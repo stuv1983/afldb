@@ -1913,14 +1913,17 @@ export async function runSettleAfltables(
       // AFLDB-ISSUE-257 F-S4-01: the recompute runs in its own savepoint with a
       // bounded retry on `40P01` only — a concurrent Match Sheet save's
       // recompute can deadlock with this one. Exhaustion or any other error
-      // still propagates and takes the whole run down, as above.
+      // still propagates and takes the whole run down, as above. AFLDB-ISSUE-261:
+      // every recompute statement goes through the attempt's savepoint-scoped
+      // `scope`, never `tx` — a recovered `40P01` raised on `tx` would still be
+      // re-thrown by `sql.begin` and roll the whole run back.
       if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0) {
         const playerIds = await affectedPlayerIds(tx, derived);
-        await runDerivedRecomputeWithDeadlockRetry(tx, async () => {
-          await recomputeSeasonMetadata(tx, bundle.season);
-          await recomputeClubSeasons(tx, bundle.season);
-          await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
-          await recomputeSeasonBrownlowStatus(tx, bundle.season);
+        await runDerivedRecomputeWithDeadlockRetry(tx, async (scope) => {
+          await recomputeSeasonMetadata(scope, bundle.season);
+          await recomputeClubSeasons(scope, bundle.season);
+          await recomputePlayerDerivedStats(scope, playerIds, bundle.season);
+          await recomputeSeasonBrownlowStatus(scope, bundle.season);
         });
         counters.derivedRecomputeRuns = 1;
         counters.derivedRecomputePlayers = playerIds.length;

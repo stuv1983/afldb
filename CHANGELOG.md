@@ -15,6 +15,30 @@ commit.
 
 ## [Unreleased]
 
+### The Data Editor score edit and match deletion bound their lock waits, and the settles' deadlock retry now recovers (AFLDB-ISSUE-261; resolved; commit pending) - 8 October 2026
+
+- `saveEdit` (match score group only) and `deleteMatch` run under `SET LOCAL lock_timeout = '5s'`, a bound on each lock
+  wait, not on the transaction. A lock timeout (`55P03`) or a deadlock victim (`40P01`) rolls the whole transaction back
+  and returns "This match is busy. Please try again shortly." (`saveEdit` applies the refusal only to that same match
+  score group; other edits keep the generic message.) An admin save made while a settle holds the same rows is
+  therefore refused after 5 s instead of waiting for the settle. `deleteMatch` returns the refusal instead of throwing.
+- Both settles' end-of-run derived recompute retry now runs each attempt through `tx.savepoint(...)` and hands the
+  scoped handle to the recompute calls (`runDerivedRecomputeWithDeadlockRetry`). Before this, a `40P01` that the retry
+  recovered from was still remembered by the outer postgres.js transaction handle and re-thrown at the end, so the
+  whole settle rolled back anyway. Four attempts, the 1 s/2 s/3 s backoff and `40P01`-only handling are unchanged.
+- **This bounds and recovers from the deadlock; it does not eliminate it.** The recompute still rewrites every affected
+  row (no changed-value guard, no player lock), and the cycle can still form. The settle's retries outlast a writer's
+  5 s bound only where one bounded writer is in one continuing contended wait and the settle's canonical locks are
+  retained across the retry rollback; that is sizing under stated assumptions, not an unconditional guarantee.
+- Validation (operator-run on `afldb_test`, 8 October 2026): combined DB-free unit run 108 passed; TypeScript check
+  passed; driver recovery 2 passed (35 filtered skips); contention 4 passed (33 filtered skips; neither deadlock case
+  skipped); post-run residue all zero, no idle transactions or lock waits. A first run failed both settle/admin
+  deadlock cases; that failure found the retry-handle defect above (`issues.md`, ISSUE-261 "Analysis of run 1").
+- Limits of that validation: a synthetic transaction stands in for the settle; the settle-as-victim shape was tested
+  (the case skips above a `deadlock_timeout` of 3 s); no full production settle, no UI rendering and no restricted
+  importer-role validation was performed.
+- Not changed: the recompute itself. The optional changed-value guard with a sorted player lock stays deferred.
+
 ### The fitzRoy Brownlow load resolves each round-vote row to its match, so a rebuild no longer leaves `match_id` NULL (AFLDB-ISSUE-263; resolved) - 8 October 2026
 
 - `import_brownlow_round_votes` (`tools/migration/import_fitzroy_core.py`) now applies migration 094's rule

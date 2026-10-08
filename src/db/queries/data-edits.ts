@@ -9,6 +9,7 @@ import {
   recomputePlayerDerivedStats,
   recomputeSeasonBrownlowStatus,
   recomputeSeasonMetadata,
+  matchBusyRefusal,
 } from '@/db/queries/player-derived';
 import { syncManualIdentityNameRecord } from '@/db/queries/player-identity';
 import {
@@ -196,6 +197,13 @@ export async function saveEdit(input: {
   let old: Record<string, FieldValue>;
   try {
     const applied = await importSql.begin(async (tx) => {
+      // AFLDB-ISSUE-261: the score edit recomputes player-derived rows and so can
+      // wait on, or deadlock with, a settle. Bound every lock wait of this
+      // transaction (not its total run time) so a loser rolls back and releases its
+      // locks. Set before the first contended statement, `readCurrent`'s FOR UPDATE.
+      if (input.entityKey === 'matches' && input.groupKey === 'score') {
+        await tx`SET LOCAL lock_timeout = '5s'`;
+      }
       const before = await readCurrent(tx, entity, group.fields, input.rowId);
       if (!before) return null;
 
@@ -266,6 +274,12 @@ export async function saveEdit(input: {
     if (applied === null) return { ok: false, error: 'No row with that id.' };
     old = applied;
   } catch (error) {
+    // 55P03 / 40P01: the whole transaction rolled back (AFLDB-ISSUE-261). Mapped only
+    // where the bound above is set (matches/score); other edits keep the generic message.
+    if (input.entityKey === 'matches' && input.groupKey === 'score') {
+      const busy = matchBusyRefusal(error);
+      if (busy) return { ok: false, error: busy };
+    }
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The edit could not be applied: ${message}` };
   } finally {

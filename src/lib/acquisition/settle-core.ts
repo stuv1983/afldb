@@ -229,7 +229,26 @@ export const DEADLOCK_DETECTED_SQLSTATE = '40P01';
  * after the settle loses a deadlock, the writer is still waiting on row locks
  * the settle's units took BEFORE this savepoint, so by the last attempt that
  * writer has timed out (its "settle running" refusal) and released its rows.
- * `tests/match-sheet.test.ts` pins the relationship.
+ * AFLDB-ISSUE-261: the Data Editor score edit (`data-edits.ts`) and `deleteMatch`
+ * (`match-admin.ts`) carry the same 5 s bound and are covered by the same sizing.
+ *
+ * This is sizing under stated assumptions, NOT an unconditional recovery guarantee.
+ * The retries can only rescue the settle when all of these hold:
+ *   1. ONE bounded writer: the other side of the cycle is a single admin writer that
+ *      carries the 5 s `lock_timeout` (not several writers, and not an unbounded one).
+ *   2. ONE continuing contended wait: that writer is blocked on a single lock wait that
+ *      began no later than the settle's first failure, so its 5 s bound expires inside
+ *      the 6 s of pauses and it then releases its rows. A writer that starts a fresh
+ *      wait, or a second writer, restarts the clock.
+ *   3. The settle's canonical row locks, taken before this savepoint, are RETAINED
+ *      across the retry rollback (see below); the retry never frees them, so it
+ *      depends on the writer being the one to give way.
+ * Measured boundary (`tests/integration/data-editor.test.ts`): the deadlock case where
+ * the SETTLE is the victim is exercised only with `deadlock_timeout` <= 3 s and is
+ * skipped otherwise; the case where the writer is the victim is not choreographed.
+ * Nothing here is claimed for a larger `deadlock_timeout`. A `40P01` still unabsorbed
+ * on the last attempt propagates and rolls the whole settle back (the next run retries).
+ * `tests/match-sheet.test.ts` pins only the arithmetic: the pause sum exceeds the 5 s bound.
  */
 export const DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS: readonly number[] = [1000, 2000, 3000];
 
@@ -239,24 +258,45 @@ export function isDeadlockDetected(error: unknown): boolean {
     && (error as { code?: unknown }).code === DEADLOCK_DETECTED_SQLSTATE;
 }
 
-/** The statements the retry issues; the tagged-template subset of `TransactionSql` it needs. */
-export type SavepointTx = (strings: TemplateStringsArray, ...values: never[]) => PromiseLike<unknown>;
+/** The handle `work` receives: the driver's savepoint-scoped transaction handle. */
+export type RecomputeScope = import('postgres').TransactionSql;
 
 /**
- * Runs the settle's end-of-run derived recompute inside a named savepoint and
- * retries it, after a pause, ONLY when PostgreSQL chose it as a deadlock
- * victim (`40P01`). Each failed attempt is rolled back to its savepoint before
- * the next, so a retry never stacks on half-written derived rows. Any other
- * error, or a `40P01` on the last attempt, propagates WITHOUT being absorbed:
- * the caller's transaction aborts and the whole settle rolls back, so canonical
+ * What the retry needs of the settle's transaction: the tagged-template subset
+ * that issues the anchor statements, and the driver's `savepoint(fn)`. Method
+ * syntax keeps the driver's overloaded `savepoint` assignable.
+ */
+export interface SavepointTx {
+  (strings: TemplateStringsArray, ...values: never[]): PromiseLike<unknown>;
+  savepoint(fn: (scope: RecomputeScope) => PromiseLike<unknown>): PromiseLike<unknown>;
+}
+
+/**
+ * Runs the settle's end-of-run derived recompute inside a savepoint and retries
+ * it, after a pause, ONLY when PostgreSQL chose it as a deadlock victim
+ * (`40P01`). Each failed attempt is rolled back to its savepoint before the
+ * next, so a retry never stacks on half-written derived rows. Any other error,
+ * or a `40P01` on the last attempt, propagates WITHOUT being absorbed: the
+ * caller's transaction aborts and the whole settle rolls back, so canonical
  * writes are never committed without their derived recompute.
+ *
+ * `work` MUST issue every statement through the `scope` it is given, never
+ * through the outer `tx`. postgres.js records the first rejection of every
+ * query issued on a transaction handle and re-throws it when `sql.begin`'s
+ * callback resolves, rolling the whole transaction back, even if the caller
+ * caught that rejection and recovered with `ROLLBACK TO SAVEPOINT`. A scoped
+ * handle keeps that record inside its own savepoint, which has been rolled
+ * back, so the recovered `40P01` no longer poisons the outer transaction
+ * (AFLDB-ISSUE-261; the pattern is `canonical-apply.ts`'s unit savepoint).
+ * The fixed-name anchor is released on both paths because postgres.js does not
+ * release its own `sN` savepoint on success.
  *
  * Rolling back to the savepoint releases only the locks the recompute took;
  * the canonical row locks the run's units took before it are still held.
  */
 export async function runDerivedRecomputeWithDeadlockRetry<T>(
   tx: SavepointTx,
-  work: () => Promise<T>,
+  work: (scope: RecomputeScope) => Promise<T>,
   options: {
     backoffMs?: readonly number[];
     sleep?: (ms: number) => Promise<void>;
@@ -267,7 +307,10 @@ export async function runDerivedRecomputeWithDeadlockRetry<T>(
   for (let attempt = 1; ; attempt += 1) {
     await tx`SAVEPOINT afldb_derived_recompute`;
     try {
-      const value = await work();
+      let value!: T;
+      await tx.savepoint(async (scope) => {
+        value = await work(scope);
+      });
       await tx`RELEASE SAVEPOINT afldb_derived_recompute`;
       return { value, attempts: attempt };
     } catch (error) {

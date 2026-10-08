@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 6
+**Open issues:** 5
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 - **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
@@ -85,19 +85,6 @@
 - **Next action:**
   1. The operator reviews and commits the eighteen files in runbook §25.7 (explicit paths; not the stray files; nothing under `D:\tmp\`).
   2. `npm run merge:ready -- --issue 265`, then merge/push, `deploy/sync-dev.ps1` and DEV acceptance (runbook §18.2).
-
-### AFLDB-ISSUE-261 — Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save
-- **Severity:** Low. **Area:** data integrity / concurrency — `src/db/queries/player-derived.ts`
-  (`recomputePlayerDerivedStats`), `data-edits.ts`, `match-admin.ts`, both settles.
-- **State:** Open (2026-10-02), found in ISSUE-257 Slice 4 (F-S4-01) by code reading; pre-existing.
-  - The recompute updates every `player_match_stats` row of each affected player, with no
-    changed-value guard, so a settle and an admin writer touching one player can wait on each other.
-  - ISSUE-257 mitigates the Match Sheet case: a bounded 40P01 retry around both settles' end-of-run
-    recompute, sized to outlast the Match Sheet's 5 s `lock_timeout`.
-  - Residual: `data-edits.ts` and `match-admin.ts` set no `lock_timeout`, so the retry can exhaust
-    and roll the settle back (the next run retries). Not reproduced against a database.
-- **Next action:** decide whether to fix (changed-value guard, global `players` lock order, or a
-  `lock_timeout` on the other writers).
 
 ### AFLDB-ISSUE-260 — NL answer explanation prints internal column markers for career conditions
 - **Severity:** Low. **Area:** NL search, describe/render stage — `src/search/nl/plan.ts`

@@ -4,16 +4,27 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 6
+**Open issues:** 5
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Medium | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated; 2026-10-05 investigation (runbook §10–§15): F-265-1 AFL API attendance enrichment can lose the whole run, `match_attendance` is a third unordered writer, in-run unit retry futile in the main shapes; 2026-10-05 operator: D-265-1..12 accepted (Option 3 advisory gate incl. `match_attendance`; severity Medium); 2026-10-05 operator: D-265-5 accepted (300 s settle gate wait with a 330 s gate-statement bound; an operator judgement, PROD records cannot validate it; the D-265-13 query is context only), D-265-14 (Phase B case B11) and D-265-15 (Phase A tooling archived unchanged in `issues/open/AFLDB-ISSUE-265-phase-a/`); Phase A window 2 (2026-10-05 16:22) PASSED 3/3, census CLEAN (runbook §17.14); Phase A retired, Phase B replaces it; final plan and Phase B assertions in runbook §18–§20; S0 checkpoint committed (62f2cd67); **2026-10-05 mitigation IMPLEMENTED in the working tree, uncommitted (runbook §21): shared settle gate (300 s / 330 s), exclusive gate in the three legacy hooks, `match_attendance` ascending hook, database-free pins, Phase B harness B1–B11; Phase B PASSED 11/11 (2026-10-05, runbook §23); regression window FAILED twice on test-teardown residue, cause fixed (§24), then PASSED (2026-10-06, §25.1); build PASSED (2026-10-06, §25.8: exit 0, 1,515 static pages, standalone ready, census CLEAN, two warnings recorded and not claimed pre-existing); commit, deployment and DEV acceptance pending** | Operator reviews and commits the eighteen files in runbook §25.7, then `npm run merge:ready -- --issue 265`, merge/push, `deploy/sync-dev.ps1` and DEV acceptance (§18.2) |
-| AFLDB-ISSUE-261 | Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save | Low | Data integrity / concurrency — `src/db/queries/player-derived.ts` (`recomputePlayerDerivedStats`), `data-edits.ts`, `match-admin.ts`, both settles | Open (2026-10-02); found in ISSUE-257 Slice 4 (F-S4-01) by code reading; pre-existing; the recompute updates every `player_match_stats` row of each affected player with no changed-value guard, so a settle and an admin writer can wait on each other's rows; ISSUE-257 added a bounded 40P01 retry around the settles' end-of-run recompute and a 5 s Match Sheet `lock_timeout`; residual: `data-edits.ts`/`match-admin.ts` set no `lock_timeout`, so the retry can exhaust and roll the settle back; not reproduced | Decide whether to fix (changed-value guard, global `players` lock order, or `lock_timeout` on the other writers) |
 | AFLDB-ISSUE-260 | NL answer explanation prints internal column markers for career conditions | Low | NL search, describe/render stage — `src/search/nl/plan.ts` (`describePlan`) | Open (2026-10-02); code review F-004 (`playbooks/issue.md`); a career column condition is labelled with the compiler's SQL marker ("Condition: c.premierships exactly 0."); results unaffected; confirmed DB-free; operator decision 2026-10-02 (after the review): approved for implementation, reader-facing labels only, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-260.md` | Implement in the same focused NL session as AFLDB-ISSUE-259 unless evidence shows they should be separated |
 | AFLDB-ISSUE-259 | NL club-scoped career rankings accept a career condition that is evaluated across the whole career | Low | NL search, validate stage — `src/search/nl/plan.ts` (`validatePlan`), `src/db/queries/nl/player-career.ts` | Open (2026-10-02); code review F-003 (`playbooks/issue.md`); the club-scope guard tests conditions only for unranked plans, so a ranked club-scoped plan with a non-games condition validates while its unranked form is refused; confirmed DB-free through the parser and validator, SQL read not run; operator decision 2026-10-02 (after the review) D-259-1: fail closed — decline when a condition cannot be evaluated at club scope, never reinterpret it as whole-career, add no per-club compiler capability, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-259.md` | One focused NL session with AFLDB-ISSUE-260; check the corpora there for rows of this shape that expect an answer |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
+
+**AFLDB-ISSUE-261 resolved 2026-10-08** (implementation uncommitted at resolution, worktree
+`afldb-issue-261`; operator-run validation on `afldb_test`). Resolved as **bounded admin lock waits plus corrected
+savepoint-scoped settle retries; deadlocks are not eliminated.** The Data Editor score edit and `deleteMatch` now run
+under a 5 s `lock_timeout` and refuse with "This match is busy. Please try again shortly."; the settles' end-of-run
+retry now runs each attempt through `tx.savepoint`, so a recovered `40P01` no longer rolls the whole settle back
+(validation run 1 failed on exactly that). Final operator-run results: combined unit run 108 passed; `tsc` passed;
+driver recovery 2 passed (35 filtered skips); contention 4 passed (33 filtered skips, neither deadlock case skipped);
+post-run residue all zero, no idle transactions or lock waits. Limits: a synthetic transaction stands in for the
+settle; the settle-as-victim shape was tested; no full production settle, no UI rendering and no restricted
+importer-role validation was performed. The optional recompute optimisation (Slice 2) stays deferred. Removed from
+`IssuesIndex.md` and the Open Issues table. Full record: the entry in this file.
 
 **AFLDB-ISSUE-262 resolved 2026-10-08** (test-only correction, uncommitted at resolution, worktree
 `afldb-issue-262`; operator-run DB-free validation). The `reference-data` guard's exact list of post-045
@@ -47458,8 +47469,9 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-261 — Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save
 
-- **Status:** Open (2026-10-02). **Severity:** Low. **Area:** data integrity / concurrency, settle
-  versus admin writers. Key files:
+- **Status:** **Resolved (2026-10-08)** (opened 2026-10-02; see "Resolution (2026-10-08)" at the end of this entry,
+  which supersedes the open-state wording below, preserved as history). **Severity:** Low. **Area:** data integrity /
+  concurrency, settle versus admin writers. Key files:
   - `src/db/queries/player-derived.ts` (`recomputePlayerDerivedStats`, lines 32-66);
   - `src/db/queries/data-edits.ts` (recompute at :451), `src/db/queries/match-admin.ts` (:640),
     `src/db/queries/match-sheet.ts`;
@@ -47493,6 +47505,510 @@ retained behaviour under `Unreleased`.
   career_game_no IS DISTINCT FROM ordered.game_number` guard, a `players … ORDER BY id FOR UPDATE`
   taken before any `player_match_stats` row lock on every side, or a `lock_timeout` on the other admin
   writers. Nothing implemented.
+- **Investigation (2026-10-08, Sonnet 5.5; code reading only).** No shell, Git, SQL or test command was
+  run, so **nothing below is database-reproduced**. Each claim is labelled CODE (read in the tree) or
+  INFERRED (PostgreSQL semantics applied to the code). Inspected: `player-derived.ts` (whole file),
+  `data-edits.ts` :255-467, `match-admin.ts` :405-675, `match-sheet.ts` :125-370 (and the lock/recompute
+  sites at :582-662), `settle-core.ts` :185-377, `settle-afltables.ts` :1835-1965,
+  `settle-afl-api.ts` :1935-2004, `canonical-apply.ts` :466-506, migrations 007/015 (keys only), and
+  the test homes named below. No design change is made; the runtime is untouched.
+  - **Lock footprint of one recompute (CODE).** `recomputePlayerDerivedStats(tx, ids, season)` runs, in
+    order: (1) `UPDATE player_match_stats` of EVERY row of every id, all seasons, with no `WHERE` on the
+    value; (2) `DELETE`+`INSERT` `player_clubs`; (3) the same for `player_club_season_stats` and
+    `player_season_stats` (that season only); (4) `DELETE`+`INSERT` `player_career_stats`; (5)
+    `UPDATE players` (`debut_season`, `final_season`), then (6) `UPDATE players SET search_rank`.
+    No statement orders its rows (the `pms` `UPDATE ... FROM (window subquery)` is visited in plan order),
+    and no `ids` ordering is applied. Row locks are held to commit.
+  - **What each writer holds BEFORE its recompute (CODE).**
+
+    | Writer | Held before the recompute | Own wait bound |
+    |---|---|---|
+    | Match Sheet save (`match-sheet.ts`) | `matches` row `FOR UPDATE`, then every `pms` row of that match `FOR UPDATE ORDER BY player_id`; calls `recomputePlayerDerivedStats` only (no seasons/club_seasons/Brownlow recompute) | `lock_timeout = 5s`; 55P03/40P01 map to the retryable "settle running" refusal |
+    | Data Editor, `matches`/`score` (`data-edits.ts:413-452`) | `matches` row `FOR UPDATE` (`readCurrent`), `UPDATE matches`, period scores, then `UPDATE seasons` (`recomputeSeasonMetadata`) and the season's whole `club_seasons` delete/insert | **none** |
+    | `deleteMatch` (`match-admin.ts:412-657`) | `matches` row `FOR UPDATE`, `DELETE` of its `pms` rows, the `matches` row, then `seasons` and `club_seasons` as above | **none** |
+    | Settle unit (`canonical-apply.ts:490-506`) | `matches` row `FOR SHARE` (or `FOR UPDATE ORDER BY id` on a rekey), plus whatever `pms` rows the unit INSERTed or UPDATEd; each unit is in a savepoint | gate only (below) |
+    | Settle end of run (both settles) | everything the units still hold (they are outside the retry savepoint) | none |
+
+    The three recompute-calling admin writers and both settles all update the `seasons` row FIRST
+    (`recomputeSeasonMetadata`), so for one season they queue on that row before touching any `pms` row
+    (INFERRED: row-lock semantics). The Match Sheet does not, and a recompute reaches every season of
+    the player's career, so two different-season writers do not queue on it.
+  - **Concrete deadlock sequence A, settle vs Data Editor score edit or `deleteMatch` (CODE + INFERRED;
+    the one the retry cannot fix).** Needs a settle that UPDATEd an existing `pms` row of player P in a
+    season-s match A (a real statistic correction, counted in `canonicalRowsUpdated`), and an admin
+    edit of another season-s match M that P also played.
+    1. Settle unit on A: `UPDATE player_match_stats` (P, A). The settle holds that row row-lock to commit.
+    2. Data Editor, match M: locks M, `UPDATE seasons` s, rewrites `club_seasons`; its recompute's
+       `pms` `UPDATE` reaches (P, A) and WAITS on the settle. No `lock_timeout`, so it waits for the
+       rest of the settle run.
+    3. Settle end of run, inside the savepoint: `recomputeSeasonMetadata` `UPDATE seasons` s WAITS on
+       the Data Editor. Cycle.
+    4. PostgreSQL checks once per wait after `deadlock_timeout` (default 1 s; not verified here). **When
+       the Data Editor's check ran before the cycle closed, the settle's own check is the first to find
+       the cycle and the settle is the victim (`40P01`).** *(Corrected 2026-10-08, D-261-4: this entry
+       first said the settle is the victim "deterministically". That held only for this ordering. If the
+       settle's wait starts within `deadlock_timeout` of the writer's, the writer's check finds the cycle
+       and the WRITER is the victim; victim selection is timing-dependent and is not assumed anywhere.)*
+    5. `ROLLBACK TO SAVEPOINT` releases only what the recompute took. (P, A) and every other unit lock
+       stay held, so the Data Editor is still blocked and the next attempt waits on the `seasons` row
+       again. **With no bound on the Data Editor** the Data Editor's one check has passed, so every
+       attempt's own check finds the same cycle: four attempts (1 + three retries, sleeps 1 s/2 s/3 s)
+       all lose, the `40P01` propagates, and the settle rolls back whole. The Data Editor then commits.
+  - **Concrete sequence B, settle end-of-run vs Match Sheet (CODE + INFERRED; the F-S4-01 case).** The
+    Match Sheet holds (P, B) from its own `FOR UPDATE`. The settle's recompute locks P's other rows and
+    blocks on (P, B); the Match Sheet's recompute blocks on a row the settle holds. It needs no plan
+    order assumption beyond "(P, B) is not the first row the settle visits". Whichever backend's
+    deadlock check fires first is the victim. If the settle loses and holds no unit-UPDATEd row of P,
+    the savepoint rollback frees what the sheet needs, so the retry succeeds. If it does hold one, the
+    sheet times out at 5 s and the settle's fourth attempt (after at least 6 s of sleeps plus a
+    detection wait per attempt) runs against nothing. This is the sizing ISSUE-257 pinned.
+  - **Sequence C, mid-run (CODE).** A settle unit wanting match B's lock `FOR SHARE` while an admin
+    writer holds B and waits for a `pms` row the settle UPDATEd. The settle unit is the victim and
+    rolls back to its unit savepoint (a `canonical_apply_failed` finding, retried next run), which also
+    releases the contended row. Contained. An admin victim surfaces as a generic error.
+  - **Where the existing retry begins and ends (CODE).** `runDerivedRecomputeWithDeadlockRetry`
+    (`settle-core.ts:257-280`) wraps exactly the four-call block: `recomputeSeasonMetadata`,
+    `recomputeClubSeasons`, `recomputePlayerDerivedStats`, `recomputeSeasonBrownlowStatus`
+    (`settle-afltables.ts:1919-1924`, `settle-afl-api.ts:1968-1973`). `SAVEPOINT` per attempt, `40P01`
+    only, rollback to the savepoint, sleep, retry; a `40P01` on the fourth attempt, or any other error,
+    propagates. It sits inside the settle's single `sql.begin`, so exhaustion rolls back the canonical
+    writes, the derived rows and the `import_batches` row together (the AFL Tables catch re-throws
+    anything but the dry-run rollback, `:1960-1961`; the AFL API catch was not separately inspected).
+    The next run re-derives and retries. Nothing is half-committed.
+  - **Match Sheet `lock_timeout = 5s` (CODE).** `SET LOCAL lock_timeout = '5s'` (`match-sheet.ts:138`,
+    `:582`) bounds each lock wait of the sheet. It is what makes the settle's 6 s of backoff sleeps
+    sufficient against the sheet, and is pinned in `tests/match-sheet.test.ts:547-552`. It does nothing
+    for `data-edits.ts` or `match-admin.ts`: `grep` finds no `lock_timeout`, `40P01` or `55P03` in
+    either file.
+  - **Does the ISSUE-265 gate cover these writers? No (CODE).** `SETTLE_PROMOTION_GATE` (class 717275,
+    key 4) is taken SHARED by both settles (`settle-afltables.ts:1839`, `settle-afl-api.ts:1909`) and
+    EXCLUSIVE by the three legacy promotions (`datasets.ts:598`). No admin writer takes it. Settles take
+    it shared, so taking it shared would not exclude them; taking it exclusive would block admin saves
+    for a whole settle run. The legacy promotions never call `recomputePlayerDerivedStats` (grep), so
+    ISSUE-265 neither fixes nor worsens this issue.
+  - **Which recompute statements write unchanged values (CODE).** (1) `pms.career_game_no`: every row of
+    every affected player, in every season. The value changes only when a player's match membership or
+    date order changes: a back-dated insert, `deleteMatch`, a Match Sheet add/remove. It is identical on a
+    Data Editor score edit, a Match Sheet statistics-only save and a settle recompute over players
+    already numbered. (2) `UPDATE players` (`debut_season`, `final_season`, `search_rank`) per player,
+    unconditional. (3) `player_clubs`, `player_club_season_stats`, `player_season_stats` and
+    `player_career_stats` are DELETEd and re-INSERTed, so they are rewritten even when equal. (4) Season
+    scope: `seasons` metadata `UPDATE`, `club_seasons` delete/insert, and
+    `recomputeSeasonBrownlowStatus` (`UPDATE` of EVERY `player_season_stats` row of the season,
+    unconditional). Each of these takes a row lock and leaves a dead tuple.
+  - **KEY FINDING, against a guard-only fix (INFERRED; predicted, not reproduced).** The unconditional
+    `pms` `UPDATE` is today an accidental per-player mutex: two recomputes for one player queue on its
+    first `pms` row until the first commits, and READ COMMITTED then gives the second a fresh snapshot
+    for the DELETE/INSERT statements. `player_clubs` is keyed `(player_id, club_id)`, `player_career_stats`
+    `(player_id)`, `player_season_stats` `(player_id, season)`. If a `IS DISTINCT FROM` guard removes the
+    `pms` lock in the unchanged case, two overlapping recomputes for one player reach the DELETE/INSERT
+    pairs with no mutex: the second DELETE skips rows the first deleted (its snapshot predates the
+    first's INSERTs), then its INSERT collides with the first's committed rows, `23505`. The retry
+    helper pins that `23505` is NEVER retried (`tests/match-sheet.test.ts:527`), so the settle would
+    roll back anyway and a Data Editor save would fail. **A guard must therefore ship with an explicit
+    per-player lock, never alone.**
+  - **Fix comparison.**
+
+    | Option | Removes sequence A | Removes B | Cost / risk |
+    |---|---|---|---|
+    | **(a) changed-value guard** on the `pms` `UPDATE` (and `players`) | Yes, when numbering is unchanged: the `UPDATE` never waits for (P, A), so step 2 does not block | Mostly (no `pms` row locked, so no cross-hold) | Loses the accidental mutex (above). Does not touch the DELETE/INSERT pairs or the season-wide statements. Cycles remain when numbering really changes (`deleteMatch`, back-dated insert). Cheap to write, easy to get wrong alone. |
+    | **(b) lock order**: `SELECT ... FROM players WHERE id = ANY(ids) ORDER BY id FOR NO KEY UPDATE` first in the recompute | No: the Data Editor takes P's player lock but still waits on (P, A), and the settle still waits on `seasons` | No: the Match Sheet already holds (P, B) before it takes the player lock | Gives the explicit mutex and a sorted multi-player order (precedent: `lockUnitMatchRows`, Match Sheet `ORDER BY ... FOR UPDATE`). `NO KEY UPDATE` is compatible with the FK key-share a `pms` INSERT takes on `players`, so settle inserts do not block. As an ORDER on its own it is insufficient: the locks that matter are taken earlier by the callers. A full order (player locks before `matches`/`pms` locks, in the settle units too) is a much larger change and is not recommended. |
+    | **(c) bounded wait**: `SET LOCAL lock_timeout = '5s'` in the Data Editor score path and `deleteMatch`, 55P03/40P01 mapped to a retryable refusal | No, the cycle still forms | No change (already bounded) | Smallest; mirrors `match-sheet.ts` and `settle-core.ts`'s pinned sizing. Turns the futile settle rollback into an admin refusal at 5 s: the settle's fourth attempt then runs against nothing. Behaviour change: an admin save made while a settle holds its rows is refused after 5 s instead of waiting for the settle (minutes) or deadlocking. The deadlock still happens and is still logged. |
+    | (a)+(b) | Yes in the common unchanged case | Yes | Real structural fix; touches the core recompute used by every writer, so it needs the `derived-rebuild-parity` proof and its own runbook. |
+
+  - **Recommendation.** **Slice 1 = option (c)**, because it is the only option that deterministically
+    closes the stated residual (settle rolled back by a futile retry) without touching the recompute.
+    **Slice 2 = (a)+(b) together, optional**, only if the write amplification (every row of every
+    affected player rewritten on each save) is itself worth removing; never (a) alone. Severity stays
+    Low: sequence A needs a settle that UPDATEs an existing `pms` row of a player and a concurrent
+    unbounded-wait admin save for the same season; its worst outcome is one lost settle run that the next
+    run redoes. Whether either ever occurred is unknown; `pg_stat_database.deadlocks` answers it cheaply
+    (operator-run, read-only, below).
+  - **Regression design (synthetic fixtures; exact cleanup; reuse the closest suites).**
+    1. DB-free, `tests/match-sheet.test.ts` (it already holds the retry, the 5 s pin and the source-text
+       pins at :547-572 and :912-919): pin that the `data-edits.ts` score path and `match-admin.ts`
+       `deleteMatch` set `SET LOCAL lock_timeout = '5s'` before their first lock, and map `55P03`/`40P01`
+       to the retryable refusal; generalise the "backoff outlasts lock_timeout" pin over all three
+       writers.
+    2. DB-backed contention witness, a new `describe` in `tests/integration/data-editor.test.ts` (it
+       already owns a committed synthetic-season fixture, `SEASON_257 = 2079`, with prefix-keyed
+       cleanup at :185-222 and a residue count at :250-257; copy that shape with an `issue261` prefix
+       and its own unused season, candidates 2080/2081/2083, to be re-checked against `tests/` before
+       use). One player P, two matches A and B in that season, P in both. Sequence: connection S
+       `BEGIN`, `UPDATE player_match_stats` (P, A); the real `applyDataEdit` score edit of B starts and
+       is polled via `pg_locks`/`pg_stat_activity` until it is waiting (the helper pattern is in
+       `tests/integration/settle-promotion-deadlock.test.ts:508-660`, copied, not imported); S then runs
+       the real four-call block through the real `runDerivedRecomputeWithDeadlockRetry` with the real
+       backoff. No sleeps for sequencing. Today (red witness): S rejects `40P01` after four attempts and
+       the Data Editor commits once S rolls back. After Slice 1: the Data Editor ends with the retryable
+       refusal at about 5 s and S commits on a later attempt. After Slice 2: the Data Editor never
+       waits. It reads `SHOW deadlock_timeout` first and states it. ~10 s runtime, needs `AFLDB_TEST_DATABASE_URL`
+       on an `_test` database. Cleanup is exact by prefix; the afterAll asserts zero residue.
+    3. Slice 2 only, `tests/integration/derived-rebuild-parity.test.ts` (rolled-back transaction, season
+       2082): after one recompute, capture `ctid` of the fixture players' `pms` and `players` rows, run a
+       second recompute, assert the `ctid` sets are identical (no row rewritten) and that the existing
+       parity comparison still holds; plus two committed overlapping recomputes for one player must both
+       succeed (the 23505 guard-only hazard).
+  - **Decisions needed from the operator.** D-261-1: fix scope (recommended: Slice 1 now; Slice 2 deferred
+    to its own runbook; or accept and close as Low). D-261-2: scope of the 5 s bound (score group and
+    `deleteMatch` only, recommended; or the whole Data Editor transaction) and the refusal wording
+    (reuse the Match Sheet "settle running" text or a neutral "another save or settle is running, retry").
+    D-261-3: approval for a ~10 s contention test and its reserved season. D-261-4: whether to run the
+    read-only `deadlock_timeout` and `pg_stat_database.deadlocks` check on DEV/PROD first.
+  - **Optional operator evidence (read-only):** `SHOW deadlock_timeout;` and
+    `SELECT datname, deadlocks, stats_reset FROM pg_stat_database WHERE datname IN ('afldb_dev','afldb_prod');`
+    A non-zero count is cluster-wide, not specific to this cause; the PostgreSQL log lines
+    `deadlock detected` name the relations.
+  - *(Superseded by the 2026-10-08 decisions and Slice 1 implementation below.)*
+
+- **Operator decisions (2026-10-08).**
+  - **D-261-1.** Implement Slice 1. The optional recompute optimisation (changed-value guard, sorted
+    `players` lock) is deferred; no guard and no player lock in this issue.
+  - **D-261-2.** `SET LOCAL lock_timeout = '5s'` on the Data Editor score transaction and the `deleteMatch`
+    transaction, before the first contended write; atomic rollback preserved; `55P03` and `40P01` map to
+    the retryable refusal "This match is busy. Please try again shortly." The bound is per lock wait,
+    not a five-second transaction deadline, and is not described as one.
+  - **D-261-3.** Prepare the synthetic contention regression in the closest existing integration suite,
+    on a collision-checked season, exercising the real admin mutations, covering both writers, proving the
+    refusal releases the blocking locks and leaves no partial change, and labelling a basic lock-timeout
+    case apart from the settle/admin deadlock reproduction.
+  - **D-261-4.** Skip the optional cluster-wide `pg_stat_database.deadlocks` check; it cannot establish
+    this issue's cause. Correct the "victim every time" claim.
+- **Reassessment: does the bound let the settle recover whichever transaction detects the cycle?
+  (2026-10-08, INFERRED from the code and PostgreSQL's lock semantics; the integration case below is the
+  DB-backed check and has not been run.)** No contradiction was found that blocks implementation. The
+  investigation's "victim every time" was a conditional result stated as a rule (corrected in place above).
+  Let `T_W` be the instant the writer's wait on the settle's row begins, `T_S` the instant the settle's
+  wait on the writer's row begins, and `d` = `deadlock_timeout`. The cycle exists from `max(T_W, T_S)`.
+  Each wait runs ONE deadlock check, `d` after its own start, and the backend whose check first sees the
+  cycle is the victim. With E the earlier waiter and L the later one: if `T_L < T_E + d`, E's check sees
+  the cycle and **E is the victim**; otherwise E's check passed with no cycle and **L is the victim**. Either
+  party can therefore be the victim, in either role:
+  - **Writer is the victim** (the writer waited first and the settle joined within `d`, or the settle waited
+    first and the writer joined more than `d` later): the writer gets `40P01`, rolls back whole (its bound
+    is irrelevant), releases its rows; the settle proceeds unretried. The admin sees the same refusal.
+    Recovery does not depend on the bound.
+  - **Settle is the victim** (the writer waited first and the settle joined more than `d` later, or the
+    settle waited first and the writer joined within `d`): the savepoint rollback
+    frees nothing the writer waits for, so each retry's own check finds the same cycle until the writer
+    leaves. The writer leaves at `T_W + 5 s` at the latest (`55P03`, whole transaction rolled back, locks
+    released), and the settle's first failure is at or after `max(T_W, T_S) >= T_W`. The retries span
+    `1 + 2 + 3 = 6 s` of pauses after that first failure, so the last attempt starts after `T_W + 6 s >
+    T_W + 5 s`: **the settle's retries outlast the writer's bound, for any `d` and any `T_S`, under the
+    assumptions listed in the 2026-10-08 review correction below** (one bounded writer, one continuing
+    contended wait, the settle's canonical locks retained across the retry rollback). That is a sizing
+    argument, not an unconditional recovery guarantee. This is the sizing ISSUE-257 pinned for the Match
+    Sheet, extended to two more writers; `tests/match-sheet.test.ts` pins only the arithmetic DB-free.
+  - **Residual limits (not contradictions).** (1) The bound does not stop a writer that has just been
+    refused being re-submitted at once into a still-running settle; each such attempt is itself bounded and
+    the settle has no new wait to lose to it unless it re-enters the cycle, which the retries can absorb
+    only up to their 6 s. (2) A second, different bounded writer in the same cycle does not change the
+    arithmetic (each leaves within 5 s). (3) A non-deadlock wait is now also cut at 5 s: an admin save made
+    while a settle holds its rows is refused after 5 s instead of waiting for the whole settle run, by
+    design (D-261-2). (4) `deadlock_timeout` and the PostgreSQL version of DEV/PROD were not read.
+- **Slice 1 implementation (2026-10-08, uncommitted; no command was run).**
+  - `src/db/queries/player-derived.ts`: `MATCH_BUSY_REFUSAL` ("This match is busy. Please try again
+    shortly.") and `matchBusyRefusal(error)` (classification only; `55P03`/`40P01` -> the text, everything
+    else -> `null`).
+  - `src/db/queries/data-edits.ts` `saveEdit`: `SET LOCAL lock_timeout = '5s'` as the first statement of
+    the transaction, only for `matches`/`score` (the group that recomputes player-derived rows; other
+    groups and player edits are unchanged). The catch returns the refusal unprefixed, and (review
+    correction, 2026-10-08) maps it only for `matches`/`score`, the same scope as the bound; every other
+    entity/group keeps the generic "The edit could not be applied: ..." handling.
+  - `src/db/queries/match-admin.ts` `deleteMatch`: `SET LOCAL lock_timeout = '5s'` before the first
+    `FOR UPDATE`. The catch now RETURNS `{ ok: false, error: MATCH_BUSY_REFUSAL }` before the existing
+    `23503` fallback. Previously every non-`23503` error was rethrown and `deleteMatchAction` has no
+    `try/catch`, so a lock error would have surfaced as an opaque Server Action failure.
+  - **UI path (CODE).** `saveDataEdit` returns `{ error: result.error }` and `EditorForm.tsx:93` renders
+    `state.error`; `deleteMatchAction` returns `{ error: result.error }` and `DeleteMatchButton.tsx:68-72`
+    renders `state.error`. Neither form is cleared by the error, so the admin can resubmit. Pinned
+    DB-free; a rendered-UI check was not run.
+  - `src/lib/acquisition/settle-core.ts`: comment only (sizing now covers all three writers).
+  - `tests/match-sheet.test.ts` (extends "F-S4-01 deadlock handling"): backoff total exceeds EVERY
+    writer's `lock_timeout` (parsed from source, three files); exact refusal text and the `55P03`/`40P01`
+    -only mapping; source-order pins for both writers (bound before the first lock; refusal mapped before
+    the `23503` fallback / generic message); the action-to-form pass-through.
+  - `tests/integration/data-editor.test.ts` (new `describe` at the end): season **2080**, key prefix
+    `2080|issue261-`, slug `issue261-`, note `issue-261 contention`, per-case seed, `afterEach` and
+    `afterAll` cleanup, residue assertion. **Season check:** 2083 is NOT used (the rolled-back fixture of
+    "Targeted club_seasons rebuild" in the same file, `data-editor.test.ts:~897-902`); 2079 is ISSUE-257's.
+    Searched `tests/`, `src/`, `tools/` and `deploy/` for 2074-2076, 2080 and 2081: no code reference.
+    Non-code hits only (`tests/fixtures/oracle_baseline.json` year lists, one number in
+    `tests/fixtures/gridley/corpus.json`), neither a seasons-table claim. `beforeAll` asserts that
+    `seasons`/`matches` hold nothing for 2080 before it seeds.
+    - **Evidence labels.** For BOTH writers (`describe.each`): (a) **BASIC LOCK TIMEOUT**, no cycle:
+      a holder keeps one `player_match_stats` row lock, the real writer waits, is refused at >= 4.5 s with
+      the exact text, `stateOf261` (match row, period scores, stat rows, audit and override counts, ladder)
+      is unchanged, and the holder then takes `matches`, `seasons` and `club_seasons` locks with `NOWAIT`
+      and runs the settle's real four-call block at once. (b) **SETTLE/ADMIN DEADLOCK** (sequence A):
+      the holder is a TEST TRANSACTION standing in for a settle (not the full settle), running the real
+      block through the real `runDerivedRecomputeWithDeadlockRetry` and real backoff, started only after
+      the writer's wait exceeds `deadlock_timeout + 500 ms` so the settle is the victim; asserts the
+      settle needed >= 2 attempts and committed, the writer was refused at >= 4.5 s, and nothing partial
+      remains. Skipped with a warning if `deadlock_timeout` > 3 s. The "writer is the victim" ordering is
+      not choreographed (timing-dependent) and has no case.
+    - **Red/green expectation (reasoned, not run).** Without Slice 1, case (a) hangs (the writer waits
+      for the holder) and is cut by the 20 s guard; case (b) ends with the settle's `40P01` after four
+      attempts. Neither has been observed.
+    - Needs `AFLDB_TEST_DATABASE_URL` on an `_test` database with `pg_locks.waitstart` (PostgreSQL 14+;
+      already relied on by `settle-promotion-deadlock.test.ts`). About 6 s per (a) and 8 s per (b), x2.
+- **Process note.** One read-only shell command (`wc -l` on the test file) was run by mistake in this
+  session before native tools were used again, contrary to CLAUDE.md §9. It changed nothing. No other
+  shell, Git, SQL or test command was run.
+- **Verification (operator-run; nothing run yet).** In order:
+  1. `npx vitest run tests/match-sheet.test.ts tests/admin-match-mutations.test.ts` (DB-free).
+  2. `npx tsc --noEmit -p .` (the new tests and helpers are type-checked only by this).
+  3. With `AFLDB_TEST_DATABASE_URL` set to the `_test` database:
+     `npx vitest run tests/integration/data-editor.test.ts -t "AFLDB-ISSUE-261"`.
+  Expected: the first two pass; step 3 runs 4 cases (2 per writer, ~30 s) and ends with residue zero.
+  Report any failure with the vitest output; do not weaken an assertion to pass.
+- **Status: Open, Low. Slice 1 implemented, unvalidated.** Closing needs the three commands above to pass,
+  then the operator's commit, and DEV acceptance is not required for a timeout bound on admin saves unless
+  the operator asks. Slice 2 (guard + sorted player lock) remains deferred and unscheduled.
+- **Validation run 1 (2026-10-08, operator-run): FAILED.** Recorded as reported; nothing above is replaced.
+  - Reported: DB-free suites 107 passed; `tsc` passed; integration: both BASIC LOCK TIMEOUT cases passed
+    (Data Editor score edit, `deleteMatch`); **both SETTLE/ADMIN DEADLOCK cases failed** with
+    `PostgresError: deadlock detected` (`40P01`) at `recomputeSeasonMetadata`, `player-derived.ts:538`.
+    The full vitest output was not pasted: per-case durations, the full stack, the `deadlock_timeout` in
+    force and the post-run residue were NOT seen.
+  - **This supersedes the "Status" bullet above: Open, Low. Slice 1 implemented; validation run 1 failed.**
+    The "Red/green expectation" above ("`40P01` after four attempts") is not what the code predicts; see
+    the analysis. Only the BASIC cases are green evidence; the SETTLE/ADMIN DEADLOCK cases are red.
+- **Analysis of run 1 (2026-10-08, Sonnet 5.5; code reading only; no shell, Git, SQL or test command run).**
+  Labels: CODE = read in the tree or `node_modules`; INFERRED = PostgreSQL/driver semantics applied to CODE;
+  NOT VERIFIED = needs the operator's evidence.
+  - **Which transaction (CODE + INFERRED).** The holder: `postgres(AFLDB_TEST_DATABASE_URL, { max: 1 })` +
+    `holder.begin` in `withHeldPlayerRow261` (`data-editor.test.ts` :2041-2059), whose first statement in
+    `settleBlock261` is `recomputeSeasonMetadata`. A writer victim cannot surface as a thrown error:
+    `saveEdit` and `deleteMatch` map `40P01` to `{ ok: false, error: MATCH_BUSY_REFUSAL }`. The fixture seed
+    (`seedFixture261`, :1906) also calls `recomputeSeasonMetadata`, but in its own transaction with no
+    concurrent writer, so no cycle can form there. Which ATTEMPT is NOT VERIFIED from the reported line.
+  - **Root cause candidate (CODE; proven for the driver, not yet observed in this run).**
+    `runDerivedRecomputeWithDeadlockRetry` (`settle-core.ts` :262-285) issues a raw `SAVEPOINT` and runs
+    `work()`, which closes over the OUTER `tx`. postgres.js 3.4.9 `begin` (`node_modules/postgres/src/index.js`
+    :291-296, `handler`) attaches `q.catch(e => uncaughtError || (uncaughtError = e))` to EVERY query issued on
+    a transaction handle, and `scope` (:265-266) does `if (uncaughtError) throw uncaughtError` after the
+    callback RESOLVES, then rolls the whole transaction back (:267-272). `Query.handle` (`query.js` :139-140)
+    calls that handler for each executed query regardless of whether the caller later catches the rejection.
+    So a `40P01` that the helper catches, rolls back to its savepoint and recovers from is still rethrown at
+    the end of `sql.begin`, and the whole transaction rolls back. The error's stack is the originating query
+    (`recomputeSeasonMetadata`, :538), which is exactly what was reported. The same defect applies to BOTH
+    production settles (`settle-afltables.ts` :1919, `settle-afl-api.ts` :1968), which call the helper inside
+    `sql.begin`. The helper's unit tests (`match-sheet.test.ts` :478-546) use a mock `tx` that has no
+    `uncaughtError` behaviour, so they cannot see this.
+  - **The repository already uses the correct idiom elsewhere (CODE).** `canonical-apply.ts` :1004-1274 takes a
+    raw anchor `SAVEPOINT`, but issues every statement through `tx.savepoint(async (scope) => ...)`'s `scope`
+    handle. Errors raised on `scope` are recorded in the nested scope's own `uncaughtError`, which that scope
+    rolls back and rethrows, so the outer transaction stays clean.
+  - **Savepoint rollback, SQLSTATE extraction, retry count (CODE).** `PostgresError.code` is the SQLSTATE
+    string, so `isDeadlockDetected` matches. `ROLLBACK TO` + `RELEASE` run before the sleep. Four attempts
+    (`attempt > backoff.length` throws on the 4th). Non-`40P01` errors and an exhausted `40P01` propagate
+    unabsorbed. None of this is the fault; the fault is what the driver does after the helper has recovered.
+  - **Timeline (INFERRED; `deadlock_timeout` dt NOT VERIFIED, but the case ran, so dt <= 3 s). W = the writer
+    began waiting on the holder's row; its `lock_timeout` expires at W + 5 s and its rollback follows at once.**
+    The test starts the holder's conflict after the writer has waited dt + 0.5 s (+ <= 25 ms poll), at
+    H ~ W + dt + 0.5. The holder's own check runs at H + dt and finds the cycle (the writer's single check,
+    at W + dt, already passed). With dt = 1 s: attempt 1 is the victim at ~W + 2.5 s; sleep 1 s; attempt 2
+    starts ~W + 3.5 s and is the victim at ~W + 4.5 s (the writer is still waiting until W + 5 s); sleep 2 s;
+    attempt 3 starts ~W + 6.5 s, the writer is gone, so it takes the season row without waiting and succeeds
+    (attempts = 3, inside the test's 2..4 bound). For dt = 2 s: attempt 1 is the victim at ~W + 4.5 s; attempt 2
+    starts ~W + 5.5 s and succeeds. For dt = 3 s: the holder would start at ~W + 3.5 s and its check would fall
+    at ~W + 6.5 s, after the writer's bound, so there is no deadlock and the case would fail its
+    `attempts >= 2` assertion instead (not the reported error).
+  - **So exhaustion is unreachable in this fixture (INFERRED).** A fourth attempt starts only after three
+    failures, so not before the first failure + 6 s of pauses >= W + 6 s, by which point the writer's 5 s
+    bound has expired. With the writer gone no cycle exists. A recovered run therefore ends with the
+    retry helper succeeding and then `holder.begin` throwing the FIRST attempt's `40P01`. This predicts the
+    failing cases take roughly W + 6.5 s + settle time (~8-9 s each) rather than ~13 s+; NOT VERIFIED.
+    *(2026-10-08, Slice 1b: a prediction about duration is not an oracle for the cause and nothing rests on it.
+    The deterministic driver regression, not any case duration, is the check.)*
+  - **Reassessment of "6 s of backoff guarantees recovery for any deadlock_timeout" (INFERRED).** The sum
+    alone is not the proof. The valid argument is: (1) the writer's contended wait began at or before the
+    settle's first `40P01` (the settle's check can only find a cycle that already includes the writer's wait);
+    (2) the settle's last attempt starts no earlier than first failure + 6 s of pauses; (3) the writer's
+    `lock_timeout` bounds THAT wait, so it has ended by then. That holds for one writer wait, for any dt. Its
+    assumptions are (a) a single contended wait, not a sequence: `lock_timeout` is per lock wait, not per
+    transaction, so a writer that is granted something the rollback released and then waits on another
+    settle-held row gets a fresh 5 s; here the holder's savepoint holds nothing (it blocks on its FIRST
+    statement, the season row) so nothing is released to the writer, but that is a property of the statement
+    order, not of the arithmetic; (b) the helper actually recovers on the real driver, which run 1 shows it does
+    NOT. The claim is therefore unproven as shipped, and the changelog sentence that relies on it is premature.
+  - **Test control flow (CODE).** `start261` attaches `run.catch(() => undefined)` into `pending261` at
+    creation, so a writer rejection cannot be an unhandled rejection. The body awaits the retry first and the
+    writer second, so when the retry rejects the writer is not yet awaited; `holder.begin` rolls back, which
+    frees the writer, and the writer then COMPLETES and commits its edit/deletion on match B. `afterEach`
+    awaits `pending261` before `cleanup261`, so the writer is finished before its rows are deleted, and the
+    cleanup is exact by season/key/slug/note. The fixture does not hold locks longer than intended: the holder's
+    row lock is released by its rollback in `begin`, and `holder.end({ timeout: 5 })` runs in `finally`. No
+    in-flight promise rejects unobserved.
+  - **Residue after the failed run: NOT VERIFIED.** The `afterEach` cleanup should have removed the namespace
+    and `afterAll` asserts `NO_RESIDUE_261`; the report does not say whether either ran clean. `beforeAll`
+    cleans first, so a rerun would hide residue. A read-only count query is needed BEFORE any rerun.
+- **Recommended smallest correction (Slice 1b; recorded before approval; IMPLEMENTED later the same day, see "Slice 1b implementation" below).** In
+  `runDerivedRecomputeWithDeadlockRetry`, run each attempt through `tx.savepoint(...)` and give `work` the
+  savepoint handle, keeping the raw anchor/rollback/release as in `canonical-apply.ts`. Both settles and the
+  integration test pass that handle to the four recompute calls. No retry count, backoff or assertion changes.
+  A DB-backed witness is added (a real `sql.begin` where `work` raises SQLSTATE 40P01 once via a server-side
+  `RAISE ... USING ERRCODE = '40P01'`, and the transaction must still commit), which is deterministic and
+  does not depend on timing. This is a defect in the ISSUE-257 F-S4-01 mitigation that Slice 1 relies on, so it
+  is tracked here rather than as a new issue.
+
+- **Review corrections (2026-10-08; comment, scope and test pin only; no command run; retry behaviour unchanged).**
+  - **Recovery claim narrowed.** The `settle-core.ts` comment and this ledger no longer say the 6 s of
+    backoff recovers the settle unconditionally or "whatever `deadlock_timeout` is". The sizing holds under
+    three stated assumptions: (1) one bounded writer carrying the 5 s `lock_timeout`; (2) one continuing
+    contended wait that began no later than the settle's first failure (a fresh wait or a second writer
+    restarts the clock); (3) the settle's canonical row locks, taken before the savepoint, are retained across
+    the retry rollback. Tested boundary, stated separately: the settle-as-victim integration case runs only with
+    `deadlock_timeout` <= 3 s and skips otherwise; the writer-as-victim case is not choreographed. Nothing is
+    claimed for a larger `deadlock_timeout`. Residual limit (4) above (DEV/PROD `deadlock_timeout` not read) stands.
+  - **`saveEdit` refusal scoped.** `matchBusyRefusal` is applied in the catch only for `entityKey === 'matches'
+    && groupKey === 'score'`, matching where `lock_timeout` is set. Other entities/groups keep the generic
+    message. `tests/match-sheet.test.ts` ("the Data Editor score path sets the bound only for matches/score ...")
+    now pins the guard, that nothing returns before the mapping, and the single use.
+- **Evidence status: source finding versus runtime confirmation (2026-10-08, Slice 1b session).**
+  - **SOURCE FINDING (CODE; read in the tree and in `node_modules/postgres/src/index.js`, 3.4.9).** The retry
+    helper issued a raw `SAVEPOINT` and ran `work()` on the OUTER transaction handle. `begin`'s `handler`
+    attaches `q.catch(e => uncaughtError || (uncaughtError = e))` to every query on a transaction handle, and
+    `scope` throws `uncaughtError` after the callback resolves, then rolls back (`index.js` :251-273, :291-296). A
+    `40P01` raised on the outer handle is therefore remembered even after the helper has recovered, so the
+    transaction is rolled back at the end. A savepoint-scoped handle (`tx.savepoint(fn)`, `scope(c, fn, name)`) has
+    its OWN `uncaughtError`; a failed scope rolls back to its savepoint and rethrows, and the outer handle never
+    sees the rejection. The repository already relies on this in `canonical-apply.ts` (unit and attendance
+    savepoints). The same defect applied to both production settles, which call the helper inside `sql.begin`.
+  - **RUNTIME CONFIRMATION: NONE YET.** Run 1 reported only `PostgresError: deadlock detected` at
+    `recomputeSeasonMetadata` (`player-derived.ts`). That line is what the source finding predicts, but any
+    `40P01` raised there would report the same line. The full vitest output, per-case durations, the
+    `deadlock_timeout` in force and the post-run residue were not seen. The failed-run record and analysis above
+    are preserved unedited apart from the label on the duration prediction. The deterministic driver regression
+    below is what turns the source finding into a runtime fact (red before, green after). It has not been run.
+  - **Residue after run 1: still NOT VERIFIED.** The suite's `beforeAll` cleans the namespace first, so a rerun
+    would hide it. Step 1 of the validation plan runs first.
+- **Slice 1b implementation (2026-10-08, uncommitted; no shell, Git, SQL or test command was run).**
+  - `src/lib/acquisition/settle-core.ts`: new exported `RecomputeScope` (the driver's `TransactionSql`) and
+    `SavepointTx` is now an interface with the template call signature and `savepoint(fn)` (method syntax, so the
+    driver's overloaded `savepoint` is assignable). `runDerivedRecomputeWithDeadlockRetry(tx, work, options)` now
+    takes `work: (scope: RecomputeScope) => Promise<T>`. Per attempt: raw anchor `SAVEPOINT
+    afldb_derived_recompute`; `tx.savepoint(async (scope) => { value = await work(scope) })`; `RELEASE` on
+    success; on `40P01`, `ROLLBACK TO` and `RELEASE` the anchor, then sleep. The anchor is the
+    `canonical-apply.ts` idiom: postgres.js does not release its own `sN` savepoint on success. **Unchanged:** four
+    attempts (`attempt > backoff.length`), backoff `[1000, 2000, 3000]`, `40P01` the only absorbed SQLSTATE,
+    exhaustion and every other error propagate unabsorbed, the contention assertions.
+  - **Callers (a repository-wide search for the helper name found these and no others).**
+    `settle-afltables.ts` and `settle-afl-api.ts`: the block is now `async (scope) =>` and all four calls
+    (`recomputeSeasonMetadata`, `recomputeClubSeasons`, `recomputePlayerDerivedStats`,
+    `recomputeSeasonBrownlowStatus`) use `scope`; none uses `tx` inside the wrapper. `affectedPlayerIds(tx, ...)`
+    runs before the helper, outside the retried block, as before. `tests/match-sheet.test.ts` (unit) and the
+    stand-in `settleBlock261` in `tests/integration/data-editor.test.ts` are updated below.
+  - `tests/match-sheet.test.ts` ("F-S4-01 deadlock handling"): the mock `tx` gains `savepoint`, which hands
+    `work` a distinct scoped handle per attempt and records the savepoint's rollback. Retained assertions: one
+    retry then success, exhaustion after four attempts with the exact backoff list, no retry of
+    `23505`/`55P03`/`40001`/`57014`/plain errors. New: every attempt gets its own handle and none is the outer
+    `tx`; the source pin now requires all four recompute calls on `scope` and no `tx` inside the wrapper in both
+    settles. **A mock cannot reproduce the driver's `uncaughtError` bookkeeping**; it pins the call shape only.
+  - `tests/integration/data-editor.test.ts`: `settleBlock261(fx)` returns `async (handle) => ...`; the retry case
+    passes it to the helper (so it receives the scoped handle), the BASIC case passes its transaction. New nested
+    `describe` **"driver recovery (Slice 1b)"**: (1) a server-side `DO ... RAISE EXCEPTION ... USING ERRCODE =
+    '40P01'` fails attempt 1 after it wrote a synthetic marker row; attempt 2 succeeds; the outer transaction
+    also wrote a row before and after the retry. From a SEPARATE connection: nothing is visible before commit; after
+    commit exactly the two outer rows and attempt 2's row exist and attempt 1's row does not; the helper reports
+    2 attempts and slept `[1000]`; the two scoped handles differ from each other and from the outer `tx`. (2)
+    `40P01` on every attempt: four attempts, the exact backoff, the error propagates, and the separate
+    connection sees nothing (the whole outer transaction rolled back). No lock, no timing, no `deadlock_timeout`
+    dependency (the sleep is stubbed). Fixtures: `players` rows with slugs `issue261-drv-*`, inside the existing
+    `issue261-` namespace, removed by `cleanup261` after each case and covered by the existing residue assertion.
+    The case proves driver recovery only. The four contention cases remain the evidence for the lock mitigation.
+- **Scope (updated 2026-10-08).** In scope: Slice 1 (the 5 s bound and refusal on the Data Editor score edit and
+  `deleteMatch`) and Slice 1b (the retry helper, both settles, the test stand-in, the driver regression). Out of
+  scope, unchanged: Slice 2 (changed-value guard + sorted `players` lock), the full rebuild, ISSUE-257's Match
+  Sheet authority, ISSUE-265's gate.
+- **Claim limit.** Nothing here asserts guaranteed recovery. What the work can support once validated is
+  narrow: a recovered `40P01` no longer rolls back the outer transaction (driver regression), and in the
+  demonstrated shape (one bounded writer waiting on one settle-held row, the settle as the victim, `deadlock_timeout`
+  <= 3 s) the settle commits on a later attempt (the contention cases). It is not shown for a second concurrent
+  writer, a writer that re-enters the cycle, a writer outside the two bounded paths, or a larger
+  `deadlock_timeout` (the deadlock cases skip loudly above 3 s, and a skip is not a pass). `deadlock_timeout` and
+  the PostgreSQL version of DEV/PROD remain unread.
+- **Validation plan (operator-run, in this order; nothing run yet; do not weaken an assertion to pass).**
+  1. **Residue check, read-only, BEFORE any rerun:** `powershell -NoProfile -File D:\tmp\issue261\residue-check.ps1`
+     (outside the repository). It loads `AFLDB_TEST_DATABASE_URL` from this worktree's `.env` with
+     `tests/setup.ts`'s rule, refuses a missing, invalid or non-`_test` target or a shell value that differs from
+     `.env`, uses `psql -w` and `ON_ERROR_STOP`, forces a read-only session and prints no credentials. It counts
+     the season-2080 / `issue261-` namespace and lists sessions idle in a transaction or waiting on a lock.
+     Report its output whatever it says.
+  2. DB-free unit tests: `npx vitest run tests/match-sheet.test.ts tests/admin-match-mutations.test.ts`.
+  3. Typecheck: `npx tsc --noEmit -p .` (the new interface and the test mock are checked only here).
+  4. Deterministic driver regression: `npx vitest run tests/integration/data-editor.test.ts -t "driver recovery"`.
+     Expected: 2 passed, seconds. If it fails, stop and report the output: the contention cases cannot be read
+     until this one is green.
+  5. The four contention cases: `npx vitest run tests/integration/data-editor.test.ts -t "BASIC LOCK TIMEOUT|SETTLE/ADMIN DEADLOCK"`.
+     Expected: 4 passed (about 30 s). Skipped is not passed. Re-run step 1 afterwards; the suite's own `afterAll`
+     also asserts zero residue.
+  Report the vitest output for any failure.
+- **Latest operator-run results (2026-10-08).** Step 2's `tests/match-sheet.test.ts`: **91 passed**. Step 3
+  (typecheck): **FAILED** on two `TS2532` errors at `tests/match-sheet.test.ts:719`, both `wrapped[0]` (possibly
+  `undefined` from `RegExpMatchArray`) in the settle source pin. **Fix (test only, runtime code unchanged):**
+  `wrapped[0]` is bound to a local and an explicit guard throws if it is `undefined`; the `'=> {'` callback
+  marker is located first and its absence throws a named error instead of slicing from index `-1 + 4`. The
+  `toHaveLength(1)` check, all four `scope`-call checks and the no-outer-`tx` body assertion are retained; no
+  non-null assertion is used. Not yet re-run: step 2 and step 3 must be repeated.
+- **Status (superseded by the resolution below): Open, Low.** Slice 1 and Slice 1b are implemented and UNVALIDATED;
+  validation run 1 failed and its cause is a source finding awaiting runtime confirmation. Closing needs steps 1-5 to
+  pass, then the operator's commit. DEV acceptance is not required for an admin-save timeout bound unless the operator
+  asks. Slice 2 stays deferred and unscheduled.
+- **Resolution (2026-10-08).** Status: **Resolved.** The commit is the operator's and has not happened at the time of
+  writing.
+  - **What was fixed (and what was not).** Two changes, both in the tree:
+    1. *Bounded admin lock waits (Slice 1).* The Data Editor `matches`/`score` edit and `deleteMatch` run under
+       `SET LOCAL lock_timeout = '5s'` (a bound on each lock wait, not a transaction deadline); `55P03` and `40P01`
+       roll the transaction back and return "This match is busy. Please try again shortly."
+    2. *Corrected savepoint-scoped settle retries (Slice 1b).* `runDerivedRecomputeWithDeadlockRetry` runs each attempt
+       through `tx.savepoint(...)` and passes the scoped handle to both settles' four recompute calls, so a recovered
+       `40P01` is no longer remembered by the outer postgres.js handle and re-thrown at the end of the transaction.
+       Retry count (four attempts), backoff (1 s/2 s/3 s) and `40P01`-only handling are unchanged.
+    **This does not eliminate deadlocks.** The recompute still rewrites every affected row with no changed-value guard,
+    victim selection stays timing-dependent, and the cycle still forms and is still logged. The work bounds how long an
+    admin writer can hold a settle in the cycle and stops a recovered deadlock from rolling the settle back.
+  - **Root cause as established.** The residual: the Data Editor score edit and `deleteMatch` had no wait bound, so a
+    settle that lost the deadlock could exhaust its retries against a writer that never left. Found by validation run 1: the
+    retry helper itself defeated recovery, because it ran on the outer postgres.js handle (`begin`'s `uncaughtError`
+    bookkeeping, `index.js` :251-273, :291-296), which affected both production settles. The latter is a source finding,
+    read in `node_modules/postgres/src/index.js` 3.4.9; it is corroborated by the final results (the deterministic driver
+    regression and both settle-as-victim cases pass with the scoped handle) but was not observed failing in isolation
+    before the correction.
+  - **Final operator-run validation (2026-10-08).**
+    - Latest combined DB-free unit run (`tests/match-sheet.test.ts`, `tests/admin-match-mutations.test.ts`): **108 passed**.
+    - Latest TypeScript check (`npx tsc --noEmit -p .`): **passed**. (The earlier `TS2532` at `tests/match-sheet.test.ts:719`
+      was a test-only typing fault, corrected as recorded above.)
+    - Driver recovery (`-t "driver recovery"`): **2 passed, 35 filtered skips.**
+    - Contention (`-t "BASIC LOCK TIMEOUT|SETTLE/ADMIN DEADLOCK"`): **all 4 passed, 33 filtered skips; neither
+      SETTLE/ADMIN DEADLOCK case skipped.** A skip would not have been a pass.
+    - Post-run residue (read-only): **all counts zero; no visible idle transactions or lock waits.**
+  - **Failed-run evidence preserved.** Validation run 1 (both SETTLE/ADMIN DEADLOCK cases failed with `40P01` at
+    `recomputeSeasonMetadata`, `player-derived.ts:538`; both BASIC LOCK TIMEOUT cases passed), the "Analysis of run 1"
+    and the Slice 1b correction above are kept unedited. The failure is what led to Slice 1b; it is not erased by the
+    later passes.
+  - **Limits of the validation (stated, not softened).**
+    - A **synthetic test transaction stands in for the settle**; the real settle was not run into the deadlock. The
+      real four-call recompute block and the real retry helper with real backoff were used.
+    - The **settle-as-victim** shape was tested. The writer-as-victim ordering is timing-dependent, is not choreographed
+      and has no case.
+    - **No full production settle**, **no UI rendering** (the refusal reaches the forms by code reading and DB-free pins
+      only) and **no restricted importer-role validation** was performed.
+    - Nothing is claimed for a second concurrent writer, a writer that re-enters the cycle, a writer outside the two
+      bounded paths, or a `deadlock_timeout` above 3 s (the settle-as-victim case skips above 3 s; a skip is not a pass).
+      `deadlock_timeout` and the PostgreSQL version of DEV/PROD were never read.
+  - **Documented assumptions retained.** The settle's 6 s of retries outlast the writer's 5 s bound only under: (1) one
+    bounded writer carrying the 5 s `lock_timeout`; (2) one continuing contended wait that began no later than the
+    settle's first failure (a fresh wait or a second writer restarts the clock); (3) the settle's canonical row locks,
+    taken before the savepoint, are retained across the retry rollback. This is a sizing argument, not an unconditional
+    recovery guarantee.
+  - **Deferred, not resolved here.** Slice 2 (changed-value guard together with a sorted `players` lock; never the guard
+    alone, because the unconditional `UPDATE` is today an accidental per-player mutex) remains an optional optimisation
+    with its own future runbook. The cluster-wide `pg_stat_database.deadlocks` check was skipped by D-261-4. Out of scope
+    and unchanged: ISSUE-257's Match Sheet authority, the full rebuild, ISSUE-265's gate.
+  - **Tracking.** Removed from the Open Issues table (count 6 to 5) and from `IssuesIndex.md` (count 6 to 5);
+    `CHANGELOG.md` finalised. DEV acceptance was not required for an admin-save timeout bound and was not asked for.
 
 ## AFLDB-ISSUE-262 — `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104)
 

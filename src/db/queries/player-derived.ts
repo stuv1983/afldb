@@ -2,6 +2,28 @@ import type postgres from 'postgres';
 
 type Tx = postgres.TransactionSql;
 
+/**
+ * What an admin match writer tells the operator when its transaction could not get
+ * a row lock in time, or was chosen as a deadlock victim (AFLDB-ISSUE-261).
+ */
+export const MATCH_BUSY_REFUSAL = 'This match is busy. Please try again shortly.';
+
+/**
+ * Classification only. The Data Editor score edit and `deleteMatch` run their whole
+ * transaction under `SET LOCAL lock_timeout = '5s'` so a wait on a concurrent settle
+ * ends, rolls the transaction back and releases the writer's own locks (this is what
+ * lets a settle that lost a deadlock to the writer recover; see
+ * `DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS` in `settle-core.ts`). A lock timeout (`55P03`)
+ * or a deadlock victim (`40P01`) is therefore a retryable refusal with nothing saved;
+ * every other error returns `null` and keeps its existing handling.
+ */
+export function matchBusyRefusal(error: unknown): string | null {
+  const code = typeof error === 'object' && error !== null
+    ? (error as { code?: unknown }).code
+    : undefined;
+  return code === '55P03' || code === '40P01' ? MATCH_BUSY_REFUSAL : null;
+}
+
 function distinctPositiveIntegers(values: number[]): number[] {
   return Array.from(new Set(values)).filter((value) => Number.isInteger(value) && value > 0);
 }

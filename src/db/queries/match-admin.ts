@@ -7,6 +7,7 @@ import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
 import {
   clearPlayerClubMatchReferences,
+  matchBusyRefusal,
   recomputeClubSeasons,
   recomputePlayerDerivedStats,
   recomputeSeasonBrownlowStatus,
@@ -413,6 +414,12 @@ export async function deleteMatch(input: {
       | { ok: true; deletedId: number; season: number; affectedPlayers: number }
       | { ok: false; error: string }
     >(async (tx) => {
+      // AFLDB-ISSUE-261: a settle holds match and player_match_stats row locks while
+      // it runs, and this transaction's recompute can wait on, or deadlock with, it.
+      // Bound every lock wait (not the total run time) so a loser rolls back whole
+      // and releases its locks. Set before the first contended statement below.
+      await tx`SET LOCAL lock_timeout = '5s'`;
+
       // 1. Fetch match info
       const [match] = await tx<{
         id: number;
@@ -705,6 +712,13 @@ export async function deleteMatch(input: {
     // refusal shape without inspecting the constraint name (which FK fired
     // can't be known without that, and isn't needed for a useful message);
     // every other error still throws.
+    //
+    // AFLDB-ISSUE-261: 55P03 (lock timeout) and 40P01 (deadlock victim) mean the
+    // whole transaction rolled back. The action does not catch, so a thrown error
+    // would reach the UI as an opaque server-action failure; return the retryable
+    // refusal instead.
+    const busy = matchBusyRefusal(error);
+    if (busy) return { ok: false, error: busy };
     if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23503') {
       return {
         ok: false,

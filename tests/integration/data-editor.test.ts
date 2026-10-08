@@ -11,7 +11,14 @@ import { loadMatchSheetStaleToken, returnMatchSheetToSource, saveMatchSheet } fr
 import { playerMatchStatsAuthorityStorable } from '@/lib/acquisition/manual-authority';
 import { AUTHORITY_UNAVAILABLE_REFUSAL } from '@/lib/acquisition/match-sheet-authority';
 import { createPlayerInTransaction } from '@/db/queries/players';
-import { recomputeClubSeasons, recomputePlayerDerivedStats } from '@/db/queries/player-derived';
+import {
+  MATCH_BUSY_REFUSAL,
+  recomputeClubSeasons,
+  recomputePlayerDerivedStats,
+  recomputeSeasonBrownlowStatus,
+  recomputeSeasonMetadata,
+} from '@/db/queries/player-derived';
+import { DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS, runDerivedRecomputeWithDeadlockRetry } from '@/lib/acquisition/settle-core';
 import { BROWNLOW_MATCH_SHEET_REFUSAL } from '@/lib/match-sheet';
 import { createImportRoleParityHarness } from './import-role-parity';
 import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
@@ -54,7 +61,8 @@ const tokenOf = (matchId: number) => loadMatchSheetStaleToken(sql, matchId);
  * uncommitted fixture would be invisible to them. `clubs` and `sources` are READ, never
  * written.
  *
- *   season 2079 (claimed here; 2083/2088 are this file's older fixtures, 2086-2099 other suites)
+ *   season 2079 (claimed here; 2080 is the AFLDB-ISSUE-261 contention fixture at the end of this
+ *   file; 2083/2088 are this file's older fixtures, 2086-2099 other suites)
  *   match_key          2079|issue257-<token>   (a durable-authority key is season-prefixed)
  *   absent-key control 9999|issue257-...       (never a real match)
  *   player slug        issue257-<token>
@@ -1799,4 +1807,466 @@ describe('Durable Match Sheet authority: rollback, replay and continuity (AFLDB-
     expectOk(runReplay());
     expect((await statsOf(p)).goals).toBe(corrected);
   }, TIMEOUT);
+});
+
+/* ---------------------------------------------------------------------------------------
+ * AFLDB-ISSUE-261 Slice 1 (D-261-2 / D-261-3): the Data Editor score edit and `deleteMatch` bound
+ * their lock waits (`SET LOCAL lock_timeout = '5s'`) and refuse with a retryable message.
+ *
+ * WHAT EACH CASE PROVES (evidence is labelled, never blurred):
+ *   BASIC LOCK TIMEOUT. One holder transaction keeps a player_match_stats row lock; the REAL admin
+ *     writer waits on it and must be refused at its 5 s bound, roll back whole, and release every
+ *     lock it took. No cycle forms. This is NOT a deadlock reproduction.
+ *   SETTLE/ADMIN DEADLOCK (sequence A of the ISSUE-261 investigation). The holder is a TEST
+ *     TRANSACTION standing in for a settle: it holds the row, then runs the REAL four-call
+ *     end-of-run recompute through the REAL `runDerivedRecomputeWithDeadlockRetry` with the REAL
+ *     backoff. It is not the full settle (no canonical writes, no gate, no import batch). The
+ *     choreography makes the HOLDER the deadlock victim: it starts its conflicting wait only after
+ *     the writer's one deadlock check (waitstart + deadlock_timeout) has already run, so the
+ *     writer's own detection cannot fire first. The case then proves the holder recovers on a retry
+ *     because the writer's 5 s bound ends the wait. The case where the WRITER is the victim needs no
+ *     bound to recover and is not choreographed (victim selection is timing-dependent and is not
+ *     assumed anywhere). Needs `deadlock_timeout` <= 3 s; skipped, loudly, otherwise.
+ *   DRIVER RECOVERY (Slice 1b, last `describe`). No contention: a server-side `RAISE ... '40P01'`
+ *     proves the postgres.js transaction survives a recovered retry. It is not lock evidence.
+ *
+ * Synthetic, committed fixtures in a reserved namespace: season 2080 (checked against every test,
+ * src, tools and deploy reference; 2083 is the rolled-back fixture of "Targeted club_seasons rebuild"
+ * above and 2079 is the ISSUE-257 namespace), match keys `2080|issue261-*`, player slug `issue261-`.
+ * Cleanup is exact by that namespace, runs in beforeAll, afterEach and afterAll, and a residue
+ * assertion proves nothing remains. No historical row is read for write or touched.
+ * ------------------------------------------------------------------------------------ */
+const SEASON_261 = 2080;
+const KEY_ROOT_261 = `${SEASON_261}|issue261-`;
+const SLUG_261 = 'issue261-';
+const NOTE_261 = 'issue-261 contention';
+const seededPlayerIds261: number[] = [];
+const seededMatchIds261: number[] = [];
+const pending261: Promise<unknown>[] = [];
+const ids261 = (ids: number[]) => (ids.length > 0 ? ids : [0]);
+const pause261 = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+type Fx261 = { playerId: number; matchA: number; matchB: number };
+
+async function seedFixture261(): Promise<Fx261> {
+  const fx = await sql.begin(async (tx) => {
+    const clubs = await tx<{ id: number }[]>`
+      SELECT DISTINCT ON (organization_id) id::int AS id
+        FROM clubs
+       WHERE organization_id IS NOT NULL
+       ORDER BY organization_id, id
+       LIMIT 2
+    `;
+    if (clubs.length < 2) throw new Error('ISSUE-261 fixture needs two club identities');
+    const [home, away] = clubs;
+    const [source] = await tx<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'afltables'`;
+    await tx`
+      INSERT INTO seasons (year, league, status)
+      VALUES (${SEASON_261}, 'AFL', 'complete'::season_status)
+      ON CONFLICT DO NOTHING
+    `;
+    const insertMatch = async (token: string, round: number, date: string) => {
+      const [m] = await tx<{ id: number }[]>`
+        INSERT INTO matches (
+          match_key, season, round_code, round_number, round_type, is_final,
+          match_date, venue_raw, home_club_id, away_club_id,
+          home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
+          result, winner_club_id, margin,
+          attendance, attendance_status, source_id
+        ) VALUES (
+          ${`${KEY_ROOT_261}${token}`}, ${SEASON_261}, ${String(round)}, ${round},
+          'home_and_away'::round_type, false,
+          ${date}, 'ISSUE-261 Fixture Oval', ${home.id}, ${away.id},
+          15, 10, 100, 12, 8, 80,
+          'home_win'::match_result, ${home.id}, 20,
+          NULL, 'not_collected'::coverage_status, ${source.id}
+        )
+        RETURNING id::int AS id
+      `;
+      return m.id;
+    };
+    const matchA = await insertMatch('a', 1, `${SEASON_261}-03-05`);
+    const matchB = await insertMatch('b', 2, `${SEASON_261}-03-12`);
+    const [player] = await tx<{ id: number }[]>`
+      INSERT INTO players (display_name, sort_name, search_name, slug)
+      VALUES ('Issue261 Holder', 'Holder, Issue261', 'issue261 holder', ${`${SLUG_261}holder`})
+      RETURNING id::int AS id
+    `;
+    for (const matchId of [matchA, matchB]) {
+      await tx`
+        INSERT INTO player_match_stats (
+          player_id, match_id, club_id, jumper_number, kicks, marks, handballs, disposals,
+          goals, behinds, hitouts, tackles, frees_for, frees_against, source_id
+        ) VALUES (
+          ${player.id}, ${matchId}, ${home.id}, ${STAT_257.jumperNumber}, ${STAT_257.kicks},
+          ${STAT_257.marks}, ${STAT_257.handballs}, ${STAT_257.disposals}, ${STAT_257.goals},
+          ${STAT_257.behinds}, ${STAT_257.hitouts}, ${STAT_257.tackles}, ${STAT_257.freesFor},
+          ${STAT_257.freesAgainst}, ${source.id}
+        )
+      `;
+    }
+    await recomputeSeasonMetadata(tx, SEASON_261);
+    await recomputeClubSeasons(tx, SEASON_261);
+    await recomputePlayerDerivedStats(tx, [player.id], SEASON_261);
+    return { playerId: player.id, matchA, matchB };
+  });
+  seededPlayerIds261.push(fx.playerId);
+  seededMatchIds261.push(fx.matchA, fx.matchB);
+  return fx;
+}
+
+/** Removes exactly the ISSUE-261 namespace, children first. Idempotent. */
+async function cleanup261(): Promise<void> {
+  const players = () => sql`(SELECT id FROM players WHERE starts_with(slug, ${SLUG_261}::text))`;
+  const matches = () => sql`(SELECT id FROM matches WHERE starts_with(match_key, ${KEY_ROOT_261}::text))`;
+  await sql`
+    DELETE FROM data_overrides
+     WHERE entity_type = 'matches' AND starts_with(entity_key, ${KEY_ROOT_261}::text)
+  `;
+  await sql`
+    DELETE FROM data_edits
+     WHERE table_name = 'matches'
+       AND (row_id = ANY(${ids261(seededMatchIds261)}) OR row_id IN ${matches()})
+  `;
+  if (adminUserId > 0) {
+    await sql`DELETE FROM data_edits WHERE admin_user_id = ${adminUserId} AND note = ${NOTE_261}`;
+  }
+  await sql`DELETE FROM player_match_stats WHERE player_id IN ${players()} OR match_id IN ${matches()}`;
+  for (const table of ['player_clubs', 'player_club_season_stats', 'player_season_stats', 'player_career_stats']) {
+    await sql`DELETE FROM ${sql(table)} WHERE player_id IN ${players()}`;
+  }
+  await sql`DELETE FROM match_period_scores WHERE match_id IN ${matches()}`;
+  await sql`DELETE FROM players WHERE starts_with(slug, ${SLUG_261}::text)`;
+  await sql`DELETE FROM matches WHERE starts_with(match_key, ${KEY_ROOT_261}::text)`;
+  // Season-scoped rows go only when no match of the season survives (a foreign match keeps them).
+  await sql`
+    DELETE FROM club_seasons
+     WHERE season = ${SEASON_261} AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${SEASON_261})
+  `;
+  await sql`
+    DELETE FROM seasons
+     WHERE year = ${SEASON_261} AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${SEASON_261})
+  `;
+}
+
+const NO_RESIDUE_261 = {
+  dataOverrides: 0, dataEdits: 0, playerMatchStats: 0, playerDerived: 0, periodScores: 0,
+  clubSeasons: 0, players: 0, matches: 0, seasons: 0,
+};
+
+async function residue261(): Promise<typeof NO_RESIDUE_261> {
+  const pids = ids261(seededPlayerIds261);
+  const mids = ids261(seededMatchIds261);
+  const [r] = await sql<(typeof NO_RESIDUE_261)[]>`
+    SELECT
+      (SELECT count(*) FROM data_overrides
+        WHERE entity_type = 'matches' AND starts_with(entity_key, ${KEY_ROOT_261}::text))::int AS "dataOverrides",
+      (SELECT count(*) FROM data_edits
+        WHERE table_name = 'matches' AND row_id = ANY(${mids}))::int AS "dataEdits",
+      (SELECT count(*) FROM player_match_stats
+        WHERE player_id = ANY(${pids}) OR match_id = ANY(${mids}))::int AS "playerMatchStats",
+      ((SELECT count(*) FROM player_clubs WHERE player_id = ANY(${pids}))
+       + (SELECT count(*) FROM player_club_season_stats WHERE player_id = ANY(${pids}))
+       + (SELECT count(*) FROM player_season_stats WHERE player_id = ANY(${pids}))
+       + (SELECT count(*) FROM player_career_stats WHERE player_id = ANY(${pids})))::int AS "playerDerived",
+      (SELECT count(*) FROM match_period_scores WHERE match_id = ANY(${mids}))::int AS "periodScores",
+      (SELECT count(*) FROM club_seasons WHERE season = ${SEASON_261})::int AS "clubSeasons",
+      (SELECT count(*) FROM players
+        WHERE id = ANY(${pids}) OR starts_with(slug, ${SLUG_261}::text))::int AS "players",
+      (SELECT count(*) FROM matches
+        WHERE id = ANY(${mids}) OR starts_with(match_key, ${KEY_ROOT_261}::text))::int AS "matches",
+      (SELECT count(*) FROM seasons WHERE year = ${SEASON_261})::int AS "seasons"
+  `;
+  return r;
+}
+
+/**
+ * Everything a writer could have changed in the fixture match B and its season, in a
+ * comparable shape: a refusal that rolled back whole leaves this identical.
+ */
+async function stateOf261(fx: Fx261): Promise<unknown> {
+  const [r] = await sql<{ state: unknown }[]>`
+    SELECT jsonb_build_object(
+      'match', (SELECT to_jsonb(m) FROM matches m WHERE m.id = ${fx.matchB}),
+      'periods', (SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.period, p.club_id), '[]'::jsonb)
+                    FROM match_period_scores p WHERE p.match_id = ${fx.matchB}),
+      'statRows', (SELECT count(*) FROM player_match_stats WHERE match_id = ${fx.matchB}),
+      'audits', (SELECT count(*) FROM data_edits WHERE table_name = 'matches' AND row_id = ${fx.matchB}),
+      'overrides', (SELECT count(*) FROM data_overrides
+                     WHERE entity_type = 'matches' AND starts_with(entity_key, ${KEY_ROOT_261}::text)),
+      'ladder', (SELECT coalesce(jsonb_agg(jsonb_build_array(c.club_id, c.played, c.wins, c.points_for,
+                                                            c.points_against) ORDER BY c.club_id), '[]'::jsonb)
+                   FROM club_seasons c WHERE c.season = ${SEASON_261})
+    ) AS state
+  `;
+  return r.state;
+}
+
+async function deadlockTimeoutMs261(): Promise<number> {
+  const [r] = await sql<{ ms: number }[]>`SELECT setting::int AS ms FROM pg_settings WHERE name = 'deadlock_timeout'`;
+  return r.ms;
+}
+
+/** The backend waiting on `holderPid`, once its wait has lasted at least `minWaitedMs` (server clock). */
+async function waitUntilBlocked261(holderPid: number, minWaitedMs: number): Promise<{ pid: number; waitedMs: number }> {
+  const deadline = Date.now() + 20_000;
+  for (;;) {
+    const [row] = await sql<{ pid: number; waitedMs: number }[]>`
+      SELECT l.pid::int AS pid,
+             (extract(epoch FROM (clock_timestamp() - l.waitstart)) * 1000)::int AS "waitedMs"
+        FROM pg_locks l
+       WHERE NOT l.granted AND l.waitstart IS NOT NULL
+         AND ${holderPid}::int = ANY(pg_blocking_pids(l.pid))
+       LIMIT 1
+    `;
+    if (row && row.waitedMs >= minWaitedMs) return row;
+    if (Date.now() > deadline) {
+      throw new Error(`no backend waited >= ${minWaitedMs} ms on holder ${holderPid} within 20 s (saw ${JSON.stringify(row ?? null)})`);
+    }
+    await pause261(25);
+  }
+}
+
+/** Rejects (so the holder's transaction rolls back and frees the writer) instead of hanging. */
+function within261<R>(label: string, promise: Promise<R>, ms: number): Promise<R> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label}: not finished within ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * A transaction holding the row lock a settle unit holds after UPDATEing player P's statistic in
+ * match A. It never waits unless `body` makes it. Rolled back (locks freed) when `body` throws.
+ */
+async function withHeldPlayerRow261<R>(
+  fx: Fx261,
+  body: (tx: postgres.TransactionSql, holderPid: number) => Promise<R>,
+): Promise<R> {
+  const holder = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1, onnotice: () => {} });
+  try {
+    return await holder.begin(async (tx) => {
+      const [{ pid }] = await tx<{ pid: number }[]>`SELECT pg_backend_pid()::int AS pid`;
+      await tx`
+        SELECT id FROM player_match_stats
+         WHERE match_id = ${fx.matchA} AND player_id = ${fx.playerId}
+           FOR UPDATE
+      `;
+      return body(tx, pid);
+    }) as unknown as R;
+  } finally {
+    await holder.end({ timeout: 5 });
+  }
+}
+
+/**
+ * The settle's real end-of-run block (settle-afltables.ts / settle-afl-api.ts), verbatim in order.
+ * `handle` is the savepoint-scoped handle the retry helper passes in production; the BASIC case,
+ * which runs the block once with no retry, passes its transaction.
+ */
+const settleBlock261 = (fx: Fx261) => async (handle: postgres.TransactionSql) => {
+  await recomputeSeasonMetadata(handle, SEASON_261);
+  await recomputeClubSeasons(handle, SEASON_261);
+  await recomputePlayerDerivedStats(handle, [fx.playerId], SEASON_261);
+  await recomputeSeasonBrownlowStatus(handle, SEASON_261);
+};
+
+type Writer261 = { label: string; run: (fx: Fx261) => Promise<{ ok: boolean; error?: string }> };
+const writers261: Writer261[] = [
+  {
+    label: 'Data Editor score edit (saveEdit, matches/score)',
+    run: (fx) => saveEdit({
+      entityKey: 'matches', rowId: fx.matchB, groupKey: 'score',
+      raw: { home_goals: '16', home_behinds: '0', away_goals: '12', away_behinds: '8' },
+      adminUserId, note: NOTE_261,
+    }),
+  },
+  {
+    label: 'deleteMatch',
+    run: (fx) => deleteMatch({ matchId: fx.matchB, adminUserId, reason: NOTE_261 }),
+  },
+];
+
+/** Starts a writer without awaiting it; the afterEach waits for every started writer. */
+function start261(writer: Writer261, fx: Fx261) {
+  const t0 = Date.now();
+  const run = writer.run(fx).then((result) => ({ result, ms: Date.now() - t0 }));
+  pending261.push(run.catch(() => undefined));
+  return run;
+}
+
+describe('AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch', () => {
+  beforeAll(async () => {
+    await cleanup261();
+    const [reserved] = await sql<{ seasons: number; matches: number }[]>`
+      SELECT (SELECT count(*) FROM seasons WHERE year = ${SEASON_261})::int AS seasons,
+             (SELECT count(*) FROM matches WHERE season = ${SEASON_261})::int AS matches
+    `;
+    expect(reserved, `season ${SEASON_261} is reserved for the ISSUE-261 fixture`).toEqual({ seasons: 0, matches: 0 });
+  }, 120_000);
+
+  afterEach(async () => {
+    // A writer started by a failed case must finish (its bound ends it) before its rows go.
+    await Promise.allSettled(pending261.splice(0));
+    await cleanup261();
+  }, 120_000);
+
+  afterAll(async () => {
+    await cleanup261();
+    expect(await residue261()).toEqual(NO_RESIDUE_261);
+  }, 120_000);
+
+  describe.each(writers261)('$label', (writer) => {
+    it('BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released', async () => {
+      const fx = await seedFixture261();
+      const before = await stateOf261(fx);
+
+      await withHeldPlayerRow261(fx, async (tx, holderPid) => {
+        const run = start261(writer, fx);
+        const blocked = await waitUntilBlocked261(holderPid, 0);
+        expect(blocked.pid).not.toBe(holderPid);
+
+        const { result, ms } = await within261('the writer to be refused', run, 20_000);
+        expect(result).toEqual({ ok: false, error: MATCH_BUSY_REFUSAL });
+        // The bound, not a deadlock check, ended the wait (a deadlock victim is refused after ~deadlock_timeout).
+        expect(ms).toBeGreaterThanOrEqual(4500);
+
+        // Atomic: nothing of the writer survived.
+        expect(await stateOf261(fx)).toEqual(before);
+
+        // Released: the holder can now take, without waiting, every lock the writer held,
+        // and the settle's real end-of-run block completes at once.
+        await tx`SET LOCAL lock_timeout = '2s'`;
+        await tx`SELECT id FROM matches WHERE season = ${SEASON_261} FOR UPDATE NOWAIT`;
+        await tx`SELECT year FROM seasons WHERE year = ${SEASON_261} FOR UPDATE NOWAIT`;
+        await tx`SELECT season FROM club_seasons WHERE season = ${SEASON_261} FOR UPDATE NOWAIT`;
+        await settleBlock261(fx)(tx);
+      });
+
+      expect(await stateOf261(fx)).toEqual(before);
+    }, FX_TIMEOUT);
+
+    it('SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry', async (ctx) => {
+      const deadlockTimeout = await deadlockTimeoutMs261();
+      if (deadlockTimeout > 3000) {
+        console.warn(`[ISSUE-261] SKIPPED: deadlock_timeout is ${deadlockTimeout} ms; the choreography needs <= 3000 ms `
+          + 'so the settle starts waiting after the writer\'s one deadlock check and before its 5 s bound.');
+        ctx.skip();
+        return;
+      }
+      const fx = await seedFixture261();
+      const before = await stateOf261(fx);
+
+      const outcome = await withHeldPlayerRow261(fx, async (tx, holderPid) => {
+        const run = start261(writer, fx);
+        // The writer holds the season row and waits on the holder's row. Let its ONE deadlock
+        // check (waitstart + deadlock_timeout) pass with no cycle, so it cannot be the victim.
+        await waitUntilBlocked261(holderPid, deadlockTimeout + 500);
+        // Now the holder, like a settle's end of run, wants the season row: a cycle. The real
+        // retry helper and the real backoff; the holder's own check detects it.
+        const retried = await within261(
+          'the settle block to finish',
+          runDerivedRecomputeWithDeadlockRetry(tx, settleBlock261(fx)),
+          60_000,
+        );
+        const { result, ms } = await within261('the writer to be refused', run, 20_000);
+        return { retried, result, ms };
+      });
+
+      // The settle lost at least one deadlock (it was the victim) and still committed.
+      expect(outcome.retried.attempts).toBeGreaterThanOrEqual(2);
+      expect(outcome.retried.attempts).toBeLessThanOrEqual(DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS.length + 1);
+      // The writer was ended by its own bound, refused, and left nothing behind.
+      expect(outcome.result).toEqual({ ok: false, error: MATCH_BUSY_REFUSAL });
+      expect(outcome.ms).toBeGreaterThanOrEqual(4500);
+      expect(await stateOf261(fx)).toEqual(before);
+    }, FX_TIMEOUT);
+  });
+
+  /* -------------------------------------------------------------------------------------
+   * DRIVER RECOVERY (Slice 1b). Deterministic, no lock, no timing, no `deadlock_timeout`.
+   * Validation run 1 showed the SETTLE/ADMIN DEADLOCK cases failing with a `40P01` the retry
+   * helper had already recovered from: postgres.js records the first rejection of every query on a
+   * transaction handle and re-throws it when `sql.begin`'s callback resolves. The helper now issues
+   * each attempt through `tx.savepoint(...)` and gives `work` that scoped handle.
+   *
+   * This proves the DRIVER recovers: a server-side `RAISE ... ERRCODE '40P01'` stands in for the
+   * deadlock victim, so the outer transaction's fate is the only thing under test. It does NOT
+   * prove the lock mitigation; the contention cases above do that. Synthetic rows only: players in
+   * the `issue261-drv-` slug namespace, removed by `cleanup261` (afterEach) and checked by the
+   * afterAll residue assertion. The check runs on a separate connection after the commit.
+   * ----------------------------------------------------------------------------------- */
+  describe('driver recovery (Slice 1b): a 40P01 recovered inside the retry does not roll the outer transaction back', () => {
+    const DRV = `${SLUG_261}drv-`;
+    const marker = (handle: postgres.TransactionSql, token: string) => handle`
+      INSERT INTO players (display_name, sort_name, search_name, slug)
+      VALUES (${`Issue261 ${token}`}, ${`${token}, Issue261`}, ${`issue261 ${token}`}, ${`${DRV}${token}`})
+    `;
+    const raiseDeadlock = (handle: postgres.TransactionSql) => handle.unsafe(
+      `DO $$ BEGIN RAISE EXCEPTION 'issue-261 synthetic deadlock' USING ERRCODE = '40P01'; END $$`,
+    );
+    /** What a SEPARATE session (the shared client, never the writer's connection) sees committed. */
+    const committedMarkers = () => sql.begin(async (view) => {
+      const rows = await view<{ slug: string }[]>`SELECT slug FROM players WHERE starts_with(slug, ${DRV}::text)`;
+      return rows.map((row) => row.slug.slice(DRV.length)).sort();
+    });
+
+    it('first attempt raises 40P01, a later attempt succeeds: the outer transaction commits and the failed attempt\'s writes are gone', async () => {
+      const writer = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1, onnotice: () => {} });
+      const sleeps: number[] = [];
+      const scopes: unknown[] = [];
+      let outer: unknown;
+      try {
+        const retried = await writer.begin(async (tx) => {
+          outer = tx;
+          await marker(tx, 'outer-before');
+          const result = await runDerivedRecomputeWithDeadlockRetry(tx, async (scope) => {
+            scopes.push(scope);
+            const attempt = scopes.length;
+            await marker(scope, `attempt-${attempt}`);
+            if (attempt === 1) await raiseDeadlock(scope);
+            return attempt;
+          }, { sleep: async (ms) => { sleeps.push(ms); } });
+          // Uncommitted writes are invisible to the separate session: it is a real second view.
+          expect(await committedMarkers()).toEqual([]);
+          await marker(tx, 'outer-after');
+          return result;
+        });
+
+        expect(retried).toEqual({ value: 2, attempts: 2 });
+        expect(sleeps).toEqual([DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS[0]]);
+        expect(scopes).toHaveLength(2);
+        expect(scopes[0]).not.toBe(scopes[1]);
+        for (const scope of scopes) expect(scope).not.toBe(outer);
+
+        // Committed: both outer writes and the SUCCESSFUL attempt. Rolled back: attempt 1's write.
+        expect(await committedMarkers()).toEqual(['attempt-2', 'outer-after', 'outer-before']);
+      } finally {
+        await writer.end({ timeout: 5 });
+      }
+    }, FX_TIMEOUT);
+
+    it('40P01 on every attempt: four attempts, the error propagates, and the whole outer transaction rolls back', async () => {
+      const writer = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1, onnotice: () => {} });
+      const sleeps: number[] = [];
+      let attempts = 0;
+      try {
+        await expect(writer.begin(async (tx) => {
+          await marker(tx, 'outer-before');
+          await runDerivedRecomputeWithDeadlockRetry(tx, async (scope) => {
+            attempts += 1;
+            await marker(scope, `attempt-${attempts}`);
+            await raiseDeadlock(scope);
+          }, { sleep: async (ms) => { sleeps.push(ms); } });
+        })).rejects.toMatchObject({ code: '40P01' });
+
+        expect(attempts).toBe(DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS.length + 1);
+        expect(sleeps).toEqual([...DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS]);
+        expect(await committedMarkers()).toEqual([]);
+      } finally {
+        await writer.end({ timeout: 5 });
+      }
+    }, FX_TIMEOUT);
+  });
 });

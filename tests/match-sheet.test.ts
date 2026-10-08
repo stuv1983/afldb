@@ -36,10 +36,12 @@ import {
   SETTLE_PROMOTION_GATE_STATEMENT_BOUND_MS,
   SETTLE_PROMOTION_GATE_WAIT_MS,
   SettlePromotionGateTimeout,
+  type RecomputeScope,
   type SavepointTx,
   type SettleGateTx,
 } from '@/lib/acquisition/settle-core';
 import type { PlayerMatchStatInput } from '@/lib/match-sheet';
+import { MATCH_BUSY_REFUSAL, matchBusyRefusal } from '@/db/queries/player-derived';
 
 describe('match-sheet write validation', () => {
   it('accepts and normalises a valid payload', () => {
@@ -479,23 +481,50 @@ describe('F-S4-01 deadlock handling (AFLDB-ISSUE-257)', () => {
     return Object.assign(new Error(`pg ${code}`), { code });
   }
 
+  /**
+   * A stand-in for the driver's transaction handle. `tx` records the anchor statements; its
+   * `savepoint(fn)` hands `fn` a DISTINCT scoped handle per call and records the savepoint's
+   * rollback when `fn` rejects, as postgres.js does. It cannot reproduce the driver's
+   * `uncaughtError` bookkeeping: that is proven against the real driver in
+   * `tests/integration/data-editor.test.ts` ("driver recovery"). What it pins is that `work`
+   * is given the scoped handle, a fresh one per attempt, and never the outer `tx`.
+   */
   function harness(outcomes: ReadonlyArray<'ok' | string>) {
     const statements: string[] = [];
     const sleeps: number[] = [];
+    const scopes: unknown[] = [];
     let calls = 0;
-    const tx: SavepointTx = async (strings) => {
-      statements.push(strings.join('?').trim());
-      return [];
-    };
-    const work = async () => {
+    let opened = 0;
+    const tx: SavepointTx = Object.assign(
+      async (strings: TemplateStringsArray) => {
+        statements.push(strings.join('?').trim());
+        return [];
+      },
+      {
+        savepoint: async (fn: (scope: RecomputeScope) => PromiseLike<unknown>) => {
+          opened += 1;
+          const n = opened;
+          const scope = Object.assign(async () => [], { label: `scope ${n}` }) as unknown as RecomputeScope;
+          scopes.push(scope);
+          statements.push(`<savepoint ${n}>`);
+          try {
+            return await fn(scope);
+          } catch (error) {
+            statements.push(`<savepoint ${n} rolled back>`);
+            throw error;
+          }
+        },
+      },
+    );
+    const work = async (scope: RecomputeScope) => {
       const outcome = outcomes[Math.min(calls, outcomes.length - 1)];
       calls += 1;
-      statements.push('<work>');
+      statements.push(`<work on ${(scope as unknown as { label: string }).label}>`);
       if (outcome !== 'ok') throw pgError(outcome);
       return 'done';
     };
     const sleep = async (ms: number) => { sleeps.push(ms); };
-    return { tx, work, sleep, statements, sleeps, calls: () => calls };
+    return { tx, work, sleep, statements, sleeps, scopes, calls: () => calls };
   }
 
   it('retries a first-attempt 40P01 from a rolled-back savepoint, then succeeds', async () => {
@@ -504,14 +533,30 @@ describe('F-S4-01 deadlock handling (AFLDB-ISSUE-257)', () => {
     expect(result).toEqual({ value: 'done', attempts: 2 });
     expect(h.statements).toEqual([
       'SAVEPOINT afldb_derived_recompute',
-      '<work>',
+      '<savepoint 1>',
+      '<work on scope 1>',
+      '<savepoint 1 rolled back>',
       'ROLLBACK TO SAVEPOINT afldb_derived_recompute',
       'RELEASE SAVEPOINT afldb_derived_recompute',
       'SAVEPOINT afldb_derived_recompute',
-      '<work>',
+      '<savepoint 2>',
+      '<work on scope 2>',
       'RELEASE SAVEPOINT afldb_derived_recompute',
     ]);
     expect(h.sleeps).toEqual([DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS[0]]);
+  });
+
+  it('gives every attempt its own scoped handle and never the outer transaction handle (ISSUE-261)', async () => {
+    const h = harness(['40P01', '40P01', 'ok']);
+    const seen: unknown[] = [];
+    await runDerivedRecomputeWithDeadlockRetry(h.tx, async (scope) => {
+      seen.push(scope);
+      return h.work(scope);
+    }, { sleep: h.sleep });
+    expect(seen).toHaveLength(3);
+    expect(new Set(seen).size).toBe(3);
+    expect(seen).toEqual(h.scopes);
+    for (const scope of seen) expect(scope).not.toBe(h.tx);
   });
 
   it('propagates the 40P01 once attempts are exhausted, leaving the caller to roll back the whole settle', async () => {
@@ -520,8 +565,11 @@ describe('F-S4-01 deadlock handling (AFLDB-ISSUE-257)', () => {
       .rejects.toMatchObject({ code: '40P01' });
     expect(h.calls()).toBe(DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS.length + 1);
     expect(h.sleeps).toEqual([...DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS]);
-    // The last attempt is not absorbed: no rollback-to/release after the final <work>.
-    expect(h.statements.at(-1)).toBe('<work>');
+    // The last attempt is not absorbed: only the driver's own savepoint rollback follows the final
+    // <work>; no anchor rollback-to/release is issued.
+    expect(h.statements.slice(-2)).toEqual(['<work on scope 4>', '<savepoint 4 rolled back>']);
+    expect(h.statements.filter((s) => s.startsWith('ROLLBACK TO')))
+      .toHaveLength(DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS.length);
   });
 
   it.each(['23505', '55P03', '40001', '57014'])('never retries a non-40P01 error (%s)', async (code) => {
@@ -530,14 +578,18 @@ describe('F-S4-01 deadlock handling (AFLDB-ISSUE-257)', () => {
       .rejects.toMatchObject({ code });
     expect(h.calls()).toBe(1);
     expect(h.sleeps).toEqual([]);
-    expect(h.statements).toEqual(['SAVEPOINT afldb_derived_recompute', '<work>']);
+    expect(h.statements).toEqual([
+      'SAVEPOINT afldb_derived_recompute',
+      '<savepoint 1>',
+      '<work on scope 1>',
+      '<savepoint 1 rolled back>',
+    ]);
   });
 
   it('never retries a plain error without a SQLSTATE', async () => {
-    const statements: string[] = [];
-    const tx: SavepointTx = async (strings) => { statements.push(strings.join('?')); return []; };
+    const h = harness(['ok']);
     let calls = 0;
-    await expect(runDerivedRecomputeWithDeadlockRetry(tx, async () => {
+    await expect(runDerivedRecomputeWithDeadlockRetry(h.tx, async () => {
       calls += 1;
       throw new Error('boom');
     }, { sleep: async () => {} })).rejects.toThrow('boom');
@@ -549,6 +601,92 @@ describe('F-S4-01 deadlock handling (AFLDB-ISSUE-257)', () => {
     expect(src).toContain("SET LOCAL lock_timeout = '5s'");
     const total = DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS.reduce((sum, ms) => sum + ms, 0);
     expect(total).toBeGreaterThan(5000);
+  });
+
+  // AFLDB-ISSUE-261 Slice 1: DB-free pins. They prove the source shape and the arithmetic,
+  // NOT PostgreSQL behaviour; tests/integration/data-editor.test.ts holds the DB-backed witnesses.
+  describe('ISSUE-261 bounded lock waits on the other recompute writers', () => {
+    const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), 'utf-8').replace(/\r\n/g, '\n');
+    const lockSeconds = (text: string) => [...text.matchAll(/SET LOCAL lock_timeout = '(\d+)s'/g)].map((m) => Number(m[1]));
+    const backoffTotal = DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS.reduce((sum, ms) => sum + ms, 0);
+
+    it('the settle backoff outlasts the lock_timeout of EVERY recompute-calling admin writer', () => {
+      const writers: Record<string, string> = {
+        'src/db/queries/match-sheet.ts': 'saveMatchSheet',
+        'src/db/queries/data-edits.ts': 'saveEdit',
+        'src/db/queries/match-admin.ts': 'deleteMatch',
+      };
+      for (const file of Object.keys(writers)) {
+        const seconds = lockSeconds(read(file));
+        expect(seconds.length, file).toBeGreaterThan(0);
+        for (const s of seconds) expect(s * 1000, file).toBeLessThan(backoffTotal);
+      }
+    });
+
+    it('maps ONLY 55P03 and 40P01 to the busy refusal, with the exact wording', () => {
+      expect(MATCH_BUSY_REFUSAL).toBe('This match is busy. Please try again shortly.');
+      expect(matchBusyRefusal(pgError('55P03'))).toBe(MATCH_BUSY_REFUSAL);
+      expect(matchBusyRefusal(pgError('40P01'))).toBe(MATCH_BUSY_REFUSAL);
+      for (const code of ['23505', '23503', '40001', '57014', '42P01']) {
+        expect(matchBusyRefusal(pgError(code)), code).toBeNull();
+      }
+      expect(matchBusyRefusal(new Error('x'))).toBeNull();
+      expect(matchBusyRefusal(null)).toBeNull();
+      expect(matchBusyRefusal(undefined)).toBeNull();
+    });
+
+    it('the Data Editor score path sets the bound only for matches/score, before its first lock', () => {
+      const src = read('src/db/queries/data-edits.ts');
+      const begin = src.indexOf('importSql.begin(');
+      const bound = src.indexOf("SET LOCAL lock_timeout = '5s'", begin);
+      const firstLock = src.indexOf('await readCurrent(', begin);
+      expect(lockSeconds(src)).toEqual([5]);
+      expect(begin).toBeGreaterThan(0);
+      expect(bound).toBeGreaterThan(begin);
+      expect(bound).toBeLessThan(firstLock);
+      expect(src.slice(src.lastIndexOf('if (', bound), bound))
+        .toContain("input.entityKey === 'matches' && input.groupKey === 'score'");
+      // The refusal replaces the generic message; it is not prefixed by it.
+      const catchAt = src.indexOf('} catch (error) {', begin);
+      const mapped = src.indexOf('matchBusyRefusal(error)', catchAt);
+      const generic = src.indexOf('The edit could not be applied', catchAt);
+      expect(mapped).toBeGreaterThan(catchAt);
+      expect(mapped).toBeLessThan(generic);
+      // The mapping is scoped like the bound: guarded by the same matches/score condition,
+      // so every other entity/group keeps the generic message.
+      const guard = src.lastIndexOf('if (', mapped);
+      expect(guard).toBeGreaterThan(catchAt);
+      expect(src.slice(guard, mapped))
+        .toContain("input.entityKey === 'matches' && input.groupKey === 'score'");
+      expect(src.slice(catchAt, mapped)).not.toContain('return');
+      expect(src.indexOf('matchBusyRefusal(error)', mapped + 1)).toBe(-1);
+    });
+
+    it('deleteMatch sets the bound before its first lock and returns the refusal instead of throwing', () => {
+      const src = read('src/db/queries/match-admin.ts');
+      const body = src.slice(src.indexOf('export async function deleteMatch'));
+      const begin = body.indexOf('importSql.begin<');
+      const bound = body.indexOf("SET LOCAL lock_timeout = '5s'", begin);
+      const firstLock = body.indexOf('FOR UPDATE', begin);
+      expect(lockSeconds(body)).toEqual([5]);
+      expect(bound).toBeGreaterThan(begin);
+      expect(bound).toBeLessThan(firstLock);
+      const catchAt = body.indexOf('} catch (error) {', begin);
+      const mapped = body.indexOf('matchBusyRefusal(error)', catchAt);
+      expect(mapped).toBeGreaterThan(catchAt);
+      expect(body.slice(mapped, body.indexOf('throw error;', mapped))).toContain('return { ok: false, error: busy }');
+      // Mapped before the 23503 fallback and before the final rethrow.
+      expect(mapped).toBeLessThan(body.indexOf("=== '23503'", catchAt));
+    });
+
+    it('the Server Actions return the writers\' error text to the form unchanged', () => {
+      const actions = read('src/app/admin/data-editor/actions.ts');
+      expect(actions).toContain('if (!result.ok) return { error: result.error };');
+      const del = actions.slice(actions.indexOf('export async function deleteMatchAction'));
+      expect(del).toContain('if (!result.ok) {\n    return { error: result.error };');
+      expect(read('src/app/admin/data-editor/DeleteMatchButton.tsx')).toContain('{state.error}');
+      expect(read('src/app/admin/data-editor/EditorForm.tsx')).toContain('{state.error}');
+    });
   });
 
   it('maps 40P01 and 55P03 from saveMatchSheet to the retryable settle-running refusal only', () => {
@@ -565,11 +703,30 @@ describe('F-S4-01 deadlock handling (AFLDB-ISSUE-257)', () => {
   it('both settles route their end-of-run recompute through the bounded retry', () => {
     for (const file of ['src/lib/acquisition/settle-afltables.ts', 'src/lib/acquisition/settle-afl-api.ts']) {
       const src = fs.readFileSync(path.join(process.cwd(), file), 'utf-8');
-      const wrapped = src.match(/runDerivedRecomputeWithDeadlockRetry\(tx, async \(\) => \{[\s\S]*?\n\s*\}\);/g) ?? [];
+      const wrapped = src.match(/runDerivedRecomputeWithDeadlockRetry\(tx, async \(scope\) => \{[\s\S]*?\n\s*\}\);/g) ?? [];
       expect(wrapped, file).toHaveLength(1);
-      expect(wrapped[0]).toContain('recomputePlayerDerivedStats(tx, playerIds, bundle.season)');
+      const block = wrapped[0];
+      if (block === undefined) throw new Error(`${file}: no runDerivedRecomputeWithDeadlockRetry(tx, ...) block found`);
+      // AFLDB-ISSUE-261: all four recompute calls use the savepoint-scoped handle, and none
+      // reaches the outer `tx` (a recovered 40P01 raised on `tx` would roll the settle back).
+      for (const call of [
+        'recomputeSeasonMetadata(scope, bundle.season)',
+        'recomputeClubSeasons(scope, bundle.season)',
+        'recomputePlayerDerivedStats(scope, playerIds, bundle.season)',
+        'recomputeSeasonBrownlowStatus(scope, bundle.season)',
+      ]) {
+        expect(block, `${file} ${call}`).toContain(call);
+      }
+      // The wrapper's own first argument is `tx`; only the callback body must not name it.
+      const marker = '=> {';
+      const markerAt = block.indexOf(marker);
+      if (markerAt === -1) throw new Error(`${file}: callback marker '${marker}' not found in the wrapped recompute`);
+      const body = block.slice(markerAt + marker.length);
+      expect(body.trim().length, file).toBeGreaterThan(0);
+      expect(body, file).not.toMatch(/\btx\b/);
       // No bare end-of-run recompute left outside the wrapper.
-      expect(src.split('recomputePlayerDerivedStats(tx, playerIds, bundle.season)').length - 1, file).toBe(1);
+      expect(src.split('recomputePlayerDerivedStats(scope, playerIds, bundle.season)').length - 1, file).toBe(1);
+      expect(src, file).not.toContain('recomputePlayerDerivedStats(tx, playerIds, bundle.season)');
     }
     const sheet = fs.readFileSync(path.join(process.cwd(), 'src/db/queries/match-sheet.ts'), 'utf-8');
     expect(sheet).toContain('matchSheetRetryableRefusal(err)');

@@ -1963,13 +1963,15 @@ export async function runSettleAflApi(
         // committed canonical rows beside stale derived ones.
         // AFLDB-ISSUE-257 F-S4-01: same bounded `40P01`-only retry as the AFL
         // Tables settle; exhaustion or any other error still fails the settle.
+        // AFLDB-ISSUE-261: statements go through the attempt's savepoint-scoped
+        // `scope`, never `tx` (see `runDerivedRecomputeWithDeadlockRetry`).
         if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0) {
           const playerIds = await affectedPlayerIds(tx, derived);
-          await runDerivedRecomputeWithDeadlockRetry(tx, async () => {
-            await recomputeSeasonMetadata(tx, bundle.season);
-            await recomputeClubSeasons(tx, bundle.season);
-            await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
-            await recomputeSeasonBrownlowStatus(tx, bundle.season);
+          await runDerivedRecomputeWithDeadlockRetry(tx, async (scope) => {
+            await recomputeSeasonMetadata(scope, bundle.season);
+            await recomputeClubSeasons(scope, bundle.season);
+            await recomputePlayerDerivedStats(scope, playerIds, bundle.season);
+            await recomputeSeasonBrownlowStatus(scope, bundle.season);
           });
           counters.derivedRecomputeRuns = 1;
           counters.derivedRecomputePlayers = playerIds.length;
