@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Email intake forwards a message only on a trusted DMARC pass for its one From domain (AFLDB-ISSUE-266; implemented, database-free suite passed on Windows and Linux; host configuration and deployment pending) - 9 October 2026
+### Email intake forwards a message only on a trusted DMARC pass for its one From domain (AFLDB-ISSUE-266; merged; deployed to DEV only, where intake is not active; PROD not deployed; live-mail acceptance not performed; issue open) - 9 October 2026
 
 - `tools/email_intake/fetch_and_stage.py` no longer accepts `spf=pass` with `dkim=pass` as sender verification. Those
   results vouch for the envelope sender and the signing domain, and the sender chooses both, so a forged
@@ -34,6 +34,11 @@ commit.
   server's behaviour has been verified (`docs/admin-and-beta.md` §5).
 - DMARC authenticates the From domain, not the individual mailbox owner. Senders whose domain publishes no DMARC record
   are now refused; the web upload form is unchanged. The intake route is unchanged.
+- Deployment state: the fix (`077af7ee`) is on DEV, deployed without a build or restart; the deployed suite passed 160
+  checks on CPython 3.12.3 (operator-reported). Neither DEV nor PROD has an intake timer, cron reference, IMAP settings
+  or `AFLDB_INTAKE_AUTHSERV_ID` in the places checked, so the fix is dormant there. PROD is not deployed and stays at
+  `cd3cf782` during ISSUE-265's observation. Before intake is activated on any host, the mail provider's header
+  behaviour must be verified and `AFLDB_INTAKE_AUTHSERV_ID` set. No live message has been tested.
 
 ### NL search declines club-scoped career rankings with a whole-career condition, and the explanation names career conditions in words (AFLDB-ISSUE-259 and AFLDB-ISSUE-260; resolved; merged at `7adfb3e8`; DEV browser acceptance passed) - 8 October 2026
 

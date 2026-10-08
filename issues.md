@@ -10,7 +10,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Medium | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated; 2026-10-05 investigation (runbook §10–§15): F-265-1 AFL API attendance enrichment can lose the whole run, `match_attendance` is a third unordered writer, in-run unit retry futile in the main shapes; 2026-10-05 operator: D-265-1..12 accepted (Option 3 advisory gate incl. `match_attendance`; severity Medium); 2026-10-05 operator: D-265-5 accepted (300 s settle gate wait with a 330 s gate-statement bound; an operator judgement, PROD records cannot validate it; the D-265-13 query is context only), D-265-14 (Phase B case B11) and D-265-15 (Phase A tooling archived unchanged in `issues/open/AFLDB-ISSUE-265-phase-a/`); Phase A window 2 (2026-10-05 16:22) PASSED 3/3, census CLEAN (runbook §17.14); Phase A retired, Phase B replaces it; final plan and Phase B assertions in runbook §18–§20; S0 checkpoint committed (62f2cd67); **2026-10-05 mitigation IMPLEMENTED in the working tree, uncommitted (runbook §21): shared settle gate (300 s / 330 s), exclusive gate in the three legacy hooks, `match_attendance` ascending hook, database-free pins, Phase B harness B1–B11; Phase B PASSED 11/11 (2026-10-05, runbook §23); regression window FAILED twice on test-teardown residue, cause fixed (§24), then PASSED (2026-10-06, §25.1); build PASSED (2026-10-06, §25.8: exit 0, 1,515 static pages, standalone ready, census CLEAN, two warnings recorded and not claimed pre-existing); commit, deployment and DEV acceptance pending** | Operator reviews and commits the eighteen files in runbook §25.7, then `npm run merge:ready -- --issue 265`, merge/push, `deploy/sync-dev.ps1` and DEV acceptance (§18.2) |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
-| AFLDB-ISSUE-266 | Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin | High | Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py` | Open (2026-10-08); 2026-10-08 full code review F-001; reproduced DB-free (W1; W2 adds substring injection and an unbound pass); D-266-1 and D-266-2 decided 2026-10-09; **implemented in the working tree, uncommitted**; pre-commit review fixed two parser gaps (runbook §18.8); DB-free suite 160/160 on Windows Python 3.12.10 and 3.14.4 and on Linux (streamanator, CPython 3.12.3, 2026-10-09; runbook §18.9); live mail-host behaviour and host configuration unverified; not deployed | Operator reviews and commits; per host, verify the receiving server's header insertion, forged-header removal, authserv-id and a legitimate message's format, then set `AFLDB_INTAKE_AUTHSERV_ID` before deploying (runbook §18.6) |
+| AFLDB-ISSUE-266 | Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin | High | Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py` | Open (2026-10-08); 2026-10-08 full code review F-001; reproduced DB-free (W1; W2 adds substring injection and an unbound pass); D-266-1 and D-266-2 decided 2026-10-09; implemented and committed as `077af7ee`, merged and pushed to main; pre-commit review fixed two parser gaps (runbook §18.8); DB-free suite 160/160 on Windows Python 3.12.10 and 3.14.4 and on Linux (streamanator, CPython 3.12.3, 2026-10-09; runbook §18.9); **deployed to DEV only** (`7adfb3e8` → `077af7ee`, 2026-10-09; deployed suite 160/160, operator-reported; build and service unchanged; DEV `preflight` BLOCKED by nine untracked settle manifests, not passed; runbook §18.10); PROD inspected, not deployed (held at `cd3cf782` during ISSUE-265 observation); neither host has an intake timer, cron reference, IMAP settings or authserv-id in the places checked, so the fix is dormant; live mail not tested, no host accepted | Before intake is activated on any host: verify the receiving server's header insertion, forged-header removal, authserv-id and a legitimate message's format, set `AFLDB_INTAKE_AUTHSERV_ID`, then `--dry-run` a legitimate and a non-passing message (runbook §18.6, §18.10.8); PROD gets the code after ISSUE-265's observation |
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator-run
 standalone promotion-gate reads on DEV and PROD, graded offline; operator decision D-233-4). Resolved as **AFL API
@@ -48907,13 +48907,14 @@ retained behaviour under `Unreleased`.
     exactly one mailbox; the dmarc `header.from` must equal its domain.
   - D-266-2: `AFLDB_INTAKE_AUTHSERV_ID` is required whenever `AFLDB_INTAKE_REQUIRE_AUTH` is on. A missing or invalid
     configuration exits before the mailbox is touched.
-- **Implementation (2026-10-09, uncommitted).**
+- **Implementation (2026-10-09; committed as `077af7ee`).**
   - RFC 8601 parser (`parse_authentication_results`), From parser (`parse_from_mailbox`), DMARC check
     (`dmarc_verifies`), configuration check (`intake_auth_config`, exit 78).
   - Docs: `docs/admin-and-beta.md` §5 and `.env.example`.
   - Details are in runbook §18.
-- **Validation.** `python -I tools/email_intake/test_fetch_and_stage.py`: 145/145 on Windows Python 3.12.10 and 3.14.4.
-  W1 and W2b witnesses refuse every case. Not run on Linux.
+- **Validation.** *Historical — superseded by Linux validation and DEV deployment (below).*
+  `python -I tools/email_intake/test_fetch_and_stage.py`: 145/145 on Windows Python 3.12.10 and 3.14.4.
+  W1 and W2b witnesses refuse every case. Not run on Linux at that point.
 - **Pre-commit review (2026-10-09, runbook §18.8).** Two gaps fixed: an RFC 2047 encoded-word inside the From address
   was decoded by the stdlib and forwarded under the decoded spelling, and `Authentication-Results`/dmarc versions other
   than 1 were accepted. Tests added for both and for the `main()` forwarding path. 160/160 on Windows Python 3.12.10
@@ -48921,12 +48922,35 @@ retained behaviour under `Unreleased`.
 - **Linux validation (2026-10-09, runbook §18.9).** Operator run `20261009-074215` on streamanator (Ubuntu 24.04.5 LTS,
   CPython 3.12.3), isolated temporary directory, empty environment, no mailbox: 160 ok / 0 FAIL, exit 0. Both source
   hashes matched the reviewed bytes. No mail server, host configuration or deployment was exercised.
+  - **Saved evidence:** `D:\tmp\issue266\linux-validation\run-20261009-074215\evidence\` (`meta.txt`, `suite.out`,
+    `status.txt`). This run used copies of the worktree files, whose bytes are CRLF (the hashes matched the worktree
+    files). It is the only Linux run with files saved here.
+  - It is a different run from the deployed LF-suite run below, which is operator-transcribed with no saved output.
+- **Merge and DEV deployment (2026-10-09, runbook §18.10).**
+  - Saved evidence (`D:\tmp\issue266\evidence\`): DEV HEAD `7adfb3e8` before and `077af7ee` after; the deployed poller
+    carries the fix, SHA-256 `1eeb494996072c2aff5c3399cd5cca354fcfe396e9e8af887d0b4eec1d4f21ba`. DEV and PROD both have
+    no intake timer or service, no installed unit file, no cron reference in the checked places, no IMAP settings and
+    no `AFLDB_INTAKE_AUTHSERV_ID`. PROD is at `cd3cf782` on the pre-fix poller and has not been deployed.
+  - Operator-transcribed (no saved output): the merge and push; `sync-dev.ps1` with `-SkipInstall -SkipMigrate
+    -SkipBuild -SkipRestart`; deployed files match the commit; deployed (LF) suite on CPython 3.12.3, 160 ok / 0 FAIL,
+    exit 0 (a separate run from the saved CRLF-copy run `20261009-074215` above, not covered by those files); BUILD_ID `1iy-ZuCMeAIY9W77kTRMT` and MainPID `3896015` (started `2026-10-08 12:56:50 AEDT`) unchanged, service
+    active; local and LAN health HTTP 200, database ok.
+  - DEV `npm run preflight`: **BLOCKED, exit 1** (transcribed). The sole failure is nine untracked settle manifests
+    under `docs/rebuild-manifests/afltables_fitzroy_core/`, which `sync-dev` classified and preserved as known
+    operational artifacts. Database identity and migration parity 110/110 passed. Not passed; no waiver recorded.
+  - The worktree and deployed hashes differ only in line endings (Windows CRLF against LF); the Git blob hashes match
+    (transcribed).
+  - Inspection limits: only the checked scheduler locations and a three-day, unprivileged journal read (PROD reported
+    it could not see system messages). "No active intake" means none found there, not none anywhere.
 - **Impact.** Any internet sender with SPF and DKIM on their own domain could stage and validate submissions under any
   staff identity and mis-attribute audit rows. Promotion still needs Super Admin approval.
 - **Related history.** ISSUE-186 (Phase B deferred; contributor residual). AFLDB-ISSUE-304 (review F-039; attachment size
   bounds, tracked in the review worktree).
 - **Next action.**
-  1. The operator reviews and commits.
-  2. On each host where the intake timer runs or will run, satisfy the deployment prerequisites (runbook §18.6) and set
-     `AFLDB_INTAKE_AUTHSERV_ID` **before** this code reaches that host.
-  3. Close only after a host's legitimate message is accepted and a non-passing one is refused.
+  1. Before intake is activated on any host (none is active in the places checked), satisfy the activation
+     prerequisites (runbook §18.6): verify the mail provider's header behaviour, confirm the authserv-id, and set
+     `AFLDB_INTAKE_AUTHSERV_ID`.
+  2. Close only after a host's legitimate message is accepted and a non-passing one is refused (`--dry-run`).
+     Live-mail acceptance has not been performed.
+  3. PROD receives `077af7ee` after ISSUE-265's observation; `cd3cf782` is preserved until then.
+  4. DEV `preflight` stays BLOCKED until the operator classifies the untracked settle manifests.

@@ -2,10 +2,14 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). D-266-1 and D-266-2 decided 2026-10-09. **Implemented in the working tree of
-  `fix/issue-266-email-intake`, uncommitted** (§18; pre-commit review fixes §18.8). Isolated Linux suite passed
-  160/160 on streamanator, 2026-10-09 (§18.9). Per-host mail-server verification and configuration outstanding
-  (§18.6); not deployed, no host accepted.
+- **Status:** Open (2026-10-08). D-266-1 and D-266-2 decided 2026-10-09. Implemented (§18; pre-commit review fixes
+  §18.8) and committed as `077af7ee` on `fix/issue-266-email-intake`. Isolated Linux suite passed 160/160 on
+  streamanator, 2026-10-09 (§18.9). **Merged and pushed to main; deployed to DEV only** (`7adfb3e8` → `077af7ee`,
+  §18.10); the deployed suite passed 160/160 on CPython 3.12.3. **PROD inspected, not deployed** (held at `cd3cf782`
+  during ISSUE-265's observation). Neither host has an intake timer, a cron reference, IMAP settings or
+  `AFLDB_INTAKE_AUTHSERV_ID` in the places checked, so the fix is dormant there. Mail-provider verification and
+  authserv-id configuration remain **activation prerequisites** (§18.6); no live mail was tested and no host is
+  accepted. DEV `preflight` is BLOCKED (§18.10.3), not passed.
 - **Severity:** High. **Area:** legacy CSV intake / email ingress / authentication boundary.
 - **Key files:** `tools/email_intake/fetch_and_stage.py` (`sender_is_authenticated`), `src/app/api/admin/email-intake/route.ts`.
 - **Origin:** full code review of `review/full-code-20261008` at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-001; partition note R5a-F01).
@@ -255,6 +259,10 @@ Superseded 2026-10-09 by §18.7.
 
 ### 18.6 Deployment prerequisites (none performed; no host was contacted)
 
+*Update 2026-10-09 (§18.10): the code is now on DEV, and neither host has an active intake. These items are therefore
+**activation** prerequisites: complete them before any intake timer, cron entry or manual poll is enabled on a host.
+Original text follows unchanged.*
+
 For each host where `afldb-email-intake.timer` is or will be enabled (DEV and/or PROD, to be established by the
 operator):
 
@@ -375,7 +383,130 @@ Run `20261009-074215`, executed by the operator; graded here from the local copi
 
 #### 18.9.2 Next action
 
+*Superseded by §18.10.8. Item 1 is done. Item 2 did not happen as written: DEV received the code with no
+authserv-id set, because no intake was active there (§18.10.5). The text below is the earlier record.*
+
 1. The operator reviews and commits the eight changed files.
 2. Complete §18.6 per host, setting `AFLDB_INTAKE_AUTHSERV_ID` **before** the code reaches that host, then deploy.
 3. Resolve only after a host-side `--dry-run` accepts a legitimate message and refuses a non-passing one.
 4. Reconcile the review worktree's ISSUE-266 row at tracker merge (§18.8.5 item 5).
+
+### 18.10 Merge, DEV deployment and host discovery (2026-10-09)
+
+#### 18.10.1 Evidence basis
+
+Two classes of evidence are kept apart below.
+
+- **Saved evidence** is a file under `D:\tmp\issue266\evidence\` that this session read: `dev-before.out`,
+  `discovery-dev.out`, `discovery-dev-post.out` and `discovery-prod.out`. Each discovery file is the output of the
+  read-only kit `D:\tmp\issue266\host-evidence\i266-host-discovery.sh`. It took no `sudo`, started or stopped no service,
+  opened no IMAP login, touched no database and edited nothing. Its first three lines read `OK` for the three kit files
+  (the check against `SHA256SUMS.txt`).
+- **Operator-transcribed** results are console results the operator reported to this session. No output file for them
+  exists under that directory, and they were not re-derived here. Each is labelled *(transcribed)*.
+
+#### 18.10.2 Merge
+
+- *(transcribed)* Fix `077af7ee` (the commit of the eight files, §18.9.2) was merged and pushed to main.
+
+#### 18.10.3 DEV deployment
+
+- *(transcribed)* `deploy/sync-dev.ps1` moved DEV from `7adfb3e8` to `077af7ee` with `-SkipInstall -SkipMigrate
+  -SkipBuild -SkipRestart`. By construction the Next.js service was not rebuilt or restarted. The poller is a separate
+  Python process and the intake route is unchanged.
+- **Before** (saved, `dev-before.out` and `discovery-dev.out`, 08:01 AEDT): HEAD `7adfb3e8`, branch `main`,
+  MainPID `3896015`, started `Thu 2026-10-08 12:56:50 AEDT`, `ActiveState=active`, BUILD_ID `1iy-ZuCMeAIY9W77kTRMT`.
+  The poller was the pre-fix code (`no dmarc_verifies`), SHA-256 `1cf6e522…8464b39`.
+- **After** (saved, `discovery-dev-post.out`, 08:18 AEDT): HEAD `077af7ee` (committed `2026-10-09 07:47:38 +1100`);
+  `ISSUE-266 code PRESENT (dmarc_verifies found)`; deployed `fetch_and_stage.py` SHA-256
+  `1eeb494996072c2aff5c3399cd5cca354fcfe396e9e8af887d0b4eec1d4f21ba`. The after-state discovery file does not record
+  MainPID, BUILD_ID or health.
+- *(transcribed)* The deployed intake files match the commit.
+- *(transcribed)* The suite run on the deployed files: CPython 3.12.3, 160 ok, 0 FAIL, exit 0. Unlike §18.9, which ran
+  the Windows working-tree bytes (§18.10.4), this ran the committed bytes as deployed.
+- *(transcribed)* BUILD_ID unchanged at `1iy-ZuCMeAIY9W77kTRMT`. MainPID unchanged at `3896015`, start time
+  `2026-10-08 12:56:50 AEDT`, service active. These equal the saved before-values.
+- *(transcribed)* Local and LAN health returned HTTP 200 with the database ok.
+- *(transcribed)* **DEV `npm run preflight` was BLOCKED (exit 1).** Its sole failure was nine untracked settle manifests
+  under `docs/rebuild-manifests/afltables_fitzroy_core/`. `sync-dev` had itself classified and preserved them as
+  known operational artifacts. Database identity and migration parity (110/110) passed. **Preflight did not pass, and
+  no waiver or approval for the untracked manifests is recorded.** They are not an ISSUE-266 change and were not touched.
+
+#### 18.10.4 Why the Windows and deployed hashes differ
+
+The worktree's `fetch_and_stage.py` hashes to `C8A09666…723BE893F` (§18.8.4, §18.9), and the deployed file to
+`1eeb4949…1d4f21ba`. The difference is line endings. The Windows working tree holds CRLF; the committed blob and the
+Linux checkout hold LF. *(transcribed)* The two files' Git blob hashes are identical. Git hashes the normalised blob,
+so equal blob hashes with different file hashes means the content is the same and only the line endings differ.
+
+The §18.9 Linux run matched the `C8A09666…` hash on the host, so it ran the CRLF working-tree bytes. The deployed-suite
+run above (transcribed) is the first run on the LF bytes that were committed and deployed.
+
+#### 18.10.5 Host discovery (saved evidence)
+
+| Item | DEV before | DEV after | PROD |
+|---|---|---|---|
+| File | `discovery-dev.out` | `discovery-dev-post.out` | `discovery-prod.out` |
+| Time (AEDT) | 2026-10-09 08:01:01 | 2026-10-09 08:18:40 | 2026-10-09 08:06:27 |
+| Host | streamanator | streamanator | afldb-prod |
+| HEAD | `7adfb3e8` | `077af7ee` | `cd3cf782` (2026-10-06 09:31:00 +1100) |
+| Poller code | pre-fix, `1cf6e522…8464b39` | fix present, `1eeb4949…1d4f21ba` | pre-fix, `1cf6e522…8464b39` |
+| Intake timer and service | not-found, inactive | not-found, inactive | not-found, inactive |
+| Installed unit files | not installed | not installed | not installed |
+| Cron reference (checked places) | none | none | none |
+| `AFLDB_EMAIL_INTAKE_SECRET` | SET | SET | UNSET |
+| IMAP user, password, host, port, mailbox | UNSET | UNSET | UNSET |
+| `AFLDB_INTAKE_URL`, `AFLDB_INTAKE_REQUIRE_AUTH` | UNSET | UNSET | UNSET |
+| `AFLDB_INTAKE_AUTHSERV_ID` | UNSET | UNSET | UNSET |
+
+Readings:
+
+- The fixed poller is on DEV and intake is not set up there: no unit, no scheduler reference in the checked places,
+  no IMAP settings, no authserv-id. The IMAP user is unset, so the mailbox domain and its MX could not be derived.
+- PROD still runs the pre-fix poller and is equally inactive. This is why deploying the fix to either host does not
+  yet need `AFLDB_INTAKE_AUTHSERV_ID`: nothing runs the poller. The setting is needed before intake is activated.
+- By D-266-2, a manual run of the fixed poller on DEV today would exit 78 before opening any mailbox (authserv-id
+  unset while `AFLDB_INTAKE_REQUIRE_AUTH` defaults on). That is code reading (§18.2); it was not run.
+- The pre-fix poller is byte-identical on DEV (before) and PROD (`1cf6e522…`), so PROD's version is not a separate
+  variant.
+
+#### 18.10.6 Limits of the inspection
+
+"No active email intake" means none was found **in the places checked**. It does not prove none exists.
+
+- **Scheduler.** Checked: systemd (`list-unit-files`, `is-enabled`, `is-active`, `list-timers --all`, `show`,
+  `systemctl cat`) for the two `afldb-email-intake*` names only; the `arm` user's crontab; and `/etc/cron.d` plus
+  `/etc/crontab` by name (`email_intake` or `fetch_and_stage`). Not checked: other users' crontabs
+  (including `root`), `/var/spool/cron`, `/etc/cron.hourly|daily|weekly|monthly`, user-level systemd timers, `at`
+  jobs, differently named units, wrappers that call the poller indirectly, other checkouts, containers, or any other
+  machine that could poll a mailbox with credentials of its own. No poller credentials are set in either host's
+  `.env`, which makes a poll from these checkouts unlikely but does not exclude one elsewhere.
+- **Journal.** The kit read `journalctl -u afldb-email-intake.service --since '-3 days'` unprivileged, kept only
+  systemd status lines (poller output names senders and is withheld), and showed the last eight. The PROD file carries
+  systemd's "not seeing messages from other users and the system" hint, so that account could not read the system
+  journal there. The DEV files show no lines and no hint: they cannot distinguish "no runs in three days" from "nothing
+  readable". Neither covers history older than three days.
+- **Not a mailbox check.** No IMAP login was made, so nothing is known about the provider, its
+  `Authentication-Results` format, or whether it strips forged headers.
+
+#### 18.10.7 What is not shown
+
+- No legitimate or forged message has been run through a host: live-mail acceptance was **not performed**.
+- No receiving mail server's header insertion, forged-header removal or authserv-id has been verified (§18.6 items
+  1–4 stand in full).
+- No `--dry-run` was made against a real mailbox on any host.
+- PROD was inspected and **not deployed**. `cd3cf782` is preserved during ISSUE-265's observation window.
+- DEV `preflight` has not passed (§18.10.3).
+
+#### 18.10.8 Next action
+
+1. ISSUE-266 stays **Open**. Do not close on the strength of the merge, the DEV deploy or the deployed suite.
+2. Before intake is activated on any host: complete §18.6 (verify the provider's header behaviour, confirm the real
+   authserv-id, verify a legitimate message's format, confirm the sender domains publish DMARC), then set
+   `AFLDB_INTAKE_AUTHSERV_ID` in that host's `.env`, then enable the timer.
+3. Resolve only after a host-side `--dry-run` accepts a legitimate message and refuses a non-passing one.
+4. PROD receives `077af7ee` through the ordinary PROD deploy after ISSUE-265's observation ends, not before. The
+   discovery above found no active intake on PROD for the fix to affect.
+5. The untracked settle manifests that block DEV `preflight` are the operator's to classify; no part of this issue
+   waives them.
+6. Reconcile the review worktree `afldb-review-20261008`'s ISSUE-266 row at tracker merge. It was not edited.

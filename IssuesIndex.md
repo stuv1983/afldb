@@ -108,12 +108,17 @@
 - **Severity:** High. **Area:** Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py`.
 - **State:** Open (2026-10-08), 2026-10-08 full code review F-001. D-266-1 (trusted `dmarc=pass` only, bound to the
   single From mailbox's domain) and D-266-2 (`AFLDB_INTAKE_AUTHSERV_ID` required; exit 78 before IMAP) were decided on
-  2026-10-09. **Implemented in the working tree, uncommitted.** Pre-commit review fixed two parser gaps (runbook §18.8);
-  the DB-free suite passed 160/160 on Windows and, on 2026-10-09, 160/160 on Linux (streamanator, CPython 3.12.3;
-  runbook §18.9). Live mail-host behaviour and host configuration are unverified; not deployed.
+  2026-10-09. Committed as `077af7ee`, merged and pushed to main. Pre-commit review fixed two parser gaps (runbook
+  §18.8); the DB-free suite passed 160/160 on Windows and on Linux (streamanator, CPython 3.12.3; runbook §18.9).
+  **Deployed to DEV only** (`7adfb3e8` → `077af7ee`; deployed suite 160/160, operator-reported; build and service
+  unchanged; runbook §18.10). DEV `preflight` is BLOCKED by nine untracked settle manifests, not passed. PROD
+  inspected, not deployed (held at `cd3cf782` during ISSUE-265 observation). Neither host has an intake timer, cron
+  reference, IMAP settings or authserv-id in the places checked, so the fix is dormant. Live mail not tested; no host
+  accepted.
 - **Runbook:** `issues/open/AFLDB-ISSUE-266.md`.
-- **Next action:** Operator reviews and commits. Per host, verify the receiving server's header behaviour and
-  authserv-id, then set `AFLDB_INTAKE_AUTHSERV_ID` before deploying (runbook §18.6).
+- **Next action:** Before intake is activated on any host, verify the mail provider's header behaviour, confirm the
+  authserv-id and set `AFLDB_INTAKE_AUTHSERV_ID`, then `--dry-run` a legitimate and a non-passing message (runbook
+  §18.6, §18.10.8). PROD gets the code after ISSUE-265's observation.
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
 decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an
