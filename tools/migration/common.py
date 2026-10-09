@@ -1862,68 +1862,185 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str, *,
             _pms_apply(cur, _pms_plan_from_database(cur, True, continuity_rules))
 
         elif table == "matches":
-            # home_goals, away_goals are NOT NULL. attendance is nullable.
+            # AFLDB-ISSUE-269. The Data Editor keeps one row per (entity_type, entity_key,
+            # field_group), so a match corrected in two groups (attendance AND score, say)
+            # carries two active rows. A bare `UPDATE ... FROM data_overrides` uses ONE joined
+            # row per target and PostgreSQL leaves which one unspecified, so every other group
+            # was silently not re-applied. The rows are therefore MERGED into one object per
+            # match_key first, as the players branch does (AFLDB-ISSUE-224 §21.3.2).
+            #
+            # Every matches override is keyed by match_key alone, so every row has the same
+            # authority: there is no creation record to rank below a correction. Two rows that
+            # disagree about the same field have no honest winner and are REFUSED below; rows
+            # that agree merge to that value, and the ORDER BY field_group tie-break only makes
+            # the choice between identical values deterministic. Inactive rows never contribute.
+            # Only keys that resolve to a match are considered, the rows the UPDATE can apply.
+            merged_overrides_cte = """
+                merged_overrides AS (
+                    SELECT w.match_key, jsonb_object_agg(w.key, w.value) AS override_values
+                      FROM (SELECT DISTINCT ON (o.entity_key, f.key)
+                                   o.entity_key AS match_key, f.key, f.value
+                              FROM data_overrides o
+                              JOIN matches m ON m.match_key = o.entity_key
+                              CROSS JOIN LATERAL jsonb_each(o.override_values) AS f(key, value)
+                             WHERE o.entity_type = 'matches' AND o.is_active = true
+                             ORDER BY o.entity_key, f.key, o.field_group) w
+                     GROUP BY w.match_key
+                )
+            """
+            # The final-period rule is unchanged: a match whose key holds an active `score` row.
+            score_override_keys = """
+                SELECT entity_key FROM data_overrides
+                 WHERE entity_type = 'matches' AND field_group = 'score' AND is_active = true
+            """
+
+            # Fail closed FIRST, over the whole active set, before anything is written.
             cur.execute("""
+                SELECT o.entity_key, f.key,
+                       string_agg(o.field_group || '=' || f.value::text, ', ' ORDER BY o.field_group)
+                           AS rows_in_conflict
+                  FROM data_overrides o
+                  JOIN matches m ON m.match_key = o.entity_key
+                  CROSS JOIN LATERAL jsonb_each(o.override_values) AS f(key, value)
+                 WHERE o.entity_type = 'matches' AND o.is_active = true
+                 GROUP BY o.entity_key, f.key
+                HAVING count(DISTINCT f.value) > 1
+                 ORDER BY o.entity_key, f.key
+            """)
+            equal_authority_conflicts = cur.fetchall()
+            if equal_authority_conflicts:
+                raise RuntimeError(
+                    "replay_admin_overrides(matches): refusing to commit, "
+                    + str(len(equal_authority_conflicts))
+                    + " field(s) are claimed by equal-authority overrides that disagree: "
+                    + "; ".join(
+                        f"match {match_key} field {key!r} -- {rows_in_conflict}"
+                        for match_key, key, rows_in_conflict in equal_authority_conflicts[:10]))
+
+            # A score-overridden match is re-derived from all four components, exactly as the
+            # editor derives it. A component that is still NULL after the merge (the source does
+            # not record it and no override supplies it) cannot be derived without inventing a
+            # zero, so it is refused rather than guessed. This is not a new refusal: the previous
+            # code's separate derived-score UPDATE computed home_score/away_score/margin as NULL for
+            # the same match and failed on their NOT NULL (migration 003). Merging only ADDS
+            # values, so every match refused here also failed before, whichever single row the
+            # old join picked. Census section 4 (issues/open/AFLDB-ISSUE-267-269-override-census.sql)
+            # runs this same evaluation; keep the two in step.
+            cur.execute("WITH " + merged_overrides_cte + """
+                SELECT m.match_key,
+                       array_to_string(array_remove(ARRAY[
+                           CASE WHEN COALESCE((o.override_values->>'home_goals')::smallint, m.home_goals) IS NULL THEN 'home_goals' END,
+                           CASE WHEN COALESCE((o.override_values->>'home_behinds')::smallint, m.home_behinds) IS NULL THEN 'home_behinds' END,
+                           CASE WHEN COALESCE((o.override_values->>'away_goals')::smallint, m.away_goals) IS NULL THEN 'away_goals' END,
+                           CASE WHEN COALESCE((o.override_values->>'away_behinds')::smallint, m.away_behinds) IS NULL THEN 'away_behinds' END
+                       ], NULL), ', ') AS missing
+                  FROM matches m
+                  LEFT JOIN merged_overrides o ON o.match_key = m.match_key
+                 WHERE m.match_key IN (""" + score_override_keys + """)
+                 ORDER BY m.match_key
+            """)
+            underivable = [(key, missing) for key, missing in cur.fetchall() if missing]
+            if underivable:
+                raise RuntimeError(
+                    "replay_admin_overrides(matches): refusing to commit, "
+                    + str(len(underivable))
+                    + " score-overridden match(es) lack a score component the override does not supply: "
+                    + "; ".join(f"match {key} -- {missing}" for key, missing in underivable[:10]))
+
+            # ONE statement writes the components AND everything derived from them. Applying the
+            # components first and re-deriving in a second UPDATE left a row between the two whose
+            # corrected goals no longer reconciled with its stored total, and
+            # matches_score_components_ck (migration 022) rejects that row at once (SQLSTATE
+            # 23514; operator run 2026-10-09, `2081|issue267-one-field` as 16.10 with
+            # home_score 100). SET expressions all read the OLD row, so the derived columns cannot
+            # read the new components from `m`: the `effective` CTE computes the components
+            # first, and every SET reads them from there.
+            #
+            # attendance and the four score components are nullable (migrations 003, 022). An
+            # absent key leaves the column as loaded; an explicit JSON null clears attendance,
+            # match_time, match_event and notes, but never a score component (COALESCE).
+            #
+            # `rederive` is the unchanged score-override rule: only a match whose key holds an
+            # active `score` row has its totals, margin, result and winner re-derived; every other
+            # match keeps them exactly as loaded, as before. The underivable preflight above has
+            # already proved all four effective components non-NULL for every rederive row.
+            # A score-overridden match whose override rows merge to no key at all (an empty
+            # object) is still re-derived, from its loaded components, as the old second UPDATE
+            # did.
+            cur.execute("WITH " + merged_overrides_cte + """,
+                effective AS (
+                    SELECT m.id,
+                           COALESCE(o.override_values, '{}'::jsonb) AS override_values,
+                           COALESCE((o.override_values->>'home_goals')::smallint, m.home_goals) AS hg,
+                           COALESCE((o.override_values->>'home_behinds')::smallint, m.home_behinds) AS hb,
+                           COALESCE((o.override_values->>'away_goals')::smallint, m.away_goals) AS ag,
+                           COALESCE((o.override_values->>'away_behinds')::smallint, m.away_behinds) AS ab,
+                           COALESCE(m.match_key IN (""" + score_override_keys + """), false) AS rederive
+                      FROM matches m
+                      LEFT JOIN merged_overrides o ON o.match_key = m.match_key
+                     WHERE o.match_key IS NOT NULL
+                        OR m.match_key IN (""" + score_override_keys + """)
+                ),
+                derived AS (
+                    SELECT e.*, (e.hg * 6 + e.hb) AS home_total, (e.ag * 6 + e.ab) AS away_total
+                      FROM effective e
+                )
                 UPDATE matches m
-                   SET attendance = CASE WHEN jsonb_exists(o.override_values, 'attendance') THEN (o.override_values->>'attendance')::integer ELSE m.attendance END,
+                   SET attendance = CASE WHEN jsonb_exists(d.override_values, 'attendance') THEN (d.override_values->>'attendance')::integer ELSE m.attendance END,
                        attendance_status = CASE
-                           WHEN jsonb_exists(o.override_values, 'attendance') THEN
-                               CASE WHEN (o.override_values->>'attendance') IS NULL THEN 'not_collected'::coverage_status ELSE 'complete'::coverage_status END
+                           WHEN jsonb_exists(d.override_values, 'attendance') THEN
+                               CASE WHEN (d.override_values->>'attendance') IS NULL THEN 'not_collected'::coverage_status ELSE 'complete'::coverage_status END
                            ELSE m.attendance_status
                        END,
                        attendance_source_id = CASE
-                           WHEN jsonb_exists(o.override_values, 'attendance') THEN
-                               CASE WHEN (o.override_values->>'attendance') IS NULL THEN NULL ELSE (SELECT id FROM sources WHERE key = 'manual_admin_edit') END
+                           WHEN jsonb_exists(d.override_values, 'attendance') THEN
+                               CASE WHEN (d.override_values->>'attendance') IS NULL THEN NULL ELSE (SELECT id FROM sources WHERE key = 'manual_admin_edit') END
                            ELSE m.attendance_source_id
                        END,
-                       match_time = CASE WHEN jsonb_exists(o.override_values, 'match_time') THEN o.override_values->>'match_time' ELSE m.match_time END,
-                       match_event = CASE WHEN jsonb_exists(o.override_values, 'match_event') THEN o.override_values->>'match_event' ELSE m.match_event END,
-                       notes = CASE WHEN jsonb_exists(o.override_values, 'notes') THEN o.override_values->>'notes' ELSE m.notes END,
-                       home_goals = COALESCE((o.override_values->>'home_goals')::smallint, m.home_goals),
-                       home_behinds = COALESCE((o.override_values->>'home_behinds')::smallint, m.home_behinds),
-                       away_goals = COALESCE((o.override_values->>'away_goals')::smallint, m.away_goals),
-                       away_behinds = COALESCE((o.override_values->>'away_behinds')::smallint, m.away_behinds)
-                  FROM data_overrides o
-                 WHERE o.entity_type = 'matches' AND o.entity_key = m.match_key AND o.is_active = true
-            """)
-            # Recalculate derived score fields for overridden matches
-            cur.execute("""
-                UPDATE matches m
-                   SET home_score = (home_goals * 6 + home_behinds)::smallint,
-                       away_score = (away_goals * 6 + away_behinds)::smallint,
-                       margin = abs((home_goals * 6 + home_behinds) - (away_goals * 6 + away_behinds))::smallint,
+                       match_time = CASE WHEN jsonb_exists(d.override_values, 'match_time') THEN d.override_values->>'match_time' ELSE m.match_time END,
+                       match_event = CASE WHEN jsonb_exists(d.override_values, 'match_event') THEN d.override_values->>'match_event' ELSE m.match_event END,
+                       notes = CASE WHEN jsonb_exists(d.override_values, 'notes') THEN d.override_values->>'notes' ELSE m.notes END,
+                       home_goals = d.hg,
+                       home_behinds = d.hb,
+                       away_goals = d.ag,
+                       away_behinds = d.ab,
+                       home_score = CASE WHEN d.rederive THEN d.home_total::smallint ELSE m.home_score END,
+                       away_score = CASE WHEN d.rederive THEN d.away_total::smallint ELSE m.away_score END,
+                       margin = CASE WHEN d.rederive THEN abs(d.home_total - d.away_total)::smallint ELSE m.margin END,
                        result = CASE
-                           WHEN (home_goals * 6 + home_behinds) > (away_goals * 6 + away_behinds) THEN 'home_win'::match_result
-                           WHEN (home_goals * 6 + home_behinds) < (away_goals * 6 + away_behinds) THEN 'away_win'::match_result
+                           WHEN NOT d.rederive THEN m.result
+                           WHEN d.home_total > d.away_total THEN 'home_win'::match_result
+                           WHEN d.home_total < d.away_total THEN 'away_win'::match_result
                            ELSE 'draw'::match_result
                        END,
                        winner_club_id = CASE
-                           WHEN (home_goals * 6 + home_behinds) > (away_goals * 6 + away_behinds) THEN home_club_id
-                           WHEN (home_goals * 6 + home_behinds) < (away_goals * 6 + away_behinds) THEN away_club_id
+                           WHEN NOT d.rederive THEN m.winner_club_id
+                           WHEN d.home_total > d.away_total THEN m.home_club_id
+                           WHEN d.home_total < d.away_total THEN m.away_club_id
                            ELSE NULL
                        END
-                 WHERE m.match_key IN (
-                     SELECT entity_key FROM data_overrides
-                      WHERE entity_type = 'matches' AND field_group = 'score' AND is_active = true
-                 )
+                  FROM derived d
+                 WHERE d.id = m.id
             """)
-            # Period scores injection for score overrides
+            # AFLDB-ISSUE-267. The final-period rows are cumulative and must equal the corrected
+            # totals, so both clubs' rows are written from the UPDATED matches row, never from
+            # the payload: the editor stores only the components that changed, and reading an
+            # absent one from the payload wrote NULL over a recorded figure. Points are derived
+            # as the editor derives them (applyMatchEdit, src/db/queries/data-edits.ts). The
+            # final period is the editor's rule too: 4 unless extra-time rows (5+) already exist.
             cur.execute("""
-                WITH overrides AS (
+                WITH synced AS (
                     SELECT m.id AS match_id, m.home_club_id, m.away_club_id,
-                           (o.override_values->>'home_goals')::int AS hg,
-                           (o.override_values->>'home_behinds')::int AS hb,
-                           (o.override_values->>'away_goals')::int AS ag,
-                           (o.override_values->>'away_behinds')::int AS ab,
+                           m.home_goals AS hg, m.home_behinds AS hb,
+                           m.away_goals AS ag, m.away_behinds AS ab,
                            (SELECT GREATEST(COALESCE(max(period), 4), 4)::int FROM match_period_scores WHERE match_id = m.id) AS final_period
-                      FROM data_overrides o
-                      JOIN matches m ON m.match_key = o.entity_key
-                     WHERE o.entity_type = 'matches' AND o.field_group = 'score' AND o.is_active = true
+                      FROM matches m
+                     WHERE m.match_key IN (""" + score_override_keys + """)
                 )
                 INSERT INTO match_period_scores (match_id, club_id, period, goals, behinds, points)
-                SELECT match_id, home_club_id, final_period, hg, hb, (hg * 6 + hb) FROM overrides
+                SELECT match_id, home_club_id, final_period, hg, hb, (hg * 6 + hb) FROM synced
                 UNION ALL
-                SELECT match_id, away_club_id, final_period, ag, ab, (ag * 6 + ab) FROM overrides
+                SELECT match_id, away_club_id, final_period, ag, ab, (ag * 6 + ab) FROM synced
                 ON CONFLICT (match_id, club_id, period) DO UPDATE SET
                   goals = EXCLUDED.goals,
                   behinds = EXCLUDED.behinds,

@@ -2270,3 +2270,594 @@ describe('AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score e
     }, FX_TIMEOUT);
   });
 });
+
+/* ---------------------------------------------------------------------------------------
+ * AFLDB-ISSUE-267 / AFLDB-ISSUE-269: replay_admin_overrides('matches').
+ *
+ * The REAL tools/migration/common.py replay, spawned in Python, over committed synthetic
+ * fixtures (the Python connection cannot see an uncommitted TypeScript transaction).
+ *
+ * TRANSACTION BOUNDARY. The replay is database-wide: it re-applies EVERY active `matches`
+ * override and re-syncs every score-overridden match's final period, not only the fixture's.
+ * So the Python side never commits. It snapshots the fixture, replays (twice, for
+ * idempotence), snapshots again, and ROLLS BACK, all on one connection that sees its own
+ * writes. No real match is changed by this suite. The cost: a foreign active override in
+ * afldb_test that the replay itself refuses (a disagreement, an underivable score) refuses
+ * these cases too, and the refusal text names the foreign key.
+ *
+ * A reload is simulated by restoring the fixture's SOURCE values (committed) after the
+ * editor wrote its override, which is the state a `matches` reload leaves before it replays.
+ *
+ * Namespace: season 2081 (no test, src, tools or deploy source names it; 2080 is the ISSUE-261
+ * fixture above, 2082-2099 other suites), match keys `2081|issue267-*`.
+ *
+ * OWNERSHIP. A preflight runs FIRST, before anything is deleted or written: any season 2081
+ * row, season-2081 or `2081|issue267-*` match, season-2081 club_seasons row, `2081|issue267-*`
+ * override or ISSUE-267-noted matches edit is foreign state (another suite, real data, or the
+ * residue of a crashed run), and the suite refuses to start. Until the preflight passes,
+ * seeding refuses and cleanup is a no-op. Cleanup then deletes only what this run recorded
+ * creating: its match ids and keys (and their overrides, edits and period rows), the season's
+ * club_seasons rows its own score saves derived (saveEdit267), and the season row only if THIS
+ * run's INSERT created it. "No match of the season remains" is never read as ownership on its
+ * own. One transaction: a failure part-way deletes nothing, so the residue stays whole and
+ * reportable rather than a season row stranded under its ladder (operator run 2026-10-09:
+ * club_seasons_season_fkey, two rows left, historical club_seasons 1,624 -> 1,626).
+ * ------------------------------------------------------------------------------------ */
+const SEASON_267 = 2081;
+const KEY_ROOT_267 = `${SEASON_267}|issue267-`;
+const NOTE_267 = 'issue-267 replay';
+/** Exactly what this run created; cleanup deletes nothing outside it. Ids are never reused. */
+const owned267 = {
+  preflightPassed: false,
+  createdSeason: false,
+  matchIds: [] as number[],
+  matchKeys: [] as string[],
+  /** club_seasons.club_id of the owned season's ladder rows this run's score saves derived. */
+  clubSeasonClubIds: [] as number[],
+};
+const ids267 = (ids: number[]) => (ids.length > 0 ? ids : [0]);
+const keys267 = (keys: string[]) => (keys.length > 0 ? keys : ['']);
+
+type Fx267 = { matchId: number; matchKey: string; homeClubId: number; awayClubId: number };
+type Period267 = [clubId: number, period: number, goals: number | null, behinds: number | null, points: number | null];
+type Snapshot267 = Record<string, { match: Record<string, unknown>; periods: Period267[] }>;
+type Replay267 = {
+  before: Snapshot267;
+  first?: Snapshot267;
+  second?: Snapshot267;
+  refused?: string;
+  afterRefusal?: Snapshot267;
+};
+
+/**
+ * The fixture's source score, 15.10 (100) v 12.8 (80), and its cumulative quarter rows
+ * (Q4 = the totals). `homeBehinds: null` seeds a match whose home breakdown is not recorded.
+ */
+const SOURCE_267 = { homeGoals: 15, homeBehinds: 10, awayGoals: 12, awayBehinds: 8 };
+const SOURCE_PERIODS_267 = {
+  home: [[1, 4, 2], [2, 8, 5], [3, 11, 7], [4, 15, 10]],
+  away: [[1, 3, 1], [2, 6, 4], [3, 9, 6], [4, 12, 8]],
+} as const;
+
+async function seedFixture267(token: string, opts: { homeBehinds?: number | null } = {}): Promise<Fx267> {
+  if (!owned267.preflightPassed) throw new Error('ISSUE-267 fixture: refusing to seed before the ownership preflight passes');
+  const homeBehinds = opts.homeBehinds === undefined ? SOURCE_267.homeBehinds : opts.homeBehinds;
+  const seeded = await sql.begin(async (tx) => {
+    const clubs = await tx<{ id: number }[]>`
+      SELECT DISTINCT ON (organization_id) id::int AS id
+        FROM clubs
+       WHERE organization_id IS NOT NULL
+       ORDER BY organization_id, id
+       LIMIT 2
+    `;
+    if (clubs.length < 2) throw new Error('ISSUE-267 fixture needs two club identities');
+    const [home, away] = clubs;
+    const [source] = await tx<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'afltables'`;
+    // RETURNING tells this run whether ITS insert created the season; a row that appeared
+    // since the preflight is left alone, and so is never deleted.
+    const createdSeason = (await tx`
+      INSERT INTO seasons (year, league, status)
+      VALUES (${SEASON_267}, 'AFL', 'complete'::season_status)
+      ON CONFLICT DO NOTHING
+      RETURNING year
+    `).length === 1;
+    const matchKey = `${KEY_ROOT_267}${token}`;
+    const [m] = await tx<{ id: number }[]>`
+      INSERT INTO matches (
+        match_key, season, round_code, round_number, round_type, is_final,
+        match_date, venue_raw, home_club_id, away_club_id,
+        home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
+        result, winner_club_id, margin,
+        attendance, attendance_status, source_id
+      ) VALUES (
+        ${matchKey}, ${SEASON_267}, '1', 1, 'home_and_away'::round_type, false,
+        ${`${SEASON_267}-03-05`}, 'ISSUE-267 Fixture Oval', ${home.id}, ${away.id},
+        ${SOURCE_267.homeGoals}, ${homeBehinds}, 100, ${SOURCE_267.awayGoals}, ${SOURCE_267.awayBehinds}, 80,
+        'home_win'::match_result, ${home.id}, 20,
+        NULL, 'not_collected'::coverage_status, ${source.id}
+      )
+      RETURNING id::int AS id
+    `;
+    return { createdSeason, fx: { matchId: m.id, matchKey, homeClubId: home.id, awayClubId: away.id } };
+  });
+  // Recorded only once the transaction committed: a rolled-back seed created nothing.
+  if (seeded.createdSeason) owned267.createdSeason = true;
+  owned267.matchIds.push(seeded.fx.matchId);
+  owned267.matchKeys.push(seeded.fx.matchKey);
+  const fx = seeded.fx;
+  await reloadSource267(fx, opts);
+  return fx;
+}
+
+/**
+ * What a `matches` reload leaves before it replays: every column an override can touch back at
+ * its source value, and the source's period rows. Committed, so the Python connection sees it.
+ */
+async function reloadSource267(fx: Fx267, opts: { homeBehinds?: number | null } = {}): Promise<void> {
+  const homeBehinds = opts.homeBehinds === undefined ? SOURCE_267.homeBehinds : opts.homeBehinds;
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE matches
+         SET home_goals = ${SOURCE_267.homeGoals}, home_behinds = ${homeBehinds}, home_score = 100,
+             away_goals = ${SOURCE_267.awayGoals}, away_behinds = ${SOURCE_267.awayBehinds}, away_score = 80,
+             result = 'home_win'::match_result, winner_club_id = home_club_id, margin = 20,
+             attendance = NULL, attendance_status = 'not_collected'::coverage_status,
+             attendance_source_id = NULL, match_time = NULL, match_event = NULL, notes = NULL
+       WHERE id = ${fx.matchId}
+    `;
+    await tx`DELETE FROM match_period_scores WHERE match_id = ${fx.matchId}`;
+    for (const [clubId, rows] of [[fx.homeClubId, SOURCE_PERIODS_267.home], [fx.awayClubId, SOURCE_PERIODS_267.away]] as const) {
+      for (const [period, goals, behinds] of rows) {
+        // The home side's breakdown is "not recorded" when the fixture says so, not zero.
+        const b = clubId === fx.homeClubId && homeBehinds === null ? null : behinds;
+        const points = clubId === fx.homeClubId && period === 4 ? 100 : b === null ? null : goals * 6 + b;
+        await tx`
+          INSERT INTO match_period_scores (match_id, club_id, period, goals, behinds, points)
+          VALUES (${fx.matchId}, ${clubId}, ${period}, ${goals}, ${b}, ${points})
+        `;
+      }
+    }
+  });
+}
+
+const NO_FOREIGN_STATE_267 = { seasons: 0, matches: 0, clubSeasons: 0, dataOverrides: 0, dataEdits: 0 };
+
+/**
+ * The ownership preflight. Reads only; deletes nothing. Passes only when the namespace holds
+ * no state at all, so everything found in it afterwards was created by this run.
+ */
+async function preflight267(): Promise<void> {
+  const [found] = await sql<(typeof NO_FOREIGN_STATE_267)[]>`
+    SELECT
+      (SELECT count(*) FROM seasons WHERE year = ${SEASON_267})::int AS seasons,
+      (SELECT count(*) FROM matches
+        WHERE season = ${SEASON_267} OR starts_with(match_key, ${KEY_ROOT_267}::text))::int AS matches,
+      (SELECT count(*) FROM club_seasons WHERE season = ${SEASON_267})::int AS "clubSeasons",
+      (SELECT count(*) FROM data_overrides
+        WHERE entity_type = 'matches' AND starts_with(entity_key, ${KEY_ROOT_267}::text))::int AS "dataOverrides",
+      (SELECT count(*) FROM data_edits WHERE table_name = 'matches' AND note = ${NOTE_267})::int AS "dataEdits"
+  `;
+  expect(found, `season ${SEASON_267} and keys ${KEY_ROOT_267}* are reserved for the ISSUE-267 fixture, `
+    + 'but foreign state exists; nothing was deleted. Inspect and remove it by hand before re-running.')
+    .toEqual(NO_FOREIGN_STATE_267);
+  owned267.preflightPassed = true;
+}
+
+/**
+ * The live editor save on a fixture match, recording the derived rows it creates.
+ *
+ * A committed `score` save runs applyMatchEdit's coupled recomputes (src/db/queries/data-edits.ts)
+ * over the fixture's season (src/db/queries/player-derived.ts):
+ *   - recomputeSeasonMetadata: UPDATEs the season row (owned; deleted last);
+ *   - recomputeClubSeasons: DELETEs and re-INSERTs the season's ladder, one club_seasons row per
+ *     club with a home-and-away match: these are the rows recorded here;
+ *   - recomputePlayerDerivedStats: a no-op, the fixture has no player_match_stats;
+ *   - recomputeSeasonBrownlowStatus: UPDATEs player_season_stats of the season, of which it has none.
+ * Plus the period rows, the override and the data_edits audit row, all keyed to the fixture match.
+ * Other groups write only the match row, the override and the audit row.
+ *
+ * Recorded only while the season is this run's and every match of it is this run's: the
+ * preflight proved the season held no ladder row, so each one present then was written by this
+ * run's recompute. A ladder that also counts a foreign match is never claimed.
+ */
+async function saveEdit267(input: Parameters<typeof saveEdit>[0]): ReturnType<typeof saveEdit> {
+  const saved = await saveEdit(input);
+  if (saved.ok && input.groupKey === 'score' && owned267.createdSeason) {
+    const rows = await sql<{ clubId: number }[]>`
+      SELECT cs.club_id::int AS "clubId"
+        FROM club_seasons cs
+       WHERE cs.season = ${SEASON_267}
+         AND NOT EXISTS (
+           SELECT 1 FROM matches m
+            WHERE m.season = ${SEASON_267} AND NOT (m.id = ANY(${ids267(owned267.matchIds)}))
+         )
+    `;
+    for (const { clubId } of rows) {
+      if (!owned267.clubSeasonClubIds.includes(clubId)) owned267.clubSeasonClubIds.push(clubId);
+    }
+  }
+  return saved;
+}
+
+/**
+ * Removes exactly what this run created, children first, in ONE transaction. Idempotent. A
+ * no-op until the preflight passes, so a refused run never deletes anything.
+ */
+async function cleanup267(): Promise<void> {
+  if (!owned267.preflightPassed) return;
+  const mids = ids267(owned267.matchIds);
+  await sql.begin(async (tx) => {
+    await tx`
+      DELETE FROM data_overrides
+       WHERE entity_type = 'matches' AND entity_key = ANY(${keys267(owned267.matchKeys)})
+    `;
+    await tx`DELETE FROM data_edits WHERE table_name = 'matches' AND row_id = ANY(${mids})`;
+    await tx`DELETE FROM match_period_scores WHERE match_id = ANY(${mids})`;
+    await tx`DELETE FROM matches WHERE id = ANY(${mids})`;
+    if (!owned267.createdSeason) return;
+    // The ladder rows this run's score saves derived, before their parent season. Only once no
+    // match of the season survives: a surviving (foreign) match is counted in them.
+    await tx`
+      DELETE FROM club_seasons
+       WHERE season = ${SEASON_267} AND club_id = ANY(${ids267(owned267.clubSeasonClubIds)})
+         AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${SEASON_267})
+    `;
+    // This run's INSERT created the season. A match or ladder row that is not ours keeps it
+    // regardless: the season then stays as residue for the assertion to report, never deleted
+    // from under it.
+    await tx`
+      DELETE FROM seasons
+       WHERE year = ${SEASON_267}
+         AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${SEASON_267})
+         AND NOT EXISTS (SELECT 1 FROM club_seasons WHERE season = ${SEASON_267})
+    `;
+  });
+  // Recorded only once the transaction committed: a rolled-back cleanup released nothing.
+  owned267.createdSeason = false;
+  owned267.clubSeasonClubIds = [];
+}
+
+const NO_RESIDUE_267 = { dataOverrides: 0, dataEdits: 0, periodScores: 0, clubSeasons: 0, matches: 0, seasons: 0 };
+
+async function residue267(): Promise<typeof NO_RESIDUE_267> {
+  const mids = ids267(owned267.matchIds);
+  const [r] = await sql<(typeof NO_RESIDUE_267)[]>`
+    SELECT
+      (SELECT count(*) FROM data_overrides
+        WHERE entity_type = 'matches' AND starts_with(entity_key, ${KEY_ROOT_267}::text))::int AS "dataOverrides",
+      (SELECT count(*) FROM data_edits
+        WHERE table_name = 'matches' AND (row_id = ANY(${mids}) OR note = ${NOTE_267}))::int AS "dataEdits",
+      (SELECT count(*) FROM match_period_scores WHERE match_id = ANY(${mids}))::int AS "periodScores",
+      (SELECT count(*) FROM club_seasons WHERE season = ${SEASON_267})::int AS "clubSeasons",
+      (SELECT count(*) FROM matches
+        WHERE id = ANY(${mids}) OR starts_with(match_key, ${KEY_ROOT_267}::text))::int AS "matches",
+      (SELECT count(*) FROM seasons WHERE year = ${SEASON_267})::int AS "seasons"
+  `;
+  return r;
+}
+
+describe('AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period', () => {
+  const TIMEOUT = 120_000;
+  const root = process.cwd();
+  const venvPython = process.platform === 'win32'
+    ? join(root, '.venv', 'Scripts', 'python.exe')
+    : join(root, '.venv', 'bin', 'python');
+  const python = process.env.AFLDB_PYTHON
+    ?? (existsSync(venvPython) ? venvPython : (process.platform === 'win32' ? 'python' : 'python3'));
+  // Every subprocess and database wait is bounded. The process limit sits inside the test
+  // TIMEOUT so a hang is reported as a hang, not as a vitest timeout.
+  const PROBE_TIMEOUT_MS = 30_000;
+  const REPLAY_PROCESS_TIMEOUT_MS = 90_000;
+  const REPLAY_CONNECT_TIMEOUT_S = 10;
+  const REPLAY_LOCK_TIMEOUT = '5s';
+  const REPLAY_STATEMENT_TIMEOUT = '30s';
+
+  const probe = spawnSync(python, ['-c', 'import psycopg'], { encoding: 'utf8', timeout: PROBE_TIMEOUT_MS });
+  const probeFailure = probe.error
+    ? ((probe.error as NodeJS.ErrnoException).code === 'ETIMEDOUT'
+      ? `timed out after ${PROBE_TIMEOUT_MS} ms and was killed`
+      : `could not run: ${probe.error.message}`)
+    : probe.signal ? `was terminated by ${probe.signal}`
+    : probe.status !== 0 ? `exited ${probe.status}: ${(probe.stderr ?? '').trim().split(/\r?\n/).pop()}`
+    : null;
+  const canReplay = probeFailure === null;
+  if (!canReplay) {
+    // A skip must never pass for a run: say why, so "6 passed" is checked, not assumed.
+    console.warn(`AFLDB-ISSUE-267/269 replay cases SKIPPED: \`${python} -c "import psycopg"\` ${probeFailure}`);
+  }
+
+  /**
+   * The REAL replay_admin_overrides(conn, 'matches'), run twice on one connection between
+   * snapshots of the fixture matches, then ROLLED BACK (see the section comment). A
+   * RuntimeError refusal is caught and the fixture is snapshotted again in the same
+   * transaction, so "refused before any write" is observed, not inferred from a rollback.
+   *
+   * Bounded: a connect timeout, transaction-local lock and statement timeouts (nothing here
+   * commits, so SET LOCAL holds for both passes), and a process timeout. A database error,
+   * timeouts included, is printed as REPLAY267_ERROR after the rollback. A killed process
+   * cannot roll back itself; the server aborts its open transaction when the connection drops.
+   */
+  const replay = (fixtures: Fx267[]): Replay267 => {
+    const r = spawnSync(python, ['-c', [
+      'import sys, os, json',
+      `sys.path.insert(0, ${JSON.stringify(join(root, 'tools', 'migration'))})`,
+      'import psycopg',
+      'from common import replay_admin_overrides',
+      'keys = json.loads(os.environ["AFLDB_ISSUE267_KEYS"])',
+      'conn = None',
+      'def snapshot():',
+      '    with conn.cursor() as cur:',
+      '        cur.execute("""',
+      '            SELECT coalesce(jsonb_object_agg(m.match_key, jsonb_build_object(',
+      "                       'match', to_jsonb(m),",
+      "                       'periods', (SELECT coalesce(jsonb_agg(jsonb_build_array(",
+      '                                              p.club_id, p.period, p.goals, p.behinds, p.points)',
+      '                                            ORDER BY p.period, p.club_id), \'[]\'::jsonb)',
+      '                                     FROM match_period_scores p WHERE p.match_id = m.id))),',
+      "                   '{}'::jsonb)",
+      '              FROM matches m WHERE m.match_key = ANY(%s)',
+      '        """, (keys,))',
+      '        return cur.fetchone()[0]',
+      'out = {}',
+      'try:',
+      `    conn = psycopg.connect(os.environ["AFLDB_REPLAY_DSN"], connect_timeout=${REPLAY_CONNECT_TIMEOUT_S})`,
+      '    with conn.cursor() as cur:',
+      `        cur.execute("SET LOCAL lock_timeout = '${REPLAY_LOCK_TIMEOUT}'")`,
+      `        cur.execute("SET LOCAL statement_timeout = '${REPLAY_STATEMENT_TIMEOUT}'")`,
+      '    out["before"] = snapshot()',
+      '    try:',
+      '        replay_admin_overrides(conn, "matches")',
+      '        out["first"] = snapshot()',
+      '        replay_admin_overrides(conn, "matches")',
+      '        out["second"] = snapshot()',
+      '    except RuntimeError as exc:',
+      '        out["refused"] = str(exc)',
+      '        out["afterRefusal"] = snapshot()',
+      'except psycopg.Error as exc:',
+      '    print("REPLAY267_ERROR " + json.dumps({"type": type(exc).__name__,',
+      '                                          "sqlstate": getattr(exc, "sqlstate", None),',
+      '                                          "message": str(exc).strip()}), flush=True)',
+      '    sys.exit(3)',
+      'finally:',
+      '    if conn is not None and not conn.closed:',
+      '        try:',
+      '            conn.rollback()',
+      '        finally:',
+      '            conn.close()',
+      'print("REPLAY267 " + json.dumps(out))',
+    ].join('\n')], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: REPLAY_PROCESS_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
+      env: {
+        ...process.env,
+        AFLDB_REPLAY_DSN: process.env.AFLDB_TEST_DATABASE_URL,
+        AFLDB_ISSUE267_KEYS: JSON.stringify(fixtures.map((f) => f.matchKey)),
+      },
+    });
+    const output = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+    if (r.error) {
+      throw new Error((r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT'
+        ? `ISSUE-267 replay process exceeded ${REPLAY_PROCESS_TIMEOUT_MS} ms and was killed; `
+          + `the server aborts its uncommitted transaction on disconnect.\n${output}`
+        : `ISSUE-267 replay process could not run (${python}): ${r.error.message}\n${output}`);
+    }
+    if (r.signal) throw new Error(`ISSUE-267 replay process was terminated by ${r.signal}.\n${output}`);
+    const failure = r.stdout.split(/\r?\n/).find((l) => l.startsWith('REPLAY267_ERROR '));
+    if (failure) {
+      throw new Error(`ISSUE-267 replay failed in the database and was rolled back (connect ${REPLAY_CONNECT_TIMEOUT_S} s, `
+        + `lock ${REPLAY_LOCK_TIMEOUT}, statement ${REPLAY_STATEMENT_TIMEOUT}): ${failure.slice('REPLAY267_ERROR '.length)}`);
+    }
+    expect(r.status, output).toBe(0);
+    const line = r.stdout.split(/\r?\n/).find((l) => l.startsWith('REPLAY267 '));
+    expect(line, output).toBeDefined();
+    return JSON.parse(line!.slice('REPLAY267 '.length)) as Replay267;
+  };
+
+  /** Replays that must succeed: not refused, and the second pass changes nothing. */
+  const replayOk = (fixtures: Fx267[]) => {
+    const out = replay(fixtures);
+    expect(out.refused, 'the replay refused; a foreign afldb_test override may be the cause').toBeUndefined();
+    expect(out.second, 'repeating the replay changes the result').toEqual(out.first);
+    return out.first!;
+  };
+
+  const override = (fx: Fx267, fieldGroup: string, values: Record<string, unknown>, isActive = true) => sql`
+    INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active)
+    VALUES ('matches', ${fx.matchKey}, ${fieldGroup}, ${sql.json(values as never)}, ${adminUserId}, ${isActive})
+  `;
+
+  const overridesOf = async (fx: Fx267) => Object.fromEntries((await sql<{
+    fieldGroup: string; overrideValues: Record<string, unknown>;
+  }[]>`
+    SELECT field_group AS "fieldGroup", override_values AS "overrideValues"
+      FROM data_overrides
+     WHERE entity_type = 'matches' AND entity_key = ${fx.matchKey} AND is_active
+  `).map((row) => [row.fieldGroup, row.overrideValues]));
+
+  /** Q1-Q3 as the source published them, and the final (Q4) row as given. */
+  const periodsWith = (
+    fx: Fx267,
+    home: [number, number, number],
+    away: [number, number, number],
+  ): Period267[] => {
+    const rows: Period267[] = [];
+    for (const [period, hg, hb] of SOURCE_PERIODS_267.home.slice(0, 3)) {
+      rows.push([fx.homeClubId, period, hg, hb, hg * 6 + hb]);
+    }
+    for (const [period, ag, ab] of SOURCE_PERIODS_267.away.slice(0, 3)) {
+      rows.push([fx.awayClubId, period, ag, ab, ag * 6 + ab]);
+    }
+    rows.push([fx.homeClubId, 4, ...home], [fx.awayClubId, 4, ...away]);
+    return rows.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  };
+
+  /** Every final-period row equals its club's corrected match totals, with nothing NULL. */
+  const expectFinalPeriodMatchesTotals = (state: Snapshot267[string], fx: Fx267) => {
+    const m = state.match as Record<string, number>;
+    const q4 = state.periods.filter((p) => p[1] === 4);
+    expect(q4).toEqual(expect.arrayContaining([
+      [fx.homeClubId, 4, m.home_goals, m.home_behinds, m.home_score],
+      [fx.awayClubId, 4, m.away_goals, m.away_behinds, m.away_score],
+    ]));
+    expect(q4).toHaveLength(2);
+  };
+
+  /**
+   * Census section 4, read from the operator census file itself and run as written, so the
+   * test fails if the census and the Python preflight stop evaluating the same thing.
+   */
+  const censusUnderivable = async (): Promise<{ match_key: string; missing: string }[]> => {
+    const census = readFileSync(join(root, 'issues', 'open', 'AFLDB-ISSUE-267-269-override-census.sql'), 'utf8');
+    const section = /^\\echo '== 4\..*$([\s\S]*?)^\\echo '== 5\./m.exec(census);
+    expect(section, 'census section 4 not found between its == 4. and == 5. markers').not.toBeNull();
+    const statement = section![1].trim().replace(/;$/, '');
+    return (await sql.unsafe(statement)) as unknown as { match_key: string; missing: string }[];
+  };
+
+  // The preflight reads only and deletes nothing; a refusal leaves cleanup a no-op.
+  beforeAll(async () => {
+    await preflight267();
+  }, TIMEOUT);
+
+  afterEach(async () => {
+    await cleanup267();
+  }, TIMEOUT);
+
+  afterAll(async () => {
+    if (!owned267.preflightPassed) return;
+    await cleanup267();
+    expect(await residue267()).toEqual(NO_RESIDUE_267);
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('ISSUE-267: a one-field score edit keeps every unchanged component, and both final-period rows equal the corrected totals', async () => {
+    const fx = await seedFixture267('one-field');
+    const saved = await saveEdit267({
+      entityKey: 'matches', rowId: fx.matchId, groupKey: 'score',
+      raw: { home_goals: '16', home_behinds: '10', away_goals: '12', away_behinds: '8' },
+      adminUserId, note: NOTE_267,
+    });
+    expect(saved).toMatchObject({ ok: true });
+    // The score save derived the season's ladder, one row per fixture club, and cleanup owns it.
+    expect([...owned267.clubSeasonClubIds].sort((a, b) => a - b))
+      .toEqual([fx.homeClubId, fx.awayClubId].sort((a, b) => a - b));
+    // The editor stores only what changed: this partial payload is the ISSUE-267 trigger.
+    expect(await overridesOf(fx)).toEqual({ score: { home_goals: 16 } });
+
+    await reloadSource267(fx);
+    const after = replayOk([fx])[fx.matchKey];
+
+    expect(after.match).toMatchObject({
+      home_goals: 16, home_behinds: 10, home_score: 106,
+      away_goals: 12, away_behinds: 8, away_score: 80,
+      result: 'home_win', winner_club_id: fx.homeClubId, margin: 26,
+    });
+    // Q1-Q3 untouched; Q4 is complete for BOTH clubs (the defect wrote [16, NULL, NULL] and
+    // an all-NULL away row).
+    expect(after.periods).toEqual(periodsWith(fx, [16, 10, 106], [12, 8, 80]));
+    expectFinalPeriodMatchesTotals(after, fx);
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('ISSUE-269: an attendance edit and a partial score edit on one match both survive, with derived totals and final periods', async () => {
+    const fx = await seedFixture267('two-groups');
+    for (const [groupKey, raw] of [
+      ['attendance', { attendance: '45000' }],
+      ['score', { home_goals: '15', home_behinds: '10', away_goals: '16', away_behinds: '8' }],
+    ] as const) {
+      const saved = await saveEdit267({ entityKey: 'matches', rowId: fx.matchId, groupKey, raw, adminUserId, note: NOTE_267 });
+      expect(saved).toMatchObject({ ok: true });
+    }
+    expect(await overridesOf(fx)).toEqual({ attendance: { attendance: 45000 }, score: { away_goals: 16 } });
+
+    await reloadSource267(fx);
+    const after = replayOk([fx])[fx.matchKey];
+
+    const [manual] = await sql<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'manual_admin_edit'`;
+    // Both groups applied (UPDATE ... FROM applied only one of the two rows). The away side
+    // now wins: result, winner and margin are re-derived from the merged components.
+    expect(after.match).toMatchObject({
+      attendance: 45000, attendance_status: 'complete', attendance_source_id: manual.id,
+      home_goals: 15, home_behinds: 10, home_score: 100,
+      away_goals: 16, away_behinds: 8, away_score: 104,
+      result: 'away_win', winner_club_id: fx.awayClubId, margin: 4,
+    });
+    expect(after.periods).toEqual(periodsWith(fx, [15, 10, 100], [16, 8, 104]));
+    expectFinalPeriodMatchesTotals(after, fx);
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('equal-authority overrides that disagree are refused before any write', async () => {
+    const fx = await seedFixture267('conflict');
+    // Not reachable through the editor (its field groups are disjoint), but a legacy or
+    // hand-written row can carry a field outside its group; there is no honest winner.
+    await override(fx, 'score', { home_goals: 16 });
+    await override(fx, 'attendance', { attendance: 45000, home_goals: 17 });
+
+    const out = replay([fx]);
+    expect(out.refused).toContain('replay_admin_overrides(matches): refusing to commit');
+    expect(out.refused).toContain(`match ${fx.matchKey} field 'home_goals'`);
+    expect(out.first).toBeUndefined();
+    // Observed in the SAME transaction after the refusal: nothing of the fixture was written,
+    // neither the agreeing attendance nor the period rows.
+    expect(out.afterRefusal).toEqual(out.before);
+    expect(out.before[fx.matchKey].match).toMatchObject({ home_goals: 15, attendance: null });
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('identical overlapping values merge; an inactive override contributes nothing', async () => {
+    const fx = await seedFixture267('overlap');
+    await override(fx, 'score', { home_goals: 16 });
+    await override(fx, 'attendance', { attendance: 45000, home_goals: 16 });
+    // Inactive, and it disagrees on home_goals: excluded from the merge AND from the refusal.
+    await override(fx, 'notes', { notes: 'ISSUE-267 inactive override', home_goals: 3 }, false);
+
+    const after = replayOk([fx])[fx.matchKey];
+
+    expect(after.match).toMatchObject({
+      attendance: 45000, notes: null,
+      home_goals: 16, home_behinds: 10, home_score: 106,
+      away_goals: 12, away_behinds: 8, away_score: 80, margin: 26,
+    });
+    expect(after.periods).toEqual(periodsWith(fx, [16, 10, 106], [12, 8, 80]));
+    expectFinalPeriodMatchesTotals(after, fx);
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('a score component neither the source nor the override records is refused, never written as zero', async () => {
+    const fx = await seedFixture267('unrecorded', { homeBehinds: null });
+    await override(fx, 'score', { home_goals: 16 });
+
+    // The census classifies it exactly as the replay preflight does.
+    expect(await censusUnderivable()).toContainEqual(expect.objectContaining({ match_key: fx.matchKey, missing: 'home_behinds' }));
+
+    const out = replay([fx]);
+    expect(out.refused).toContain('lack a score component the override does not supply');
+    expect(out.refused).toContain(`match ${fx.matchKey} -- home_behinds`);
+    expect(out.afterRefusal).toEqual(out.before);
+    expect(out.before[fx.matchKey].match).toMatchObject({ home_goals: 15, home_behinds: null, home_score: 100 });
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('a component the source lacks but another active group supplies is derived from the merge: the replay succeeds and census section 4 agrees', async () => {
+    const fx = await seedFixture267('merged-component', { homeBehinds: null });
+    await override(fx, 'score', { home_goals: 16 });
+    // A legacy or hand-written row outside its group (the editor's groups are disjoint) carries
+    // the component the source does not record. Different keys: no disagreement.
+    await override(fx, 'attendance', { attendance: 45000, home_behinds: 11 });
+
+    // Reading the score row alone would call this underivable; the merged evaluation does not.
+    expect((await censusUnderivable()).map((row) => row.match_key)).not.toContain(fx.matchKey);
+
+    const out = replay([fx]);
+    expect(out.refused, 'the replay refused; a foreign afldb_test override may be the cause').toBeUndefined();
+    expect(out.second, 'repeating the replay changes the result').toEqual(out.first);
+    const after = out.first![fx.matchKey];
+    expect(after.match).toMatchObject({
+      attendance: 45000,
+      home_goals: 16, home_behinds: 11, home_score: 107,
+      away_goals: 12, away_behinds: 8, away_score: 80,
+      result: 'home_win', winner_club_id: fx.homeClubId, margin: 27,
+    });
+    // Q1-Q3 keep their "not recorded" home behinds; only the final period is re-derived.
+    const early = (state: Snapshot267[string]) => state.periods.filter((p) => p[1] < 4);
+    expect(early(after)).toEqual(early(out.before[fx.matchKey]));
+    expectFinalPeriodMatchesTotals(after, fx);
+  }, TIMEOUT);
+});

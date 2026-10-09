@@ -15,6 +15,43 @@ commit.
 
 ## [Unreleased]
 
+### The `matches` override replay applies every active correction and keeps final-period scores whole (AFLDB-ISSUE-267, AFLDB-ISSUE-269; implemented, uncommitted; validated on afldb_test after a second fix pass; DEV census complete; deployment and PROD census pending; issues open) - 9 October 2026
+
+- `replay_admin_overrides(conn, 'matches')` (`tools/migration/common.py`), which every `matches` reload, rebuild and
+  the post-swap promotion replay run, now merges a match's active Data Editor overrides into one set of values before
+  updating it. It previously used one `UPDATE … FROM`, so a match corrected in two field groups (attendance and score,
+  say) kept only one of them, and which one was unspecified (ISSUE-269).
+- Both clubs' final-period `match_period_scores` rows are written from the corrected match totals. They were read from
+  the override payload, which holds only the components an admin changed, so a one-field score correction wrote NULL
+  goals, behinds and points over recorded figures on every replay (ISSUE-267).
+- The replay now refuses, before writing anything, when two active overrides of the same match give one field
+  different values, and when a score-overridden match lacks a component that neither the source nor an override
+  records. The second state already failed, as a NOT NULL violation; the first was resolved arbitrarily. A refusal
+  stops the reload or promotion step; the read-only census
+  `issues/open/AFLDB-ISSUE-267-269-override-census.sql` lists both states, and exposure, ahead of a run.
+- The corrected components and everything derived from them (`home_score`, `away_score`, `margin`, `result`,
+  `winner_club_id`) are written by ONE statement. The first implementation wrote the components first and re-derived
+  in a second UPDATE, and `matches_score_components_ck` rejected the intermediate row (SQLSTATE 23514); the constraint
+  is unchanged. A match without an active `score` override keeps its loaded totals, as before.
+- The operator's first `afldb_test` run of the six integration cases in `tests/integration/data-editor.test.ts`
+  failed (6 failed): the CHECK violation above, and a test-fixture cleanup that did not own the two `club_seasons` rows
+  the Data Editor's score save derives (`club_seasons_season_fkey`; the suite's historical `club_seasons` count rose
+  from 1,624 to 1,626). The fixture now records and removes those rows in one transaction. A read-only residue census
+  and a guarded, dry-run-by-default recovery are in `issues/open/`. The recovery's dry run passed and rolled back. Its
+  commit attempt then refused before any DELETE because the two ladder rows were already gone. The fixture namespace
+  was confirmed empty by a fresh read-only census, with the count back at 1,624. What removed the earlier residue is
+  unknown.
+- Validated on `afldb_test` (9 October 2026, operator-run, as `afldb_owner`): the six integration cases passed (6
+  passed, 37 filtered skips, no suite or hook failures, 33.80 s). They cover the conflict refusal before any write,
+  the missing-component refusal, components merged across groups, census section 4 agreeing with the replay,
+  final-period correctness and replay idempotence. The residue and historical-baseline assertions passed, as did the
+  typecheck and the data-overrides source-contract suite (69/69). Not yet committed or deployed.
+- The read-only override census ran on DEV (9 October 2026, operator-run, before the fix was deployed; `afldb_dev` as
+  `afldb_import`, read-only, through `== Done.` with no command failure): 0 active `matches` overrides, no rows in any
+  section, so no current DEV exposure and nothing the fixed replay would refuse. With no active overrides, its empty
+  symptom section does not assess historical corruption. The PROD census has not run. Historical corruption is not
+  established; historical impact remains unassessed. No historical data was repaired.
+
 ### Email intake forwards a message only on a trusted DMARC pass for its one From domain (AFLDB-ISSUE-266; merged; deployed to DEV only, where intake is not active; PROD not deployed; live-mail acceptance not performed; issue open) - 9 October 2026
 
 - `tools/email_intake/fetch_and_stage.py` no longer accepts `spf=pass` with `dkim=pass` as sender verification. Those

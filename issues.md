@@ -4,13 +4,15 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 3
+**Open issues:** 5
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Medium | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated; 2026-10-05 investigation (runbook §10–§15): F-265-1 AFL API attendance enrichment can lose the whole run, `match_attendance` is a third unordered writer, in-run unit retry futile in the main shapes; 2026-10-05 operator: D-265-1..12 accepted (Option 3 advisory gate incl. `match_attendance`; severity Medium); 2026-10-05 operator: D-265-5 accepted (300 s settle gate wait with a 330 s gate-statement bound; an operator judgement, PROD records cannot validate it; the D-265-13 query is context only), D-265-14 (Phase B case B11) and D-265-15 (Phase A tooling archived unchanged in `issues/open/AFLDB-ISSUE-265-phase-a/`); Phase A window 2 (2026-10-05 16:22) PASSED 3/3, census CLEAN (runbook §17.14); Phase A retired, Phase B replaces it; final plan and Phase B assertions in runbook §18–§20; S0 checkpoint committed (62f2cd67); **2026-10-05 mitigation IMPLEMENTED in the working tree, uncommitted (runbook §21): shared settle gate (300 s / 330 s), exclusive gate in the three legacy hooks, `match_attendance` ascending hook, database-free pins, Phase B harness B1–B11; Phase B PASSED 11/11 (2026-10-05, runbook §23); regression window FAILED twice on test-teardown residue, cause fixed (§24), then PASSED (2026-10-06, §25.1); build PASSED (2026-10-06, §25.8: exit 0, 1,515 static pages, standalone ready, census CLEAN, two warnings recorded and not claimed pre-existing); commit, deployment and DEV acceptance pending** | Operator reviews and commits the eighteen files in runbook §25.7, then `npm run merge:ready -- --issue 265`, merge/push, `deploy/sync-dev.ps1` and DEV acceptance (§18.2) |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
 | AFLDB-ISSUE-266 | Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin | High | Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py` | Open (2026-10-08); 2026-10-08 full code review F-001; reproduced DB-free (W1; W2 adds substring injection and an unbound pass); D-266-1 and D-266-2 decided 2026-10-09; implemented and committed as `077af7ee`, merged and pushed to main; pre-commit review fixed two parser gaps (runbook §18.8); DB-free suite 160/160 on Windows Python 3.12.10 and 3.14.4 and on Linux (streamanator, CPython 3.12.3, 2026-10-09; runbook §18.9); **deployed to DEV only** (`7adfb3e8` → `077af7ee`, 2026-10-09; deployed suite 160/160, operator-reported; build and service unchanged; DEV `preflight` BLOCKED by nine untracked settle manifests, not passed; runbook §18.10); PROD inspected, not deployed (held at `cd3cf782` during ISSUE-265 observation); neither host has an intake timer, cron reference, IMAP settings or authserv-id in the places checked, so the fix is dormant; live mail not tested, no host accepted | Before intake is activated on any host: verify the receiving server's header insertion, forged-header removal, authserv-id and a legitimate message's format, set `AFLDB_INTAKE_AUTHSERV_ID`, then `--dry-run` a legitimate and a non-passing message (runbook §18.6, §18.10.8); PROD gets the code after ISSUE-265's observation |
+| AFLDB-ISSUE-267 | Override replay writes NULL period scores from a partial `score` override | High | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-002; implemented 2026-10-09 with ISSUE-269, uncommitted; **operator integration run 2026-10-09 FAILED (6 failed)**: replay `matches_score_components_ck` 23514 (components and totals written in two UPDATEs) and fixture cleanup `club_seasons_season_fkey` (score save derived 2 `club_seasons` rows; baseline 1,624 → 1,626); second fix pass (uncommitted): one atomic UPDATE, cleanup owns the derived ladder rows in one transaction; `py_compile`, `tsc` and source-contract 69/69 green; residue recovery dry run passed and rolled back, commit attempt refused before any DELETE (ladder rows already absent; remover unknown), fresh census empty with `club_seasons_total` 1,624; **second integration run 2026-10-09 10:47:03 PASSED on `afldb_test` (`afldb_owner`): 6 passed, 37 filtered skips, 33.80 s; implementation validated on `afldb_test`**; **DEV exposure census complete 2026-10-09** (operator-run before deployment; `afldb_dev`, `afldb_import`, read-only; 0 active `matches` overrides, sections 1–5 no rows, no replay blockers); review/commit/merge, deployment and PROD census pending; historical corruption not established, historical impact remains unassessed, nothing repaired; runbook `issues/open/AFLDB-ISSUE-267.md` §17.10–§17.11 | Operator review and commit (§17.7), `merge:ready`, merge/push, `deploy/sync-dev.ps1`; override census on PROD before the next promotion (§17.5 step 4); resolve any section-3/4 row first |
+| AFLDB-ISSUE-269 | `replay_admin_overrides('matches')` applies only one of a match's active override rows | Medium | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-004; implemented 2026-10-09 with ISSUE-267, uncommitted: active rows merged into one object per `match_key`; equal-authority disagreements and underivable score components refused before any write; shared operator integration run 2026-10-09 FAILED (6 failed); **shared second-pass run 2026-10-09 PASSED on `afldb_test` (6 passed), implementation validated on `afldb_test`** (ISSUE-267); **DEV exposure census complete 2026-10-09** (0 active `matches` overrides, section 2 and all others no rows, no replay blockers); review/commit/merge, deployment and PROD census pending; historical impact remains unassessed; runbook `issues/open/AFLDB-ISSUE-269.md` §17.6–§17.7 | As ISSUE-267 (commit, merge, DEV deploy; the shared census on PROD before the next promotion); resolve any census section-3/4 row before a promotion |
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator-run
 standalone promotion-gate reads on DEV and PROD, graded offline; operator decision D-233-4). Resolved as **AFL API
@@ -48954,3 +48956,122 @@ retained behaviour under `Unreleased`.
      Live-mail acceptance has not been performed.
   3. PROD receives `077af7ee` after ISSUE-265's observation; `cd3cf782` is preserved until then.
   4. DEV `preflight` stays BLOCKED until the operator classifies the untracked settle manifests.
+
+## AFLDB-ISSUE-267 — Override replay writes NULL period scores from a partial `score` override
+
+- **Status:** Open (2026-10-08). **Severity:** High. **Area:** data integrity / admin override replay (rebuild, reload,
+  promotion). Key file: `tools/migration/common.py` (`replay_admin_overrides`, matches branch).
+- **Runbook:** `issues/open/AFLDB-ISSUE-267.md` (§0–§16 from the review, §17 implementation).
+- **Origin.** Full code review of `review/full-code-20261008` at `20a7a4bb` (`issues/reviews/2026-10-08-full-code-review.md`,
+  F-002; that review and its other findings are tracked in the separate review worktree). Code-proven, not reproduced.
+- **Defect.** The matches replay wrote both clubs' final-period `match_period_scores` rows straight from the `score`
+  payload. The Data Editor stores only the components that changed, so a partial payload upserted NULL goals, behinds
+  and points over recorded figures (`common.py:1911-1931` at `20a7a4bb`).
+- **Implementation (2026-10-09, with ISSUE-269; branch `sonnet/issue-267-269`, base `259ee7c6`; uncommitted).** The
+  final-period rows are written from the UPDATED `matches` row, with `points = 6·goals + behinds` as the editor
+  derives them; the final-period rule and the set of matches it applies to (an active `score` row) are unchanged. A
+  score-overridden match with a component neither the source nor any override records is refused by name before any
+  write; nothing is converted to zero. Verified not to be a new refusal: the old derived-score UPDATE computed
+  `home_score`/`away_score`/`margin` as NULL for the same match and failed on their NOT NULL (`003_matches.sql:45,48,52`;
+  runbook §17.8). Runbook §17.2.
+- **Tests (added, not run).** Six cases in `tests/integration/data-editor.test.ts`, `describe('AFLDB-ISSUE-267/269: …')`:
+  synthetic season 2081; the REAL Python replay run twice on one connection between snapshots, then rolled back, so
+  no real match changes. The one-field score case fails on the original code (Q4 home `[16, NULL, NULL]`, away all
+  NULL). Review-fix pass (2026-10-09): a read-only ownership preflight runs before anything is deleted and cleanup
+  deletes only rows the run recorded creating (no-op after a failed preflight); the Python probe and replay are bounded
+  (connect 10 s, `SET LOCAL` lock 5 s / statement 30 s, process 30 s / 90 s) with timeouts reported as such; a sixth
+  case covers a component supplied by another active group, and runs census section 4 from the census file. Runbook §17.3.
+- **Validation.** Python syntax (`py_compile common.py`; the embedded replay script parsed): OK. `npx tsc --noEmit -p .`:
+  exit 0. `npx vitest run tests/data-overrides-source-contract.test.ts`: 69/69. One read-only shell command (`wc -l`)
+  was run in the first session contrary to CLAUDE.md §9; it changed nothing.
+- **Operator integration run (2026-10-09): FAILED — not validated.** The six-case describe on `afldb_test`: **6 failed,
+  37 filtered/skipped**. Two defects, as reported by the operator:
+  - *Replay CHECK violation (code defect).* The replay wrote the merged components in one UPDATE and re-derived the
+    totals in a second. `2081|issue267-one-field` became `home_goals = 16, home_behinds = 10, home_score = 100` after
+    the first, violating `matches_score_components_ck` (SQLSTATE 23514). The constraint is correct; the statement
+    split was not. The pre-fix statement had the same split, so the original replay should also have failed with
+    23514 wherever an active `score` override differs from the reloaded source with both components recorded
+    (code-derived, not reproduced; runbook §17.9.1). That narrows but does not remove the ISSUE-267 exposure.
+  - *Cleanup FK failure (test-fixture defect).* The fixture claimed nothing created `club_seasons`; the live score save
+    did (`applyMatchEdit` → `recomputeClubSeasons`, two rows for season 2081). Cleanup then failed on
+    `club_seasons_season_fkey`, and the file's historical baseline `club_seasons` count rose from **1,624 to 1,626**.
+    afldb_test therefore carries season-2081 residue until recovered (below).
+- **Second fix pass (2026-10-09, uncommitted, not database-validated).** Runbook §17.9.
+  - `common.py`: ONE `UPDATE` now writes the components and, for a match with an active `score` row, `home_score`,
+    `away_score`, `margin`, `result` and `winner_club_id`, all from an `effective` CTE (merged override `COALESCE`
+    source), because SET expressions read the old row. Matches without a `score` row keep their loaded totals, as
+    before. Both preflights still run before any write; the final-period sync still runs after. The CHECK is untouched.
+  - Test: `saveEdit267` records the `club_seasons` rows a fixture score save derives (only while the season and every
+    match of it are this run's); `cleanup267` is one transaction and deletes those rows before the season it created.
+    The preflight, the guards, the residue assertion and the historical baseline are unchanged.
+  - Recovery prepared, **not run**: `issues/open/AFLDB-ISSUE-267-269-fixture-residue-census.sql` (read-only) and
+    `…-fixture-residue-recovery.sql` (ownership checks, `expect_*` affected-row checks, dry run by default).
+  - Checks: `py_compile` OK; `npx tsc --noEmit` exit 0; source-contract 69/69. The integration cases stay pending.
+- **Census (prepared; since run on DEV only, below).** `issues/open/AFLDB-ISSUE-267-269-override-census.sql`, read-only: partial `score`
+  payloads (exposure), multi-row keys (ISSUE-269), the states the fixed replay refuses (section 3 disagreements;
+  section 4 now the same merged `COALESCE` evaluation as the replay preflight), and final-period/total mismatches
+  (symptom only). Exposure does not prove that a past rebuild or promotion wrote NULL rows.
+- **Residue recovery (2026-10-09, operator-run; runbook §17.10.1).** The recovery dry run passed and explicitly rolled
+  back. The later commit attempt (`recover_commit=1`) **refused before any DELETE**: the two expected `club_seasons`
+  ladder rows were already absent. A fresh read-only census then showed the whole fixture namespace empty, every
+  foreign count 0 and `club_seasons_total = 1624`. The fixture namespace was confirmed empty by a fresh read-only
+  census. **What removed the earlier residue is unknown.** The reported dry run rolled back and the reported commit
+  attempt refused before DELETE; neither establishes what happened between them.
+- **Second operator integration run (2026-10-09): PASSED — implementation validated on `afldb_test`** (runbook
+  §17.10.2). Target verified as `afldb_test`, role `afldb_owner`. Run at 10:47:03: **6 passed, 37 filtered skips, no
+  suite or hook failures, 33.80 s.** All six cases passed, including the conflict refusal before writes, the
+  missing-component refusal, components merged across groups, census section 4 agreeing with the replay preflight,
+  final-period correctness and replay idempotence. The fixture residue and historical-baseline assertions passed.
+  Prior checks stand: Python syntax, `tsc` exit 0, source-contract 69/69. No implementation or test file changed for
+  this run. Not established: DEV/PROD exposure. Historical corruption: not established; historical impact remains
+  unassessed; nothing repaired.
+- **DEV exposure census (2026-10-09, operator-run, before the fix was deployed): complete** (runbook §17.11). The
+  read-only override census on exact target `afldb_dev`, role `afldb_import`, `transaction_read_only = on`; ran
+  through `== Done.` with no command failure. Active `matches` overrides: **0**. Section 1: partial `score` overrides
+  0, resolving 0. Sections 2–5: no rows; no current replay blockers (sections 3 and 4). DEV has no ISSUE-267/269
+  exposure today. With no active `matches` overrides, the empty symptom section (5) does not assess historical
+  corruption; historical impact remains unassessed; nothing repaired. PROD census not run.
+- **Next action.** Operator review and commit (explicit paths, runbook §17.7); `npm run merge:ready -- --issue 267`;
+  merge/push; `deploy/sync-dev.ps1`; the read-only override census on PROD before the next promotion (runbook §17.5
+  step 4; DEV done, §17.11), resolving any section-3/4 row before a promotion. Historical repair, if a census shows
+  damage, is a separate operator decision. Runbook §17.10.4.
+
+## AFLDB-ISSUE-269 — `replay_admin_overrides('matches')` applies only one of a match's active override rows
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** data integrity / admin override replay (rebuild,
+  reload, promotion). Key file: `tools/migration/common.py` (`replay_admin_overrides`, matches branch).
+- **Runbook:** `issues/open/AFLDB-ISSUE-269.md` (§0–§16 from the review, §17 implementation).
+- **Origin.** Full code review at `20a7a4bb` (F-004; tracked in the separate review worktree). Code-proven, not
+  reproduced.
+- **Defect.** One `data_overrides` row per field group, but a single `UPDATE matches … FROM data_overrides`, so
+  PostgreSQL applied one unspecified row per match and the other groups' corrections were silently lost
+  (`common.py:1866-1888` at `20a7a4bb`).
+- **Implementation (2026-10-09, with ISSUE-267; uncommitted).** Every active row whose key resolves to a match is
+  merged into one object per `match_key` (`jsonb_each` + `DISTINCT ON` + `jsonb_object_agg`, as the players branch
+  does). All matches rows have equal authority, so a field given different values by two active rows is refused before
+  any write, naming the match, field and rows; identical values merge; inactive rows never contribute. Derived fields
+  and the final-period rows follow from the merged, updated row. The optional predictor STOP (review §14.2) was not
+  implemented. Runbook §17.1.
+- **Tests and validation.** Shared with ISSUE-267 (same describe, six cases; none run; DB-free checks green). The
+  attendance + partial score case fails on the original code whichever row `UPDATE … FROM` picks; the conflict case
+  fails because nothing refused; the component-from-another-group case (added 2026-10-09) fails whichever row it picks.
+- **Operator integration run (2026-10-09): FAILED — not validated.** Shared with ISSUE-267: 6 failed, 37
+  filtered/skipped; replay `matches_score_components_ck` violations (23514) from writing the merged components before
+  re-deriving the totals in a second UPDATE, and fixture-cleanup `club_seasons_season_fkey` failures. The merge itself
+  was not shown wrong; nothing passed. The second fix pass (ISSUE-267 entry; runbook `AFLDB-ISSUE-267.md` §17.9) makes
+  the merged components and their derived fields one UPDATE; uncommitted, not database-validated.
+- **Second operator integration run (2026-10-09): PASSED — implementation validated on `afldb_test`.** Shared with
+  ISSUE-267 (entry above; runbook `AFLDB-ISSUE-269.md` §17.6, `AFLDB-ISSUE-267.md` §17.10): `afldb_test` as
+  `afldb_owner`, 10:47:03, 6 passed, 37 filtered skips, no suite or hook failures, 33.80 s; the attendance + partial
+  score, conflict, overlap/inactive and component-from-another-group cases all passed, with idempotence. Beforehand,
+  the fixture namespace was confirmed empty by a fresh read-only census. What removed the earlier residue is unknown.
+  DEV/PROD exposure (census section 2) not measured. Historical corruption: not established; historical impact
+  remains unassessed; nothing repaired.
+- **DEV exposure census (2026-10-09, operator-run, before the fix was deployed): complete.** Shared with ISSUE-267
+  (entry above; runbook `AFLDB-ISSUE-269.md` §17.7, `AFLDB-ISSUE-267.md` §17.11): `afldb_dev` as `afldb_import`,
+  read-only, through `== Done.` with no command failure; 0 active `matches` overrides; section 2 (ISSUE-269 exposure)
+  no rows; sections 1 and 3–5 no rows; no current replay blockers. The empty symptom section does not assess
+  historical corruption; historical impact remains unassessed; nothing repaired. PROD census not run.
+- **Next action.** As ISSUE-267 (commit, `merge:ready`, merge/push, DEV deploy; the shared census on PROD before the
+  next promotion — DEV done). Any census section-3 or section-4 row must be resolved before a promotion, because
+  the fixed replay refuses it post-swap and `planPromotionMatchReplay` does not check it.
