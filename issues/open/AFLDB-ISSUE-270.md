@@ -5,12 +5,16 @@
 - **Status:** Open (2026-10-08). **Implemented 2026-10-09 in `sonnet/issue-270` (worktree `afldb-issue-270`, base
   `4fe93a96`); revised the same day for operator decision D-270-2 (§18), then for the independent review's findings
   (§19: 5 s statement timeout, tracked background transactions, doc corrections, integration-harness deadline
-  correction); uncommitted, not deployed. Operator validation is COMPLETE for the working tree (§19.9):** unit file
+  correction). Operator validation is COMPLETE for the working tree (§19.9):** unit file
   199/199 (19:59:08 AEDT), typecheck, four-file ESLint and diff check (re-passed after the final harness correction),
   and the whole `tests/integration/admin-lifecycle.test.ts` 37/37 on `afldb_test` as `afldb_owner` (from 20:57:05 AEDT).
-  **Review, commit, `merge:ready`, merge, DEV/PROD deployment and acceptance are outstanding.** Earlier "unvalidated" /
-  "not run" statements in §17–§19.8 are kept as the historical record of the time they were written; §19.9 supersedes
-  them on the validation question. §1–§16 below are the review's record, kept as historical; where §13 and §17 differ,
+  **Committed as `b239e0ac19b04becd4c1bdf26737d806590d8484`, merged to `main` and pushed, and installed on DEV three
+  times on 10 October 2026 (latest: service start 08:14:38 AEDT, BUILD_ID `caodaX9EgGbJK4cZLFLRk`); see §20. That is DEV
+  installation and operational acceptance only: no invite redemption was exercised on DEV. PROD installation and any
+  applicable PROD acceptance are outstanding behind the unchanged ISSUE-265 hold, so the issue stays open.** Earlier
+  "uncommitted", "not deployed", "unvalidated" and "not run" statements in §17–§19.9 are kept as the historical record of
+  the time they were written; §19.9 supersedes them on the validation question and §20 on commit, merge and DEV
+  deployment. §1–§16 below are the review's record, kept as historical; where §13 and §17 differ,
   §17 governs (§17.3); where §17 and §18 differ, §18 governs; where §18 and §19 differ, §19 governs.
 - **Severity:** Medium. **Area:** authentication / administrator lifecycle.
 - **Key files:** `src/app/admin/invite/[token]/actions.ts` (`confirmEnrolment`), `src/app/admin/admins/invite-actions.ts` (`createInvite`).
@@ -666,3 +670,67 @@ no command, Git, test, database, network or host contact).
 
 D-270-1 (live-invite uniqueness index, a migration) remains **undecided** and is not a merge gate; D-270-2 stays decided
 and implemented; the §19.6 follow-ups remain recorded, not gates. The issue stays **open**.
+
+*(Steps 1–3 of "Remaining steps" above were later completed; see §20. Steps 4 and 5 remain outstanding.)*
+
+## 20. Commit, merge and DEV deployment (operator-reported, 10 October 2026)
+
+Recorded from the operator's supplied results; documentation-only pass (no command, Git, test, database, network or host
+contact by the implementer, and no Git state re-checked).
+
+### 20.1 Commit and merge
+
+- **Commit:** `b239e0ac19b04becd4c1bdf26737d806590d8484`, message `fix(auth): enforce issuer authority at invite
+  redemption (AFLDB-ISSUE-270)`.
+- **Gates.** The commit gate and the fresh-ref merge-readiness gate both returned **READY, 0 blockers, 2 warnings**: (a)
+  no `afldb-merge-readiness` JSON block, and (b) no automated unexpected-file classification metadata. The two warnings
+  are not gates recorded anywhere. The operator checked the ten changed paths separately (the paths are not listed in the
+  supplied report).
+- **Merge.** `main` was fast-forwarded and pushed. `main` and `origin/main` both matched the full commit SHA above, and
+  `main` was clean.
+- **What this does not say.** The report does not state whether the committed tree differs from the tree validated in
+  §19.9, and no repeat of the §19.9 functional runs against the commit is reported. Functional evidence is unchanged
+  (§20.3).
+
+### 20.2 DEV deployments (host `streamanator`, 10 October 2026, AEDT)
+
+Three deployments of the **same revision** (`b239e0ac…`). The **third is the latest recorded deployment**; the first two
+are earlier successful deployments of the same revision, preserved as reported.
+
+| # | Service start | Built `BUILD_ID` | MainPID | Readiness |
+|---|---|---|---|---|
+| 1 | 05:53:50 | `Fn5rxPCeUqtVWKIMz5Y7e` | 1095527 → 1755144 | 1 second, 1 probe |
+| 2 | 07:55:26 | `mURayZyID_N004cS0fGzF` | 1755144 → 1863673 | 2 seconds, 2 probes |
+| 3 (latest) | 08:14:38 | `caodaX9EgGbJK4cZLFLRk` | 1863673 → 1881568 | 2 seconds, 2 probes |
+
+- Each run completed dependency installation, migration check, build, restart and readiness.
+- **All 110 migrations were already applied on each run; nothing new was applied.**
+- After **each** deployment: the remote `HEAD` equalled the full target commit; `src/db/queries/admin-invites.ts` and the
+  invite `actions.ts` each matched `HEAD`; `systemctl` reported the service active; `/api/health` reported `status=ok` and
+  `database=ok`.
+- **Second run, journal warning.** Its journal reported a control-group kill warning and an old `next-server` process
+  remaining after the stop. This is recorded as reported. It is **not** claimed that any process persisted after the
+  restart, and the warning was **not independently investigated**. The run's post-deployment checks above are as reported.
+- The supplied report does not give the reason for the repeat deployments, so none is stated here.
+
+### 20.3 Acceptance limits
+
+- This is **DEV installation and operational acceptance** only. **No invite redemption was exercised on DEV.**
+- Functional evidence remains the recorded `afldb_test` runs (§19.9): 199 auth unit tests and 37 PostgreSQL integration
+  tests, including the 16 ISSUE-270 cases.
+- **Not validated:** the restricted `afldb_auth` role, and real-database Server Action end-to-end coverage.
+- **The ISSUE-107 gate was off.** The `BUILD_ID` values are built-artifact identities, not proof of live build-header
+  parity (compare ISSUE-259/260, where the gate failed with exit 21 on DEV).
+- **No historical-misuse assessment and no repair:** nobody has searched DEV or PROD for invites already used to take
+  over a peer administrator, and how many outstanding invites would now be refused is unmeasured.
+- The supplied evidence states no DEV preflight result.
+
+### 20.4 Remaining
+
+1. **PROD installation and any applicable PROD acceptance**, behind the unchanged ISSUE-265 hold, like every release after
+   `cd3cf782`. No PROD deployment procedure exists or is proposed here. DEV acceptance is not PROD acceptance.
+2. **Resolution** of ISSUE-270 only after that applicable remaining acceptance is complete (CLAUDE.md §5).
+3. **D-270-1** (live-invite uniqueness index, a migration) remains **undecided**; **D-270-2** stays decided and
+   implemented; the §19.6 follow-ups stay recorded, not gates.
+
+The issue stays **open**.

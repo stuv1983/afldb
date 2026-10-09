@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Accepting an admin invite can no longer overwrite a peer administrator's credentials, and needs the issuer's current authority (AFLDB-ISSUE-270; implemented, revised for D-270-2 and for the independent review; validated on afldb_test as the test owner, uncommitted, not deployed; issue open) - 9 October 2026
+### Accepting an admin invite can no longer overwrite a peer administrator's credentials, and needs the issuer's current authority (AFLDB-ISSUE-270; implemented, revised for D-270-2 and for the independent review; validated on afldb_test as the test owner; committed `b239e0ac`, merged, deployed to DEV only; PROD not installed; issue open) - 9 October 2026
 
 - Accepting an invite upserts on email, so an invite for an address that already has an account resets its password,
   authenticator, role and delegation and signs it out everywhere. Until now the only redemption-time check was that the
@@ -55,10 +55,22 @@ commit.
   covering all 16 ISSUE-270 cases, the issuer-lock statement timeout, concurrent account creation and both existing
   concurrent lifecycle cases, with no hook or cleanup errors. A read-only check afterwards found no leftover i270 or i155
   users or invites (those address patterns and those two tables only). Not covered: the restricted `afldb_auth` role,
-  Server Action end-to-end against a real database, and any DEV or PROD deployment or acceptance; no historical misuse
-  was searched for and nothing was repaired. Commit, merge, deployment and acceptance remain outstanding; after DEV
-  acceptance the issue stays open for PROD installation and any applicable PROD acceptance, behind the unchanged
-  ISSUE-265 hold.
+  Server Action end-to-end against a real database, and PROD installation or acceptance; no historical misuse
+  was searched for and nothing was repaired.
+- Commit and DEV deployment (operator-reported, 10 October 2026): committed as
+  `b239e0ac19b04becd4c1bdf26737d806590d8484` (`fix(auth): enforce issuer authority at invite redemption
+  (AFLDB-ISSUE-270)`); the commit gate and the fresh-ref merge-readiness gate returned READY with 0 blockers and 2
+  warnings (no `afldb-merge-readiness` JSON block; no automated unexpected-file classification metadata); `main` was
+  fast-forwarded and pushed, and `main` and `origin/main` matched that SHA. Three DEV deployments of that revision on
+  `streamanator` (service starts 05:53:50, 07:55:26 and 08:14:38 AEDT, the last being the latest; built BUILD_IDs
+  `Fn5rxPCeUqtVWKIMz5Y7e`, `mURayZyID_N004cS0fGzF`, `caodaX9EgGbJK4cZLFLRk`) each completed install, migration check,
+  build, restart and readiness; all 110 migrations were already applied and nothing new was applied. After each, the
+  remote HEAD equalled the commit, `admin-invites.ts` and the invite `actions.ts` matched HEAD, the service was active
+  and `/api/health` reported `status=ok`, `database=ok`. The second run's journal reported a control-group kill warning
+  (recorded as reported, not investigated). This is DEV installation and operational acceptance only: no invite
+  redemption was exercised on DEV, restricted `afldb_auth` and real-database Server Action end-to-end validation remain
+  unclaimed, and the ISSUE-107 gate was off, so the BUILD_ID values are not proof of live build-header parity. The issue
+  stays open for PROD installation and any applicable PROD acceptance, behind the unchanged ISSUE-265 hold.
 
 ### The `match_attendance` CSV dataset refuses a blank attendance cell instead of promoting a zero crowd (AFLDB-ISSUE-268; validated on afldb_test, DEV and PROD censuses complete; committed `5659f789`, merged, deployed to DEV only; PROD not installed; issue open) - 9 October 2026
 

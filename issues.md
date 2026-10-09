@@ -14,7 +14,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-267 | Override replay writes NULL period scores from a partial `score` override | High | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-002; implemented 2026-10-09 with ISSUE-269; **operator integration run 2026-10-09 FAILED (6 failed)**: replay `matches_score_components_ck` 23514 (components and totals written in two UPDATEs) and fixture cleanup `club_seasons_season_fkey` (score save derived 2 `club_seasons` rows; baseline 1,624 → 1,626); second fix pass: one atomic UPDATE, cleanup owns the derived ladder rows in one transaction; `py_compile`, `tsc` and source-contract 69/69 green; residue recovery dry run passed and rolled back, commit attempt refused before any DELETE (ladder rows already absent; remover unknown), fresh census empty with `club_seasons_total` 1,624; **second integration run 2026-10-09 10:47:03 PASSED on `afldb_test` (`afldb_owner`): 6 passed, 37 filtered skips, 33.80 s; implementation validated on `afldb_test`**; **DEV exposure census complete 2026-10-09** (operator-run before deployment; `afldb_dev`, `afldb_import`, read-only; 0 active `matches` overrides, sections 1–5 no rows, no replay blockers); **committed as `86e2d19fa6936f73872da45c7b5cb3200e274543`, merged to `main` and pushed; DEV deployed 2026-10-09** (operator-confirmed: `common.py` no working-tree diff from HEAD; migrations 110/110, nothing to apply; build OK, `BUILD_ID` `Jlf_U7HZnqispmedF-TaS`; respawn 844885 → 849656, active since 11:40:00 AEDT; readiness after 2 s; health ok, database ok, 28 ms); the deployment did not exercise the Python matches replay; **PROD exposure census complete 2026-10-09** (operator-run; `afldb_prod` via SSH alias `afldb`, `postgres`, read-only, `== Done.`, psql exit 0; 0 active `matches` overrides, sections 1–5 no rows, no section-3/4 replay blockers; does not establish the fix is installed on PROD); `merge:ready -- --issue 267` READY twice (after a fresh fetch too), 0 blockers, 2 metadata warnings (no `afldb-merge-readiness` JSON block in the ISSUE-267 runbook; no automated unexpected-file classification metadata); PROD installation deferred (PROD held at `cd3cf782` for ISSUE-265's observation; `cd3cf782..86e2d19f` measured at 9 commits, 40 files (assistant read-only review of GitHub's comparison, not operator-run Git evidence), no migration/package/deploy/next.config.ts change, but includes ISSUE-261's settle/retry change); historical corruption not established, historical impact remains unassessed, nothing repaired; runbook `issues/open/AFLDB-ISSUE-267.md` §17.10–§17.15 | The applicable after the ISSUE-265 observation hold at `cd3cf782` lifts, prepare and review a deployment procedure for this release (r6 pack must not be reused; range includes ISSUE-266 and ISSUE-261; preflight manifest FAILs expected), then the PROD deployment acceptance (§17.15: verify the installed `common.py`); then resolve with ISSUE-269 |
 | AFLDB-ISSUE-268 | Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd | High | Legacy intake / NULL-vs-zero — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-003. Validator fix, promotion-time re-check of retained cells and tests (DB-free + integration) committed 2026-10-09 as `5659f789`, merged and pushed to `main`, and deployed to DEV 2026-10-09 (installation and operational acceptance complete; attendance validation/promotion not exercised on DEV, ISSUE-107 gate off so no live build-header parity claimed); operator checks at 15:11:57 passed (ingest-datasets 181/181, tsc, eslint, diff-check) and the targeted ISSUE-268 integration cases passed twice on `afldb_test` as the test owner (15:21:42, 15:30:35; restricted-role path and full integration file not validated); both operator-run censuses complete 2026-10-09 (DEV 15:59:22, PROD 16:02:57: no retained submissions, no rows in Sections 2–5, no exposure found in the records checked); historical impact unassessed, nothing repaired, fix not installed by the censuses; not installed on PROD | Operator: PROD installation and acceptance after the unchanged ISSUE-265 hold; D-268-1 and D-268-3 are separate follow-ups, not merge gates |
 | AFLDB-ISSUE-269 | `replay_admin_overrides('matches')` applies only one of a match's active override rows | Medium | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-004; implemented 2026-10-09 with ISSUE-267: active rows merged into one object per `match_key`; equal-authority disagreements and underivable score components refused before any write; shared operator integration run 2026-10-09 FAILED (6 failed); **shared second-pass run 2026-10-09 PASSED on `afldb_test` (6 passed), implementation validated on `afldb_test`** (ISSUE-267); **DEV exposure census complete 2026-10-09** (0 active `matches` overrides, section 2 and all others no rows, no replay blockers); **committed as `86e2d19f`, merged/pushed, DEV deployed 2026-10-09** (shared with ISSUE-267; the deployment did not exercise the Python matches replay); **PROD exposure census complete 2026-10-09** (shared; 0 active `matches` overrides, section 2 and all others no rows, no replay blockers; does not establish the fix is installed on PROD); `merge:ready` READY twice; PROD installation deferred (shared with ISSUE-267, §17.15); historical impact remains unassessed; runbook `issues/open/AFLDB-ISSUE-269.md` §17.6–§17.9 | As ISSUE-267 (deployment procedure prepared and reviewed after the hold lifts, then the applicable PROD deployment acceptance, ISSUE-267 runbook §17.15); resolve any census section-3/4 row before a promotion |
-| AFLDB-ISSUE-270 | A delegated admin manager can take over a peer admin account through a spare invite | Medium | Authentication / administrator lifecycle — `src/app/admin/invite/[token]/actions.ts` (`confirmEnrolment`), `src/db/queries/admin-invites.ts` (new) | Open (2026-10-08); 2026-10-08 full code review F-005, code-proven, not reproduced; **implemented 2026-10-09 in `sonnet/issue-270` (worktree `afldb-issue-270`) and revised the same day for operator decision D-270-2 and then for the independent review (5 s redemption statement timeout, tracked background transactions in the race tests, doc corrections); uncommitted, not deployed; operator validation COMPLETE for the working tree (runbook §19.9): unit 199/199 at 19:59:08 AEDT, typecheck, four-file lint and diff check (repeated after the final harness correction), and the whole `afldb_test` integration file 37/37 from 20:57:05 AEDT as `afldb_owner`; not shown: restricted `afldb_auth`, real-database Server Action end-to-end, DEV/PROD deployment or acceptance (the earlier 18:50:00 177/177 and 19:32:44 198/198 runs are historical)**: every redemption requires the stored issuer's current authority under its row lock (D-270-2), free addresses and contributors included; an existing `admin`/`super_admin` is overwritten only for a current super admin, also in the upsert's `ON CONFLICT … WHERE`; refusals write nothing and audit `admin.invite_rejected` with a reason; a lock wait past 5 s rolls back as a generic failure; runbook §17–§19 | Operator reviews and commits the validated tree, `npm run merge:ready -- --issue 270`, push/merge, DEV deployment with smoke and acceptance, then closure; D-270-1 remains undecided, not a merge gate; §19.6 follow-ups recorded; PROD held behind ISSUE-265 |
+| AFLDB-ISSUE-270 | A delegated admin manager can take over a peer admin account through a spare invite | Medium | Authentication / administrator lifecycle — `src/app/admin/invite/[token]/actions.ts` (`confirmEnrolment`), `src/db/queries/admin-invites.ts` (new) | Open (2026-10-08); 2026-10-08 full code review F-005, code-proven, not reproduced; **implemented 2026-10-09 in `sonnet/issue-270` (worktree `afldb-issue-270`) and revised the same day for operator decision D-270-2 and then for the independent review (5 s redemption statement timeout, tracked background transactions in the race tests, doc corrections); operator validation COMPLETE for the working tree (runbook §19.9): unit 199/199 at 19:59:08 AEDT, typecheck, four-file lint and diff check (repeated after the final harness correction), and the whole `afldb_test` integration file 37/37 from 20:57:05 AEDT as `afldb_owner` (the earlier 18:50:00 177/177 and 19:32:44 198/198 runs are historical). Committed as `b239e0ac19b04becd4c1bdf26737d806590d8484`, merged to `main` and pushed (merge-readiness READY, 0 blockers, 2 warnings), and installed on DEV three times on 10 October 2026 (runbook §20; latest service start 08:14:38 AEDT, BUILD_ID `caodaX9EgGbJK4cZLFLRk`; all 110 migrations already applied; `/api/health` ok). That is DEV installation and operational acceptance only: no invite redemption exercised on DEV; not shown: restricted `afldb_auth`, real-database Server Action end-to-end, PROD installation or acceptance, historical misuse (not assessed, nothing repaired); ISSUE-107 gate off, so no live build-header parity is claimed**: every redemption requires the stored issuer's current authority under its row lock (D-270-2), free addresses and contributors included; an existing `admin`/`super_admin` is overwritten only for a current super admin, also in the upsert's `ON CONFLICT … WHERE`; refusals write nothing and audit `admin.invite_rejected` with a reason; a lock wait past 5 s rolls back as a generic failure; runbook §17–§20 | PROD installation and any applicable PROD acceptance, behind the unchanged ISSUE-265 hold; close only after that acceptance is complete; D-270-1 remains undecided, not a gate; §19.6 follow-ups recorded |
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator-run
 standalone promotion-gate reads on DEV and PROD, graded offline; operator decision D-233-4). Resolved as **AFL API
@@ -49235,7 +49235,8 @@ retained behaviour under `Unreleased`.
   `src/app/admin/invite/[token]/actions.ts` (`confirmEnrolment`), `src/app/admin/admins/invite-actions.ts`
   (`createInvite`), and since the fix `src/db/queries/admin-invites.ts`.
 - **Runbook:** `issues/open/AFLDB-ISSUE-270.md` (§0–§16 from the review, kept as historical; §17 implementation; §18
-  D-270-2 revision; §19 review follow-up, which governs; §19.9 operator validation results).
+  D-270-2 revision; §19 review follow-up, which governs; §19.9 operator validation results; §20 commit, merge and DEV
+  deployment).
 - **Origin.** Full code review at `20a7a4bb` (F-005; partition note R1a-F01; tracked in the separate review worktree).
   Code-proven, not reproduced.
 - **Defect (review evidence, at `20a7a4bb`).** `createInvite` stops a delegated manager (an `admin` with
@@ -49245,7 +49246,8 @@ retained behaviour under `Unreleased`.
   invites unique per email), or one issued before the address became an administrator, therefore let the manager take
   over a peer, audited as an ordinary `admin.invite_accepted`. No vertical escalation (a super admin outranks an
   `admin` invite).
-- **Implementation (2026-10-09, `sonnet/issue-270` in worktree `afldb-issue-270`; uncommitted, not deployed).** The
+- **Implementation (2026-10-09, `sonnet/issue-270` in worktree `afldb-issue-270`; uncommitted and not deployed when
+  written; since committed and installed on DEV, see "Commit, merge and DEV deployment" below).** The
   redemption transaction moved to `redeemInviteInTransaction` (`src/db/queries/admin-invites.ts`). Rule: an account that
   outranks the invite is refused as before (`outranked`); an existing `admin` or `super_admin` is overwritten only when
   the invite's stored `invited_by` is, at redemption, an enabled `super_admin` (`issuer_not_authorised` otherwise); an
@@ -49258,7 +49260,7 @@ retained behaviour under `Unreleased`.
   No migration, uniqueness index or invite revocation. The review's §13 proposal ("refuse when an `auth_users` row exists
   at the email") was corrected: it would also have refused the intended delegated handling of contributors. Runbook
   §17.1–§17.5. `docs/admin-and-beta.md` updated.
-- **Revision for D-270-2 (2026-10-09, same worktree; uncommitted, not deployed; validated, see Validation below).** The issuer's current
+- **Revision for D-270-2 (2026-10-09, same worktree; uncommitted and not deployed when written; validated, see Validation below).** The issuer's current
   authority, read from its locked row (`role`, `can_manage_admins`, `disabled_at`), is now required for **every**
   redemption, free addresses and contributors included: an enabled `super_admin` may grant `admin` or `super_admin` and
   the delegation; an enabled `admin` with `can_manage_admins` (the `people.admins.manage` capability) may grant an
@@ -49276,8 +49278,8 @@ retained behaviour under `Unreleased`.
   `hasCapability`). Real PostgreSQL in `tests/integration/admin-lifecycle.test.ts`: the §17 eleven, updated, plus four
   stale-authority cases; the concurrency cases now run under a harness that bounds readiness waits and settles every
   background transaction on every path; the `_test` preflight is file-wide. Runbook §18.6.
-- **Follow-up revision from the independent (Fable) review (2026-10-09, same worktree; uncommitted, not deployed;
-  validated, see Validation below).** The redemption's dedicated connection now carries `statement_timeout` = 5000 ms
+- **Follow-up revision from the independent (Fable) review (2026-10-09, same worktree; uncommitted and not deployed when
+  written; validated, see Validation below).** The redemption's dedicated connection now carries `statement_timeout` = 5000 ms
   (`INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS`, the bound `src/db/authClient.ts` uses): a redemption stuck on another
   transaction's issuer or target row lock is cancelled (`57014`), rolls back whole and takes the generic failure path (no
   redirect, no `admin.invite_accepted`, log carries only the invite id and SQLSTATE). New tests: a DB-free case for the
@@ -49302,8 +49304,31 @@ retained behaviour under `Unreleased`.
   existing concurrent lifecycle cases, with no hook or cleanup errors. A subsequent read-only check on `afldb_test` as
   `afldb_owner` returned `i270_users=0`, `i270_invites=0`, `i155_users=0`, `i155_invites=0` (limited to those address
   patterns and those two tables). **Not shown:** restricted `afldb_auth` validation; real-database Server Action
-  end-to-end coverage; any DEV or PROD deployment or acceptance. No historical misuse was searched for or found; nothing
-  was repaired.
+  end-to-end coverage; any DEV or PROD deployment or acceptance (at the time of those runs). No historical misuse was
+  searched for or found; nothing was repaired.
+- **Commit, merge and DEV deployment (operator-reported, 10 October 2026; runbook §20).** Commit
+  `b239e0ac19b04becd4c1bdf26737d806590d8484` (`fix(auth): enforce issuer authority at invite redemption
+  (AFLDB-ISSUE-270)`). The commit gate and the fresh-ref merge-readiness gate both returned READY, 0 blockers, 2 warnings
+  (no `afldb-merge-readiness` JSON block; no automated unexpected-file classification metadata); the ten changed paths
+  were checked separately. `main` was fast-forwarded and pushed; `main` and `origin/main` matched the full SHA and `main`
+  was clean. Three DEV deployments of that revision on `streamanator`, all completing install, migration check, build,
+  restart and readiness, with all 110 migrations already applied (nothing applied):
+
+  | Service start (AEDT) | Built BUILD_ID | MainPID | Readiness |
+  |---|---|---|---|
+  | 05:53:50 | `Fn5rxPCeUqtVWKIMz5Y7e` | 1095527 → 1755144 | 1 second, 1 probe |
+  | 07:55:26 | `mURayZyID_N004cS0fGzF` | 1755144 → 1863673 | 2 seconds, 2 probes |
+  | 08:14:38 (**latest**) | `caodaX9EgGbJK4cZLFLRk` | 1863673 → 1881568 | 2 seconds, 2 probes |
+
+  After each: remote HEAD equalled the full target commit, `admin-invites.ts` and the invite `actions.ts` matched HEAD,
+  `systemctl` reported active, and `/api/health` reported `status=ok`, `database=ok`. The first two are earlier successful
+  deployments of the same revision. The second run's journal reported a control-group kill warning and an old
+  `next-server` process remaining after the stop; recorded as reported, not claimed to have persisted afterwards and not
+  independently investigated. **Acceptance limits:** DEV installation and operational acceptance only; no invite
+  redemption was exercised on DEV; functional evidence remains the 199 auth tests and 37 PostgreSQL integration tests
+  (16 ISSUE-270 cases) on `afldb_test`; restricted `afldb_auth` and real-database Server Action end-to-end validation are
+  not claimed; the ISSUE-107 gate was off, so the BUILD_ID values are built-artifact identities, not proof of live
+  build-header parity; no historical-misuse assessment and no repair.
 - **Follow-ups and limitations (recorded, not implemented; runbook §19.6).** Invite liveness is checked before the
   transaction, not under it; a case-variant address fails with a unique violation instead of a rule-2 decision; a
   fresh-account enrolment does not burn its TOTP step; D-270-1 uniqueness index undecided; no bulk revocation. The
@@ -49311,9 +49336,9 @@ retained behaviour under `Unreleased`.
 - **Decisions.** D-270-1 (live-invite uniqueness index, a migration): **undecided**, separate from the fix. D-270-2:
   **decided by the operator 2026-10-09 — enforce current issuer authority for every redemption**; implemented (§18), with
   no bulk revocation and no migration.
-- **Next action.** Validation is complete (runbook §19.9). Operator reviews and commits the validated tree, runs
-  `npm run merge:ready -- --issue 270` against freshly updated refs, fast-forwards `main` and pushes `main`, then the
-  normal DEV deployment (`deploy/sync-dev.ps1`) with smoke and recorded DEV acceptance. The issue stays open: PROD
-  installation and any applicable acceptance remain outstanding behind the unchanged ISSUE-265 hold (like every release
-  after `cd3cf782`); resolution only after the applicable remaining acceptance is complete. D-270-1 is not a merge gate. The review worktree's own ISSUE-270 tracker row is older and must be reconciled at tracker
-  merge.
+- **Next action.** Validation (runbook §19.9), commit, merge/push and DEV installation with operational acceptance
+  (runbook §20) are complete. The issue stays open: PROD installation and any applicable PROD acceptance remain
+  outstanding behind the unchanged ISSUE-265 hold (like every release after `cd3cf782`; no PROD procedure exists or is
+  proposed here); resolution only after that applicable remaining acceptance is complete. D-270-1 (uniqueness index)
+  remains undecided and is not a gate. The review worktree's own ISSUE-270 tracker row is older and must be reconciled at
+  tracker merge.
