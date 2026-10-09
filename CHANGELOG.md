@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### The `match_attendance` CSV dataset refuses a blank attendance cell instead of promoting a zero crowd (AFLDB-ISSUE-268; validated on afldb_test, DEV and PROD censuses complete; uncommitted, not deployed; issue open) - 9 October 2026
+### The `match_attendance` CSV dataset refuses a blank attendance cell instead of promoting a zero crowd (AFLDB-ISSUE-268; validated on afldb_test, DEV and PROD censuses complete; committed `5659f789`, merged, deployed to DEV only; PROD not installed; issue open) - 9 October 2026
 
 - A blank `attendance` cell in a `match_attendance` upload used to read as `Number('') = 0`: the row validated `ok`, stayed
   off the review page, and promotion wrote a `complete` zero crowd recorded against the manual-edit source, which settles
@@ -43,13 +43,21 @@ commit.
   a read-only repeatable-read transaction, complete through `== Done.`. Both found no retained `match_attendance` submissions, no
   rows in Sections 2–5 and zero in every summary count; every statement parsed, but populated-row classification was not
   exercised. No exposure was found in the records checked. Historical impact remains unassessed, nothing was repaired, no repair is
-  indicated, and the censuses did not install the fix (it is uncommitted and undeployed; PROD stays behind the ISSUE-265 hold).
-  Numeric-format tightening (D-268-1) and failed-submission recovery (D-268-3) are separate follow-ups. When the output is
+  indicated, and the censuses did not install the fix (PROD stays behind the ISSUE-265 hold).
+  Numeric-format tightening (D-268-1) and failed-submission recovery (D-268-3) are separate follow-ups, not merge gates. When the output is
   populated, it keeps the retained input, the stored
   resolution, the recorded promotion and the current match state apart. A nonblank cell beside a stored 0 is reported as
   such, with its retained text, and is marked "input interpretation unverified; investigate before concluding" (it shows
   neither a valid zero nor the absence of exposure); a stored resolution with no usable match id is reported as unknown
   identity, separately from a known id with no `matches` row.
+- Committed as `5659f789e95339f744ef4047e9ebdd3c0f81c299`, fast-forwarded and pushed to `main` (both `merge:ready` runs READY, 0
+  blockers, 2 metadata warnings; the operator checked the nine paths explicitly), and deployed to DEV on 9 October 2026 (operator-
+  reported): revision `86e2d19f` → `5659f789`, dependency installation and standalone build passed, all 110 migrations already
+  applied (none applied), `BUILD_ID` `HcuY5qwdXjl-wq55zN3I_`, service restarted 16:36:31 AEDT, readiness and post-deployment health
+  `ok`, installed SHA and `datasets.ts` matching `HEAD` confirmed. DEV installation and operational acceptance are complete. That
+  deployment did not exercise attendance validation or promotion on DEV (functional evidence remains the `afldb_test` runs), and the
+  ISSUE-107 gate was off, so no live build-header parity is claimed. PROD is not installed and stays at `cd3cf782` behind the
+  ISSUE-265 hold; installation and acceptance there are outstanding. Historical impact remains unassessed and nothing was repaired.
 
 ### The `matches` override replay applies every active correction and keeps final-period scores whole (AFLDB-ISSUE-267, AFLDB-ISSUE-269; validated on afldb_test after a second fix pass; DEV and PROD censuses complete; committed as 86e2d19f and deployed to DEV; PROD installation deferred; issues open) - 9 October 2026
 

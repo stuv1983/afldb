@@ -166,7 +166,8 @@
 ### AFLDB-ISSUE-268 — Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd
 - **Severity:** High. **Area:** legacy intake / NULL-vs-zero — `src/lib/ingest/datasets.ts` (`match_attendance`).
 - **State:** Open (2026-10-08), 2026-10-08 full code review F-003, reproduced DB-free (W2). **Implemented 2026-10-09 in
-  `sonnet/issue-268`, uncommitted and not deployed; operator checks at 15:11:57 passed (ingest-datasets 181/181, `tsc`,
+  `sonnet/issue-268`, committed as `5659f789`, merged and pushed to `main`, and deployed to DEV (installation and operational
+  acceptance complete, 9 Oct 2026); operator checks at 15:11:57 passed (ingest-datasets 181/181, `tsc`,
   `eslint`, `git diff --check`) and the targeted ISSUE-268 integration cases passed twice on `afldb_test` as `afldb_owner`
   (15:21:42, 15:30:35: 7 passed, 32 filtered skips each); both operator-run censuses complete (DEV 15:59:22, PROD 16:02:57).**
   `validateRow` refuses a blank or missing `attendance` cell;
@@ -181,8 +182,10 @@
   `afldb_prod`), both PostgreSQL 16.15, read-only repeatable-read, complete through `== Done.`: **no retained `match_attendance`
   submissions, no rows in Sections 2–5, every summary count zero, every statement parsed; classification of populated rows not
   exercised; no exposure found in the records checked** (runbook §17.14). **Historical impact unassessed, nothing repaired, no
-  repair indicated, neither census installed the fix.** Not deployed anywhere; PROD is held at `cd3cf782`.
-- **Runbook:** `issues/open/AFLDB-ISSUE-268.md` (§0–§16 from the review; §17 implementation record); census
+  repair indicated, neither census installed the fix.** **Deployed to DEV only** (`86e2d19f` → `5659f789`, 110/110 migrations already
+  applied, readiness and health `ok`); that deployment did not exercise attendance validation or promotion, and the ISSUE-107 gate
+  was off, so no live build-header parity is claimed. **Not installed on PROD**, which is held at `cd3cf782`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-268.md` (§0–§16 from the review; §17 implementation record, §17.15 commit, merge and DEV deployment); census
   `issues/open/AFLDB-ISSUE-268-blank-attendance-census.sql`.
 - **Residual exposure:** approval still trusts stored verdicts (a stale `validated` submission can be approved); promotion
   is now refused, but a refused attempt leaves the submission `failed`, which can be neither rejected nor re-validated
@@ -194,12 +197,17 @@
   `afldb_test` / `afldb_owner` / `127.0.0.1:55432`; targeted ISSUE-268 integration cases passed at 15:21:42 and 15:30:35 (7 passed,
   32 filtered skips; no suite or hook failures; fixture preflight and cleanup assertions passed). All three pools used the test owner
   connection temporarily, so **restricted-role permissions and the full integration file are NOT validated.** The 15:11:57 ESLint
-  command covered `datasets.ts`, `ingest-datasets.test.ts` and `match-results-promotion.test.ts`. Nothing committed or
-  deployed. Both censuses complete (runbook §17.14, above).
-- **Next action:** Operator reviews and commits explicit paths (repeating `git diff --check`, since the census SQL header comments
-  and tracking files changed after the runs); `merge:ready`; merge/push; DEV deployment and acceptance. PROD installation follows
-  the unchanged ISSUE-265 hold (R6 in `blockers.md`). The restricted-role and full-file integration runs are optional extra
-  evidence, not done and not claimed. No repair is indicated by the census outputs; a future repair needs separate evidence and
+  command covered `datasets.ts`, `ingest-datasets.test.ts` and `match-results-promotion.test.ts`. Both censuses complete (runbook
+  §17.14, above). **Commit and deployment (operator-reported, runbook §17.15):** `5659f789e95339f744ef4047e9ebdd3c0f81c299`
+  fast-forwarded and pushed (`main` and `origin/main` matched); both `merge:ready` runs READY, 0 blockers, 2 warnings (no runbook
+  readiness JSON metadata; no automated unexpected-file classification), nine paths checked explicitly by the operator. DEV
+  (`streamanator`, `/home/arm/projects/afldb`): dependency installation and standalone build passed; nothing migrated;
+  `BUILD_ID` `HcuY5qwdXjl-wq55zN3I_`; PID 849656 → 1095527, started 16:36:31 AEDT; readiness passed after 3 seconds; exact SHA
+  confirmed, `datasets.ts` matched `HEAD`, service active, health `ok` (latency 30 and 32 ms).
+- **Next action:** PROD installation and acceptance after the unchanged ISSUE-265 hold is lifted and a deployment procedure is
+  prepared and reviewed (R2, R6, R15 in `blockers.md`). D-268-1 and D-268-3 are separate follow-ups, not merge gates. The
+  restricted-role and full-file integration runs are optional extra evidence, not done and not claimed. Historical impact is
+  unassessed and nothing is repaired; no repair is indicated by the census outputs, and a future repair needs separate evidence and
   operator authorisation (runbook §15).
 
 ### AFLDB-ISSUE-269 — `replay_admin_overrides('matches')` applies only one of a match's active override rows

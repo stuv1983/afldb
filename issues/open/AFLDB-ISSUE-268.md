@@ -2,8 +2,10 @@
 
 ## 0. Status
 
-- **Status (2026-10-09, current):** Open. **Validated on `afldb_test`, both censuses complete, uncommitted and undeployed.** Validator fix,
-  the promotion-time re-check of the retained cells (§17.10) and their DB-free and integration tests are written in the working tree.
+- **Status (2026-10-09, current):** Open. **Committed (`5659f789`), merged to `main` and pushed, and deployed to DEV (installation and
+  operational acceptance complete, §17.15); PROD installation and acceptance outstanding behind the unchanged ISSUE-265 hold.**
+  Validated on `afldb_test`; both censuses complete. Validator fix,
+  the promotion-time re-check of the retained cells (§17.10) and their DB-free and integration tests are in `5659f789`.
   Operator validation after the review round (§17.11): at **15:11:57** 181/181 `tests/ingest-datasets.test.ts`, TypeScript, ESLint
   (covering `src/lib/ingest/datasets.ts`, `tests/ingest-datasets.test.ts` and `tests/integration/match-results-promotion.test.ts`) and
   `git diff --check` passed; against `afldb_test` (`afldb_owner`, tunnel `127.0.0.1:55432`) the **targeted ISSUE-268 integration cases**
@@ -11,8 +13,10 @@
   pools used the test owner connection temporarily) and the full integration file. **Both operator-run censuses are complete (§17.14):**
   DEV (snapshot 15:59:22) and PROD (snapshot 16:02:57) each found no retained `match_attendance` submissions, no rows in Sections 2–5
   and zero in every summary count; no exposure was found in the records checked. **Historical impact remains unassessed; nothing was
-  repaired; neither census installed the fix.** Next: review/commit, merge readiness, merge/push, DEV deployment and acceptance; PROD
-  installation stays behind the unchanged ISSUE-265 hold. See §17.
+  repaired; neither census installed the fix.** **DEV deployment (§17.15):** revision `86e2d19f` → `5659f789`, health `ok`; it did **not**
+  exercise attendance validation or promotion on DEV (functional evidence remains the recorded `afldb_test` runs), and the ISSUE-107
+  gate was off, so live build-header parity is not claimed. Next: PROD installation and acceptance, behind the unchanged ISSUE-265
+  hold; D-268-1 and D-268-3 are separate follow-ups, not merge gates. See §17.
 - **Status as brought from the review (2026-10-08):** Open (2026-10-08). Nothing implemented. *(Preserved; §1–§16 below are the review worktree's text, unchanged.)*
 - **Severity:** High. **Area:** legacy CSV intake / data integrity (NULL vs zero).
 - **Key file:** `src/lib/ingest/datasets.ts` (`match_attendance` dataset).
@@ -220,10 +224,11 @@ That was **not** supported by a recorded decision and has been reverted:
 
 - **Done:** the validator fix and the promotion-time re-check; D-268-2's scoped promotion guard (authorised, implemented, and the seven
   targeted integration cases passed twice, §17.11); the 15:11:57 DB-free/`tsc`/ESLint/`git diff --check` round; both operator-run
-  censuses (§17.14).
-- **Remaining ISSUE-268 steps, in order:** operator review and commit of explicit paths (repeat `git diff --check`: the census SQL header
-  and the tracking files changed after the runs, no source or test file did); `merge:ready`; merge/push; DEV deployment and acceptance.
-  PROD installation stays behind the unchanged ISSUE-265 hold (`blockers.md` R2, R6, R15).
+  censuses (§17.14); **commit `5659f789`, `merge:ready`, merge/push, and the DEV deployment with its installation and operational
+  acceptance (§17.15).**
+- **Remaining ISSUE-268 steps (updated after §17.15):** PROD installation and its acceptance, behind the unchanged ISSUE-265 hold
+  (`blockers.md` R2, R6, R15). Nothing else is outstanding for the merge or DEV; the earlier list (review/commit, `merge:ready`,
+  merge/push, DEV deployment and acceptance) is complete.
 - **Not ISSUE-268 merge gates (separate follow-ups):** numeric-format tightening (D-268-1) and any change to failed-submission recovery
   (D-268-3, a shared-pipeline change).
 - **Not validated, and not implied to have passed:** the restricted-role (import/auth) permissions, and the full integration file.
@@ -257,10 +262,10 @@ That was **not** supported by a recorded decision and has been reverted:
   write" is reserved for row-level write evidence, which the legacy path does not
   retain, so this census cannot produce one.** Any repair is an operator decision (§15) and nothing in this issue
   authorises one. Section 3 rows marked `STALE_VERDICT` need the handling in §17.7.
-- **Deployment:** none. No DEV or PROD installation, and PROD remains held at `cd3cf782` (ISSUE-265 observation);
-  this change is not part of any deployment procedure yet.
-- **Not resolved:** the issue stays Open until the change is committed (and merged), and deployed and accepted per the operator's
-  sequence. Both census results are now recorded (§17.14). Tests have passed as far as §17.11 states; that is not resolution.
+- **Deployment (updated after §17.15):** **DEV is installed and operationally accepted** (9 October 2026, `5659f789`, §17.15). **PROD is
+  not installed** and remains held at `cd3cf782` (ISSUE-265 observation); this change is not part of any PROD deployment procedure yet.
+- **Not resolved:** the issue stays Open until it is installed on PROD and that installation is accepted. Commit, merge/push and DEV
+  deployment are done (§17.15). Both census results are recorded (§17.14). Tests have passed as far as §17.11 states; that is not resolution.
 
 ### 17.7 Residual exposure: the stale-verdict path (found 2026-10-09 by reading; promotion half closed in code, §17.10)
 
@@ -530,7 +535,53 @@ as it stood after §17.13 (only its header comments were edited afterwards, to r
 - **D-268-2:** neither database retained a `match_attendance` submission, so there is no stale `validated` or `approved` submission to
   reject and re-validate on either (Section 3 empty).
 
-**Status after this record.** ISSUE-268 stays **Open**: validated on `afldb_test` (DB-free file 181/181 at 15:11:57; the seven targeted
+**Status after this record (historical; superseded by §17.15 for commit, merge and DEV).** ISSUE-268 stays **Open**: validated on `afldb_test` (DB-free file 181/181 at 15:11:57; the seven targeted
 integration cases twice as the test owner; restricted-role and full-file integration coverage NOT validated), both censuses complete,
 **uncommitted and undeployed**. Remaining: review/commit, `merge:ready`, merge/push, DEV deployment and acceptance. PROD installation
 stays behind the unchanged ISSUE-265 hold. D-268-1 and D-268-3 are separate follow-ups, not merge gates for this issue.
+
+### 17.15 Commit, merge and DEV deployment (2026-10-09; recorded from the operator's supplied results, edited by reading only)
+
+The implementer ran nothing (CLAUDE.md §9) and observed none of this; every figure below is the operator's report. No Git, host,
+database or network contact was made to record it.
+
+**Commit and merge.**
+
+- **Commit:** `5659f789e95339f744ef4047e9ebdd3c0f81c299` (`fix(ingest): refuse blank attendance at validation and promotion
+  (AFLDB-ISSUE-268)`), on `sonnet/issue-268`.
+- **Merge/push:** fast-forwarded and pushed to `main`; `main` and `origin/main` matched that SHA.
+- **`merge:ready`:** both runs returned **READY, 0 blockers, 2 warnings**: (1) no runbook readiness JSON metadata; (2) no automated
+  unexpected-file classification. The nine paths were checked explicitly by the operator. (The same two warnings were returned for
+  ISSUE-267.) Neither warning is a merge gate recorded anywhere.
+
+**DEV deployment (completed 9 October 2026).**
+
+| | |
+|---|---|
+| Host / checkout | `streamanator`, `/home/arm/projects/afldb` |
+| Revision | `86e2d19f` → `5659f789` |
+| Dependency installation, standalone build | passed |
+| Migrations | all 110 already applied; none applied |
+| `BUILD_ID` | `HcuY5qwdXjl-wq55zN3I_` |
+| Systemd respawn | PID 849656 → 1095527; service start 16:36:31 AEDT |
+| Readiness | passed after 3 seconds: `{"status":"ok","database":"ok","latencyMs":30}` |
+| Post-deployment verification | exact SHA confirmed; `datasets.ts` matched `HEAD`; service active; health `{"status":"ok","database":"ok","latencyMs":32}` |
+
+**Recorded as complete:** DEV installation and DEV operational acceptance (revision, build, service and health only).
+
+**What this does not establish.**
+
+- **Attendance validation and promotion were not exercised on DEV.** The deployment ran no `match_attendance` upload, validation or
+  promotion. Functional evidence for the fix remains the recorded `afldb_test` runs (§17.11): the DB-free file 181/181 and the seven
+  targeted integration cases twice, both as the test owner. The restricted-role permissions and the full integration file remain
+  **not validated** (optional extra evidence, the operator decides).
+- **No live build-header parity is claimed.** The ISSUE-107 gate was off for this deployment (compare `blockers.md` R19, where the
+  gate failed with exit 21 for ISSUE-259/260).
+- **PROD is untouched.** It stays at `cd3cf782`; the ISSUE-265 observation hold is unchanged and nothing here lifts it or proposes a
+  PROD procedure. The supplied evidence does not state a DEV preflight result; `blockers.md` R7 is unchanged.
+- **Historical impact remains unassessed and nothing was repaired.** Both censuses (§17.14) are empty, present-state evidence only.
+  The `blockers.md` inventory stays explicitly INCOMPLETE; this record does not extend that audit.
+
+**Status after this record.** ISSUE-268 stays **Open**: committed, merged and pushed (`5659f789`), and **deployed and operationally
+accepted on DEV only**. **Remaining: PROD installation and acceptance**, behind the unchanged ISSUE-265 hold (`blockers.md` R2, R6,
+R15). D-268-1 (numeric-format tightening) and D-268-3 (failed-submission recovery) are separate follow-ups, not merge gates.
