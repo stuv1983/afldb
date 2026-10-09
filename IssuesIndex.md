@@ -9,7 +9,11 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 5
+**Open issues:** 6
+
+> **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
+> work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
+> runbooks and `issues.md` are. Update it whenever a listed blocker or acceptance state changes.
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 - **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
@@ -158,6 +162,45 @@
   procedure for this release (the r6 pack must not be reused; the range includes ISSUE-266 and ISSUE-261; the
   deploy-mode preflight is expected to FAIL on the settle manifests), then the applicable PROD deployment acceptance
   (runbook §17.15): verify the installed `tools/migration/common.py`. Then resolve with ISSUE-269.
+
+### AFLDB-ISSUE-268 — Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd
+- **Severity:** High. **Area:** legacy intake / NULL-vs-zero — `src/lib/ingest/datasets.ts` (`match_attendance`).
+- **State:** Open (2026-10-08), 2026-10-08 full code review F-003, reproduced DB-free (W2). **Implemented 2026-10-09 in
+  `sonnet/issue-268`, uncommitted and not deployed; operator checks at 15:11:57 passed (ingest-datasets 181/181, `tsc`,
+  `eslint`, `git diff --check`) and the targeted ISSUE-268 integration cases passed twice on `afldb_test` as `afldb_owner`
+  (15:21:42, 15:30:35: 7 passed, 32 filtered skips each); both operator-run censuses complete (DEV 15:59:22, PROD 16:02:57).**
+  `validateRow` refuses a blank or missing `attendance` cell;
+  every nonblank cell is read as before (`Number()`, whole number 0–200,000; `0` still validates; stricter `^\d+$` is
+  undecided, D-268-1).
+  `match_attendance`'s `preparePromotion` also re-reads every retained cell (same shared reader) before the gate/locks/writes
+  and refuses the whole submission on a blank, unreadable or out-of-range cell or a disagreeing stored figure, whatever the
+  stored verdict; the pipeline records that refusal as status `failed` (no `matches` row or batch written). DB-free and
+  integration cases added; the integration file's fixture hooks were hardened in the review round (read-only preflight that
+  refuses existing reserved rows, owned-id-only teardown, residue reported, runbook §17.12.1). A read-only census of
+  already-promoted blank-cell rows was run by the operator on DEV (snapshot 2026-10-09 15:59:22, `afldb_dev`) and PROD (16:02:57,
+  `afldb_prod`), both PostgreSQL 16.15, read-only repeatable-read, complete through `== Done.`: **no retained `match_attendance`
+  submissions, no rows in Sections 2–5, every summary count zero, every statement parsed; classification of populated rows not
+  exercised; no exposure found in the records checked** (runbook §17.14). **Historical impact unassessed, nothing repaired, no
+  repair indicated, neither census installed the fix.** Not deployed anywhere; PROD is held at `cd3cf782`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-268.md` (§0–§16 from the review; §17 implementation record); census
+  `issues/open/AFLDB-ISSUE-268-blank-attendance-census.sql`.
+- **Residual exposure:** approval still trusts stored verdicts (a stale `validated` submission can be approved); promotion
+  is now refused, but a refused attempt leaves the submission `failed`, which can be neither rejected nor re-validated
+  (runbook §17.7). Remedy before any attempt: reject → re-validate; after: upload a corrected file as a new submission.
+  Undecided, as separate follow-ups and **not** merge gates: D-268-1 (tighten nonblank cells to digits?) and D-268-3 (let a
+  `failed` submission be rejected? shared pipeline). D-268-2's scoped promotion guard is implemented and passed the seven targeted
+  integration cases twice.
+- **Evidence (runbook §17.11):** 2026-10-09 15:11:57 unit file 181/181, `tsc`, `eslint`, `git diff --check` passed; target
+  `afldb_test` / `afldb_owner` / `127.0.0.1:55432`; targeted ISSUE-268 integration cases passed at 15:21:42 and 15:30:35 (7 passed,
+  32 filtered skips; no suite or hook failures; fixture preflight and cleanup assertions passed). All three pools used the test owner
+  connection temporarily, so **restricted-role permissions and the full integration file are NOT validated.** The 15:11:57 ESLint
+  command covered `datasets.ts`, `ingest-datasets.test.ts` and `match-results-promotion.test.ts`. Nothing committed or
+  deployed. Both censuses complete (runbook §17.14, above).
+- **Next action:** Operator reviews and commits explicit paths (repeating `git diff --check`, since the census SQL header comments
+  and tracking files changed after the runs); `merge:ready`; merge/push; DEV deployment and acceptance. PROD installation follows
+  the unchanged ISSUE-265 hold (R6 in `blockers.md`). The restricted-role and full-file integration runs are optional extra
+  evidence, not done and not claimed. No repair is indicated by the census outputs; a future repair needs separate evidence and
+  operator authorisation (runbook §15).
 
 ### AFLDB-ISSUE-269 — `replay_admin_overrides('matches')` applies only one of a match's active override rows
 - **Severity:** Medium. **Area:** data integrity / admin override replay — `tools/migration/common.py`.

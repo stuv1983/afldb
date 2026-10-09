@@ -1287,12 +1287,69 @@ const playerBio: DatasetSpec = {
 // Keyed by AFLDB match id (from the match URL or an exported worklist).
 // Honours migration 020's contract: the figure and its status agree,
 // and a genuine zero cites the manual-edit source.
+const MATCH_ATTENDANCE_MAX = 200_000;
+
+type AttendanceCell =
+  | { kind: 'figure'; value: number }
+  | { kind: 'blank' }
+  | { kind: 'invalid'; text: string };
+
+/**
+ * AFLDB-ISSUE-268: the ONE reading of an `attendance` cell, shared by `validateRow` and the
+ * promotion-time re-check so the two cannot drift. A missing or blank cell is "not recorded"
+ * (`Number('')` is 0, which is how a blank used to become a zero recorded against the manual-edit source); a nonblank cell keeps its
+ * pre-fix reading (`Number()`, whole number, `0..MATCH_ATTENDANCE_MAX`), so `0` and every
+ * previously accepted spelling still resolve to the same figure (runbook §15, D-268-1).
+ */
+function readAttendanceCell(raw: unknown): AttendanceCell {
+  if (raw === null || raw === undefined) return { kind: 'blank' };
+  if (typeof raw !== 'string') return { kind: 'invalid', text: JSON.stringify(raw) };
+  const text = raw.trim();
+  if (text === '') return { kind: 'blank' };
+  const value = Number(text);
+  if (!Number.isInteger(value) || value < 0 || value > MATCH_ATTENDANCE_MAX) {
+    return { kind: 'invalid', text };
+  }
+  return { kind: 'figure', value };
+}
+
+/**
+ * Why a submission's stored rows can no longer be promoted as attendance figures, one entry per
+ * offending row (empty = every row still agrees with the validator's current reading). Reads the
+ * retained payload cell, never the stored verdict: a submission validated before ISSUE-268 keeps an
+ * `ok` verdict and `resolved.attendance = 0` on a blank cell, and both promotion and approval trust
+ * the stored verdict.
+ */
+function staleAttendanceRows(rows: readonly PromotionRow[]): string[] {
+  const stale: string[] = [];
+  for (const row of rows) {
+    const payload = row.payload as unknown;
+    if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+      stale.push(`Row ${row.rowNo}: the stored row payload is unreadable`);
+      continue;
+    }
+    const cell = readAttendanceCell((payload as Record<string, unknown>).attendance);
+    if (cell.kind === 'blank') {
+      stale.push(`Row ${row.rowNo}: attendance is blank`);
+    } else if (cell.kind === 'invalid') {
+      stale.push(`Row ${row.rowNo}: attendance "${cell.text.slice(0, 40)}" is not a whole number from 0 to ${MATCH_ATTENDANCE_MAX}`);
+    } else if (row.resolved.attendance !== cell.value) {
+      stale.push(
+        `Row ${row.rowNo}: the stored resolved attendance (${String(row.resolved.attendance)}) `
+        + `disagrees with the cell (${cell.value})`,
+      );
+    }
+  }
+  return stale;
+}
+
 const matchAttendance: DatasetSpec = {
   key: 'match_attendance',
   title: 'Match attendance updates',
   description:
     'attendance keyed by AFLDB match_id. A 0 is accepted as a confirmed zero-crowd '
-    + 'figure and cited to the manual-edit source; use it only when a source supports it.',
+    + 'figure and cited to the manual-edit source; use it only when a source supports it. '
+    + 'A blank attendance cell is refused, never read as 0: remove rows you have no figure for.',
   requiredColumns: ['match_id', 'attendance'],
   fileKey: (row) => row.match_id ?? '',
   async validateRow(row, { sql }) {
@@ -1309,14 +1366,30 @@ const matchAttendance: DatasetSpec = {
        WHERE m.id = ${matchId}
     `;
     if (!match) return { verdict: 'error', reasons: [`no match with id ${matchId}`] };
-    const attendance = Number((row.attendance ?? '').trim());
-    if (!Number.isInteger(attendance) || attendance < 0 || attendance > 200000) {
-      return { verdict: 'error', reasons: ['attendance must be a whole number from 0 to 200000'] };
+    // AFLDB-ISSUE-268: a blank cell is "not recorded", never a crowd of 0. Number('') is 0, so the
+    // old reading turned a half-filled worklist into `complete` zeros recorded against the manual-edit
+    // source, which the settles then honoured as manual authority. A zero must be typed; a row with nothing to say is
+    // removed from the file (the dataset exists to SET a figure, so there is nothing to preserve).
+    // Nonblank cells keep the pre-fix reading (see readAttendanceCell), so spellings such as `1e2`,
+    // `0x10` and `+5` stay accepted. Tightening to `^\d+$` like optionalCountReader would be a separate,
+    // undecided change (runbook §15, D-268-1).
+    const cell = readAttendanceCell(row.attendance);
+    if (cell.kind === 'blank') {
+      return {
+        verdict: 'error',
+        reasons: [`attendance is blank; enter a whole number from 0 to ${MATCH_ATTENDANCE_MAX}, or remove the row to leave the stored value`],
+      };
+    }
+    if (cell.kind === 'invalid') {
+      return {
+        verdict: 'error',
+        reasons: [`attendance "${cell.text}" must be a whole number from 0 to ${MATCH_ATTENDANCE_MAX}`],
+      };
     }
     return {
       verdict: 'ok',
-      reasons: [`sets ${match.label} to ${attendance}`],
-      resolved: { match_id: matchId, attendance },
+      reasons: [`sets ${match.label} to ${cell.value}`],
+      resolved: { match_id: matchId, attendance: cell.value },
     };
   },
 
@@ -1331,6 +1404,17 @@ const matchAttendance: DatasetSpec = {
     const bad = rows.find((row) => !isPositiveInt(row.resolved.match_id));
     if (bad) {
       throw new Error(`Row ${bad.rowNo} carries no resolved match; re-validate the submission.`);
+    }
+    // AFLDB-ISSUE-268: the whole file is checked against the validator's CURRENT reading of each retained
+    // cell before the gate, any lock or any write, so one stale row refuses every row. DB-free, so a
+    // refused file never waits on the gate.
+    const stale = staleAttendanceRows(rows);
+    if (stale.length > 0) {
+      throw new Error(
+        `Nothing was promoted: ${stale.length} of ${rows.length} rows fail the attendance check applied at promotion `
+        + `(${stale[0]}${stale.length > 1 ? `; ${stale.length - 1} more` : ''}). The stored verdicts predate it; `
+        + 'upload a corrected file as a new submission.',
+      );
     }
     const matchIds = [...new Set(rows.map((row) => Number(row.resolved.match_id)))].sort((a, b) => a - b);
     await withLegacyLockTimeout(sql, async () => {

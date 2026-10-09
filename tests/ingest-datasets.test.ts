@@ -235,6 +235,237 @@ describe('AFLDB-ISSUE-258 player_match_stats optional columns', () => {
 });
 
 /**
+ * AFLDB-ISSUE-268 — `match_attendance` never reads a blank cell as a zero crowd.
+ *
+ * The dataset exists to SET a figure, so a blank has nothing to preserve and is a validation error
+ * (runbook §13). Before the fix `Number('')` was 0: the row validated `ok`, stayed off the review
+ * page and promoted a `complete` zero with manual-source provenance, which the settles honour as manual authority.
+ */
+describe('AFLDB-ISSUE-268 match_attendance attendance cell', () => {
+  const matchAttendance = DATASETS.match_attendance;
+
+  /** Answers the one match lookup validateRow makes; any other query fails the test. */
+  function attendanceSql(found = true) {
+    const queries: string[] = [];
+    const tag = (strings: TemplateStringsArray) => {
+      const text = strings.join('?');
+      queries.push(text);
+      if (/FROM matches m/.test(text)) {
+        return Promise.resolve(found ? [{ id: 12345, label: 'Home FC v Away FC · 2073 R1' }] : []);
+      }
+      throw new Error(`unexpected query: ${text}`);
+    };
+    return { sql: tag as unknown as Sql, queries };
+  }
+
+  const attRow = (attendance: string | null | undefined): Record<string, string | null> => (
+    attendance === undefined ? { match_id: '12345' } : { match_id: '12345', attendance }
+  );
+
+  it.each([[null], [''], ['   ']])('refuses a blank attendance cell %j instead of reading it as 0', async (cell) => {
+    const result = await matchAttendance.validateRow(attRow(cell), { sql: attendanceSql().sql });
+    expect(result.verdict).toBe('error');
+    expect(result.reasons).toHaveLength(1);
+    expect(result.reasons[0]).toContain('attendance is blank');
+    expect(result.resolved).toBeUndefined();
+  });
+
+  it('refuses a row whose attendance column is absent altogether', async () => {
+    const result = await matchAttendance.validateRow(attRow(undefined), { sql: attendanceSql().sql });
+    expect(result.verdict).toBe('error');
+    expect(result.reasons[0]).toContain('attendance is blank');
+    expect(result.resolved).toBeUndefined();
+  });
+
+  it.each([
+    ['x'], ['12,000'], ['12.5'], ['-1'], ['1O'], ['200001'], ['99999999999999999999'],
+  ])('refuses a malformed or out-of-range cell %j, naming it', async (cell) => {
+    const result = await matchAttendance.validateRow(attRow(cell), { sql: attendanceSql().sql });
+    expect(result.verdict).toBe('error');
+    expect(result.reasons).toHaveLength(1);
+    expect(result.reasons[0]).toContain(`attendance "${cell}"`);
+    expect(result.resolved).toBeUndefined();
+  });
+
+  it.each([
+    ['0', 0], ['1', 1], ['41000', 41000], [' 41000 ', 41000], ['0042', 42], ['200000', 200000],
+  ])('accepts the typed figure %j as %i', async (cell, expected) => {
+    const result = await matchAttendance.validateRow(attRow(cell), { sql: attendanceSql().sql });
+    expect(result.verdict).toBe('ok');
+    expect(result.reasons).toEqual([`sets Home FC v Away FC · 2073 R1 to ${expected}`]);
+    expect(result.resolved).toEqual({ match_id: 12345, attendance: expected });
+  });
+
+  // Pre-fix behaviour for NONBLANK cells is preserved (Number() + integer + 0..200000). `^\d+$` strictness
+  // is an undecided change (runbook §15, D-268-1); these pin the status quo so a later tightening is a
+  // visible, deliberate test edit.
+  it.each([
+    ['1e2', 100], ['0x10', 16], ['+5', 5], ['1.0', 1], ['0e0', 0], ['+0', 0],
+  ])('keeps accepting the Number()-readable nonblank spelling %j as %i (unchanged, undecided)', async (cell, expected) => {
+    const result = await matchAttendance.validateRow(attRow(cell), { sql: attendanceSql().sql });
+    expect(result.verdict).toBe('ok');
+    expect(result.resolved).toEqual({ match_id: 12345, attendance: expected });
+  });
+
+  it('still reports an unknown match before looking at the attendance cell', async () => {
+    const result = await matchAttendance.validateRow(attRow(null), { sql: attendanceSql(false).sql });
+    expect(result).toMatchObject({ verdict: 'error', reasons: ['no match with id 12345'] });
+  });
+
+  it('keeps the match_id check first, with no query', async () => {
+    const { sql, queries } = attendanceSql();
+    const result = await matchAttendance.validateRow({ match_id: 'abc', attendance: '' }, { sql });
+    expect(result).toMatchObject({ verdict: 'error', reasons: ['match_id must be a positive integer'] });
+    expect(queries).toEqual([]);
+  });
+
+  it('tells the uploader a blank is refused, in the dataset description', () => {
+    expect(matchAttendance.description).toMatch(/blank attendance cell is refused/i);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-268 — the stale-verdict path.
+ *
+ * Approval and promotion trust the STORED row verdicts, so a submission validated before the fix keeps
+ * `ok` and `resolved.attendance = 0` on a blank cell. `preparePromotion` therefore re-reads every
+ * retained payload cell with the validator's own reader before the gate, any lock or any write.
+ * DB-free: the hook is driven with the rows exactly as the pipeline hands them over; the status
+ * handling around it (approved / failed, the recorded `failed` write) is proven end to end in
+ * tests/integration/match-results-promotion.test.ts.
+ */
+describe('AFLDB-ISSUE-268 match_attendance promotion re-check of the retained cells', () => {
+  const matchAttendance = DATASETS.match_attendance;
+
+  function promotionSql() {
+    const queries: { text: string; values: unknown[] }[] = [];
+    const tag = (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const text = strings.join('?');
+      queries.push({ text, values });
+      if (/current_setting\('lock_timeout'\)/.test(text)) return Promise.resolve([{ previous: '7s' }]);
+      if (/set_config\('lock_timeout'/.test(text) || /pg_advisory_xact_lock\(/.test(text)) return Promise.resolve([]);
+      if (/FROM matches\s+WHERE id = ANY/.test(text)) return Promise.resolve([]);
+      if (/FROM matches m/.test(text)) {
+        return Promise.resolve([{ id: values[0], label: 'Home FC v Away FC · 2073 R1' }]);
+      }
+      throw new Error(`unexpected query: ${text}`);
+    };
+    return { sql: tag as unknown as Sql, queries };
+  }
+
+  /** A row as `promoteSubmission` hands it over: the retained payload and the stored `resolved`. */
+  const row = (
+    rowNo: number,
+    cell: string | null | undefined,
+    resolvedAttendance: number | string | null = 0,
+    matchId = 500 + rowNo,
+  ): PromotionRow => ({
+    rowNo,
+    payload: cell === undefined ? { match_id: String(matchId) } : { match_id: String(matchId), attendance: cell },
+    resolved: { match_id: matchId, attendance: resolvedAttendance },
+  });
+  const prepare = (rows: PromotionRow[], sql: Sql) => matchAttendance.preparePromotion!(rows, { sql });
+
+  // The stale rows are `ok` / resolved 0 exactly as the pre-fix validator stored them. Both an approved
+  // submission and a retryable `failed` one (a 55P03 / 40P01 earlier) reach the hook with these rows.
+  it.each([
+    ['a null cell', null], ['an empty cell', ''], ['a whitespace cell', '   '], ['an absent column', undefined],
+  ])('refuses a stale `ok` row with %s and resolved 0, before the gate or any lock', async (_label, cell) => {
+    const { sql, queries } = promotionSql();
+    await expect(prepare([row(1, cell, 0)], sql)).rejects.toThrow(/Row 1: attendance is blank/);
+    expect(queries).toEqual([]);
+  });
+
+  it('refuses the WHOLE file when one row of several is blank, naming it and counting the rest', async () => {
+    const { sql, queries } = promotionSql();
+    const error = await prepare([row(1, '41000', 41000), row(2, null, 0), row(3, '42000', 42000), row(4, '', 0)], sql)
+      .catch((e: unknown) => e);
+    expect(String(error)).toContain('Nothing was promoted: 2 of 4 rows');
+    expect(String(error)).toContain('Row 2: attendance is blank');
+    expect(String(error)).toContain('1 more');
+    expect(String(error)).toContain('upload a corrected file as a new submission');
+    expect(queries).toEqual([]);
+  });
+
+  it('does not advertise a re-validation the submission may no longer be able to take', async () => {
+    const error = await prepare([row(1, null, 0)], promotionSql().sql).catch((e: unknown) => e);
+    expect(String(error)).not.toMatch(/re-?validat/i);
+  });
+
+  it.each([
+    ['x'], ['12,000'], ['12.5'], ['-1'], ['200001'], ['99999999999999999999'],
+  ])('refuses a stored `ok` row whose cell %j no longer reads as a figure', async (cell) => {
+    const { sql, queries } = promotionSql();
+    await expect(prepare([row(1, cell, 1000)], sql)).rejects.toThrow(new RegExp(`Row 1: attendance "${cell}" is not a whole number`));
+    expect(queries).toEqual([]);
+  });
+
+  it.each([
+    ['a payload that is a JSON string (double-encoded)', '{"match_id":"501","attendance":"1000"}'],
+    ['a null payload', null],
+    ['an array payload', ['1000']],
+  ])('refuses %s as unreadable evidence', async (_label, payload) => {
+    const { sql, queries } = promotionSql();
+    const unreadable = { ...row(1, '1000', 1000), payload } as unknown as PromotionRow;
+    await expect(prepare([unreadable], sql)).rejects.toThrow(/Row 1: the stored row payload is unreadable/);
+    expect(queries).toEqual([]);
+  });
+
+  it('refuses a non-string cell value as unreadable rather than coercing it', async () => {
+    const numeric = { ...row(1, '1000', 1000), payload: { match_id: '501', attendance: 1000 } } as unknown as PromotionRow;
+    await expect(prepare([numeric], promotionSql().sql)).rejects.toThrow(/Row 1: attendance "1000" is not a whole number/);
+  });
+
+  it.each<[string, string, number | string | null]>([
+    ['a typed figure resolved to 0', '41000', 0],
+    ['a typed zero resolved to a figure', '0', 41000],
+    ['a figure resolved to a different figure', '41000', 40999],
+    ['a figure with no resolved attendance', '41000', null],
+    ['a figure resolved as text', '41000', '41000'],
+  ])('refuses %s: the stored resolved value must equal the parsed cell', async (_label, cell, resolved) => {
+    const { sql, queries } = promotionSql();
+    await expect(prepare([row(1, cell, resolved)], sql)).rejects.toThrow(/Row 1: the stored resolved attendance \(.*\) disagrees with the cell \(/);
+    expect(queries).toEqual([]);
+  });
+
+  it('accepts "0" cells resolved to 0 and still takes the gate and the ascending match lock', async () => {
+    const { sql, queries } = promotionSql();
+    await prepare([row(1, '0', 0, 502), row(2, '41000', 41000, 500), row(3, ' 0 ', 0, 501)], sql);
+    const kinds = queries.map((q) => (/current_setting/.test(q.text) ? 'read'
+      : /pg_advisory_xact_lock\(/.test(q.text) ? 'gate'
+        : /set_config/.test(q.text) ? 'set'
+          : /FROM matches/.test(q.text) ? 'matches' : '?'));
+    expect(kinds).toEqual(['read', 'set', 'gate', 'matches', 'set']);
+    expect(queries.filter((q) => /set_config\('lock_timeout'/.test(q.text)).map((q) => q.values)).toEqual([['5s'], ['7s']]);
+    expect(queries.find((q) => /FROM matches/.test(q.text))!.values[0]).toEqual([500, 501, 502]);
+  });
+
+  it.each([
+    ['0', 0], ['1', 1], ['41000', 41000], [' 41000 ', 41000], ['0042', 42], ['200000', 200000],
+    ['1e2', 100], ['0x10', 16], ['+5', 5], ['1.0', 1], ['0e0', 0], ['+0', 0],
+  ])('accepts the existing spelling %j resolved to %i', async (cell, resolved) => {
+    const { sql, queries } = promotionSql();
+    await prepare([row(1, cell, resolved)], sql);
+    expect(queries.some((q) => /FROM matches/.test(q.text))).toBe(true);
+  });
+
+  // Drift guard: for every cell the validator and the promotion re-check must agree, so a spelling cannot
+  // validate `ok` and then be refused at promotion (or the reverse).
+  it.each([
+    [null], [''], ['   '], ['0'], ['1'], ['41000'], [' 41000 '], ['0042'], ['200000'], ['200001'], ['-1'],
+    ['x'], ['12,000'], ['12.5'], ['1O'], ['1e2'], ['0x10'], ['+5'], ['1.0'], ['+0'], ['Infinity'], ['NaN'],
+  ])('validateRow and the promotion re-check agree about the cell %j', async (cell) => {
+    const verdict = await matchAttendance.validateRow({ match_id: '501', attendance: cell }, { sql: promotionSql().sql });
+    const { sql, queries } = promotionSql();
+    const promoted = await prepare([{
+      rowNo: 1, payload: { match_id: '501', attendance: cell }, resolved: verdict.resolved ?? { match_id: 501, attendance: 0 },
+    }], sql).then(() => true, () => false);
+    expect(promoted).toBe(verdict.verdict === 'ok');
+    expect(queries.some((q) => /FROM matches/.test(q.text))).toBe(verdict.verdict === 'ok');
+  });
+});
+
+/**
  * AFLDB-ISSUE-264 — a legacy row against durable Match Sheet authority.
  *
  * The authority is built by the settle's own pure reader

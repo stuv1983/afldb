@@ -32,6 +32,13 @@
  * resolves for 2073: real spans end at a concrete last season
  * (tools/migration/load_reference_data.py), and none is borrowed or widened.
  *
+ * Fixture ownership (AFLDB-ISSUE-268 hardening): the file-level and ISSUE-258 hooks run for every nested block.
+ * The file-level `beforeAll` checks the target and the reserved namespace read-only and refuses any existing
+ * reserved row (season 2073, its matches and club_seasons, the fixture clubs and players) before its first
+ * write; the suite never adopts or deletes such a row. Teardown deletes only the season it inserted and the
+ * matches, submissions, clubs, organizations and players it recorded as created, reports anything else it finds
+ * in season 2073, and throws that residue list at the end instead of removing it.
+ *
  * AFLDB-ISSUE-264 nests inside that block and reuses its fixtures: synthetic
  * players with synthetic AFL Tables identities and synthetic `data_overrides`
  * Match Sheet records on two fixture-season matches (R258X, R258Y), all
@@ -81,6 +88,117 @@ let awayClubId: number;
 let awayClubName: string;
 let sportsDataLabSourceId: number;
 const submissionIds = new Set<number>();
+
+// Fixture ownership (hardened under AFLDB-ISSUE-268). This file reserves season 2073 and the names below.
+// Nothing is adopted: a read-only preflight refuses any existing reserved row before the first write, and
+// teardown deletes only rows whose creation this run saw commit and recorded. Everything starts disabled,
+// so a failed preflight leaves every teardown a no-op. A row found in the reserved namespace that this run
+// does not own is left in place and reported, never deleted.
+const CLUB_SLUG_PREFIX = 'afldb-issue-258-fixture-';
+/** Every player display_name this file creates (the ISSUE-258 block and the ISSUE-264 block). */
+const RESERVED_PLAYER_NAMES = [
+  'AFLDB-ISSUE-258 Kept Player', 'AFLDB-ISSUE-258 Fresh Player',
+  ...['Guarded', 'Removed', 'Added', 'Clear', 'Late'].map((tag) => `AFLDB-ISSUE-264 ${tag} Player`),
+];
+let preflightPassed = false; // set only after every read-only target and namespace check has passed
+let seasonOwned = false; // set only after this run's own INSERT of the season returned
+/** Matches this run created: claimed from its own promotions' batches, or recorded at a direct insert. */
+const ownedMatchIds = new Set<number>();
+/** Things teardown could not remove, or found that it does not own. Thrown once, at the end of the file. */
+const residue: string[] = [];
+
+type DbTarget = { db: string; addr: string | null; port: number | null };
+const targetKey = (t: DbTarget) => `${t.db}@${t.addr}:${t.port}`;
+
+/**
+ * Read-only. validateSubmission() writes verdicts through the auth pool, whose DSN tests/setup.ts does not
+ * check: refuse unless it reaches this same _test database, so no submission id can reach another one.
+ */
+async function assertTestTarget(): Promise<void> {
+  const [authTarget] = await authSql<DbTarget[]>`
+    SELECT current_database() AS db, inet_server_addr()::text AS addr, inet_server_port() AS port
+  `;
+  const [ownerTarget] = await owner<DbTarget[]>`
+    SELECT current_database() AS db, inet_server_addr()::text AS addr, inet_server_port() AS port
+  `;
+  if (targetKey(authTarget) !== targetKey(ownerTarget) || !/_test$/.test(ownerTarget.db)) {
+    throw new Error(
+      `AFLDB_AUTH_DATABASE_URL must target ${targetKey(ownerTarget)} (a _test database); it targets ${targetKey(authTarget)}`,
+    );
+  }
+}
+
+/** Read-only. Refuses any existing row in the reserved namespace; the suite neither adopts nor deletes it. */
+async function assertNamespaceFree(): Promise<void> {
+  const [seen] = await owner<{
+    season: number; matches: number; clubSeasons: number; clubs: number; organizations: number;
+    players: number; adminRole: string | null;
+  }[]>`
+    SELECT (SELECT count(*) FROM seasons WHERE year = ${FIXTURE_SEASON})::int AS season,
+           (SELECT count(*) FROM matches WHERE season = ${FIXTURE_SEASON})::int AS matches,
+           (SELECT count(*) FROM club_seasons WHERE season = ${FIXTURE_SEASON})::int AS "clubSeasons",
+           (SELECT count(*) FROM clubs WHERE slug LIKE ${`${CLUB_SLUG_PREFIX}%`})::int AS clubs,
+           (SELECT count(*) FROM club_organizations
+             WHERE slug LIKE ${`${CLUB_SLUG_PREFIX}%`})::int AS organizations,
+           (SELECT count(*) FROM players WHERE display_name = ANY(${RESERVED_PLAYER_NAMES}::text[]))::int AS players,
+           (SELECT role::text FROM auth_users WHERE email = ${FIXTURE_EMAIL}) AS "adminRole"
+  `;
+  const taken = (Object.entries(seen) as [string, number | string | null][])
+    .filter(([key, value]) => key !== 'adminRole' && Number(value) > 0)
+    .map(([key, value]) => `${key}: ${value}`);
+  if (taken.length > 0) {
+    throw new Error(
+      `reserved fixture namespace (season ${FIXTURE_SEASON}, ${CLUB_SLUG_PREFIX}*, the fixture players) is not empty `
+      + `(${taken.join(', ')}). Nothing was written and nothing will be deleted; remove that residue by hand first.`,
+    );
+  }
+  // The one retained shared row (never deleted): refuse to adopt it unless it is the fixture super_admin.
+  if (seen.adminRole !== null && seen.adminRole !== 'super_admin') {
+    throw new Error(`${FIXTURE_EMAIL} exists with role ${seen.adminRole}, not super_admin; refusing to use it`);
+  }
+}
+
+/** Claims matches the pipeline created from this run's own submissions (their batches are `submission N`). */
+async function claimOwnedMatches(): Promise<void> {
+  if (submissionIds.size === 0) return;
+  const notes = [...submissionIds].map((id) => `submission ${id}`);
+  const rows = await owner<{ id: number }[]>`
+    SELECT m.id::int AS id
+      FROM matches m JOIN import_batches b ON b.id = m.import_batch_id
+     WHERE m.season = ${FIXTURE_SEASON} AND b.tool = 'admin-upload' AND b.notes = ANY(${notes}::text[])
+  `;
+  for (const row of rows) ownedMatchIds.add(row.id);
+}
+
+async function deleteOwnedMatches(): Promise<void> {
+  await owner`
+    DELETE FROM matches WHERE season = ${FIXTURE_SEASON} AND id = ANY(${[...ownedMatchIds]}::int[])
+  `;
+}
+
+/** Reports, and leaves alone, any season-2073 match this run does not own. */
+async function reportForeignMatches(): Promise<void> {
+  const foreign = await owner<{ id: number; roundCode: string }[]>`
+    SELECT id::int AS id, round_code AS "roundCode" FROM matches
+     WHERE season = ${FIXTURE_SEASON} AND NOT (id = ANY(${[...ownedMatchIds]}::int[]))
+     ORDER BY id
+  `;
+  if (foreign.length > 0) {
+    residue.push(
+      `season ${FIXTURE_SEASON} holds ${foreign.length} match row(s) this run does not own, left in place: `
+      + foreign.map((m) => `${m.id} (${m.roundCode})`).join(', '),
+    );
+  }
+}
+
+/** One teardown step: a failure (for example a foreign row still referencing ours) is recorded, not fatal. */
+async function cleanStep(label: string, step: () => Promise<unknown>): Promise<void> {
+  try {
+    await step();
+  } catch (error) {
+    residue.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 function matchKey(roundCode: string, matchDate: string): string {
   return `${FIXTURE_SEASON}|${roundCode}|${matchDate}|${homeClubName}|${awayClubName}`;
@@ -147,10 +265,9 @@ async function readMatch(roundCode: string, matchDate: string) {
 }
 
 beforeAll(async () => {
-  await owner`
-    INSERT INTO seasons (year, league) VALUES (${FIXTURE_SEASON}, 'AFL')
-    ON CONFLICT (year) DO NOTHING
-  `;
+  // Read-only checks first; nothing is written until every one has passed.
+  await assertTestTarget();
+  await assertNamespaceFree();
 
   // Read-only: two real, existing club identities, distinct organizations.
   const clubs = await owner<{ id: number; name: string }[]>`
@@ -163,6 +280,12 @@ beforeAll(async () => {
   if (clubs.length < 2) throw new Error('fixture needs two existing club identities');
   [homeClubId, awayClubId] = clubs.map((c) => c.id);
   [homeClubName, awayClubName] = clubs.map((c) => c.name) as [string, string];
+  preflightPassed = true;
+
+  // The first write. No ON CONFLICT: if the season appeared since the preflight this throws and the run
+  // owns nothing, so the season is not deleted.
+  await owner`INSERT INTO seasons (year, league) VALUES (${FIXTURE_SEASON}, 'AFL')`;
+  seasonOwned = true;
 
   // The promotion pipeline resolves this key (src/lib/ingest/pipeline.ts) but
   // no SQL migration seeds it -- only tools/migration/import_legacy_afl.py's
@@ -194,19 +317,36 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await owner`DELETE FROM matches WHERE season = ${FIXTURE_SEASON}`;
-  // data_submission_rows cascades off data_submissions (migration 023).
-  if (submissionIds.size > 0) {
-    await owner`DELETE FROM data_submissions WHERE id = ANY(${[...submissionIds]}::int[])`;
+  try {
+    // Disabled unless the preflight passed; then it removes only what this run recorded as its own.
+    if (preflightPassed) {
+      await cleanStep('claim fixture matches', claimOwnedMatches);
+      await cleanStep('owned matches', deleteOwnedMatches);
+      await cleanStep('foreign matches', reportForeignMatches);
+      // data_submission_rows cascades off data_submissions (migration 023). Every id here came back from
+      // this run's own INSERT.
+      if (submissionIds.size > 0) {
+        await cleanStep('submissions', () => owner`
+          DELETE FROM data_submissions WHERE id = ANY(${[...submissionIds]}::int[])
+        `);
+      }
+      // import_batches rows are left in place, matching submission-promotion.test.ts's
+      // own convention -- import_batches/sources are append-only (001_foundations.sql).
+      // The season goes only if this run inserted it; a foreign row still referencing it fails the
+      // DELETE, which is recorded as residue rather than forced.
+      if (seasonOwned) {
+        await cleanStep('season', () => owner`DELETE FROM seasons WHERE year = ${FIXTURE_SEASON}`);
+      }
+      // The fixture auth_users row and the sports_data_lab source are intentionally retained (never
+      // deleted), matching submission-promotion.test.ts's rationale: deleting them would race a
+      // concurrent run that reused them.
+    }
+  } finally {
+    await owner.end({ timeout: 5 });
   }
-  // import_batches rows are left in place, matching submission-promotion.test.ts's
-  // own convention -- import_batches/sources are append-only (001_foundations.sql).
-  await owner`DELETE FROM seasons WHERE year = ${FIXTURE_SEASON}`;
-  // The fixture auth_users row is intentionally retained, matching
-  // submission-promotion.test.ts's rationale: deleting it would race a
-  // concurrent run that reused it.
-
-  await owner.end({ timeout: 5 });
+  if (residue.length > 0) {
+    throw new Error(`fixture teardown left residue (not deleted):\n- ${residue.join('\n- ')}`);
+  }
 });
 
 describe('AFLDB-ISSUE-185 match_results promotion provenance', () => {
@@ -259,7 +399,8 @@ describe('AFLDB-ISSUE-185 match_results promotion provenance', () => {
     if (!afltables) throw new Error("sources.key = 'afltables' is not seeded in this database");
 
     const seededSourceRecordId = `${MARKER}-preexisting-${roundCode}`;
-    await owner`
+    // Seeded with no import batch, so teardown cannot claim it from a batch: its id is recorded here.
+    const [seeded] = await owner<{ id: number }[]>`
       INSERT INTO matches (
         match_key, season, round_code, round_type, round_number, is_final, match_date,
         venue_raw, home_club_id, away_club_id, home_score, away_score, result,
@@ -270,7 +411,9 @@ describe('AFLDB-ISSUE-185 match_results promotion provenance', () => {
         ${MARKER}, ${homeClubId}, ${awayClubId}, 60, 50, 'home_win',
         ${homeClubId}, 10, 'not_collected', ${afltables.id}, ${seededSourceRecordId}
       )
+      RETURNING id::int AS id
     `;
+    ownedMatchIds.add(seeded.id);
 
     const id = await insertMatchResultsSubmission({ roundCode, matchDate });
     const result = await promoteSubmission(id);
@@ -300,7 +443,6 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
   type Payload = Record<string, string | null>;
   type Fingerprint = { n: number; h: string };
 
-  const CLUB_SLUG_PREFIX = 'afldb-issue-258-fixture-';
   const FIXTURE_CLUBS = [
     { slug: `${CLUB_SLUG_PREFIX}home`, name: `${TAG} Home Club`, abbreviation: 'I258H' },
     { slug: `${CLUB_SLUG_PREFIX}away`, name: `${TAG} Away Club`, abbreviation: 'I258A' },
@@ -428,21 +570,9 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
   };
 
   beforeAll(async () => {
-    // validateSubmission() writes verdicts through the auth pool, whose DSN
-    // tests/setup.ts does not check. Refuse unless it is this same _test
-    // database, so no submission id can reach another database.
-    const target = (db: string, addr: string | null, port: number | null) => `${db}@${addr}:${port}`;
-    const [authTarget] = await authSql<{ db: string; addr: string | null; port: number | null }[]>`
-      SELECT current_database() AS db, inet_server_addr()::text AS addr, inet_server_port() AS port
-    `;
-    const [ownerTarget] = await owner<{ db: string; addr: string | null; port: number | null }[]>`
-      SELECT current_database() AS db, inet_server_addr()::text AS addr, inet_server_port() AS port
-    `;
-    const authAt = target(authTarget.db, authTarget.addr, authTarget.port);
-    const ownerAt = target(ownerTarget.db, ownerTarget.addr, ownerTarget.port);
-    if (authAt !== ownerAt || !/_test$/.test(authTarget.db)) {
-      throw new Error(`AFLDB_AUTH_DATABASE_URL must target ${ownerAt}; it targets ${authAt}`);
-    }
+    // The target and namespace checks ran, read-only, in the file-level beforeAll before its first write.
+    // Refuse to build anything on a run whose preflight did not pass.
+    if (!preflightPassed) throw new Error('the file-level preflight did not pass; no fixture is created');
 
     baseline = await fingerprint();
 
@@ -458,7 +588,10 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     // One transaction: both identities exist or neither does. The
     // self-referencing current_identity_id FK is deferred, then pointed at
     // itself, as tests/integration/match-admin-create.test.ts does.
-    await owner.begin(async (tx) => {
+    // The ids are recorded only after the transaction commits: a rolled-back identity is never "ours".
+    const made = await owner.begin(async (tx) => {
+      const organizationIds: number[] = [];
+      const clubIds: number[] = [];
       await tx`SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`;
       for (const club of FIXTURE_CLUBS) {
         const [organization] = await tx<{ id: number }[]>`
@@ -474,10 +607,13 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
           RETURNING id
         `;
         await tx`UPDATE clubs SET current_identity_id = ${created.id} WHERE id = ${created.id}`;
-        fixtureOrganizationIds.push(organization.id);
-        fixtureClubIds.push(created.id);
+        organizationIds.push(organization.id);
+        clubIds.push(created.id);
       }
+      return { organizationIds, clubIds };
     });
+    fixtureOrganizationIds.push(...made.organizationIds);
+    fixtureClubIds.push(...made.clubIds);
 
     // Each must resolve, for the fixture season, to itself through the
     // validator's own resolver; nothing about resolution is relaxed.
@@ -504,27 +640,44 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
   });
 
   afterAll(async () => {
+    // Disabled unless the file-level preflight passed. Every delete below is by an id this run recorded as
+    // created (committed); a step a foreign row blocks is recorded as residue and the rest still run.
+    if (!preflightPassed) return;
     const playerIdList = [...fixturePlayers.values()];
-    await owner`DELETE FROM player_match_stats WHERE player_id = ANY(${playerIdList}::int[])`;
-    await owner`DELETE FROM matches WHERE season = ${FIXTURE_SEASON} AND round_code LIKE 'R258%'`;
-    await owner`DELETE FROM players WHERE id = ANY(${playerIdList}::int[])`;
+    await cleanStep('claim fixture matches', claimOwnedMatches);
+    await cleanStep('fixture player_match_stats', () => owner`
+      DELETE FROM player_match_stats WHERE player_id = ANY(${playerIdList}::int[])
+    `);
+    await cleanStep('owned matches', deleteOwnedMatches);
+    await cleanStep('fixture players', () => owner`DELETE FROM players WHERE id = ANY(${playerIdList}::int[])`);
     // Only the identities this run created; club_aliases would cascade (none are made).
-    await owner`DELETE FROM clubs WHERE id = ANY(${fixtureClubIds}::int[])`;
-    await owner`DELETE FROM club_organizations WHERE id = ANY(${fixtureOrganizationIds}::int[])`;
+    await cleanStep('fixture clubs', () => owner`DELETE FROM clubs WHERE id = ANY(${fixtureClubIds}::int[])`);
+    await cleanStep('fixture organizations', () => owner`
+      DELETE FROM club_organizations WHERE id = ANY(${fixtureOrganizationIds}::int[])
+    `);
+
+    // A slug-prefixed identity this run did not create is reported, never deleted.
+    const [strays] = await owner<{ n: number }[]>`
+      SELECT ((SELECT count(*) FROM clubs
+                WHERE slug LIKE ${`${CLUB_SLUG_PREFIX}%`} AND NOT (id = ANY(${fixtureClubIds}::int[])))
+            + (SELECT count(*) FROM club_organizations
+                WHERE slug LIKE ${`${CLUB_SLUG_PREFIX}%`} AND NOT (id = ANY(${fixtureOrganizationIds}::int[]))))::int AS n
+    `;
+    if (strays.n > 0) {
+      residue.push(`${strays.n} ${CLUB_SLUG_PREFIX}* club/organization row(s) this run does not own, left in place`);
+    }
 
     const [left] = await owner<{
       matches: number; stats: number; players: number; clubs: number; organizations: number;
     }[]>`
       SELECT (SELECT count(*)::int FROM matches
-               WHERE season = ${FIXTURE_SEASON} AND round_code LIKE 'R258%') AS matches,
+               WHERE season = ${FIXTURE_SEASON} AND id = ANY(${[...ownedMatchIds]}::int[])) AS matches,
              (SELECT count(*)::int FROM player_match_stats
                WHERE player_id = ANY(${playerIdList}::int[])) AS stats,
              (SELECT count(*)::int FROM players WHERE id = ANY(${playerIdList}::int[])) AS players,
-             (SELECT count(*)::int FROM clubs
-               WHERE id = ANY(${fixtureClubIds}::int[]) OR slug LIKE ${`${CLUB_SLUG_PREFIX}%`}) AS clubs,
+             (SELECT count(*)::int FROM clubs WHERE id = ANY(${fixtureClubIds}::int[])) AS clubs,
              (SELECT count(*)::int FROM club_organizations
-               WHERE id = ANY(${fixtureOrganizationIds}::int[])
-                  OR slug LIKE ${`${CLUB_SLUG_PREFIX}%`}) AS organizations
+               WHERE id = ANY(${fixtureOrganizationIds}::int[])) AS organizations
     `;
     expect(left).toEqual({ matches: 0, stats: 0, players: 0, clubs: 0, organizations: 0 });
     // No historical row was touched: every pre-existing row is byte-for-byte as it was.
@@ -633,6 +786,187 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     const row = await readStats(player);
     expect(Object.values(row).every((value) => value === null)).toBe(true);
     expect(Object.keys(row)).toHaveLength(STATS.length + 3);
+  });
+
+  // AFLDB-ISSUE-268: a blank match_attendance cell must never promote as a sourced zero, including from a
+  // submission validated BEFORE the fix (stored verdict `ok`, resolved attendance 0). These run the real
+  // pipeline on the fixture matches above; nothing here touches a match outside the fixture season. Every
+  // match and submission they create is covered by the ownership ledger above (claimed at teardown from the
+  // run's own submissions' batches); a case that fails part-way is cleaned the same way. They reach
+  // `approved` through approveAndPromote()/insertStaleSubmission(), which set the status directly.
+  describe('AFLDB-ISSUE-268 match_attendance blank cells and stale verdicts', () => {
+    const TAG_268 = 'AFLDB-ISSUE-268';
+
+    /** A fresh fixture match (never attendance-bearing), returning its id. */
+    async function freshMatch(roundCode: string, day: string): Promise<number> {
+      await promoteFile('match_results', [matchPayload(roundCode, day)]);
+      const [row] = await owner<{ id: number }[]>`
+        SELECT id::int AS id FROM matches WHERE season = ${FIXTURE_SEASON} AND round_code = ${roundCode}
+      `;
+      return row.id;
+    }
+
+    async function readAttendance(matchId: number) {
+      const [row] = await owner<{ attendance: number | null; status: string; sourceKey: string | null }[]>`
+        SELECT m.attendance, m.attendance_status::text AS status, s.key AS "sourceKey"
+          FROM matches m LEFT JOIN sources s ON s.id = m.attendance_source_id
+         WHERE m.id = ${matchId}
+      `;
+      return row;
+    }
+
+    async function readSubmissionState(id: number) {
+      const [row] = await owner<{ status: string; error: string | null; importBatchId: string | null }[]>`
+        SELECT status::text, error, import_batch_id::text AS "importBatchId"
+          FROM data_submissions WHERE id = ${id}
+      `;
+      const [{ batches }] = await owner<{ batches: number }[]>`
+        SELECT count(*)::int AS batches FROM import_batches
+         WHERE tool = 'admin-upload' AND notes = ${`submission ${id}`}
+      `;
+      return { ...row, batches };
+    }
+
+    /**
+     * A submission exactly as the PRE-FIX validator left it: every row verdict `ok`, a blank cell resolved to
+     * 0. Inserted directly (stageSubmission/validateSubmission would now refuse the blank), at the status
+     * the scenario needs.
+     */
+    async function insertStaleSubmission(
+      status: 'approved' | 'failed',
+      rows: { matchId: number; cell: string | null; resolved: number }[],
+    ): Promise<number> {
+      const sha = `${TAG_268}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      const [submission] = await owner<{ id: number }[]>`
+        INSERT INTO data_submissions
+          (dataset, filename, content, content_sha256, uploaded_by, row_count, status, error)
+        VALUES ('match_attendance', ${`${TAG_268}.csv`}, ${Buffer.from('synthetic\n')}, ${sha},
+                ${fixtureAdminId}, ${rows.length}, ${status}::submission_status,
+                ${status === 'failed' ? 'first failure' : null})
+        RETURNING id
+      `;
+      submissionIds.add(submission.id);
+      for (const [index, row] of rows.entries()) {
+        await owner`
+          INSERT INTO data_submission_rows (submission_id, row_no, payload, verdict, reasons)
+          VALUES (${submission.id}, ${index + 1},
+                  ${owner.json({ match_id: String(row.matchId), attendance: row.cell })},
+                  'ok',
+                  ${owner.json({
+                    reasons: [`sets fixture to ${row.resolved}`],
+                    resolved: { match_id: row.matchId, attendance: row.resolved },
+                  })})
+        `;
+      }
+      return submission.id;
+    }
+
+    const NOT_RECORDED = { attendance: null, status: 'not_collected', sourceKey: null };
+
+    it.each(['approved', 'failed'] as const)(
+      'a stale `ok` blank row from a %s submission is refused: the match is untouched, no batch is created, and the submission is recorded as failed',
+      async (status) => {
+        const matchId = await freshMatch(`R258S${status === 'approved' ? 'A' : 'F'}`, status === 'approved' ? '11' : '12');
+        expect(await readAttendance(matchId)).toEqual(NOT_RECORDED);
+        const id = await insertStaleSubmission(status, [{ matchId, cell: null, resolved: 0 }]);
+
+        const result = await promoteSubmission(id);
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toMatch(/Promotion failed and was rolled back: Nothing was promoted: 1 of 1 rows/);
+          expect(result.error).toContain('Row 1: attendance is blank');
+        }
+
+        // The refusal throws inside the promotion savepoint, so the pipeline records it: the submission is
+        // `failed` with the refusal text (an approved one is moved to failed; a failed one keeps failed with
+        // a fresh error). The match table and the import-batch table are not written.
+        const state = await readSubmissionState(id);
+        expect(state.status).toBe('failed');
+        expect(state.error).toMatch(/Nothing was promoted: 1 of 1 rows/);
+        expect(state.error).not.toBe('first failure');
+        expect(state.importBatchId).toBeNull();
+        expect(state.batches).toBe(0);
+        expect(await readAttendance(matchId)).toEqual(NOT_RECORDED);
+
+        // A retry from `failed` re-reads the same retained cell and refuses again.
+        expect((await promoteSubmission(id)).ok).toBe(false);
+        expect(await readAttendance(matchId)).toEqual(NOT_RECORDED);
+      },
+    );
+
+    it('a mixed file (valid rows around a blank one) refuses whole: the valid figures are not applied either', async () => {
+      const a = await freshMatch('R258SM1', '13');
+      const b = await freshMatch('R258SM2', '14');
+      const c = await freshMatch('R258SM3', '15');
+      const id = await insertStaleSubmission('approved', [
+        { matchId: a, cell: '41000', resolved: 41000 },
+        { matchId: b, cell: '', resolved: 0 },
+        { matchId: c, cell: '42000', resolved: 42000 },
+      ]);
+
+      const result = await promoteSubmission(id);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toContain('Row 2: attendance is blank');
+      for (const matchId of [a, b, c]) expect(await readAttendance(matchId)).toEqual(NOT_RECORDED);
+      expect((await readSubmissionState(id)).batches).toBe(0);
+    });
+
+    it('a stored resolved value that disagrees with a typed cell is refused, not corrected', async () => {
+      const matchId = await freshMatch('R258SD', '16');
+      const id = await insertStaleSubmission('approved', [{ matchId, cell: '41000', resolved: 0 }]);
+      const result = await promoteSubmission(id);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toMatch(/stored resolved attendance \(0\) disagrees with the cell \(41000\)/);
+      expect(await readAttendance(matchId)).toEqual(NOT_RECORDED);
+    });
+
+    // approveAndPromote() sets status = 'approved' with a direct UPDATE: the approval ACTION (decideSubmission,
+    // its authorisation and error-row check) is not exercised by this file. What this case proves is that
+    // validation stores an `error` row for a blank cell and that promoteSubmission() refuses such a submission.
+    it('a blank cell validated afresh is stored as an error row, and promoteSubmission refuses it with no status write', async () => {
+      const matchId = await freshMatch('R258SV', '17');
+      const staged = await stageAndValidate('match_attendance', [{ match_id: String(matchId), attendance: '' }]);
+      expect(staged.summary.errors).toBe(1);
+      expect(staged.rows[0].verdict).toBe('error');
+      expect(staged.rows[0].reasons.reasons[0]).toContain('attendance is blank');
+
+      const result = await approveAndPromote(staged.id);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toMatch(/error rows/i);
+      // This is the pre-existing error-row refusal: it writes nothing, so the status stays as the helper forced it.
+      const state = await readSubmissionState(staged.id);
+      expect(state.status).toBe('approved');
+      expect(state.error).toBeNull();
+      expect(await readAttendance(matchId)).toEqual(NOT_RECORDED);
+    });
+
+    // The file has no citation column: the stored source is the manual-source provenance promoteRow records for
+    // every figure of this dataset, not a separately supplied citation for the zero.
+    it('a "0" cell validates and promotes as a complete zero with manual-source provenance (no separate citation is supplied)', async () => {
+      const matchId = await freshMatch('R258SZ', '18');
+      await promoteFile('match_attendance', [{ match_id: String(matchId), attendance: '0' }]);
+      expect(await readAttendance(matchId)).toEqual({
+        attendance: 0, status: 'complete', sourceKey: 'manual_admin_edit',
+      });
+    });
+
+    it('the existing nonblank spellings still validate and promote to the figure Number() reads', async () => {
+      const spellings: [string, string, number][] = [
+        ['R258SN1', '1e2', 100], ['R258SN2', '0x10', 16], ['R258SN3', ' 41000 ', 41000], ['R258SN4', '0042', 42],
+      ];
+      const ids: number[] = [];
+      for (const [index, [roundCode]] of spellings.entries()) {
+        ids.push(await freshMatch(roundCode, String(20 + index)));
+      }
+      await promoteFile('match_attendance', spellings.map(([, cell], index) => ({
+        match_id: String(ids[index]), attendance: cell,
+      })));
+      for (const [index, [, , expected]] of spellings.entries()) {
+        expect(await readAttendance(ids[index])).toEqual({
+          attendance: expected, status: 'complete', sourceKey: 'manual_admin_edit',
+        });
+      }
+    });
   });
 
   describe('AFLDB-ISSUE-264 durable Match Sheet authority refuses a reverting row', () => {

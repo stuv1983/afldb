@@ -15,6 +15,42 @@ commit.
 
 ## [Unreleased]
 
+### The `match_attendance` CSV dataset refuses a blank attendance cell instead of promoting a zero crowd (AFLDB-ISSUE-268; validated on afldb_test, DEV and PROD censuses complete; uncommitted, not deployed; issue open) - 9 October 2026
+
+- A blank `attendance` cell in a `match_attendance` upload used to read as `Number('') = 0`: the row validated `ok`, stayed
+  off the review page, and promotion wrote a `complete` zero crowd recorded against the manual-edit source, which settles
+  then honoured as manual authority. The validator now refuses a blank or missing cell. Every nonblank cell is read exactly
+  as before (a whole number from 0 to 200,000 as `Number()` reads it), so a `0` cell is still accepted as a zero crowd and no
+  previously accepted nonblank spelling (including `1e2`, `0x10`, `+5`) changes. Whether to tighten nonblank cells to plain
+  digits is an undecided question (D-268-1). The dataset description tells uploaders a blank is refused.
+- Promotion of a `match_attendance` submission now re-reads every retained attendance cell with the same reader and
+  refuses the whole file, before any lock or write, if a cell is blank, unreadable or out of range or the stored figure
+  disagrees with the cell, so a submission validated before the fix cannot promote a blank as a zero on its stale `ok`
+  verdict. The pipeline records such a refusal as a `failed` submission (nothing is written to `matches` or the import
+  batches); a `failed` submission cannot be rejected or re-validated, so the file is uploaded again as a new submission
+  (D-268-3, undecided).
+- DB-free and integration regression cases are in `tests/ingest-datasets.test.ts` and
+  `tests/integration/match-results-promotion.test.ts`. The operator reported on 9 October 2026 that the DB-free file passed
+  181/181 (with `tsc`, `eslint` over `datasets.ts`, `ingest-datasets.test.ts` and `match-results-promotion.test.ts`, and
+  `git diff --check`) at 15:11:57, and that the seven ISSUE-268 integration cases (including the scoped promotion guard, D-268-2) passed twice
+  on `afldb_test` (15:21:42 and 15:30:35, 32 other cases filtered out, no suite or hook failure). Those runs used the test owner
+  connection for all three pools, so the restricted-role permissions and the full integration file are not validated. Its
+  fixture hooks (which run for these cases) were hardened: a read-only preflight refuses existing reserved fixture rows before
+  the first write, and teardown deletes only rows this run created, reporting anything else it finds. A leftover season 2073 on
+  `afldb_test` therefore makes the file refuse to start until removed by hand.
+- A read-only census of already-promoted blank-cell rows (`issues/open/AFLDB-ISSUE-268-blank-attendance-census.sql`) was run by
+  the operator on 9 October 2026 on DEV (snapshot 15:59:22, `afldb_dev`) and PROD (16:02:57, `afldb_prod`), each PostgreSQL 16.15 in
+  a read-only repeatable-read transaction, complete through `== Done.`. Both found no retained `match_attendance` submissions, no
+  rows in Sections 2–5 and zero in every summary count; every statement parsed, but populated-row classification was not
+  exercised. No exposure was found in the records checked. Historical impact remains unassessed, nothing was repaired, no repair is
+  indicated, and the censuses did not install the fix (it is uncommitted and undeployed; PROD stays behind the ISSUE-265 hold).
+  Numeric-format tightening (D-268-1) and failed-submission recovery (D-268-3) are separate follow-ups. When the output is
+  populated, it keeps the retained input, the stored
+  resolution, the recorded promotion and the current match state apart. A nonblank cell beside a stored 0 is reported as
+  such, with its retained text, and is marked "input interpretation unverified; investigate before concluding" (it shows
+  neither a valid zero nor the absence of exposure); a stored resolution with no usable match id is reported as unknown
+  identity, separately from a known id with no `matches` row.
+
 ### The `matches` override replay applies every active correction and keeps final-period scores whole (AFLDB-ISSUE-267, AFLDB-ISSUE-269; validated on afldb_test after a second fix pass; DEV and PROD censuses complete; committed as 86e2d19f and deployed to DEV; PROD installation deferred; issues open) - 9 October 2026
 
 - `replay_admin_overrides(conn, 'matches')` (`tools/migration/common.py`), which every `matches` reload, rebuild and

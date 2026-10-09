@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 5
+**Open issues:** 6
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
@@ -12,6 +12,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
 | AFLDB-ISSUE-266 | Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin | High | Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py` | Open (2026-10-08); 2026-10-08 full code review F-001; reproduced DB-free (W1; W2 adds substring injection and an unbound pass); D-266-1 and D-266-2 decided 2026-10-09; implemented and committed as `077af7ee`, merged and pushed to main; pre-commit review fixed two parser gaps (runbook §18.8); DB-free suite 160/160 on Windows Python 3.12.10 and 3.14.4 and on Linux (streamanator, CPython 3.12.3, 2026-10-09; runbook §18.9); **deployed to DEV only** (`7adfb3e8` → `077af7ee`, 2026-10-09; deployed suite 160/160, operator-reported; build and service unchanged; DEV `preflight` BLOCKED by nine untracked settle manifests, not passed; runbook §18.10); PROD inspected, not deployed (held at `cd3cf782` during ISSUE-265 observation); neither host has an intake timer, cron reference, IMAP settings or authserv-id in the places checked, so the fix is dormant; live mail not tested, no host accepted | Before intake is activated on any host: verify the receiving server's header insertion, forged-header removal, authserv-id and a legitimate message's format, set `AFLDB_INTAKE_AUTHSERV_ID`, then `--dry-run` a legitimate and a non-passing message (runbook §18.6, §18.10.8); PROD gets the code after ISSUE-265's observation |
 | AFLDB-ISSUE-267 | Override replay writes NULL period scores from a partial `score` override | High | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-002; implemented 2026-10-09 with ISSUE-269; **operator integration run 2026-10-09 FAILED (6 failed)**: replay `matches_score_components_ck` 23514 (components and totals written in two UPDATEs) and fixture cleanup `club_seasons_season_fkey` (score save derived 2 `club_seasons` rows; baseline 1,624 → 1,626); second fix pass: one atomic UPDATE, cleanup owns the derived ladder rows in one transaction; `py_compile`, `tsc` and source-contract 69/69 green; residue recovery dry run passed and rolled back, commit attempt refused before any DELETE (ladder rows already absent; remover unknown), fresh census empty with `club_seasons_total` 1,624; **second integration run 2026-10-09 10:47:03 PASSED on `afldb_test` (`afldb_owner`): 6 passed, 37 filtered skips, 33.80 s; implementation validated on `afldb_test`**; **DEV exposure census complete 2026-10-09** (operator-run before deployment; `afldb_dev`, `afldb_import`, read-only; 0 active `matches` overrides, sections 1–5 no rows, no replay blockers); **committed as `86e2d19fa6936f73872da45c7b5cb3200e274543`, merged to `main` and pushed; DEV deployed 2026-10-09** (operator-confirmed: `common.py` no working-tree diff from HEAD; migrations 110/110, nothing to apply; build OK, `BUILD_ID` `Jlf_U7HZnqispmedF-TaS`; respawn 844885 → 849656, active since 11:40:00 AEDT; readiness after 2 s; health ok, database ok, 28 ms); the deployment did not exercise the Python matches replay; **PROD exposure census complete 2026-10-09** (operator-run; `afldb_prod` via SSH alias `afldb`, `postgres`, read-only, `== Done.`, psql exit 0; 0 active `matches` overrides, sections 1–5 no rows, no section-3/4 replay blockers; does not establish the fix is installed on PROD); `merge:ready -- --issue 267` READY twice (after a fresh fetch too), 0 blockers, 2 metadata warnings (no `afldb-merge-readiness` JSON block in the ISSUE-267 runbook; no automated unexpected-file classification metadata); PROD installation deferred (PROD held at `cd3cf782` for ISSUE-265's observation; `cd3cf782..86e2d19f` measured at 9 commits, 40 files (assistant read-only review of GitHub's comparison, not operator-run Git evidence), no migration/package/deploy/next.config.ts change, but includes ISSUE-261's settle/retry change); historical corruption not established, historical impact remains unassessed, nothing repaired; runbook `issues/open/AFLDB-ISSUE-267.md` §17.10–§17.15 | The applicable after the ISSUE-265 observation hold at `cd3cf782` lifts, prepare and review a deployment procedure for this release (r6 pack must not be reused; range includes ISSUE-266 and ISSUE-261; preflight manifest FAILs expected), then the PROD deployment acceptance (§17.15: verify the installed `common.py`); then resolve with ISSUE-269 |
+| AFLDB-ISSUE-268 | Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd | High | Legacy intake / NULL-vs-zero — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-003. Validator fix, promotion-time re-check of retained cells and tests (DB-free + integration) written 2026-10-09 in `sonnet/issue-268`, uncommitted, not deployed; operator checks at 15:11:57 passed (ingest-datasets 181/181, tsc, eslint, diff-check) and the targeted ISSUE-268 integration cases passed twice on `afldb_test` as the test owner (15:21:42, 15:30:35; restricted-role path and full integration file not validated); both operator-run censuses complete 2026-10-09 (DEV 15:59:22, PROD 16:02:57: no retained submissions, no rows in Sections 2–5, no exposure found in the records checked); historical impact unassessed, nothing repaired, fix not installed by the censuses | Operator: review and commit, `merge:ready`, merge/push, DEV deployment and acceptance; PROD installation after the ISSUE-265 hold |
 | AFLDB-ISSUE-269 | `replay_admin_overrides('matches')` applies only one of a match's active override rows | Medium | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-004; implemented 2026-10-09 with ISSUE-267: active rows merged into one object per `match_key`; equal-authority disagreements and underivable score components refused before any write; shared operator integration run 2026-10-09 FAILED (6 failed); **shared second-pass run 2026-10-09 PASSED on `afldb_test` (6 passed), implementation validated on `afldb_test`** (ISSUE-267); **DEV exposure census complete 2026-10-09** (0 active `matches` overrides, section 2 and all others no rows, no replay blockers); **committed as `86e2d19f`, merged/pushed, DEV deployed 2026-10-09** (shared with ISSUE-267; the deployment did not exercise the Python matches replay); **PROD exposure census complete 2026-10-09** (shared; 0 active `matches` overrides, section 2 and all others no rows, no replay blockers; does not establish the fix is installed on PROD); `merge:ready` READY twice; PROD installation deferred (shared with ISSUE-267, §17.15); historical impact remains unassessed; runbook `issues/open/AFLDB-ISSUE-269.md` §17.6–§17.9 | As ISSUE-267 (deployment procedure prepared and reviewed after the hold lifts, then the applicable PROD deployment acceptance, ISSUE-267 runbook §17.15); resolve any census section-3/4 row before a promotion |
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator-run
@@ -49061,6 +49062,102 @@ retained behaviour under `Unreleased`.
   manifests, an operator decision), then the applicable PROD deployment acceptance (runbook §17.15): verify the
   installed `tools/migration/common.py`. Then resolve with ISSUE-269. Historical repair, if ever needed, is a
   separate operator decision.
+
+## AFLDB-ISSUE-268 — Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd
+
+- **Status:** Open (2026-10-08); **validated on `afldb_test`, both censuses complete (2026-10-09), uncommitted and undeployed.**
+  **Severity:** High. **Area:** legacy CSV intake / NULL-vs-zero. Key file:
+  `src/lib/ingest/datasets.ts` (`match_attendance`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-268.md` (§0–§16 from the review, §15–§16 annotated; §17 implementation record, §17.14 census record).
+- **Origin.** Full code review of `review/full-code-20261008` at `20a7a4bb` (`issues/reviews/2026-10-08-full-code-review.md`,
+  F-003; that review and its other findings are tracked in the separate review worktree). Reproduced DB-free (witness W2).
+- **Defect.** A blank `attendance` cell becomes `Number('') = 0` (`datasets.ts:1312-1313`). The row validates `ok`, so it
+  is invisible on the review page. Promotion writes attendance 0, `complete`, cited to `manual_admin_edit`
+  (`:1348-1354`), which settles then honour as human authority (`manual-authority.ts:721-727`).
+- **Impact.** Fabricated, sourced, settle-protected zero crowds on canonical matches, bounded by Super Admin approval.
+- **Related history.** The same class as ISSUE-258, in a dataset that issue excluded. ISSUE-305 (other legacy datasets'
+  numeric parsing) is out of scope.
+- **Implementation (2026-10-09, branch `sonnet/issue-268`, base `cc61771e`; uncommitted; not deployed; DB-free checks passed at 15:11:57 and targeted integration cases twice on `afldb_test`, see "Operator validation" below; both censuses since run, see "Census results" below).** `validateRow` now
+  trims the cell: blank or missing → `error` ("attendance is blank; …remove the row to leave the stored value"); every
+  nonblank cell is read exactly as before (`Number()`, whole number 0–200,000 via new `MATCH_ATTENDANCE_MAX`, else `error`
+  naming the cell), so `0`, `1e2`, `0x10`, `+5`, leading zeros and padding all validate as they did. The dataset description
+  tells uploaders a blank is refused. `preparePromotion`/`promoteRow` are unchanged. Decided by the review (§4/§13/§14.1):
+  "blank → validation error, `0` → ok, `x` → error". **Not decided:** D-268-1, whether nonblank cells should tighten to `^\d+$`
+  (ISSUE-258's reader, whose D-258-2 covers only `match_results`/`player_match_stats`); an earlier draft of this change
+  tightened it without a decision and was reverted. Runbook §15, §17.1–§17.3.
+- **Tests (DB-free 181/181 at 15:11:57; the seven ISSUE-268 integration cases passed twice as the test owner on `afldb_test`; restricted-role path and full integration file not validated).** `tests/ingest-datasets.test.ts`, `describe('AFLDB-ISSUE-268 match_attendance attendance
+  cell')`, DB-free: blank/whitespace/absent → error with no `resolved`; seven malformed or out-of-range cells → error naming
+  the cell; six valid figures (including `0` and `200000`) and six `Number()`-readable spellings (`1e2`, `0x10`, `+5`, `1.0`,
+  `0e0`, `+0`, pinned as unchanged) → `ok` with the exact `resolved`; unknown-match and `match_id`
+  ordering preserved; description notice. Runbook §17.4. Plus the promotion re-check tests below.
+- **Promotion-time re-check (D-268-2's scoped promotion guard: operator-authorised 2026-10-09, implemented; DB-free cases passed at 15:11:57, the seven targeted integration cases passed twice as the test owner, runbook §17.10–§17.11).** `match_attendance`'s
+  `preparePromotion` re-reads every retained payload cell with the validator's own shared reader before the settle gate,
+  any lock or any write, and refuses the **whole** submission if any cell is blank, missing, unreadable or out of range,
+  or if the stored `resolved.attendance` disagrees with the parsed cell (it is never silently corrected), whatever the
+  stored verdict. A `0` cell and every previously accepted nonblank spelling still pass; gate, lock order and timeout for a
+  valid file are unchanged; no other dataset and no approval rule changed. **A refusal is recorded by the pipeline as
+  status `failed`** with the refusal text (no `matches` row and no import batch is written, but the submission is not left
+  untouched), and a `failed` submission can be neither rejected nor re-validated (D-268-3, undecided). Tests: DB-free
+  cases in `tests/ingest-datasets.test.ts` (stale `ok` blank rows, mixed file, unreadable payloads, disagreements, `0`
+  cells, spellings, a validator/hook drift guard) and real-pipeline cases in
+  `tests/integration/match-results-promotion.test.ts` (approved and failed stale submissions, mixed file, a `0` cell,
+  existing spellings). The fresh-blank case proves validation storing an `error` row and `promoteSubmission` refusing it;
+  its helper sets the status with a direct UPDATE, so the approval action is not exercised. The `0` case promotes a
+  `complete` zero with manual-source provenance; no separate citation is supplied.
+- **Integration fixture ownership (review round, 2026-10-09; exercised by the two targeted runs, which passed the preflight and cleanup assertions; runbook §17.12.1).** The ISSUE-268 cases run
+  under the file's two ancestor hook pairs, which used to adopt season 2073 and delete by season and round-code prefix.
+  They now refuse any existing reserved fixture row in a read-only preflight before the first write (target check moved
+  ahead of it), insert the season without `ON CONFLICT`, record created ids only once committed, delete only those ids,
+  leave and report any foreign row, and stay disabled if the preflight failed. Residue from an earlier failed run now
+  makes the file refuse to start instead of being adopted. Sibling ISSUE-264 hooks are unchanged.
+- **Census (written 2026-10-09 and since run on DEV and PROD, results in "Census results" below; evidence labels revised three times before the runs, runbook §17.13).** `issues/open/AFLDB-ISSUE-268-blank-attendance-census.sql`
+  (§14.2): read-only, rolled back; reads the retained `data_submissions` / `data_submission_rows`. Each row's `cell_state` says
+  only what the retained input is: proven blank, `nonblank_string` (not checked to read as any figure),
+  `non_string_value` or `payload_unreadable` (unreadable). The stored resolution (the figure handed to `promoteRow`, not an
+  affected row), the recorded promotion and the current match state are separate columns. A nonblank cell beside a stored 0
+  is `NONBLANK_CELL_STORED_ZERO`, which establishes neither a valid zero nor the absence of exposure (input interpretation
+  unverified; investigate before concluding), and its retained cell text is printed beside it; a stored resolution with no
+  usable `match_id` is `MATCH_IDENTITY_UNKNOWN`, kept apart from a known id with no `matches` row. It keeps four kinds of evidence apart: a
+  **recorded promotion** of a blank-derived zero (a promoted blank cell whose stored resolution was 0; this alone does
+  **not** show a canonical match changed), the **current match state**, **possible exposure** (not-yet-promoted blank rows;
+  current manual-source zeros) and **missing evidence** (unreadable input, rows short of `row_count`, `admin-upload`
+  batches whose submission is not retained). "Confirmed canonical write" is reserved for row-level write evidence, which the
+  legacy path does not retain, so the census cannot produce one. It cannot show the value a promotion overwrote, and a
+  non-zero value is not clearance.
+- **Census results (operator-run 2026-10-09; runbook §17.14).** *DEV:* snapshot 15:59:22.305028+11, `afldb_dev` as `afldb_import`,
+  PostgreSQL 16.15, read-only repeatable-read transaction, ran through `== Done.`, operator block returned successfully. *PROD:*
+  snapshot 16:02:57.217989+11, `afldb_prod` as `postgres` over the socket, PostgreSQL 16.15, read-only repeatable-read transaction,
+  ran through `== Done.`, explicit `psql` exit status 0. *Both:* Section 1 no retained `match_attendance` submissions; Sections 2–3
+  no rows with every Section 2 summary count zero; Section 4 no rows (`manual_zero_crowd_matches` = 0); Section 5 no rows
+  (`match_attendance_batches`, `with_retained_submission`, `without_retained_submission` all zero). Every statement parsed on both
+  databases; the classification of populated rows was not exercised. **No exposure was found in the records checked. Historical
+  impact remains unassessed; nothing was repaired; no repair is indicated by these outputs (a future repair needs separate
+  evidence and authorisation); neither census installed the fix.**
+- **Residual exposure (runbook §17.7, D-268-2).** Approval still trusts *stored* row verdicts, so a stale `validated`
+  submission can be approved; promotion is now refused (above). The hand remedy for a stale submission **before any promote
+  attempt** is reject (if approved) → re-validate; after a refused attempt it is `failed` and the file must be uploaded again
+  as a new submission (D-268-3, a separate follow-up, not a merge gate). Neither census retained a `match_attendance` submission,
+  so none is stale on DEV or PROD at the snapshots.
+- **Operator validation (runbook §17.11; reported 2026-10-09, after the review round).** At 15:11:57
+  `tests/ingest-datasets.test.ts` passed 181/181, and TypeScript, ESLint and `git diff --check` passed. Target verified:
+  `afldb_test`, role `afldb_owner`, tunnel `127.0.0.1:55432`. The targeted ISSUE-268 integration cases passed twice: 15:21:42
+  (7 passed, 32 filtered skips, 45.78 s) and 15:30:35 (7 passed, 32 filtered skips, 46.01 s); no suite or hook failures, and both
+  runs passed the fixture preflight and cleanup assertions. **Not validated:** restricted-role permissions (all three pools used
+  the test owner connection temporarily) and the full integration file. The operator's 15:11:57 ESLint command covered
+  `src/lib/ingest/datasets.ts`, `tests/ingest-datasets.test.ts` and `tests/integration/match-results-promotion.test.ts`. Nothing is
+  committed or deployed. *(Recorded at the time: "Both censuses remain unrun"; both have since been run, see "Census results".)*
+  The census SQL was corrected after these runs (runbook §17.13) and its header comments again to record the census runs
+  (§17.14). Superseded: the 14:26:48 round on the earlier tree.
+- **Not resolved / outstanding.** Operator review and commit (repeat `git diff --check`: only the census SQL header comments and the
+  tracking files changed since the runs); `merge:ready`; merge/push; DEV deployment and acceptance per the operator's sequence. PROD
+  installation remains behind the unchanged ISSUE-265 hold at `cd3cf782`, and nothing here proposes a PROD deployment.
+  **Not validated:** restricted-role permissions and the full integration file (optional extra evidence; the operator decides).
+  **Separate follow-ups, not ISSUE-268 merge gates:** numeric-format tightening (D-268-1) and any change to failed-submission
+  recovery (D-268-3). No repair is indicated; a future repair needs separate evidence and authorisation (§15).
+- **Observation, not decided.** The dataset still accepts a `0` cell without a separate citation field, unlike
+  `match_results`; outside the proposed fix boundary (runbook §17.9).
+- **Next action.** Operator reviews and commits explicit paths, then `merge:ready`, merge/push, DEV deployment and acceptance
+  (runbook §17.5, §17.14).
 
 ## AFLDB-ISSUE-269 — `replay_admin_overrides('matches')` applies only one of a match's active override rows
 
