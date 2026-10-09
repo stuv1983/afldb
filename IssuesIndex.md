@@ -124,10 +124,10 @@
 - **Severity:** High. **Area:** data integrity / admin override replay — `tools/migration/common.py`
   (`replay_admin_overrides`, matches branch).
 - **State:** Open (2026-10-08), 2026-10-08 full code review F-002. Implemented 2026-10-09 with ISSUE-269 on
-  `sonnet/issue-267-269`, uncommitted. **Operator integration run 2026-10-09 FAILED (6 failed, 37 filtered/skipped):**
+  `sonnet/issue-267-269` (since committed, below). **Operator integration run 2026-10-09 FAILED (6 failed, 37 filtered/skipped):**
   the replay wrote merged components and derived totals in two UPDATEs (`matches_score_components_ck`, 23514), and
   fixture cleanup failed on `club_seasons_season_fkey` (the score save derived two season-2081 `club_seasons` rows;
-  historical baseline 1,624 → 1,626), leaving residue on `afldb_test`. **Second fix pass (uncommitted):** one atomic
+  historical baseline 1,624 → 1,626), leaving residue on `afldb_test`. **Second fix pass:** one atomic
   UPDATE for components, totals, margin, result and winner; cleanup records and deletes the derived ladder rows in one
   transaction. `py_compile`, `tsc` (exit 0), source-contract 69/69 green. **Residue:** recovery dry run passed and
   rolled back; the commit attempt refused before any DELETE (the two ladder rows were already absent; what removed
@@ -136,27 +136,46 @@
   skips, no suite or hook failures, 33.80 s; residue and baseline assertions passed. **Implementation validated on
   `afldb_test`.** **DEV exposure census complete 2026-10-09** (operator-run before deployment; `afldb_dev` as
   `afldb_import`, read-only, through `== Done.`): 0 active `matches` overrides; section 1 partial 0, resolving 0;
-  sections 2–5 no rows; no replay blockers. Review/commit/merge, deployment and PROD census pending; the empty symptom
-  section does not assess historical corruption; historical impact remains unassessed, nothing repaired.
-- **Runbook:** `issues/open/AFLDB-ISSUE-267.md` §17.10–§17.11; census
+  sections 2–5 no rows; no replay blockers. **Committed as `86e2d19f`, merged to `main` and pushed; DEV deployed
+  2026-10-09** (operator-confirmed: full revision `86e2d19fa6936f73872da45c7b5cb3200e274543`; `common.py` no
+  working-tree diff from HEAD; migrations 110/110, nothing to apply; build OK, `BUILD_ID` `Jlf_U7HZnqispmedF-TaS`;
+  respawn 844885 → 849656, active since 11:40:00 AEDT; readiness after 2 s; health ok, database ok, 28 ms). The
+  deployment did not exercise the Python matches replay. **PROD exposure census complete 2026-10-09** (operator-run;
+  `afldb_prod` via SSH alias `afldb`, as `postgres`, read-only, through `== Done.`, psql exit 0): 0 active `matches`
+  overrides; section 1 partial 0, resolving 0; sections 2–5 no rows; no section-3/4 replay blockers. It does not
+  establish that the fix is installed on PROD. `merge:ready -- --issue 267`: READY twice (after a fresh fetch too),
+  0 blockers, 2 metadata warnings (no `afldb-merge-readiness` JSON block in the ISSUE-267 runbook; no automated
+  unexpected-file classification metadata). **PROD installation deferred:** PROD stays at `cd3cf782` until ISSUE-265's
+  observation ends; measured release `cd3cf782..86e2d19f` (assistant read-only review of GitHub's comparison, transcribed from the
+  supplied review; not operator-run Git evidence) is 9 commits, 40 files (no migration, package
+  manifest/lockfile, `deploy/` or `next.config.ts` change), but includes ISSUE-261's settle/retry change, so deploying
+  the full range would change the code under observation. Neither host's empty symptom section assesses historical
+  corruption; historical impact remains unassessed, nothing repaired.
+- **Runbook:** `issues/open/AFLDB-ISSUE-267.md` §17.10–§17.15; census
   `issues/open/AFLDB-ISSUE-267-269-override-census.sql`; residue
   `issues/open/AFLDB-ISSUE-267-269-fixture-residue-{census,recovery}.sql`.
-- **Next action:** Operator review and commit (runbook §17.7); `npm run merge:ready -- --issue 267`; merge/push;
-  `deploy/sync-dev.ps1`; override census on PROD before the next promotion (runbook §17.5 step 4), resolving any
-  section-3/4 row first.
+- **Next action:** After the ISSUE-265 observation hold at `cd3cf782` is lifted, prepare and review a deployment
+  procedure for this release (the r6 pack must not be reused; the range includes ISSUE-266 and ISSUE-261; the
+  deploy-mode preflight is expected to FAIL on the settle manifests), then the applicable PROD deployment acceptance
+  (runbook §17.15): verify the installed `tools/migration/common.py`. Then resolve with ISSUE-269.
 
 ### AFLDB-ISSUE-269 — `replay_admin_overrides('matches')` applies only one of a match's active override rows
 - **Severity:** Medium. **Area:** data integrity / admin override replay — `tools/migration/common.py`.
-- **State:** Open (2026-10-08), 2026-10-08 full code review F-004. Implemented 2026-10-09 with ISSUE-267,
-  uncommitted: active rows merged into one object per `match_key`; equal-authority disagreements refused before any
+- **State:** Open (2026-10-08), 2026-10-08 full code review F-004. Implemented 2026-10-09 with ISSUE-267
+  (since committed, below): active rows merged into one object per `match_key`; equal-authority disagreements refused before any
   write; inactive rows excluded. Shared operator integration run 2026-10-09 FAILED (6 failed); **shared second-pass
   run 2026-10-09 PASSED on `afldb_test` (6 passed): implementation validated on `afldb_test`** (ISSUE-267).
   **DEV exposure census complete 2026-10-09** (shared with ISSUE-267: 0 active `matches` overrides, section 2 and all
-  other sections no rows, no replay blockers). Review/commit/merge, deployment and PROD census pending; historical
-  corruption not established, historical impact remains unassessed, nothing repaired.
-- **Runbook:** `issues/open/AFLDB-ISSUE-269.md` §17.6–§17.7.
-- **Next action:** As ISSUE-267 (commit, merge, DEV deploy; the shared census on PROD before the next promotion);
-  resolve any census section-3 or section-4 row before a promotion.
+  other sections no rows, no replay blockers). **Committed as `86e2d19f`, merged/pushed, DEV deployed 2026-10-09**
+  (shared with ISSUE-267; the deployment did not exercise the Python matches replay). **PROD exposure census complete
+  2026-10-09** (shared: 0 active `matches` overrides, section 2 and all other sections no rows, no replay blockers; not
+  evidence that the fix is installed on PROD); `merge:ready` READY twice. PROD installation deferred (PROD held at
+  `cd3cf782`; shared with ISSUE-267, §17.15); historical corruption not established, historical impact remains
+  unassessed, nothing repaired.
+- **Runbook:** `issues/open/AFLDB-ISSUE-269.md` §17.6–§17.9.
+- **Next action:** As ISSUE-267 (deployment procedure prepared and reviewed after the hold lifts, then the applicable
+  PROD deployment acceptance, ISSUE-267 runbook §17.15); resolve any
+  census section-3 or section-4 row before a promotion.
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
 decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an

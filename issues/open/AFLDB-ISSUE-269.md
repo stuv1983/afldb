@@ -3,11 +3,16 @@
 ## 0. Status
 
 - **Status:** Open (2026-10-08). **Implemented 2026-10-09 together with AFLDB-ISSUE-267 (worktree
-  `D:\dev\afldb-issue-267-269`, branch `sonnet/issue-267-269`, base `259ee7c6`); uncommitted. Implementation validated
-  on `afldb_test` 2026-10-09 (shared second-pass run, 6/6 passed, operator-run, §17.6).** Not committed, merged or
-  deployed. **DEV exposure census complete 2026-10-09** (operator-run, before deployment: 0 active `matches`
-  overrides, section 2 empty, no replay blockers; §17.7); the PROD census has not run. Historical corruption is not
-  established; historical impact remains unassessed, and nothing was repaired. See §17.
+  `D:\dev\afldb-issue-267-269`, branch `sonnet/issue-267-269`, base `259ee7c6`). Implementation validated on
+  `afldb_test` 2026-10-09 (shared second-pass run, 6/6 passed, operator-run, §17.6).** **DEV exposure census complete
+  2026-10-09** (operator-run, before deployment: 0 active `matches` overrides, section 2 empty, no replay blockers;
+  §17.7). **Committed as `86e2d19fa6936f73872da45c7b5cb3200e274543`, merged to `main` and pushed; deployed to DEV
+  2026-10-09** (operator-confirmed; §17.8). The deployment did not exercise the Python matches replay. **PROD exposure
+  census complete 2026-10-09** (operator-run; `afldb_prod` as `postgres`, read-only: 0 active `matches` overrides,
+  section 2 empty, no replay blockers; §17.9). `merge:ready -- --issue 267` reported READY twice (§17.9). The census
+  does not show that the fix is installed on PROD; the applicable PROD deployment acceptance is outstanding, and the
+  issue stays open until it passes.
+  Historical corruption is not established; historical impact remains unassessed, and nothing was repaired. See §17.
 - **Severity:** Medium. **Area:** data integrity / admin override replay (rebuild, reload, promotion).
 - **Key file:** `tools/migration/common.py` (`replay_admin_overrides`, matches branch).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-004; partition note R3-F01). The orchestrator re-read the cited lines and confirmed them.
@@ -142,8 +147,10 @@ deactivates or corrects one of the rows.
 ### 17.4 Remaining before resolution
 
 As ISSUE-267 §17.6: ~~residue recovery (ISSUE-267 §17.9.4), a green integration run on `afldb_test` (6/6)~~ (done
-2026-10-09, §17.6 below), operator commit and merge, ~~the census on DEV~~ (done 2026-10-09, §17.7: no rows)
-and the census on PROD before the next promotion, with any section-3 or section-4 row resolved first. Which group a past replay dropped, if any, is
+2026-10-09, §17.6 below), ~~operator commit and merge~~ (done 2026-10-09, `86e2d19f`, with the DEV deployment;
+§17.8), ~~the census on DEV~~ (done 2026-10-09, §17.7: no rows), ~~the census on PROD before the next promotion, with
+any section-3 or section-4 row resolved first~~ (done 2026-10-09, §17.9: no rows), and the applicable PROD deployment
+acceptance (ISSUE-267 §17.15). Which group a past replay dropped, if any, is
 not recoverable from the census alone.
 
 ### 17.5 Operator integration run FAILED (2026-10-09); second fix pass
@@ -193,4 +200,50 @@ changed.
   historical corruption, and which group, if any, a past DEV replay dropped is not recoverable from it. Historical
   impact remains unassessed; nothing was repaired.
 - **DEV exposure census: complete.** Remaining: operator review and commit, `merge:ready`, merge/push, the DEV
-  deployment, the PROD census before the next promotion; then resolution.
+  deployment, the PROD census before the next promotion; then resolution. (Commit, merge/push and the DEV deployment
+  have since completed; §17.8.)
+
+### 17.8 Commit, merge and DEV deployment (2026-10-09, operator-confirmed)
+
+Full record: ISSUE-267 §17.12. Operator-confirmed; nothing here was run by Claude. No implementation, test or SQL file
+changed.
+
+- **Commit, `main` merge and push: complete.** Revision `86e2d19fa6936f73872da45c7b5cb3200e274543`.
+- **DEV deployment: complete.** Deployed revision `86e2d19fa6936f73872da45c7b5cb3200e274543`;
+  `tools/migration/common.py` has no working-tree difference from HEAD; migrations 110/110 applied, nothing to apply;
+  build succeeded (`BUILD_ID` `Jlf_U7HZnqispmedF-TaS`); systemd respawn 844885 → 849656, active since 11:40:00 AEDT;
+  readiness passed after 2 seconds; follow-up health `status` ok, `database` ok, `latencyMs` 28.
+- **What it does not show:** the deployment did not exercise the Python matches replay, so the merge has not run on
+  `afldb_dev`; its database validation remains the `afldb_test` run (§17.6). PROD has not been censused (section 2
+  unmeasured on PROD). Historical corruption is not established; historical impact remains unassessed; nothing was
+  repaired.
+- **Remaining (issue stays open):** ~~the shared PROD census before the next promotion, resolving any section-3/4 row
+  first~~ (done 2026-10-09, §17.9); the applicable PROD deployment acceptance; then resolution.
+
+### 17.9 PROD exposure census and `merge:ready` (2026-10-09, operator-run)
+
+Full record: ISSUE-267 §17.13 (census), §17.14 (`merge:ready`) and §17.15 (PROD deployment route and blockers).
+Operator-reported; nothing here was run by Claude, and Claude contacted no host or database. No implementation, test
+or SQL file changed.
+
+- **Census target:** host `afldb-prod` through the SSH alias `afldb`; exact database `afldb_prod`, role `postgres`,
+  `transaction_read_only = on`; ran through `== Done.`, `psql exit status: 0`.
+- **Census result:** active `matches` overrides **0**; section 1 partial `score` overrides 0 (resolving 0); **section 2
+  (ISSUE-269 exposure) no rows**; sections 3–5 no rows. **No current replay blockers** (sections 3 and 4).
+- **What it shows:** on 9 October 2026 no PROD match carried more than one active `matches` override, and nothing on
+  PROD would make the fixed replay refuse.
+- **What it does not show:** section 5 checked no score-overridden match (PROD has none), so historical corruption is
+  not assessed, and which group, if any, a past PROD replay dropped is not recoverable from it. Historical impact
+  remains unassessed; no repair was performed. Census completion does **not** establish that the fix is installed on
+  PROD.
+- **`merge:ready -- --issue 267`:** READY twice, the second run after a fresh fetch; 0 blockers, 2 metadata warnings:
+  (1) no `afldb-merge-readiness` JSON block in the ISSUE-267 runbook; (2) no automated unexpected-file classification
+  metadata. The ten-file list was checked separately by the operator; both gates returned READY.
+- **PROD installation: deferred** (ISSUE-267 §17.15). PROD stays at `cd3cf782` until ISSUE-265's observation ends. The
+  measured release `cd3cf782..86e2d19f` (assistant read-only review of GitHub's comparison, transcribed from the
+  supplied review; not operator-run Git evidence) is 9 commits and 40 files, with no migration, package manifest/lockfile,
+  `deploy/` or `next.config.ts` change; it includes ISSUE-261, which changes the settle/retry code, so deploying the
+  full range would change the code under observation. No executable PROD procedure is recorded: one is to be prepared
+  and reviewed after the hold lifts, and the ISSUE-265 r6 pack must not be reused.
+- **Remaining (issue stays open):** the applicable PROD deployment acceptance (ISSUE-267 §17.15), after the hold; then
+  resolution.

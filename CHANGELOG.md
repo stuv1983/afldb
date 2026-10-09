@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### The `matches` override replay applies every active correction and keeps final-period scores whole (AFLDB-ISSUE-267, AFLDB-ISSUE-269; implemented, uncommitted; validated on afldb_test after a second fix pass; DEV census complete; deployment and PROD census pending; issues open) - 9 October 2026
+### The `matches` override replay applies every active correction and keeps final-period scores whole (AFLDB-ISSUE-267, AFLDB-ISSUE-269; validated on afldb_test after a second fix pass; DEV and PROD censuses complete; committed as 86e2d19f and deployed to DEV; PROD installation deferred; issues open) - 9 October 2026
 
 - `replay_admin_overrides(conn, 'matches')` (`tools/migration/common.py`), which every `matches` reload, rebuild and
   the post-swap promotion replay run, now merges a match's active Data Editor overrides into one set of values before
@@ -45,12 +45,32 @@ commit.
   passed, 37 filtered skips, no suite or hook failures, 33.80 s). They cover the conflict refusal before any write,
   the missing-component refusal, components merged across groups, census section 4 agreeing with the replay,
   final-period correctness and replay idempotence. The residue and historical-baseline assertions passed, as did the
-  typecheck and the data-overrides source-contract suite (69/69). Not yet committed or deployed.
+  typecheck and the data-overrides source-contract suite (69/69).
 - The read-only override census ran on DEV (9 October 2026, operator-run, before the fix was deployed; `afldb_dev` as
   `afldb_import`, read-only, through `== Done.` with no command failure): 0 active `matches` overrides, no rows in any
   section, so no current DEV exposure and nothing the fixed replay would refuse. With no active overrides, its empty
-  symptom section does not assess historical corruption. The PROD census has not run. Historical corruption is not
+  symptom section does not assess historical corruption. (The PROD census ran later; see below.) Historical corruption is not
   established; historical impact remains unassessed. No historical data was repaired.
+- Committed as `86e2d19fa6936f73872da45c7b5cb3200e274543`, merged to `main` and pushed, and deployed to DEV on
+  9 October 2026 (operator-confirmed): `tools/migration/common.py` has no working-tree difference from HEAD;
+  migrations 110/110 applied, nothing to apply; the build succeeded (`BUILD_ID` `Jlf_U7HZnqispmedF-TaS`); the service
+  respawned (844885 → 849656) and has been active since 11:40:00 AEDT; readiness passed after 2 seconds and the
+  follow-up health check reported status ok, database ok, latency 28 ms. The deployment did not exercise the Python
+  matches replay; DEV's next `matches` reload, rebuild or promotion replay will.
+- The read-only override census ran on PROD (9 October 2026, operator-run; `afldb_prod` as `postgres`, read-only,
+  through `== Done.` with psql exit status 0): 0 active `matches` overrides and no rows in any section, so no current
+  PROD exposure and nothing the fixed replay would refuse. Its symptom section checked no score-overridden match, so
+  historical impact remains unassessed; no repair was performed. The census does not show that the fix is installed
+  on PROD. `merge:ready` for the change reported READY twice, the second time after a fresh fetch (0 blockers, 2
+  metadata warnings: no `afldb-merge-readiness` JSON block in the ISSUE-267 runbook, and no automated
+  unexpected-file classification metadata).
+- PROD installation is deferred. PROD stays at `cd3cf782` until ISSUE-265's observation ends. The measured release
+  `cd3cf782..86e2d19f` (assistant read-only review of GitHub's comparison for that range, transcribed from the supplied
+  review; not operator-run Git evidence) is 9 commits and 40 files, with no migration, package manifest/lockfile, `deploy/` or
+  `next.config.ts` change, but it includes ISSUE-261, which changes the settle/retry code, so deploying the full range
+  would change the code under observation. No PROD deployment procedure is recorded: one is to be prepared and
+  reviewed after the hold lifts, and the ISSUE-265 r6 pack must not be reused. The applicable PROD deployment
+  acceptance remains, and both issues stay open.
 
 ### Email intake forwards a message only on a trusted DMARC pass for its one From domain (AFLDB-ISSUE-266; merged; deployed to DEV only, where intake is not active; PROD not deployed; live-mail acceptance not performed; issue open) - 9 October 2026
 
