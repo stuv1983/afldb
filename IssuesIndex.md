@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 7
+**Open issues:** 51 (ISSUE-229, ISSUE-265–270, and the 44 review findings ISSUE-271–314 registered on 2026-10-10)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -257,6 +257,234 @@
   ISSUE-270 stays open: PROD installation and any applicable PROD acceptance remain outstanding behind the unchanged
   ISSUE-265 hold (no PROD procedure exists or is proposed here); close only after that applicable remaining acceptance is
   complete. D-270-1 (uniqueness index) remains undecided and is not a gate; §19.6 follow-ups are recorded, not gates.
+
+> **2026-10-08 full code review findings ISSUE-271–314 (imported 2026-10-10).** Findings F-006–F-049 of the 2026-10-08 full code review at `20a7a4bb`, all **Open (2026-10-08), nothing implemented**.
+> Runbooks copied unchanged from the review worktree into `issues/open/` and registered on **10 October 2026** (an import
+> date, not a review or validation date). Classifications are the review's; **no finding was re-verified against current
+> `main`**. The cited review report `issues/reviews/2026-10-08-full-code-review.md` and witness outputs were not imported.
+> Ledger entries: `issues.md`, section *Imported review findings AFLDB-ISSUE-271–314*. **Selected next implementation
+> batch: ISSUE-271/272.** Each runbook is `issues/open/AFLDB-ISSUE-<ID>.md`.
+
+### AFLDB-ISSUE-271 — Legacy `match_results` promotion overwrites Data Editor corrections on `matches`
+- **Severity:** Medium. **Area:** legacy CSV intake / admin authority — `src/lib/ingest/datasets.ts` (`match_results`).
+- **State:** Open (2026-10-08), review F-006, code-proven; nothing implemented; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-271.md`.
+- **Next action:** **Selected next batch** with ISSUE-272: refuse a supplied value that differs from an active override.
+
+### AFLDB-ISSUE-272 — Legacy `match_results` builds the match key from the raw round code and creates duplicate matches
+- **Severity:** Medium. **Area:** legacy CSV intake / match identity — `src/lib/ingest/datasets.ts` (`match_results`).
+- **State:** Open (2026-10-08), review F-007, reproduced DB-free by the review (W3); nothing implemented; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-272.md`.
+- **Next action:** **Selected next batch** with ISSUE-271; then the read-only DEV/PROD duplicate-match census (runbook §15).
+
+### AFLDB-ISSUE-273 — Submission validation overwrites a concurrent approve, promote or reject
+- **Severity:** Medium. **Area:** legacy CSV intake / submission lifecycle concurrency — `src/lib/ingest/pipeline.ts`.
+- **State:** Open (2026-10-08), review F-008, code-proven; nothing implemented; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-273.md`. **Next action:** code fix plus tests.
+
+### AFLDB-ISSUE-274 — A settle unit that writes only the `matches` row takes no row lock before its authority read
+- **Severity:** Medium. **Area:** acquisition / settle concurrency — `src/lib/acquisition/canonical-apply.ts`.
+- **State:** Open (2026-10-08), review F-009, code-proven mechanism (interleaving not executed); imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Next action:** fix plus tests, sequenced with ISSUE-275.
+
+### AFLDB-ISSUE-275 — A settle can insert period scores under a match it refused because a foreign owner created it concurrently
+- **Severity:** Medium. **Area:** acquisition / canonical ownership — `src/lib/acquisition/canonical-apply.ts`.
+- **State:** Open (2026-10-08), review F-010, code-proven mechanism (interleaving not executed); imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Next action:** fix plus integration case, with ISSUE-274; split-ownership
+  census open.
+
+### AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
+- **Severity:** Medium. **Area:** AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts`.
+- **State:** Open (2026-10-08), review F-011, code-proven; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-276.md`. **Next action:** fix plus DB-free test; refusal reason name open.
+
+### AFLDB-ISSUE-277 — Data Editor edits other than the name to a token-only player are not durable
+- **Severity:** Medium. **Area:** Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py`.
+- **State:** Open (2026-10-08), review F-012, code-proven; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-277.md`. **Next action:** operator decision **D-277-1** ((a) or (b)), then implementation.
+
+### AFLDB-ISSUE-278 — The destructive `db:test:rebuild` reset never asserts which database it is connected to
+- **Severity:** Medium (the reviewer graded it High; the review's main session regraded it). **Area:** DB tooling /
+  wrong-target safety — `tools/db/rebuild-test.ts`.
+- **State:** Open (2026-10-08), review F-013, assertion gap code-proven, libpq trigger not executed; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-278.md`. **Next action:** fix (1), optionally (2), plus tests; review gating note:
+  before the next `db:test:rebuild`. H-278-1 open.
+
+### AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
+- **Severity:** Medium. **Area:** public site / SEO — `src/app/sitemap.ts`.
+- **State:** Open (2026-10-08), review F-014, reproduced DB-free by the review (W6); imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-279.md`. **Next action:** fix plus test update, before search indexing is enabled.
+
+### AFLDB-ISSUE-280 — Beta magic link is consumed by any GET, including a mail scanner's prefetch
+- **Severity:** Low. **Area:** beta gate — `src/app/beta/verify/route.ts`. **State:** Open (2026-10-08), F-015; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-280.md`. **Next action:** implementation (low priority).
+
+### AFLDB-ISSUE-281 — Two public list pages fail on a sort key that names an inherited object property
+- **Severity:** Low. **Area:** public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts`. **State:** Open
+  (2026-10-08), F-016, reproduced by the review (W5); imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-281.md`. **Next action:** implementation (trivial).
+
+### AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
+- **Severity:** Low. **Area:** admin awards / special records / revalidation. **State:** Open (2026-10-08), F-017; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-282.md`. **Next action:** implementation, with ISSUE-283.
+
+### AFLDB-ISSUE-283 — The administrative note is not recorded on creation audit rows
+- **Severity:** Low. **Area:** admin awards / special records / audit. **State:** Open (2026-10-08), F-018; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-283.md`. **Next action:** implementation, with ISSUE-282.
+
+### AFLDB-ISSUE-284 — Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish
+- **Severity:** Low. **Area:** admin Brownlow — `src/db/queries/admin-brownlow.ts`. **State:** Open (2026-10-08), F-019;
+  imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-284.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-285 — Award Replace panel cannot give the duplicate confirmation its action requires
+- **Severity:** Low. **Area:** admin awards UI — `src/app/admin/awards/ReplacePanel.tsx`. **State:** Open (2026-10-08),
+  F-020; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-285.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-286 — Hall of Fame legend and removal years are not bounded server-side
+- **Severity:** Low. **Area:** admin awards / Hall of Fame validation. **State:** Open (2026-10-08), F-021; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-286.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-287 — Source-owned draft pick `null_pick_number` confirmation is unreachable
+- **Severity:** Low. **Area:** admin draft UI — `src/app/admin/draft/SourceFieldsPanel.tsx`. **State:** Open (2026-10-08),
+  F-022; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-287.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-288 — `createCoach` casts an unvalidated `dob` outside its error handling
+- **Severity:** Low. **Area:** admin coaches — `src/db/queries/admin-coaches.ts`. **State:** Open (2026-10-08), F-023;
+  imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-288.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
+- **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;
+  imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-289.md`. **Next action:** operator decision **D-289-1** ((a) or (b)).
+
+### AFLDB-ISSUE-290 — Manual draft selections accept out-of-range age, height, weight and pick number
+- **Severity:** Low. **Area:** admin draft / validation. **State:** Open (2026-10-08), F-025; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-290.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-291 — Admin player creation persists unvalidated biographical fields
+- **Severity:** Low. **Area:** admin player creation — `src/db/queries/players.ts` (`createPlayerInTransaction`).
+  **State:** Open (2026-10-08), F-026; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-291.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-292 — Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths
+- **Severity:** Low. **Area:** Data Editor / override replay — `src/db/queries/data-edits.ts`. **State:** Open
+  (2026-10-08), F-027 (trigger a hypothesis); imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-292.md`. **Next action:** implementation (small), possibly with ISSUE-277;
+  two-path census open.
+
+### AFLDB-ISSUE-293 — Settle runs under-report `dataIssuesResolved`
+- **Severity:** Low. **Area:** acquisition / settle accounting. **State:** Open (2026-10-08), F-028; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-293.md`. **Next action:** implementation (trivial).
+
+### AFLDB-ISSUE-294 — AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count
+- **Severity:** Low. **Area:** acquisition / import batch accounting. **State:** Open (2026-10-08), F-029; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-294.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-295 — Settle exception report mixes both sources' apply-failure findings
+- **Severity:** Low. **Area:** acquisition / settle reporting — `src/lib/acquisition/settle-report.ts`. **State:** Open
+  (2026-10-08), F-030; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-295.md`. **Next action:** implementation (trivial).
+
+### AFLDB-ISSUE-296 — Deprecated fallback importer sets `records_rejected` without rejection rows
+- **Severity:** Low. **Area:** acquisition / deprecated fallback — `src/lib/external-afl/current-season-import.ts`.
+  **State:** Open (2026-10-08), F-031; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-296.md`. **Next action:** implementation, or an operator decision to retire the
+  fallback path.
+
+### AFLDB-ISSUE-297 — AFL API provider id is used unvalidated as a file path and URL path segment
+- **Severity:** Low. **Area:** AFL API client — `src/lib/acquisition/afl-api-client.ts`. **State:** Open (2026-10-08),
+  F-032; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-297.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-298 — AFL API snapshot companion files are read without manifest verification
+- **Severity:** Low. **Area:** acquisition / evidence integrity — `src/lib/acquisition/afl-api-snapshot.ts`. **State:**
+  Open (2026-10-08), F-033; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-298.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-299 — R lineup and roster acquirers overwrite retained evidence in place
+- **Severity:** Low. **Area:** acquisition tooling — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R`. **State:** Open
+  (2026-10-08), F-034; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-299.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-300 — AFL API control-database read failure is reported as "disabled by a super admin"
+- **Severity:** Low. **Area:** acquisition / diagnostics — `src/lib/acquisition/afl-api-ingestion-control.ts`. **State:**
+  Open (2026-10-08), F-035; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-300.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-301 — AFL API HTTP client has no request timeout and reads the body outside its retry
+- **Severity:** Low. **Area:** acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts`. **State:** Open
+  (2026-10-08), F-036; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-301.md`. **Next action:** implementation; timeout value open.
+
+### AFLDB-ISSUE-302 — Lineup bundle records the pinned fitzRoy version as provenance whatever version ran
+- **Severity:** Low. **Area:** acquisition / provenance — `src/lib/acquisition/lineup-bundle.ts`. **State:** Open
+  (2026-10-08), F-037; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-302.md`. **Next action:** operator decision **D-302-1**.
+
+### AFLDB-ISSUE-303 — `/admin/upload` promises 5 MB but Server Actions accept 1 MB
+- **Severity:** Low. **Area:** legacy CSV intake UI / framework configuration — `next.config.ts`. **State:** Open
+  (2026-10-08), F-038; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-303.md`. **Next action:** operator decision **D-303-1**.
+
+### AFLDB-ISSUE-304 — Email intake parses the whole body before sender and size checks
+- **Severity:** Low. **Area:** email ingress resource bounds — `src/app/api/admin/email-intake/route.ts`. **State:** Open
+  (2026-10-08), F-039; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-304.md`. **Next action:** implementation, after ISSUE-266.
+
+### AFLDB-ISSUE-305 — Legacy intake validation accepts values promotion then rejects
+- **Severity:** Low. **Area:** legacy CSV intake validation — `src/lib/ingest/datasets.ts`. **State:** Open (2026-10-08),
+  F-040, reproduced by the review (W4); imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-305.md`. **Next action:** implementation; H-305-1 open.
+
+### AFLDB-ISSUE-306 — Legacy intake duplicate detection compares raw club text
+- **Severity:** Low. **Area:** legacy CSV intake validation — `src/lib/ingest/datasets.ts` (`fileKey`). **State:** Open
+  (2026-10-08), F-041; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-306.md`. **Next action:** implementation, alongside ISSUE-272.
+
+### AFLDB-ISSUE-307 — Legacy promotion counts every promoted row as inserted
+- **Severity:** Low. **Area:** legacy CSV intake / batch accounting — `src/lib/ingest/pipeline.ts`. **State:** Open
+  (2026-10-08), F-042; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-307.md`. **Next action:** implementation (low priority).
+
+### AFLDB-ISSUE-308 — Approving a player-link suggestion does not revalidate public pages
+- **Severity:** Low. **Area:** admin player links / revalidation — `src/app/admin/player-links/actions.ts`. **State:** Open
+  (2026-10-08), F-043; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-308.md`. **Next action:** choose the mechanism (does the ISSUE-087 hang reproduce on
+  Next 16.3.1?), then implement with ISSUE-309/311.
+
+### AFLDB-ISSUE-309 — Multi-target player-link actions stop at the first failure after earlier targets committed
+- **Severity:** Low. **Area:** admin player links — `src/app/admin/player-links/actions.ts`. **State:** Open (2026-10-08),
+  F-044; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-309.md`. **Next action:** implementation, with ISSUE-308 and ISSUE-311.
+
+### AFLDB-ISSUE-310 — AFL API link path derives the stable player identity by a different rule from the forward classifier
+- **Severity:** Low. **Area:** AFL API identity — `src/db/queries/afl-api-player-links.ts`. **State:** Open (2026-10-08),
+  F-045 (collation-dependent); imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-310.md`. **Next action:** implementation; DEV/PROD collation question open
+  (operator-run).
+
+### AFLDB-ISSUE-311 — Activity audit after a committed player-link mutation is unwrapped or silent
+- **Severity:** Low. **Area:** admin player links / activity audit. **State:** Open (2026-10-08), F-046; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-311.md`. **Next action:** implementation, with ISSUE-309.
+
+### AFLDB-ISSUE-312 — Migration safety scan fails on a detached HEAD with a misleading error
+- **Severity:** Low. **Area:** DB tooling / migrations / preflight — `tools/db/migration-safety.ts`. **State:** Open
+  (2026-10-08), F-047; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-312.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
+- **Severity:** Low. **Area:** DB tooling / credential handling — `tools/db/psql.ts`. **State:** Open (2026-10-08), F-048;
+  imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-313.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-314 — `prepare-promotion-source --apply` checks `--record-out` only after committing its writes
+- **Severity:** Low. **Area:** DB tooling / promotion preparation — `tools/db/prepare-promotion-source.ts`. **State:** Open
+  (2026-10-08), F-049; imported 2026-10-10.
+- **Runbook:** `issues/open/AFLDB-ISSUE-314.md`. **Next action:** implementation.
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
 decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an

@@ -4,7 +4,14 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 7
+**Open issues:** 51
+
+> **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
+> `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
+> and registered here on 10 October 2026. That is an import date, not a review or validation date: no finding was
+> re-reproduced or re-read against current `main`, and nothing was implemented. The review report the runbooks cite
+> (`issues/reviews/2026-10-08-full-code-review.md`) and the witness outputs (`D:\tmp\review-20261008-full\witness\`) were
+> not imported and are not on `main`. Selected next implementation batch: ISSUE-271/272.
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
@@ -15,6 +22,50 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-268 | Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd | High | Legacy intake / NULL-vs-zero — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-003. Validator fix, promotion-time re-check of retained cells and tests (DB-free + integration) committed 2026-10-09 as `5659f789`, merged and pushed to `main`, and deployed to DEV 2026-10-09 (installation and operational acceptance complete; attendance validation/promotion not exercised on DEV, ISSUE-107 gate off so no live build-header parity claimed); operator checks at 15:11:57 passed (ingest-datasets 181/181, tsc, eslint, diff-check) and the targeted ISSUE-268 integration cases passed twice on `afldb_test` as the test owner (15:21:42, 15:30:35; restricted-role path and full integration file not validated); both operator-run censuses complete 2026-10-09 (DEV 15:59:22, PROD 16:02:57: no retained submissions, no rows in Sections 2–5, no exposure found in the records checked); historical impact unassessed, nothing repaired, fix not installed by the censuses; not installed on PROD | Operator: PROD installation and acceptance after the unchanged ISSUE-265 hold; D-268-1 and D-268-3 are separate follow-ups, not merge gates |
 | AFLDB-ISSUE-269 | `replay_admin_overrides('matches')` applies only one of a match's active override rows | Medium | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-004; implemented 2026-10-09 with ISSUE-267: active rows merged into one object per `match_key`; equal-authority disagreements and underivable score components refused before any write; shared operator integration run 2026-10-09 FAILED (6 failed); **shared second-pass run 2026-10-09 PASSED on `afldb_test` (6 passed), implementation validated on `afldb_test`** (ISSUE-267); **DEV exposure census complete 2026-10-09** (0 active `matches` overrides, section 2 and all others no rows, no replay blockers); **committed as `86e2d19f`, merged/pushed, DEV deployed 2026-10-09** (shared with ISSUE-267; the deployment did not exercise the Python matches replay); **PROD exposure census complete 2026-10-09** (shared; 0 active `matches` overrides, section 2 and all others no rows, no replay blockers; does not establish the fix is installed on PROD); `merge:ready` READY twice; PROD installation deferred (shared with ISSUE-267, §17.15); historical impact remains unassessed; runbook `issues/open/AFLDB-ISSUE-269.md` §17.6–§17.9 | As ISSUE-267 (deployment procedure prepared and reviewed after the hold lifts, then the applicable PROD deployment acceptance, ISSUE-267 runbook §17.15); resolve any census section-3/4 row before a promotion |
 | AFLDB-ISSUE-270 | A delegated admin manager can take over a peer admin account through a spare invite | Medium | Authentication / administrator lifecycle — `src/app/admin/invite/[token]/actions.ts` (`confirmEnrolment`), `src/db/queries/admin-invites.ts` (new) | Open (2026-10-08); 2026-10-08 full code review F-005, code-proven, not reproduced; **implemented 2026-10-09 in `sonnet/issue-270` (worktree `afldb-issue-270`) and revised the same day for operator decision D-270-2 and then for the independent review (5 s redemption statement timeout, tracked background transactions in the race tests, doc corrections); operator validation COMPLETE for the working tree (runbook §19.9): unit 199/199 at 19:59:08 AEDT, typecheck, four-file lint and diff check (repeated after the final harness correction), and the whole `afldb_test` integration file 37/37 from 20:57:05 AEDT as `afldb_owner` (the earlier 18:50:00 177/177 and 19:32:44 198/198 runs are historical). Committed as `b239e0ac19b04becd4c1bdf26737d806590d8484`, merged to `main` and pushed (merge-readiness READY, 0 blockers, 2 warnings), and installed on DEV three times on 10 October 2026 (runbook §20; latest service start 08:14:38 AEDT, BUILD_ID `caodaX9EgGbJK4cZLFLRk`; all 110 migrations already applied; `/api/health` ok). That is DEV installation and operational acceptance only: no invite redemption exercised on DEV; not shown: restricted `afldb_auth`, real-database Server Action end-to-end, PROD installation or acceptance, historical misuse (not assessed, nothing repaired); ISSUE-107 gate off, so no live build-header parity is claimed**: every redemption requires the stored issuer's current authority under its row lock (D-270-2), free addresses and contributors included; an existing `admin`/`super_admin` is overwritten only for a current super admin, also in the upsert's `ON CONFLICT … WHERE`; refusals write nothing and audit `admin.invite_rejected` with a reason; a lock wait past 5 s rolls back as a generic failure; runbook §17–§20 | PROD installation and any applicable PROD acceptance, behind the unchanged ISSUE-265 hold; close only after that acceptance is complete; D-270-1 remains undecided, not a gate; §19.6 follow-ups recorded |
+| AFLDB-ISSUE-271 | Legacy `match_results` promotion overwrites Data Editor corrections on `matches` | Medium | Legacy CSV intake / admin authority — `src/lib/ingest/datasets.ts` (`match_results`) | Open (2026-10-08); review F-006, code-proven; nothing implemented; imported 2026-10-10, not re-verified on current `main`; runbook `issues/open/AFLDB-ISSUE-271.md` | **Selected next batch** with ISSUE-272: refuse a supplied value that differs from an active override (runbook §13–§14) |
+| AFLDB-ISSUE-272 | Legacy `match_results` builds the match key from the raw round code and creates duplicate matches | Medium | Legacy CSV intake / match identity — `src/lib/ingest/datasets.ts` (`match_results`) | Open (2026-10-08); review F-007, reproduced DB-free (review witness W3); nothing implemented; imported 2026-10-10, not re-verified on current `main`; runbook `issues/open/AFLDB-ISSUE-272.md` | **Selected next batch** with ISSUE-271; then the read-only DEV/PROD duplicate-match census (runbook §15) |
+| AFLDB-ISSUE-273 | Submission validation overwrites a concurrent approve, promote or reject | Medium | Legacy CSV intake / submission lifecycle concurrency — `src/lib/ingest/pipeline.ts` (`validateSubmission`) | Open (2026-10-08); review F-008, code-proven (operator-driven timing); nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-273.md` | Code fix plus tests |
+| AFLDB-ISSUE-274 | A settle unit that writes only the `matches` row takes no row lock before its authority read | Medium | Acquisition / settle concurrency / manual authority — `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows`) | Open (2026-10-08); review F-009, code-proven mechanism, interleaving not executed; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-274.md` | Code fix plus tests, sequenced with ISSUE-275; amend the ISSUE-261 writer-table wording when fixed |
+| AFLDB-ISSUE-275 | A settle can insert period scores under a match it refused because a foreign owner created it concurrently | Medium | Acquisition / canonical ownership / provenance — `src/lib/acquisition/canonical-apply.ts` (`applyCanonicalUnit`) | Open (2026-10-08); review F-010, code-proven mechanism, interleaving not executed; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-275.md` | Code fix plus integration case, sequenced with ISSUE-274; open question: read-only split-ownership census |
+| AFLDB-ISSUE-276 | AFL API period scores that contradict the final score are written | Medium | Acquisition / AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts` | Open (2026-10-08); review F-011, code-proven; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-276.md` | Code fix plus DB-free test; refusal reason name open |
+| AFLDB-ISSUE-277 | Data Editor edits other than the name to a token-only player are not durable | Medium | Admin authority / Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py` | Open (2026-10-08); review F-012, code-proven; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-277.md` | Operator decision **D-277-1** (option (a) or (b)), then implementation |
+| AFLDB-ISSUE-278 | The destructive `db:test:rebuild` reset never asserts which database it is connected to | Medium (review graded High; regraded by the review's main session) | Database tooling / wrong-target safety — `tools/db/rebuild-test.ts` | Open (2026-10-08); review F-013, missing assertion code-proven, libpq trigger not executed; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-278.md` | Fix (1), optionally (2), then tests; review gating note: before the next `db:test:rebuild`; H-278-1 open |
+| AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | Code fix plus test update, before search indexing is enabled |
+| AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
+| AFLDB-ISSUE-281 | Two public list pages fail on a sort key that names an inherited object property | Low | Public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts` | Open (2026-10-08); review F-016, reproduced DB-free (W5); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-281.md` | Implementation (trivial) |
+| AFLDB-ISSUE-282 | Replace actions revalidate only the replaced row's public pages | Low | Admin awards / special records / revalidation — `admin-awards.ts`, `admin-special-records.ts` | Open (2026-10-08); review F-017, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-282.md` | Implementation, grouped with ISSUE-283 |
+| AFLDB-ISSUE-283 | The administrative note is not recorded on creation audit rows | Low | Admin awards / special records / audit trail | Open (2026-10-08); review F-018, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-283.md` | Implementation, grouped with ISSUE-282 |
+| AFLDB-ISSUE-284 | Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish | Low | Admin Brownlow — `src/db/queries/admin-brownlow.ts` | Open (2026-10-08); review F-019, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-284.md` | Implementation |
+| AFLDB-ISSUE-285 | Award Replace panel cannot give the duplicate confirmation its action requires | Low | Admin awards UI — `src/app/admin/awards/ReplacePanel.tsx` | Open (2026-10-08); review F-020, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-285.md` | Implementation |
+| AFLDB-ISSUE-286 | Hall of Fame legend and removal years are not bounded server-side | Low | Admin awards / Hall of Fame validation | Open (2026-10-08); review F-021, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-286.md` | Implementation |
+| AFLDB-ISSUE-287 | Source-owned draft pick `null_pick_number` confirmation is unreachable | Low | Admin draft UI — `src/app/admin/draft/SourceFieldsPanel.tsx` | Open (2026-10-08); review F-022, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-287.md` | Implementation |
+| AFLDB-ISSUE-288 | `createCoach` casts an unvalidated `dob` outside its error handling | Low | Admin coaches — `src/db/queries/admin-coaches.ts` | Open (2026-10-08); review F-023, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-288.md` | Implementation |
+| AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
+| AFLDB-ISSUE-290 | Manual draft selections accept out-of-range age, height, weight and pick number | Low | Admin draft / validation | Open (2026-10-08); review F-025, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-290.md` | Implementation |
+| AFLDB-ISSUE-291 | Admin player creation persists unvalidated biographical fields | Low | Admin player creation — `src/db/queries/players.ts` (`createPlayerInTransaction`) | Open (2026-10-08); review F-026, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-291.md` | Implementation |
+| AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
+| AFLDB-ISSUE-293 | Settle runs under-report `dataIssuesResolved` | Low | Acquisition / settle run accounting | Open (2026-10-08); review F-028, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-293.md` | Implementation (trivial) |
+| AFLDB-ISSUE-294 | AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count | Low | Acquisition / import batch accounting | Open (2026-10-08); review F-029, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-294.md` | Implementation |
+| AFLDB-ISSUE-295 | Settle exception report mixes both sources' apply-failure findings | Low | Acquisition / settle reporting — `src/lib/acquisition/settle-report.ts` | Open (2026-10-08); review F-030, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-295.md` | Implementation (trivial) |
+| AFLDB-ISSUE-296 | Deprecated fallback importer sets `records_rejected` without rejection rows | Low | Acquisition / deprecated fallback — `src/lib/external-afl/current-season-import.ts` | Open (2026-10-08); review F-031, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-296.md` | Implementation, or an operator decision to retire the fallback path |
+| AFLDB-ISSUE-297 | AFL API provider id is used unvalidated as a file path and URL path segment | Low | Acquisition / AFL API client — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-032, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-297.md` | Implementation |
+| AFLDB-ISSUE-298 | AFL API snapshot companion files are read without manifest verification | Low | Acquisition / evidence integrity — `src/lib/acquisition/afl-api-snapshot.ts` | Open (2026-10-08); review F-033, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-298.md` | Implementation |
+| AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
+| AFLDB-ISSUE-300 | AFL API control-database read failure is reported as "disabled by a super admin" | Low | Acquisition / diagnostics — `src/lib/acquisition/afl-api-ingestion-control.ts` | Open (2026-10-08); review F-035, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-300.md` | Implementation |
+| AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
+| AFLDB-ISSUE-302 | Lineup bundle records the pinned fitzRoy version as provenance whatever version ran | Low | Acquisition / provenance — `src/lib/acquisition/lineup-bundle.ts` | Open (2026-10-08); review F-037, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-302.md` | Operator decision **D-302-1** (refuse, or record the installed version) |
+| AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
+| AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-304.md` | Implementation, after ISSUE-266 |
+| AFLDB-ISSUE-305 | Legacy intake validation accepts values promotion then rejects | Low | Legacy CSV intake validation — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-040, reproduced DB-free (W4); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-305.md` | Implementation; hypothesis H-305-1 open |
+| AFLDB-ISSUE-306 | Legacy intake duplicate detection compares raw club text | Low | Legacy CSV intake validation — `src/lib/ingest/datasets.ts` (`fileKey`) | Open (2026-10-08); review F-041, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-306.md` | Implementation, alongside ISSUE-272 |
+| AFLDB-ISSUE-307 | Legacy promotion counts every promoted row as inserted | Low | Legacy CSV intake / import batch accounting — `src/lib/ingest/pipeline.ts` | Open (2026-10-08); review F-042, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-307.md` | Implementation (low priority) |
+| AFLDB-ISSUE-308 | Approving a player-link suggestion does not revalidate public pages | Low | Admin player links / revalidation — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-043, code-proven, fix framework-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-308.md` | Choose the mechanism (does the ISSUE-087 hang reproduce on Next 16.3.1?), then implement, with ISSUE-309/311 |
+| AFLDB-ISSUE-309 | Multi-target player-link actions stop at the first failure after earlier targets committed | Low | Admin player links — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-044, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-309.md` | Implementation, with ISSUE-308 and ISSUE-311 |
+| AFLDB-ISSUE-310 | AFL API link path derives the stable player identity by a different rule from the forward classifier | Low | AFL API identity / adjudication ledger — `src/db/queries/afl-api-player-links.ts` | Open (2026-10-08); review F-045, divergence code-proven, trigger collation-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-310.md` | Implementation; open question: DEV/PROD collation (operator-run) |
+| AFLDB-ISSUE-311 | Activity audit after a committed player-link mutation is unwrapped or silent | Low | Admin player links / activity audit | Open (2026-10-08); review F-046, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-311.md` | Implementation, with ISSUE-309 |
+| AFLDB-ISSUE-312 | Migration safety scan fails on a detached HEAD with a misleading error | Low | Database tooling / migrations / preflight — `tools/db/migration-safety.ts` | Open (2026-10-08); review F-047, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-312.md` | Implementation |
+| AFLDB-ISSUE-313 | Database tooling passes the owner DSN, password included, on the `psql` command line | Low | Database tooling / credential handling — `tools/db/psql.ts` | Open (2026-10-08); review F-048, code-proven, exposure host-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-313.md` | Implementation |
+| AFLDB-ISSUE-314 | `prepare-promotion-source --apply` checks `--record-out` only after committing its writes | Low | Database tooling / production promotion preparation — `tools/db/prepare-promotion-source.ts` | Open (2026-10-08); review F-049, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-314.md` | Implementation |
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator-run
 standalone promotion-gate reads on DEV and PROD, graded offline; operator decision D-233-4). Resolved as **AFL API
@@ -48949,7 +49000,7 @@ retained behaviour under `Unreleased`.
 - **Impact.** Any internet sender with SPF and DKIM on their own domain could stage and validate submissions under any
   staff identity and mis-attribute audit rows. Promotion still needs Super Admin approval.
 - **Related history.** ISSUE-186 (Phase B deferred; contributor residual). AFLDB-ISSUE-304 (review F-039; attachment size
-  bounds, tracked in the review worktree).
+  bounds; runbook imported to `issues/open/AFLDB-ISSUE-304.md` and registered on 2026-10-10).
 - **Next action.**
   1. Before intake is activated on any host (none is active in the places checked), satisfy the activation
      prerequisites (runbook §18.6): verify the mail provider's header behaviour, confirm the authserv-id, and set
@@ -49342,3 +49393,411 @@ retained behaviour under `Unreleased`.
   proposed here); resolution only after that applicable remaining acceptance is complete. D-270-1 (uniqueness index)
   remains undecided and is not a gate. The review worktree's own ISSUE-270 tracker row is older and must be reconciled at
   tracker merge.
+
+## Imported review findings AFLDB-ISSUE-271–314 (registered 2026-10-10)
+
+The entries below register findings F-006–F-049 of the 2026-10-08 full code review of `review/full-code-20261008` at
+`20a7a4bbdea835cdd3fc5520e65ad47d275bd881`. Each runbook was written by that review and copied unchanged from the review
+worktree `afldb-review-20261008` into `issues/open/` (operator-verified byte-for-byte, main at `8817fe39`); it was
+registered here on **10 October 2026**. The import date is not a review or validation date. The classification, evidence
+and line references are the review's, at `20a7a4bb`: **no finding was re-reproduced, re-read or re-measured against current
+`main` by the import, and nothing was implemented, repaired or deployed.** The review report every runbook cites
+(`issues/reviews/2026-10-08-full-code-review.md`, including its §11–§13 triage and recommended order) and the witness
+outputs W3–W6 (`D:\tmp\review-20261008-full\witness\`) were **not** imported; only the 44 runbooks were. The review's own
+tracker rows (its index and ledger, older than `main` for ISSUE-265–270) were not imported either. Selected next
+implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
+
+## AFLDB-ISSUE-271 — Legacy `match_results` promotion overwrites Data Editor corrections on `matches`
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** legacy CSV intake / admin authority. Key file:
+  `src/lib/ingest/datasets.ts` (`match_results` `validateRow`, `preparePromotion`, `promoteRow`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-271.md` (review §0–§16; imported unchanged 2026-10-10).
+- **Origin.** Review F-006 (partition note R5a-F04) at `20a7a4bb`. Code-proven, not reproduced (DB-backed).
+- **Defect.** The `match_results` promotion's `ON CONFLICT (match_key) DO UPDATE` overwrites score, venue, round and
+  attendance columns unconditionally; neither validation nor promotion reads `data_overrides`. A Data Editor correction is
+  silently reverted and its still-active override then shields the reverted CSV value from source correction. Same class
+  as ISSUE-264 (`player_match_stats`).
+- **Decisions.** None (precedent ISSUE-264 D-264-*).
+- **Next action.** Implement with ISSUE-272 (selected next batch): refuse a supplied value differing from an active override,
+  at validation and under the match lock at promotion (runbook §13–§14).
+
+## AFLDB-ISSUE-272 — Legacy `match_results` builds the match key from the raw round code and creates duplicate matches
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** legacy CSV intake / match identity. Key file:
+  `src/lib/ingest/datasets.ts` (`match_results`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-272.md` (review §0–§16; imported unchanged 2026-10-10).
+- **Origin.** Review F-007 (partition note R5a-F05) at `20a7a4bb`. Reproduced DB-free by the review (witness W3, not
+  imported).
+- **Defect.** Any non-empty `round_code` is accepted and the key is built from the raw string, so `R1`, `gf` or `Round 1`
+  match no canonical key; the lookup and lock find nothing, `ON CONFLICT` does not fire, and a second `matches` row is
+  inserted for the same fixture.
+- **Open question.** Whether DEV or PROD already holds such a duplicate (read-only census proposed in runbook §15).
+- **Next action.** Implement with ISSUE-271 (selected next batch), then the census.
+
+## AFLDB-ISSUE-273 — Submission validation overwrites a concurrent approve, promote or reject
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** legacy CSV intake / submission lifecycle concurrency.
+  Key file: `src/lib/ingest/pipeline.ts` (`validateSubmission`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-273.md`. **Origin.** Review F-008 (R5a-F03) at `20a7a4bb`. Code-proven; the timing
+  is operator-driven.
+- **Defect.** Status is checked once at start; the final `UPDATE … SET status = 'validated'` has no status predicate, so an
+  approve, promote or reject landing during a long validation is silently overwritten.
+- **Decisions.** None. **Next action.** Code fix plus tests.
+
+## AFLDB-ISSUE-274 — A settle unit that writes only the `matches` row takes no row lock before its authority read
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** acquisition / settle concurrency / manual authority. Key
+  file: `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows`, `applyCanonicalUnit`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Origin.** Review F-009 (R4a-F01) at `20a7a4bb`. Code-proven mechanism;
+  the concurrent interleaving was not executed.
+- **Defect.** A unit with only `matches`/`match_period_scores` targets reads manual authority and re-reads the row unlocked
+  before `UPDATE matches`; a Data Editor edit committed in between is overwritten while its override stays active.
+- **Decisions.** Amend the ISSUE-261 writer-table wording when fixed. **Next action.** Code fix plus tests; sequence with
+  ISSUE-275.
+
+## AFLDB-ISSUE-275 — A settle can insert period scores under a match it refused because a foreign owner created it concurrently
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** acquisition / canonical ownership / provenance. Key file:
+  `src/lib/acquisition/canonical-apply.ts` (`applyCanonicalUnit`, `readFreshTarget`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Origin.** Review F-010 (R4a-F02) at `20a7a4bb`. Code-proven mechanism;
+  the concurrent interleaving was not executed.
+- **Defect.** `matchId` is bound before the `matches` target's owner/baseline gates and not cleared on refusal, so the
+  unit's `pending_match` period-score target inserts `afltables`-owned rows under a match another source owns.
+- **Open question.** Whether DEV or PROD already has split ownership (read-only census proposed, runbook §15).
+- **Next action.** Code fix plus an integration case; sequence with ISSUE-274.
+
+## AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** acquisition / AFL API settle / data integrity. Key files:
+  `src/lib/acquisition/afl-api-settle-plan.ts` (`planRosterFamily`), `src/lib/acquisition/afl-api-bundle.ts`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-276.md`. **Origin.** Review F-011 (R4b-F02) at `20a7a4bb`. Code-proven.
+- **Defect.** The bundle computes `periodScoresReproduceFinalScore` ("§9 assertion 4") but neither the plan nor the writer
+  consults it, so contradicting period scores are written to `match_period_scores`.
+- **Open choice.** The refusal reason name and its data-issue type (operator or implementation). **Next action.** Code fix
+  plus a DB-free test.
+
+## AFLDB-ISSUE-277 — Data Editor edits other than the name to a token-only player are not durable
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** admin authority / Data Editor / override replay. Key
+  files: `src/db/queries/data-edits.ts` (`getEntityNaturalKey`, `saveEdit`), `src/db/queries/player-identity.ts`,
+  `tools/migration/common.py` (players replay).
+- **Runbook:** `issues/open/AFLDB-ISSUE-277.md`. **Origin.** Review F-012 (R3-F03) at `20a7a4bb`. Code-proven.
+- **Defect.** For a player with only a `manual_admin_edit` token, `getEntityNaturalKey('players')` is null, so a save of
+  `dob`, `birth_year`, `height_cm`, `weight_kg` or `notes` writes no override; the replay restores the old value while the
+  `data_edits` audit row still names the change.
+- **Decisions.** **D-277-1 (operator, undecided):** (a) sync each edited group into the creation record, or (b) key a
+  correction row `manual_admin_edit:<token>` ranked above `identity`. **Next action.** D-277-1, then implementation.
+
+## AFLDB-ISSUE-278 — The destructive `db:test:rebuild` reset never asserts which database it is connected to
+
+- **Status:** Open (2026-10-08). **Severity:** Medium (the reviewer graded it High; the review's main session
+  regraded it Medium: the trigger needs a non-standard DSN form, the consequence would be catastrophic). **Area:** database
+  tooling / wrong-target safety. Key files: `tools/db/rebuild-test.ts`, `tools/db/prove-reset.ts`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-278.md`. **Origin.** Review F-013 (R6b-F01) at `20a7a4bb`. The missing assertion
+  is code-proven; the libpq trigger was not executed.
+- **Defect.** The target name is derived from the DSN URL path and checked against the allowlist, but `RESET_SQL` runs
+  through psql without asserting `current_database()`/`current_user` on that connection.
+- **Open question.** H-278-1 (libpq query-part precedence; fix (1) stands regardless). **Next action.** Fix (1), optionally
+  (2), then tests. The review's gating note: before the next `db:test:rebuild`.
+
+## AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
+
+- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** public site / SEO / framework upgrade. Key files:
+  `src/app/sitemap.ts`, `tests/seo.test.ts`, `tests/e2e/seo.spec.ts`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-279.md`. **Origin.** Review F-014 (R1c-F01) at `20a7a4bb`. Reproduced DB-free by
+  the review (witness W6, not imported) and confirmed against the installed `next@16.3.1` documentation.
+- **Defect.** Next 16 passes the segment `id` as a `Promise<string>`; `Number(promise)` is `NaN`, so every
+  `/sitemap/<n>.xml` is an empty `<urlset>` while the index still advertises them.
+- **Decisions.** None. **Next action.** Code fix plus test update, before search indexing is enabled (review gating note).
+
+## AFLDB-ISSUE-280 — Beta magic link is consumed by any GET, including a mail scanner's prefetch
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** beta gate / authentication UX. Key file:
+  `src/app/beta/verify/route.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-280.md`.
+- **Origin.** Review F-015 (R1a-F02) at `20a7a4bb`. Code-proven mechanism; incidence depends on recipients' mail providers.
+- **Defect.** `GET /beta/verify` burns the single-use token first, so a scanner prefetch spends it before the reader clicks.
+- **Next action.** Implementation (low priority).
+
+## AFLDB-ISSUE-281 — Two public list pages fail on a sort key that names an inherited object property
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** public site / query sort allowlists. Key files:
+  `src/db/queries/players.ts` (`isPlayerMatchSort`), `src/db/queries/draft.ts` (`isDraftSort`).
+  **Runbook:** `issues/open/AFLDB-ISSUE-281.md`.
+- **Origin.** Review F-016 (R1b-F01) at `20a7a4bb`. Reproduced DB-free by the review (witness W5, not imported).
+- **Defect.** The guards use `in`, which admits `Object.prototype` keys (`constructor`, `toString`, …); the value reaches
+  `ORDER BY` via `sql.unsafe`, PostgreSQL rejects it and the page renders its error boundary.
+- **Next action.** Implementation (trivial).
+
+## AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin awards, Hall of Fame, honour teams and special records
+  / public cache revalidation. Key files: `src/db/queries/admin-awards.ts`, `src/db/queries/admin-special-records.ts`.
+  **Runbook:** `issues/open/AFLDB-ISSUE-282.md`.
+- **Origin.** Review F-017 (R2a-F01 and R2c-F02, grouped) at `20a7a4bb`. Code-proven.
+- **Defect.** The five replace transactions return the old row's revalidation paths only; the replacement's pages stay
+  stale until ISR expiry (up to a day).
+- **Next action.** Implementation, grouped with ISSUE-283.
+
+## AFLDB-ISSUE-283 — The administrative note is not recorded on creation audit rows
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin awards and special records / audit trail. Key files:
+  `src/app/admin/awards/actions.ts`, `src/db/queries/admin-awards.ts`, `src/db/queries/admin-special-records.ts`.
+  **Runbook:** `issues/open/AFLDB-ISSUE-283.md`.
+- **Origin.** Review F-018 (R2a-F02 and R2c-F03, grouped) at `20a7a4bb`. Code-proven.
+- **Defect.** The forms promise the note is kept with the audit entry (both entries on replace), but the creation half of
+  each write drops it.
+- **Next action.** Implementation, grouped with ISSUE-282.
+
+## AFLDB-ISSUE-284 — Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin Brownlow. Key file: `src/db/queries/admin-brownlow.ts`
+  (`selectSeasonAggregates`). **Runbook:** `issues/open/AFLDB-ISSUE-284.md`.
+- **Origin.** Review F-019 (R2a-F03) at `20a7a4bb`. Code-proven.
+- **Next action.** Implementation.
+
+## AFLDB-ISSUE-285 — Award Replace panel cannot give the duplicate confirmation its action requires
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin awards UI. Key files:
+  `src/app/admin/awards/ReplacePanel.tsx`, `src/app/admin/awards/actions.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-285.md`.
+- **Origin.** Review F-020 (R2a-F04) at `20a7a4bb`. Code-proven.
+- **Defect.** The action returns `needsConfirmation` for a `duplicate` replacement, but the panel only ever sends
+  `confirmReplace`, so the confirmation cannot be given.
+- **Next action.** Implementation.
+
+## AFLDB-ISSUE-286 — Hall of Fame legend and removal years are not bounded server-side
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin awards / Hall of Fame validation. Key files:
+  `src/app/admin/awards/actions.ts`, `src/db/queries/admin-awards.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-286.md`.
+- **Origin.** Review F-021 (R2a-F05) at `20a7a4bb`. Code-proven. **Next action.** Implementation.
+
+## AFLDB-ISSUE-287 — Source-owned draft pick `null_pick_number` confirmation is unreachable
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin draft UI. Key files:
+  `src/app/admin/draft/SourceFieldsPanel.tsx`, `src/app/admin/draft/actions.ts`. **Runbook:**
+  `issues/open/AFLDB-ISSUE-287.md`.
+- **Origin.** Review F-022 (R2c-F01) at `20a7a4bb`. Code-proven.
+- **Defect.** The action asks for J-5 `null_pick_number` confirmation, but the panel never sends `confirmed`, so the
+  operation can never complete. **Next action.** Implementation.
+
+## AFLDB-ISSUE-288 — `createCoach` casts an unvalidated `dob` outside its error handling
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin coaches. Key files: `src/db/queries/admin-coaches.ts`
+  (`createCoach`, `saveCoachMetadata`), `src/app/admin/coaches/actions.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-288.md`.
+- **Origin.** Review F-023 (R2c-F04) at `20a7a4bb`. Code-proven; the rendering of a thrown Server Action is
+  framework-defined.
+- **Defect.** A non-date `dob` throws an uncaught PostgreSQL cast error out of the action instead of returning `{ error }`;
+  `saveCoachMetadata` surfaces the raw message. **Next action.** Implementation.
+
+## AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin fixtures (ISSUE-162 lifecycle). Key file:
+  `src/db/queries/admin-fixtures.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-289.md`.
+- **Origin.** Review F-024 (R2c-F05) at `20a7a4bb`. Code-proven.
+- **Defect.** Once the game is played and settled, the played-lock gate (and `checkMoveTarget`'s `already_played`) refuses
+  Reinstate; the fixture stays `cancelled` + played with no diagnostic.
+- **Decisions.** **D-289-1 (operator, undecided):** (a) exempt `fixture_reinstated` for the fixture's own pair and round, or
+  (b) keep the lock, add a `cancelled_but_played` diagnostic and amend the runbook. **Next action.** D-289-1.
+
+## AFLDB-ISSUE-290 — Manual draft selections accept out-of-range age, height, weight and pick number
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin draft / validation. Key files:
+  `src/app/admin/draft/actions.ts`, `src/db/queries/admin-draft.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-290.md`.
+- **Origin.** Review F-025 (R2c-F06) at `20a7a4bb`. Code-proven.
+- **Defect.** Manual picks accept any positive integer and persist it into the replayed `selection` payload; the
+  source-owned path enforces the `EDITABLE_ENTITIES.draft_picks` ranges. **Next action.** Implementation.
+
+## AFLDB-ISSUE-291 — Admin player creation persists unvalidated biographical fields
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin player creation (Data Editor; player-links
+  create-and-link). Key files: `src/app/admin/data-editor/actions.ts`, `src/app/admin/player-links/actions.ts`,
+  `src/db/queries/players.ts` (`createPlayerInTransaction`). **Runbook:** `issues/open/AFLDB-ISSUE-291.md`.
+- **Origin.** Review F-026 (R3-F05 and R5b-F05, grouped on the shared primitive) at `20a7a4bb`. Code-proven.
+- **Next action.** Implementation.
+
+## AFLDB-ISSUE-292 — Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** Data Editor / override replay. Key file:
+  `src/db/queries/data-edits.ts` (`getEntityNaturalKey`). **Runbook:** `issues/open/AFLDB-ISSUE-292.md`.
+- **Origin.** Review F-027 (R3-F04) at `20a7a4bb`. The nondeterminism is code-proven; the operational trigger is a
+  hypothesis.
+- **Defect.** `LIMIT 1` without `ORDER BY` can key two edits of one group under different paths for a renumbered-profile
+  player (ISSUE-136/137); differing values then make the players replay refuse.
+- **Open question.** Whether DEV or PROD already carries such overrides (read-only census proposed). **Next action.**
+  Implementation (small); consider with ISSUE-277.
+
+## AFLDB-ISSUE-293 — Settle runs under-report `dataIssuesResolved`
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / settle run accounting. Key files:
+  `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/settle-afl-api.ts`. **Runbook:**
+  `issues/open/AFLDB-ISSUE-293.md`.
+- **Origin.** Review F-028 (R4a-F03) at `20a7a4bb`. Code-proven. **Next action.** Implementation (trivial).
+
+## AFLDB-ISSUE-294 — AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / import batch accounting. Key files:
+  `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/lineup-store.ts`,
+  `src/lib/external-afl/current-season-import.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-294.md`.
+- **Origin.** Review F-029 (R4a-F04) at `20a7a4bb`. Code-proven.
+- **Defect.** `completed_at = now()` inside the run transaction equals `started_at`, and the counts stay 0; `settle-core.ts`
+  already fixed both for AFL API. **Next action.** Implementation.
+
+## AFLDB-ISSUE-295 — Settle exception report mixes both sources' apply-failure findings
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / settle reporting. Key file:
+  `src/lib/acquisition/settle-report.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-295.md`.
+- **Origin.** Review F-030 (R4a-F05) at `20a7a4bb`. Code-proven.
+- **Defect.** Open `canonical_apply_failed` findings are not filtered by `source_key`, so each source's report shows the
+  other's failures and can push its own past the 20-row cut. **Next action.** Implementation (trivial).
+
+## AFLDB-ISSUE-296 — Deprecated fallback importer sets `records_rejected` without rejection rows
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / deprecated fallback staging refresh. Key file:
+  `src/lib/external-afl/current-season-import.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-296.md`.
+- **Origin.** Review F-031 (R4a-F06) at `20a7a4bb`. Code-proven. Contradicts the ISSUE-244 F008 contract
+  (`records_rejected` equals the batch's rejection rows).
+- **Open question.** Whether the fallback path should simply be retired (operator). **Next action.** Implementation, or a
+  retirement decision.
+
+## AFLDB-ISSUE-297 — AFL API provider id is used unvalidated as a file path and URL path segment
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / AFL API client and acquisition tool. Key files:
+  `src/lib/acquisition/afl-api-client.ts`, `tools/current-season/acquire-afl-api.ts`,
+  `src/lib/acquisition/afl-api-snapshot.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-297.md`.
+- **Origin.** Review F-032 (R4b-F01) at `20a7a4bb`. Code-proven. **Next action.** Implementation.
+
+## AFLDB-ISSUE-298 — AFL API snapshot companion files are read without manifest verification
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / evidence integrity. Key file:
+  `src/lib/acquisition/afl-api-snapshot.ts` (`aflApiUnitSourcesFrom`). **Runbook:** `issues/open/AFLDB-ISSUE-298.md`.
+- **Origin.** Review F-033 (R4b-F03) at `20a7a4bb`. Code-proven.
+- **Defect.** `match-roster.json` and `player-stats.json` are read by naming convention whether or not the manifest lists or
+  hashes them, so unverified bytes reach the settle. **Next action.** Implementation.
+
+## AFLDB-ISSUE-299 — R lineup and roster acquirers overwrite retained evidence in place
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition tooling / evidence retention. Key files:
+  `tools/rebuild/afl_api/acquire_lineups.R`, `tools/rebuild/afl_api/acquire_rosters.R`. **Runbook:**
+  `issues/open/AFLDB-ISSUE-299.md`.
+- **Origin.** Review F-034 (R4b-F04) at `20a7a4bb`. Code-proven. The hazard `src/lib/acquisition/snapshot-dir.ts` prevents
+  for the TypeScript acquirers. **Next action.** Implementation.
+
+## AFLDB-ISSUE-300 — AFL API control-database read failure is reported as "disabled by a super admin"
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / operational diagnostics. Key files:
+  `src/lib/acquisition/afl-api-ingestion-control.ts`, `tools/current-season/acquire-afl-api.ts`,
+  `discover-afl-api-seasons.ts`, `acquire-afl-api-brownlow.ts`. **Runbook:**
+  `issues/open/AFLDB-ISSUE-300.md`.
+- **Origin.** Review F-035 (R4b-F05) at `20a7a4bb`. Code-proven. The fail-closed read is correct; only the message misleads.
+- **Next action.** Implementation.
+
+## AFLDB-ISSUE-301 — AFL API HTTP client has no request timeout and reads the body outside its retry
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / network resilience. Key file:
+  `src/lib/acquisition/afl-api-client.ts` (`requestAflApi`). **Runbook:** `issues/open/AFLDB-ISSUE-301.md`.
+- **Origin.** Review F-036 (R4b-F06) at `20a7a4bb`. Code-proven.
+- **Open choice.** The timeout value (operator or implementation). **Next action.** Implementation.
+
+## AFLDB-ISSUE-302 — Lineup bundle records the pinned fitzRoy version as provenance whatever version ran
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / provenance. Key files:
+  `src/lib/acquisition/lineup-bundle.ts`, `tools/rebuild/afl_api/acquire_lineups.R`. **Runbook:**
+  `issues/open/AFLDB-ISSUE-302.md`.
+- **Origin.** Review F-037 (a partition R4b cross-partition lead, verified by the review's main session) at `20a7a4bb`.
+  Code-proven.
+- **Decisions.** **D-302-1 (operator, undecided):** refuse a version mismatch, or record the installed version. **Next
+  action.** D-302-1.
+
+## AFLDB-ISSUE-303 — `/admin/upload` promises 5 MB but Server Actions accept 1 MB
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** legacy CSV intake UI / framework configuration. Key files:
+  `next.config.ts`, `src/app/admin/upload/actions.ts`, `src/app/admin/upload/UploadForm.tsx`, `src/lib/ingest/pipeline.ts`.
+  **Runbook:** `issues/open/AFLDB-ISSUE-303.md`.
+- **Origin.** Review F-038 (R5a-F06) at `20a7a4bb`. Code-proven, framework-confirmed by the review.
+- **Decisions.** **D-303-1 (operator, undecided):** raise the global action body limit (widens every action) or lower the
+  upload limit. **Next action.** D-303-1.
+
+## AFLDB-ISSUE-304 — Email intake parses the whole body before sender and size checks
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** legacy CSV intake / email ingress resource bounds. Key files:
+  `src/app/api/admin/email-intake/route.ts`, `tools/email_intake/fetch_and_stage.py`. **Runbook:**
+  `issues/open/AFLDB-ISSUE-304.md`.
+- **Origin.** Review F-039 (R5a-F07) at `20a7a4bb`. Code-proven. Related: ISSUE-266.
+- **Next action.** Implementation, after ISSUE-266.
+
+## AFLDB-ISSUE-305 — Legacy intake validation accepts values promotion then rejects
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** legacy CSV intake validation. Key file:
+  `src/lib/ingest/datasets.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-305.md`.
+- **Origin.** Review F-040 (R5a-F08) at `20a7a4bb`. Reproduced DB-free by the review (witness W4, not imported). Example:
+  dates are checked only against `^\d{4}-\d{2}-\d{2}$`, so `2024-02-30` validates.
+- **Open question.** Hypothesis H-305-1 (`rising_star` negative values; depends on whether `award_nominations` has a CHECK).
+  **Next action.** Implementation.
+
+## AFLDB-ISSUE-306 — Legacy intake duplicate detection compares raw club text
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** legacy CSV intake validation. Key files:
+  `src/lib/ingest/datasets.ts` (`fileKey`), `src/lib/ingest/pipeline.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-306.md`.
+- **Origin.** Review F-041 (R5a-F09) at `20a7a4bb`. Code-proven.
+- **Next action.** Implementation, alongside ISSUE-272.
+
+## AFLDB-ISSUE-307 — Legacy promotion counts every promoted row as inserted
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** legacy CSV intake / import batch accounting. Key file:
+  `src/lib/ingest/pipeline.ts` (`promoteSubmission`). **Runbook:** `issues/open/AFLDB-ISSUE-307.md`.
+- **Origin.** Review F-042 (R5a-F10) at `20a7a4bb`. Code-proven. **Next action.** Implementation (low priority).
+
+## AFLDB-ISSUE-308 — Approving a player-link suggestion does not revalidate public pages
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin player links / public cache revalidation. Key file:
+  `src/app/admin/player-links/actions.ts` (`approveSuggestion`, `bulkApproveSuggestions`). **Runbook:**
+  `issues/open/AFLDB-ISSUE-308.md`.
+- **Origin.** Review F-043 (R5b-F01) at `20a7a4bb`. Code-proven; the fix choice is framework-dependent.
+- **Open question.** Whether the ISSUE-087 `revalidatePath`-in-action hang reproduces on Next 16.3.1. **Next action.**
+  Choose the mechanism, then implement (with ISSUE-309 and ISSUE-311).
+
+## AFLDB-ISSUE-309 — Multi-target player-link actions stop at the first failure after earlier targets committed
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin player links. Key file:
+  `src/app/admin/player-links/actions.ts` (`linkPlayer`, `confirmUnlinked`, `createAndLinkPlayer`). **Runbook:**
+  `issues/open/AFLDB-ISSUE-309.md`.
+- **Origin.** Review F-044 (R5b-F02) at `20a7a4bb`. Code-proven.
+- **Next action.** Implementation, together with ISSUE-308 and ISSUE-311.
+
+## AFLDB-ISSUE-310 — AFL API link path derives the stable player identity by a different rule from the forward classifier
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** AFL API identity / adjudication ledger. Key files:
+  `src/db/queries/afl-api-player-links.ts` (`readPlayerStableIdentity`, `linkAflApiProvider`),
+  `src/lib/acquisition/afl-api-adjudication.ts` (`classifyAflApiForwardIdentity`). **Runbook:**
+  `issues/open/AFLDB-ISSUE-310.md`.
+- **Origin.** Review F-045 (R5b-F03) at `20a7a4bb`. The divergence is code-proven; which path is picked depends on the
+  database collation.
+- **Open question.** DEV/PROD collation (`SHOW lc_collate`, operator-run). **Next action.** Implementation.
+
+## AFLDB-ISSUE-311 — Activity audit after a committed player-link mutation is unwrapped or silent
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin player links / activity audit. Key files:
+  `src/app/admin/player-links/actions.ts`, `src/app/admin/player-links/afl-api/actions.ts`. **Runbook:**
+  `issues/open/AFLDB-ISSUE-311.md`.
+- **Origin.** Review F-046 (R5b-F04) at `20a7a4bb`. Code-proven. **Next action.** Implementation, with ISSUE-309.
+
+## AFLDB-ISSUE-312 — Migration safety scan fails on a detached HEAD with a misleading error
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** database tooling / migrations / preflight. Key files:
+  `tools/db/migration-safety.ts`, `tools/db/migrate.ts`, `tools/dev/preflight.ts`. **Runbook:**
+  `issues/open/AFLDB-ISSUE-312.md`.
+- **Origin.** Review F-047 (R6a-F01) at `20a7a4bb`. Code-proven. **Next action.** Implementation.
+
+## AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** database tooling / credential handling. Key files:
+  `tools/db/psql.ts` (`psqlArgv`, `runPsql`), `tools/db/privileges.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-313.md`.
+- **Origin.** Review F-048 (R6a-F02) at `20a7a4bb`. Code-proven; the practical exposure depends on the host (`/proc`
+  `hidepid`). **Next action.** Implementation.
+
+## AFLDB-ISSUE-314 — `prepare-promotion-source --apply` checks `--record-out` only after committing its writes
+
+- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** database tooling / production promotion preparation. Key file:
+  `tools/db/prepare-promotion-source.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-314.md`.
+- **Origin.** Review F-049 (R6b-F02) at `20a7a4bb`. Code-proven.
+- **Defect.** A pre-existing `--record-out` path fails only at the final write, after the apply committed to `afldb_test`,
+  leaving a prepared source with no preparation record. **Next action.** Implementation.

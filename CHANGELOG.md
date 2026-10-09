@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Issue tracking: the 2026-10-08 full code review's ISSUE-271–314 registered on `main` (documentation import only) - 10 October 2026
+
+- The 44 runbooks for AFLDB-ISSUE-271–314 (review findings F-006–F-049, review at `20a7a4bb`, 2026-10-08) were imported
+  unchanged from the review worktree into `issues/open/` and registered in `issues.md` (Open Issues table and one ledger
+  entry each) and `IssuesIndex.md`: 9 Medium, 35 Low; open issues 7 → 51. `blockers.md` R12, R24, R25 and C3 now point at
+  the imported runbooks; its coverage stays INCOMPLETE and the ISSUE-265 PROD hold is unchanged.
+- Tracking only: no code, test, data or deployment change. The import date is not a review or validation date; no finding
+  was re-verified against current `main`. The review report the runbooks cite
+  (`issues/reviews/2026-10-08-full-code-review.md`) was not imported. ISSUE-271/272 are the selected next implementation
+  batch.
+
 ### Accepting an admin invite can no longer overwrite a peer administrator's credentials, and needs the issuer's current authority (AFLDB-ISSUE-270; implemented, revised for D-270-2 and for the independent review; validated on afldb_test as the test owner; committed `b239e0ac`, merged, deployed to DEV only; PROD not installed; issue open) - 9 October 2026
 
 - Accepting an invite upserts on email, so an invite for an address that already has an account resets its password,
