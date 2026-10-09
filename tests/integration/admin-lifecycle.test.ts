@@ -29,7 +29,7 @@ import './guard';
 import { randomUUID } from 'node:crypto';
 
 import postgres from 'postgres';
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // session.ts's audit writer reads the request IP through next/headers,
 // which has no request scope here. requestIp() already absorbs that by
@@ -41,6 +41,12 @@ vi.mock('next/headers', () => ({
 }));
 
 // After the mock, which vitest hoists above the imports.
+import {
+  INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS,
+  redeemInviteInTransaction,
+  type InviteRedemptionTestHooks,
+  type RedeemableInvite,
+} from '@/db/queries/admin-invites';
 import {
   applyLifecycleMutation,
   listAdminAccounts,
@@ -54,9 +60,19 @@ const sql = postgres(testDbUrl, { max: 1 });
 const sql1 = postgres(testDbUrl, { max: 1 });
 const sql2 = postgres(testDbUrl, { max: 1 });
 const observer = postgres(testDbUrl, { max: 1 });
+/**
+ * AFLDB-ISSUE-270: a connection bounded exactly as confirmEnrolment bounds
+ * its dedicated redemption connection, for the statement-timeout case.
+ */
+const bounded = postgres(testDbUrl, {
+  max: 1,
+  connection: { statement_timeout: INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS },
+});
 
 /** Every auth_users row this run created, for cleanup by id. */
 const createdUserIds: number[] = [];
+/** Every admin_invites row this run created (AFLDB-ISSUE-270), for cleanup by id. */
+const createdInviteIds: number[] = [];
 
 type Fixture = { id: number; email: string };
 
@@ -141,6 +157,12 @@ function input(
 }
 
 afterEach(async () => {
+  // admin_invites.invited_by references auth_users, so this run's invites
+  // go before its users -- by id, never by email pattern.
+  if (createdInviteIds.length > 0) {
+    await observer`DELETE FROM admin_invites WHERE id = ANY(${createdInviteIds})`;
+    createdInviteIds.length = 0;
+  }
   if (createdUserIds.length === 0) return;
   // The audit trail's actor FK would refuse the user delete, so this run's
   // rows go first. Sessions cascade with the user.
@@ -154,7 +176,18 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await Promise.all([sql.end(), sql1.end(), sql2.end(), observer.end()]);
+  await Promise.all([sql.end(), sql1.end(), sql2.end(), observer.end(), bounded.end()]);
+});
+
+// Before ANY test in this file writes (AFLDB-ISSUE-270 moved it here from
+// that issue's own describe). tests/setup.ts and ./guard check the URL's
+// database name and that it connects; this asks the server which database
+// the connection actually landed in.
+beforeAll(async () => {
+  const [{ database }] = await observer<{ database: string }[]>`SELECT current_database() AS database`;
+  if (!database.endsWith('_test')) {
+    throw new Error(`Refusing to write admin fixtures: connected to ${database}, not a _test database.`);
+  }
 });
 
 describe('preconditions', () => {
@@ -549,54 +582,152 @@ describe('AFLDB-ISSUE-186: the retired contributor role cannot authenticate, but
  * No sleep is load-bearing: the poll below waits for a fact, and the
  * transactions are released in a fixed order.
  */
-describe('two super admins acting at once', () => {
-  async function waitForBlock(t1Pid: number, t2Pid: number): Promise<void> {
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const [{ blocking }] = await observer<{ blocking: number[] }[]>`
-        SELECT pg_blocking_pids(${t2Pid}) AS blocking
-      `;
-      if (blocking?.includes(t1Pid)) return;
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    throw new Error(`Timeout waiting for PID ${t2Pid} to be blocked by PID ${t1Pid}`);
+/**
+ * Polls until backend `t2Pid` is waiting on a lock held by `t1Pid`. Shared
+ * by the lifecycle and invite-redemption concurrency cases below.
+ */
+async function waitForBlock(t1Pid: number, t2Pid: number): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const [{ blocking }] = await observer<{ blocking: number[] }[]>`
+      SELECT pg_blocking_pids(${t2Pid}) AS blocking
+    `;
+    if (blocking?.includes(t1Pid)) return;
+    await new Promise((r) => setTimeout(r, 50));
   }
+  throw new Error(`Timeout waiting for PID ${t2Pid} to be blocked by PID ${t1Pid}`);
+}
 
+/** A promise with its settle functions exposed: a barrier or a readiness signal. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+/** How long a background transaction may take to reach its announced point. */
+const READY_TIMEOUT_MS = 10_000;
+
+/** `promise`, or a rejection naming `what` after `ms`: a readiness wait never hangs. */
+async function within<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out after ${ms} ms waiting for ${what}`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+type Background = {
+  /** Registers a started transaction or watcher; a rejection is handled at once and reported after the body. */
+  track<T>(promise: Promise<T>): Promise<T>;
+  /** Registers a barrier release, run after the body whether it resolved or threw. */
+  onRelease(release: () => void): void;
+};
+
+/**
+ * Runs `body` (AFLDB-ISSUE-270's concurrency cases), then -- on every path,
+ * including the body throwing -- runs every registered release and awaits
+ * every tracked promise before returning, so no transaction or watcher
+ * outlives the test into the file's afterEach cleanup. The body's own error
+ * wins; otherwise the first background failure is thrown.
+ */
+async function withBackground<T>(body: (bg: Background) => Promise<T>): Promise<T> {
+  const tracked: Promise<unknown>[] = [];
+  const releases: (() => void)[] = [];
+  const bg: Background = {
+    track(promise) {
+      promise.catch(() => undefined);
+      tracked.push(promise);
+      return promise;
+    },
+    onRelease(release) { releases.push(release); },
+  };
+  let outcome: { ok: true; value: T } | { ok: false; error: unknown };
+  try {
+    outcome = { ok: true, value: await body(bg) };
+  } catch (error) {
+    outcome = { ok: false, error };
+  }
+  for (const release of releases) release();
+  const settled = await Promise.allSettled(tracked);
+  if (!outcome.ok) throw outcome.error;
+  const failed = settled.find((s): s is PromiseRejectedResult => s.status === 'rejected');
+  if (failed) throw failed.reason;
+  return outcome.value;
+}
+
+/**
+ * Starts `body` as the second transaction on `sql2` and returns it tracked
+ * by `bg` (so withBackground awaits it on every path), together with its
+ * backend PID. The PID wait is bounded by READY_TIMEOUT_MS and fails at once
+ * if the transaction ends, or fails, before announcing itself, so a broken
+ * start never leaves the first transaction holding its locks until Vitest's
+ * own timeout.
+ */
+async function startTracked<T>(
+  bg: Background,
+  body: (tx2: postgres.TransactionSql) => Promise<T>,
+  what: string,
+): Promise<{ done: Promise<unknown>; pid: number }> {
+  const started = deferred<number>();
+  const done = bg.track(sql2.begin(async (tx2) => {
+    const [{ pid }] = await tx2<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+    started.resolve(pid);
+    return body(tx2);
+  }));
+  done.then(
+    () => started.reject(new Error(`${what} ended before announcing itself`)),
+    (error) => started.reject(error),
+  );
+  return { done, pid: await within(started.promise, READY_TIMEOUT_MS, what) };
+}
+
+describe('two super admins acting at once', () => {
+  // Both cases start the second transaction inside the first one's
+  // afterLock hook, under withBackground: whatever fails -- the PID wait,
+  // the block wait, the first transaction, an assertion inside the body --
+  // the second transaction is still awaited before the file's afterEach
+  // deletes the fixtures. No barrier is needed: the second transaction is
+  // held only by the first one's own locks, which end with it.
   it('mutual demotion: the loser waits, re-reads its own row and refuses', async () => {
     const a = await createAccount({ role: 'super_admin' });
     const b = await createAccount({ role: 'super_admin' });
     await createSession(a.id);
     await createSession(b.id);
 
-    const race: { t2?: Promise<unknown> } = {};
+    const { t1Result, t2Result } = await withBackground(async (bg) => {
+      const race: { t2?: Promise<unknown> } = {};
 
-    const t1Result = await sql1.begin(async (tx1) => {
-      const [{ pid: t1Pid }] = await tx1<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      const t1Result = await sql1.begin(async (tx1) => {
+        const [{ pid: t1Pid }] = await tx1<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
 
-      let resolveT2Pid!: (pid: number) => void;
-      const t2PidPromise = new Promise<number>((r) => { resolveT2Pid = r; });
-
-      return runLifecycleSteps(
-        tx1,
-        input('demote', a, b, { expectedRole: 'super_admin' }),
-        {
-          // Hold the advisory lock and both row locks while B's attempt
-          // on A is started and proven blocked.
-          afterLock: async () => {
-            race.t2 = sql2.begin(async (tx2) => {
-              const [{ pid: t2Pid }] = await tx2<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
-              resolveT2Pid(t2Pid);
-              return runLifecycleSteps(
+        return runLifecycleSteps(
+          tx1,
+          input('demote', a, b, { expectedRole: 'super_admin' }),
+          {
+            // Hold the advisory lock and both row locks while B's attempt
+            // on A is started and proven blocked.
+            afterLock: async () => {
+              const t2 = await startTracked(bg, (tx2) => runLifecycleSteps(
                 tx2,
                 input('demote', b, a, { expectedRole: 'super_admin' }),
-              );
-            });
-            await waitForBlock(t1Pid, await t2PidPromise);
+              ), 'B\'s demotion of A');
+              race.t2 = t2.done;
+              await waitForBlock(t1Pid, t2.pid);
+            },
           },
-        },
-      );
-    });
+        );
+      });
 
-    const t2Result = await race.t2;
+      if (!race.t2) throw new Error('B\'s demotion of A was never started');
+      return { t1Result, t2Result: await race.t2 };
+    });
 
     // A demoted B. B's transaction then woke up, re-read its OWN row, and
     // found it is no longer a super admin: the request that would have
@@ -619,41 +750,537 @@ describe('two super admins acting at once', () => {
     const y = await createAccount({ role: 'super_admin' });
     const scope = { countScope: [x.id, y.id] };
 
-    const race: { t2?: Promise<unknown> } = {};
+    const { t1Result, t2Result } = await withBackground(async (bg) => {
+      const race: { t2?: Promise<unknown> } = {};
 
-    const t1Result = await sql1.begin(async (tx1) => {
-      const [{ pid: t1Pid }] = await tx1<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      const t1Result = await sql1.begin(async (tx1) => {
+        const [{ pid: t1Pid }] = await tx1<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
 
-      let resolveT2Pid!: (pid: number) => void;
-      const t2PidPromise = new Promise<number>((r) => { resolveT2Pid = r; });
-
-      return runLifecycleSteps(
-        tx1,
-        input('deactivate', actor, x, { expectedRole: 'super_admin' }),
-        {
-          ...scope,
-          afterLock: async () => {
-            race.t2 = sql2.begin(async (tx2) => {
-              const [{ pid: t2Pid }] = await tx2<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
-              resolveT2Pid(t2Pid);
-              return runLifecycleSteps(
+        return runLifecycleSteps(
+          tx1,
+          input('deactivate', actor, x, { expectedRole: 'super_admin' }),
+          {
+            ...scope,
+            afterLock: async () => {
+              const t2 = await startTracked(bg, (tx2) => runLifecycleSteps(
                 tx2,
                 input('deactivate', actor, y, { expectedRole: 'super_admin' }),
                 scope,
-              );
-            });
-            await waitForBlock(t1Pid, await t2PidPromise);
+              ), 'the deactivation of Y');
+              race.t2 = t2.done;
+              await waitForBlock(t1Pid, t2.pid);
+            },
           },
-        },
-      );
-    });
+        );
+      });
 
-    const t2Result = await race.t2;
+      if (!race.t2) throw new Error('the deactivation of Y was never started');
+      return { t1Result, t2Result: await race.t2 };
+    });
 
     expect(t1Result).toMatchObject({ ok: true });
     expect(t2Result).toMatchObject({ ok: false, code: 'last_super_admin' });
     expect((await readAccount(x.id)).disabledAt).toBeInstanceOf(Date);
     // The invariant held: one of the two is still an enabled super admin.
     expect(await readAccount(y.id)).toMatchObject({ role: 'super_admin', disabledAt: null });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-270: the invite redemption's account write against a real
+ * PostgreSQL. The unit half (tests/auth.test.ts) proves which decision is
+ * taken and which statements are issued; only a database can prove that
+ * the upsert's `ON CONFLICT ... WHERE` really refuses a row created after
+ * the lock read, and that the issuer row really stays locked to commit.
+ *
+ * `redeemInviteInTransaction` is the body confirmEnrolment runs, driven
+ * here on the suite's own connections. It writes no audit row (the Server
+ * Action does that after the transaction), so these fixtures leave none.
+ *
+ * Fixture rules: the file-wide beforeAll has checked current_database()
+ * ends in `_test` before any write; every new address is a fresh
+ * `i270-<uuid>@example.test` that is refused if it already exists anywhere;
+ * a row is recorded as this run's only once its creating transaction has
+ * committed, and only when this run created it (see `redeem`); everything
+ * is removed by id in the file's afterEach, never by email pattern. The
+ * concurrency cases run their background transactions under
+ * `withBackground`, which releases every barrier and awaits every started
+ * transaction and watcher on every path. No real administrator is touched.
+ */
+describe('invite redemption cannot overwrite a peer (AFLDB-ISSUE-270)', () => {
+  /** Addresses this run reserved: the only ones at which a redemption may create a row this run owns. */
+  const reservedEmails = new Set<string>();
+
+  /** A fresh reserved address, refused if any row already uses it. */
+  async function reservedEmail(): Promise<string> {
+    const email = `i270-${randomUUID()}@example.test`;
+    const [row] = await observer<{ users: number; invites: number }[]>`
+      SELECT (SELECT count(*)::int FROM auth_users    WHERE email = ${email}) AS users,
+             (SELECT count(*)::int FROM admin_invites WHERE email = ${email}) AS invites
+    `;
+    if (row.users !== 0 || row.invites !== 0) {
+      throw new Error(`Reserved fixture address ${email} already exists; refusing to touch it.`);
+    }
+    reservedEmails.add(email);
+    return email;
+  }
+
+  /** Staged on every fixture invite, so a refusal can be shown to leave them in place. */
+  const PENDING_HASH = 'scrypt$i270$pending';
+  const PENDING_SECRET = 'I270PENDINGSECRET';
+  /** An unconsumed invite: unused, its staged credentials intact. */
+  const unconsumed = { usedAt: null, pendingPasswordHash: PENDING_HASH, pendingTotpSecret: PENDING_SECRET };
+
+  /** Records a committed row this run created; idempotent. */
+  function own(id: number): void {
+    if (!createdUserIds.includes(id)) createdUserIds.push(id);
+  }
+
+  /** The competing writer's account: committed at once on the observer connection. */
+  async function createAccountAt(email: string, role: 'admin'): Promise<Fixture> {
+    const [row] = await observer<Fixture[]>`
+      INSERT INTO auth_users (email, role, password_hash, totp_secret)
+      VALUES (${email}, ${role}, 'scrypt$i270$competitor', 'I270COMPETITORSECRET')
+      RETURNING id, email
+    `;
+    // Autocommitted: the row is committed by the time it is returned.
+    own(row.id);
+    return row;
+  }
+
+  async function createInvite(
+    issuer: Fixture,
+    email: string,
+    role: 'admin' | 'super_admin' = 'admin',
+    canManageAdmins = false,
+  ): Promise<RedeemableInvite> {
+    const [row] = await observer<RedeemableInvite[]>`
+      INSERT INTO admin_invites (email, role, can_manage_admins, token_hash, invited_by, expires_at,
+                                 pending_password_hash, pending_totp_secret)
+      VALUES (${email}, ${role}, ${canManageAdmins}, ${`i270-${randomUUID()}`}, ${issuer.id},
+              now() + interval '1 day', ${PENDING_HASH}, ${PENDING_SECRET})
+      RETURNING id, email, role, can_manage_admins AS "canManageAdmins", invited_by AS "invitedBy"
+    `;
+    createdInviteIds.push(row.id);
+    return row;
+  }
+
+  async function redeem(
+    db: postgres.Sql,
+    invite: RedeemableInvite,
+    label: string,
+    hooks?: InviteRedemptionTestHooks,
+  ) {
+    // The upsert returns an id whether it inserted or overwrote, so the id
+    // alone never makes a row this run's. A row is adopted only when the
+    // address is one this run reserved and held no row when the redemption
+    // began: then the row there afterwards was inserted by it (or by a
+    // competitor this test started, which registers its own row). Any other
+    // returned id is an existing row, owned already or not ours to delete.
+    const [before] = await observer<{ id: number }[]>`SELECT id FROM auth_users WHERE email = ${invite.email}`;
+    const mayInsert = reservedEmails.has(invite.email) && before === undefined;
+    const result = await db.begin((tx) => redeemInviteInTransaction(tx, {
+      invite,
+      passwordHash: `scrypt$i270$${label}`,
+      totpSecret: `I270${label.toUpperCase()}SECRET`,
+      totpStep: 1,
+    }, hooks));
+    // begin() has resolved, so the transaction has committed.
+    if (result.ok && mayInsert) own(result.userId);
+    return result;
+  }
+
+  async function accountCountAt(email: string): Promise<number> {
+    const [row] = await observer<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM auth_users WHERE email = ${email}
+    `;
+    return row.count;
+  }
+
+  async function credentialsAt(email: string) {
+    const [row] = await observer<{
+      id: number; role: string; passwordHash: string; totpSecret: string; disabledAt: Date | null;
+    }[]>`
+      SELECT id, role, password_hash AS "passwordHash", totp_secret AS "totpSecret",
+             disabled_at AS "disabledAt"
+        FROM auth_users WHERE email = ${email}
+    `;
+    return row;
+  }
+
+  async function inviteState(id: number) {
+    const [row] = await observer<{
+      usedAt: Date | null; pendingPasswordHash: string | null; pendingTotpSecret: string | null;
+    }[]>`
+      SELECT used_at AS "usedAt", pending_password_hash AS "pendingPasswordHash",
+             pending_totp_secret AS "pendingTotpSecret"
+        FROM admin_invites WHERE id = ${id}
+    `;
+    return row;
+  }
+
+  const refusedPeer = { ok: false, reason: 'target_requires_super_admin', existingRole: 'admin' };
+
+  it('a spare invite cannot overwrite the admin its sibling invite created', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const email = await reservedEmail();
+    const first = await createInvite(manager, email);
+    const spare = await createInvite(manager, email);
+
+    const enrolled = await redeem(sql, first, 'alice');
+    expect(enrolled).toMatchObject({ ok: true });
+    const alice = await credentialsAt(email);
+    await createSession(alice.id);
+
+    const takeover = await redeem(sql, spare, 'manager');
+
+    expect(takeover).toMatchObject(refusedPeer);
+    expect(await credentialsAt(email)).toMatchObject({
+      role: 'admin', passwordHash: 'scrypt$i270$alice', totpSecret: 'I270ALICESECRET',
+    });
+    expect(await liveSessionCount(alice.id)).toBe(1);
+    expect(await inviteState(spare.id)).toEqual(unconsumed);
+  });
+
+  it('refuses a target promoted to admin after the invite was issued', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const target = await createAccount({ role: 'contributor' });
+    const invite = await createInvite(manager, target.email);
+    await observer`UPDATE auth_users SET role = 'admin' WHERE id = ${target.id}`;
+    await createSession(target.id);
+
+    expect(await redeem(sql, invite, 'manager')).toMatchObject(refusedPeer);
+    expect(await credentialsAt(target.email)).toMatchObject({ role: 'admin', passwordHash: 'scrypt$test$dummy' });
+    expect(await liveSessionCount(target.id)).toBe(1);
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+  });
+
+  it('refuses an admin created, and committed, after the lock read found the address free', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const email = await reservedEmail();
+    const invite = await createInvite(manager, email);
+    const holder: { peer?: Fixture } = {};
+
+    const result = await redeem(sql1, invite, 'manager', {
+      // The lock read has run and found no account. Another writer now
+      // creates the address as an admin, committed, with a live session.
+      afterLock: async () => {
+        holder.peer = await createAccountAt(email, 'admin');
+        await createSession(holder.peer.id);
+      },
+    });
+
+    expect(result).toMatchObject(refusedPeer);
+    expect(await credentialsAt(email)).toMatchObject({
+      id: holder.peer!.id, role: 'admin', passwordHash: 'scrypt$i270$competitor',
+      totpSecret: 'I270COMPETITORSECRET',
+    });
+    expect(await liveSessionCount(holder.peer!.id)).toBe(1);
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+  });
+
+  it('refuses an admin whose creation is still uncommitted when the upsert arrives', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const email = await reservedEmail();
+    const invite = await createInvite(manager, email);
+
+    const result = await withBackground(async (bg) => {
+      // The creator commits only once this gate opens: when the redemption's
+      // upsert is proven to be waiting on it, or -- on any failure path --
+      // when withBackground releases it.
+      const gate = deferred<void>();
+      bg.onRelease(() => gate.resolve());
+
+      return sql1.begin(async (tx1) => {
+        const [{ pid: redeemerPid }] = await tx1<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+        return redeemInviteInTransaction(tx1, {
+          invite, passwordHash: 'scrypt$i270$manager', totpSecret: 'I270MANAGERSECRET', totpStep: 1,
+        }, {
+          afterLock: async () => {
+            const inserted = deferred<number>();
+            // The competing writer inserts the admin row and holds its
+            // transaction open until the redemption's upsert is proven to be
+            // waiting on it; only then does it commit.
+            const creator = bg.track(sql2.begin(async (tx2) => {
+              const [{ pid }] = await tx2<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+              const [row] = await tx2<{ id: number }[]>`
+                INSERT INTO auth_users (email, role, password_hash, totp_secret)
+                VALUES (${email}, 'admin', 'scrypt$i270$competitor', 'I270COMPETITORSECRET')
+                RETURNING id
+              `;
+              inserted.resolve(pid);
+              await gate.promise;
+              return row.id;
+            }).then((id) => {
+              // begin() resolved: committed, so the row is now this run's.
+              own(id);
+              return id;
+            }));
+            // A creator that fails (or finishes) before announcing fails the
+            // wait below instead of leaving it pending forever.
+            creator.then(
+              () => inserted.reject(new Error('the competing insert ended before announcing itself')),
+              (error) => inserted.reject(error),
+            );
+            const creatorPid = await within(inserted.promise, READY_TIMEOUT_MS, 'the competing insert');
+            // Not awaited here: the upsert must run while this watches it.
+            bg.track(waitForBlock(creatorPid, redeemerPid).finally(() => gate.resolve()));
+          },
+        });
+      });
+    });
+
+    expect(result).toMatchObject(refusedPeer);
+    expect(await credentialsAt(email)).toMatchObject({
+      role: 'admin', passwordHash: 'scrypt$i270$competitor', totpSecret: 'I270COMPETITORSECRET',
+    });
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+  });
+
+  it('does not let a super admin demoted since issuing the invite reset a peer', async () => {
+    const formerBoss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'admin' });
+    const invite = await createInvite(formerBoss, target.email);
+    await observer`UPDATE auth_users SET role = 'admin' WHERE id = ${formerBoss.id}`;
+    await createSession(target.id);
+
+    // D-270-2: a demoted issuer (no delegation) authorises nothing, so the
+    // authority refusal comes before the target rule.
+    expect(await redeem(sql, invite, 'formerboss')).toMatchObject({
+      ok: false, reason: 'issuer_not_admin_manager', existingRole: 'admin',
+    });
+    expect(await credentialsAt(target.email)).toMatchObject({ passwordHash: 'scrypt$test$dummy' });
+    expect(await liveSessionCount(target.id)).toBe(1);
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+  });
+
+  /*
+   * D-270-2 (operator decision, 2026-10-09): the issuer's current authority
+   * is required for every redemption. Each case changes the issuer after
+   * issuance, then proves the redemption creates no account at a free
+   * address, changes nothing about an existing contributor, and leaves the
+   * invite unconsumed.
+   */
+  it('refuses a stale super_admin grant at a free address once its issuer is no longer a super admin', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const email = await reservedEmail();
+    const invite = await createInvite(boss, email, 'super_admin');
+    // Demoted, then (separately) given the delegation: an admin manager
+    // still, but one who may no longer grant super_admin.
+    await observer`UPDATE auth_users SET role = 'admin', can_manage_admins = true WHERE id = ${boss.id}`;
+
+    expect(await redeem(sql, invite, 'stalesuper')).toEqual({
+      ok: false,
+      reason: 'grant_exceeds_issuer',
+      existingRole: null,
+      issuer: { role: 'admin', active: true, canManageAdmins: true },
+    });
+    expect(await accountCountAt(email)).toBe(0);
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+  });
+
+  it('refuses a stale can_manage_admins grant over a contributor once its issuer is no longer a super admin', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'contributor' });
+    const invite = await createInvite(boss, target.email, 'admin', true);
+    await observer`UPDATE auth_users SET role = 'admin', can_manage_admins = true WHERE id = ${boss.id}`;
+    await createSession(target.id);
+
+    expect(await redeem(sql, invite, 'staledelegation')).toMatchObject({
+      ok: false, reason: 'grant_exceeds_issuer', existingRole: 'contributor',
+    });
+    expect(await credentialsAt(target.email)).toMatchObject({
+      id: target.id, role: 'contributor', passwordHash: 'scrypt$test$dummy', totpSecret: 'JBSWY3DPEHPK3PXP',
+    });
+    expect((await readAccount(target.id)).canManageAdmins).toBe(false);
+    expect(await liveSessionCount(target.id)).toBe(1);
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+  });
+
+  it('refuses a free-address enrolment once the issuing manager loses the delegation', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const email = await reservedEmail();
+    const invite = await createInvite(manager, email);
+    await observer`UPDATE auth_users SET can_manage_admins = false WHERE id = ${manager.id}`;
+
+    expect(await redeem(sql, invite, 'nodelegation')).toMatchObject({
+      ok: false, reason: 'issuer_not_admin_manager', existingRole: null,
+    });
+    expect(await accountCountAt(email)).toBe(0);
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+  });
+
+  it('refuses enrolment over a contributor once the issuing manager is deactivated', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const target = await createAccount({ role: 'contributor' });
+    const invite = await createInvite(manager, target.email);
+    await observer`UPDATE auth_users SET disabled_at = now() WHERE id = ${manager.id}`;
+    await createSession(target.id);
+
+    expect(await redeem(sql, invite, 'deactivated')).toMatchObject({
+      ok: false, reason: 'issuer_deactivated', existingRole: 'contributor',
+    });
+    expect(await credentialsAt(target.email)).toMatchObject({ role: 'contributor', passwordHash: 'scrypt$test$dummy' });
+    expect(await liveSessionCount(target.id)).toBe(1);
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+  });
+
+  it('lets a current super admin\'s invite reset an existing admin', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'admin' });
+    const invite = await createInvite(boss, target.email);
+    await createSession(target.id);
+    await createSession(target.id);
+
+    expect(await redeem(sql, invite, 'reset')).toEqual({ ok: true, userId: target.id });
+    expect(await credentialsAt(target.email)).toMatchObject({
+      role: 'admin', passwordHash: 'scrypt$i270$reset', totpSecret: 'I270RESETSECRET', disabledAt: null,
+    });
+    expect(await liveSessionCount(target.id)).toBe(0);
+    expect((await inviteState(invite.id)).usedAt).toBeInstanceOf(Date);
+  });
+
+  it('holds the issuer row through an authorised reset, so a demotion waits for it', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'admin' });
+    const invite = await createInvite(boss, target.email);
+
+    // No gate: the demotion is held by the redemption's own issuer lock and
+    // finishes when that transaction ends, by commit or by rollback.
+    // withBackground awaits it on every path.
+    const result = await withBackground(async (bg) => sql1.begin(async (tx1) => {
+      const [{ pid: redeemerPid }] = await tx1<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      return redeemInviteInTransaction(tx1, {
+        invite, passwordHash: 'scrypt$i270$held', totpSecret: 'I270HELDSECRET', totpStep: 1,
+      }, {
+        afterLock: async () => {
+          const started = deferred<number>();
+          const demotion = bg.track(sql2.begin(async (tx2) => {
+            const [{ pid }] = await tx2<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+            started.resolve(pid);
+            await tx2`UPDATE auth_users SET role = 'admin' WHERE id = ${boss.id}`;
+          }));
+          demotion.then(
+            () => started.reject(new Error('the demotion ended before announcing itself')),
+            (error) => started.reject(error),
+          );
+          const demoterPid = await within(started.promise, READY_TIMEOUT_MS, 'the demotion to start');
+          await waitForBlock(redeemerPid, demoterPid);
+        },
+      });
+    }));
+
+    // The reset committed under the authority it read; the demotion applied after.
+    expect(result).toEqual({ ok: true, userId: target.id });
+    expect(await credentialsAt(target.email)).toMatchObject({ passwordHash: 'scrypt$i270$held' });
+    expect((await readAccount(boss.id)).role).toBe('admin');
+  });
+
+  it('times out, writing nothing, while another transaction holds the issuer row', async () => {
+    // A reset that would succeed (a current super admin's invite over an
+    // admin), so only the timeout stands between it and the target's
+    // credentials, sessions and the invite.
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'admin' });
+    const invite = await createInvite(boss, target.email);
+    await createSession(target.id);
+    const before = await credentialsAt(target.email);
+
+    const attempt = await withBackground(async (bg) => {
+      // The holder keeps the issuer row locked until this opens: after the
+      // redemption has settled, or -- on any failure path -- when
+      // withBackground releases it. It changes nothing and commits.
+      const gate = deferred<void>();
+      bg.onRelease(() => gate.resolve());
+      const locked = deferred<number>();
+      const holder = bg.track(sql2.begin(async (tx2) => {
+        const [{ pid }] = await tx2<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+        await tx2`SELECT id FROM auth_users WHERE id = ${boss.id} FOR UPDATE`;
+        locked.resolve(pid);
+        await gate.promise;
+      }));
+      holder.then(
+        () => locked.reject(new Error('the issuer-row holder ended before announcing its lock')),
+        (error) => locked.reject(error),
+      );
+      const holderPid = await within(locked.promise, READY_TIMEOUT_MS, 'the issuer-row lock');
+
+      // `bounded` has one connection, so this is the backend the redemption runs on.
+      const [{ pid: redeemerPid }] = await bounded<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      // Settled into a value, so a rejection is this case's evidence rather
+      // than a background failure withBackground would rethrow.
+      const settled = bg.track(redeem(bounded, invite, 'timedout').then(
+        (result) => ({ completed: true as const, result }),
+        (error: unknown) => ({ completed: false as const, error }),
+      ));
+      // Proven blocked on the holder, not failing for some other reason.
+      await waitForBlock(holderPid, redeemerPid);
+      // The server must cancel the read at the statement timeout; the
+      // client-side deadline only keeps a server that never does from hanging
+      // the case. Expiry throws here, so withBackground opens the gate and
+      // awaits every tracked promise, and the error fails the case.
+      const outcome = await within(
+        settled,
+        INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS + READY_TIMEOUT_MS,
+        `PostgreSQL to cancel the blocked redemption at its ${INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS} ms statement timeout`,
+      );
+      gate.resolve();
+      return outcome;
+    });
+
+    // The server cancelled the redemption's lock read at the bound.
+    if (attempt.completed) {
+      throw new Error(`the redemption completed while the issuer row was held: ${JSON.stringify(attempt.result)}`);
+    }
+    const error = attempt.error as { code?: string; message?: string };
+    expect(error.code).toBe('57014');
+    expect(error.message).toMatch(/statement timeout/);
+    // Rolled back as a whole: the target's credentials, its session and the
+    // invite are exactly as they were.
+    expect(await credentialsAt(target.email)).toEqual(before);
+    expect(await liveSessionCount(target.id)).toBe(1);
+    expect(await inviteState(invite.id)).toEqual(unconsumed);
+    // The holder committed without changing the issuer.
+    expect(await readAccount(boss.id)).toMatchObject({ role: 'super_admin', disabledAt: null });
+  });
+
+  it('completes a super admin\'s invite to their own address without deadlocking on itself', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const invite = await createInvite(boss, boss.email, 'super_admin');
+
+    expect(await redeem(sql, invite, 'self')).toEqual({ ok: true, userId: boss.id });
+    expect(await credentialsAt(boss.email)).toMatchObject({ role: 'super_admin', passwordHash: 'scrypt$i270$self' });
+  });
+
+  it('still lets a delegated manager\'s invite enrol over an existing contributor', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const target = await createAccount({ role: 'contributor' });
+    const invite = await createInvite(manager, target.email);
+
+    expect(await redeem(sql, invite, 'contrib')).toEqual({ ok: true, userId: target.id });
+    expect(await credentialsAt(target.email)).toMatchObject({ role: 'admin', passwordHash: 'scrypt$i270$contrib' });
+  });
+
+  it('still lets a delegated manager\'s invite enrol a free address', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const email = await reservedEmail();
+    const invite = await createInvite(manager, email);
+
+    const result = await redeem(sql, invite, 'newcomer');
+
+    expect(result).toMatchObject({ ok: true });
+    expect(await credentialsAt(email)).toMatchObject({ role: 'admin', passwordHash: 'scrypt$i270$newcomer' });
+    expect((await inviteState(invite.id)).usedAt).toBeInstanceOf(Date);
+  });
+
+  it('keeps refusing an account that outranks the invite, even from a super admin', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'super_admin' });
+    const invite = await createInvite(boss, target.email, 'admin');
+
+    expect(await redeem(sql, invite, 'demote')).toMatchObject({
+      ok: false, reason: 'outranked', existingRole: 'super_admin',
+    });
+    expect(await credentialsAt(target.email)).toMatchObject({ role: 'super_admin', passwordHash: 'scrypt$test$dummy' });
   });
 });

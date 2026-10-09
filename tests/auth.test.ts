@@ -41,6 +41,67 @@ const inviteRow = vi.hoisted(() => ({
   row: null as null | {
     id: number; email: string; role: 'contributor' | 'admin' | 'super_admin';
     canManageAdmins: boolean; pendingTotpSecret: string | null;
+    // AFLDB-ISSUE-270: the issuer, and the staged hash confirmEnrolment's
+    // second admin_invites read returns (this one row answers both reads).
+    invitedBy?: number; pendingPasswordHash?: string | null;
+  },
+}));
+/**
+ * The dedicated connection confirmEnrolment opens with the raw `postgres`
+ * package for its transaction (AFLDB-ISSUE-270). Every statement the
+ * redemption issues is captured; `locked` answers the issuer/target
+ * `FOR UPDATE` read, `upsertReturns` the guarded `INSERT ... ON CONFLICT`
+ * (empty = the conflict WHERE refused the row), `reread` the role read that
+ * follows such a refusal. What the database would DO with that WHERE is not
+ * provable here -- tests/integration/admin-lifecycle.test.ts proves it.
+ * `failOn`, when set, makes the first statement containing that fragment
+ * reject with `failWith` (a database failure mid-transaction).
+ * `connectionOptions` records the options each connection was opened with.
+ */
+type LockedAccountRow = {
+  id: number; email: string; role: 'contributor' | 'admin' | 'super_admin';
+  canManageAdmins: boolean; disabledAt: Date | null;
+};
+const redemptionDb = vi.hoisted(() => {
+  const state = {
+    queries: [] as CapturedQuery[],
+    locked: [] as LockedAccountRow[],
+    upsertReturns: [{ id: 77 }] as { id: number }[],
+    reread: [] as { role: string }[],
+    connections: 0,
+    connectionOptions: [] as unknown[],
+    failOn: null as string | null,
+    failWith: null as unknown,
+    reset() {
+      state.queries.length = 0;
+      state.locked = [];
+      state.upsertReturns = [{ id: 77 }];
+      state.reread = [];
+      state.connections = 0;
+      state.connectionOptions.length = 0;
+      state.failOn = null;
+      state.failWith = null;
+    },
+  };
+  return state;
+});
+vi.mock('postgres', () => ({
+  default: (_dsn: string, options?: unknown) => {
+    redemptionDb.connections += 1;
+    redemptionDb.connectionOptions.push(options);
+    const tx = (strings: TemplateStringsArray, ...values: unknown[]) => {
+      redemptionDb.queries.push({ strings: [...strings], values });
+      const text = strings.join('?');
+      if (redemptionDb.failOn && text.includes(redemptionDb.failOn)) return Promise.reject(redemptionDb.failWith);
+      if (text.includes('FOR UPDATE')) return Promise.resolve(redemptionDb.locked);
+      if (text.includes('INSERT INTO auth_users')) return Promise.resolve(redemptionDb.upsertReturns);
+      if (text.includes('SELECT role FROM auth_users')) return Promise.resolve(redemptionDb.reread);
+      return Promise.resolve([]);
+    };
+    return {
+      begin: async (body: (sql: typeof tx) => unknown) => body(tx),
+      end: async () => undefined,
+    };
   },
 }));
 vi.mock('@/db/authClient', () => {
@@ -86,6 +147,14 @@ import type postgres from 'postgres';
 
 import { createInvite } from '@/app/admin/admins/invite-actions';
 import { beginEnrolment, confirmEnrolment } from '@/app/admin/invite/[token]/actions';
+import {
+  INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS,
+  type InviteRedemptionRefusal,
+  issuerAuthorityRefusal,
+  issuerMayResetAdministrators,
+  overwritableRoles,
+  overwriteRefusal,
+} from '@/db/queries/admin-invites';
 import { adminNavFor, isCurrentAdminPath, type AdminNavViewer } from '@/app/admin/nav-model';
 import {
   LIFECYCLE_ACTIONS,
@@ -114,6 +183,8 @@ import {
 import { BACKSPACE, DELETE, applyEditing, takeLine } from '@/lib/auth/line-input';
 import { signClaim, verifyClaim, type AccessClaim } from '@/lib/auth/tokens';
 import { CsvError, parseCsv, toObjects } from '@/lib/ingest/csv';
+
+import { totpCode } from './admin-nav/totp';
 
 describe('password hashing', () => {
   it('round-trips and rejects a wrong password', async () => {
@@ -857,17 +928,543 @@ describe('the retired contributor role cannot be granted through an invite (AFLD
     const form = new FormData();
     form.set('token', 'irrelevant-token');
     form.set('totp', '123456');
+    redemptionDb.reset();
 
     const result = await confirmEnrolment({ step: 'confirm' }, form);
 
     expect(result.error).toMatch(/retired/i);
     expect(result.step).toBe('password');
     // Never reached the transaction that would create/overwrite the
-    // auth_users row -- proven by there being no INSERT for it, rather
-    // than by mocking the raw `postgres` package this module opens its
-    // own connection with.
+    // auth_users row: no INSERT for it on the pool, and the dedicated
+    // connection the transaction runs on (the mocked raw `postgres`
+    // package, AFLDB-ISSUE-270) was never even opened.
     const insertedUser = poolQueries.find((q) => q.strings.join('').includes('INSERT INTO auth_users'));
     expect(insertedUser).toBeUndefined();
+    expect(redemptionDb.connections).toBe(0);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-270: accepting an invite is a credential reset of any account
+ * already at the address, so who may do it is decided at the account write,
+ * against the stored invite's issuer as that issuer stands now. Since the
+ * operator's D-270-2 the issuer's current authority to grant the invite is
+ * required for every redemption, free addresses and contributors included.
+ *
+ * These drive the real confirmEnrolment and the real redemption body
+ * (src/db/queries/admin-invites.ts) against the captured transaction
+ * above. They prove the decisions, the statements and the absence of
+ * success side effects; that PostgreSQL enforces the upsert's conflict
+ * WHERE against a row created concurrently is proven only by the
+ * integration half (tests/integration/admin-lifecycle.test.ts).
+ */
+describe('invite redemption is authorised at the account write (AFLDB-ISSUE-270)', () => {
+  const SECRET = 'JBSWY3DPEHPK3PXP';
+  const PENDING_HASH = 'scrypt$i270$pending-password-hash';
+  const TOKEN = 'i270-raw-invite-token';
+  const INVITE_ID = 41;
+  const ISSUER_ID = 3;
+  const TARGET_ID = 8;
+  const TARGET_EMAIL = 'peer@example.test';
+  const previousDsn = process.env.AFLDB_AUTH_DATABASE_URL;
+  let address = 0;
+
+  type Outcome = { state: Awaited<ReturnType<typeof confirmEnrolment>> | null; redirectedTo: string | null };
+
+  beforeEach(() => {
+    // Never connected to: the `postgres` package is mocked above.
+    process.env.AFLDB_AUTH_DATABASE_URL = 'postgres://unit.invalid/afldb_unit_never_connected';
+    // CONFIRM_LIMIT counts every attempt per address; a fresh one per test
+    // keeps this suite off the shared 'ip:unknown' budget.
+    address += 1;
+    requestHeaders.forwardedFor = `198.51.100.${address}`;
+    poolQueries.length = 0;
+    redemptionDb.reset();
+  });
+
+  afterEach(() => {
+    inviteRow.row = null;
+    requestHeaders.forwardedFor = null;
+    if (previousDsn === undefined) delete process.env.AFLDB_AUTH_DATABASE_URL;
+    else process.env.AFLDB_AUTH_DATABASE_URL = previousDsn;
+    poolQueries.length = 0;
+    redemptionDb.reset();
+  });
+
+  function stageInvite(over: { role?: 'admin' | 'super_admin'; canManageAdmins?: boolean } = {}): void {
+    inviteRow.row = {
+      id: INVITE_ID, email: TARGET_EMAIL, role: over.role ?? 'admin',
+      canManageAdmins: over.canManageAdmins ?? false,
+      pendingTotpSecret: SECRET, pendingPasswordHash: PENDING_HASH, invitedBy: ISSUER_ID,
+    };
+  }
+
+  const account = (
+    id: number, email: string, role: LockedAccountRow['role'],
+    over: { canManageAdmins?: boolean; disabledAt?: Date | null } = {},
+  ): LockedAccountRow => ({
+    id, email, role, canManageAdmins: over.canManageAdmins ?? false, disabledAt: over.disabledAt ?? null,
+  });
+  const DEACTIVATED = new Date('2026-10-01T00:00:00Z');
+  /** An enabled admin holding can_manage_admins: may grant an ordinary admin, nothing more. */
+  const delegatedIssuer = () => account(ISSUER_ID, 'manager@example.test', 'admin', { canManageAdmins: true });
+  const superIssuer = () => account(ISSUER_ID, 'boss@example.test', 'super_admin');
+
+  async function redeem(extra: Record<string, string> = {}): Promise<Outcome> {
+    const form = new FormData();
+    form.set('token', TOKEN);
+    form.set('totp', totpCode(SECRET));
+    for (const [key, value] of Object.entries(extra)) form.set(key, value);
+    try {
+      return { state: await confirmEnrolment({ step: 'confirm' }, form), redirectedTo: null };
+    } catch (error) {
+      const redirected = /^NEXT_REDIRECT (.+)$/.exec((error as Error).message);
+      if (redirected) return { state: null, redirectedTo: redirected[1] };
+      throw error;
+    }
+  }
+
+  const txStatement = (fragment: string) => redemptionDb.queries.find((q) => q.strings.join('?').includes(fragment));
+  const auditRows = () => poolQueries.filter((q) => q.strings.join('').includes('INSERT INTO auth_audit_log'));
+  const auditActions = () => auditRows().map((q) => q.values[2]);
+  const auditDetail = (action: string) => (
+    auditRows().find((q) => q.values[2] === action)?.values[3] as { value: Record<string, unknown> } | undefined
+  )?.value;
+  /** The role list bound into the upsert's `ON CONFLICT ... WHERE`. */
+  const boundOverwritableRoles = () => txStatement('INSERT INTO auth_users')?.values.find(Array.isArray);
+
+  function expectRefusedWithNoSuccessEffects(
+    outcome: Outcome,
+    reason: InviteRedemptionRefusal,
+    existingRole: LockedAccountRow['role'] | null,
+  ): Record<string, unknown> {
+    expect(outcome.redirectedTo, 'a refusal must never redirect as a success').toBeNull();
+    expect(outcome.state?.step).toBe('confirm');
+    expect(outcome.state?.error).toMatch(/cannot be used/);
+    // No session revoked, invite not consumed (its pending credentials
+    // untouched), and nothing on the pool either.
+    expect(txStatement('UPDATE auth_sessions')).toBeUndefined();
+    expect(txStatement('UPDATE admin_invites')).toBeUndefined();
+    expect(poolQueries.find((q) => /UPDATE (auth_sessions|admin_invites|auth_users)/.test(q.strings.join('')))).toBeUndefined();
+    expect(auditActions()).toEqual(['admin.invite_rejected']);
+    const detail = auditDetail('admin.invite_rejected')!;
+    expect(detail).toMatchObject({
+      email: TARGET_EMAIL, reason, existingRole, inviteId: INVITE_ID, invitedBy: ISSUER_ID,
+    });
+    const serialised = JSON.stringify(detail);
+    for (const secret of [PENDING_HASH, SECRET, TOKEN, sha256Hex(TOKEN)]) {
+      expect(serialised).not.toContain(secret);
+    }
+    return detail;
+  }
+
+  function expectEnrolled(outcome: Outcome, userId = 77): void {
+    expect(outcome.redirectedTo).toBe('/admin/login');
+    expect(txStatement('UPDATE auth_sessions')?.values).toEqual([userId]);
+    expect(txStatement('UPDATE admin_invites')?.values).toEqual([INVITE_ID]);
+    expect(auditActions()).toEqual(['admin.invite_accepted']);
+  }
+
+  it('locks the stored issuer and the target together, in id order, before any write', async () => {
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer()];
+
+    // A forged field naming a super admin is ignored: the issuer is the
+    // invite row's invited_by, never anything the browser sends.
+    await redeem({ invitedBy: '1', inviter: '1' });
+
+    const lock = redemptionDb.queries[0];
+    const text = lock.strings.join('?');
+    expect(text).toMatch(/WHERE id = \? OR email = \?/);
+    expect(text).toMatch(/ORDER BY id\s+FOR UPDATE/);
+    // Every issuer field the authority rule reads comes from this locked row.
+    expect(text).toMatch(/role, can_manage_admins AS "canManageAdmins",\s+disabled_at AS "disabledAt"/);
+    expect(lock.values).toEqual([ISSUER_ID, TARGET_EMAIL]);
+    expect(redemptionDb.queries.flatMap((q) => q.values)).not.toContain('1');
+  });
+
+  it('refuses a delegated manager\'s invite against an existing admin, writing nothing', async () => {
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer(), account(TARGET_ID, TARGET_EMAIL, 'admin')];
+
+    const outcome = await redeem();
+
+    const detail = expectRefusedWithNoSuccessEffects(outcome, 'target_requires_super_admin', 'admin');
+    expect(detail).toMatchObject({ issuerRole: 'admin', issuerActive: true });
+    expect(outcome.state?.error).toMatch(/current super admin/);
+    // Refused before the upsert: no credential write was even attempted.
+    expect(txStatement('INSERT INTO auth_users')).toBeUndefined();
+  });
+
+  it('a spare invite cannot overwrite the admin its sibling invite created', async () => {
+    // I1: the address is free, so the delegated manager's invite enrols it.
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer()];
+    expectEnrolled(await redeem());
+
+    // I2, same issuer and address, after I1 made it an admin account.
+    poolQueries.length = 0;
+    redemptionDb.reset();
+    requestHeaders.forwardedFor = '198.51.100.250';
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer(), account(77, TARGET_EMAIL, 'admin')];
+
+    const outcome = await redeem();
+
+    expectRefusedWithNoSuccessEffects(outcome, 'target_requires_super_admin', 'admin');
+    expect(txStatement('INSERT INTO auth_users')).toBeUndefined();
+  });
+
+  it('refuses when the target was a contributor at issuance and has since been promoted', async () => {
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer(), account(TARGET_ID, TARGET_EMAIL, 'admin')];
+
+    expectRefusedWithNoSuccessEffects(await redeem(), 'target_requires_super_admin', 'admin');
+  });
+
+  it('guards the upsert itself, so a target created after the lock read is refused', async () => {
+    // The lock read found no account; a concurrent writer then created one
+    // as an admin. The upsert's conflict WHERE refuses it (no row back),
+    // and the role read that follows names the refusal.
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer()];
+    redemptionDb.upsertReturns = [];
+    redemptionDb.reread = [{ role: 'admin' }];
+
+    const outcome = await redeem();
+
+    const upsert = txStatement('INSERT INTO auth_users')!.strings.join('?');
+    expect(upsert).toMatch(/ON CONFLICT \(email\) DO UPDATE/);
+    expect(upsert).toMatch(/WHERE auth_users\.role = ANY\(\?::text\[\]\)\s+RETURNING id/);
+    expect(boundOverwritableRoles()).toEqual(['contributor']);
+    expectRefusedWithNoSuccessEffects(outcome, 'target_requires_super_admin', 'admin');
+  });
+
+  it('lets a current super admin\'s invite reset an existing admin', async () => {
+    stageInvite();
+    redemptionDb.locked = [superIssuer(), account(TARGET_ID, TARGET_EMAIL, 'admin')];
+    redemptionDb.upsertReturns = [{ id: TARGET_ID }];
+
+    const outcome = await redeem();
+
+    expect(boundOverwritableRoles()).toEqual(['contributor', 'admin']);
+    expectEnrolled(outcome, TARGET_ID);
+  });
+
+  it('does not let a super admin demoted since issuance reset a peer', async () => {
+    stageInvite({ role: 'super_admin' });
+    redemptionDb.locked = [
+      account(ISSUER_ID, 'former-boss@example.test', 'admin'),
+      account(TARGET_ID, TARGET_EMAIL, 'admin'),
+    ];
+
+    const outcome = await redeem();
+
+    // D-270-2: the demoted issuer authorises nothing, so the authority
+    // refusal is reached before the target rule is even asked.
+    const detail = expectRefusedWithNoSuccessEffects(outcome, 'issuer_not_admin_manager', 'admin');
+    expect(detail).toMatchObject({
+      role: 'super_admin', issuerRole: 'admin', issuerActive: true, issuerCanManageAdmins: false,
+    });
+    expect(outcome.state?.error).toMatch(/no longer has the authority/);
+    expect(txStatement('INSERT INTO auth_users')).toBeUndefined();
+  });
+
+  it('does not let a deactivated super admin reset a peer either', async () => {
+    stageInvite({ role: 'super_admin' });
+    redemptionDb.locked = [
+      account(ISSUER_ID, 'gone-boss@example.test', 'super_admin', { disabledAt: DEACTIVATED }),
+      account(TARGET_ID, TARGET_EMAIL, 'super_admin'),
+    ];
+
+    const detail = expectRefusedWithNoSuccessEffects(await redeem(), 'issuer_deactivated', 'super_admin');
+    expect(detail).toMatchObject({ issuerRole: 'super_admin', issuerActive: false });
+    expect(txStatement('INSERT INTO auth_users')).toBeUndefined();
+  });
+
+  it('still lets a delegated manager\'s invite enrol over an existing contributor', async () => {
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer(), account(TARGET_ID, TARGET_EMAIL, 'contributor')];
+    redemptionDb.upsertReturns = [{ id: TARGET_ID }];
+
+    const outcome = await redeem();
+
+    expect(boundOverwritableRoles()).toEqual(['contributor']);
+    expectEnrolled(outcome, TARGET_ID);
+  });
+
+  it('still lets a delegated manager\'s invite enrol a free address', async () => {
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer()];
+
+    const outcome = await redeem();
+
+    const insert = txStatement('INSERT INTO auth_users')!;
+    expect(insert.values).toEqual(expect.arrayContaining([TARGET_EMAIL, 'admin', PENDING_HASH, SECRET]));
+    expectEnrolled(outcome);
+  });
+
+  it('keeps refusing an account that outranks the invite, whoever issued it', async () => {
+    stageInvite({ role: 'admin' });
+    redemptionDb.locked = [superIssuer(), account(TARGET_ID, TARGET_EMAIL, 'super_admin')];
+
+    const outcome = await redeem();
+
+    expectRefusedWithNoSuccessEffects(outcome, 'outranked', 'super_admin');
+    expect(outcome.state?.error).toMatch(/already holds a higher role/);
+    expect(txStatement('INSERT INTO auth_users')).toBeUndefined();
+  });
+
+  /*
+   * D-270-2 (operator decision, 2026-10-09): the issuer's CURRENT authority
+   * is required for every redemption, not only for an overwrite of an
+   * administrator. Each scenario runs at a free address and over an existing
+   * contributor -- the two targets the target rule alone would have let
+   * through -- and must refuse before any write.
+   */
+  type IssuerScenario = {
+    name: string;
+    issuer: LockedAccountRow | null;
+    invite: { role: 'admin' | 'super_admin'; canManageAdmins: boolean };
+    reason: InviteRedemptionRefusal;
+  };
+  const LOST_AUTHORITY: IssuerScenario[] = [
+    {
+      name: 'a manager whose delegation was removed',
+      issuer: account(ISSUER_ID, 'ex-manager@example.test', 'admin'),
+      invite: { role: 'admin', canManageAdmins: false },
+      reason: 'issuer_not_admin_manager',
+    },
+    {
+      name: 'a deactivated delegated manager',
+      issuer: account(ISSUER_ID, 'gone-manager@example.test', 'admin', { canManageAdmins: true, disabledAt: DEACTIVATED }),
+      invite: { role: 'admin', canManageAdmins: false },
+      reason: 'issuer_deactivated',
+    },
+    {
+      name: 'a super admin since demoted (demotion clears the delegation)',
+      issuer: account(ISSUER_ID, 'former-boss@example.test', 'admin'),
+      invite: { role: 'super_admin', canManageAdmins: true },
+      reason: 'issuer_not_admin_manager',
+    },
+    {
+      name: 'a deactivated super admin',
+      issuer: account(ISSUER_ID, 'gone-boss@example.test', 'super_admin', { disabledAt: DEACTIVATED }),
+      invite: { role: 'admin', canManageAdmins: false },
+      reason: 'issuer_deactivated',
+    },
+    {
+      name: 'an issuer now a contributor, even one carrying the delegation flag',
+      issuer: account(ISSUER_ID, 'now-contributor@example.test', 'contributor', { canManageAdmins: true }),
+      invite: { role: 'admin', canManageAdmins: false },
+      reason: 'issuer_not_admin_manager',
+    },
+    {
+      name: 'an issuer with no account row',
+      issuer: null,
+      invite: { role: 'admin', canManageAdmins: false },
+      reason: 'issuer_missing',
+    },
+    {
+      name: 'a stale super_admin grant from a now-delegated admin',
+      issuer: account(ISSUER_ID, 'demoted-delegate@example.test', 'admin', { canManageAdmins: true }),
+      invite: { role: 'super_admin', canManageAdmins: false },
+      reason: 'grant_exceeds_issuer',
+    },
+    {
+      name: 'a stale can_manage_admins grant from a now-delegated admin',
+      issuer: account(ISSUER_ID, 'demoted-delegate@example.test', 'admin', { canManageAdmins: true }),
+      invite: { role: 'admin', canManageAdmins: true },
+      reason: 'grant_exceeds_issuer',
+    },
+  ];
+  const TARGETS = [
+    { target: 'a free address', existing: null },
+    { target: 'an existing contributor', existing: 'contributor' as const },
+  ];
+  const LOST_AUTHORITY_CASES = LOST_AUTHORITY.flatMap((scenario) => TARGETS.map((t) => ({ ...scenario, ...t })));
+
+  it.each(LOST_AUTHORITY_CASES)(
+    'refuses $name at $target, writing nothing ($reason)',
+    async ({ issuer, invite, reason, existing }) => {
+      stageInvite(invite);
+      redemptionDb.locked = [
+        ...(issuer ? [issuer] : []),
+        ...(existing ? [account(TARGET_ID, TARGET_EMAIL, existing)] : []),
+      ];
+
+      const outcome = await redeem();
+
+      const detail = expectRefusedWithNoSuccessEffects(outcome, reason, existing);
+      expect(detail).toMatchObject({
+        role: invite.role,
+        canManageAdmins: invite.canManageAdmins,
+        issuerRole: issuer?.role ?? null,
+        issuerActive: issuer ? issuer.disabledAt === null : null,
+        issuerCanManageAdmins: issuer?.canManageAdmins ?? null,
+      });
+      expect(outcome.state?.error).toMatch(/no longer has the authority/);
+      // Refused under the lock: no account write was even attempted.
+      expect(txStatement('INSERT INTO auth_users')).toBeUndefined();
+    },
+  );
+
+  it.each(TARGETS)('lets a current super admin grant super_admin with the delegation at $target', async ({ existing }) => {
+    stageInvite({ role: 'super_admin', canManageAdmins: true });
+    redemptionDb.locked = [superIssuer(), ...(existing ? [account(TARGET_ID, TARGET_EMAIL, existing)] : [])];
+    const userId = existing ? TARGET_ID : 77;
+    redemptionDb.upsertReturns = [{ id: userId }];
+
+    const outcome = await redeem();
+
+    const insert = txStatement('INSERT INTO auth_users')!;
+    expect(insert.values).toEqual(expect.arrayContaining([TARGET_EMAIL, 'super_admin', PENDING_HASH, SECRET, true]));
+    expect(boundOverwritableRoles()).toEqual(['contributor', 'admin', 'super_admin']);
+    expectEnrolled(outcome, userId);
+  });
+
+  it('never reports a database failure as an enrolment, and logs no bound parameter', async () => {
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer()];
+    // What postgres.js raises: the SQLSTATE, plus the statement and its bound
+    // values (here the pending hash and TOTP secret) on the error object.
+    redemptionDb.failOn = 'INSERT INTO auth_users';
+    redemptionDb.failWith = Object.assign(new Error('deadlock detected'), {
+      code: '40P01',
+      query: 'INSERT INTO auth_users ...',
+      parameters: [TARGET_EMAIL, 'admin', PENDING_HASH, SECRET, false],
+    });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const outcome = await redeem();
+
+      expect(outcome.redirectedTo, 'a failure must never redirect as a success').toBeNull();
+      expect(outcome.state?.step).toBe('confirm');
+      expect(outcome.state?.error).toMatch(/server error/);
+      expect(txStatement('UPDATE auth_sessions')).toBeUndefined();
+      expect(txStatement('UPDATE admin_invites')).toBeUndefined();
+      expect(auditActions()).not.toContain('admin.invite_accepted');
+      const printed = JSON.stringify(logged.mock.calls);
+      expect(printed).toContain('40P01');
+      for (const secret of [PENDING_HASH, SECRET, TOKEN, sha256Hex(TOKEN)]) {
+        expect(printed).not.toContain(secret);
+        expect(JSON.stringify(outcome.state)).not.toContain(secret);
+      }
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('bounds the dedicated connection, and treats a statement timeout as a failure, not an enrolment', async () => {
+    stageInvite();
+    redemptionDb.locked = [superIssuer(), account(TARGET_ID, TARGET_EMAIL, 'admin')];
+    // What the server raises when the lock read waits past statement_timeout
+    // behind another transaction's lock on the issuer row; postgres.js
+    // attaches the statement and its bound values to the error.
+    redemptionDb.failOn = 'FOR UPDATE';
+    redemptionDb.failWith = Object.assign(new Error('canceling statement due to statement timeout'), {
+      code: '57014',
+      query: 'SELECT ... FOR UPDATE',
+      parameters: [ISSUER_ID, TARGET_EMAIL],
+    });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const outcome = await redeem();
+
+      // The one dedicated connection carries the same bound as authClient.ts.
+      expect(INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS).toBe(5000);
+      expect(redemptionDb.connectionOptions).toHaveLength(1);
+      expect(redemptionDb.connectionOptions[0]).toMatchObject({
+        max: 1,
+        connection: { statement_timeout: INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS },
+      });
+      expect(outcome.redirectedTo, 'a timeout must never redirect as a success').toBeNull();
+      expect(outcome.state?.step).toBe('confirm');
+      expect(outcome.state?.error).toMatch(/server error/);
+      // Cancelled at the lock read: nothing after it ran, and no audit at all.
+      expect(txStatement('INSERT INTO auth_users')).toBeUndefined();
+      expect(txStatement('UPDATE auth_sessions')).toBeUndefined();
+      expect(txStatement('UPDATE admin_invites')).toBeUndefined();
+      expect(auditActions()).toEqual([]);
+      const printed = JSON.stringify(logged.mock.calls);
+      expect(printed).toContain('57014');
+      for (const secret of [PENDING_HASH, SECRET, TOKEN, sha256Hex(TOKEN)]) {
+        expect(printed).not.toContain(secret);
+        expect(JSON.stringify(outcome.state)).not.toContain(secret);
+      }
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('treats a refused row that cannot then be read back as a failure, not an enrolment', async () => {
+    stageInvite();
+    redemptionDb.locked = [delegatedIssuer()];
+    redemptionDb.upsertReturns = [];
+    redemptionDb.reread = [];
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const outcome = await redeem();
+
+      expect(outcome.redirectedTo).toBeNull();
+      expect(outcome.state?.error).toMatch(/server error/);
+      expect(txStatement('UPDATE admin_invites')).toBeUndefined();
+      expect(auditActions()).not.toContain('admin.invite_accepted');
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('decides issuer authority by the capability policy and the createInvite grant line', () => {
+    const issuer = (
+      role: LockedAccountRow['role'], canManageAdmins: boolean, disabledAt: Date | null = null,
+    ) => ({ role, canManageAdmins, disabledAt });
+    const plainAdmin = { role: 'admin', canManageAdmins: false } as const;
+    const superWithDelegation = { role: 'super_admin', canManageAdmins: true } as const;
+
+    expect(issuerAuthorityRefusal(issuer('super_admin', false), superWithDelegation)).toBeNull();
+    expect(issuerAuthorityRefusal(issuer('admin', true), plainAdmin)).toBeNull();
+    expect(issuerAuthorityRefusal(issuer('admin', true), { role: 'super_admin', canManageAdmins: false }))
+      .toBe('grant_exceeds_issuer');
+    expect(issuerAuthorityRefusal(issuer('admin', true), { role: 'admin', canManageAdmins: true }))
+      .toBe('grant_exceeds_issuer');
+    expect(issuerAuthorityRefusal(issuer('admin', false), plainAdmin)).toBe('issuer_not_admin_manager');
+    expect(issuerAuthorityRefusal(issuer('contributor', true), plainAdmin)).toBe('issuer_not_admin_manager');
+    expect(issuerAuthorityRefusal(issuer('super_admin', false, DEACTIVATED), plainAdmin)).toBe('issuer_deactivated');
+    expect(issuerAuthorityRefusal(issuer('admin', true, DEACTIVATED), plainAdmin)).toBe('issuer_deactivated');
+    expect(issuerAuthorityRefusal(null, plainAdmin)).toBe('issuer_missing');
+
+    // "May manage admins" is exactly the capability policy's answer for an enabled issuer.
+    for (const role of ['contributor', 'admin', 'super_admin'] as const) {
+      for (const canManageAdmins of [false, true]) {
+        expect(issuerAuthorityRefusal(issuer(role, canManageAdmins), plainAdmin) === null)
+          .toBe(hasCapability({ role, canManageAdmins }, 'people.admins.manage'));
+      }
+    }
+  });
+
+  it('decides every target/issuer pair by one rule, which the upsert guard mirrors', () => {
+    expect(issuerMayResetAdministrators({ role: 'super_admin', canManageAdmins: false, disabledAt: null })).toBe(true);
+    expect(issuerMayResetAdministrators({ role: 'super_admin', canManageAdmins: false, disabledAt: new Date() })).toBe(false);
+    expect(issuerMayResetAdministrators({ role: 'admin', canManageAdmins: true, disabledAt: null })).toBe(false);
+    expect(issuerMayResetAdministrators(null)).toBe(false);
+
+    const roles = ['contributor', 'admin', 'super_admin'] as const;
+    for (const inviteRole of ['admin', 'super_admin'] as const) {
+      for (const mayReset of [false, true]) {
+        for (const existing of roles) {
+          const refusal = overwriteRefusal(existing, inviteRole, mayReset);
+          expect(overwritableRoles(inviteRole, mayReset).includes(existing)).toBe(refusal === null);
+        }
+      }
+    }
+    // The ladder, spelled out.
+    expect(overwriteRefusal('contributor', 'admin', false)).toBeNull();
+    expect(overwriteRefusal('admin', 'admin', false)).toBe('target_requires_super_admin');
+    expect(overwriteRefusal('admin', 'admin', true)).toBeNull();
+    expect(overwriteRefusal('super_admin', 'admin', true)).toBe('outranked');
+    expect(overwriteRefusal('super_admin', 'super_admin', false)).toBe('target_requires_super_admin');
+    expect(overwriteRefusal('super_admin', 'super_admin', true)).toBeNull();
   });
 });
 

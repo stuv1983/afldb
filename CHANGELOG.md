@@ -15,6 +15,51 @@ commit.
 
 ## [Unreleased]
 
+### Accepting an admin invite can no longer overwrite a peer administrator's credentials, and needs the issuer's current authority (AFLDB-ISSUE-270; implemented, revised for D-270-2 and for the independent review; validated on afldb_test as the test owner, uncommitted, not deployed; issue open) - 9 October 2026
+
+- Accepting an invite upserts on email, so an invite for an address that already has an account resets its password,
+  authenticator, role and delegation and signs it out everywhere. Until now the only redemption-time check was that the
+  account did not outrank the invite, so a delegated admin manager could use a spare invite (or one issued before the
+  address became an administrator) to take over a peer admin. `confirmEnrolment` now decides at the account write itself
+  (`src/db/queries/admin-invites.ts`): an existing `admin` or `super_admin` is overwritten only when the invite's stored
+  issuer (`admin_invites.invited_by`) is, at that moment, an enabled `super_admin`. A super admin demoted or deactivated
+  since issuing the invite keeps no reset power through it.
+- Every redemption now also requires the issuer's **current** authority to grant what the invite grants (operator
+  decision D-270-2), including enrolment at a free address or over a contributor: an enabled super admin may grant
+  `admin` or `super_admin` and the manage-admins delegation; an enabled admin holding the delegation may grant an
+  ordinary admin only; a missing or deactivated issuer, a contributor, or an admin without the delegation authorises
+  nothing. So an outstanding invite stops working once its issuer loses that authority (it is refused and audited when
+  used; nothing is revoked in bulk).
+- The rules are read from the issuer's row locked inside the transaction, and the target rule also holds against an
+  account created concurrently, after the transaction's first read found the address free: the upsert's
+  `ON CONFLICT (email) DO UPDATE … WHERE` re-applies it to the conflicting row under PostgreSQL's own row lock, with no
+  advisory lock that other account writers would have to honour. The issuer's row stays locked until the transaction
+  ends, so its authority cannot change part-way through a redemption.
+- A refusal writes nothing (no account is created; an existing account's credentials, role, delegation, enabled state
+  and sessions are unchanged; the invite stays unused) and is audited as `admin.invite_rejected` with a `reason`
+  (`issuer_missing`, `issuer_deactivated`, `issuer_not_admin_manager`, `grant_exceeds_issuer`, `outranked` or
+  `target_requires_super_admin`), the invite id, the issuer's id and the issuer's current role, enabled state and
+  delegation; no credential or token is recorded. The existing refusal of an account that outranks the invite is
+  unchanged. A database failure during redemption is shown as a server error, never as a completed enrolment, and its
+  log line carries only the SQLSTATE.
+- The redemption's own connection now bounds every statement at 5 seconds, as the pooled auth connections already do.
+  A redemption stuck behind another transaction's lock on the issuer's or target's account is cancelled and rolled back
+  (no account, session or invite change, no `admin.invite_accepted`) and shown as the same generic server error.
+- Unchanged: a delegated manager with current authority still enrols a free address or an existing contributor as an
+  ordinary admin; a current super admin's invite still resets an existing administrator. No migration, index or invite
+  revocation was added (D-270-1 remains undecided).
+- Validation (operator, 9 October 2026): `tests/auth.test.ts` 199/199 at 19:59:08 AEDT, with TypeScript, four-file ESLint
+  and `git diff --check` passing, and repeated after the final integration-harness deadline correction (a test-harness
+  change only; no production code or auth-unit test changed). The whole `tests/integration/admin-lifecycle.test.ts`
+  passed 37/37, none skipped, from 20:57:05 AEDT (41.75 s) on `afldb_test` as `afldb_owner` through tunnel port 55432,
+  covering all 16 ISSUE-270 cases, the issuer-lock statement timeout, concurrent account creation and both existing
+  concurrent lifecycle cases, with no hook or cleanup errors. A read-only check afterwards found no leftover i270 or i155
+  users or invites (those address patterns and those two tables only). Not covered: the restricted `afldb_auth` role,
+  Server Action end-to-end against a real database, and any DEV or PROD deployment or acceptance; no historical misuse
+  was searched for and nothing was repaired. Commit, merge, deployment and acceptance remain outstanding; after DEV
+  acceptance the issue stays open for PROD installation and any applicable PROD acceptance, behind the unchanged
+  ISSUE-265 hold.
+
 ### The `match_attendance` CSV dataset refuses a blank attendance cell instead of promoting a zero crowd (AFLDB-ISSUE-268; validated on afldb_test, DEV and PROD censuses complete; committed `5659f789`, merged, deployed to DEV only; PROD not installed; issue open) - 9 October 2026
 
 - A blank `attendance` cell in a `match_attendance` upload used to read as `Number('') = 0`: the row validated `ok`, stayed

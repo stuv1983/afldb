@@ -7,11 +7,17 @@ import QRCode from 'qrcode';
 
 import { authSql } from '@/db/authClient';
 import {
+  INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS,
+  type InviteRedemptionRefusal,
+  type InviteRedemptionResult,
+  redeemInviteInTransaction,
+} from '@/db/queries/admin-invites';
+import {
   MIN_PASSWORD_LENGTH,
   generateTotpSecret, hashPassword, sha256Hex, totpUri, verifyTotpStep,
 } from '@/lib/auth/crypto';
 import { RateLimiter } from '@/lib/auth/rate-limit';
-import { ROLE_RANK, type AdminUser, audit, requestIp } from '@/lib/auth/session';
+import { audit, requestIp } from '@/lib/auth/session';
 
 export type InviteAcceptState = {
   error?: string;
@@ -31,12 +37,31 @@ type InviteRow = {
   role: 'admin' | 'super_admin' | 'contributor';
   canManageAdmins: boolean;
   pendingTotpSecret: string | null;
+  /** The issuer, from the stored row; confirmEnrolment judges an overwrite by it (ISSUE-270). */
+  invitedBy: number;
 };
+
+/** What the invitee is told when redemption refuses (AFLDB-ISSUE-270); the audit row carries the exact reason. */
+function refusalMessage(reason: InviteRedemptionRefusal): string {
+  switch (reason) {
+    case 'outranked':
+      return 'This invite cannot be used: the account for this address already holds a higher role. '
+        + 'Ask a super admin to sort it out.';
+    case 'target_requires_super_admin':
+      return 'This invite cannot be used: the address already belongs to an administrator, and only '
+        + 'an invite from a current super admin can reset it. Ask a super admin to sort it out.';
+    default:
+      // issuer_missing, issuer_deactivated, issuer_not_admin_manager,
+      // grant_exceeds_issuer: the same whether or not the address has an account.
+      return 'This invite cannot be used: the administrator who issued it no longer has the authority '
+        + 'to grant this access. Ask a current admin manager or super admin for a new invite.';
+  }
+}
 
 async function loadLiveInvite(token: string): Promise<InviteRow | null> {
   const [row] = await authSql<InviteRow[]>`
     SELECT id, email, role, can_manage_admins AS "canManageAdmins",
-           pending_totp_secret AS "pendingTotpSecret"
+           pending_totp_secret AS "pendingTotpSecret", invited_by AS "invitedBy"
       FROM admin_invites
      WHERE token_hash = ${sha256Hex(token)}
        AND used_at IS NULL AND revoked_at IS NULL AND expires_at > now()
@@ -140,70 +165,76 @@ export async function confirmEnrolment(
   // `authSql` proxy exists for one-shot queries, not for `.begin()`.
   const dsn = process.env.AFLDB_AUTH_DATABASE_URL;
   if (!dsn) return { step: 'confirm', error: 'Server is not configured (AFLDB_AUTH_DATABASE_URL).' };
-  const tx = postgres(dsn, { max: 1, onnotice: () => {} });
-  // Set inside the transaction; read after it. A plain `let` would be
-  // narrowed to null by the compiler, which cannot see the closure write.
-  const outranked: { role: AdminUser['role'] | null } = { role: null };
+  // Every statement is bounded as the pooled auth connections are
+  // (src/db/authClient.ts): a redemption stuck behind another transaction's
+  // lock on the issuer or target row is cancelled, rolls back and lands in
+  // the generic failure below, rather than holding this request open.
+  const tx = postgres(dsn, {
+    max: 1,
+    onnotice: () => {},
+    connection: { statement_timeout: INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS },
+  });
+  // The upsert overwrites any account already at this email -- role,
+  // password and TOTP secret -- so who may do that is decided inside the
+  // transaction, at the write, against the account and the issuer as they
+  // stand now (AFLDB-ISSUE-270; src/db/queries/admin-invites.ts). The issuer
+  // must still hold the authority to grant what the invite grants (D-270-2),
+  // an invite is never the way someone is demoted, and only a current super
+  // admin's invite resets an existing administrator.
+  const passwordHash = pending.pendingPasswordHash;
+  const totpSecret = pending.pendingTotpSecret;
+  let result: InviteRedemptionResult | null = null;
+  let failureCode: string | null = null;
   try {
-    await tx.begin(async (t) => {
-      // The upsert below overwrites any account that already holds this
-      // email -- role, password and TOTP secret. Refuse when that account
-      // outranks what the invite grants, so an invite can never be the way
-      // someone is demoted: not when it was aimed at them deliberately, and
-      // not when they were promoted in the days since it was issued.
-      // createInvite blocks the first case at source; this is the check that
-      // holds regardless of who issued the invite or when.
-      const [existing] = await t<{ role: AdminUser['role'] }[]>`
-        SELECT role FROM auth_users WHERE email = ${invite.email} FOR UPDATE
-      `;
-      if (existing && ROLE_RANK[existing.role] > ROLE_RANK[invite.role]) {
-        outranked.role = existing.role;
-        return;
-      }
-
-      const [user] = await t<{ id: number }[]>`
-        INSERT INTO auth_users (email, role, password_hash, totp_secret, can_manage_admins)
-        VALUES (${invite.email}, ${invite.role}, ${pending.pendingPasswordHash},
-                ${pending.pendingTotpSecret}, ${invite.canManageAdmins})
-        ON CONFLICT (email) DO UPDATE
-          SET role              = EXCLUDED.role,
-              password_hash     = EXCLUDED.password_hash,
-              totp_secret       = EXCLUDED.totp_secret,
-              can_manage_admins = EXCLUDED.can_manage_admins,
-              -- A new secret starts a new counter; see create-admin.ts for why.
-              totp_last_step    = ${totpStep},
-              -- The invitee chose this password themselves, so any temporary
-              -- one issued in the meantime is discharged rather than carried
-              -- over into an account whose password is already theirs.
-              must_change_password = false,
-              password_changed_at  = now(),
-              disabled_at       = NULL
-        RETURNING id
-      `;
-      // Re-enrolling an existing email invalidates whatever sessions it had.
-      await t`
-        UPDATE auth_sessions SET revoked_at = now()
-         WHERE user_id = ${user.id} AND revoked_at IS NULL
-      `;
-      await t`
-        UPDATE admin_invites
-           SET used_at = now(), pending_password_hash = NULL, pending_totp_secret = NULL
-         WHERE id = ${invite.id}
-      `;
-    });
+    result = await tx.begin((t) => redeemInviteInTransaction(t, {
+      invite, passwordHash, totpSecret, totpStep,
+    }));
+  } catch (error) {
+    // A database failure (a deadlock victim, a statement timeout, a lost
+    // connection, a unique violation, the vanished-target guard) rolls the
+    // transaction back and is never a success: no redirect
+    // and no invite_accepted below. Only the SQLSTATE (or the error's name)
+    // is kept: postgres.js errors carry the statement's bound parameters,
+    // which here include the pending password hash and TOTP secret.
+    const code = (error as { code?: unknown } | null)?.code;
+    failureCode = typeof code === 'string' ? code : (error instanceof Error ? error.name : 'unknown');
   } finally {
-    await tx.end({ timeout: 5 });
+    // Closing the connection cannot change the outcome of a transaction that
+    // has already committed or rolled back, so its own failure is ignored.
+    await tx.end({ timeout: 5 }).catch(() => undefined);
   }
 
-  if (outranked.role) {
-    await audit('admin.invite_rejected',
-      { email: invite.email, role: invite.role, existingRole: outranked.role },
-      { label: invite.email });
+  if (!result) {
+    console.error(`[admin.invite] redemption of invite ${invite.id} failed (${failureCode}); not enrolled`);
     return {
       step: 'confirm',
-      error: 'This invite cannot be used: the account for this address already holds a higher role. '
-        + 'Ask a super admin to sort it out.',
+      // If the failure struck while the commit itself was in flight the
+      // outcome is unknown to this process, so nothing here claims that
+      // nothing changed: a retry against a committed redemption simply
+      // finds the invite used.
+      error: 'The invite could not be completed because of a server error. Try again in a moment; '
+        + 'if it keeps failing, ask a super admin.',
     };
+  }
+
+  if (!result.ok) {
+    // Nothing was written: the account (or the free address), its sessions
+    // and the invite (still unused, its pending credentials untouched) are as
+    // they were. The audit names who issued the invite and what they now
+    // hold, never a credential or the token.
+    await audit('admin.invite_rejected', {
+      email: invite.email,
+      role: invite.role,
+      canManageAdmins: invite.canManageAdmins,
+      existingRole: result.existingRole,
+      reason: result.reason,
+      inviteId: invite.id,
+      invitedBy: invite.invitedBy,
+      issuerRole: result.issuer?.role ?? null,
+      issuerActive: result.issuer?.active ?? null,
+      issuerCanManageAdmins: result.issuer?.canManageAdmins ?? null,
+    }, { label: invite.email });
+    return { step: 'confirm', error: refusalMessage(result.reason) };
   }
 
   await audit('admin.invite_accepted', { email: invite.email, role: invite.role }, { label: invite.email });

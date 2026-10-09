@@ -147,8 +147,21 @@ available for break-glass account recovery.
 `/admin/admins` shows an "Invite an admin" form to anyone with admin-
 management access. Only an actual `super_admin` may set the invited
 role to `super_admin` or tick "can also invite/manage admins" — a
-delegated admin manager can invite a plain admin or a contributor, never
-a peer or better, so delegation can never compound.
+delegated admin manager can invite a plain `admin` only, never a peer or
+better, so delegation can never compound. Nobody issues a
+`contributor`-role invite any more: that role is retired
+(AFLDB-ISSUE-186), `createInvite` refuses one for every issuer
+(`admin.invite_refused`, reason `contributor_retired`), and acceptance
+refuses any such invite row issued before that change.
+
+Issuing an invite and redeeming it are different things. Every invite
+issued is for an `admin` or `super_admin`; what differs is the address
+it is redeemed at. Redeemed at a free address, it creates a new
+administrator. Redeemed at an address that already belongs to a
+contributor account, it converts that account into the invited
+administrator — new role, password and TOTP secret, sessions revoked —
+which is why the rules below treat redemption over an existing account
+as a credential reset.
 
 Creating an invite writes a row to `admin_invites` (only the token's
 sha256, exactly like `beta_login_tokens`) with a 7-day expiry, and
@@ -160,14 +173,48 @@ Because accepting an invite upserts on email (see below), an invite aimed
 at an address that already has an account is a **credential reset** for
 it, not just a new account — so the same "never a peer or better" line is
 drawn over the target as over the role. A delegated admin manager may
-only invite an address that is free or belongs to a contributor;
+only issue an (admin-role) invite to an address that is free or belongs
+to a contributor account;
 `createInvite` refuses one that already belongs to an admin or super
 admin and audits the refusal as `admin.invite_refused`. Acceptance checks
-again, and independently: `confirmEnrolment` refuses to overwrite an
-account whose current role outranks what the invite grants
-(`admin.invite_rejected`), which is what covers an invite issued before
-the target was promoted. Between them, an invite can never be the route
-by which someone is demoted or locked out.
+again, and independently, at the account write itself
+(`src/db/queries/admin-invites.ts`, AFLDB-ISSUE-270), against the issuer's
+account (`admin_invites.invited_by`) locked inside the same transaction:
+
+- **The issuer must still be able to grant the invite**, whatever is at
+  the address (operator decision D-270-2). An enabled super admin may
+  grant `admin` or `super_admin`, with or without the manage-admins
+  delegation; an enabled admin holding the delegation may grant an
+  ordinary admin only; a missing or deactivated issuer, a contributor, or
+  an admin without the delegation authorises nothing. An outstanding
+  invite therefore stops working once its issuer loses that authority — it
+  is not revoked, it is refused when used.
+- **The account at the address is protected.** `confirmEnrolment` refuses
+  to overwrite an account whose current role outranks what the invite
+  grants, and refuses to overwrite any existing `admin` or `super_admin`
+  unless the issuer is, at that moment, an enabled `super_admin`.
+
+Every refusal is audited as `admin.invite_rejected` with a `reason`
+(`issuer_missing`, `issuer_deactivated`, `issuer_not_admin_manager`,
+`grant_exceeds_issuer`, `outranked` or `target_requires_super_admin`) and
+changes nothing: no account is created, an existing account and its
+sessions stay as they were, and the invite stays unused. This is what
+covers an invite issued before the target was promoted, a delegated
+manager's spare invite for an address that has since become an
+administrator (including one created at the same moment — the upsert's
+own conflict clause enforces the target rule), and an issuer who has
+since been demoted, deactivated or stripped of the delegation. An issuer
+with current authority still enrols an existing contributor or a free
+address as before. Between them, an invite can never be the route by
+which someone is demoted, locked out or taken over, nor outlive the
+authority of whoever issued it. A database failure while accepting is
+shown as a server error, never as a completed enrolment. That includes a
+timeout: the accepting transaction runs on its own connection with the
+same 5-second `statement_timeout` as the pooled auth connections
+(`src/db/authClient.ts`), so an acceptance stuck behind another
+transaction's lock on the issuer's or target's account row is cancelled
+and rolled back — no account change, no session revoked, the invite left
+unused, no `admin.invite_accepted` — and the invitee is told to try again.
 
 Accepting an invite at `/admin/invite/<token>` is two steps, and nothing
 sensitive ever round-trips through the browser between them:
@@ -180,9 +227,19 @@ sensitive ever round-trips through the browser between them:
    already depends on) with the raw key available only as a "can't scan
    it?" fallback. Only once a real 6-digit code from that secret
    verifies does the server create (or update, on a re-invited email)
-   the `auth_users` row, immediately burn that code's step the same way
-   login does, revoke any sessions the email already had, and mark the
-   invite used.
+   the `auth_users` row, revoke any sessions the email already had, and
+   mark the invite used. Whether the enrolment code's step is burned
+   depends on which of those happened, and the two paths currently
+   differ:
+   - **Update of an existing account** (a contributor being converted, or
+     an administrator a super admin's invite resets): the update writes
+     the matched step to `totp_last_step`, so that code cannot also be
+     used to sign in.
+   - **Insert of a new account** (a free address): the insert does not
+     set `totp_last_step`, so the code just used to enrol is not burned
+     and could still be accepted at the first sign-in within its ±1-step
+     window. This is a known gap, recorded on AFLDB-ISSUE-270 as a
+     follow-up and deliberately not changed in that issue.
 
 An invite that is never finished leaves no account behind — only a dead
 row in `admin_invites` with a password hash and secret nobody can reach

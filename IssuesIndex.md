@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 6
+**Open issues:** 7
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -227,6 +227,30 @@
 - **Next action:** As ISSUE-267 (deployment procedure prepared and reviewed after the hold lifts, then the applicable
   PROD deployment acceptance, ISSUE-267 runbook §17.15); resolve any
   census section-3 or section-4 row before a promotion.
+
+### AFLDB-ISSUE-270 — A delegated admin manager can take over a peer admin account through a spare invite
+- **Severity:** Medium. **Area:** authentication / administrator lifecycle — `src/app/admin/invite/[token]/actions.ts`
+  (`confirmEnrolment`), `src/db/queries/admin-invites.ts` (new).
+- **State:** Open (2026-10-08), 2026-10-08 full code review F-005, code-proven. **Implemented 2026-10-09 in
+  `sonnet/issue-270` (worktree `afldb-issue-270`), revised the same day for D-270-2 and then for the independent
+  review (§19: 5 s redemption statement timeout, tracked background transactions, doc corrections, integration-harness
+  deadline correction); uncommitted, not deployed; operator validation is COMPLETE for the working tree** (runbook §19.9,
+  9 Oct 2026: unit 199/199 at 19:59:08 AEDT; typecheck, four-file lint and diff check, repeated after the harness
+  correction; the whole `tests/integration/admin-lifecycle.test.ts` 37/37, none skipped, on `afldb_test` as
+  `afldb_owner` from 20:57:05 AEDT; fixture residue check 0/0/0/0 for the i270 and i155 patterns on users and invites
+  only). **Not shown:** restricted `afldb_auth` validation, real-database Server Action end-to-end coverage, DEV/PROD
+  deployment or acceptance, historical-misuse assessment. Every redemption now requires the stored issuer's current authority, read under its row lock
+  (D-270-2, operator-decided: enabled super admin grants anything; enabled delegated admin grants a plain admin only;
+  anyone else nothing), free addresses and contributors included. An existing `admin`/`super_admin` is still overwritten
+  only for a current super admin, and an outranking account is still refused, also in the upsert's `ON CONFLICT … WHERE`.
+  Refusals write nothing and audit `admin.invite_rejected` with a reason. No migration, no bulk revocation.
+- **Runbook:** `issues/open/AFLDB-ISSUE-270.md` §17 (implementation), §18 (D-270-2 revision, corrected concurrency
+  reasoning), §19 (review follow-up, follow-ups list) and §19.9 (operator validation results).
+- **Next action:** Operator reviews and commits the validated tree, runs `npm run merge:ready -- --issue 270` against
+  freshly updated refs, fast-forwards `main` and pushes `main`, then deploys to DEV (`deploy/sync-dev.ps1`) with smoke
+  and records DEV acceptance. ISSUE-270 stays open: PROD installation and any applicable acceptance remain outstanding
+  behind the unchanged ISSUE-265 hold; close only after that applicable remaining acceptance is complete. D-270-1 (uniqueness index) remains undecided and is not a merge gate; §19.6 follow-ups are recorded,
+  not gates.
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
 decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an

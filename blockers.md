@@ -13,7 +13,15 @@
 > ISSUE-268 DEV and PROD censuses recorded, rows R13–R15c and section 5 only, 2026-10-09 — the coverage audit was NOT extended
 > and stays INCOMPLETE as the fifth pass left it; a second evidence update (also not an audit pass) records the ISSUE-268
 > commit, merge/push and DEV deployment, 2026-10-09: R13 completed, R15 narrowed to PROD, R15d added, section 5, section 11 and
-> the summary counts only, and the coverage is again NOT extended and stays INCOMPLETE.** Files only: no Git, database, host or network contact. Sources: this worktree (branch `sonnet/issue-268` at `5659f789`; the operator reports `main` and `origin/main` at the same SHA, not re-checked here), `IssuesIndex.md`,
+> the summary counts only, and the coverage is again NOT extended and stays INCOMPLETE; a third evidence update (also not an audit
+pass), 2026-10-09 in worktree `afldb-issue-270`, records the ISSUE-270 implementation: R24 and R25 reworded, R58 added, the
+summary counts only; the coverage is NOT extended and stays INCOMPLETE; a fourth evidence update (also not an audit pass), same
+worktree and day, records operator decision D-270-2 and the ISSUE-270 revision: R25 and R58 reworded only, counts unchanged; the
+coverage is NOT extended and stays INCOMPLETE; a fifth evidence update (also not an audit pass), same worktree and day, records
+the ISSUE-270 review follow-up (runbook §19) and the 19:32:44 AEDT run as pre-revision evidence: R58 reworded only, counts
+unchanged; the coverage is NOT extended and stays INCOMPLETE; a sixth evidence update (also not an audit pass), same
+worktree and day, records the ISSUE-270 operator validation results (runbook §19.9): R58 reworded only, counts unchanged; the
+coverage is NOT extended and stays INCOMPLETE.** Files only: no Git, database, host or network contact. Sources: this worktree (branch `sonnet/issue-268` at `5659f789`; the operator reports `main` and `origin/main` at the same SHA, not re-checked here), `IssuesIndex.md`,
 > `issues.md`, the runbooks under `issues/open/`, a sweep of `issues/closed/` (see *Coverage*), and — read-only, not
 > edited — the worktrees `D:\dev\afldb-issue-265` (holds ISSUE-265 runbook §27–§28.28, newer than `main`) and
 > `D:\dev\afldb-review-20261008` (the 2026-10-08 review's ISSUE-270…314). Nothing here was re-measured on a host; every
@@ -56,18 +64,18 @@ categories. *Accepted limitations* is not a waiting category:** nothing is owed 
 "Responsible" is filled only where a record names one. Every record in these sources names **the operator** (a role);
 none names an individual, so none is named here. "—" means no owner is recorded.
 
-## Summary by category (68 rows; every row appears once)
+## Summary by category (69 rows; every row appears once)
 
 | Category | Rows |
 |---|---|
-| **Actionable work** (17) | R4, R5, R7, R12, R15a, R15c, R17, R18b, R23, R24, R25, R26, R30, R35, R43a, R43b, R50 |
+| **Actionable work** (18) | R4, R5, R7, R12, R15a, R15c, R17, R18b, R23, R24, R25, R26, R30, R35, R43a, R43b, R50, R58 |
 | **External blockers** (9) | R1, R2, R3, R6, R8, R10, R11, R15, R16 |
 | **Deferred backlog** (14) | R9, R18, R19, R20, R21, R22, R27, R31, R33, R38, R39, R44, R45, R47 |
 | **Unallocated follow-ups** (17, **not** accepted, no owner or trigger) | R18a, R28a, R29a, R32, R34, R36, R37, R40, R42, R46, R48a, R49, R53, R54, R55, R56, R57 |
-| *Waiting rows subtotal (the four waiting categories above)* | 17 + 9 + 14 + 17 = **57** |
+| *Waiting rows subtotal (the four waiting categories above)* | 18 + 9 + 14 + 17 = **58** |
 | **Accepted limitations** (7, each on a cited explicit record; **not waiting, not blocked**, nothing owed) | R28, R29, R41, R43, R48, R51, R52 |
 | **Completed history** (4, **outside the five categories**; section 11) | R13, R14, R15b, R15d |
-| *Total* | 57 waiting + 7 accepted + 4 completed = **68** |
+| *Total* | 58 waiting + 7 accepted + 4 completed = **69** |
 
 Rows in *Actionable* that are decisions (R4, R7, R15a, R15c, R17, R18b, R23, R25, R26, R30, R43a, R50) wait on the operator's choice,
 not on anything external. R3 is a decision but sits under *External blockers* because R1 gates it. R37 is user-visible
@@ -78,7 +86,22 @@ five categories (the ISSUE-268 censuses ran on DEV and PROD; the authorised prom
 validated as scoped). Later the same day **R13** (review, commit, `merge:ready`, merge/push) was also moved to COMPLETE, and a
 new completed row **R15d** (DEV deployment and operational acceptance) was added; **R15** stays, narrowed to PROD installation and
 acceptance. The waiting rows fell from 65 to 57 (R13 left; the 7 accepted limitations are no longer counted as waiting) and the
-row total rose from 67 to 68 (R15d). Nothing was moved to ACCEPTED.)* Before the fifth pass 14 rows were labelled ACCEPTED; the *Classification audit* in section 9b maps each old row to its
+row total rose from 67 to 68 (R15d). Nothing was moved to ACCEPTED.)* *(Status update, 2026-10-09, worktree `afldb-issue-270`:
+ISSUE-270 implemented, uncommitted and unrun; new ACTIONABLE row **R58** (its operator validation, review and commit), so the
+waiting rows rose from 57 to 58 and the row total from 68 to 69. R24 and R25 were reworded for ISSUE-270 only. Nothing was moved
+to ACCEPTED.)* *(Status update, 2026-10-09, worktree `afldb-issue-270`, later: the operator decided **D-270-2** (enforce current
+issuer authority on every redemption) and the ISSUE-270 implementation was revised for it (runbook §18). R25 now requests five
+decisions and records D-270-2 as decided; R58 records the 18:50:00 operator run as pre-revision evidence and points at §18.8.
+No row was added, removed or relabelled, so the counts are unchanged. The coverage is NOT extended and stays INCOMPLETE. Nothing
+was moved to ACCEPTED.)* *(Status update, 2026-10-09, worktree `afldb-issue-270`, later still: the ISSUE-270 implementation was
+revised for the independent review (runbook §19); R58 records the 19:32:44 AEDT operator run (198/198 and the static checks) as
+evidence preceding that revision and points at §19.7. No row was added, removed or relabelled, so the counts are unchanged. The
+coverage is NOT extended and stays INCOMPLETE. Nothing was moved to ACCEPTED.)* *(Status update, 2026-10-09, worktree
+`afldb-issue-270`, later again: the operator reported the ISSUE-270 validation (runbook §19.9: unit file 199/199, static checks
+repeated after the final harness correction, whole integration file 37/37 on `afldb_test` as `afldb_owner`). R58's validation
+component is complete; **R58 stays ACTIONABLE** because review, commit, `merge:ready`, merge, DEV deployment and acceptance
+remain outstanding. No row was added, removed or relabelled, so the counts are unchanged. The coverage is NOT extended and stays
+INCOMPLETE. Nothing was moved to ACCEPTED.)* Before the fifth pass 14 rows were labelled ACCEPTED; the *Classification audit* in section 9b maps each old row to its
 new label, keeping every old reference (R18a, R28, R29, R32, R34, R36, R37, R40, R41, R42, R43, R46, R48, R49) valid.
 
 ## 1. ISSUE-265 — settle/promotion gate: PROD observation
@@ -180,8 +203,9 @@ Open since 2026-09-23; Option B decided 2026-10-02 (D-229-1…8a decided; B1 com
 
 | # | Item | Status · what is waiting | Blocker / prerequisite | Env | Next action · owner | Release condition / evidence required | Last evidenced · source |
 |---|---|---|---|---|---|---|---|
-| R24 | **ISSUE-270…314** (2026-10-08 full code review: 45 issues, 10 Medium and 35 Low by the review's F-NN = 265+NN mapping; the review's 266–269 are tracked above) | **ACTIONABLE** — untracked on `main`; not individually re-read for this register. | They exist only as uncommitted files in worktree `afldb-review-20261008`. That worktree's own index (51 open) is older than `main` for 265–269 (C3). Review gating notes: ISSUE-279 (F-014) before search indexing is enabled; ISSUE-278 (F-013) before the next `db:test:rebuild`. | — | Operator commits the review's tracking files and triages; the review's recommended order is in its §13. Operator. | The issues are on `main`, then worked individually. | 2026-10-08 · review §11–§13 (worktree) |
-| R25 | **Operator decisions D-270-1, D-277-1, D-289-1, D-302-1, D-303-1** | **DECISION** (all five requested, none recorded). | 270: also add a live-invite uniqueness index (a migration)? 277 and 289: option (a) or (b). 302: refuse, or record the installed version? 303: raise the global action limit or lower the upload limit? | — | Operator decides each; these belong to issues not yet tracked on `main`. | A recorded decision per issue. | 2026-10-08 · the five runbooks (worktree) |
+| R24 | **ISSUE-270…314** (2026-10-08 full code review: 45 issues, 10 Medium and 35 Low by the review's F-NN = 265+NN mapping; the review's 266–269 are tracked above) | **ACTIONABLE** — untracked on `main`; not individually re-read for this register. **ISSUE-270 only:** now also tracked (ledger, index, runbook §17) in worktree `afldb-issue-270`, uncommitted, with its implementation (R58); still not on `main`. 271–314 unchanged. | They exist only as uncommitted files in worktree `afldb-review-20261008`. That worktree's own index (51 open) is older than `main` for 265–269 (C3). Review gating notes: ISSUE-279 (F-014) before search indexing is enabled; ISSUE-278 (F-013) before the next `db:test:rebuild`. | — | Operator commits the review's tracking files and triages; the review's recommended order is in its §13. Operator. | The issues are on `main`, then worked individually. | 2026-10-08 · review §11–§13 (worktree) |
+| R25 | **Operator decisions D-270-1, D-277-1, D-289-1, D-302-1, D-303-1** (D-270-2 recorded 2026-10-09, see status) | **DECISION** (five requested, none recorded). **D-270-2 is DECIDED** (operator, 2026-10-09: enforce the issuer's current authority for every redemption, including a free address or a contributor; no bulk revocation, no migration) and is implemented in worktree `afldb-issue-270` under R58; it no longer waits here. | 270: also add a live-invite uniqueness index (a migration)? Not a gate on the ISSUE-270 fix. 277 and 289: option (a) or (b). 302: refuse, or record the installed version? 303: raise the global action limit or lower the upload limit? | — | Operator decides each; these belong to issues not yet tracked on `main`. | A recorded decision per issue. | 2026-10-09 · ISSUE-270 §15, §18.1 (worktree `afldb-issue-270`); 2026-10-08 · the other runbooks (review worktree) |
+| R58 | [ISSUE-270](issues/open/AFLDB-ISSUE-270.md) **review, commit, merge and DEV deployment of the validated implementation** | **ACTIONABLE.** Implemented 2026-10-09 in `sonnet/issue-270` (worktree `afldb-issue-270`), then revised the same day for the operator's D-270-2 (issuer authority on every redemption), the corrected concurrency explanation and the integration harness (runbook §18), then for the independent review (runbook §19: 5 s redemption statement timeout, tracked background transactions in the race tests, doc corrections, integration-harness deadline correction); uncommitted, not deployed. **Operator validation is COMPLETE for the working tree (runbook §19.9, 2026-10-09):** unit file 199/199 at 19:59:08 AEDT; TypeScript, four-file ESLint and diff check passed, and passed again after the final harness correction (which changed no production code or auth-unit test); the whole `tests/integration/admin-lifecycle.test.ts` passed 37/37, none skipped, from 20:57:05 AEDT (41.75 s) on `afldb_test` as `afldb_owner` (tunnel port 55432, `.env` unchanged), including all 16 ISSUE-270 cases, the issuer-lock statement timeout, concurrent account creation and both existing concurrent lifecycle cases; a following read-only check found i270/i155 users and invites all 0 (those patterns and tables only). Not shown: restricted `afldb_auth` validation, real-database Server Action end-to-end, any DEV/PROD deployment or acceptance, historical misuse (not assessed, nothing repaired). The earlier 18:50:00 (177/177) and 19:32:44 (198/198) runs are historical. | None external for review and commit. DEV deployment needs the DEV host and `deploy/sync-dev.ps1`. | DEV host (deployment and smoke) | Operator reviews and commits the validated tree, runs `npm run merge:ready -- --issue 270` against freshly updated refs, fast-forwards `main` and pushes `main`, deploys to DEV, smokes it and records DEV acceptance; any change after the validated runs needs the affected checks repeated. ISSUE-270 stays open afterwards: PROD installation and any applicable acceptance remain outstanding behind the unchanged ISSUE-265 hold (PROD rides on R6 and so R2, like every release after `cd3cf782`), and it closes only after the applicable remaining acceptance is complete. Operator. | A reviewed commit on `main`, the DEV deployment and acceptance. D-270-1 and the §19.6 follow-ups are not gates. | 2026-10-09 · ISSUE-270 §17, §18, §19, §19.9 |
 
 ## 9. Older follow-ups found in the ledger and closed runbooks (second pass)
 
