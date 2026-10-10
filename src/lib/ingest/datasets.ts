@@ -8,6 +8,7 @@ import { CONTINUITY_CONTRACT_SEGMENTS } from '@/db/queries/match-sheet';
 
 import {
   loadPlayerMatchStatsAuthority,
+  MANUAL_ATTENDANCE_SOURCE_KEY,
   playerMatchStatsPairKey,
   type PlayerMatchStatsAuthority,
 } from '../acquisition/manual-authority';
@@ -16,7 +17,9 @@ import {
   seasonOfMatchKeyForAuthority,
 } from '../acquisition/match-sheet-authority';
 import { SETTLE_PROMOTION_GATE } from '../acquisition/settle-core';
+import { EDITABLE_ENTITIES, type EditField } from '../edit/spec';
 import type { ImportBatchId } from '../import-batch-id';
+import { decodeJsonbObject } from '../jsonb';
 
 /**
  * AFLDB-ISSUE-249: the two read-only resolvers accept a transaction handle as
@@ -64,6 +67,12 @@ export type ValidationContext = {
    * closed when it is absent.
    */
   matchSheetAuthority?: MatchSheetAuthorityReader;
+  /**
+   * AFLDB-ISSUE-271: the active Data Editor authority on one canonical match key,
+   * supplied the same way (afldb_auth cannot read `data_overrides`). Only
+   * `match_results` asks for it, and fails closed when it is absent.
+   */
+  matchResultsAuthority?: MatchResultsAuthorityReader;
 };
 
 export type MatchSheetAuthorityRead =
@@ -548,6 +557,72 @@ function matchResultsKey(
   return `${season}|${roundCode}|${matchDate}|${homeName}|${awayName}`;
 }
 
+export type MatchResultsRound =
+  | { ok: true; roundCode: string; roundType: string; roundNumber: number | null }
+  | { ok: false; reason: string };
+
+/**
+ * AFLDB-ISSUE-272 — the ONE reading of a `match_results` round, shared by `validateRow`, `fileKey`
+ * and promotion, so the match key is never built from two spellings of one round.
+ *
+ * Canonical keys carry the bare round number for a home-and-away round and an upper-case code for
+ * every other round: `normalise_results_round` in tools/migration/import_fitzroy_core.py (`R1` -> `1`,
+ * and `str(round_number) != round_code` refuses), `translateAflRound` (`String(roundNumber)`), and
+ * public/samples/match-results.csv. So:
+ * - EF/QF/SF/PF/GF/WF, in any letter case (this validator always case-folded them for the type
+ *   lookup), is that code upper-cased, and round_number must be empty;
+ * - a bare number, or `R` and a number (fitzRoy's own results spelling), is home-and-away: round_number
+ *   must be supplied and its decimal spelling must equal the digits exactly, so `01`, `R01` and an `R1`
+ *   that disagrees with round_number are refused, never guessed;
+ * - anything else (`Round 1`, lower-case `r1`, `OR`) is refused. No wider alias table is invented here.
+ * Pure.
+ */
+export function readMatchResultsRound(rawCode: unknown, roundNumber: number | null): MatchResultsRound {
+  const code = typeof rawCode === 'string' ? rawCode.trim() : '';
+  if (!code) return { ok: false, reason: 'round_code is empty' };
+  const upper = code.toUpperCase();
+  if (Object.hasOwn(FINALS_ROUND_TYPES, upper)) {
+    if (roundNumber !== null) {
+      return { ok: false, reason: `round_code "${code}" is a non-home-and-away round code; round_number must be empty` };
+    }
+    return { ok: true, roundCode: upper, roundType: FINALS_ROUND_TYPES[upper], roundNumber: null };
+  }
+  const homeAndAway = /^R?(\d+)$/.exec(code);
+  if (!homeAndAway) {
+    return {
+      ok: false,
+      reason: `round_code "${code}" is not a recognised round code: use the round number (or R and the number) `
+        + 'for a home-and-away round, or EF/QF/SF/PF/GF/WF',
+    };
+  }
+  if (roundNumber === null) {
+    return { ok: false, reason: `round_code "${code}" is a home-and-away round and round_number is empty` };
+  }
+  if (String(roundNumber) !== homeAndAway[1]) {
+    return { ok: false, reason: `round_code "${code}" does not match round_number ${roundNumber}` };
+  }
+  return { ok: true, roundCode: homeAndAway[1], roundType: 'home_and_away', roundNumber };
+}
+
+/**
+ * AFLDB-ISSUE-272 — the canonical round of a STORED row, at promotion. A submission validated before
+ * the fix carries no `resolved.round_code`, and its retained cell may read `R1` or `gf`; one validated
+ * after carries the canonical code. Either way the round is re-read from the retained cell against the
+ * number and type the validator resolved, so an older row is normalised exactly as validation would
+ * now normalise it, and a row whose stored values disagree (or whose cell is no supported round) is
+ * refused, never repaired. Null when refused. Pure.
+ */
+function storedRowRoundCode(
+  payload: Readonly<Record<string, unknown>>, resolved: Readonly<Record<string, unknown>>,
+): string | null {
+  const roundNumber = resolved.round_number ?? null;
+  if (roundNumber !== null && !Number.isInteger(roundNumber)) return null;
+  const read = readMatchResultsRound(payload.round_code, roundNumber as number | null);
+  if (!read.ok || read.roundType !== resolved.round_type) return null;
+  if (resolved.round_code !== undefined && resolved.round_code !== read.roundCode) return null;
+  return read.roundCode;
+}
+
 /**
  * AFLDB-ISSUE-264 F-002 / AFLDB-ISSUE-265 — the locks the three legacy match writers take.
  *
@@ -605,6 +680,259 @@ async function withLegacyLockTimeout(sql: Sql, work: () => Promise<void>): Promi
   await sql`SELECT set_config('lock_timeout', ${previous}, true)`;
 }
 
+/**
+ * AFLDB-ISSUE-271 — what a canonical match key carries of human authority, as `match_results` needs it.
+ *
+ * The Data Editor (`saveEdit`, src/db/queries/data-edits.ts) corrects one field group of a match and
+ * upserts one ACTIVE `data_overrides` row per `(match_key, field_group)`, whose `override_values` holds
+ * only the fields that save changed, merged with the row's earlier ones (key presence is the stored
+ * decision; the replay in tools/migration/common.py applies exactly those keys). The settles treat the
+ * whole active GROUP as manual authority (`manualAuthorityVerdict`), and an attendance figure cited to
+ * `manual_admin_edit` as authority too, whether or not its override row survived. A rekey carries the
+ * rows to the new key (`carryMatchOverrides`).
+ */
+export type MatchResultsAuthority = {
+  /** The canonical match carrying the key, as it stands; null when none does. */
+  match: {
+    id: number;
+    homeGoals: number | null; homeBehinds: number | null; awayGoals: number | null; awayBehinds: number | null;
+    homeScore: number | null; awayScore: number | null;
+    attendance: number | null;
+    /** `attendance_source_id` is the manual-edit source. */
+    manualAttendance: boolean;
+  } | null;
+  /** The ACTIVE `matches` overrides recorded under the key. */
+  overrides: readonly { fieldGroup: string; overrideValues: unknown }[];
+};
+
+export type MatchResultsAuthorityRead =
+  | { ok: true; authority: MatchResultsAuthority }
+  | { ok: false; reason: string };
+
+export type MatchResultsAuthorityReader = (matchKey: string) => Promise<MatchResultsAuthorityRead>;
+
+const NO_MATCH_RESULTS_AUTHORITY: MatchResultsAuthority = { match: null, overrides: [] };
+
+const SCORE_COMPONENTS = [
+  ['home_goals', 'homeGoals'], ['home_behinds', 'homeBehinds'],
+  ['away_goals', 'awayGoals'], ['away_behinds', 'awayBehinds'],
+] as const;
+
+/** A stored override value the field's spec can hold (what `validateFieldValue` can have produced). */
+function readableOverrideValue(field: EditField, value: unknown): boolean {
+  if (value === null) return field.nullable;
+  return field.kind === 'integer' ? Number.isInteger(value) : typeof value === 'string';
+}
+
+/**
+ * AFLDB-ISSUE-271 — a `match_results` row against active human authority on its match. Like ISSUE-264
+ * and ISSUE-165 D-12, this writer does not replay the authority; it REFUSES a row that would move a
+ * protected value, at validation for the report and again in promotion under the match lock.
+ *
+ * Protected fields, from the editor spec (`EDITABLE_ENTITIES.matches`), against what `promoteRow` writes:
+ * - an active `score` group (or any score component in an active row) protects all four components;
+ *   each protected value is the override's where its key is present, otherwise the stored one (the
+ *   group is the authority, as the settles read it). A component is written only when supplied
+ *   (ISSUE-258 `COALESCE`), so a blank cell compares the stored value it keeps. home_score and
+ *   away_score are always written and must equal goals x 6 + behinds of the protected components, as
+ *   the editor and the replay derive them; result, winner and margin are derived from those two
+ *   scores, so equal scores cannot move them;
+ * - an active `attendance` group, or an attendance cited to `manual_admin_edit`, protects attendance;
+ *   attendance_status moves with it (complete exactly when a figure is set), so the figure decides;
+ * - `match_time`, `match_event` and `notes` are never written by this dataset; round, venue and the
+ *   fixture identity belong to no editor group, so no human can have overridden them.
+ * An override on a group the editor does not define, an unreadable or contradictory payload, a
+ * protected score that cannot be derived, or an override under a key no match carries refuses.
+ *
+ * Returns the reason, or null when the row may be written. Pure.
+ */
+export function legacyMatchResultsAuthorityRefusal(input: {
+  authority: MatchResultsAuthority;
+  /** The resolved values promoteRow writes. */
+  write: Readonly<Record<string, number | string | null | undefined>>;
+}): string | null {
+  const { match, overrides } = input.authority;
+  if (overrides.length === 0 && !match?.manualAttendance) return null;
+  if (match === null) {
+    return 'an active Data Editor override is recorded under this match key, but no match carries it '
+      + '(inconsistent authority)';
+  }
+
+  const entity = EDITABLE_ENTITIES.matches;
+  const groups = new Set<string>();
+  const decided = new Map<string, unknown>();
+  for (const override of overrides) {
+    if (!Object.hasOwn(entity.groups, override.fieldGroup)) {
+      return `an active Data Editor override names the field group "${override.fieldGroup}", which the editor `
+        + 'does not define (unreadable authority)';
+    }
+    const values = override.overrideValues;
+    if (typeof values !== 'object' || values === null || Array.isArray(values)) {
+      return `the active Data Editor ${override.fieldGroup} override cannot be read (unreadable authority)`;
+    }
+    groups.add(override.fieldGroup);
+    for (const [field, value] of Object.entries(values)) {
+      if (!Object.hasOwn(entity.fields, field) || !readableOverrideValue(entity.fields[field], value)) {
+        return `the active Data Editor ${override.fieldGroup} override holds an unreadable ${field} value `
+          + '(unreadable authority)';
+      }
+      if (decided.has(field) && decided.get(field) !== value) {
+        return `two active Data Editor overrides disagree about ${field} (inconsistent authority)`;
+      }
+      decided.set(field, value);
+    }
+  }
+
+  const supplied = (field: string): number | null => {
+    const value = input.write[field];
+    return value === null || value === undefined ? null : Number(value);
+  };
+  const conflicts: string[] = [];
+
+  if (groups.has('score') || SCORE_COMPONENTS.some(([field]) => decided.has(field))) {
+    const kept: Record<string, number> = {};
+    for (const [field, column] of SCORE_COMPONENTS) {
+      const value = decided.has(field) ? decided.get(field) as number : match[column];
+      if (value === null) {
+        return `the Data Editor protects this match's score, but its ${field} is not recorded, so the protected `
+          + 'score cannot be derived (inconsistent authority)';
+      }
+      kept[field] = value;
+      const file = supplied(field);
+      if (file !== null && file !== value) {
+        conflicts.push(`${field} (file ${file}, Data Editor ${value})`);
+      } else if (file === null && match[column] !== value) {
+        conflicts.push(`${field} (file blank, which keeps the stored ${match[column] ?? 'not recorded'}; `
+          + `Data Editor ${value})`);
+      }
+    }
+    for (const side of ['home', 'away'] as const) {
+      const total = kept[`${side}_goals`] * 6 + kept[`${side}_behinds`];
+      const file = supplied(`${side}_score`);
+      if (file !== total) conflicts.push(`${side}_score (file ${file ?? 'blank'}, Data Editor ${total})`);
+    }
+  }
+
+  const attendanceDecided = groups.has('attendance') || decided.has('attendance');
+  if (attendanceDecided || match.manualAttendance) {
+    const value = decided.has('attendance') ? decided.get('attendance') as number | null : match.attendance;
+    const authority = attendanceDecided ? 'Data Editor' : 'manual-edit citation';
+    const file = supplied('attendance');
+    if (file !== null && file !== value) {
+      conflicts.push(`attendance (file ${file}, ${authority} ${value ?? 'not recorded'})`);
+    } else if (file === null && match.attendance !== value) {
+      conflicts.push(`attendance (file blank, which keeps the stored ${match.attendance ?? 'not recorded'}; `
+        + `${authority} ${value ?? 'not recorded'})`);
+    }
+  }
+
+  if (conflicts.length === 0) return null;
+  return `the Data Editor protects ${conflicts.join(', ')}; promoting would overwrite it`;
+}
+
+/**
+ * The authority under each key, read in the caller's transaction. With `lock`, the existing matches
+ * are locked FIRST, in ONE statement, ascending id, FOR NO KEY UPDATE (AFLDB-ISSUE-264 F-002), and the
+ * authority is read after the lock: the Data Editor's `saveEdit` takes FOR UPDATE on the match before
+ * it writes an override, so a correction committed before the lock is seen here and one attempted after
+ * it waits for this promotion. Throws on a query error or a shape it cannot read.
+ */
+async function loadMatchResultsAuthority(
+  sql: Sql | TransactionSql, matchKeys: readonly string[], opts: { lock: boolean },
+): Promise<Map<string, MatchResultsAuthority>> {
+  type Row = NonNullable<MatchResultsAuthority['match']> & { matchKey: string };
+  const keys = [...matchKeys];
+  const matches = opts.lock
+    ? await sql<Omit<Row, 'manualAttendance'>[]>`
+        SELECT id::int AS id, match_key AS "matchKey",
+               home_goals AS "homeGoals", home_behinds AS "homeBehinds",
+               away_goals AS "awayGoals", away_behinds AS "awayBehinds",
+               home_score AS "homeScore", away_score AS "awayScore", attendance
+          FROM matches
+         WHERE match_key = ANY(${keys}::text[])
+         ORDER BY id
+           FOR NO KEY UPDATE
+      `
+    : await sql<Omit<Row, 'manualAttendance'>[]>`
+        SELECT id::int AS id, match_key AS "matchKey",
+               home_goals AS "homeGoals", home_behinds AS "homeBehinds",
+               away_goals AS "awayGoals", away_behinds AS "awayBehinds",
+               home_score AS "homeScore", away_score AS "awayScore", attendance
+          FROM matches
+         WHERE match_key = ANY(${keys}::text[])
+      `;
+  // As text, decoded once (`decodeJsonbObject`, as the ISSUE-264 reader does): a double-encoded
+  // payload stays a string and so reads as unreadable rather than as no authority.
+  const overrides = await sql<{ entityKey: string; fieldGroup: string; overrideValues: string | null }[]>`
+    SELECT entity_key AS "entityKey", field_group AS "fieldGroup", override_values::text AS "overrideValues"
+      FROM data_overrides
+     WHERE entity_type = 'matches'
+       AND is_active
+       AND entity_key = ANY(${keys}::text[])
+     ORDER BY entity_key, field_group
+  `;
+  // The settles' own provenance read (`loadManualAuthority`), narrowed to these keys.
+  const manualAttendance = await sql<{ matchKey: string }[]>`
+    SELECT m.match_key AS "matchKey"
+      FROM matches m
+      JOIN sources s ON s.id = m.attendance_source_id
+     WHERE m.match_key = ANY(${keys}::text[])
+       AND s.key = ${MANUAL_ATTENDANCE_SOURCE_KEY}
+  `;
+
+  const cited = new Set<string>();
+  for (const row of manualAttendance) {
+    if (typeof row.matchKey !== 'string') throw new Error('the manual attendance citations cannot be read');
+    cited.add(row.matchKey);
+  }
+  const byKey = new Map<string, {
+    match: MatchResultsAuthority['match']; overrides: { fieldGroup: string; overrideValues: unknown }[];
+  }>();
+  const entry = (key: string) => {
+    let found = byKey.get(key);
+    if (found === undefined) {
+      found = { match: null, overrides: [] };
+      byKey.set(key, found);
+    }
+    return found;
+  };
+  for (const { matchKey, ...match } of matches) {
+    if (typeof matchKey !== 'string' || !Number.isInteger(match.id)) throw new Error('a locked match cannot be read');
+    const target = entry(matchKey);
+    if (target.match !== null) throw new Error(`two matches carry the key ${matchKey}`);
+    target.match = { ...match, manualAttendance: cited.has(matchKey) };
+  }
+  for (const row of overrides) {
+    if (typeof row.entityKey !== 'string' || typeof row.fieldGroup !== 'string') {
+      throw new Error('the active Data Editor overrides cannot be read');
+    }
+    entry(row.entityKey).overrides.push({
+      fieldGroup: row.fieldGroup, overrideValues: decodeJsonbObject(row.overrideValues),
+    });
+  }
+  return byKey;
+}
+
+/**
+ * One canonical key's authority for the validation report, never throwing: an unreadable answer is a
+ * reason, never "no authority". The pipeline calls it inside a read-only import-role transaction.
+ */
+export async function readMatchResultsAuthority(
+  sql: Sql | TransactionSql, matchKey: string,
+): Promise<MatchResultsAuthorityRead> {
+  try {
+    const byKey = await loadMatchResultsAuthority(sql, [matchKey], { lock: false });
+    return { ok: true, authority: byKey.get(matchKey) ?? NO_MATCH_RESULTS_AUTHORITY };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+const resolveInDataEditor = (matchId: number | null) => (matchId === null
+  ? 'Resolve the authority in the Data Editor or correct the file, then re-validate.'
+  : `Resolve it in the Data Editor (/admin/data-editor?entity=matches&id=${matchId}) or correct the file, `
+    + 'then re-validate.');
+
 const matchResults: DatasetSpec = {
   key: 'match_results',
   title: 'Match results',
@@ -616,9 +944,15 @@ const matchResults: DatasetSpec = {
     'season', 'round_code', 'match_date', 'venue', 'home_club', 'away_club',
     'home_score', 'away_score',
   ],
-  fileKey: (row) => `${row.season}|${row.round_code}|${row.match_date}|${row.home_club}|${row.away_club}`,
+  // AFLDB-ISSUE-272: the canonical round, so `R1` and `1` for one fixture in one file are duplicates
+  // (both now promote to the same match). A row whose round is refused keeps its raw text; it is an error
+  // row anyway. Club spellings are still compared raw (AFLDB-ISSUE-306).
+  fileKey: (row) => {
+    const round = readMatchResultsRound(row.round_code, toIntOrNull(row.round_number ?? null));
+    return `${row.season}|${round.ok ? round.roundCode : row.round_code}|${row.match_date}|${row.home_club}|${row.away_club}`;
+  },
 
-  async validateRow(row, { sql }) {
+  async validateRow(row, { sql, matchResultsAuthority }) {
     const reasons: string[] = [];
     let verdict: RowVerdict['verdict'] = 'ok';
 
@@ -637,29 +971,11 @@ const matchResults: DatasetSpec = {
       return { verdict: 'error', reasons: [`season ${row.season ?? '(empty)'} does not exist`] };
     }
 
-    const roundCode = (row.round_code ?? '').trim();
-    if (!roundCode) return { verdict: 'error', reasons: ['round_code is empty'] };
-    const roundNumber = toIntOrNull(row.round_number);
-    const finalsType = FINALS_ROUND_TYPES[roundCode.toUpperCase()];
-
-    let roundType: string;
-    if (finalsType) {
-      if (roundNumber !== null) {
-        return {
-          verdict: 'error',
-          reasons: [`round_code "${roundCode}" is a non-home-and-away round code; round_number must be empty`],
-        };
-      }
-      roundType = finalsType;
-    } else if (roundNumber !== null) {
-      roundType = 'home_and_away';
-    } else {
-      return {
-        verdict: 'error',
-        reasons: [`round_code "${roundCode}" is not a recognised round code (EF/QF/SF/PF/GF/WF) `
-          + 'and round_number is empty'],
-      };
-    }
+    // AFLDB-ISSUE-272: the canonical round code, carried as resolved.round_code and used for every
+    // key below; the retained cell stays as uploaded, for the evidence.
+    const round = readMatchResultsRound(row.round_code, toIntOrNull(row.round_number ?? null));
+    if (!round.ok) return { verdict: 'error', reasons: [round.reason] };
+    const { roundCode, roundType, roundNumber } = round;
 
     if (!row.match_date || !/^\d{4}-\d{2}-\d{2}$/.test(row.match_date)) {
       return { verdict: 'error', reasons: [`match_date "${row.match_date ?? '(empty)'}" must be YYYY-MM-DD`] };
@@ -713,7 +1029,7 @@ const matchResults: DatasetSpec = {
         SELECT home_goals AS "homeGoals", home_behinds AS "homeBehinds",
                away_goals AS "awayGoals", away_behinds AS "awayBehinds"
           FROM matches
-         WHERE match_key = ${matchResultsKey(season, row.round_code, row.match_date, home.name, away.name)}
+         WHERE match_key = ${matchResultsKey(season, roundCode, row.match_date, home.name, away.name)}
       `;
       if (stored) {
         const sides = [
@@ -749,20 +1065,34 @@ const matchResults: DatasetSpec = {
     const winnerClubId = result === 'draw' ? null : result === 'home_win' ? home.id : away.id;
     const margin = Math.abs(homeScore - awayScore);
 
-    return {
-      verdict,
-      reasons,
-      resolved: {
-        season, round_number: roundNumber, round_type: roundType,
-        home_club_id: home.id, home_club_name: home.name,
-        away_club_id: away.id, away_club_name: away.name,
-        venue_id: venue?.id ?? null,
-        home_score: homeScore, home_goals: homeGoals, home_behinds: homeBehinds,
-        away_score: awayScore, away_goals: awayGoals, away_behinds: awayBehinds,
-        attendance, attendance_status: attendanceStatus,
-        result, winner_club_id: winnerClubId, margin,
-      },
+    const resolved: Record<string, number | string | null> = {
+      season, round_code: roundCode, round_number: roundNumber, round_type: roundType,
+      home_club_id: home.id, home_club_name: home.name,
+      away_club_id: away.id, away_club_name: away.name,
+      venue_id: venue?.id ?? null,
+      home_score: homeScore, home_goals: homeGoals, home_behinds: homeBehinds,
+      away_score: awayScore, away_goals: awayGoals, away_behinds: awayBehinds,
+      attendance, attendance_status: attendanceStatus,
+      result, winner_club_id: winnerClubId, margin,
     };
+
+    // AFLDB-ISSUE-271: advisory here, for the report, against the CANONICAL key (so `R1` or `gf` cannot
+    // miss authority recorded under `1` or `GF`); promotion re-reads it under the match lock.
+    // Unreadable or unavailable authority is an error.
+    const read: MatchResultsAuthorityRead = matchResultsAuthority
+      ? await matchResultsAuthority(matchResultsKey(season, roundCode, row.match_date, home.name, away.name))
+      : { ok: false, reason: 'no authority reader was supplied' };
+    const refusal = read.ok
+      ? legacyMatchResultsAuthorityRefusal({ authority: read.authority, write: resolved })
+      : `the Data Editor authority for this match could not be read (${read.reason})`;
+    if (refusal !== null) {
+      return {
+        verdict: 'error',
+        reasons: [`Data Editor authority: ${refusal}. ${resolveInDataEditor(read.ok ? read.authority.match?.id ?? null : null)}`],
+      };
+    }
+
+    return { verdict, reasons, resolved };
   },
 
   // AFLDB-ISSUE-264 F-002: lock the EXISTING target matches, ascending id, with the
@@ -771,25 +1101,78 @@ const matchResults: DatasetSpec = {
   // then run in file order against rows already held, so this writer takes match
   // locks in the same order as player_match_stats' hook and as a rekey. A row that
   // inserts a new match has nothing to lock.
+  //
+  // AFLDB-ISSUE-272: every key is built from the canonical round (`storedRowRoundCode`), checked for
+  // the whole file before the gate, any lock or any write, so a submission validated before the fix
+  // (no resolved.round_code; a retained `R1` or `gf`) is normalised exactly as validation now would, and
+  // one with an unsupported or inconsistent round, or with two rows on one canonical key, refuses whole.
+  // The hook runs before promoteSubmission creates the import batch. AFLDB-ISSUE-271: under the lock, the
+  // active Data Editor authority on those keys is re-read and any conflicting row refuses the whole
+  // submission, so a correction recorded after validation still wins.
   async preparePromotion(rows, { sql }) {
-    const keys = new Set<string>();
+    const keyOf = new Map<number, string>();
+    const stale: string[] = [];
     for (const row of rows) {
       const { season, home_club_name: homeName, away_club_name: awayName } = row.resolved;
-      const { round_code: roundCode, match_date: matchDate } = row.payload;
+      const { round_code: rawRound, match_date: matchDate } = row.payload;
       if (typeof season !== 'number' || typeof homeName !== 'string' || typeof awayName !== 'string'
-        || !roundCode || !matchDate) {
+        || !rawRound || !matchDate) {
         throw new Error(`Row ${row.rowNo} carries no resolved season, clubs, round or date; re-validate the submission.`);
       }
-      keys.add(matchResultsKey(season, roundCode, matchDate, homeName, awayName));
+      const roundCode = storedRowRoundCode(row.payload, row.resolved);
+      if (roundCode === null) {
+        stale.push(`Row ${row.rowNo}: round_code "${String(rawRound).slice(0, 40)}" is not a supported round code `
+          + 'or disagrees with the stored round number and type');
+        continue;
+      }
+      keyOf.set(row.rowNo, matchResultsKey(season, roundCode, matchDate, homeName, awayName));
+    }
+    if (stale.length > 0) {
+      throw new Error(
+        `Nothing was promoted: ${stale.length} of ${rows.length} rows fail the round-code check applied at promotion `
+        + `(${stale[0]}${stale.length > 1 ? `; ${stale.length - 1} more` : ''}). The stored verdicts predate it; `
+        + 'upload a corrected file as a new submission.',
+      );
+    }
+    // AFLDB-ISSUE-272: one row per canonical match, checked across the whole file on the very key the
+    // lock, the authority read and promoteRow use. A submission validated before the fix compared raw
+    // round spellings, so `R1` and `1` (or `gf` and `GF`) for one fixture can both be stored `ok`; each
+    // would then write the same match in turn. Refused whole, like the fresh duplicate rule, even when
+    // the rows' values are identical: no winner is chosen.
+    const rowsOfKey = new Map<string, number[]>();
+    for (const [rowNo, key] of keyOf) {
+      const claimed = rowsOfKey.get(key);
+      if (claimed === undefined) rowsOfKey.set(key, [rowNo]);
+      else claimed.push(rowNo);
+    }
+    const collisions = [...rowsOfKey].filter(([, rowNos]) => rowNos.length > 1)
+      .map(([key, rowNos]) => `rows ${rowNos.join(', ')} are all ${key}`);
+    if (collisions.length > 0) {
+      const shown = collisions.slice(0, 10).join('; ');
+      const more = collisions.length > 10 ? `; and ${collisions.length - 10} more` : '';
+      throw new Error(
+        `Nothing was promoted: ${collisions.length} canonical match key(s) are claimed by more than one row `
+        + `(${shown}${more}). A match may appear once per file, whatever its round spelling and even with `
+        + 'identical values; the stored verdicts did not catch it. Upload a corrected file as a new submission.',
+      );
     }
     await withLegacyLockTimeout(sql, async () => {
-      await sql`
-        SELECT id::int AS id
-          FROM matches
-         WHERE match_key = ANY(${[...keys]}::text[])
-         ORDER BY id
-           FOR NO KEY UPDATE
-      `;
+      const authority = await loadMatchResultsAuthority(sql, [...new Set(keyOf.values())], { lock: true });
+      const refusals: string[] = [];
+      for (const row of rows) {
+        const key = keyOf.get(row.rowNo)!;
+        const held = authority.get(key) ?? NO_MATCH_RESULTS_AUTHORITY;
+        const refusal = legacyMatchResultsAuthorityRefusal({ authority: held, write: row.resolved });
+        if (refusal !== null) {
+          refusals.push(`row ${row.rowNo} (${key}${held.match ? `, match #${held.match.id}` : ''}): ${refusal}`);
+        }
+      }
+      if (refusals.length > 0) {
+        const shown = refusals.slice(0, 10).join('; ');
+        const more = refusals.length > 10 ? `; and ${refusals.length - 10} more` : '';
+        throw new Error(`${refusals.length} row(s) conflict with active Data Editor authority; nothing was promoted. `
+          + `${shown}${more}. Resolve them in the Data Editor and promote this submission again, or upload a corrected file.`);
+      }
     });
   },
 
@@ -803,8 +1186,15 @@ const matchResults: DatasetSpec = {
     // instead (the file has no source_key column, unlike rising_star),
     // so it follows all_australian's convention of deriving one from the
     // resolved identifying fields rather than inventing a new format.
+    // AFLDB-ISSUE-272: the canonical round, re-derived exactly as preparePromotion (which has already
+    // refused the whole submission if any row's round is unsupported) derived its lock key, so the
+    // lookup, the lock, the INSERT and ON CONFLICT all use one key and round_code is stored canonical.
+    const roundCode = storedRowRoundCode(row, resolved);
+    if (roundCode === null) {
+      throw new Error(`round_code "${row.round_code}" is not a supported round code; re-validate the submission.`);
+    }
     const matchKey = matchResultsKey(
-      resolved.season, row.round_code, row.match_date,
+      resolved.season, roundCode, row.match_date,
       resolved.home_club_name, resolved.away_club_name,
     );
 
@@ -816,7 +1206,7 @@ const matchResults: DatasetSpec = {
          result, winner_club_id, margin, attendance, attendance_status,
          source_id, source_record_id, import_batch_id)
       VALUES
-        (${matchKey}, ${resolved.season}, ${row.round_code}, ${resolved.round_number},
+        (${matchKey}, ${resolved.season}, ${roundCode}, ${resolved.round_number},
          ${resolved.round_type}::round_type, ${resolved.round_type !== 'home_and_away'},
          ${row.match_date}, ${resolved.venue_id}, ${row.venue},
          ${resolved.home_club_id}, ${resolved.away_club_id},
@@ -858,6 +1248,9 @@ const matchResults: DatasetSpec = {
       -- owned by afltables, manual_admin_edit, or an earlier promotion --
       -- and must never silently reassign that row's provenance, exactly as
       -- applyMatchEdit's score/attendance-group corrections never do.
+      -- AFLDB-ISSUE-271: preparePromotion has already refused any row whose
+      -- write would move a value active Data Editor authority protects, so
+      -- no protected value changes here.
     `;
   },
 };

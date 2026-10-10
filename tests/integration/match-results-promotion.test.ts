@@ -51,6 +51,16 @@
  * ordering with side transactions (never a race), through the real hooks, the
  * real pipeline and the real Match Sheet, Return to source and deleteMatch
  * writers; a settle is emulated at the lock-statement level.
+ *
+ * AFLDB-ISSUE-271/272 adds a block inside the ISSUE-258 one: canonical round
+ * codes (an `R<n>` or lower-case final, fresh or validated before the fix,
+ * promotes onto the existing canonical match, leaving one row; two rows of a
+ * submission validated before the fix that name one canonical match, `R<n>`/`<n>`
+ * or `gf`/`GF`, refuse whole and leave the match unchanged) and active Data
+ * Editor authority (a correction recorded after validation refuses the whole
+ * submission, which is left failed, and survives). Because match_results now
+ * refuses a non-canonical round code, the file's long-standing round labels
+ * ('R258X', ...) are mapped to canonical round numbers by fixtureRound().
  */
 import './guard';
 
@@ -205,6 +215,22 @@ function matchKey(roundCode: string, matchDate: string): string {
 }
 
 /**
+ * AFLDB-ISSUE-272: match_results accepts only a canonical round (the round number, `R` and the number,
+ * or a finals code), so the labels this file has always used ('R185A', 'R258X', 'R258L3', ...) now NAME
+ * a fixture round instead of being one. Each label maps, once per run, to its own home-and-away round
+ * number in the reserved season (code = number), and every payload, key and lookup goes through this.
+ */
+const fixtureRounds = new Map<string, string>();
+function fixtureRound(label: string): string {
+  let round = fixtureRounds.get(label);
+  if (round === undefined) {
+    round = String(101 + fixtureRounds.size);
+    fixtureRounds.set(label, round);
+  }
+  return round;
+}
+
+/**
  * Inserts a `data_submissions` + `data_submission_rows` pair shaped exactly
  * as `validateSubmission()` would have left them for `match_results` — bypasses
  * `validateRow()` itself (already covered by `tests/integration/datasets.test.ts`)
@@ -238,8 +264,9 @@ async function insertMatchResultsSubmission(opts: {
       })},
       'ok',
       ${owner.json({
+        // No round_code: the shape a submission validated before AFLDB-ISSUE-272 carries.
         resolved: {
-          season: FIXTURE_SEASON, round_number: 1, round_type: 'home_and_away',
+          season: FIXTURE_SEASON, round_number: Number(opts.roundCode), round_type: 'home_and_away',
           home_club_id: resolvedHomeClubId, home_club_name: homeClubName,
           away_club_id: awayClubId, away_club_name: awayClubName,
           venue_id: null, home_score: 100, home_goals: null, home_behinds: null,
@@ -351,7 +378,7 @@ afterAll(async () => {
 
 describe('AFLDB-ISSUE-185 match_results promotion provenance', () => {
   it('A-C. a promoted match persists source_id, source_record_id and import_batch_id', async () => {
-    const roundCode = 'R185A';
+    const roundCode = fixtureRound('R185A');
     const matchDate = `${FIXTURE_SEASON}-03-01`;
     const id = await insertMatchResultsSubmission({ roundCode, matchDate });
 
@@ -367,7 +394,7 @@ describe('AFLDB-ISSUE-185 match_results promotion provenance', () => {
   });
 
   it('D. leaves no partially-provenanced match behind when promotion fails and rolls back', async () => {
-    const roundCode = 'R185D';
+    const roundCode = fixtureRound('R185D');
     const matchDate = `${FIXTURE_SEASON}-03-08`;
     // A non-existent home_club_id/winner_club_id forces a real FK-violation
     // deep inside promoteRow's INSERT, inside promoteSubmission's savepoint --
@@ -393,7 +420,7 @@ describe('AFLDB-ISSUE-185 match_results promotion provenance', () => {
     // under a DIFFERENT source (afltables) and re-promoting a "corrected"
     // match_results row over the same natural key must never silently
     // reassign its provenance to sports_data_lab.
-    const roundCode = 'R185F';
+    const roundCode = fixtureRound('R185F');
     const matchDate = `${FIXTURE_SEASON}-03-15`;
     const [afltables] = await owner<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afltables'`;
     if (!afltables) throw new Error("sources.key = 'afltables' is not seeded in this database");
@@ -407,7 +434,7 @@ describe('AFLDB-ISSUE-185 match_results promotion provenance', () => {
         winner_club_id, margin, attendance_status, source_id, source_record_id
       ) VALUES (
         ${matchKey(roundCode, matchDate)}, ${FIXTURE_SEASON}::smallint, ${roundCode},
-        'home_and_away', 1, false, ${matchDate}::date,
+        'home_and_away', ${Number(roundCode)}, false, ${matchDate}::date,
         ${MARKER}, ${homeClubId}, ${awayClubId}, 60, 50, 'home_win',
         ${homeClubId}, 10, 'not_collected', ${afltables.id}, ${seededSourceRecordId}
       )
@@ -518,16 +545,17 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     expect(await approveAndPromote(staged.id)).toMatchObject({ ok: true });
   }
 
-  function matchPayload(roundCode: string, day: string, extra: Payload = {}): Payload {
+  /** One fixture round's row; `label` names the round through fixtureRound() (AFLDB-ISSUE-272). */
+  function matchPayload(label: string, day: string, extra: Payload = {}): Payload {
     return {
-      season: String(FIXTURE_SEASON), round_code: roundCode, round_number: '1',
+      season: String(FIXTURE_SEASON), round_code: fixtureRound(label), round_number: fixtureRound(label),
       match_date: `${FIXTURE_SEASON}-04-${day}`, venue: `${TAG} Oval`,
       home_club: home.name, away_club: away.name, home_score: '86', away_score: '70',
       ...extra,
     };
   }
 
-  async function readMatchFigures(roundCode: string) {
+  async function readMatchFigures(label: string) {
     const [row] = await owner<{
       homeGoals: number | null; homeBehinds: number | null; homeScore: number;
       awayGoals: number | null; awayBehinds: number | null;
@@ -536,14 +564,14 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
       SELECT home_goals AS "homeGoals", home_behinds AS "homeBehinds", home_score AS "homeScore",
              away_goals AS "awayGoals", away_behinds AS "awayBehinds",
              attendance, attendance_status::text AS "attendanceStatus"
-        FROM matches WHERE season = ${FIXTURE_SEASON} AND round_code = ${roundCode}
+        FROM matches WHERE season = ${FIXTURE_SEASON} AND round_code = ${fixtureRound(label)}
     `;
     return row;
   }
 
   function statsPayload(player: string, extra: Payload = {}): Payload {
     return {
-      season: String(FIXTURE_SEASON), round_code: 'R258P',
+      season: String(FIXTURE_SEASON), round_code: fixtureRound('R258P'),
       home_club: home.name, away_club: away.name, player, club: home.name,
       ...extra,
     };
@@ -553,7 +581,7 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     const [row] = await owner<Record<string, number | string | null>[]>`
       SELECT s.career_game_no, s.jumper_number, s.brownlow_votes, ${owner([...STATS])}
         FROM player_match_stats s JOIN matches m ON m.id = s.match_id
-       WHERE m.season = ${FIXTURE_SEASON} AND m.round_code = 'R258P'
+       WHERE m.season = ${FIXTURE_SEASON} AND m.round_code = ${fixtureRound('R258P')}
          AND s.player_id = ${fixturePlayers.get(player)!}
     `;
     return row;
@@ -798,10 +826,10 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     const TAG_268 = 'AFLDB-ISSUE-268';
 
     /** A fresh fixture match (never attendance-bearing), returning its id. */
-    async function freshMatch(roundCode: string, day: string): Promise<number> {
-      await promoteFile('match_results', [matchPayload(roundCode, day)]);
+    async function freshMatch(label: string, day: string): Promise<number> {
+      await promoteFile('match_results', [matchPayload(label, day)]);
       const [row] = await owner<{ id: number }[]>`
-        SELECT id::int AS id FROM matches WHERE season = ${FIXTURE_SEASON} AND round_code = ${roundCode}
+        SELECT id::int AS id FROM matches WHERE season = ${FIXTURE_SEASON} AND round_code = ${fixtureRound(label)}
       `;
       return row.id;
     }
@@ -969,6 +997,275 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     });
   });
 
+  // AFLDB-ISSUE-272 and AFLDB-ISSUE-271 against PostgreSQL, through the real validateSubmission() ->
+  // promoteSubmission() path on fixture matches of the reserved season. A Data Editor correction is
+  // emulated as the end state saveEdit() leaves (the corrected canonical values plus its active `matches`
+  // override row), so no club-season, period-score or audit row is written. The override rows this block
+  // inserts are removed by the ids their INSERT returned; the enclosing ledger removes its matches and
+  // submissions. No background transaction is used.
+  describe('AFLDB-ISSUE-271/272 canonical match identity and Data Editor authority', () => {
+    const overrideIds: number[] = [];
+    type Staged = Awaited<ReturnType<typeof stageAndValidate>>;
+    const resolvedOf = (staged: Staged, index: number) =>
+      (staged.rows[index].reasons as unknown as { resolved: Record<string, unknown> | null }).resolved;
+
+    /** Every fixture match on that April day between the two fixture clubs, whatever its round code. */
+    async function rowsOnDay(day: string) {
+      return owner<{ id: number; roundCode: string }[]>`
+        SELECT id::int AS id, round_code AS "roundCode" FROM matches
+         WHERE season = ${FIXTURE_SEASON} AND match_date = ${`${FIXTURE_SEASON}-04-${day}`}::date
+           AND home_club_id = ${home.id} AND away_club_id = ${away.id}
+         ORDER BY id
+      `;
+    }
+
+    async function fixtureMatch(label: string) {
+      const [match] = await owner<{ id: number; key: string }[]>`
+        SELECT id::int AS id, match_key AS key FROM matches
+         WHERE season = ${FIXTURE_SEASON} AND round_code = ${fixtureRound(label)}
+      `;
+      if (!match) throw new Error(`fixture match ${label} was not created by the promotion`);
+      return match;
+    }
+
+    async function submissionState(id: number) {
+      const [row] = await owner<{ status: string; error: string | null; importBatchId: string | null }[]>`
+        SELECT status::text AS status, error, import_batch_id::text AS "importBatchId"
+          FROM data_submissions WHERE id = ${id}
+      `;
+      const [{ batches }] = await owner<{ batches: number }[]>`
+        SELECT count(*)::int AS batches FROM import_batches
+         WHERE tool = 'admin-upload' AND notes = ${`submission ${id}`}
+      `;
+      return { ...row, batches };
+    }
+
+    /** The active `matches` override a Data Editor save leaves (one row per field group). Fails on any existing row. */
+    async function recordOverride(matchKey: string, fieldGroup: string, values: Record<string, number | null>) {
+      const [row] = await owner<{ id: number }[]>`
+        INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active)
+        VALUES ('matches', ${matchKey}, ${fieldGroup}, ${owner.json(values as never)}, ${fixtureAdminId}, true)
+        RETURNING id::int AS id
+      `;
+      overrideIds.push(row.id);
+      return row.id;
+    }
+
+    afterAll(async () => {
+      if (overrideIds.length === 0) return;
+      await owner`DELETE FROM data_overrides WHERE id = ANY(${overrideIds}::int[])`;
+      const [left] = await owner<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM data_overrides WHERE id = ANY(${overrideIds}::int[])
+      `;
+      expect(left.n).toBe(0);
+    });
+
+    it('272: an R-code row and a lower-case final validate canonical and promote onto the existing match, one row each', async () => {
+      await promoteFile('match_results', [
+        matchPayload('R272A', '05', { home_goals: '13', home_behinds: '8', away_goals: '10', away_behinds: '10' }),
+        matchPayload('R272F', '06', { round_code: 'GF', round_number: null }),
+      ]);
+      const round = fixtureRound('R272A');
+      const before = { a: await rowsOnDay('05'), f: await rowsOnDay('06') };
+      expect(before.a).toEqual([{ id: expect.any(Number), roundCode: round }]);
+      expect(before.f).toEqual([{ id: expect.any(Number), roundCode: 'GF' }]);
+
+      const staged = await stageAndValidate('match_results', [
+        matchPayload('R272A', '05', { round_code: `R${round}`, attendance: '41000' }),
+        matchPayload('R272F', '06', { round_code: 'gf', round_number: null, home_score: '90' }),
+      ]);
+      expect(staged.summary.errors).toBe(0);
+      expect(resolvedOf(staged, 0)?.round_code).toBe(round);
+      expect(resolvedOf(staged, 1)?.round_code).toBe('GF');
+      expect(await approveAndPromote(staged.id)).toMatchObject({ ok: true });
+
+      // ON CONFLICT fired on the canonical key: still one row each, now carrying the file's figures.
+      expect(await rowsOnDay('05')).toEqual(before.a);
+      expect(await rowsOnDay('06')).toEqual(before.f);
+      expect(await readMatchFigures('R272A')).toMatchObject({ homeGoals: 13, attendance: 41000 });
+      const [final] = await owner<{ homeScore: number }[]>`
+        SELECT home_score AS "homeScore" FROM matches WHERE id = ${before.f[0].id}
+      `;
+      expect(final.homeScore).toBe(90);
+      // The retained cells stay as uploaded, for the evidence.
+      const cells = await owner<{ roundCode: string }[]>`
+        SELECT payload->>'round_code' AS "roundCode" FROM data_submission_rows
+         WHERE submission_id = ${staged.id} ORDER BY row_no
+      `;
+      expect(cells.map((cell) => cell.roundCode)).toEqual([`R${round}`, 'gf']);
+    });
+
+    it('272: an older prevalidated R-code row promotes onto the canonical match; unsupported round text refuses whole', async () => {
+      await promoteFile('match_results', [matchPayload('R272B', '07')]);
+      const round = fixtureRound('R272B');
+      const before = await rowsOnDay('07');
+      expect(before).toHaveLength(1);
+
+      // Validated now, then stripped of resolved.round_code: exactly the row the pre-fix validator stored.
+      const older = await stageAndValidate('match_results', [
+        matchPayload('R272B', '07', { round_code: `R${round}`, home_score: '99' }),
+      ]);
+      expect(older.summary.errors).toBe(0);
+      await owner`
+        UPDATE data_submission_rows SET reasons = reasons #- '{resolved,round_code}' WHERE submission_id = ${older.id}
+      `;
+      expect(await approveAndPromote(older.id)).toMatchObject({ ok: true });
+      expect(await rowsOnDay('07')).toEqual(before);
+      expect((await readMatchFigures('R272B')).homeScore).toBe(99);
+
+      // A pre-fix row whose cell is no supported round (the old validator accepted any text with a round number).
+      const unsupported = await stageAndValidate('match_results', [matchPayload('R272B', '07', { home_score: '98' })]);
+      expect(unsupported.summary.errors).toBe(0);
+      await owner`
+        UPDATE data_submission_rows
+           SET payload = jsonb_set(payload, '{round_code}', to_jsonb(${`Round ${round}`}::text)),
+               reasons = reasons #- '{resolved,round_code}'
+         WHERE submission_id = ${unsupported.id}
+      `;
+      const refused = await approveAndPromote(unsupported.id);
+      expect(refused.ok).toBe(false);
+      expect(refused.ok ? '' : refused.error)
+        .toMatch(/Nothing was promoted: 1 of 1 rows fail the round-code check applied at promotion/);
+      expect(await submissionState(unsupported.id)).toMatchObject({ status: 'failed', importBatchId: null, batches: 0 });
+      expect(await rowsOnDay('07')).toEqual(before);
+      expect((await readMatchFigures('R272B')).homeScore).toBe(99);
+    });
+
+    /** The whole matches row, as text, so "unchanged" covers every column (provenance included). */
+    async function matchRowText(id: number) {
+      const [row] = await owner<{ text: string }[]>`SELECT m::text AS text FROM matches m WHERE m.id = ${id}`;
+      return row.text;
+    }
+
+    /**
+     * Rewrites a fresh validation as the pre-fix validator stored it: that validator compared the RAW round
+     * spellings, so neither row was a duplicate, and it recorded no resolved.round_code. Each row keeps the
+     * `resolved` today's validator produced for it (a duplicate verdict keeps its resolved values).
+     */
+    async function asPrevalidatedBeforeTheFix(submissionId: number) {
+      await owner`
+        UPDATE data_submission_rows
+           SET verdict = 'ok',
+               reasons = jsonb_build_object('reasons', '[]'::jsonb, 'resolved', (reasons->'resolved') - 'round_code')
+         WHERE submission_id = ${submissionId}
+      `;
+    }
+
+    // Each variant needs an April day no other case in this file uses for the same two fixture clubs
+    // (01-18 and 20-24 are taken, 11 by the ISSUE-268 R258SA match), so rowsOnDay() sees only its own match.
+    for (const variant of [
+      { name: 'an R<n>/bare-number pair with different values', label: 'R272C', day: '10', finals: false },
+      { name: 'a gf/GF pair with identical values', label: 'R272G', day: '19', finals: true },
+    ]) {
+      it(`272: ${variant.name}, prevalidated before the fix, refuses whole and cannot update the existing match twice`, async () => {
+        // The gf/GF variant's final is DRAWN (no winner_club_id), as the 1948/1977/2010 Grand Finals are, so
+        // R272F stays the reserved season's only decided Grand Final. recomputeClubSeasons() (run by the
+        // F-002 deleteMatch case) joins one row per decided Grand Final: a second one won by the same club
+        // duplicates that club's club_seasons row (23505 club_seasons_uq).
+        const finals: Payload = variant.finals
+          ? { round_code: 'GF', round_number: null, home_score: '80', away_score: '80' }
+          : {};
+        await promoteFile('match_results', [matchPayload(variant.label, variant.day, finals)]);
+        const before = await rowsOnDay(variant.day);
+        expect(before).toHaveLength(1);
+        const existing = await matchRowText(before[0].id);
+        const [{ key }] = await owner<{ key: string }[]>`SELECT match_key AS key FROM matches WHERE id = ${before[0].id}`;
+        const round = variant.finals ? 'GF' : fixtureRound(variant.label);
+        expect(key.split('|')[1]).toBe(round);
+
+        const pair = variant.finals
+          ? [matchPayload(variant.label, variant.day, { ...finals, round_code: 'gf' }),
+            matchPayload(variant.label, variant.day, finals)]
+          : [matchPayload(variant.label, variant.day, { round_code: `R${round}`, home_score: '95' }),
+            matchPayload(variant.label, variant.day, { home_score: '96' })];
+        const staged = await stageAndValidate('match_results', pair);
+        // Today's validator already refuses the pair (the second row duplicates the first's canonical key).
+        expect(staged.summary.duplicates).toBe(1);
+        await asPrevalidatedBeforeTheFix(staged.id);
+
+        const result = await approveAndPromote(staged.id);
+        expect(result.ok).toBe(false);
+        expect(result.ok ? '' : result.error).toMatch(
+          /^Promotion failed and was rolled back: Nothing was promoted: 1 canonical match key\(s\) are claimed by more than one row \(rows 1, 2 are all /,
+        );
+        expect(result.ok ? '' : result.error).toContain(`rows 1, 2 are all ${key}`);
+        // The pipeline's refusal outcome: failed, no batch linked, and no batch survives the rollback.
+        expect(await submissionState(staged.id)).toMatchObject({ status: 'failed', importBatchId: null, batches: 0 });
+        expect(await rowsOnDay(variant.day)).toEqual(before);
+        expect(await matchRowText(before[0].id)).toBe(existing);
+        // The uploaded cells stay as uploaded.
+        const cells = await owner<{ roundCode: string }[]>`
+          SELECT payload->>'round_code' AS "roundCode" FROM data_submission_rows
+           WHERE submission_id = ${staged.id} ORDER BY row_no
+        `;
+        expect(cells.map((cell) => cell.roundCode)).toEqual(pair.map((payload) => payload.round_code));
+      });
+    }
+
+    it('271: a correction recorded after validation wins: the whole submission is refused and left failed', async () => {
+      await promoteFile('match_results', [
+        matchPayload('R271A', '08', {
+          home_goals: '13', home_behinds: '8', away_goals: '10', away_behinds: '10', attendance: '45000',
+        }),
+        matchPayload('R271B', '09'),
+      ]);
+      // Validated while no authority exists: a change to another match, and the original 13.8 for R271A.
+      const staged = await stageAndValidate('match_results', [
+        matchPayload('R271B', '09', { home_score: '101' }),
+        matchPayload('R271A', '08', { home_goals: '13', home_behinds: '8', away_goals: '10', away_behinds: '10' }),
+      ]);
+      expect(staged.summary.errors).toBe(0);
+
+      // A Data Editor score correction lands between validation and promotion: 13.8 (86) becomes 14.8 (92).
+      const match = await fixtureMatch('R271A');
+      await owner`UPDATE matches SET home_goals = 14, home_score = 92, margin = 22 WHERE id = ${match.id}`;
+      const overrideId = await recordOverride(match.key, 'score', { home_goals: 14 });
+      const otherBefore = await readMatchFigures('R271B');
+
+      const result = await approveAndPromote(staged.id);
+      expect(result.ok).toBe(false);
+      expect(result.ok ? '' : result.error).toMatch(
+        /1 row\(s\) conflict with active Data Editor authority; nothing was promoted\. row 2 .*home_goals \(file 13, Data Editor 14\).*home_score \(file 86, Data Editor 92\)/,
+      );
+      expect(await submissionState(staged.id)).toMatchObject({ status: 'failed', importBatchId: null, batches: 0 });
+      // The correction stands, the override is untouched and still active, and row 1 was not applied either.
+      expect(await readMatchFigures('R271A')).toMatchObject({ homeGoals: 14, homeBehinds: 8, homeScore: 92, attendance: 45000 });
+      expect(await readMatchFigures('R271B')).toEqual(otherBefore);
+      const [override] = await owner<{ isActive: boolean; unchanged: boolean }[]>`
+        SELECT is_active AS "isActive", override_values = '{"home_goals": 14}'::jsonb AS unchanged
+          FROM data_overrides WHERE id = ${overrideId}
+      `;
+      expect(override).toEqual({ isActive: true, unchanged: true });
+      // A retry re-reads the authority and refuses again.
+      expect((await promoteSubmission(staged.id)).ok).toBe(false);
+      expect((await readMatchFigures('R271A')).homeGoals).toBe(14);
+    });
+
+    it('271: validation reports the conflict under the canonical key, and the identical figures still promote', async () => {
+      // The R271A correction from the previous case is in place (14.8, 92, an active score override).
+      const round = fixtureRound('R271A');
+      const original = { home_goals: '13', home_behinds: '8', away_goals: '10', away_behinds: '10' };
+      // `R<n>` is the same canonical match, so it cannot slip past the override recorded under `<n>`.
+      for (const roundCode of [round, `R${round}`]) {
+        const fresh = await stageAndValidate('match_results', [matchPayload('R271A', '08', { ...original, round_code: roundCode })]);
+        expect(fresh.summary.errors).toBe(1);
+        expect(fresh.rows[0].reasons.reasons).toHaveLength(1);
+        expect(fresh.rows[0].reasons.reasons[0]).toMatch(
+          /^Data Editor authority: the Data Editor protects home_goals \(file 13, Data Editor 14\), home_score \(file 86, Data Editor 92\);/,
+        );
+        expect(fresh.rows[0].reasons.reasons[0]).toContain('/admin/data-editor?entity=matches&id=');
+        expect((await approveAndPromote(fresh.id)).ok).toBe(false); // an error row: refused with no write
+      }
+
+      // The corrected figures themselves, with an unprotected attendance change: admitted, one row.
+      await promoteFile('match_results', [matchPayload('R271A', '08', {
+        round_code: `R${round}`, home_goals: '14', home_behinds: '8', home_score: '92', attendance: '46000',
+      })]);
+      expect(await readMatchFigures('R271A')).toMatchObject({ homeGoals: 14, homeScore: 92, attendance: 46000 });
+      expect(await rowsOnDay('08')).toHaveLength(1);
+    });
+  });
+
   describe('AFLDB-ISSUE-264 durable Match Sheet authority refuses a reverting row', () => {
     const TAG_264 = 'AFLDB-ISSUE-264';
     const RUN = Date.now().toString(36);
@@ -991,18 +1288,18 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
 
     const nameOf = (tag: Tag) => `${TAG_264} ${tag} Player`;
     const pathOf = (tag: string) => `players/I/Issue264_${tag}_${RUN}.html`;
-    const row264 = (tag: Tag, extra: Payload = {}, roundCode = 'R258X'): Payload => ({
-      season: String(FIXTURE_SEASON), round_code: roundCode,
+    const row264 = (tag: Tag, extra: Payload = {}, label = 'R258X'): Payload => ({
+      season: String(FIXTURE_SEASON), round_code: fixtureRound(label),
       home_club: home.name, away_club: away.name, player: nameOf(tag), club: home.name,
       ...extra,
     });
 
-    async function matchOf(roundCode: string): Promise<FixtureMatch> {
+    async function matchOf(label: string): Promise<FixtureMatch> {
       const [match] = await owner<FixtureMatch[]>`
         SELECT id::int AS id, match_key AS key FROM matches
-         WHERE season = ${FIXTURE_SEASON} AND round_code = ${roundCode}
+         WHERE season = ${FIXTURE_SEASON} AND round_code = ${fixtureRound(label)}
       `;
-      if (!match) throw new Error(`fixture match ${roundCode} was not created by the promotion`);
+      if (!match) throw new Error(`fixture match ${label} was not created by the promotion`);
       createdMatchKeys.push(match.key);
       return match;
     }
@@ -1352,8 +1649,11 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
       const runMatchResultsHook = (tx: postgres.TransactionSql, ...ns: number[]) =>
         DATASETS.match_results.preparePromotion!(ns.map((n, index) => ({
           rowNo: index + 1,
-          payload: { round_code: `R258L${n}`, match_date: dateOf(n) },
-          resolved: { season: FIXTURE_SEASON, home_club_name: home.name, away_club_name: away.name },
+          payload: { round_code: fixtureRound(`R258L${n}`), match_date: dateOf(n) },
+          resolved: {
+            season: FIXTURE_SEASON, round_number: Number(fixtureRound(`R258L${n}`)), round_type: 'home_and_away',
+            home_club_name: home.name, away_club_name: away.name,
+          },
         })), { sql: asSql(tx) });
 
       const lockRow = (match: FixtureMatch, strength: 'FOR UPDATE' | 'FOR SHARE'): Tx => (tx) => (strength === 'FOR UPDATE'

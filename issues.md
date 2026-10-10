@@ -22,8 +22,8 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-268 | Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd | High | Legacy intake / NULL-vs-zero — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-003. Validator fix, promotion-time re-check of retained cells and tests (DB-free + integration) committed 2026-10-09 as `5659f789`, merged and pushed to `main`, and deployed to DEV 2026-10-09 (installation and operational acceptance complete; attendance validation/promotion not exercised on DEV, ISSUE-107 gate off so no live build-header parity claimed); operator checks at 15:11:57 passed (ingest-datasets 181/181, tsc, eslint, diff-check) and the targeted ISSUE-268 integration cases passed twice on `afldb_test` as the test owner (15:21:42, 15:30:35; restricted-role path and full integration file not validated); both operator-run censuses complete 2026-10-09 (DEV 15:59:22, PROD 16:02:57: no retained submissions, no rows in Sections 2–5, no exposure found in the records checked); historical impact unassessed, nothing repaired, fix not installed by the censuses; not installed on PROD | Operator: PROD installation and acceptance after the unchanged ISSUE-265 hold; D-268-1 and D-268-3 are separate follow-ups, not merge gates |
 | AFLDB-ISSUE-269 | `replay_admin_overrides('matches')` applies only one of a match's active override rows | Medium | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-004; implemented 2026-10-09 with ISSUE-267: active rows merged into one object per `match_key`; equal-authority disagreements and underivable score components refused before any write; shared operator integration run 2026-10-09 FAILED (6 failed); **shared second-pass run 2026-10-09 PASSED on `afldb_test` (6 passed), implementation validated on `afldb_test`** (ISSUE-267); **DEV exposure census complete 2026-10-09** (0 active `matches` overrides, section 2 and all others no rows, no replay blockers); **committed as `86e2d19f`, merged/pushed, DEV deployed 2026-10-09** (shared with ISSUE-267; the deployment did not exercise the Python matches replay); **PROD exposure census complete 2026-10-09** (shared; 0 active `matches` overrides, section 2 and all others no rows, no replay blockers; does not establish the fix is installed on PROD); `merge:ready` READY twice; PROD installation deferred (shared with ISSUE-267, §17.15); historical impact remains unassessed; runbook `issues/open/AFLDB-ISSUE-269.md` §17.6–§17.9 | As ISSUE-267 (deployment procedure prepared and reviewed after the hold lifts, then the applicable PROD deployment acceptance, ISSUE-267 runbook §17.15); resolve any census section-3/4 row before a promotion |
 | AFLDB-ISSUE-270 | A delegated admin manager can take over a peer admin account through a spare invite | Medium | Authentication / administrator lifecycle — `src/app/admin/invite/[token]/actions.ts` (`confirmEnrolment`), `src/db/queries/admin-invites.ts` (new) | Open (2026-10-08); 2026-10-08 full code review F-005, code-proven, not reproduced; **implemented 2026-10-09 in `sonnet/issue-270` (worktree `afldb-issue-270`) and revised the same day for operator decision D-270-2 and then for the independent review (5 s redemption statement timeout, tracked background transactions in the race tests, doc corrections); operator validation COMPLETE for the working tree (runbook §19.9): unit 199/199 at 19:59:08 AEDT, typecheck, four-file lint and diff check (repeated after the final harness correction), and the whole `afldb_test` integration file 37/37 from 20:57:05 AEDT as `afldb_owner` (the earlier 18:50:00 177/177 and 19:32:44 198/198 runs are historical). Committed as `b239e0ac19b04becd4c1bdf26737d806590d8484`, merged to `main` and pushed (merge-readiness READY, 0 blockers, 2 warnings), and installed on DEV three times on 10 October 2026 (runbook §20; latest service start 08:14:38 AEDT, BUILD_ID `caodaX9EgGbJK4cZLFLRk`; all 110 migrations already applied; `/api/health` ok). That is DEV installation and operational acceptance only: no invite redemption exercised on DEV; not shown: restricted `afldb_auth`, real-database Server Action end-to-end, PROD installation or acceptance, historical misuse (not assessed, nothing repaired); ISSUE-107 gate off, so no live build-header parity is claimed**: every redemption requires the stored issuer's current authority under its row lock (D-270-2), free addresses and contributors included; an existing `admin`/`super_admin` is overwritten only for a current super admin, also in the upsert's `ON CONFLICT … WHERE`; refusals write nothing and audit `admin.invite_rejected` with a reason; a lock wait past 5 s rolls back as a generic failure; runbook §17–§20 | PROD installation and any applicable PROD acceptance, behind the unchanged ISSUE-265 hold; close only after that acceptance is complete; D-270-1 remains undecided, not a gate; §19.6 follow-ups recorded |
-| AFLDB-ISSUE-271 | Legacy `match_results` promotion overwrites Data Editor corrections on `matches` | Medium | Legacy CSV intake / admin authority — `src/lib/ingest/datasets.ts` (`match_results`) | Open (2026-10-08); review F-006, code-proven; nothing implemented; imported 2026-10-10, not re-verified on current `main`; runbook `issues/open/AFLDB-ISSUE-271.md` | **Selected next batch** with ISSUE-272: refuse a supplied value that differs from an active override (runbook §13–§14) |
-| AFLDB-ISSUE-272 | Legacy `match_results` builds the match key from the raw round code and creates duplicate matches | Medium | Legacy CSV intake / match identity — `src/lib/ingest/datasets.ts` (`match_results`) | Open (2026-10-08); review F-007, reproduced DB-free (review witness W3); nothing implemented; imported 2026-10-10, not re-verified on current `main`; runbook `issues/open/AFLDB-ISSUE-272.md` | **Selected next batch** with ISSUE-271; then the read-only DEV/PROD duplicate-match census (runbook §15) |
+| AFLDB-ISSUE-271 | Legacy `match_results` promotion overwrites Data Editor corrections on `matches` | Medium | Legacy CSV intake / admin authority — `src/lib/ingest/datasets.ts` (`match_results`), `src/lib/ingest/pipeline.ts` (validation reader) | Open (2026-10-08); review F-006, code-proven; imported 2026-10-10; **implemented 2026-10-10 with ISSUE-272 in worktree `afldb-issue-271` (`sonnet/issue-271`), uncommitted; operator 10 Oct 2026 on the pre-review-correction tree: DB-free 246/246, TypeScript, five-file ESLint, `git diff --check` passed; integration: first window 10 Oct FAILED 44/45 + 16/16 (historical: one ISSUE-264 F-002 fixture interaction), then after the fixture and runner corrections **PASSED 61/61 (45/45 + 16/16, 0 failed, 0 skipped; `afldb_test` only; State A verified; `D:\tmp\issue271\apply-20261010-122808-24240`; runbook §17.12); still uncommitted**: a supplied value conflicting with active Data Editor authority (score group incl. derived scores, attendance group, manual-edit attendance citation — which also blocks replacing a `match_attendance` figure) is refused at validation (advisory, import-role read-only reader, canonical key) and again under the match lock at promotion, whole submission, left `failed`; unreadable or inconsistent authority refuses; open follow-ups F4 (orphaned overrides, unreachable editor link), F5 (reader bounds), no real Data Editor save-versus-promotion race test, no dedicated manual-attendance-citation DB case (§17.10, §17.12); runbook `issues/open/AFLDB-ISSUE-271.md` §17 | Operator review and commit; `merge:ready` on a fresh ref, fast-forward and push `main`; ISSUE-272 DEV census run and reviewed; then DEV deployment and acceptance (which alone does not close the issue); PROD behind the ISSUE-265 hold (D-271-1…4 are the derived implementation basis, runbook §17.7; no open decision) |
+| AFLDB-ISSUE-272 | Legacy `match_results` builds the match key from the raw round code and creates duplicate matches | Medium | Legacy CSV intake / match identity — `src/lib/ingest/datasets.ts` (`match_results`) | Open (2026-10-08); review F-007, reproduced DB-free (review witness W3); imported 2026-10-10; **implemented 2026-10-10 with ISSUE-271 in worktree `afldb-issue-271` (`sonnet/issue-271`), uncommitted; DB-free tests, typecheck, lint and diff check passed (operator, 10 Oct, pre-correction tree); integration: first window 10 Oct FAILED 44/45 + 16/16 (historical: one F-002 fixture interaction with this batch's 2073 Grand Finals), then after the fixture and runner corrections **PASSED 61/61 (45/45 + 16/16, 0 failed, 0 skipped; `afldb_test` only; State A verified; `D:\tmp\issue271\apply-20261010-122808-24240`; runbook §17.14); still uncommitted**: `R1`→`1`, `gf`→`GF`, unsupported text refused; `resolved.round_code` and the canonical key at every key site; pre-fix submissions normalised at promotion when consistent, otherwise refused whole, and refused whole when two rows resolve to one canonical match key (§17.11); updates reach only a compatible canonical name-keyed match; existing non-canonical matches are not repaired and a corrected upload can create a canonical twin; duplicate census (third pass, §17.12) prepared, **unrun, not syntax-checked**; runbook `issues/open/AFLDB-ISSUE-272.md` §17 | Operator review and commit; `merge:ready` on a fresh ref, fast-forward and push `main` (integration passed, §17.14); read-only DEV census (still unrun, not syntax-checked) and its review (incl. singleton non-canonical rows) **before DEV deployment**, candidates to operator disposition, no automatic repair; then DEV deployment and acceptance (which alone does not close the issue); PROD behind the ISSUE-265 hold, PROD census only if chosen; historical impact unknown (D-272-1…4 are the derived implementation basis, §17.7; no open decision) |
 | AFLDB-ISSUE-273 | Submission validation overwrites a concurrent approve, promote or reject | Medium | Legacy CSV intake / submission lifecycle concurrency — `src/lib/ingest/pipeline.ts` (`validateSubmission`) | Open (2026-10-08); review F-008, code-proven (operator-driven timing); nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-273.md` | Code fix plus tests |
 | AFLDB-ISSUE-274 | A settle unit that writes only the `matches` row takes no row lock before its authority read | Medium | Acquisition / settle concurrency / manual authority — `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows`) | Open (2026-10-08); review F-009, code-proven mechanism, interleaving not executed; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-274.md` | Code fix plus tests, sequenced with ISSUE-275; amend the ISSUE-261 writer-table wording when fixed |
 | AFLDB-ISSUE-275 | A settle can insert period scores under a match it refused because a foreign owner created it concurrently | Medium | Acquisition / canonical ownership / provenance — `src/lib/acquisition/canonical-apply.ts` (`applyCanonicalUnit`) | Open (2026-10-08); review F-010, code-proven mechanism, interleaving not executed; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-275.md` | Code fix plus integration case, sequenced with ISSUE-274; open question: read-only split-ownership census |
@@ -57,7 +57,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
 | AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-304.md` | Implementation, after ISSUE-266 |
 | AFLDB-ISSUE-305 | Legacy intake validation accepts values promotion then rejects | Low | Legacy CSV intake validation — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-040, reproduced DB-free (W4); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-305.md` | Implementation; hypothesis H-305-1 open |
-| AFLDB-ISSUE-306 | Legacy intake duplicate detection compares raw club text | Low | Legacy CSV intake validation — `src/lib/ingest/datasets.ts` (`fileKey`) | Open (2026-10-08); review F-041, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-306.md` | Implementation, alongside ISSUE-272 |
+| AFLDB-ISSUE-306 | Legacy intake duplicate detection compares raw club text | Low | Legacy CSV intake validation — `src/lib/ingest/datasets.ts` (`fileKey`) | Open (2026-10-08); review F-041, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-306.md`; **not implemented** (the ISSUE-271/272 batch canonicalised only the round code; club text still compared raw) | Implementation (proposed alongside ISSUE-272; that batch did not do it) |
 | AFLDB-ISSUE-307 | Legacy promotion counts every promoted row as inserted | Low | Legacy CSV intake / import batch accounting — `src/lib/ingest/pipeline.ts` | Open (2026-10-08); review F-042, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-307.md` | Implementation (low priority) |
 | AFLDB-ISSUE-308 | Approving a player-link suggestion does not revalidate public pages | Low | Admin player links / revalidation — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-043, code-proven, fix framework-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-308.md` | Choose the mechanism (does the ISSUE-087 hang reproduce on Next 16.3.1?), then implement, with ISSUE-309/311 |
 | AFLDB-ISSUE-309 | Multi-target player-link actions stop at the first failure after earlier targets committed | Low | Admin player links — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-044, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-309.md` | Implementation, with ISSUE-308 and ISSUE-311 |
@@ -49420,6 +49420,53 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Decisions.** None (precedent ISSUE-264 D-264-*).
 - **Next action.** Implement with ISSUE-272 (selected next batch): refuse a supplied value differing from an active override,
   at validation and under the match lock at promotion (runbook §13–§14).
+- **Implementation (2026-10-10; uncommitted, UNVALIDATED — no command was run).** Worktree `afldb-issue-271`, branch
+  `sonnet/issue-271`, intended base `41cbf730` (operator-stated). `legacyMatchResultsAuthorityRefusal` in `datasets.ts`
+  compares what promotion writes with the active `matches` overrides (merged per key) and the manual-edit attendance
+  citation, as derived in runbook §17.2: an active `score` group protects all four components (override value where named,
+  stored value otherwise) and the always-written `home_score`/`away_score` (goals × 6 + behinds); an `attendance` group or a
+  `manual_admin_edit` citation protects attendance; identical values pass; blank or omitted cells keep ISSUE-258
+  preservation; groups this dataset never writes are ignored. Unknown groups, unreadable or double-encoded payloads,
+  disagreeing rows, an underivable protected score, and an override under a key no match carries refuse. Validation asks a
+  new `ValidationContext.matchResultsAuthority` reader (pipeline: existing import-role READ ONLY connection, once per
+  canonical key); promotion re-reads it after the existing ascending `FOR NO KEY UPDATE` lock inside the gate, so a
+  correction recorded after validation wins. A promotion refusal rolls back the savepoint (no `matches` change, no import
+  batch) and leaves the submission `failed` (D-268-3 applies). Tests added to `tests/ingest-datasets.test.ts` and
+  `tests/integration/match-results-promotion.test.ts`, **unrun**. Runbook §17.7 records D-271-1…4 as the implementation
+  basis derived from the editor, `saveEdit`/`applyMatchEdit`, `manualAuthorityVerdict` and the ISSUE-264 reader precedent
+  (revised 2026-10-10, second pass); none is an open decision. Not done: any historical assessment; no repair.
+  *(Historical: "UNVALIDATED — no command was run" and "unrun" above were true when written.)*
+- **Third pass (2026-10-10; review corrections; uncommitted; no production code changed).** Operator validation of the
+  second-pass tree, 10 October 2026: `tests/ingest-datasets.test.ts` **246/246 passed** (start 09:40:51 AEDT); TypeScript
+  passed; ESLint over the five changed files passed; `git diff --check` passed. **Integration files not run.** Made
+  explicit: protecting a `manual_admin_edit` attendance also stops `match_results` replacing a figure previously supplied
+  through `match_attendance` (that writer is unchanged). Recorded as open follow-ups, **not tested, not accepted, not
+  resolved** (runbook §17.10): F4, an active override under a key no match carries refuses promotion and its Data Editor
+  link cannot reach the missing match (needs investigation; no repair); F5, the validation reader's import-role
+  connection has no connect/statement/lock bound; no real Data Editor-versus-promotion race test; no restricted-role
+  reader or manual-attendance-citation database evidence yet; protection for absent matches rests on the existing gate
+  used by name-keyed creators; only a compatible canonical name-keyed match is reached (admin-created club-ID-keyed
+  matches are not; ISSUE-182/ISSUE-306 not implemented). Open; PROD hold unchanged.
+- **Fourth pass (2026-10-10; integration window result; corrections uncommitted and UNRUN; runbook §17.11, ISSUE-272
+  §17.13).** The earlier State A precondition failure was the direct Vitest run at 10:10:37 AEDT (39 passed, 22 skipped;
+  ISSUE-264 `beforeAll` refused, migration 110 absent; operator-provided console evidence, not a runner window; historical,
+  preserved). The operator's window `D:\tmp\issue271\apply-20261010-120323-16676` **failed full integration validation**:
+  `match-results-promotion.test.ts` 44 passed, 1 failed, 0 skipped, 45 total; `datasets.test.ts` 16/16. **All six
+  ISSUE-271/272 cases passed**, both ISSUE-271 cases among them, with the import connection set to `afldb_import`. The
+  failure, ISSUE-264 F-002 *blocks deleteMatch until the promotion finishes* (23505 `club_seasons_uq`, 2073/59), is a
+  fixture interaction (ISSUE-272 entry). State A was restored and verified against the capture; censuses were ACCOUNTED
+  with all fixture residue counters zero; isolation and owned-process checks passed. The runner's final report then threw
+  `Argument types do not match` (exit 1), a separate reporting failure. Fixture and runner corrected, unrun; a fresh
+  Preflight is required. No production code changed. Open; PROD hold unchanged. *(Historical: superseded by the fifth pass.)*
+- **Fifth pass (2026-10-10; successful validation window; implementation still uncommitted; documentation only; runbook
+  §17.12, full record ISSUE-272 §17.14).** The corrected fixture and runner passed in a fresh window
+  (`D:\tmp\issue271\apply-20261010-122808-24240`): `match-results-promotion.test.ts` 45/45, `datasets.test.ts` 16/16, **61/61
+  passed, 0 failed, 0 skipped**; both ISSUE-271 cases passed again with the proved `afldb_import` connection supplied
+  (`current_user` not asserted inside every application connection); `afldb_test` restored to the verified State A; the
+  census coverage limit in the ISSUE-272 entry applies (not described as wholly unchanged or residue-free). **Still open:**
+  no real Data Editor save-versus-promotion concurrency test; no dedicated PostgreSQL manual-attendance-citation case; F4;
+  F5; name-key versus club-ID-key limit; review, commit, merge, the ISSUE-272 DEV census before DEV, DEV deployment and
+  acceptance; PROD behind the ISSUE-265 hold; DEV acceptance alone does not close the issue.
 
 ## AFLDB-ISSUE-272 — Legacy `match_results` builds the match key from the raw round code and creates duplicate matches
 
@@ -49433,6 +49480,76 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   inserted for the same fixture.
 - **Open question.** Whether DEV or PROD already holds such a duplicate (read-only census proposed in runbook §15).
 - **Next action.** Implement with ISSUE-271 (selected next batch), then the census.
+- **Implementation (2026-10-10; uncommitted, UNVALIDATED — no command was run).** Same worktree and branch as ISSUE-271.
+  One pure reader, `readMatchResultsRound`, derived from `normalise_results_round`, `translateAflRound` and the sample CSV:
+  `R<n>`/`<n>` with a matching round_number → `<n>`; EF/QF/SF/PF/GF/WF in any case → upper case; `Round 1`, `r1`, `01`,
+  `R01`, a code that disagrees with round_number, or a finals code with a round_number → refused. `validateRow` carries
+  `resolved.round_code` and uses the canonical key for the stored-breakdown lookup and the ISSUE-271 authority read;
+  `fileKey` uses it (so `R1`/`1` in one file are duplicates); promotion re-derives the code from the retained cell against
+  the stored round number and type for every row before the gate, and the lock, authority read, INSERT, `source_record_id`
+  and `ON CONFLICT` all use it. **Pre-fix submissions:** normalised at promotion when consistent; otherwise the whole
+  submission is refused before any lock or write (left `failed`). The retained cell is never rewritten. Tests added
+  (DB-free and integration; the integration file's synthetic round labels now map to canonical round numbers), **unrun**.
+  Read-only duplicate census `issues/open/AFLDB-ISSUE-272-duplicate-match-census.sql` prepared, **unrun and not
+  syntax-checked**; a candidate is not confirmed damage. Historical impact unknown; no repair. **Second pass (2026-10-10;
+  uncommitted, UNVALIDATED):** promotion groups every row's canonical key across the whole submission and refuses it whole,
+  naming the rows and the key, when two rows name one match (a pre-fix `R1`/`1` or `gf`/`GF` pair, or one spelling twice),
+  even with identical values, before the gate, any lock, any write or the import batch (runbook §17.11); DB-free and
+  integration tests added, **unrun**. Residuals: `player_match_stats` `resolveMatch` still matches round codes exactly (a
+  non-canonical spelling is refused as unmatched); a file numbered in a 0-based source vocabulary is not detectable from
+  round text (census only). D-272-1…4 (runbook §17.7) are the implementation basis derived from the importer contract, not
+  open decisions. ISSUE-306 (raw club text in `fileKey`) is unchanged. *(Historical: "UNVALIDATED", "no command was run"
+  and "unrun" above were true when written.)*
+- **Third pass (2026-10-10; review corrections; uncommitted; no production code changed; runbook §17.12).** Operator
+  validation of the second-pass tree as recorded for ISSUE-271 (DB-free 246/246, TypeScript, ESLint, diff check passed);
+  **integration files and census not run**. B1: the `gf`/`GF` collision integration case moved from April 11 (shared with
+  the ISSUE-268 `R258SA` fixture, same clubs) to the unused April 19; no assertion weakened. Census: three provenance
+  classes (`match_results_upload_batch`, `no_provenance_unknown_origin` — all three provenance columns NULL, origin unknown,
+  never labelled upload damage — and `other_provenance`), no retained-submission attribution (not reliably matchable), the
+  writers' round contract as four checks (spelling, type, number, `is_final`; `gf` reported noncanonical), singleton
+  counts, and an unrestricted total before every capped listing; still unrun and not syntax-checked. Corrected: an `R1`
+  stats row can still attach to an existing old `R1` match (the earlier "finds no match" was too broad); the fix repairs
+  no existing non-canonical match and a corrected upload can create a canonical twin beside one; "updates the existing
+  match" holds only for the compatible canonical name-keyed identity (admin-created club-ID-keyed matches are not reached;
+  ISSUE-182/ISSUE-306 not implemented). DEV census review, including singleton non-canonical rows, now precedes DEV
+  deployment; candidates go to operator disposition with no automatic repair, rekey, delete or merge. Open.
+- **Fourth pass (2026-10-10; integration window result; corrections uncommitted and UNRUN; runbook §17.13).** Window
+  `D:\tmp\issue271\apply-20261010-120323-16676`: full integration validation **FAILED** (44/45 and 16/16; all six new cases
+  passed; see ISSUE-271 for the run). **Cause (code reading):** `recomputeClubSeasons` joins one row per decided Grand
+  Final, and this batch's integration cases left two decided 2073 Grand Finals won by the fixture home club (`R272F`, `R272G`).
+  The F-002 `deleteMatch` case, the file's only club-season rebuild, therefore inserted that club twice. Pre-batch fixtures
+  had no 2073 Grand Final; this is a fixture interaction, not a production defect. **Fix:** the `gf`/`GF` collision variant now
+  uses a drawn final (80–80, no winner); its assertions, the `gf`→`GF` identity case, the F-002 assertions and fixture
+  ownership are unchanged. **Runner** (`D:\tmp\issue271\Invoke-Issue271Window.ps1`): `@()` on the PSObject-wrapped
+  `List[object]` report lists replaced with `.ToArray()`; report errors now record the script line; Vitest's
+  `numFailedTestSuites` (file plus enclosing describes, hence "4") relabelled `failed-suites` beside a true failed-file
+  count, with failure detection kept and extended. **Not changed:** `recomputeClubSeasons` assumes at most one decided Grand
+  Final per season (a separate decision if wanted). The census is still unrun. Open; DEV census before DEV deployment and the
+  PROD hold unchanged. *(Historical: "FAILED", "corrected, unrun" and the fresh-Preflight requirement are superseded by the
+  fifth pass.)*
+- **Fifth pass (2026-10-10; successful validation window; implementation still uncommitted; documentation only; runbook
+  §17.14).** Operator-run, fresh Preflight `D:\tmp\issue271\preflight-20261010-122730-18800` and Apply
+  `D:\tmp\issue271\apply-20261010-122808-24240` (runner SHA-256 `35E4085F…EE641E6`; branch `sonnet/issue-271`, HEAD
+  `41cbf730`). Runner parse, TypeScript, ESLint on the corrected integration file and `git diff --check` passed first; the
+  earlier DB-free 246/246 stands. `match-results-promotion.test.ts` **45/45** (260.15 s) and `datasets.test.ts` **16/16**
+  (3.46 s): **61/61 passed**, 0 failed, 0 skipped, 0 todo, exits 0; the previously failing `deleteMatch` case passed.
+  `afldb_test` only (tunnel 55432); owner, `afldb_auth` and `afldb_import` proved read-only before the suites and their
+  connection strings supplied (`current_user` not asserted inside every application connection). Migration 110 applied
+  temporarily, State B verified, guarded rollback committed, State A verified against the capture (109 ledger rows, original
+  13-literal CHECK, 358-character comment, zero authority rows, 92 `data_overrides` rows retained); all 14 fixture-residue
+  counters zero; new append-only batches `match_results` 35, `player_match_stats` 19, `match_attendance` 2 (the legacy probe
+  labels the attendance growth UNEXPLAINED/DIRTY; the runner accounts for those two expected ISSUE-268 batches, zero other
+  findings); zero other sessions; no owned process survived; inputs unchanged; environment restored. **Coverage limit:** the
+  legacy probe fingerprints its listed tables and fixture counters only; it does not inspect every table or every row
+  written under the new batches, so the database is not described as wholly unchanged or residue-free. **Historical,
+  preserved:** the earlier State A precondition failure, a direct Vitest run at 10:10:37 AEDT (39 passed, 22 skipped; the
+  ISSUE-264 `beforeAll` refused, migration 110 absent; operator-provided console evidence, no runner directory), and the failed Apply `…\apply-20261010-120323-16676`
+  (above). **Open:** review, commit, `merge:ready` on a fresh ref, fast-forward and push `main`; the census (unrun, not
+  syntax-checked) run and reviewed before DEV deployment, candidates to operator disposition; DEV deployment and acceptance;
+  PROD behind the ISSUE-265 hold; DEV acceptance alone does not close the issue. Gaps and follow-ups unchanged: no real
+  Data Editor save-versus-promotion concurrency test; no dedicated PostgreSQL manual-attendance-citation case; F4, F5,
+  name-key versus club-ID-key limits and the ISSUE-268 D-268-3 recovery decision; ISSUE-306 not implemented; the
+  one-decided-Grand-Final-per-season assumption in `recomputeClubSeasons` is neither repaired nor fully investigated.
 
 ## AFLDB-ISSUE-273 — Submission validation overwrites a concurrent approve, promote or reject
 
@@ -49738,7 +49855,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Status:** Open (2026-10-08). **Severity:** Low. **Area:** legacy CSV intake validation. Key files:
   `src/lib/ingest/datasets.ts` (`fileKey`), `src/lib/ingest/pipeline.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-306.md`.
 - **Origin.** Review F-041 (R5a-F09) at `20a7a4bb`. Code-proven.
-- **Next action.** Implementation, alongside ISSUE-272.
+- **Not implemented.** The ISSUE-271/272 batch (2026-10-10, uncommitted) canonicalised only the round code in
+  `match_results` `fileKey`; club text is still compared raw, and `player_match_stats` is untouched.
+- **Next action.** Implementation (the review proposed doing it alongside ISSUE-272; that batch did not).
 
 ## AFLDB-ISSUE-307 — Legacy promotion counts every promoted row as inserted
 

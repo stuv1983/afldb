@@ -7,7 +7,10 @@ import postgres from 'postgres';
 import { authSql } from '@/db/authClient';
 import {
   getDataset,
+  readMatchResultsAuthority,
   readMatchSheetAuthority,
+  type MatchResultsAuthorityRead,
+  type MatchResultsAuthorityReader,
   type MatchSheetAuthorityRead,
   type MatchSheetAuthorityReader,
 } from '@/lib/ingest/datasets';
@@ -146,16 +149,37 @@ export type ValidationSummary = {
  * transaction, once per season and only when a validator asks. Validators get
  * the answer, never the connection. Advisory only: promotion re-reads it under
  * the match lock.
+ *
+ * AFLDB-ISSUE-271: the same connection answers `match_results`' question, the
+ * active Data Editor authority on one canonical match key, once per key.
  */
-function matchSheetAuthorityReader(): { read: MatchSheetAuthorityReader; close: () => Promise<void> } {
+function matchSheetAuthorityReader(): {
+  read: MatchSheetAuthorityReader; readMatchResults: MatchResultsAuthorityReader; close: () => Promise<void>;
+} {
   let importSql: postgres.Sql | null = null;
   const bySeason = new Map<number, Promise<MatchSheetAuthorityRead>>();
-  const load = async (season: number): Promise<MatchSheetAuthorityRead> => {
+  const byMatchKey = new Map<string, Promise<MatchResultsAuthorityRead>>();
+  const connect = (): postgres.Sql | null => {
     const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
-    if (!importUrl) return { ok: false, reason: 'AFLDB_IMPORT_DATABASE_URL is not configured' };
+    if (!importUrl) return null;
     importSql ??= postgres(importUrl, { max: 1, onnotice: () => {} });
+    return importSql;
+  };
+  const unconfigured = { ok: false, reason: 'AFLDB_IMPORT_DATABASE_URL is not configured' } as const;
+  const load = async (season: number): Promise<MatchSheetAuthorityRead> => {
+    const connection = connect();
+    if (!connection) return unconfigured;
     try {
-      return await importSql.begin('read only', (ro) => readMatchSheetAuthority(ro, season));
+      return await connection.begin('read only', (ro) => readMatchSheetAuthority(ro, season));
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    }
+  };
+  const loadMatchResults = async (matchKey: string): Promise<MatchResultsAuthorityRead> => {
+    const connection = connect();
+    if (!connection) return unconfigured;
+    try {
+      return await connection.begin('read only', (ro) => readMatchResultsAuthority(ro, matchKey));
     } catch (error) {
       return { ok: false, reason: error instanceof Error ? error.message : String(error) };
     }
@@ -166,6 +190,14 @@ function matchSheetAuthorityReader(): { read: MatchSheetAuthorityReader; close: 
       if (pending === undefined) {
         pending = load(season);
         bySeason.set(season, pending);
+      }
+      return pending;
+    },
+    readMatchResults: (matchKey) => {
+      let pending = byMatchKey.get(matchKey);
+      if (pending === undefined) {
+        pending = loadMatchResults(matchKey);
+        byMatchKey.set(matchKey, pending);
       }
       return pending;
     },
@@ -207,7 +239,9 @@ export async function validateSubmission(submissionId: number): Promise<Validati
     for (const row of rows) {
       let verdict;
       try {
-        verdict = await spec.validateRow(row.payload, { sql: authSql, matchSheetAuthority: authority.read });
+        verdict = await spec.validateRow(row.payload, {
+          sql: authSql, matchSheetAuthority: authority.read, matchResultsAuthority: authority.readMatchResults,
+        });
       } catch (error) {
         verdict = {
           verdict: 'error' as const,

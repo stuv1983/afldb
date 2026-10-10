@@ -3,7 +3,7 @@ import './guard';
 import { describe, expect, it } from 'vitest';
 
 import { authSql } from '@/db/authClient';
-import { DATASETS } from '@/lib/ingest/datasets';
+import { DATASETS, type MatchResultsAuthorityReader } from '@/lib/ingest/datasets';
 
 // No afterAll(authSql.end()) here: authSql is a lazy Proxy over the
 // pooled auth client (see src/db/authClient.ts), and calling .end()
@@ -15,10 +15,20 @@ import { DATASETS } from '@/lib/ingest/datasets';
 const matchResults = DATASETS.match_results;
 const playerMatchStats = DATASETS.player_match_stats;
 
+// AFLDB-ISSUE-271: these rows name no stored match, so there is no Data Editor
+// authority to read; afldb_auth cannot read data_overrides anyway. The real
+// import-role reader is exercised through validateSubmission() in
+// match-results-promotion.test.ts.
+const noMatchAuthority: MatchResultsAuthorityReader = async () => ({
+  ok: true, authority: { match: null, overrides: [] },
+});
+
 // AFLDB-ISSUE-258: a row silent on goals/behinds keeps an existing match's
 // stored breakdown, so validation checks the row's score against it. A row
 // about a NEW match therefore names a round code and date no stored match has
 // (1989 round 1, Carlton v Footscray, is a real match); this proves it first.
+// AFLDB-ISSUE-272: the round code must be canonical, so these use round 1 on a
+// date (1 January) no 1989 match was played on.
 async function expectNoStoredMatch(season: number, roundCode: string, matchDate: string) {
   const [row] = await authSql<{ n: number }[]>`
     SELECT count(*)::int AS n FROM matches
@@ -93,30 +103,31 @@ describe('match_results dataset', () => {
   });
 
   it('warns rather than errors on an unrecognised venue, and still resolves clubs/result', async () => {
-    await expectNoStoredMatch(1989, 'R258V', '1989-01-01');
+    await expectNoStoredMatch(1989, '1', '1989-01-01');
     const result = await matchResults.validateRow(
       {
-        season: '1989', round_code: 'R258V', round_number: '1', match_date: '1989-01-01',
+        season: '1989', round_code: 'R1', round_number: '1', match_date: '1989-01-01',
         venue: 'Some Ground Nobody Has Heard Of', home_club: 'Carlton', away_club: 'Footscray',
         home_score: '80', away_score: '70',
       },
-      { sql: authSql },
+      { sql: authSql, matchResultsAuthority: noMatchAuthority },
     );
     expect(result.verdict).toBe('warning');
     expect(result.resolved?.result).toBe('home_win');
     expect(result.resolved?.margin).toBe(10);
     expect(result.resolved?.home_club_id).toBeTypeOf('number');
+    expect(result.resolved?.round_code).toBe('1');
   });
 
   it('computes result/winner/margin correctly for a draw', async () => {
-    await expectNoStoredMatch(1989, 'R258D', '1989-01-01');
+    await expectNoStoredMatch(1989, '1', '1989-01-01');
     const result = await matchResults.validateRow(
       {
-        season: '1989', round_code: 'R258D', round_number: '1', match_date: '1989-01-01',
+        season: '1989', round_code: '1', round_number: '1', match_date: '1989-01-01',
         venue: 'x', home_club: 'Carlton', away_club: 'Footscray',
         home_score: '80', away_score: '80',
       },
-      { sql: authSql },
+      { sql: authSql, matchResultsAuthority: noMatchAuthority },
     );
     expect(result.verdict).not.toBe('error');
     expect(result.resolved?.result).toBe('draw');
