@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Legacy `match_results` uploads use canonical round codes and refuse to overwrite Data Editor corrections (AFLDB-ISSUE-271, AFLDB-ISSUE-272; implemented, uncommitted; DB-free unit tests, typecheck, lint, diff check and the full integration files (61/61) passed, review, commit, DEV census, deployment and acceptance outstanding; issues open) - 10 October 2026
+### Legacy `match_results` uploads use canonical round codes and refuse to overwrite Data Editor corrections (AFLDB-ISSUE-271, AFLDB-ISSUE-272; implemented, commit `d37c1422` on `main`; DB-free unit tests, typecheck, lint, diff check and the full integration files (61/61) passed; DEV duplicate census COMPLETE with 0 candidates; push verified, historical `merge:ready` result not evidenced and not waived, fresh readiness, deployment and acceptance outstanding; issues open) - 10 October 2026
 
 - **Round codes (ISSUE-272).** A `match_results` row's round is read once, by the importer's own rule: `R1` or `1` with
   round_number 1 becomes `1`; `EF/QF/SF/PF/GF/WF` in any letter case becomes upper case; `Round 1`, `r1`, `01`, `R01`, a
@@ -68,9 +68,26 @@ commit.
   `player_match_stats` 19, `match_attendance` 2) were accounted for. The census probe covers its listed tables and fixture
   counters only: it does **not** inspect every table or every row written under the new batches, so the database is not
   described as wholly unchanged or residue-free.
-- **Not done:** the ISSUE-272 duplicate census is **unrun and not syntax-checked**; nothing is reviewed, committed, merged,
-  deployed or repaired; historical duplicates and reverted corrections are unassessed (candidates would need review; no
-  damage or repair is established). No real Data Editor-versus-promotion race test and no dedicated PostgreSQL
+- **DEV duplicate census (operator, 10 October 2026, 15:56 AEDT; evidence `D:\tmp\issue272\run-20261010-155649-1780`;
+  ISSUE-272 runbook §17.15): COMPLETE.** Read-only, `afldb_dev` as `afldb_import` (server identity verified by the operator,
+  not by the runner), pinned commit `d37c1422` (on `main`), census blob `67820d85…`: **17,056 matches; 0 duplicate
+  candidate groups; 0 round-contract breaches; 0 home/away disagreements**; every match has a canonical round value; all
+  four listings FULL, 11/11 cross-checks, guard passed, stderr empty, credential scans clean. Nothing repaired or indicated.
+  It shows the current DEV data state only, not that the defect is fixed, not that historical damage never occurred, not
+  that PROD is clean. Both issues stay open.
+- **Git state (read-only check, 10 October 2026, ISSUE-272 runbook §17.16):** local `main`, `origin/main` and the live
+  remote tip (`git ls-remote`) all equal `d37c1422` (how `main` advanced is not evidenced; the earlier "fast-forward"
+  wording is withdrawn, runbook §17.17.1); the five changed source and test files
+  match the hashes the 61/61 integration window recorded. The historical `merge:ready` result is **not evidenced and not
+  waived** for either issue (console-only tool; no record), and nothing is deployed.
+- **Not done:** the ISSUE-272 PROD data state is unassessed (a PROD census is optional and not chosen, not a gate); the
+  ~~`merge:ready` result (or a written waiver), approval of the drafted DEV acceptance procedure (§17.16.4)~~ fresh
+  readiness of the documentation-only descendant of `d37c1422` that will be deployed (no waiver; the historical
+  `merge:ready` result stays not evidenced and not waived; ISSUE-272 runbook §17.17) and approval of the revised DEV
+  acceptance proposal (§17.17), an ISSUE-271 DEV acceptance procedure (not yet written), DEV
+  deployment, the DEV acceptance run and PROD installation and acceptance are outstanding; historical duplicates and
+  reverted corrections on PROD are unassessed (no damage or repair is established). *(The earlier "census unrun, nothing
+  committed" wording is superseded above.)* Also still not done: No real Data Editor-versus-promotion race test and no dedicated PostgreSQL
   manual-attendance-citation case exist. Orphaned overrides, the validation reader's bounds, the name-key versus club-ID-key
   limit and the ISSUE-268 D-268-3 recovery decision are unchanged; ISSUE-306 is not implemented; the one-decided-Grand-Final
   assumption in `recomputeClubSeasons` is neither repaired nor fully investigated. No change to `match_attendance`, the

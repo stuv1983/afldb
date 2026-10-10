@@ -264,8 +264,8 @@
 > `main`**. The cited review report `issues/reviews/2026-10-08-full-code-review.md` and witness outputs were not imported.
 > Ledger entries: `issues.md`, section *Imported review findings AFLDB-ISSUE-271–314*. **Selected next implementation
 > batch: ISSUE-271/272** (implemented 2026-10-10 in worktree `afldb-issue-271`, uncommitted; DB-free tests, typecheck,
-> lint, diff check and the full integration files (61/61) passed, review, commit, the ISSUE-272 DEV census and deployment
-> outstanding; the "nothing implemented" above no longer applies to those two, and to no other finding). Each runbook is `issues/open/AFLDB-ISSUE-<ID>.md`.
+> lint, diff check and the full integration files (61/61) passed; commit `d37c1422` on `main`; the ISSUE-272 DEV census ran
+> COMPLETE with 0 candidates (ISSUE-272 §17.15); push verified (live remote = `d37c1422`), the historical `merge:ready` result not evidenced and not waived, fresh readiness, deployment and acceptance outstanding; the "nothing implemented" above no longer applies to those two, and to no other finding). Each runbook is `issues/open/AFLDB-ISSUE-<ID>.md`.
 
 ### AFLDB-ISSUE-271 — Legacy `match_results` promotion overwrites Data Editor corrections on `matches`
 - **Severity:** Medium. **Area:** legacy CSV intake / admin authority — `src/lib/ingest/datasets.ts` (`match_results`).
@@ -287,9 +287,18 @@
   fixture counters only). Not covered: a real Data Editor save-versus-promotion race; a dedicated PostgreSQL
   manual-attendance-citation case; `current_user` asserted inside every application connection.
 - **Runbook:** `issues/open/AFLDB-ISSUE-271.md` (§17, §17.10, §17.11 historical, §17.12).
-- **Next action:** Operator review and commit; `merge:ready` on a fresh ref, fast-forward and push `main`; ISSUE-272 DEV
-  census run and reviewed; then DEV deployment and acceptance (DEV acceptance alone does not close the issue). PROD behind
-  the ISSUE-265 hold. D-271-1…4 (§17.7) are the derived implementation basis, not open decisions.
+- **Git and readiness (2026-10-10, shared with ISSUE-272 §17.16–§17.17):** commit `d37c1422` is on local `main`, the
+  recorded `origin/main` and the live remote (`git ls-remote`); "uncommitted" above is superseded as to commit; how `main`
+  advanced is not evidenced. The historical pre-merge `merge:ready` result for `d37c1422` is **not evidenced and not
+  waived** (operator decision 10 Oct 2026: no waiver for either issue); it is recorded as missing and is not regenerated or
+  replaced by any later check.
+- **Next action:** ~~Operator supplies the `merge:ready` result for `d37c1422` or waives it~~ *(withdrawn: no waiver)*. The
+  operator commits the tracking documentation as a documentation-only descendant of `d37c1422`, then runs the fresh
+  readiness of that exact revision and the `-Issue107Gate` host prechecks (ISSUE-272 §17.17.2–§17.17.3; shared, because the
+  application and test bytes are those of `d37c1422`); then DEV deployment with build identity. The ISSUE-272 DEV census is
+  **COMPLETE, 0 candidates** (ISSUE-272 §17.15; it concerns duplicate matches, not this issue's override authority). ISSUE-272's
+  proposed cases do **not** accept this issue: a DEV acceptance procedure for the Data Editor authority refusal is still to be
+  written (DEV acceptance alone does not close the issue). PROD behind the ISSUE-265 hold. D-271-1…4 (§17.7) are the derived implementation basis, not open decisions.
 
 ### AFLDB-ISSUE-272 — Legacy `match_results` builds the match key from the raw round code and creates duplicate matches
 - **Severity:** Medium. **Area:** legacy CSV intake / match identity — `src/lib/ingest/datasets.ts` (`match_results`).
@@ -305,13 +314,62 @@
   lock, write or batch (§17.11). Updates reach only a match under the compatible canonical name-keyed identity (not an
   admin-created club-ID-keyed one); existing non-canonical matches are not repaired, and a corrected upload can create a
   canonical twin beside one. Duplicate census (third pass: three provenance classes, four round-contract checks, totals
-  before every capped listing) prepared, **unrun, not syntax-checked**.
-- **Runbook:** `issues/open/AFLDB-ISSUE-272.md` (§17, §17.12, §17.13 historical, §17.14); census `issues/open/AFLDB-ISSUE-272-duplicate-match-census.sql` (**unrun, not syntax-checked**).
-- **Next action:** Operator review and commit; `merge:ready` on a fresh ref, fast-forward and push `main`; then run and
-  review the read-only **DEV census, including singleton non-canonical rows, before DEV deployment** (historical candidates
-  require review; no damage or repair is established; any disposition is the operator's, with no automatic repair, rekey,
-  delete or merge); then DEV deployment and acceptance (DEV acceptance alone does not close the issue). PROD behind the
-  ISSUE-265 hold; PROD census only if chosen. D-272-1…4 (§17.7) are the derived implementation basis, not open decisions.
+  before every capped listing) prepared, ~~unrun, not syntax-checked~~ **since run on DEV: COMPLETE, 0 candidates (below)**.
+- **Sixth pass (2026-10-10):** commit `d37c1422` is on `refs/heads/main` (census runner Git evidence; the "uncommitted"
+  wording in **State** above is superseded as to commit; push and `merge:ready` not evidenced). The read-only **DEV census
+  ran COMPLETE** (`afldb_dev` as `afldb_import`, evidence `D:\tmp\issue272\run-20261010-155649-1780`; server identity
+  operator-verified, not proved by the runner): **17,056 matches; 0 duplicate candidate groups/rows; 0 round-contract
+  breaches; 0 home/away disagreements**; all canonical; all four listings FULL; 11/11 cross-checks; no repair performed or
+  indicated. It shows the current DEV data state only: not that the defect is fixed, not that historical damage never
+  occurred, not that PROD is clean. **Closure assessed (runbook §17.15): NOT closed.**
+- **Seventh pass (2026-10-10; documentation only; runbook §17.16):** the credential-scan count of 21 is reconciled (20
+  non-report files plus `summary.txt`, scanned before the other two reports exist): not an inconsistency. The **PROD census
+  is optional and not chosen** (every statement of it is "only if chosen"): not a gate; PROD installation and acceptance
+  stay separate blockers behind the ISSUE-265 hold. **Git, read-only:** local `main`, `origin/main` and the **live remote**
+  (`git ls-remote`) all equal `d37c1422` ~~, a fast-forward of `41cbf730`~~ (eighth pass: only the tip agreement is
+  evidenced; the parent `41cbf730` does not show how `main` advanced); the five changed files match the hashes the 61/61
+  window recorded. **The `merge:ready` result is NOT EVIDENCED** (console-only tool, no readiness block, no record): the
+  missing item is the operator's console output or a written waiver; the commit's presence is not treated as a passing
+  gate. A concrete **DEV acceptance procedure is drafted for review, not approved or run** (§17.16.4).
+- **Eighth pass (2026-10-10; documentation only; runbook §17.17, supersedes §17.16.4):** operator decisions: no
+  `merge:ready` waiver, no PROD census now, no deployment or acceptance yet, validation-only insufficient. Proposed: fresh
+  post-merge readiness of `d37c1422` in a new isolated worktree (R0–R8: tip agreement, preflight implementation mode, DB-free
+  `ingest-datasets` 246, typecheck, five-file ESLint, diff check, scope and byte binding; ~~`merge:ready` informational with two
+  pre-declared structural FAILs~~ *(withdrawn, ninth pass)*); deployed-build identity (full SHA, built `BUILD_ID`, and serving-process proof: ~~gate off
+  only with worker start times and the rendered build ID~~ *(superseded, ninth/tenth pass: the gate is the only route)*); a traced side-effect inventory (submissions, row verdicts,
+  `import_batches`, `auth_audit_log`, one identical-value `matches` row version; prohibited tables listed); whole-table
+  before/after fingerprints, Gates G1/G2 before approval, stop rules with no automatic repair. The seventh-pass fixture
+  query was defective (`venues.name` does not exist) and is corrected. Nothing run.
+- **Ninth pass (2026-10-10; documentation only; runbook §17.17 revised in place):** operator decisions: no `merge:ready`
+  waiver for either issue; no dirty-main deployment and no preflight bypass; the tracking documentation is committed first,
+  so the intended deployment revision is a **documentation-only descendant of `d37c1422`**; `-Issue107Gate` preferred with
+  the documented DEV tracing configuration, with **no host setting changed** until separately authorised; no PROD census;
+  identical-value promotion stays provisional. Readiness is rebuilt around that descendant: a documentation commit (D0–D5,
+  with `preflight --mode merge`), proof that only the four tracking files differ from `d37c1422`, `worktree:bootstrap`,
+  `preflight --mode implementation`, DB-free 246, typecheck, ESLint, diff checks and byte binding on the exact revision, then
+  read-only host prechecks and `preflight --mode deploy` before a gated deployment. `merge:ready` is **not** run as part of
+  it, and no FAIL is pre-declared as acceptable. The documented read-only credential for the `auth_*` evidence is
+  `AFLDB_BACKUP_DATABASE_URL` (`afldb_backup`, `pg_read_all_data`); its availability through the tunnel is unverified.
+  Nothing run.
+- **Tenth pass (2026-10-10; documentation only; runbook §17.17 corrected in place):** S-B runs `afldb_backup` in a separate
+  child session, password typed into `Read-Host -AsSecureString` and held only in that child's `PGPASSWORD`, explicit
+  `127.0.0.1:55432`, no DSN on any command line, and an in-session guard (database, role, not superuser, read-only, write
+  probe) that refuses before any `auth_*` query. The post census V uses a reviewed **descendant-pinned copy** of the runner
+  (pin `<DOC_SHA>`, parent `d37c1422`, four-file diff, blob `67820d85…` and its copy and guard hashes required); the
+  original runner and its evidence are preserved. Credential-variable isolation now opens a child session before D0, so it
+  precedes `npm ci` and every readiness command. Snapshots fingerprint every column of 12 named tables and of pre-existing
+  batches, submissions and submission rows; what they do not cover is stated. The gate-off and `afldb_auth` alternatives
+  are kept only as superseded history. Nothing run.
+- **Runbook:** `issues/open/AFLDB-ISSUE-272.md` (§17, §17.12, §17.13 historical, §17.14, §17.15, §17.16, §17.17); census `issues/open/AFLDB-ISSUE-272-duplicate-match-census.sql` (blob `67820d85…`, run on DEV 10 Oct 2026: COMPLETE).
+- **Next action:** ~~Operator settles U-1…U-7 and approves or amends runbook §17.17~~ *(ninth pass: U-1 route, U-2
+  credential and U-6 order are settled or identified)*. ~~The operator reviews §17.17~~ *(eleventh pass: §17.17 frozen
+  10 Oct 2026 after one coverage-wording correction)*. The operator opens the isolated child session
+  (E1–E3), commits and pushes the tracking documentation (D0–D5), then runs readiness R0–R7 on that exact revision and the read-only host prechecks H-1–H-4; if the
+  DEV host lacks `AFLDB_TRACE_REQUESTS=on`, stop for a separate authorisation; then the gated DEV deployment with build
+  identity I-1–I-4; then, if U-5 is approved, the cases C3, C4, C1, C2 and the post census with the reviewed
+  descendant-pinned runner (alone they do not close the issue). The historical pre-merge `merge:ready` result stays recorded as not evidenced and not waived. PROD installation
+  and acceptance stay behind the ISSUE-265 hold; no PROD census at this stage (PROD data state unassessed, not a gate). No
+  candidate exists on DEV, so no disposition is owed. D-272-1…4 (§17.7) are the derived implementation basis, not open decisions.
 
 ### AFLDB-ISSUE-273 — Submission validation overwrites a concurrent approve, promote or reject
 - **Severity:** Medium. **Area:** legacy CSV intake / submission lifecycle concurrency — `src/lib/ingest/pipeline.ts`.
