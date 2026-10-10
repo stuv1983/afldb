@@ -382,16 +382,31 @@
   30/30 and 12/12; the two folders are not untouched), an **unreconciled** BUILD_ID-mtime difference. (Thirteenth pass, 11 Oct:
   the B0/B1/B2 totals, fingerprints, history and audit rows were cross-checked against the saved outputs, no discrepancy.) A separate **2026 venue-season defect is drafted and pending registration, no issue number
   allocated** (`D:\tmp\issue272\DRAFT-ISSUE-venue-season-bound-2026.md`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-272.md` (§17, §17.12, §17.13 historical, §17.14, §17.15, §17.16, §17.17, §17.18); census `issues/open/AFLDB-ISSUE-272-duplicate-match-census.sql` (blob `67820d85…`, run on DEV 10 Oct 2026 and again 11 Oct 2026 after acceptance: both COMPLETE).
+- **Fourteenth pass (2026-10-11; documentation only; runbook §17.18.10): B3 reconciled.** Every B3 requirement is met
+  except §17.17.6's "one new batch" (B2 rule applied at B3; the same rule as "two new import batches"). **Batch 115 is the
+  only discrepancy.** Its attribution, timing, zero canonical writes and unchanged fingerprints were re-verified from the raw
+  outputs. Two precision notes: "scheduled" is inferred from the repository timer, not evidenced on DEV; 64 `data_issues`
+  rows were refreshed, outside snapshot coverage. The adjudication authorises the attribution only (it says the rule "is NOT
+  satisfied"), so **no acceptance outcome is appended**. Criterion 8 stays QUALIFIED and undecided.
+- **Fifteenth pass (2026-10-11; documentation only; runbook §17.18.11): D-272-5 approved by the operator.** The exact
+  batch-count requirement is waived for **batch 115 only**, when assessing ISSUE-272 criterion 8 on the existing 2025
+  fixture evidence; it does not apply to ISSUE-271, PROD acceptance or issue closure. **Criterion 8: met with a recorded
+  exception.** The original B3 verdict stays **INCONCLUSIVE**; all baselines and retained evidence unchanged; the earlier
+  adjudication stays as recorded, D-272-5 separately. Batch 115: zero canonical writes, 64 `data_issues` rows refreshed,
+  scheduled origin inferred. No database contact, nothing re-run.
+- **Runbook:** `issues/open/AFLDB-ISSUE-272.md` (§17, §17.12, §17.13 historical, §17.14, §17.15, §17.16, §17.17, §17.18, §17.18.10, §17.18.11); census `issues/open/AFLDB-ISSUE-272-duplicate-match-census.sql` (blob `67820d85…`, run on DEV 10 Oct 2026 and again 11 Oct 2026 after acceptance: both COMPLETE).
 - **Next action:** ~~Operator settles U-1…U-7 and approves or amends runbook §17.17~~ *(ninth pass: U-1 route, U-2
   credential and U-6 order are settled or identified)*. ~~The operator reviews §17.17~~ *(eleventh pass: §17.17 frozen
   10 Oct 2026 after one coverage-wording correction)*. ~~The operator opens the isolated child session
   (E1–E3), commits and pushes the tracking documentation (D0–D5), then runs readiness R0–R7 on that exact revision and the
   read-only host prechecks H-1–H-4 ... the gated DEV deployment with build identity I-1–I-4; then, if U-5 is approved, the
   cases C3, C4, C1, C2 and the post census~~ *(all done 10–11 Oct 2026; twelfth pass, runbook §17.18)*. **Remaining
-  (criteria in §17.18.9):** the operator's closure-time position on the **qualified** DEV acceptance (original B3
-  INCONCLUSIVE; batch 115 adjudicated, not satisfied); PROD installation and PROD acceptance behind the ISSUE-265 hold; the
-  closure procedure. Separately: register the drafted 2026 venue-season defect (no number allocated yet; not treated as a
+  (criteria in §17.18.9, §17.18.11):** ~~the operator's closure-time position on the **qualified** DEV acceptance (original B3
+  INCONCLUSIVE; batch 115 adjudicated, not satisfied). Fourteenth pass: the operator either records the prepared decision
+  **D-272-5** (§17.18.10 item 6, Option A: waive the batch-count rule for batch 115 only; recommended) or declines it, in
+  which case the commands for a fresh full acceptance run (Option B) are prepared for approval first.~~ *(fifteenth pass:
+  D-272-5 approved and recorded; criterion 8 met with a recorded exception)* **PROD installation and PROD acceptance,
+  blocked by the ISSUE-265 hold; then the closure procedure.** Separately: register the drafted 2026 venue-season defect (no number allocated yet; not treated as a
   gate); operator-owned housekeeping (staging copies, DEV host `.env` backup and retained `AFLDB_TRACE_REQUESTS=on`,
   kept readiness worktree/branch, tunnel PID 16372). ISSUE-271 is not accepted by this. The historical
   pre-merge `merge:ready` result stays recorded as not evidenced and not waived. No PROD census at this stage (PROD data

@@ -70,6 +70,20 @@
   (`D:\tmp\issue272\run-20261011-060523-24228`) is COMPLETE, exit 0, zero findings, all listings FULL, 17,056 matches
   (= B0). **DEV acceptance is supported only with that recorded concurrency exception; it is not an unqualified PASS under
   the batch-count rule.** ISSUE-271 acceptance, PROD installation and PROD acceptance are not claimed. **Still Open.**
+- **Revision (2026-10-11, fourteenth pass: B3 reconciliation; documentation only):** every B3 requirement was reconciled
+  against the retained outputs. **Batch 115 is the only discrepancy.** The unmet rule is §17.17.6 B2's "one new batch" as
+  applied at B3, the same rule as "two new import batches" and the §17.17.4 prohibition. The adjudication's four grounds are
+  supported, with two precision notes: "scheduled" is inferred from the repository timer, not evidenced on DEV; batch 115
+  refreshed 64 `data_issues` rows (non-canonical, outside the snapshots). The adjudication authorises the attribution only,
+  not a waiver or an acceptance outcome, so **no outcome is appended**. A one-line operator decision (D-272-5, Option A) is
+  prepared for review in §17.18.10. **Still Open** (PROD rows 9–10 unmet regardless).
+- **Revision (2026-10-11, fifteenth pass: operator decision D-272-5 recorded; documentation only):** the operator approved
+  D-272-5 (§17.18.11, verbatim): the exact batch-count requirement is **waived for import batch 115 only**, when assessing
+  ISSUE-272 criterion 8, on the existing 2025-fixture evidence. **Criterion 8 is met with a recorded exception.** It does
+  not apply to ISSUE-271, PROD acceptance or issue closure. The original B3 verdict stays **INCONCLUSIVE**; all baselines
+  and retained evidence are unchanged; the earlier adjudication stays as recorded. Batch 115: zero canonical writes, 64
+  `data_issues` rows refreshed; its scheduled origin remains an inference. **Still Open:** PROD installation and PROD
+  acceptance are blocked by the ISSUE-265 hold, and the closure procedure is not performed.
 
 ## 1. Summary
 
@@ -1941,15 +1955,16 @@ reclassify).
 | 5 | PROD census | none | **Optional, not chosen; not a gate** | PROD data state unassessed |
 | 6 | Review, commit, push | local `main`, recorded `origin/main` and live remote = `b2939eb7` (verified 10 Oct 21:34, `ls-remote`; local `main` re-read 11 Oct); `d37c1422` before it. **Historical `merge:ready` result: not evidenced and not waived.** Fresh readiness of the descendant: PASS (not `merge:ready`) | **Tips verified; historical `merge:ready` NOT EVIDENCED and NOT WAIVED** | the missing historical result stays recorded as missing; the twelfth- and thirteenth-pass four-file edits were uncommitted when written and are recorded by the documentation commit that follows `b2939eb7` |
 | 7 | DEV deployment, after the census | gated `sync-dev.ps1` exit 0, `b2939eb7`, `BUILD_ID` `e6baP2aMpe9KQ13d_24BL`, I-1–I-4 PASS, 24/24 headers (17.18.3) | **Done** (10 Oct 2026) | the `BUILD_ID` mtime discrepancy is unreconciled (no effect on identity) |
-| 8 | DEV acceptance of the fixed behaviour | C3/C4 rejected as expected; C1/C2 gated, manually promoted (batches 113/114); fingerprints unchanged; **B3 INCONCLUSIVE** (batch 115); operator adjudication; census of record clean (17.18.4–17.18.6) | **Performed; QUALIFIED. Supported only with the recorded concurrency exception; not an unqualified PASS** | operator states at closure whether the qualified result stands as criterion 8; 2025 fixtures only; ISSUE-271 not accepted |
+| 8 | DEV acceptance of the fixed behaviour | C3/C4 rejected as expected; C1/C2 gated, manually promoted (batches 113/114); fingerprints unchanged; **B3 INCONCLUSIVE** (batch 115); operator adjudication; census of record clean (17.18.4–17.18.6) | **Performed; QUALIFIED. Supported only with the recorded concurrency exception; not an unqualified PASS.** *(Fifteenth pass, 11 Oct 2026: **met with a recorded exception (D-272-5, §17.18.11)**, the batch-count requirement waived for batch 115 only; B3 stays INCONCLUSIVE; still not an unqualified PASS.)* | ~~operator states at closure whether the qualified result stands as criterion 8~~ *(settled by D-272-5)*; 2025 fixtures only; ISSUE-271 not accepted |
 | 9 | PROD installation | none; behind the ISSUE-265 hold | **Not done (blocked)** | after the hold lifts |
 | 10 | PROD acceptance | none | **Not done (blocked)** | as 9 |
 | 11 | Closure procedure (`CLAUDE.md` §5) | not performed | **Not performed** (9, 10 unmet; 8 qualified) | on closure only |
 | 12 | Follow-ups that are not gates | ISSUE-306; 0-based-vocabulary file; name-key vs club-ID-key; ISSUE-268 D-268-3; one-decided-Grand-Final assumption; **new: the pending 2026 venue-season defect (17.18.8); housekeeping below** | **Recorded, not gates** | tracked separately |
 
 **Remaining blockers (ISSUE-272), exactly:** (a) PROD installation and PROD acceptance, behind the unchanged ISSUE-265 hold;
-(b) the operator's closure-time position on the qualified DEV acceptance (criterion 8), since the batch-count rule was not
-met and was adjudicated for this assessment; (c) the closure procedure itself. **Not blockers but open:** the pending venue
+~~(b) the operator's closure-time position on the qualified DEV acceptance (criterion 8), since the batch-count rule was not
+met and was adjudicated for this assessment;~~ *(settled for criterion 8 by D-272-5, §17.18.11; it does not decide
+closure)* (c) the closure procedure itself. **Not blockers but open:** the pending venue
 defect registration; operator-owned housekeeping that nothing here performed: the staging copies (17.18.7 item 5), the DEV
 host `.env` backup and the retained `AFLDB_TRACE_REQUESTS=on`, the kept readiness worktree and branch (U-7), tunnel PID 16372,
 the refused-launch directory, and the evidence directories (the incident copy-back is no longer outstanding: restored and
@@ -1957,3 +1972,171 @@ verified, item 8). **ISSUE-271 is not accepted by
 any of this** (its own DEV acceptance procedure is still unwritten).
 
 **Closure verdict: ISSUE-272 stays Open.** Nothing was repaired, rebuilt, deployed or cleaned up in this pass.
+
+#### 17.18.10 Fourteenth pass: B3 reconciliation and the outstanding criterion-8 decision (2026-10-11; documentation only)
+
+Agent (fourteenth pass, solo, no sub-agent): Read, Grep and Edit only; nothing executed (no command, Git, test, host,
+database or network contact; no hash recomputed). Read for this pass: §17.17.4–§17.17.8 and §17.18; the pack's
+`EXPECTED-RESULTS.txt`; `acceptance-exec-20261010-213359\EXECUTION-NOTES.txt` and parts 2–6; `snapshots-B3\s-a-B3.out`,
+`s-b-B3.out`, both `.err` files (0 bytes) and both `console\*-exit-code.txt` (`0`); the B2 S-A lines compared below;
+`gates-run\G2-out\s-a-G2.out`; `run-20261011-060523-24228\summary.txt`; `deploy/afldb-settle-afl-api.timer`;
+`src/lib/acquisition/settle-core.ts:562-583`; `src/app/admin/current-season/actions.ts:167-187`. The original B3 verdict,
+B0–B3 baselines and every evidence file are unchanged.
+
+**1. The unmet criterion, verbatim.** §17.17.6 row B3: "as B2, against B2, for F2", where row B2 requires "**one new batch**
+(`admin-upload`, `match_results`, `submission <C1 id>`, `completed`, read 1, inserted 1, updated 0, rejected 0)". The same
+rule appears three more times: §17.17.4, prohibited changes, "**an import batch other than the two expected**"; §17.17.6
+totals, "**two new import batches**"; `EXPECTED-RESULTS.txt:107`, "**2 new import batches**". B3 shows two new batches
+against B2 (50 → 52, maximum 113 → 115). Under stop rule 5 (§17.17.6) that is INCONCLUSIVE, not FAIL, because concurrent
+DEV activity (a settle) could explain it.
+
+**2. B3 requirements against the retained evidence (B3 read in full; B2 compared line by line).**
+
+| B3 requirement (§17.17.6 "as B2, against B2, for F2"; §17.17.5 result rule) | B3 evidence | Verdict |
+|---|---|---|
+| S-A and S-B exit 0, empty `.err`, guard line before the first result | both exit `0`; both `.err` 0 bytes; `S-A GUARD PASSED` line 4, `S-B GUARD PASSED` line 4 | met |
+| `matches` count, max id, whole-table MD5 equal B2 | 17,056 / 17,275 / `3fdab09d75f966ca84021afce6385c21`, identical to B2 line 14 | met |
+| F2 `row_md5` and `row_text` equal B2; F2 `xmin` differs | `08cf9841…` and row text identical to B2; `xmin` 407714 → 616225 | met |
+| F1 untouched since B2 | F1 `xmin` 616215, `row_md5` `26d28d98…` and row text identical to B2 | met |
+| Every other fingerprint equal B2 | old batches 49 / `31435e09…`; old submissions 42 / `6c610157…`; old submission rows 43 / `070224aa…`; all 12 S-A2 lines identical to B2 lines 81–92; batch 113 row identical to B2 line 37 | met |
+| **One new batch for C2** (`admin-upload`, `match_results`, `submission 72`, `completed`, 1/1/0/0) | batch 114 exactly so (source 15, 11:31:55.711473 UTC) **and a second new batch, 115** | **not met: the only discrepancy** |
+| C2 `promoted` with that `import_batch_id`, `error` NULL, `uploaded_by` = `reviewed_by` = acting id | submission 72: `promoted`, batch 114, `error` empty, 4 / 4, `content_sha256` = actual = `2e1761c4…`; 69–71 unchanged | met |
+| Four new audit rows by the acting admin | 1074 `upload.staged`, 1075 `submission.validated`, 1076 `submission.approved`, 1077 `submission.promoted` {applied 1, batchId "114"}; all actor 4; no other row after 1063 | met |
+| Gate G2 before approval | `s-a-G2.out`: 30 rows, none `f`, `gate_pass` `t` | met |
+| V: COMPLETE, 0 candidates/breaches/disagreements, listings FULL, `matches` = B0, pin evidence | `summary.txt`: `FINAL: COMPLETE (exit code 0)`, 17,056, all zero, 4 × FULL, 11/11 OK, descendant checks passed, copy `60aafc14…`, guard `dfaa08a0…`, credential scan CLEAN | met (V ran after the INCONCLUSIVE B3 under its own separate authorisation) |
+
+**Batch 115 is the only outstanding discrepancy** in B3, and B0, B1 and B2 passed (§17.18, thirteenth-pass cross-check).
+
+**3. The batch-115 attribution, re-verified from the raw row.**
+
+- **Identity:** source 6, tool `settle-afl-api.ts`, target `staging.source_record_versions`, notes "AFLDB-ISSUE-228 settle;
+  snapshot=afl-api-2026-2026-10-10-180936; season=2026; mode=apply; auto-apply" (`s-a-B3.out:39`). It is not an
+  `admin-upload` / `match_results` batch and names no submission. Its season (2026) is not the fixtures' (2025).
+- **No actor:** S-B lists every audit row after 1063. There are exactly the 14 acceptance rows, the last at 11:31:55 UTC.
+  The admin "fetch now" control writes `current_season.settle_triggered` on every attempt (`actions.ts:183`), and no such row
+  exists. So no admin UI trigger occurred before B3. A CLI or systemd start writes no audit row, so this neither proves nor
+  excludes one.
+- **Timing:** started 18:10:34.70 UTC, completed 18:11:03.31 UTC (05:10–05:11 AEDT, 11 October), 6 h 38 min after batch
+  114 and inside the B2 → B3 interval (B2 before 11:29:55 UTC; B3 ~05:45 AEDT). This **matches** the repository timer
+  `deploy/afldb-settle-afl-api.timer` (`OnCalendar=*-*-* 05:00`, `RandomizedDelaySec=15min`, host time zone
+  Australia/Melbourne). **Precision note:** no local evidence shows that timer **installed or enabled on DEV**. The word
+  "scheduled" in §0 and §17.18.5 is therefore an inference consistent with the timer. The attribution to non-acceptance
+  activity does not rest on it.
+- **Canonical writes:** its own `validation_result` records `canonicalRowsInserted` 0, `canonicalRowsUpdated` 0,
+  `canonicalApplicationsLogged` 0, `projectionRowsWritten` 0, `derivedRecomputeRuns` 0, `versionsAppended` 0,
+  `candidatesCreated` 0, `attendanceEnrichmentsApplied` 0, `manualAuthorityRefusals` 0 (`canonicalApplyRefusals` 64,
+  `observationsUnchanged` 10,464 of 10,464). Independently, the `matches` whole-table hash and all 12 S-A2 fingerprints are
+  unchanged B2 → B3. **Precision note:** `dataIssuesRefreshed` 64 means 64 `data_issues` rows were written through `INSERT …
+  ON CONFLICT DO UPDATE` (`settle-core.ts:565-582`). `data_issues` is bookkeeping, not canonical, and lies outside S-A2 (not
+  established by the snapshots, §17.17.5 item 1). So "zero canonical writes" is supported, but "no writes" would not be.
+- **Unchanged acceptance fingerprints:** confirmed (table in item 2).
+
+The adjudication's four grounds (source/tool, timing, zero canonical writes, unchanged fingerprints) are all supported by the
+retained evidence, within the two precision notes above.
+
+**4. What the operator adjudication authorises, and what it does not.** Its only record is `EXECUTION-NOTES-part6.txt`
+items 2–3, which transcribe the operator's words. There is no separate operator-authored file, and a search of
+`D:\tmp\issue272` for "adjudicat" finds only that file and the documentation-commit diffs. Verbatim: batch 115 "is accepted as
+unrelated concurrent DEV activity **for this assessment**, on its source/tool, timing, zero canonical writes and unchanged
+acceptance fingerprints. No acceptance re-run, no re-promotion, no baseline replacement. **The original batch-count rule is
+NOT satisfied and is not claimed as satisfied.**" Item 3 separately authorised the census.
+
+- **Authorises:** classifying batch 115 as not attributable to the acceptance submissions; keeping the existing evidence
+  (no re-run, re-promotion or baseline replacement); running V despite B3.
+- **Does not authorise:** a waiver of the batch-count rule; re-labelling B3; any acceptance outcome (PASS,
+  "PASS with exception" or "criterion 8 met"); closure. It states no outcome at all. §17.18.5 item 3 ("supported") and the
+  §17.18.9 row-8 status ("Performed; QUALIFIED") are the tracking's **evidential assessment**, not an operator-authorised
+  outcome. Row 8's own "Outstanding" column already leaves the decision to the operator.
+
+**5. Outcome of this pass.** **No separate acceptance outcome is appended**, because the recorded decision does not permit
+one. Criterion 8 stays **performed, QUALIFIED, undecided**. The original B3 verdict stays **INCONCLUSIVE**.
+
+**6. The smallest resolution, prepared for operator review (not decided; nothing here is in force).** *(Fifteenth pass:
+Option A adopted by the operator on 11 October 2026 in the operator's own words, recorded in §17.18.11; that record, not
+the draft below, is the decision. Option B not taken. Items 5–7 are kept as written for this pass.)*
+
+*Option A, recommended: one operator decision, no database contact.* If the operator adopts it, the text to be recorded verbatim, dated and attributed to the operator:
+
+> **D-272-5 (operator, <date>):** For ISSUE-272 criterion 8 (DEV acceptance), the batch-count requirement — §17.17.6 row
+> B2 "one new batch" as applied at B3, the §17.17.6 total "two new import batches", and the §17.17.4 prohibition "an import
+> batch other than the two expected" — is **waived for import batch 115 only**, on the evidence in §17.18.5 and §17.18.10.
+> The original B3 verdict stays INCONCLUSIVE and the baselines are unchanged. Criterion 8 is recorded as **met with a
+> recorded exception** (DEV only; 2025 fixtures; round-code behaviour only; not ISSUE-271, not PROD). The waiver covers no
+> other batch, table, interval or future acceptance run.
+
+Effect if adopted: §17.18.9 row 8 becomes "met with recorded exception (D-272-5)". Nothing else changes: rows 9–11 stay
+unmet, so **ISSUE-272 still cannot close**.
+
+*Option B: a fresh full acceptance run.* This is only for an unqualified PASS. It is larger: it re-executes §17.17.6 C3, C4,
+C1, C2 with fresh B0–B3 and V. It writes on DEV 4 submissions, 12 submission rows, 2 import batches, 14 acceptance audit rows
+plus sign-in rows, and one identical-value row version on each of F1 and F2. All of it is retained, since there is no
+rollback (stop rule 6). It needs U-5-style approval of a second identical-value promotion and a window that ends B3 well
+before 05:00 AEDT (the AFL API timer window above). A **C2-only re-run** is not smaller: it could satisfy the B3 interval
+rule for a new interval, but not the B0-based totals. It would still need an operator decision to combine runs. Option B's
+commands are **not prepared in this pass**. If the operator declines Option A, they are derived from §17.17.5–§17.17.6 and
+the 2025 pack before any execution request.
+
+**7. Criteria and closure after this pass.** §17.18.9 is unchanged: row 8 stays QUALIFIED pending D-272-5 or Option B; rows 9
+and 10 (PROD installation and acceptance) stay blocked behind the ISSUE-265 hold; row 11 is not performed. **Closure verdict:
+ISSUE-272 stays Open.** Nothing was run, re-promoted, re-baselined, deployed or cleaned up, and no timer was changed.
+
+#### 17.18.11 Fifteenth pass: operator decision D-272-5 recorded (2026-10-11; documentation only)
+
+Agent (fifteenth pass, solo, no sub-agent): Read, Grep and Edit of three tracking files only (this runbook, `issues.md`,
+`IssuesIndex.md`); nothing executed (no command, Git, test, host, database or network contact; no hash recomputed); no
+acceptance case, baseline or census re-run. `CHANGELOG.md` is not changed: no behaviour changed.
+
+**1. The decision, verbatim (operator, 11 October 2026).**
+
+> **D-272-5:** "I approve D-272-5: waive the exact batch-count requirement for batch 115 only when assessing ISSUE-272
+> criterion 8. Record criterion 8 as 'met with a recorded exception'. This decision applies only to ISSUE-272 DEV acceptance
+> using the existing 2025 fixture evidence. It does not apply to ISSUE-271, PROD acceptance or issue closure."
+
+It adopts §17.18.10 item 6, Option A. The operator's words above, not the draft wording in §17.18.10, are the record.
+Option B (a fresh full acceptance run) is not taken, and its commands remain unprepared.
+
+**2. What it covers, and what it does not.** "The exact batch-count requirement" is the single rule identified in
+§17.18.10 item 1: §17.17.6 row B2 "one new batch" as applied at B3, which is the same rule as the §17.17.6 total "two new
+import batches", the §17.17.4 prohibition "an import batch other than the two expected" and `EXPECTED-RESULTS.txt:107`
+"2 new import batches". The waiver covers **import batch 115 only**, and only for assessing ISSUE-272 criterion 8 on the
+existing 2025-fixture evidence (F1 16625, F2 16838; submissions 69–72; batches 113/114; B0–B3; census of record
+`run-20261011-060523-24228`). It does **not** cover any other batch, table or interval, any other criterion of this issue,
+ISSUE-271, PROD acceptance, issue closure, or any future acceptance run.
+
+**3. What is preserved, unchanged.**
+
+- The **original B3 verdict stays INCONCLUSIVE** (§17.18.5 item 1). D-272-5 waives the rule; it does not re-label B3 and
+  does not state that the batch-count rule was satisfied.
+- **All baselines** (B0 first and fresh, B1, B2, B3) and **all retained evidence** under `D:\tmp\issue272\` are unchanged;
+  none was read, moved, re-created or added to for this pass.
+- The operator adjudication of 11 October (§17.18.5 item 2; scope in §17.18.10 item 4) stays as recorded. D-272-5 is a
+  **subsequent, separate** operator decision, recorded here and not merged into it.
+- The evidential assessment (§17.18.5 item 3) and the fourteenth-pass reconciliation (§17.18.10) stay as written.
+
+**4. Batch-115 attribution, as it stands under D-272-5.** Batch 115 (source 6, `settle-afl-api.ts`,
+`staging.source_record_versions`, season 2026, 18:10:34–18:11:03 UTC) made **zero canonical writes**, on its own counters
+and on the unchanged `matches` and 12 S-A2 fingerprints. It **refreshed 64 `data_issues` rows** (non-canonical, outside
+snapshot coverage), so "no writes" is not claimed. **Its scheduled origin remains an inference** from the repository timer
+`deploy/afldb-settle-afl-api.timer`. That timer is not evidenced as installed or enabled on DEV. No admin UI trigger
+occurred (no `current_season.settle_triggered` audit row), and a CLI or systemd start is neither proved nor excluded. Where
+earlier text says "a scheduled AFL API settle" (§0, twelfth-pass line) or "a scheduled settle" (§17.18.5 item 1), read it as
+"an AFL API settle, scheduled by inference".
+
+**5. Effect on the criteria (§17.18.9).**
+
+| # | Criterion | Status after D-272-5 |
+|---|---|---|
+| 8 | DEV acceptance | **Met with a recorded exception (D-272-5).** DEV only, ISSUE-272 only, existing 2025-fixture evidence; B3 stays INCONCLUSIVE; not an unqualified PASS. The limits in §17.18.5 ("what it does not show") still apply |
+| 9 | PROD installation | **Not done; blocked by the ISSUE-265 hold** |
+| 10 | PROD acceptance | **Not done; blocked by the ISSUE-265 hold**; D-272-5 does not apply to it |
+| 11 | Closure procedure | **Not performed**; D-272-5 does not decide closure |
+
+Rows 1–7 and 12 are unchanged; row 6's historical `merge:ready` result stays not evidenced and not waived. Remaining-blocker
+(b) of §17.18.9 is settled as to criterion 8 only. ISSUE-271's own DEV acceptance procedure is still unwritten and nothing
+here accepts it.
+
+**Remaining gates (ISSUE-272):** PROD installation and PROD acceptance, behind the ISSUE-265 hold; then the closure
+procedure (`CLAUDE.md` §5). Not gates but open: registration of the drafted 2026 venue-season defect (§17.18.8) and the
+operator-owned housekeeping listed under §17.18.9.
+
+**Closure verdict: ISSUE-272 stays Open.** Nothing was run, re-promoted, re-baselined, deployed or cleaned up.
