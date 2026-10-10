@@ -265,7 +265,7 @@
 > Ledger entries: `issues.md`, section *Imported review findings AFLDB-ISSUE-271–314*. **Selected next implementation
 > batch: ISSUE-271/272** (implemented 2026-10-10 in worktree `afldb-issue-271`, uncommitted; DB-free tests, typecheck,
 > lint, diff check and the full integration files (61/61) passed; commit `d37c1422` on `main`; the ISSUE-272 DEV census ran
-> COMPLETE with 0 candidates (ISSUE-272 §17.15); push verified (live remote = `d37c1422`), the historical `merge:ready` result not evidenced and not waived, fresh readiness, deployment and acceptance outstanding; the "nothing implemented" above no longer applies to those two, and to no other finding). Each runbook is `issues/open/AFLDB-ISSUE-<ID>.md`.
+> COMPLETE with 0 candidates (ISSUE-272 §17.15); push verified (live remote = `d37c1422`, then the documentation-only descendant `b2939eb7`), the historical `merge:ready` result not evidenced and not waived; fresh readiness PASSED, **DEV deployed at `b2939eb7` (BUILD_ID `e6baP2aMpe9KQ13d_24BL`) and ISSUE-272 DEV acceptance performed and QUALIFIED (twelfth pass, 11 Oct 2026; ISSUE-272 §17.18)**; ISSUE-271 acceptance, PROD installation and PROD acceptance outstanding; the "nothing implemented" above no longer applies to those two, and to no other finding). Each runbook is `issues/open/AFLDB-ISSUE-<ID>.md`.
 
 ### AFLDB-ISSUE-271 — Legacy `match_results` promotion overwrites Data Editor corrections on `matches`
 - **Severity:** Medium. **Area:** legacy CSV intake / admin authority — `src/lib/ingest/datasets.ts` (`match_results`).
@@ -292,13 +292,18 @@
   advanced is not evidenced. The historical pre-merge `merge:ready` result for `d37c1422` is **not evidenced and not
   waived** (operator decision 10 Oct 2026: no waiver for either issue); it is recorded as missing and is not regenerated or
   replaced by any later check.
-- **Next action:** ~~Operator supplies the `merge:ready` result for `d37c1422` or waives it~~ *(withdrawn: no waiver)*. The
-  operator commits the tracking documentation as a documentation-only descendant of `d37c1422`, then runs the fresh
-  readiness of that exact revision and the `-Issue107Gate` host prechecks (ISSUE-272 §17.17.2–§17.17.3; shared, because the
-  application and test bytes are those of `d37c1422`); then DEV deployment with build identity. The ISSUE-272 DEV census is
-  **COMPLETE, 0 candidates** (ISSUE-272 §17.15; it concerns duplicate matches, not this issue's override authority). ISSUE-272's
-  proposed cases do **not** accept this issue: a DEV acceptance procedure for the Data Editor authority refusal is still to be
-  written (DEV acceptance alone does not close the issue). PROD behind the ISSUE-265 hold. D-271-1…4 (§17.7) are the derived implementation basis, not open decisions.
+- **Deployment (2026-10-10/11, shared with ISSUE-272 §17.18):** the documentation-only descendant `b2939eb7` (application and
+  test bytes those of `d37c1422`) passed fresh readiness (DB-free 246/246, typecheck, ESLint, byte binding) and is **deployed
+  on DEV** (BUILD_ID `e6baP2aMpe9KQ13d_24BL`; 24/24 build headers from 4/4 workers). This issue's code is therefore running
+  on DEV, but **no ISSUE-271 case was run**: ISSUE-272's acceptance cases exercised round codes only, so nothing here
+  accepts the Data Editor authority refusal. The ISSUE-272 acceptance is itself qualified (original B3 INCONCLUSIVE;
+  operator-adjudicated concurrent batch 115).
+- **Next action:** ~~Operator supplies the `merge:ready` result for `d37c1422` or waives it~~ *(withdrawn: no waiver)*.
+  ~~The operator commits the tracking documentation ... then DEV deployment with build identity~~ *(done, ISSUE-272
+  §17.18)*. **Open:** write and run a DEV acceptance procedure for the Data Editor authority refusal (not yet written; DEV
+  acceptance alone does not close the issue). The ISSUE-272 DEV censuses (before deployment and after acceptance) are
+  **COMPLETE, 0 candidates** (ISSUE-272 §17.15, §17.18.6; they concern duplicate matches, not this issue's override
+  authority). PROD behind the ISSUE-265 hold. D-271-1…4 (§17.7) are the derived implementation basis, not open decisions.
 
 ### AFLDB-ISSUE-272 — Legacy `match_results` builds the match key from the raw round code and creates duplicate matches
 - **Severity:** Medium. **Area:** legacy CSV intake / match identity — `src/lib/ingest/datasets.ts` (`match_results`).
@@ -360,16 +365,38 @@
   precedes `npm ci` and every readiness command. Snapshots fingerprint every column of 12 named tables and of pre-existing
   batches, submissions and submission rows; what they do not cover is stated. The gate-off and `afldb_auth` alternatives
   are kept only as superseded history. Nothing run.
-- **Runbook:** `issues/open/AFLDB-ISSUE-272.md` (§17, §17.12, §17.13 historical, §17.14, §17.15, §17.16, §17.17); census `issues/open/AFLDB-ISSUE-272-duplicate-match-census.sql` (blob `67820d85…`, run on DEV 10 Oct 2026: COMPLETE).
+- **Twelfth pass (2026-10-11; documentation only; runbook §17.18): DEV deployed and DEV acceptance performed, QUALIFIED.**
+  Documentation commit `b2939eb7658a15d7b70bd72be836107482362c0c` (sole parent `d37c1422`) pushed; fresh readiness R0–R7 PASS;
+  gated DEV deployment exit 0, **BUILD_ID `e6baP2aMpe9KQ13d_24BL`**, I-1–I-4 PASS (24/24 headers, 4/4 workers). Acceptance (2025
+  fixtures F1 16625, F2 16838): **C3/C4 = submissions 69/70 refused with the expected row reasons and rejected**; **C1/C2 =
+  submissions 71/72 passed Gates G1/G2 (30/30 each) and were manually promoted as import batches 113/114**; **4 submissions,
+  12 rows, 2 acceptance batches, 14 acceptance audit rows**. `matches` count 17,056, max id and whole-table fingerprint
+  unchanged; the 12 covered tables unchanged; F1/F2 values unchanged, **both `xmin` values changed**. **Original B3 verdict:
+  INCONCLUSIVE (unchanged)** — an unexpected import batch 115 (`settle-afl-api.ts`, 0 canonical writes). **Operator
+  adjudication (recorded separately, 11 Oct):** batch 115 is unrelated concurrent DEV activity for this assessment; the
+  batch-count rule is not met. **Census of record `D:\tmp\issue272\run-20261011-060523-24228`: COMPLETE, actual exit 0, 0
+  findings, listings FULL, 17,056 matches (= B0), credential scan clean.** Conclusion: **DEV acceptance is supported only with
+  the recorded concurrency exception; not an unqualified PASS; no ISSUE-271, PROD installation or PROD acceptance claim.**
+  Recorded exceptions: refused first census launch (quoting), fixed copy of a sealed S-B launcher, credential-reuse and host
+  routes, staging copies, an evidence-deletion incident (rebuilt hash-matched; copied back and verified 10 Oct 21:23, manifests
+  30/30 and 12/12; the two folders are not untouched), an **unreconciled** BUILD_ID-mtime difference. (Thirteenth pass, 11 Oct:
+  the B0/B1/B2 totals, fingerprints, history and audit rows were cross-checked against the saved outputs, no discrepancy.) A separate **2026 venue-season defect is drafted and pending registration, no issue number
+  allocated** (`D:\tmp\issue272\DRAFT-ISSUE-venue-season-bound-2026.md`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-272.md` (§17, §17.12, §17.13 historical, §17.14, §17.15, §17.16, §17.17, §17.18); census `issues/open/AFLDB-ISSUE-272-duplicate-match-census.sql` (blob `67820d85…`, run on DEV 10 Oct 2026 and again 11 Oct 2026 after acceptance: both COMPLETE).
 - **Next action:** ~~Operator settles U-1…U-7 and approves or amends runbook §17.17~~ *(ninth pass: U-1 route, U-2
   credential and U-6 order are settled or identified)*. ~~The operator reviews §17.17~~ *(eleventh pass: §17.17 frozen
-  10 Oct 2026 after one coverage-wording correction)*. The operator opens the isolated child session
-  (E1–E3), commits and pushes the tracking documentation (D0–D5), then runs readiness R0–R7 on that exact revision and the read-only host prechecks H-1–H-4; if the
-  DEV host lacks `AFLDB_TRACE_REQUESTS=on`, stop for a separate authorisation; then the gated DEV deployment with build
-  identity I-1–I-4; then, if U-5 is approved, the cases C3, C4, C1, C2 and the post census with the reviewed
-  descendant-pinned runner (alone they do not close the issue). The historical pre-merge `merge:ready` result stays recorded as not evidenced and not waived. PROD installation
-  and acceptance stay behind the ISSUE-265 hold; no PROD census at this stage (PROD data state unassessed, not a gate). No
-  candidate exists on DEV, so no disposition is owed. D-272-1…4 (§17.7) are the derived implementation basis, not open decisions.
+  10 Oct 2026 after one coverage-wording correction)*. ~~The operator opens the isolated child session
+  (E1–E3), commits and pushes the tracking documentation (D0–D5), then runs readiness R0–R7 on that exact revision and the
+  read-only host prechecks H-1–H-4 ... the gated DEV deployment with build identity I-1–I-4; then, if U-5 is approved, the
+  cases C3, C4, C1, C2 and the post census~~ *(all done 10–11 Oct 2026; twelfth pass, runbook §17.18)*. **Remaining
+  (criteria in §17.18.9):** the operator's closure-time position on the **qualified** DEV acceptance (original B3
+  INCONCLUSIVE; batch 115 adjudicated, not satisfied); PROD installation and PROD acceptance behind the ISSUE-265 hold; the
+  closure procedure. Separately: register the drafted 2026 venue-season defect (no number allocated yet; not treated as a
+  gate); operator-owned housekeeping (staging copies, DEV host `.env` backup and retained `AFLDB_TRACE_REQUESTS=on`,
+  kept readiness worktree/branch, tunnel PID 16372). ISSUE-271 is not accepted by this. The historical
+  pre-merge `merge:ready` result stays recorded as not evidenced and not waived. No PROD census at this stage (PROD data
+  state unassessed, not a gate). No candidate exists on DEV, so no disposition is owed. D-272-1…4 (§17.7) are the derived
+  implementation basis, not open decisions.
 
 ### AFLDB-ISSUE-273 — Submission validation overwrites a concurrent approve, promote or reject
 - **Severity:** Medium. **Area:** legacy CSV intake / submission lifecycle concurrency — `src/lib/ingest/pipeline.ts`.

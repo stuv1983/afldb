@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Legacy `match_results` uploads use canonical round codes and refuse to overwrite Data Editor corrections (AFLDB-ISSUE-271, AFLDB-ISSUE-272; implemented, commit `d37c1422` on `main`; DB-free unit tests, typecheck, lint, diff check and the full integration files (61/61) passed; DEV duplicate census COMPLETE with 0 candidates; push verified, historical `merge:ready` result not evidenced and not waived, fresh readiness, deployment and acceptance outstanding; issues open) - 10 October 2026
+### Legacy `match_results` uploads use canonical round codes and refuse to overwrite Data Editor corrections (AFLDB-ISSUE-271, AFLDB-ISSUE-272; implemented, commit `d37c1422` on `main`; DB-free unit tests, typecheck, lint, diff check and the full integration files (61/61) passed; DEV duplicate census COMPLETE with 0 candidates; push verified, historical `merge:ready` result not evidenced and not waived; fresh readiness PASSED; deployed to DEV at `b2939eb7` (BUILD_ID `e6baP2aMpe9KQ13d_24BL`); ISSUE-272 DEV acceptance performed and QUALIFIED (original B3 INCONCLUSIVE, operator-adjudicated concurrent batch 115), post-acceptance census COMPLETE with 0 findings; ISSUE-271 acceptance, PROD installation and PROD acceptance outstanding; issues open) - 10–11 October 2026
 
 - **Round codes (ISSUE-272).** A `match_results` row's round is read once, by the importer's own rule: `R1` or `1` with
   round_number 1 becomes `1`; `EF/QF/SF/PF/GF/WF` in any letter case becomes upper case; `Round 1`, `r1`, `01`, `R01`, a
@@ -79,13 +79,46 @@ commit.
   remote tip (`git ls-remote`) all equal `d37c1422` (how `main` advanced is not evidenced; the earlier "fast-forward"
   wording is withdrawn, runbook §17.17.1); the five changed source and test files
   match the hashes the 61/61 integration window recorded. The historical `merge:ready` result is **not evidenced and not
-  waived** for either issue (console-only tool; no record), and nothing is deployed.
+  waived** for either issue (console-only tool; no record). *(Superseded as to deployment by the next two entries; the
+  tips now agree at `b2939eb7`.)*
+- **DEV deployment (operator, 10 October 2026, 19:19–19:21 AEDT; ISSUE-272 runbook §17.18).** The tracking documentation
+  was committed first as `b2939eb7658a15d7b70bd72be836107482362c0c` (sole parent `d37c1422`, four tracking files; application and
+  test bytes identical to `d37c1422`) and pushed. Fresh readiness of that revision passed (implementation-mode preflight
+  READY, DB-free 246/246, typecheck, ESLint, diff checks, five-file byte binding; not `merge:ready`). The DEV host `.env`
+  gained `AFLDB_TRACE_REQUESTS=on` (separately authorised) so the gated `deploy/sync-dev.ps1` could prove build identity;
+  it exited 0 with `BUILD_ID` `e6baP2aMpe9KQ13d_24BL`, and 24 of 24 probes from 4 of 4 worker PIDs carried that build.
+  No migration (parity 110/110). The `BUILD_ID` file's modification time reads differently (19:21:39 versus 19:20:54) in
+  two records; unreconciled, no effect on the identity proof.
+- **ISSUE-272 DEV acceptance: performed, QUALIFIED (operator, 10–11 October 2026; runbook §17.18).** Four submissions, 12
+  rows, two acceptance import batches, 14 acceptance audit rows, all as one acting super admin: **C3** (submission 69, 8
+  rows) and **C4** (70, 2 rows) were refused with the expected row reasons and rejected; **C1** (`R2` onto a 2025 match)
+  and **C2** (`gf` onto the 2025 Grand Final) passed Gates G1/G2 (30/30 checks each) and were **promoted manually** as
+  import batches 113 and 114, each updating the existing match in place. The `matches` count (17,056), maximum id and
+  whole-table fingerprint, the 12 covered tables and both fixtures' values are unchanged; both fixtures' `xmin` changed
+  (one identical-value row version each). **The original B3 verdict is INCONCLUSIVE and is not changed:** an unexpected
+  import batch 115 (`settle-afl-api.ts`, a scheduled AFL API settle, 0 canonical writes) appeared 6 h 39 min after the
+  last promotion. The operator separately adjudicated it as unrelated concurrent DEV activity for this assessment; the
+  batch-count rule is not satisfied, so this is **not an unqualified PASS**. Fixtures are 2025 matches because DEV venues
+  hosting 2026 matches have `last_season = 2025` (a separate defect, drafted and not yet registered). Departures
+  (credential-reuse and host routes for the database snapshots, a fixed copy of a sealed launcher, operator-authorised
+  upload staging copies, a deleted-and-rebuilt set of earlier preparation files, since copied back and verified) are recorded in the runbook, not here.
+- **Post-acceptance DEV census (operator, 11 October 2026; evidence `D:\tmp\issue272\run-20261011-060523-24228`):
+  COMPLETE, exit 0.** Descendant-pinned runner, `afldb_dev` as `afldb_import`, read-only: **17,056 matches (= the
+  pre-acceptance count); 0 duplicate candidates; 0 round-contract breaches; 0 home/away disagreements**; all listings FULL,
+  11/11 cross-checks, credential scan clean. The runner's "sole parent `d37c1422`" check concerns the commit `b2939eb7`;
+  the census blob `67820d85…` is a separate check (same blob at both commits). A first launch was refused before any
+  database contact (an unquoted path). DEV data state at one snapshot only: not proof of the fix or of PROD.
 - **Not done:** the ISSUE-272 PROD data state is unassessed (a PROD census is optional and not chosen, not a gate); the
-  ~~`merge:ready` result (or a written waiver), approval of the drafted DEV acceptance procedure (§17.16.4)~~ fresh
+  ~~`merge:ready` result (or a written waiver), approval of the drafted DEV acceptance procedure (§17.16.4)~~ ~~fresh
   readiness of the documentation-only descendant of `d37c1422` that will be deployed (no waiver; the historical
   `merge:ready` result stays not evidenced and not waived; ISSUE-272 runbook §17.17) and approval of the revised DEV
   acceptance proposal (§17.17), an ISSUE-271 DEV acceptance procedure (not yet written), DEV
-  deployment, the DEV acceptance run and PROD installation and acceptance are outstanding; historical duplicates and
+  deployment, the DEV acceptance run and PROD installation and acceptance are outstanding~~ *(twelfth pass: fresh
+  readiness, the DEV deployment and the ISSUE-272 DEV acceptance run are done, see the entries above)*. **Still
+  outstanding:** an ISSUE-271 DEV acceptance procedure and run (not yet written; no case here exercised its refusal), PROD
+  installation and PROD acceptance behind the ISSUE-265 hold, the operator's closure-time position on the qualified
+  ISSUE-272 acceptance, and the registration of the separately drafted 2026 venue-season defect (no issue number
+  allocated yet). The historical `merge:ready` result stays not evidenced and not waived. Historical duplicates and
   reverted corrections on PROD are unassessed (no damage or repair is established). *(The earlier "census unrun, nothing
   committed" wording is superseded above.)* Also still not done: No real Data Editor-versus-promotion race test and no dedicated PostgreSQL
   manual-attendance-citation case exist. Orphaned overrides, the validation reader's bounds, the name-key versus club-ID-key

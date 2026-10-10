@@ -57,6 +57,19 @@
   `merge:ready` FAILs is withdrawn), read-only host prechecks H-1–H-4 that stop before deploying if tracing is not
   configured, gated build identity I-1–I-4, and the `afldb_backup` read path for the auth evidence. **Nothing run; still
   Open.**
+- **Revision (2026-10-11, twelfth pass: DEV deployment and qualified DEV acceptance recorded; documentation only):** the
+  §17.17 sequence was executed by the operator on 10–11 October 2026 and is recorded in **§17.18**. Documentation commit
+  `b2939eb7658a15d7b70bd72be836107482362c0c` (sole parent `d37c1422`, four tracking files) is on `main` and the live remote;
+  fresh readiness R0–R7 passed; **DEV deployed** at that revision, `BUILD_ID` `e6baP2aMpe9KQ13d_24BL`, I-1–I-4 passed.
+  Acceptance: C3/C4 (submissions 69/70) rejected with the expected validation results; C1/C2 (71/72) passed their gates
+  and were **manually promoted** as import batches 113/114; 4 submissions, 12 rows, 2 acceptance batches, 14 acceptance
+  audit rows; `matches` count (17,056), maximum id and whole-table fingerprint unchanged, the 12 covered tables
+  unchanged, F1/F2 values unchanged (both `xmin` values changed). **The original B3 verdict is INCONCLUSIVE and stays so**
+  (import batch 115, a scheduled AFL API settle, was not an expected batch); the operator's separately recorded
+  adjudication treats it as unrelated concurrent DEV activity. The post-acceptance census of record
+  (`D:\tmp\issue272\run-20261011-060523-24228`) is COMPLETE, exit 0, zero findings, all listings FULL, 17,056 matches
+  (= B0). **DEV acceptance is supported only with that recorded concurrency exception; it is not an unqualified PASS under
+  the batch-count rule.** ISSUE-271 acceptance, PROD installation and PROD acceptance are not claimed. **Still Open.**
 
 ## 1. Summary
 
@@ -727,7 +740,8 @@ alias differs (ISSUE-306; a source numbered in a 0-based vocabulary); or anythin
 disposition is owed and the §17.6 requirement to review singleton non-canonical rows is satisfied (there are none). Historical
 impact on PROD remains unknown.
 
-**Acceptance criteria assessed.** Criteria are those in §4, §14, §15, §17.6, §17.10 and §17.14, and the closure procedure in
+**Acceptance criteria assessed.** *(Twelfth pass: this table and the verdict below are the sixth-pass record; the current
+reassessment is §17.18.9.)* Criteria are those in §4, §14, §15, §17.6, §17.10 and §17.14, and the closure procedure in
 `CLAUDE.md` §5. "Met" means demonstrated by the evidence named; nothing is marked met on inference.
 
 | # | Criterion | Supporting evidence | Status | Outstanding work |
@@ -976,7 +990,8 @@ matches' rows in no value but does add an import batch and submissions to DEV.
 
 #### 17.16.5 Criteria and verdict after this pass
 
-*(Eighth pass: the blockers below are restated in §17.17.8; there is no `merge:ready` waiver, and the procedure is §17.17.)*
+*(Eighth pass: the blockers below are restated in §17.17.8; there is no `merge:ready` waiver, and the procedure is §17.17.
+Twelfth pass: DEV deployment and the DEV acceptance run have since happened; current criteria and blockers are §17.18.9.)*
 
 Corrections to the §17.15 table are made in place (rows 5, 6, 8, 10). Criterion 4 (DEV census) stays **Met**. Criterion 7 (DEV
 deployment) stays **Not done**: nothing in the evidence shows `d37c1422` deployed to DEV. Everything else is as §17.15. **Closure
@@ -1688,4 +1703,257 @@ hold. No PROD census at this stage. **Closure verdict: ISSUE-272 stays Open** (I
 procedure is not yet written). Next: §17.17 is frozen (eleventh pass); E1–E3, then D0–D5 (the documentation commit) and R0–R7 in the isolated child; H-1 to
 H-4 (stop for U-1b if tracing is absent); the gated deployment with I-1 to I-4; then, only if U-5 is approved, the cases,
 with V only after the descendant-pinned runner has passed review and `-Mode Check` (F-8). Nothing was run, created,
-deployed or repaired in the eighth, ninth, tenth or eleventh pass.
+deployed or repaired in the eighth, ninth, tenth or eleventh pass. *(Twelfth pass: the sequence above has since been
+executed; its status, the updated criteria and the remaining blockers are in §17.18, which supersedes this paragraph's
+"not done" statements for rows 7 and 8 only.)*
+
+### 17.18 Twelfth pass: DEV deployment and qualified DEV acceptance recorded (2026-10-11; documentation only)
+
+Agent (twelfth pass): Read, Grep and Edit of the four tracking files only, in `D:\dev\afldb`; nothing executed (no command,
+Git, test, host, database or network contact; no deployment, repair, cleanup or sub-agent; no `.env` read). The operator's
+execution notes were **cross-checked by reading the saved evidence**: `D:\tmp\issue272\acceptance-exec-20261010-213359\`
+(notes parts 1–6; `logs\pre-checks.txt`; the B3 S-A and S-B outputs in full; the B0, B1 and B2 S-A outputs for the F1/F2
+rows only *(superseded: all B0, B1 and B2 S-A and S-B outputs were later read in full, see the thirteenth-pass note
+below)*; `gates-run\G1-out` and `G2-out`; the 15 `captures\*.yml`), `acceptance-pack-2025-20261010-204855\`
+(`EXPECTED-RESULTS.txt`, `STATUS-AND-INCIDENT.txt`), `dev-deploy-20261010-191845\deploy\`, `h4-preflight-20261010-191549\`,
+`fresh-readiness-20261010\attempt-20261010-184919\readiness\summary.txt`, `run-20261011-060523-24228\` (`summary.txt`,
+`credential-scan.txt`) and the draft `DRAFT-ISSUE-venue-season-bound-2026.md`. **No SHA-256 was recomputed** (no command can
+be run): every hash below is as the named file or the operator's notes recorded it; where the database computed it
+(`content_sha256_actual`, `row_md5`, fingerprints) that is what the saved output shows. ~~Figures for B1 and B2 other than
+the F1/F2 rows, the deployment-time Git and migration facts, the documentation commit D0–D5 and the earlier credential
+diagnostics rest on the operator's notes and memory of the session, not on a fresh read of those files.~~ *(Corrected in the
+thirteenth pass: the B0, B1 and B2 figures were later read from the saved outputs and agree; the deployment-time Git and
+migration facts, the documentation commit D0–D5 and the earlier credential diagnostics still rest on the operator's notes
+and memory of the session, not on a fresh read of those files.)* Acting account: the operator's super admin, auth user id 4.
+
+**Thirteenth pass (11 October 2026; documentation only; Read, Grep and Edit of the four tracking files; the Git steps that
+record it are the operator-authorised documentation commit and push, outside this text).** Two corrections, nothing else:
+
+1. **Housekeeping statement corrected (item 8 below).** The three deleted preparation files **were copied back and verified**
+   on 10 October 2026 at 21:23:43 AEDT, per `D:\tmp\issue272\RESTORATION-RECORD-20261010.txt` (read): the earlier statement
+   that copy-back "has not been done" was true only until then and is withdrawn. The incident history and the reconstructed
+   files' provenance are preserved.
+2. **Read-only cross-check of B0, B1 and B2 completed against the saved outputs** (`acceptance-exec-20261010-213359\`:
+   `snapshots\s-a-B0.out`, `snapshots-REPLACEMENT-sb-b0-fixed-launcher\s-b-B0.out`,
+   `snapshots-FRESH-B0-pre-C3-20261010-215714\s-a-B0.out` and `s-b-B0.out`, `snapshots-B1\s-a-B1.out` and `s-b-B1.out`,
+   `snapshots-B2\s-a-B2.out` and `s-b-B2.out`, all read in full; no hash recomputed, no database or host contact).
+   **No discrepancy.** `matches` is 17,056 rows, max id 17,275, md5 `3fdab09d…` in all of them; the 12 S-A2 tables show
+   identical row counts and fingerprints in the original B0, the fresh B0, B1 and B2; `batches ≤ 112` is 49 / `31435e09…`,
+   `submissions ≤ 68` is 42 / `6c610157…` and submission rows 43 / `070224aa…` in all; the first B0 and the fresh B0 S-A
+   outputs are identical, and the S-B outputs differ only in `max_audit` (1061 → 1063, the two sign-in rows). B1 (after C3 and
+   C4) shows submissions 69 and 70 `rejected` (44 submissions, maximum 70), no new batch (49, 112), F1/F2 `xmin` both
+   407714, and audit 1064–1069 (3 + 3 rows); B2 (after C1) shows submission 71 `promoted` with `import_batch_id` 113, batch
+   113 (source 15, `admin-upload`, `match_results`, `completed`, 1/1/0/0, "submission 71", 2026-10-10 11:27:08 UTC; 50 batches,
+   maximum 113), F1 `xmin` 407714 → 616215 with `row_md5` unchanged and F2 unchanged, and audit 1070–1073 (4 rows, maximum
+   1073). These agree with §17.18.4 and §17.18.5. The B1/B2 `content_sha256` values for 69, 70 and 71 equal the figures recorded
+   in §17.18.4. **Still unresolved and not touched:** the `BUILD_ID` mtime discrepancy (§17.18.3).
+
+#### 17.18.1 Result in one paragraph
+
+DEV runs `b2939eb7658a15d7b70bd72be836107482362c0c` (a documentation-only descendant of `d37c1422`; application and test
+bytes identical to it), `BUILD_ID` `e6baP2aMpe9KQ13d_24BL`. Four match-results submissions were made as one acting super
+admin: **C3 (69, 8 rows) and C4 (70, 2 rows) were refused** with the expected row reasons and **rejected**; **C1 (71, 1
+row, `R2`) and C2 (72, 1 row, `gf`) passed their gates and were promoted by the operator** as import batches 113 and 114,
+each updating an existing 2025 match in place. Totals: **4 submissions, 12 rows, 2 acceptance batches, 14 acceptance audit
+rows**. The `matches` count, maximum id and whole-table fingerprint did not change; the 12 covered tables did not change;
+F1 and F2 keep their ids and row values and **both fixtures' `xmin` changed** (one identical-value row version each). The
+original B3 verdict is **INCONCLUSIVE** (an unexpected import batch 115). The operator separately adjudicated batch 115 as
+unrelated concurrent DEV activity. The census of record is COMPLETE with zero findings. **DEV acceptance is supported only
+with that recorded concurrency exception.**
+
+#### 17.18.2 Commit, readiness and host state before deployment
+
+| Step | Result | Source |
+|---|---|---|
+| Documentation commit D0–D5 | `b2939eb7658a15d7b70bd72be836107482362c0c`, sole parent `d37c1422`, four tracking files; normal push `d37c1422..b2939eb7` exit 0 (the first attempt stopped on a header-regex mismatch and was resumed; evidence `D:\tmp\issue272\docs-commit-20261010\`) | operator/session record; not re-read this pass |
+| Fresh readiness R0–R7 (not `merge:ready`) | all PASS: tip agreement and four-file scope; worktree `D:\dev\afldb-272-readiness`, branch `readiness/issue-272-b2939eb7`, tree `68370fa6…`; `npm ci`; `preflight --mode implementation` READY, 0 blockers, 3 warnings (`.env`, `psql`, `pg_restore`); DB-free `tests/ingest-datasets.test.ts` **246/246**; typecheck, ESLint, `git diff --check` clean; the five changed files match the 61/61 window's bytes and SHA-256 | `readiness\summary.txt` (read) |
+| Host prechecks H-1–H-3 | host `streamanator`, on `main`, 0 tracked changes; **H-3 first FAILED: `AFLDB_TRACE_REQUESTS` absent from the DEV host `.env`** | `H1-H3.txt`, session record |
+| U-1b (separately authorised) | DEV host `.env` line 23 `AFLDB_TRACE_REQUESTS=on` added; backup `.env.bak-issue272-u1b-20261010-191158` left on the host; service not restarted by it | `H1-H3.txt` (read), session record |
+| H-4 `preflight --mode deploy` | READY, 0 blockers, 0 warnings, exit 0; `afldb_dev` as `afldb_owner`; migration parity 110/110; run under a child-only override of the workstation `.env` owner DSN port 5432 → 55432 (see 17.18.7) | `h4-preflight-20261010-191549\` (read) |
+
+#### 17.18.3 DEV deployment and build identity
+
+`deploy/sync-dev.ps1` with the ISSUE-107 gate, operator-run, 10 October 2026 19:19:28–19:21:58 AEDT, **exit 0**
+(`deploy-times.txt`, `sync-dev.exitcode.txt`). Identity: I-1 host checkout `b2939eb7658a15d7b70bd72be836107482362c0c` on `main`,
+`git diff --name-only d37c1422` the four tracking files; I-2 `BUILD_ID` `e6baP2aMpe9KQ13d_24BL`; I-3 main process 2435770 and
+workers 2435782–2435785 started 19:21:54–19:21:55 AEDT, after the build; I-4 **24 of 24** probes carried
+`x-afldb-build: e6baP2aMpe9KQ13d_24BL`, from **4 of 4** distinct worker PIDs (6 each) (`I4-24-summary.txt`, read). The same identity
+was re-verified at the start of acceptance (10 October 21:34 AEDT, `logs\pre-checks.txt`, read): local `main` = `HEAD` =
+live remote tip = `b2939eb7`, 0 porcelain lines, host revision, `BUILD_ID`, `MainPID` 2435770, workers 2435782–85 and 24
+probes agree. **Unreconciled:** the `BUILD_ID` file's modification time reads 19:21:39.66 in the deployment evidence
+(`I1-I3a.txt`) and 19:20:54.82 in the acceptance pre-check; both precede the 19:21:54 worker start, the value agrees, and no
+explanation (a different path or a stat difference) is recorded. Build identity rests on the full SHA, the `BUILD_ID` value and the 24/24 header
+probes, not on that timestamp. The migration count (110/110, no migration applied) is from H-4 and the session record.
+
+#### 17.18.4 Acceptance cases (all as the one acting super admin, through the DEV admin UI)
+
+Fixtures are **2025** matches because every venue hosting a 2026 match has `venues.last_season = 2025` (17 venues, 218
+matches), so a 2026 row cannot resolve its venue (see 17.18.8, pending tracking): **F1 = 16625** (2025 round 2, Richmond v
+Carlton, M.C.G., venue 26) and **F2 = 16838** (2025 Grand Final, Geelong v Brisbane Lions, venue 26). Server-computed file
+hashes in the S-A output equal the sealed pack's: C1 `02255b2e…`, C2 `2e1761c4…`, C3 `18c37f4c…`, C4 `ded65f76…`
+(`content_sha256` = `content_sha256_actual` on all four rows).
+
+| Case | Submission | Rows | Result (S-A B3 output and captures) |
+|---|---|---|---|
+| C3 invalid rounds | 69 | 8 | Validated 0 ok / 0 warnings / 8 errors / 1 duplicate; all eight row reasons equal `EXPECTED-RESULTS.txt` (`Round 2`, `r2` unrecognised; `02`, `R02` and `R2`/3 not matching `round_number`; `R2` with empty number, also "duplicate of row 5"; `GF` with a number; `OR` unrecognised). Approve refused ("Only a validated submission with no error rows can be approved."); **rejected**. |
+| C4 in-file duplicate | 70 | 2 | Validated 1 ok / 0 warnings / 1 error / 1 duplicate; row 1 `R2` resolved to round code `2`, venue 26, no warning; row 2 `2` "duplicate of row 1 (key `2025|2|2025-03-13|Richmond|Carlton`)". Approve refused with the same text; **rejected**. |
+| C1 `R2` onto F1 | 71 | 1 | Validated 1 ok / 0 / 0 / 0; **Gate G1: all 30 checks `t`, `gate_pass` `t`** (`G1-out\s-a-G1.out`: 30 rows, none `f`); resolved round code `2`, round number 2; approved; **promoted by the operator**: import batch **113**, `promoted_at` 2026-10-10 11:27:08 UTC. |
+| C2 `gf` onto F2 | 72 | 1 | Validated 1 ok / 0 / 0 / 0; **Gate G2: all 30 checks `t`, `gate_pass` `t`**; resolved round code `GF`, round number null, grand final, venue 26, clubs 10/3, 11.9.75 v 18.14.122, away win, margin 47; approved; **promoted by the operator**: import batch **114**, `promoted_at` 11:31:55 UTC. |
+
+Totals: **4 submissions (69–72), 12 submission rows (8 + 2 + 1 + 1), 2 acceptance import batches (113, 114), 14 acceptance
+audit rows** (1064–1077, all actor 4: C3 3, C4 3, C1 4, C2 4: staged, validated, approved or rejected, and for C1/C2 promoted).
+Two sign-in audit rows (`admin.login_failed`, `admin.login`; `max_audit` 1061 → 1063) precede them and are not among the
+14. Batches 113 and 114 are source 15 `admin-upload`, target `match_results`, `completed`, counters 1/1/0/0, notes
+"submission 71" / "submission 72"; the importer's counter reads 1 inserted although no new match row exists (the
+`matches` count and maximum id are unchanged and F1/F2 keep their ids): not interpreted further here. The UI success
+message for 71 ("Promoted: 1 rows applied as import batch 113.") was **relayed by the operator**; no capture of either
+promotion exists, and the promotions are evidenced by the database rows and audit rows above.
+
+#### 17.18.5 B3 comparison, the unexpected batch 115 and the operator adjudication
+
+B3 (S-A and S-B, same routes as B2, run 11 October ~05:45 AEDT, outputs read) against B0/B2:
+
+| Measure | B3 | Verdict |
+|---|---|---|
+| `matches` whole table | 17,056 rows, max id 17,275, md5 `3fdab09d…` = B0 | unchanged |
+| F1 16625 | `row_md5` `26d28d98…` = B0; `xmin` 407714 → **616215** (changed at C1) | value unchanged, `xmin` changed |
+| F2 16838 | `row_md5` `08cf9841…` = B0; `xmin` 407714 → **616225** (changed at C2) | value unchanged, `xmin` changed |
+| S-A2, 12 tables | `canonical_applications` 19987, `club_aliases` 48, `clubs` 24, `club_seasons` 1640, `data_edits` 4, `data_overrides` 120, `external_identities` 19319, `player_match_stats` 695499, `seasons` 130, `sources` 14, `venue_aliases` 55, `venues` 52: row counts and fingerprints identical to B0/B1/B2 | unchanged |
+| Pre-existing batches / submissions / rows | batches ≤ 112: 49, md5 `31435e09…`; submissions ≤ 68: 42, `6c610157…`; submission rows: 43, `070224aa…` | unchanged |
+| Expected rows | batches 113 and 114; submissions 69–72 (69/70 rejected, 71/72 promoted with `import_batch_id` 113/114); 12 new submission rows; audit 1064–1077 | as documented |
+| `import_batches` totals | 50 → **52**, maximum 113 → **115** | **two new rows, one expected (114), one not expected (115): NOT AS DOCUMENTED** |
+
+**Batch 115:** source 6, tool `settle-afl-api.ts`, target `staging.source_record_versions`, status `completed`, read 10,464
+/ inserted 0 / updated 0 / rejected 0, notes "AFLDB-ISSUE-228 settle; snapshot=afl-api-2026-2026-10-10-180936; season=2026;
+mode=apply; auto-apply", started 2026-10-10 18:10:34 UTC, completed 18:11:03 UTC (05:10 AEDT, 11 October; about 6 h 39 min
+after the promotion of submission 72). Its `validation_result` records `canonicalRowsInserted` 0, `canonicalRowsUpdated` 0,
+`derivedRecomputeRuns` 0, `attendanceEnrichmentsApplied` 0, `projectionRowsWritten` 0, `canonicalApplyRefusals` 64,
+`dataIssuesRefreshed` 64, `manualAuthorityRefusals` 0.
+
+1. **Original B3 verdict: INCONCLUSIVE.** Under §17.17.4 and the stop rules an import batch other than the two expected is
+   a FAIL if attributable to the acceptance submissions and INCONCLUSIVE if concurrent DEV activity could explain it; a
+   scheduled settle is such activity. This verdict is **not re-labelled, not replaced, and the baselines are unchanged**; no
+   acceptance case was re-run, nothing was promoted again.
+2. **Operator adjudication (recorded separately; authored by the operator, 11 October 2026):** batch 115 is accepted as
+   **unrelated concurrent DEV activity for this assessment**, on its source and tool, its timing, its zero canonical writes
+   and the unchanged acceptance fingerprints. It does not change item 1 and it does not satisfy the batch-count rule.
+3. **Qualified DEV acceptance:** with item 2 as a recorded exception, the remaining B3 comparisons all passed and the census
+   of record (17.18.6) is clean, so DEV acceptance of the fixed `match_results` round-code behaviour is **supported**. It
+   is **not** an unqualified PASS, and no statement in this tracking may drop the qualification.
+
+What the acceptance shows: a legacy upload carrying `R2` (round 2) or `gf` was resolved to the canonical code (`2`, `GF`) and
+updated the existing name-keyed match **in place** (no second row; count and maximum id unchanged), while non-canonical or
+inconsistent codes and an in-file `R2`/`2` pair were refused before approval. What it does not show: the pre-fix behaviour
+on the same files (no such run exists); any 2026 row (venue defect, 17.18.8); a corrected upload beside an old non-canonical
+match; ISSUE-271's Data Editor authority refusal (no case exercised it); derived-data effects (the generic UI note to run
+`tools/migration/rebuild_derived.py` after promotion was recorded and **no rebuild was run**; the two identical-value rewrites
+changed no `matches` value, but no derived table was measured); tables outside the 12 covered, other users' activity,
+identical-value rewrites of non-fixture matches, and server identity beyond the operator's tunnel and hostname checks.
+
+#### 17.18.6 Census of record (post-acceptance, descendant-pinned runner)
+
+| Item | Value |
+|---|---|
+| Evidence directory | `D:\tmp\issue272\run-20261011-060523-24228` (the census of record) |
+| Authorisation | operator, 11 October 2026: a separate read-only step, despite B3 INCONCLUSIVE |
+| Pre-run verification | new tunnel listener `127.0.0.1:55432` owned by `ssh.exe` PID 16372 (opened ~05:45 AEDT with the identical command as before, `-L 127.0.0.1:55432:127.0.0.1:5432 arm@10.0.40.100`); `ssh arm@10.0.40.100 hostname` → `streamanator`; `main` = `b2939eb7658a15d7b70bd72be836107482362c0c`; runner SHA-256 `8d465993…9600` (as recorded; not recomputed here) |
+| Command | `Invoke-Issue272DevCensusDescendant.ps1 -Mode Run -PsqlPath "C:\Program Files\PostgreSQL\16\bin\psql.exe"`, in a clean `powershell -NoProfile` child |
+| Exit code | **0**, captured immediately by the launching session; the runner's own line reads `FINAL: COMPLETE (exit code 0)` (`summary.txt`, `credential-scan.txt`, read). The launcher's redirected console copy is outside the evidence directory |
+| Verdict | **COMPLETE**; guard passed; psql exit 0; `afldb_dev` as `afldb_import`, `transaction_read_only` on; stderr empty (0 lines) |
+| Totals | **17,056 matches (= B0)**; 0 duplicate candidate groups / rows; 0 round-contract breaches; 0 type, number or `is_final` failures; 0 non-canonical spellings; 0 home/away disagreement pairings and rows |
+| Listings | 1b, 2, 3c and 4 all **FULL** (0 of 0); 11 of 11 cross-checks OK |
+| Integrity | census blob `67820d85005b6d0bbd43b64c44fd850dcca39db6` (30,332 bytes) at **both** `b2939eb7` and `d37c1422`; execution copy SHA-256 `60aafc14…`, guard `dfaa08a0…`, both unchanged after the run; **credential scan CLEAN (27 files, 2 secret forms)**; environment unchanged |
+
+**Clarification.** The runner's "sole parent `d37c1422`" and "diff exactly the four tracking files" checks concern **the
+commit `b2939eb7`** (its parent and its diff against `d37c1422`), not the census blob; the blob's identity is a separate check
+(the same blob id at both commits, equal to the committed `67820d85…`). The summary's banner still reads "(REVISED, UNRUN
+DRAFT)", the stale label noted in §17.15 item 1. **The first launch was refused with no database contact**
+(`REFUSED-NO-DATABASE-CONTACT`, exit 2, evidence `D:\tmp\issue272\run-20261011-060517-23220`): the operator-session launcher
+passed `-PsqlPath C:\Program Files\...` unquoted and the runner saw `C:\Program`. It is kept and is not the census of record.
+Like §17.15 this census shows the DEV data state at one snapshot only; it does not prove the fix, history, or anything
+about PROD, and the runner does not prove server identity.
+
+#### 17.18.7 Exceptions, departures and incidents (all recorded; none concealed)
+
+1. **Credential-reuse route for S-A** (operator-authorised departure from the typed-password route of §17.17.5): the
+   `afldb_import` password from the workstation `.env` DSN passed to `psql` only through `PGPASSWORD` in a child process, explicit
+   `-h/-p/-U/-d`, in-session guard before any query. Used for the acceptance prep, the fixture re-plan and B0–B3.
+2. **S-B host route** (operator-authorised): the workstation `afldb_backup` credential was rejected (`password
+   authentication failed`; server log diagnostics showed no role-specific reason), the host-side credential passed the S-B
+   guard, so S-B ran on the DEV host through SSH with the guard before any `auth_*` query. Not a proof that the workstation
+   credential is wrong or right.
+3. **Sealed launcher defect and fix.** `sb-host\Invoke-SbHost.ps1` (SHA-256 `D60DF2E0…`) throws `ArgumentNullException` at its
+   final `WriteAllLines` when psql wrote nothing to stderr, after `s-b-B0.out` was written. A fixed copy (`8C191873…`, lines 67–68
+   only, `sb-launcher-fixed\Invoke-SbHost.diff`) was authorised and used for every later S-B run; the pack's launcher and
+   manifest were not changed; the replacement S-B B0 `.out` was identical to the crashed attempt's.
+4. **Fresh baselines.** The two sign-in audit rows moved `max_audit` 1061 → 1063; B0 was re-taken immediately before C3
+   (S-A identical to the first B0; S-B differing only in `max_audit`), and the pack-filled `s-b-B1..B3` (1061) were
+   replaced by files filled with 1063 outside the pack. B0 (first and fresh), B1 and B2 are preserved and unchanged.
+5. **UI upload staging.** The Playwright upload tool refused the pack path ("outside allowed roots"); the operator
+   authorised four byte-identical scratch copies of C1–C4 under
+   `D:\dev\afldb-issue-271\.playwright-mcp\issue272-acceptance-20261010-213359\` (size and full hash 4/4 match the manifest,
+   the expected results and the staged files). They remain there, untracked, inside a worktree directory.
+6. **Promotion clicks.** The agent's "Promote to database" click was denied by the tool classifier ("[Modify Shared
+   Resources]") and was not retried or bypassed; the **operator promoted 71 and 72 manually**.
+7. **H-4 child-only override** of the workstation owner DSN port (5432 → 55432) because the workstation `.env` points at a port
+   with no listener; the `.env` was not edited. **U-1b** changed the DEV host `.env` (item in 17.18.2).
+8. **Evidence incident (disclosed, recovered, restored and verified).** A builder script's helper named `Rd` resolved to
+   PowerShell's `rd` alias (`Remove-Item`) and deleted three source files from earlier, stopped acceptance preparation:
+   `acceptance-pack-20261010-201311\snapshots\s-a-B0.sql`, `…\fixture-reread\s-a-reread.sql` and
+   `fixture-replan-20261010-203136\s-a-replan.sql`. Each was rebuilt and its hash matched the recorded value; the copies live
+   in `recovered-for-*` inside `acceptance-pack-2025-20261010-204855`. Copy-back to the original folders was first blocked.
+   *(Corrected, thirteenth pass: the earlier text "has not been done; no later record of it was seen" is withdrawn.)* The
+   three files were then **restored by copy without overwrite, under operator authorisation (a narrow exception to the
+   preservation instruction), on 10 October 2026 at 21:23:43 AEDT, and verified**
+   (`D:\tmp\issue272\RESTORATION-RECORD-20261010.txt`, read): for each file the source, the expected and the restored SHA-256
+   and byte count are recorded as equal (`s-a-B0.sql` 8,900 bytes, `s-a-reread.sql` 35,611 bytes, `s-a-replan.sql` 22,241
+   bytes; as recorded there, not recomputed here), and the manifest re-checks matched **30 of 30** entries (the stopped 2026
+   pack) and **12 of 12** entries (the fixture re-plan) with none missing or mismatched. The restored files carry the
+   modification times the copy left (20:52:03, 20:55:09 and 20:54:56 on 10 October), inherited from the recovered copies and
+   not their original times, so **those two folders must not be described as untouched**. The recovered copies, both existing
+   `MANIFEST.txt` files and `STATUS-AND-INCIDENT.txt` were not modified by the restoration. The rebuilt 2025 pack, its MANIFEST
+   (32/32 entries matched at pre-submission) and the executed evidence were not affected.
+9. **Refused census launch** (17.18.6). **Evidence form:** the UI captures are Playwright accessibility snapshots (YAML), not
+   images. The change under test altered no rendered UI, so no visual claim is made.
+10. **Not run, not authorised:** derived rebuild, any repair or rollback, any PROD contact, `merge:ready` (historical
+    result stays **not evidenced and not waived**).
+
+#### 17.18.8 Pending tracking: the 2026 venue-season defect (unnumbered)
+
+A separate defect is drafted, **not yet registered, no issue number allocated**, at
+`D:\tmp\issue272\DRAFT-ISSUE-venue-season-bound-2026.md`: legacy `match_results` venue resolution applies a `venues` season
+span, and every venue hosting a 2026 match on DEV has `last_season = 2025` (17 venues, 218 matches), so a 2026 row cannot
+resolve its venue and a promotion would null a stored `venue_id`. Only ISSUE-150's cosmetic observation touches it. It is why
+the acceptance used 2025 fixtures. It is recorded here as pending tracking only: the number is allocated at registration by
+the usual targeted search; this document does not allocate one and does not treat it as a closure gate (the operator may
+reclassify).
+
+#### 17.18.9 Criteria (the §17.15 table, reassessed from the current tracking documents)
+
+"Met" means shown by the evidence named; nothing is marked met on inference. Rows 1–6 and 9–12 keep their §17.15 numbering.
+
+| # | Criterion | Evidence | Status | Outstanding |
+|---|---|---|---|---|
+| 1 | Invariant: round normalised or refused; canonical code at every key site | §17.3; `d37c1422`; deployed as `b2939eb7` | **Implemented, committed, deployed to DEV** | none for the code |
+| 2 | §14.1 DB-free | 246/246 on the tested tree (§17.12) and on the exact deployment revision `b2939eb7` in fresh readiness R5 (this pass, `summary.txt`) | **Met** | none |
+| 3 | §14.2 integration: promoting `R1` against an existing `1` leaves one row | `apply-20261010-122808-24240`: 61/61, `afldb_test` only (§17.14) | **Met** for that window | unchanged limits (§17.14) |
+| 4 | DEV duplicate census run and reviewed before DEV deployment | §17.15 (before deployment); census of record 11 Oct (after acceptance): both COMPLETE, 0 candidates | **Met** (DEV, two snapshots) | none for DEV; not proof of the fix, history or PROD |
+| 5 | PROD census | none | **Optional, not chosen; not a gate** | PROD data state unassessed |
+| 6 | Review, commit, push | local `main`, recorded `origin/main` and live remote = `b2939eb7` (verified 10 Oct 21:34, `ls-remote`; local `main` re-read 11 Oct); `d37c1422` before it. **Historical `merge:ready` result: not evidenced and not waived.** Fresh readiness of the descendant: PASS (not `merge:ready`) | **Tips verified; historical `merge:ready` NOT EVIDENCED and NOT WAIVED** | the missing historical result stays recorded as missing; the twelfth- and thirteenth-pass four-file edits were uncommitted when written and are recorded by the documentation commit that follows `b2939eb7` |
+| 7 | DEV deployment, after the census | gated `sync-dev.ps1` exit 0, `b2939eb7`, `BUILD_ID` `e6baP2aMpe9KQ13d_24BL`, I-1–I-4 PASS, 24/24 headers (17.18.3) | **Done** (10 Oct 2026) | the `BUILD_ID` mtime discrepancy is unreconciled (no effect on identity) |
+| 8 | DEV acceptance of the fixed behaviour | C3/C4 rejected as expected; C1/C2 gated, manually promoted (batches 113/114); fingerprints unchanged; **B3 INCONCLUSIVE** (batch 115); operator adjudication; census of record clean (17.18.4–17.18.6) | **Performed; QUALIFIED. Supported only with the recorded concurrency exception; not an unqualified PASS** | operator states at closure whether the qualified result stands as criterion 8; 2025 fixtures only; ISSUE-271 not accepted |
+| 9 | PROD installation | none; behind the ISSUE-265 hold | **Not done (blocked)** | after the hold lifts |
+| 10 | PROD acceptance | none | **Not done (blocked)** | as 9 |
+| 11 | Closure procedure (`CLAUDE.md` §5) | not performed | **Not performed** (9, 10 unmet; 8 qualified) | on closure only |
+| 12 | Follow-ups that are not gates | ISSUE-306; 0-based-vocabulary file; name-key vs club-ID-key; ISSUE-268 D-268-3; one-decided-Grand-Final assumption; **new: the pending 2026 venue-season defect (17.18.8); housekeeping below** | **Recorded, not gates** | tracked separately |
+
+**Remaining blockers (ISSUE-272), exactly:** (a) PROD installation and PROD acceptance, behind the unchanged ISSUE-265 hold;
+(b) the operator's closure-time position on the qualified DEV acceptance (criterion 8), since the batch-count rule was not
+met and was adjudicated for this assessment; (c) the closure procedure itself. **Not blockers but open:** the pending venue
+defect registration; operator-owned housekeeping that nothing here performed: the staging copies (17.18.7 item 5), the DEV
+host `.env` backup and the retained `AFLDB_TRACE_REQUESTS=on`, the kept readiness worktree and branch (U-7), tunnel PID 16372,
+the refused-launch directory, and the evidence directories (the incident copy-back is no longer outstanding: restored and
+verified, item 8). **ISSUE-271 is not accepted by
+any of this** (its own DEV acceptance procedure is still unwritten).
+
+**Closure verdict: ISSUE-272 stays Open.** Nothing was repaired, rebuilt, deployed or cleaned up in this pass.
