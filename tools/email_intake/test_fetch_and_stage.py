@@ -378,37 +378,38 @@ def raw_submission(from_: str, auth: str) -> bytes:
     ).encode("ascii")
 
 
+class FakeImap:
+    """Just enough IMAP for main(): every message unseen, every call OK."""
+
+    def __init__(self, raws: list[bytes]):
+        self.raws = raws
+        self.filed: list[tuple[int, str]] = []
+
+    def select(self, name, readonly=False):
+        return "OK", [b"1"]
+
+    def search(self, charset, criterion):
+        return "OK", [b" ".join(str(n).encode() for n in range(1, len(self.raws) + 1))]
+
+    def fetch(self, msg_id, parts):
+        return "OK", [(b"1 (BODY[] {n})", self.raws[int(msg_id) - 1])]
+
+    def copy(self, msg_id, folder):
+        self.filed.append((int(msg_id), folder))
+        return "OK", []
+
+    def store(self, msg_id, command, flags):
+        return "OK", []
+
+    def close(self):
+        pass
+
+    def logout(self):
+        pass
+
+
 def test_main_forwards_the_verified_mailbox() -> None:
     print("main() forwards exactly the mailbox DMARC verified")
-
-    class FakeImap:
-        """Just enough IMAP for main(): every message unseen, every call OK."""
-
-        def __init__(self, raws: list[bytes]):
-            self.raws = raws
-            self.filed: list[tuple[int, str]] = []
-
-        def select(self, name, readonly=False):
-            return "OK", [b"1"]
-
-        def search(self, charset, criterion):
-            return "OK", [b" ".join(str(n).encode() for n in range(1, len(self.raws) + 1))]
-
-        def fetch(self, msg_id, parts):
-            return "OK", [(b"1 (BODY[] {n})", self.raws[int(msg_id) - 1])]
-
-        def copy(self, msg_id, folder):
-            self.filed.append((int(msg_id), folder))
-            return "OK", []
-
-        def store(self, msg_id, command, flags):
-            return "OK", []
-
-        def close(self):
-            pass
-
-        def logout(self):
-            pass
 
     messages = [
         # 1: forwarded, as the parsed mailbox -- not the display name or the raw header text.
@@ -459,6 +460,84 @@ def test_main_forwards_the_verified_mailbox() -> None:
                        (6, "Errors")])
     finally:
         poller.load_env, poller.imap_connect, poller.post_to_intake, sys.argv = saved
+        restore_env(saved_env)
+
+
+def test_main_files_a_superseded_validation() -> None:
+    print("main() files a reviewer-superseded validation as Processed (AFLDB-ISSUE-273)")
+
+    # The route's two answers to a validation refused because the submission
+    # changed (src/app/api/admin/email-intake/route.ts), byte for byte as
+    # tests/integration/email-intake.test.ts pins their keys.
+    superseded = (200, (
+        b'{"ok":true,"submissionId":41,"duplicate":true,"rowCount":1,"validated":false,'
+        b'"status":"promoted","message":"A reviewer has ruled on this file (it is now promoted); '
+        b'this validation attempt wrote no verdicts or resolved payloads.",'
+        b'"reviewUrl":"/admin/submissions/41"}'))
+    # A reject that landed after staging, before validation's first read.
+    refused_at_start = (200, (
+        b'{"ok":true,"submissionId":41,"duplicate":false,"rowCount":1,"validated":false,'
+        b'"status":"rejected","message":"A reviewer has ruled on this file (it is now rejected); '
+        b'this validation attempt wrote no verdicts or resolved payloads.",'
+        b'"reviewUrl":"/admin/submissions/41"}'))
+    lost_to_validation = (500, (
+        b'{"error":"The file was staged but validation failed; it can be re-validated from the review '
+        b'page.","submissionId":41,"reviewUrl":"/admin/submissions/41"}'))
+
+    posts: list = []
+
+    def answering(code: int, body: bytes):
+        def _open(request, timeout=None):
+            posts.append(request)
+            if code >= 400:
+                raise urllib.error.HTTPError("http://x/api", code, "err", {}, io.BytesIO(body))
+
+            class Response:
+                def read(self):
+                    return body
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *exc):
+                    return False
+
+            return Response()
+        return _open
+
+    keys = ("AFLDB_INTAKE_AUTHSERV_ID", "AFLDB_INTAKE_REQUIRE_AUTH", "AFLDB_EMAIL_INTAKE_SECRET")
+    saved_env = {k: os.environ.get(k) for k in keys}
+    saved = (poller.load_env, poller.imap_connect, urllib.request.urlopen, sys.argv)
+    poller.load_env = lambda *args, **kwargs: None
+    sys.argv = ["fetch_and_stage.py"]
+    try:
+        for key in keys:
+            os.environ.pop(key, None)
+        os.environ.update(AFLDB_INTAKE_AUTHSERV_ID="mx.host.com", AFLDB_EMAIL_INTAKE_SECRET="s")
+        for name, (code, body), want_code, want_filed, want_status in (
+            ("superseded", superseded, poller.EXIT_OK, [(1, "Processed")], "promoted"),
+            ("refused at its first read", refused_at_start, poller.EXIT_OK, [(1, "Processed")], "rejected"),
+            ("lost to another validation", lost_to_validation, poller.EXIT_TEMPFAIL, [], None),
+        ):
+            conn = FakeImap([raw_submission("admin@example.com", PASS)])
+            poller.imap_connect = lambda: conn
+            posts.clear()
+            urllib.request.urlopen = answering(code, body)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                got_code = poller.main()
+            check(f"{name}: exit code", got_code, want_code)
+            check(f"{name}: filed", conn.filed, want_filed)
+            # One POST per run: nothing in main() re-posts the message.
+            check(f"{name}: posted once", len(posts), 1)
+            if code == 200:
+                check(f"{name}: logged as decided, not as staged",
+                      f"submission 41 is {want_status} by a reviewer; this validation attempt wrote no "
+                      "verdicts or resolved payloads" in out.getvalue()
+                      and "staged: submission" not in out.getvalue()
+                      and "wrote nothing" not in out.getvalue(), True)
+    finally:
+        poller.load_env, poller.imap_connect, urllib.request.urlopen, sys.argv = saved
         restore_env(saved_env)
 
 
@@ -592,6 +671,7 @@ def main() -> int:
         test_intake_auth_config,
         test_config_failure_leaves_mailbox_untouched,
         test_main_forwards_the_verified_mailbox,
+        test_main_files_a_superseded_validation,
         test_find_csv_attachment,
         test_load_env,
         test_intake_base_url,

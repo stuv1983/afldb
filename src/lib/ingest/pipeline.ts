@@ -13,6 +13,7 @@ import {
   type MatchResultsAuthorityReader,
   type MatchSheetAuthorityRead,
   type MatchSheetAuthorityReader,
+  type RowVerdict,
 } from '@/lib/ingest/datasets';
 import { CsvError, parseCsv, toObjects } from '@/lib/ingest/csv';
 import { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
@@ -208,18 +209,85 @@ function matchSheetAuthorityReader(): {
 }
 
 /**
+ * AFLDB-ISSUE-273: the submission moved on while it was being validated — a
+ * review action (approve, promote, reject) or another validation committed
+ * first. The run is discarded whole: no verdict and no status was written.
+ */
+export class SubmissionChangedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SubmissionChangedError';
+  }
+}
+
+/**
+ * AFLDB-ISSUE-273: the submission's status, at the read that also captures the
+ * version the run would start from, is not one this caller may validate from.
+ * The run stopped there: it read no rows and wrote nothing. `status` is the
+ * status that read returned.
+ */
+export class SubmissionNotValidatableError extends Error {
+  readonly submissionId: number;
+  readonly status: string;
+
+  constructor(submissionId: number, status: string) {
+    super(`submission is ${status}; only staged files can be validated`);
+    this.name = 'SubmissionNotValidatableError';
+    this.submissionId = submissionId;
+    this.status = status;
+  }
+}
+
+/**
+ * AFLDB-ISSUE-273: the statuses each caller may start a validation from.
+ *
+ * The review page's Validate button may also re-validate a rejected file, an
+ * authorised manual reopening. Email intake may not: it validates a file it
+ * has just staged (or resolved a resend to), so a `rejected` there is a
+ * reviewer's decision that landed after staging, and validating it would
+ * quietly reopen that decision.
+ */
+export const REVIEW_VALIDATION_START_STATUSES: readonly string[] = ['staged', 'validated', 'rejected'];
+export const INTAKE_VALIDATION_START_STATUSES: readonly string[] = ['staged', 'validated'];
+
+/** Verdicts are written in bounded statements, all inside one transaction. */
+const VERDICT_WRITE_CHUNK = 500;
+
+/**
  * Validate a staged submission and attach per-row verdicts.
  *
  * Row errors do not throw: the point of the report is to show every
  * problem at once, not the first.
+ *
+ * AFLDB-ISSUE-273: the slow part (one validator call per row) runs with no
+ * transaction and no lock, and its verdicts are held in memory. They are then
+ * written, with the final status, in ONE short transaction that first locks
+ * the submission row (`SELECT ... FOR UPDATE`, the lock promote and approve
+ * also take first) and re-reads it. The write happens only if the row is
+ * exactly the version this run started from: the same status AND the same
+ * `xmin`, which every committed UPDATE of the row replaces, so an approve,
+ * promote, reject or other validation in between — even one that has since
+ * returned the row to the starting status — refuses the run. A refused or
+ * failed run writes nothing, so the rows always carry one complete
+ * validation's verdicts and `resolved` payloads, never a mix, and promotion
+ * (which reads them under the same lock) cannot consume a partial rewrite.
+ *
+ * `startStatuses` is the caller's policy (see the two lists above; the review
+ * page's is the default). It is checked against the same SELECT that captures
+ * the starting status and `xmin`, so no change can slip in between the check
+ * and the version the run is pinned to.
  */
-export async function validateSubmission(submissionId: number): Promise<ValidationSummary> {
-  const [submission] = await authSql<{ dataset: string; status: string }[]>`
-    SELECT dataset, status::text FROM data_submissions WHERE id = ${submissionId}
+export async function validateSubmission(
+  submissionId: number,
+  options: { startStatuses?: readonly string[] } = {},
+): Promise<ValidationSummary> {
+  const startStatuses = options.startStatuses ?? REVIEW_VALIDATION_START_STATUSES;
+  const [submission] = await authSql<{ dataset: string; status: string; version: string }[]>`
+    SELECT dataset, status::text, xmin::text AS version FROM data_submissions WHERE id = ${submissionId}
   `;
   if (!submission) throw new Error(`submission ${submissionId} not found`);
-  if (!['staged', 'validated', 'rejected'].includes(submission.status)) {
-    throw new Error(`submission is ${submission.status}; only staged files can be validated`);
+  if (!startStatuses.includes(submission.status)) {
+    throw new SubmissionNotValidatableError(submissionId, submission.status);
   }
   const spec = getDataset(submission.dataset);
   if (!spec) throw new Error(`dataset ${submission.dataset} is no longer registered`);
@@ -233,6 +301,11 @@ export async function validateSubmission(submissionId: number): Promise<Validati
 
   const summary: ValidationSummary = { ok: 0, warnings: 0, errors: 0, duplicates: 0 };
   const seenKeys = new Map<string, number>();
+  const verdicts: {
+    row_no: number;
+    verdict: RowVerdict['verdict'];
+    reasons: { reasons: string[]; resolved: NonNullable<RowVerdict['resolved']> | null };
+  }[] = [];
   const authority = matchSheetAuthorityReader();
 
   try {
@@ -268,26 +341,76 @@ export async function validateSubmission(submissionId: number): Promise<Validati
       else if (verdict.verdict === 'warning') summary.warnings += 1;
       else summary.ok += 1;
 
-      await authSql`
-        UPDATE data_submission_rows
-           SET verdict = ${verdict.verdict},
-               reasons = ${authSql.json({
-                 reasons: verdict.reasons,
-                 resolved: verdict.resolved ?? null,
-               })}
-         WHERE submission_id = ${submissionId} AND row_no = ${row.rowNo}
-      `;
+      verdicts.push({
+        row_no: row.rowNo,
+        verdict: verdict.verdict,
+        reasons: { reasons: verdict.reasons, resolved: verdict.resolved ?? null },
+      });
     }
   } finally {
     await authority.close();
   }
 
-  await authSql`
-    UPDATE data_submissions
-       SET status = 'validated',
-           validation_report = ${authSql.json(summary as unknown as Record<string, number>)}
-     WHERE id = ${submissionId}
-  `;
+  await authSql.begin(async (tx) => {
+    const [current] = await tx<{ status: string; version: string }[]>`
+      SELECT status::text, xmin::text AS version
+        FROM data_submissions
+       WHERE id = ${submissionId}
+         FOR UPDATE
+    `;
+    if (!current) {
+      throw new SubmissionChangedError(
+        `submission ${submissionId} was deleted while it was being validated; nothing was written`,
+      );
+    }
+    if (current.status !== submission.status) {
+      throw new SubmissionChangedError(
+        `submission ${submissionId} became ${current.status} while it was being validated `
+        + `(it was ${submission.status}); this validation was discarded and nothing was written`,
+      );
+    }
+    if (current.version !== submission.version) {
+      throw new SubmissionChangedError(
+        `submission ${submissionId} was changed by another validation or review action while it was `
+        + 'being validated; this validation was discarded and nothing was written. Re-validate to '
+        + 'refresh the verdicts.',
+      );
+    }
+
+    // `tx.json` binds the batch as ONE jsonb parameter; jsonb_to_recordset
+    // hands each row's `reasons` object back as jsonb, not as JSON text.
+    for (let start = 0; start < verdicts.length; start += VERDICT_WRITE_CHUNK) {
+      const chunk = verdicts.slice(start, start + VERDICT_WRITE_CHUNK);
+      const written = await tx`
+        UPDATE data_submission_rows r
+           SET verdict = v.verdict,
+               reasons = v.reasons
+          FROM jsonb_to_recordset(${tx.json(chunk)}) AS v(row_no integer, verdict text, reasons jsonb)
+         WHERE r.submission_id = ${submissionId}
+           AND r.row_no = v.row_no
+      `;
+      if (written.count !== chunk.length) {
+        throw new Error(
+          `submission ${submissionId}: wrote ${written.count} of ${chunk.length} row verdicts; rolled back`,
+        );
+      }
+    }
+
+    // The lock makes this CAS unconditional in practice; it stays as the
+    // stated invariant (the ISSUE-175 rule) rather than an implied one.
+    const [validated] = await tx<{ id: number }[]>`
+      UPDATE data_submissions
+         SET status = 'validated',
+             validation_report = ${tx.json(summary as unknown as Record<string, number>)}
+       WHERE id = ${submissionId} AND status = ${submission.status}
+      RETURNING id
+    `;
+    if (!validated) {
+      throw new SubmissionChangedError(
+        `submission ${submissionId} changed status during validation; nothing was written`,
+      );
+    }
+  });
   return summary;
 }
 

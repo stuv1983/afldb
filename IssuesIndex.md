@@ -415,8 +415,17 @@
 
 ### AFLDB-ISSUE-273 — Submission validation overwrites a concurrent approve, promote or reject
 - **Severity:** Medium. **Area:** legacy CSV intake / submission lifecycle concurrency — `src/lib/ingest/pipeline.ts`.
-- **State:** Open (2026-10-08), review F-008, code-proven; nothing implemented; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-273.md`. **Next action:** code fix plus tests.
+- **State:** Open (2026-10-08), review F-008, code-proven. Fix implemented 2026-10-11 on `opus/issue-273`:
+  verdicts are computed unlocked, then written with the status in one transaction under the
+  submission row lock, guarded by status + `xmin`; approve now locks first. DB-free checks pass. `afldb_test`
+  integration passed on 2026-10-11 (§18). D-273-1 approved and implemented 2026-10-11 (§19): email intake answers
+  200 `validated: false` when a reviewer's decision superseded its validation; DB-free and `afldb_test` integration
+  pass (ISSUE-264 State-B block excluded). Residual §19.5 (a reject before validation's first read) fixed 2026-10-11
+  (§20): caller-specific start policy, intake from `staged`/`validated` only; manual re-validation kept; DB-free and
+  `afldb_test` (`email-intake` 20/20, `submission-promotion` 15/15) pass. Final review corrections 2026-10-11 (§21):
+  integration teardown now awaits all tracked background work before reset/cleanup; `afldb_test` 41 passed +
+  4 expected-fail. Committed on `opus/issue-273`, not merged.
+- **Runbook:** `issues/open/AFLDB-ISSUE-273.md` §17–§21. **Next action:** operator merge, then DEV deployment.
 
 ### AFLDB-ISSUE-274 — A settle unit that writes only the `matches` row takes no row lock before its authority read
 - **Severity:** Medium. **Area:** acquisition / settle concurrency — `src/lib/acquisition/canonical-apply.ts`.

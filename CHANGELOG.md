@@ -15,6 +15,27 @@ commit.
 
 ## [Unreleased]
 
+### Submission validation can no longer overwrite a concurrent approve, promote or reject (AFLDB-ISSUE-273; committed on `opus/issue-273`, not merged; DB-free unit, poller self-test, typecheck and lint passed; `afldb_test` integration passed for `email-intake` (23 passed + 2 expected-fail) and `submission-promotion` (18 passed + 2 expected-fail), with only the existing ISSUE-264 State-B block refused on `match-results-promotion` in the earlier run; not deployed; issue open) - 11 October 2026
+
+- **Validation.** `validateSubmission` computes every row verdict with no lock, then writes the verdicts and the
+  `validated` status in one transaction that locks the submission row and requires the status and `xmin` it started
+  from. If an approve, promote, reject or another validation committed in between, the run is refused with
+  `SubmissionChangedError` and writes nothing, so a human decision stands and the rows always carry one complete
+  validation. Approve now takes the same row lock before its guarded update. No migration or grant.
+- **Email intake (D-273-1).** When a delivery's validation is refused because a reviewer approved, rejected or promoted
+  the file (or a promotion of it failed), `POST /api/admin/email-intake` answers 200 with `ok: true`,
+  `validated: false` (this validation attempt wrote no verdicts or resolved payloads), the current `status` and
+  `reviewUrl`, and audits `email_intake.validation_superseded`. The poller files the message under Processed instead of
+  retrying it, so the file is no longer staged a second time. A delivery that lost to another validation, an ordinary
+  validation failure, a missing submission, an unreadable read and an unknown status keep the existing retryable 500.
+  The poller logs the acknowledged case as "submission N is <status> by a reviewer; this validation attempt wrote no
+  verdicts or resolved payloads".
+- **Validation start policy.** `validateSubmission` now takes the statuses its caller may start from and checks them on
+  the same read that captures the starting status and `xmin`. Email intake starts only from `staged` or `validated`, so
+  a reject that lands between staging and validation's first read is no longer reopened to `validated`, and an approve
+  or promote landing there is acknowledged instead of answered with a 500 and a second staged copy. The review page's
+  Validate button keeps re-validating rejected files.
+
 ### Legacy `match_results` uploads use canonical round codes and refuse to overwrite Data Editor corrections (AFLDB-ISSUE-271, AFLDB-ISSUE-272; implemented, commit `d37c1422` on `main`; DB-free unit tests, typecheck, lint, diff check and the full integration files (61/61) passed; DEV duplicate census COMPLETE with 0 candidates; push verified, historical `merge:ready` result not evidenced and not waived; fresh readiness PASSED; deployed to DEV at `b2939eb7` (BUILD_ID `e6baP2aMpe9KQ13d_24BL`); ISSUE-272 DEV acceptance performed and QUALIFIED (original B3 INCONCLUSIVE, operator-adjudicated concurrent batch 115), post-acceptance census COMPLETE with 0 findings; ISSUE-271 acceptance, PROD installation and PROD acceptance outstanding; issues open) - 10–11 October 2026
 
 - **Round codes (ISSUE-272).** A `match_results` row's round is read once, by the importer's own rule: `R1` or `1` with

@@ -740,7 +740,14 @@ def main() -> int:
                 deferred += 1
                 continue
 
-            if result.get("duplicate"):
+            if result.get("validated") is False:
+                # AFLDB-ISSUE-273: a reviewer ruled on the file before or
+                # while this delivery validated it, so the validation attempt
+                # wrote no verdicts (the delivery may still have staged the
+                # file). Settled, so it is Processed.
+                print(f"    submission {result.get('submissionId')} is {result.get('status')} by a reviewer; "
+                      "this validation attempt wrote no verdicts or resolved payloads")
+            elif result.get("duplicate"):
                 print(f"    already staged as submission {result.get('submissionId')}; nothing new written")
             else:
                 print(f"    staged: submission {result.get('submissionId')}, "

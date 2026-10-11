@@ -6,7 +6,10 @@ import { authSql } from '@/db/authClient';
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import { audit, lastForwardedIp } from '@/lib/auth/session';
 import type { StageResult, ValidationSummary } from '@/lib/ingest/pipeline';
-import { MAX_UPLOAD_BYTES, stageSubmission, validateSubmission } from '@/lib/ingest/pipeline';
+import {
+  INTAKE_VALIDATION_START_STATUSES, MAX_UPLOAD_BYTES, stageSubmission, SubmissionChangedError,
+  SubmissionNotValidatableError, validateSubmission,
+} from '@/lib/ingest/pipeline';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +73,40 @@ function timingSafeStringEqual(a: string, b: string): boolean {
     return false;
   }
   return timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * AFLDB-ISSUE-273 (D-273-1): the statuses that mean a reviewer has ruled on
+ * the file. Each is reached only through a review action -- approve, reject,
+ * or a promotion of an approved file ('failed' is a promotion that raised,
+ * and stays re-promotable) -- and stageSubmission will not resolve a resend
+ * to any of them, so a retry after one would stage the file a second time.
+ */
+const DECIDED_STATUSES = new Set(['approved', 'rejected', 'promoted', 'failed']);
+
+/**
+ * The status a reviewer left a refused validation's submission in, or null.
+ *
+ * Refused at its first read (the intake's start policy): that read's own
+ * status, which is already confirmed. Refused at the write
+ * (SubmissionChangedError): a fresh re-read. Anything else -- any other error,
+ * the row gone, the re-read failing, 'staged' or 'validated', a status this
+ * list does not know -- is null, and the caller keeps the retryable 500.
+ */
+async function decidedStatus(error: unknown, submissionId: number): Promise<string | null> {
+  if (error instanceof SubmissionNotValidatableError) {
+    return DECIDED_STATUSES.has(error.status) ? error.status : null;
+  }
+  if (!(error instanceof SubmissionChangedError)) return null;
+  try {
+    const [row] = await authSql<{ status: string }[]>`
+      SELECT status::text FROM data_submissions WHERE id = ${submissionId}
+    `;
+    return row && DECIDED_STATUSES.has(row.status) ? row.status : null;
+  } catch (error) {
+    console.error('[email-intake] could not re-read a changed submission', error);
+    return null;
+  }
 }
 
 type IntakeBody = {
@@ -187,12 +224,47 @@ export async function POST(request: Request) {
   // will not reopen a submission a human has ruled on), and
   // validateSubmission rewrites the verdicts for both, so this is
   // idempotent rather than a second, conflicting report.
+  //
+  // AFLDB-ISSUE-273: and only those two. A reviewer can still rule between
+  // staging and validation's first read; the intake's start policy refuses
+  // the run at that read rather than reopening a rejection.
   let report: ValidationSummary;
   try {
-    report = await validateSubmission(staged.submissionId);
+    report = await validateSubmission(staged.submissionId,
+      { startStatuses: INTAKE_VALIDATION_START_STATUSES });
     await audit('email_intake.validated', { submissionId: staged.submissionId, report },
       { userId: admin.id, label: admin.email });
   } catch (error) {
+    // AFLDB-ISSUE-273 (D-273-1): a reviewer approved, rejected or promoted
+    // the file before this validation attempt's first read or while it ran,
+    // so the attempt wrote no verdicts or resolved payloads (this delivery
+    // may still have staged the file). That decision is the outcome; a 5xx
+    // would make the poller resend, and the resend would stage a second copy.
+    // `validated: false` describes this attempt only: a promoted file was
+    // validated before it was approved. A run that lost to another
+    // validation still falls through to the 500, and its retry resolves to
+    // the same submission.
+    const status = await decidedStatus(error, staged.submissionId);
+    if (status) {
+      // Best effort, unlike the success audits: a throw here would become a
+      // 500 and bring back exactly the resend this branch exists to stop.
+      await audit('email_intake.validation_superseded',
+        { submissionId: staged.submissionId, dataset, filename, status },
+        { userId: admin.id, label: admin.email })
+        .catch((auditError) => console.error('[email-intake] audit failed', auditError));
+      return NextResponse.json({
+        ok: true,
+        submissionId: staged.submissionId,
+        duplicate: staged.duplicate,
+        rowCount: staged.rowCount,
+        validated: false,
+        status,
+        message: `A reviewer has ruled on this file (it is now ${status}); `
+          + 'this validation attempt wrote no verdicts or resolved payloads.',
+        reviewUrl: `/admin/submissions/${staged.submissionId}`,
+      });
+    }
+
     console.error('[email-intake] validation failed', error);
     await audit('email_intake.validate_error',
       { submissionId: staged.submissionId, dataset, filename },

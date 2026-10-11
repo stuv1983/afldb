@@ -45,17 +45,26 @@ export async function decideSubmission(
   if (!Number.isInteger(id)) return { error: 'Bad submission id.' };
 
   if (decision === 'approve') {
-    const [updated] = await authSql<{ id: number }[]>`
-      UPDATE data_submissions
-         SET status = 'approved', reviewed_by = ${admin.id}, reviewed_at = now()
-       WHERE id = ${id}
-         AND status = 'validated'
-         AND NOT EXISTS (
-               SELECT 1 FROM data_submission_rows r
-                WHERE r.submission_id = ${id} AND (r.verdict = 'error' OR r.verdict IS NULL)
-             )
-      RETURNING id
-    `;
+    // AFLDB-ISSUE-273: lock the submission BEFORE the guarded UPDATE. A
+    // validation writes its verdicts and status under this lock; an UPDATE
+    // that merely waited for it would re-check `status` on the new row but
+    // evaluate the error-row subquery against its pre-wait snapshot, and so
+    // could approve verdicts that validation had just replaced with errors.
+    const updated = await authSql.begin(async (tx) => {
+      await tx`SELECT id FROM data_submissions WHERE id = ${id} FOR UPDATE`;
+      const [row] = await tx<{ id: number }[]>`
+        UPDATE data_submissions
+           SET status = 'approved', reviewed_by = ${admin.id}, reviewed_at = now()
+         WHERE id = ${id}
+           AND status = 'validated'
+           AND NOT EXISTS (
+                 SELECT 1 FROM data_submission_rows r
+                  WHERE r.submission_id = ${id} AND (r.verdict = 'error' OR r.verdict IS NULL)
+               )
+        RETURNING id
+      `;
+      return row;
+    });
     if (!updated) {
       return { error: 'Only a validated submission with no error rows can be approved.' };
     }

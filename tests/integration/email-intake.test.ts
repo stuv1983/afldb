@@ -1,11 +1,107 @@
 import './guard';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
+
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import postgres from 'postgres';
 
 import { authSql } from '@/db/authClient';
 import { POST } from '@/app/api/admin/email-intake/route';
+import { decideSubmission, runValidation } from '@/app/admin/submissions/[id]/actions';
+import { promoteSubmission, validateSubmission } from '@/lib/ingest/pipeline';
+
+/**
+ * AFLDB-ISSUE-273 (D-273-1) test control, the same wrapper as
+ * tests/integration/submission-promotion.test.ts. `park` makes the NEXT
+ * validateRow call wait until its entry in `parked` is called, so a review
+ * action can commit while a delivery is mid-validation; `failFileKey` makes
+ * validation throw an ordinary error. Both are off by default, and the
+ * wrapper then passes straight through to the dataset. `afterStage` runs once,
+ * after stageSubmission has committed and before the route calls
+ * validateSubmission, so a review action can land ahead of validation's first
+ * read. A hook failure is recorded in `hookFailures` as well as thrown, since
+ * the route would otherwise report it only as a 500.
+ */
+const control = vi.hoisted(() => ({
+  park: false,
+  parked: [] as (() => void)[],
+  failFileKey: false,
+  afterStage: null as null | ((submissionId: number) => Promise<void>),
+  hookFailures: [] as unknown[],
+  admin: { id: 0, email: '' }, // set in beforeAll
+}));
+
+vi.mock('@/lib/ingest/pipeline', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ingest/pipeline')>();
+  return {
+    ...actual,
+    stageSubmission: async (...args: Parameters<typeof actual.stageSubmission>) => {
+      const staged = await actual.stageSubmission(...args);
+      const hook = control.afterStage;
+      control.afterStage = null;
+      if (hook && staged.ok) {
+        try {
+          await hook(staged.submissionId);
+        } catch (error) {
+          control.hookFailures.push(error);
+          throw error;
+        }
+      }
+      return staged;
+    },
+  };
+});
+
+vi.mock('@/lib/ingest/datasets', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ingest/datasets')>();
+  return {
+    ...actual,
+    getDataset: (key: string) => {
+      const spec = actual.getDataset(key);
+      if (!spec) return spec;
+      return {
+        ...spec,
+        fileKey: (row: Parameters<typeof spec.fileKey>[0]) => {
+          if (control.failFileKey) throw new Error('AFLDB-ISSUE-273 test: an ordinary validation failure');
+          return spec.fileKey(row);
+        },
+        validateRow: async (...args: Parameters<typeof spec.validateRow>) => {
+          if (control.park) {
+            control.park = false;
+            await new Promise<void>((resolve) => { control.parked.push(resolve); });
+          }
+          return spec.validateRow(...args);
+        },
+      };
+    },
+  };
+});
+// The real audit() still writes auth_audit_log; only the review actions'
+// session check and cache refresh are stubbed.
+vi.mock('@/lib/auth/session', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/auth/session')>(),
+  requireAdmin: vi.fn(async () => control.admin),
+  requireSuperAdmin: vi.fn(async () => control.admin),
+}));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+
+// The race cases promote. Pin the import role to the test database too, never
+// whatever an ambient .env names (submission-promotion.test.ts does the same).
+process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_IMPORT_DATABASE_URL
+  ?? process.env.AFLDB_TEST_DATABASE_URL;
+
+/**
+ * Every case but the 503 one needs the intake secret, and used to `return`
+ * early -- and pass -- without it. Now it fails instead.
+ */
+function intakeSecret(): string {
+  const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
+  if (!secret) {
+    throw new Error('AFLDB_EMAIL_INTAKE_SECRET must be set to run this suite (any value; the route runs in-process).');
+  }
+  return secret;
+}
 
 // Redirect the auth pool to the test database so authSql never opens a
 // connection to afldb_dev (or any other ambient database). The same
@@ -54,6 +150,8 @@ let fixtureAdminId = 0;
 //   * a concurrent run on the same fixture admin is unaffected (it holds its
 //     own Set with its own IDs).
 const runSubmissionIds = new Set<number>();
+// Fixture players for the player_bio race cases, deleted in afterAll.
+const runPlayerIds = new Set<number>();
 
 beforeAll(async () => {
   ownerSql = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, {
@@ -91,9 +189,79 @@ beforeAll(async () => {
     );
   }
   fixtureAdminId = fixture.id;
+  control.admin = { id: fixture.id, email: FIXTURE_EMAIL };
+});
+
+// ---------------------------------------------------------------------------
+// Background work (AFLDB-ISSUE-273)
+// ---------------------------------------------------------------------------
+// A delivery a test starts and awaits later is tracked the moment it starts,
+// with its rejection handler already attached. A test that fails before
+// awaiting it (an assertion, or a vi.waitFor timeout) therefore cannot leave
+// an unhandled rejection, or a delivery still running into the next test or
+// into the fixture cleanup: teardown releases and awaits it first.
+
+type BackgroundEntry = { done: Promise<void>; failure: { error: unknown } | null; consumed: boolean };
+const background: BackgroundEntry[] = [];
+const SETTLE_TIMEOUT_MS = 20_000; // inside the configured 30 s hookTimeout
+
+/** Track `promise`; the test reads its outcome through `result()`. */
+function track<T>(promise: Promise<T>): { result: () => Promise<T> } {
+  const entry: BackgroundEntry = { done: Promise.resolve(), failure: null, consumed: false };
+  entry.done = promise.then(() => {}, (error: unknown) => { entry.failure = { error }; });
+  background.push(entry);
+  return { result: () => { entry.consumed = true; return promise; } };
+}
+
+/**
+ * Stop new parking, release every parked delivery and await every tracked
+ * one. Returns the failures no test consumed, plus any afterStage hook
+ * failure. Throws, keeping the entries, if work is still running after
+ * SETTLE_TIMEOUT_MS, so the caller neither resets controls nor cleans
+ * fixtures under it.
+ */
+async function settleBackground(): Promise<unknown[]> {
+  control.park = false; // set first: a released multi-row validation must not park again
+  for (const release of control.parked.splice(0)) release();
+  const entries = [...background];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(
+      `${entries.length} background intake operation(s) still running after ${SETTLE_TIMEOUT_MS} ms`,
+    )), SETTLE_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([Promise.all(entries.map((e) => e.done)), timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+  background.splice(0, entries.length);
+  return [
+    ...entries.filter((e) => e.failure && !e.consumed).map((e) => e.failure!.error),
+    ...control.hookFailures.splice(0),
+  ];
+}
+
+function throwBackgroundFailures(failures: unknown[]): void {
+  if (failures.length > 0) {
+    throw new AggregateError(failures, `${failures.length} unexpected background intake failure(s)`);
+  }
+}
+
+afterEach(async () => {
+  // Await everything this test started before resetting the controls a
+  // released delivery still reads (failFileKey, afterStage).
+  const failures = await settleBackground();
+  control.failFileKey = false;
+  control.afterStage = null;
+  throwBackgroundFailures(failures);
 });
 
 afterAll(async () => {
+  // Never clean fixtures under a running delivery: settle anything an
+  // afterEach could not, or refuse the cleanup by throwing.
+  const failures = await settleBackground();
+
   // Delete exactly the data_submissions rows created by this run.
   // data_submission_rows are removed automatically by the ON DELETE CASCADE
   // declared in migration 023 (submission_id REFERENCES data_submissions(id)
@@ -108,6 +276,9 @@ afterAll(async () => {
       DELETE FROM data_submissions WHERE id = ANY(${ids}::int[])
     `;
   }
+  if (runPlayerIds.size > 0) {
+    await ownerSql`DELETE FROM players WHERE id = ANY(${[...runPlayerIds]}::int[])`;
+  }
 
   // The fixture auth_users row is intentionally NOT deleted here.
   // Deleting it would race with a concurrent run that reused the same fixture.
@@ -115,6 +286,7 @@ afterAll(async () => {
   // that is expensive to recreate and safe to leave in place.
 
   await ownerSql.end({ timeout: 5 });
+  throwBackgroundFailures(failures);
 });
 
 function request(body: unknown, headers: Record<string, string> = {}): Request {
@@ -127,15 +299,20 @@ function request(body: unknown, headers: Record<string, string> = {}): Request {
 
 describe('POST /api/admin/email-intake', () => {
   it('refuses to run at all when no secret is configured', async () => {
-    if (process.env.AFLDB_EMAIL_INTAKE_SECRET) return; // covered by the tests below instead
-    const res = await POST(request(
-      { senderEmail: 'nobody@example.com', dataset: 'match_results', contentBase64: 'eA==' },
-    ));
-    expect(res.status).toBe(503);
+    // Unset for this case only, so it runs whether or not the suite has a secret.
+    vi.stubEnv('AFLDB_EMAIL_INTAKE_SECRET', '');
+    try {
+      const res = await POST(request(
+        { senderEmail: 'nobody@example.com', dataset: 'match_results', contentBase64: 'eA==' },
+      ));
+      expect(res.status).toBe(503);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('rejects a request with the wrong secret', async () => {
-    if (!process.env.AFLDB_EMAIL_INTAKE_SECRET) return; // not configured in this environment
+    intakeSecret();
     const res = await POST(request(
       { senderEmail: 'nobody@example.com', dataset: 'match_results', contentBase64: 'eA==' },
       { 'x-intake-secret': 'definitely-not-the-real-secret' },
@@ -144,7 +321,7 @@ describe('POST /api/admin/email-intake', () => {
   });
 
   it('rejects a request with no secret header at all', async () => {
-    if (!process.env.AFLDB_EMAIL_INTAKE_SECRET) return;
+    intakeSecret();
     const res = await POST(request(
       { senderEmail: 'nobody@example.com', dataset: 'match_results', contentBase64: 'eA==' },
     ));
@@ -152,8 +329,7 @@ describe('POST /api/admin/email-intake', () => {
   });
 
   it('rejects malformed JSON', async () => {
-    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
-    if (!secret) return; // not configured in this environment; covered by the tests above
+    const secret = intakeSecret();
     const res = await POST(new Request('http://localhost/api/admin/email-intake', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-intake-secret': secret },
@@ -163,8 +339,7 @@ describe('POST /api/admin/email-intake', () => {
   });
 
   it('rejects a sender who is not a known, enabled admin', async () => {
-    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
-    if (!secret) return;
+    const secret = intakeSecret();
     const res = await POST(request(
       { senderEmail: 'definitely-not-an-admin@example.invalid', dataset: 'match_results', contentBase64: 'eA==' },
       { 'x-intake-secret': secret },
@@ -173,14 +348,13 @@ describe('POST /api/admin/email-intake', () => {
   });
 
   it('stages and validates a real CSV from a real admin end to end', async () => {
-    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
-    if (!secret) return;
+    const secret = intakeSecret();
 
     // Select the fixture admin by its known ID -- never LIMIT 1 / ordering.
     const [admin] = await authSql<{ email: string }[]>`
       SELECT email FROM auth_users WHERE id = ${fixtureAdminId}
     `;
-    if (!admin) return; // fixture admin missing; beforeAll failure already reported
+    expect(admin).toBeDefined();
 
     // Per-run unique payload via crypto.randomUUID() so the content_sha256
     // is guaranteed distinct from every prior and concurrent run. This
@@ -220,14 +394,13 @@ describe('POST /api/admin/email-intake', () => {
   });
 
   it('resolves an identical resend to the submission it already made', async () => {
-    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
-    if (!secret) return;
+    const secret = intakeSecret();
 
     // Select the fixture admin by its known ID -- never LIMIT 1 / ordering.
     const [admin] = await authSql<{ email: string }[]>`
       SELECT email FROM auth_users WHERE id = ${fixtureAdminId}
     `;
-    if (!admin) return;
+    expect(admin).toBeDefined();
 
     // Per-run unique payload via crypto.randomUUID(). The SAME payload is
     // deliberately posted TWICE below: the first call creates the submission
@@ -271,14 +444,13 @@ describe('POST /api/admin/email-intake', () => {
   });
 
   it('rejects base64 that Buffer.from would silently accept', async () => {
-    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
-    if (!secret) return;
+    const secret = intakeSecret();
 
     // Select the fixture admin by its known ID -- never LIMIT 1 / ordering.
     const [admin] = await authSql<{ email: string }[]>`
       SELECT email FROM auth_users WHERE id = ${fixtureAdminId}
     `;
-    if (!admin) return;
+    expect(admin).toBeDefined();
 
     // Buffer.from skips characters it does not recognise rather than
     // throwing, so a damaged transfer would otherwise decode to
@@ -293,14 +465,13 @@ describe('POST /api/admin/email-intake', () => {
   });
 
   it('rejects an oversized payload', async () => {
-    const secret = process.env.AFLDB_EMAIL_INTAKE_SECRET;
-    if (!secret) return;
+    const secret = intakeSecret();
 
     // Select the fixture admin by its known ID -- never LIMIT 1 / ordering.
     const [admin] = await authSql<{ email: string }[]>`
       SELECT email FROM auth_users WHERE id = ${fixtureAdminId}
     `;
-    if (!admin) return;
+    expect(admin).toBeDefined();
 
     const big = 'x'.repeat(6 * 1024 * 1024); // over the 5 MB MAX_UPLOAD_BYTES limit
     const contentBase64 = Buffer.from(big, 'utf8').toString('base64');
@@ -310,5 +481,426 @@ describe('POST /api/admin/email-intake', () => {
     ));
     // A 400 response means no submission was created; nothing to register.
     expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-273 (D-273-1): a delivery whose validation a review decision or
+// another validation overtook
+// ---------------------------------------------------------------------------
+
+/**
+ * The keys of the 200 the poller files under Processed for a superseded
+ * delivery. tools/email_intake/test_fetch_and_stage.py feeds main() this
+ * exact shape.
+ */
+const SUPERSEDED_KEYS = [
+  'duplicate', 'message', 'ok', 'reviewUrl', 'rowCount', 'status', 'submissionId', 'validated',
+];
+/** The existing retryable 500 body, unchanged by D-273-1. */
+const RETRY_ERROR = 'The file was staged but validation failed; it can be re-validated from the review page.';
+
+const sha256 = (text: string) => createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex');
+
+async function createFixturePlayer(tag: string): Promise<number> {
+  const name = `AFLDB-ISSUE-273 intake ${tag} ${crypto.randomUUID()}`;
+  const [row] = await ownerSql<{ id: number }[]>`
+    INSERT INTO players (display_name, search_name, sort_name, slug)
+    VALUES (${name}, afldb_normalise_name(${name}), ${name}, ${`issue-273-intake-${crypto.randomUUID()}`})
+    RETURNING id
+  `;
+  runPlayerIds.add(row.id);
+  return row.id;
+}
+
+/** POST one player_bio CSV as the poller would, registering whatever it staged. */
+async function deliver(csv: string): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await POST(request(
+    {
+      senderEmail: FIXTURE_EMAIL,
+      dataset: 'player_bio',
+      filename: 'issue-273.csv',
+      contentBase64: Buffer.from(csv, 'utf8').toString('base64'),
+    },
+    { 'x-intake-secret': intakeSecret() },
+  ));
+  const body = await res.json() as Record<string, unknown>;
+  if (typeof body.submissionId === 'number') runSubmissionIds.add(body.submissionId);
+  return { status: res.status, body };
+}
+
+/**
+ * Start a delivery and return once its validation is parked inside
+ * validateRow. The delivery is tracked before the wait, so a wait that times
+ * out still leaves it to teardown.
+ */
+async function startParkedDelivery(csv: string) {
+  const index = control.parked.length;
+  control.park = true;
+  const delivery = track(deliver(csv));
+  await vi.waitFor(() => { expect(control.parked.length).toBe(index + 1); }, { timeout: 10_000 });
+  return { response: delivery.result, release: control.parked[index] };
+}
+
+/** Every submission of this file, registered for cleanup: a second one is the defect. */
+async function submissionsOf(csv: string): Promise<number[]> {
+  const rows = await ownerSql<{ id: number }[]>`
+    SELECT id FROM data_submissions WHERE dataset = 'player_bio' AND content_sha256 = ${sha256(csv)} ORDER BY id
+  `;
+  for (const { id } of rows) runSubmissionIds.add(id);
+  return rows.map((r) => r.id);
+}
+
+async function readSubmission(id: number) {
+  const [row] = await ownerSql<{
+    status: string; reviewedBy: number | null; report: unknown; importBatchId: string | null;
+  }[]>`
+    SELECT status::text, reviewed_by AS "reviewedBy", validation_report AS report,
+           import_batch_id::text AS "importBatchId"
+      FROM data_submissions WHERE id = ${id}
+  `;
+  return row;
+}
+
+async function readRows(id: number) {
+  return ownerSql<{ rowNo: number; payload: unknown; verdict: string | null; reasons: unknown }[]>`
+    SELECT row_no AS "rowNo", payload, verdict, reasons
+      FROM data_submission_rows WHERE submission_id = ${id} ORDER BY row_no
+  `;
+}
+
+async function intakeAudits(id: number) {
+  return ownerSql<{ action: string; detail: Record<string, unknown> }[]>`
+    SELECT action, detail FROM auth_audit_log
+     WHERE action LIKE 'email_intake.%' AND detail->>'submissionId' = ${String(id)}
+     ORDER BY id
+  `;
+}
+
+function decision(id: number, value: 'approve' | 'reject'): FormData {
+  const form = new FormData();
+  form.set('id', String(id));
+  form.set('decision', value);
+  return form;
+}
+
+describe('AFLDB-ISSUE-273 email intake against a concurrent review (D-273-1)', () => {
+  it('a reject during the first delivery stands, and the delivery is acknowledged without a second copy', async () => {
+    const playerId = await createFixturePlayer('reject');
+    const csv = `player_id,dob\n${playerId},2001-02-03\n`;
+
+    const delivery = await startParkedDelivery(csv);
+    const [id] = await submissionsOf(csv);
+    expect(id).toBeGreaterThan(0);
+    expect(await decideSubmission({}, decision(id, 'reject'))).toEqual({ message: 'Rejected.' });
+    delivery.release();
+    const { status, body } = await delivery.response();
+
+    expect(status).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(SUPERSEDED_KEYS);
+    expect(body).toMatchObject({
+      ok: true, submissionId: id, duplicate: false, rowCount: 1, validated: false, status: 'rejected',
+      reviewUrl: `/admin/submissions/${id}`,
+    });
+
+    const review = await readSubmission(id);
+    expect(review.status).toBe('rejected');
+    expect(review.reviewedBy).toBe(fixtureAdminId);
+    expect(review.report).toBeNull();
+    // Staged and never validated: the payload as uploaded, no verdict written.
+    expect(await readRows(id)).toEqual([
+      { rowNo: 1, payload: { player_id: String(playerId), dob: '2001-02-03' }, verdict: null, reasons: null },
+    ]);
+    expect(await submissionsOf(csv)).toEqual([id]);
+    expect((await intakeAudits(id)).map((a) => [a.action, a.detail.status ?? null])).toEqual([
+      ['email_intake.staged', null],
+      ['email_intake.validation_superseded', 'rejected'],
+    ]);
+  });
+
+  it.each([
+    { outcome: 'approved', promote: false },
+    { outcome: 'promoted', promote: true },
+  ])('a review ending $outcome during a resend stands; the resend is acknowledged, not re-staged', async ({
+    outcome, promote,
+  }) => {
+    const playerId = await createFixturePlayer(outcome);
+    const csv = `player_id,dob\n${playerId},2002-03-04\n`;
+
+    // The first delivery validates normally; the poller then resends it (a
+    // timeout, say) and a reviewer acts while the resend is validating.
+    const first = await deliver(csv);
+    expect(first.status).toBe(200);
+    const id = first.body.submissionId as number;
+    const before = await readRows(id);
+    expect(before.map((r) => r.verdict)).toEqual(['ok']);
+
+    const resend = await startParkedDelivery(csv);
+    expect(await decideSubmission({}, decision(id, 'approve'))).toEqual({ message: 'Approved.' });
+    if (promote) expect((await promoteSubmission(id)).ok).toBe(true);
+    resend.release();
+    const { status, body } = await resend.response();
+
+    expect(status).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(SUPERSEDED_KEYS);
+    expect(body).toMatchObject({
+      ok: true, submissionId: id, duplicate: true, rowCount: 1, validated: false, status: outcome,
+      reviewUrl: `/admin/submissions/${id}`,
+    });
+
+    const review = await readSubmission(id);
+    expect(review.status).toBe(outcome);
+    expect(review.reviewedBy).toBe(fixtureAdminId);
+    // The verdicts and payloads the reviewer approved, untouched by the resend.
+    expect(await readRows(id)).toEqual(before);
+    expect(await submissionsOf(csv)).toEqual([id]);
+    if (promote) {
+      expect(review.importBatchId).not.toBeNull();
+      const [{ count }] = await ownerSql<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM import_batches WHERE notes = ${'submission ' + id}
+      `;
+      expect(count).toBe(1);
+    }
+    expect((await intakeAudits(id)).map((a) => [a.action, a.detail.status ?? null])).toEqual([
+      ['email_intake.staged', null],
+      ['email_intake.validated', null],
+      ['email_intake.duplicate', null],
+      ['email_intake.validation_superseded', outcome],
+    ]);
+  });
+
+  it('a resend that loses to another validation still gets the 500, and its retry resolves to the same submission', async () => {
+    const playerId = await createFixturePlayer('lost');
+    const csv = `player_id,dob\n${playerId},2003-04-05\n`;
+
+    const first = await deliver(csv);
+    expect(first.status).toBe(200);
+    const id = first.body.submissionId as number;
+
+    const resend = await startParkedDelivery(csv);
+    await validateSubmission(id); // a reviewer's Validate commits first
+    resend.release();
+    const lost = await resend.response();
+
+    expect(lost.status).toBe(500);
+    expect(lost.body).toEqual({ error: RETRY_ERROR, submissionId: id, reviewUrl: `/admin/submissions/${id}` });
+    expect((await readSubmission(id)).status).toBe('validated');
+
+    // The poller's retry of that 500.
+    const retry = await deliver(csv);
+    expect(retry.status).toBe(200);
+    expect(retry.body).toMatchObject({ ok: true, submissionId: id, duplicate: true, rowCount: 1 });
+    expect(retry.body.report).toEqual({ ok: 1, warnings: 0, errors: 0, duplicates: 0 });
+    expect(retry.body.validated).toBeUndefined();
+    expect(await submissionsOf(csv)).toEqual([id]);
+    expect((await intakeAudits(id)).map((a) => a.action)).toEqual([
+      'email_intake.staged', 'email_intake.validated',
+      'email_intake.duplicate', 'email_intake.validate_error',
+      'email_intake.duplicate', 'email_intake.validated',
+    ]);
+  });
+
+  it('an ordinary validation failure still gets the existing 500', async () => {
+    const playerId = await createFixturePlayer('ordinary');
+    const csv = `player_id,dob\n${playerId},2004-05-06\n`;
+
+    control.failFileKey = true;
+    const { status, body } = await deliver(csv);
+
+    const [id] = await submissionsOf(csv);
+    expect(status).toBe(500);
+    expect(body).toEqual({ error: RETRY_ERROR, submissionId: id, reviewUrl: `/admin/submissions/${id}` });
+    expect((await readSubmission(id)).status).toBe('staged');
+    expect((await readRows(id)).map((r) => r.verdict)).toEqual([null]);
+    expect((await intakeAudits(id)).map((a) => a.action)).toEqual([
+      'email_intake.staged', 'email_intake.validate_error',
+    ]);
+  });
+
+  it('a submission deleted mid-validation is not acknowledged', async () => {
+    const playerId = await createFixturePlayer('deleted');
+    const csv = `player_id,dob\n${playerId},2005-06-07\n`;
+
+    const delivery = await startParkedDelivery(csv);
+    const [id] = await submissionsOf(csv);
+    await ownerSql`DELETE FROM data_submissions WHERE id = ${id}`;
+    delivery.release();
+    const { status, body } = await delivery.response();
+
+    expect(status).toBe(500);
+    expect(body).toEqual({ error: RETRY_ERROR, submissionId: id, reviewUrl: `/admin/submissions/${id}` });
+    expect(await submissionsOf(csv)).toEqual([]);
+    expect((await intakeAudits(id)).map((a) => a.action)).toEqual([
+      'email_intake.staged', 'email_intake.validate_error',
+    ]);
+  });
+});
+
+describe('AFLDB-ISSUE-273 email intake against a review that lands before validation starts', () => {
+  // A decision that commits after staging but before validateSubmission's
+  // first read. Before the intake start policy, a reject there was taken as
+  // the starting state and rewritten to 'validated'; an approve or promote
+  // was refused with a plain error, a 500, and a resend that staged a
+  // second copy.
+  it.each([
+    { outcome: 'rejected', resend: false },
+    { outcome: 'rejected', resend: true },
+    { outcome: 'approved', resend: true },
+    { outcome: 'promoted', resend: true },
+  ])('a review ending $outcome before the first read (resend: $resend) stands and is acknowledged', async ({
+    outcome, resend,
+  }) => {
+    const playerId = await createFixturePlayer(`pre-read-${outcome}`);
+    const csv = `player_id,dob\n${playerId},2006-07-08\n`;
+
+    let id = 0;
+    let beforeRows: Awaited<ReturnType<typeof readRows>> | null = null;
+    let beforeReport: unknown = null;
+    if (resend) {
+      const first = await deliver(csv);
+      expect(first.status).toBe(200);
+      id = first.body.submissionId as number;
+      beforeRows = await readRows(id);
+      expect(beforeRows.map((r) => r.verdict)).toEqual(['ok']);
+      expect((beforeRows[0].reasons as { resolved: unknown }).resolved).toEqual({ player_id: playerId });
+      beforeReport = (await readSubmission(id)).report;
+    }
+
+    const decided: number[] = [];
+    control.afterStage = async (submissionId) => {
+      decided.push(submissionId);
+      if (outcome === 'rejected') {
+        expect(await decideSubmission({}, decision(submissionId, 'reject'))).toEqual({ message: 'Rejected.' });
+      } else {
+        expect(await decideSubmission({}, decision(submissionId, 'approve'))).toEqual({ message: 'Approved.' });
+        if (outcome === 'promoted') expect((await promoteSubmission(submissionId)).ok).toBe(true);
+      }
+    };
+    const { status, body } = await deliver(csv);
+    if (!resend) [id] = await submissionsOf(csv);
+
+    expect(decided).toEqual([id]);
+    expect(status).toBe(200);
+    // The shape tools/email_intake/test_fetch_and_stage.py feeds main(): filed
+    // under Processed, exit 0, one POST, so the poller never resends it.
+    expect(Object.keys(body).sort()).toEqual(SUPERSEDED_KEYS);
+    expect(body).toEqual({
+      ok: true, submissionId: id, duplicate: resend, rowCount: 1, validated: false, status: outcome,
+      message: `A reviewer has ruled on this file (it is now ${outcome}); `
+        + 'this validation attempt wrote no verdicts or resolved payloads.',
+      reviewUrl: `/admin/submissions/${id}`,
+    });
+
+    const review = await readSubmission(id);
+    expect(review.status).toBe(outcome);
+    expect(review.reviewedBy).toBe(fixtureAdminId);
+    // Verdicts, resolved payloads and the report exactly as before the delivery.
+    expect(review.report).toEqual(beforeReport);
+    expect(await readRows(id)).toEqual(beforeRows ?? [
+      { rowNo: 1, payload: { player_id: String(playerId), dob: '2006-07-08' }, verdict: null, reasons: null },
+    ]);
+    expect(await submissionsOf(csv)).toEqual([id]);
+    if (outcome === 'promoted') {
+      const [{ count }] = await ownerSql<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM import_batches WHERE notes = ${'submission ' + id}
+      `;
+      expect(count).toBe(1);
+    }
+    expect((await intakeAudits(id)).map((a) => [a.action, a.detail.status ?? null])).toEqual([
+      ...(resend ? [['email_intake.staged', null], ['email_intake.validated', null]] : []),
+      [resend ? 'email_intake.duplicate' : 'email_intake.staged', null],
+      ['email_intake.validation_superseded', outcome],
+    ]);
+  });
+
+  it('an admin can still re-validate by hand a file the intake left rejected', async () => {
+    const playerId = await createFixturePlayer('manual-revalidate');
+    const csv = `player_id,dob\n${playerId},2007-08-09\n`;
+
+    control.afterStage = async (submissionId) => {
+      expect(await decideSubmission({}, decision(submissionId, 'reject'))).toEqual({ message: 'Rejected.' });
+    };
+    const delivery = await deliver(csv);
+    const [id] = await submissionsOf(csv);
+    expect(delivery.body).toMatchObject({ validated: false, status: 'rejected' });
+    expect((await readSubmission(id)).status).toBe('rejected');
+
+    const form = new FormData();
+    form.set('id', String(id));
+    expect(await runValidation({}, form)).toEqual({ message: 'Validated: 1 ok, 0 warnings, 0 errors.' });
+
+    const review = await readSubmission(id);
+    expect(review.status).toBe('validated');
+    expect(review.report).toEqual({ ok: 1, warnings: 0, errors: 0, duplicates: 0 });
+    const [row] = await readRows(id);
+    expect(row.verdict).toBe('ok');
+    expect((row.reasons as { resolved: unknown }).resolved).toEqual({ player_id: playerId });
+    expect(await submissionsOf(csv)).toEqual([id]);
+  });
+});
+
+describe('AFLDB-ISSUE-273 email intake teardown after an early failure', () => {
+  // Each `it.fails` case parks a delivery, arms failFileKey (read only after
+  // the release), then fails before awaiting it. The case after it checks
+  // that afterEach released the delivery and awaited it to the end BEFORE
+  // resetting failFileKey: had it reset first, the delivery would have
+  // validated to 200, or still be running.
+  const stranded: { id: number; csv: string }[] = [];
+
+  async function strandDelivery(tag: string) {
+    const playerId = await createFixturePlayer(tag);
+    const csv = `player_id,dob\n${playerId},2008-09-10\n`;
+    await startParkedDelivery(csv);
+    const [id] = await submissionsOf(csv);
+    stranded.push({ id, csv });
+    control.failFileKey = true;
+  }
+
+  async function expectSettledBeforeReset() {
+    const last = stranded.at(-1);
+    expect(last).toBeDefined();
+    const { id, csv } = last!;
+    expect(background).toEqual([]);
+    expect(control.parked).toEqual([]);
+    expect(control).toMatchObject({ park: false, failFileKey: false, afterStage: null });
+    expect((await readSubmission(id)).status).toBe('staged');
+    expect((await readRows(id)).map((r) => r.verdict)).toEqual([null]);
+    expect(await submissionsOf(csv)).toEqual([id]);
+    expect((await intakeAudits(id)).map((a) => a.action)).toEqual([
+      'email_intake.staged', 'email_intake.validate_error',
+    ]);
+  }
+
+  it.fails('(deliberately fails) an assertion failure while a delivery is parked', async () => {
+    await strandDelivery('early-assertion');
+    expect('the test stopped here').toBe('never');
+  });
+
+  it('afterEach finished that delivery before resetting the controls', expectSettledBeforeReset);
+
+  it.fails('(deliberately fails) a wait failure while a delivery is parked', async () => {
+    await strandDelivery('early-wait');
+    await vi.waitFor(() => { expect('still waiting').toBe('never'); }, { timeout: 50, interval: 10 });
+  });
+
+  it('afterEach finished that delivery too', expectSettledBeforeReset);
+
+  it('teardown reports a failure no test consumed and an afterStage failure, but not a consumed one', async () => {
+    await expect(track(Promise.reject(new Error('consumed'))).result()).rejects.toThrow('consumed');
+    track(Promise.reject(new Error('never consumed')));
+
+    const playerId = await createFixturePlayer('hook-failure');
+    const csv = `player_id,dob\n${playerId},2009-10-11\n`;
+    control.afterStage = async () => { throw new Error('afterStage failed'); };
+    const { status, body } = await deliver(csv);
+    await submissionsOf(csv);
+    // What the route alone would report: the hook's own error is lost.
+    expect(status).toBe(500);
+    expect(body).toEqual({ error: 'Staging failed on the server.' });
+
+    const failures = await settleBackground();
+    expect(failures.map((e) => (e as Error).message)).toEqual(['never consumed', 'afterStage failed']);
+    expect(background).toEqual([]);
+    expect(control.hookFailures).toEqual([]);
   });
 });
