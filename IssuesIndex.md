@@ -424,8 +424,17 @@
   (§20): caller-specific start policy, intake from `staged`/`validated` only; manual re-validation kept; DB-free and
   `afldb_test` (`email-intake` 20/20, `submission-promotion` 15/15) pass. Final review corrections 2026-10-11 (§21):
   integration teardown now awaits all tracked background work before reset/cleanup; `afldb_test` 41 passed +
-  4 expected-fail. Committed on `opus/issue-273`, not merged.
-- **Runbook:** `issues/open/AFLDB-ISSUE-273.md` §17–§21. **Next action:** operator merge, then DEV deployment.
+  4 expected-fail. Merged to main at `a34f0721` on 2026-10-11, readiness accepted under an operator exception for
+  main's four untracked files (§22.1). The merge and deploy gates each failed only their clean-tree check; both raw
+  FAILs are preserved and the two exceptions are separate (§22.1, §22.2). **Installed on DEV 2026-10-11 18:13** under the
+  scoped deploy-gate exception D-273-DEV-1 (§22.2, §22.3), HEAD `a34f0721`: BUILD_ID `L22XfuX2nngl_51zwuzfH`, 4 of 4 workers, no migration applied. **DEV behavioural
+  acceptance on synthetic fixtures SUPPORTED** (§22.4): submissions 73/74 both `rejected`, 11 expected audits in order, no
+  import batch, `award_winners` 3712, migrations 110, service healthy afterwards. Not exercised on DEV: the race guard and the
+  decided acknowledgement (`afldb_test` evidence only), the poller (offline self-test only), a real mailbox (unexercised
+  anywhere); restricted roles only as narrowly tested on `afldb_test` (§22.4). The refused approve on 74 rests on a saved Playwright page snapshot (no
+  database trace beyond the absence of an approval audit). D-273-DEV-2 approved: account id 4. DEV evidence only.
+- **Runbook:** `issues/open/AFLDB-ISSUE-273.md` §17–§22. **Next action:** PROD installation and acceptance behind the
+  ISSUE-265 hold, then closure (§19.6 item 4). Not closed.
 
 ### AFLDB-ISSUE-274 — A settle unit that writes only the `matches` row takes no row lock before its authority read
 - **Severity:** Medium. **Area:** acquisition / settle concurrency — `src/lib/acquisition/canonical-apply.ts`.

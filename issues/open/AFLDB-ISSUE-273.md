@@ -94,8 +94,9 @@ The re-validation of a `rejected` submission by a plain admin (recorded as INFO 
 
 ## 16. Next action
 
-Committed on `opus/issue-273` (§21). Operator merge, then DEV deployment; see §19.6 and §21.6 for the remaining
-acceptance.
+Merged to main at `a34f0721` (§22.1), installed on DEV (§22.3), and DEV behavioural acceptance on synthetic fixtures is
+supported (§22.4). Next: PROD installation and acceptance behind the ISSUE-265 hold, then closure (§19.6 item 4); see
+§22.5.
 
 ## 17. Implementation pass 1 (2026-10-11)
 
@@ -579,6 +580,125 @@ delivery was still running. Submission promotion gets status `staged`, not `vali
 ### 21.6 Remaining
 
 - Committed on `opus/issue-273`.
-- Then, by the operator: merge, DEV deployment and DEV acceptance (§19.6 item 3).
+- Then, by the operator: merge, DEV deployment and DEV acceptance (§19.6 item 3). *(Done 2026-10-11; see §22.)*
 - PROD stays behind the ISSUE-265 hold.
 - Closure (§19.6 item 4).
+
+## 22. Merge, DEV installation and DEV acceptance (2026-10-11)
+
+Evidence: `D:\tmp\issue273\issue-273-merge-readiness-20261011.md`; `D:\tmp\issue273\dev-pack-20261011\` (`PROCEDURE.md`,
+`run-20261011-1810\INSTALLATION-RECORD.md`, `run-20261011-1810\ACCEPTANCE-RECORD.md`, `prepared-docs-update.diff` as the
+superseded pre-deployment draft).
+
+### 22.1 Merge readiness and merge
+
+- **Revision.** `a34f0721ddc7fc9e4f3e253c165c6aeaeb7abd67` on `opus/issue-273`, sole parent `f35e7cd3…`.
+- **`merge:ready -- --issue 273` (13 committed files declared):** PASS branch, issue worktree clean, main = origin/main,
+  ahead 1 / behind 0, migration collision and checksum parity, declared scope (13 changed, 0 unexpected).
+  **FAIL: main worktree is clean**, caused by four unrelated untracked files (`0)`, `60s`, `{}`, `{})`) preserved on
+  operator instruction. **WARN (outstanding): no `afldb-merge-readiness` JSON block in this runbook.** BLOCKED.
+- **`preflight --mode merge`:** the same clean-tree FAIL; BLOCKED, no database contact.
+- **Operator exception.** Covers the merge clean-tree check for those four files only. The FAIL is preserved; readiness is
+  *accepted with exception*, not PASS.
+- **Merge.** Fast-forward `f35e7cd3..a34f0721`, normal push; local, origin and live remote main equal.
+
+### 22.2 Deployment gate
+
+- **Pre-deployment host.** `streamanator`, `b2939eb7` (rollback target), BUILD_ID `e6baP2aMpe9KQ13d_24BL`, 4 of 4 workers,
+  tracing controls `on`/`4`/`10`, intake dormant, 110 migrations applied = 110 files, none in `b2939eb7..a34f0721`.
+- **`preflight --mode deploy --issue 273`** (temporary tunnel, child-only DSN override): BLOCKED by one FAIL, the
+  clean-tree check on the same four files. Every other check PASS, including `afldb_dev` as `afldb_owner` and migration
+  parity 110/110.
+- **D-273-DEV-1 (approved 2026-10-11).** A deploy-gate exception scoped to those four files only. The original FAIL is
+  preserved and no other check was waived; the merge exception was not extended.
+
+### 22.3 DEV installation (18:10–18:14)
+
+- `sync-dev.ps1 -Issue107Gate` (no skip, `-AllowDirtyServer`, `-RemoteRef` or `-NoPrune`) exited 0 at 18:13:56:
+  `b2939eb7..a34f0721`, 14 files, `npm ci` completed, `db:migrate` 110 files / 110 applied / none applied, built
+  BUILD_ID `L22XfuX2nngl_51zwuzfH`, one systemd respawn (MainPID 1647 -> 786869), `AFLDB_POOL_MAX=10`,
+  `AFLDB_WORKERS=4`, live BUILD_ID equal.
+- **I-1 to I-4 PASS:** HEAD `a34f0721` on main; BUILD_ID mtime 18:13:38; workers 786876/786877/786878/786880; 24/24 HTTP
+  200 from 4 of 4 PIDs; 0 probes with a different build.
+- **I-5 (installation only) PASS:** the four runtime files match the reviewed blobs; the intake route returns 401
+  unauthenticated; no intake unit, timer or cron; IMAP and authserv-id settings absent; the poller self-test passed.
+
+### 22.4 DEV behavioural acceptance (18:18–19:12) — SUPPORTED, with the limits below
+
+Synthetic `all_australian` fixtures A (2025, expected `warning`) and B (2099, expected `error`), token
+`d273-202610111818-a7b94f`. Baseline S-0: max submission 72, max audit 1077, max batch 115, `award_winners` 3712, 52
+batches, 110 migrations.
+
+**D-273-DEV-2 (approved).** Operator message, 11 October 2026, 18:28 AEDT: "I approve D-273-DEV-2: use my existing
+enabled DEV super-admin account, id 4, stuart.villanti@gmail.com." The account is `auth_users` id 4, `super_admin`,
+enabled, password set, TOTP enrolled (read-only lookup 18:14, `accounts-readonly.txt`). Sequence, as the evidence shows
+it: the three intake deliveries (18:18:23–18:18:33) were already attributed to id 4 as the then-proposed candidate
+(`INSTALLATION-RECORD.md`, 18:14); the approval message is timed 18:28; the review actions (18:33–18:34) and `admin.login`
+1084 (18:33:20) followed it. Every audit row and `uploaded_by` / `reviewed_by` is id 4.
+
+- **Intake (200 each):** A1 → submission 73, `duplicate:false`, report 0/1/0/0; A2 (resend) → 73, `duplicate:true`, same
+  report; B1 → submission 74, `duplicate:false`, report 0/0/1/0.
+- **Review UI (a Playwright browser session signed in as id 4, 18:32–18:34):** the attempted approval of 74 was refused,
+  then 74 was rejected; 73 was approved, then rejected; 73 was re-validated, then rejected. Nine saved page snapshots, copied to `acc\playwright\` in the pack, record the pages and
+  messages (the source folder `.playwright-mcp/` is git-ignored):
+  - the refused approve on the B fixture (`issue273-dev-acceptance-B-d273-202610111818-a7b94f.csv`, status `validated`,
+    1 error, uploaded by `stuart.villanti@gmail.com`; snapshot 18:33:49): alert "Only a validated submission with no error
+    rows can be approved."; status unchanged;
+  - then "Rejected." and status `rejected` (18:33:59);
+  - the A fixture: "Approved." and status `approved` (18:34:15), "Rejected." and `rejected` (18:34:25), "Validated: 0 ok,
+    1 warnings, 0 errors." with status `validated` (18:34:35), "Rejected." and `rejected` (18:34:47).
+
+  The snapshots identify each submission by its fixture filename, status and uploader; they carry no URL or numeric ID.
+  The mapping B = 74 and A = 73 comes from the database record (S-mid and S-1). The snapshot times fall between the
+  matching audit rows (1085 at 18:33:53, 1086 at 18:34:09, 1087 at 18:34:19, 1088 at 18:34:29, 1089 at 18:34:41). That
+  is a consistency check, not an independent proof.
+- **S-1 (19:12:10, read-only) against the pass criteria:**
+  - Exactly 2 new submissions (73, 74), this token's filenames, both `rejected`, `reviewed_by` 4, `uploaded_by` 4,
+    `promoted_at` and `import_batch_id` empty.
+  - Exactly 2 new rows: 73 `warning` (player not found for 2025, will import unlinked), 74 `error` (year 2099 does not
+    exist).
+  - Audits 1078–1089: 11 non-login rows in exactly the expected order (`email_intake.staged`, `validated`, `duplicate`,
+    `validated`, `staged`, `validated`, then `submission.rejected` 74, `approved` 73, `rejected` 73, `validated` 73,
+    `rejected` 73) plus one `admin.login` (1084). All 12 have actor 4. No `validation_superseded`, no `validate_error`.
+  - `max_batch` 115 and 52 batches (none new); `award_winners` 3712; migrations 110.
+- **Health after (19:12:23):** HEAD `a34f0721`, BUILD_ID `L22XfuX2nngl_51zwuzfH`, NRestarts 1, 4 workers, 24/24 HTTP 200,
+  0 probes with a different build, health `ok`/`ok`.
+- **Capture method.** S-0 and the mid-run snapshot used `snapshot.sh`. S-1 used a revised `snapshot-v2.sh`: the acceptance
+  SQL is identical (`diff` against `snapshot.sh` empty); `.env` is not sourced; every inherited `PG*` variable is
+  dropped and python runs isolated; a first-statement guard raises unless the session is `afldb_dev` / `afldb_owner`
+  (current and session user) / read-only `on`. Offline checks used no credentials and no connection. The guard prints
+  nothing: its pass is inferred from the completed run (exit 0) and the identity row.
+- **Retained (D-273-DEV-3):** submissions 73 and 74 (both `rejected`), their 2 rows and 12 audit rows.
+
+**What this supports:** on the deployed build the intake start policy accepts a first delivery and a resend, the locked
+approve of the approvable file succeeded (`submission.approved` for 73, no promotion), review-page re-validation of a
+`rejected` file works, no import batch was created, and `award_winners` (3712) and the migration count (110) are
+unchanged. No wider canonical-data fingerprint was taken, so "no other canonical change" is not claimed.
+
+**Limits:**
+
+- Not exercised on DEV, and different kinds of evidence exist for each:
+  - **Race guard and the D-273-1 / §20 `validated: false` acknowledgement.** Integration evidence on `afldb_test` only
+    (a test database, not DEV): the validation-vs-review cases of `submission-promotion` (§17.5 cases 2–6; 15/15 at §18.2),
+    the email-intake integration cases recorded in §19.3, and the DB-free
+    route tests for the 200 body (11/11). Final run §21: 41 passed + 4 expected-fail.
+  - **The poller.** Offline self-test evidence only: `tools/email_intake/test_fetch_and_stage.py` is DB-, IMAP- and
+    network-free and drives `main()` over a fake `urlopen`. It passed in the §19.3 run and on the deployed DEV checkout
+    at 18:14 (I-5, installation evidence).
+  - **A real mailbox.** Unexercised anywhere: no IMAP account exists, intake is dormant on DEV, and the DEV deliveries
+    were direct POSTs to the route with the shared secret (`intake-post.sh`), not mail.
+  - **Restricted roles.** Only this narrow `afldb_test` scope was tested: the launcher probe connected as `afldb_owner`,
+    `afldb_import` ×2 and `afldb_auth` ×2 (§18.2, §19.3), and the case that `afldb_auth` may `FOR UPDATE` and read `xmin`
+    on `data_submissions` passed (§17.5 case 8, §18.2). That is not a privilege matrix, and no restricted-role acceptance
+    is claimed for DEV or PROD. The DEV snapshots ran as `afldb_owner`, read-only.
+- The refused approve writes nothing, so its database evidence is only the absence of a `submission.approved` audit for 74
+  and the final `rejected` state. The refusal message itself rests on the saved Playwright snapshot (18:33:49), which
+  shows it against the B fixture filename; the snapshots are page text, not screenshots, and carry no numeric ID.
+- The health check reads no process environment; the `AFLDB_*` runtime values rest on the 18:14 I-3 evidence.
+- DEV evidence only. PROD not contacted.
+
+### 22.5 Remaining
+
+- PROD installation and any applicable PROD acceptance, behind the unchanged ISSUE-265 hold.
+- The outstanding `merge:ready` WARN (no `afldb-merge-readiness` block in this runbook).
+- Closure (§19.6 item 4) once PROD behaviour is accepted. Not closed.

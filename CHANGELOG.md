@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Submission validation can no longer overwrite a concurrent approve, promote or reject (AFLDB-ISSUE-273; committed on `opus/issue-273`, not merged; DB-free unit, poller self-test, typecheck and lint passed; `afldb_test` integration passed for `email-intake` (23 passed + 2 expected-fail) and `submission-promotion` (18 passed + 2 expected-fail), with only the existing ISSUE-264 State-B block refused on `match-results-promotion` in the earlier run; not deployed; issue open) - 11 October 2026
+### Submission validation can no longer overwrite a concurrent approve, promote or reject (AFLDB-ISSUE-273; merged to main `a34f0721` with readiness accepted under an operator exception; DB-free unit, poller self-test, typecheck and lint passed; `afldb_test` integration passed for `email-intake` (23 passed + 2 expected-fail) and `submission-promotion` (18 passed + 2 expected-fail), with only the existing ISSUE-264 State-B block refused on `match-results-promotion` in the earlier run; installed on DEV 11 October 2026 under a separate scoped deploy-gate exception for the same four files (BUILD_ID `L22XfuX2nngl_51zwuzfH`, no migration) and DEV synthetic-fixture acceptance supported, not exercising the race guard, the decided acknowledgement or a real mailbox; PROD not installed, behind the ISSUE-265 hold; issue open) - 11 October 2026
 
 - **Validation.** `validateSubmission` computes every row verdict with no lock, then writes the verdicts and the
   `validated` status in one transaction that locks the submission row and requires the status and `xmin` it started
