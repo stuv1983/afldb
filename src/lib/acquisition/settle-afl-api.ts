@@ -96,6 +96,7 @@ import { resolveAflApiSourceId } from './afl-api-match-identity';
 import {
   planAflApiMatchUnit,
   type AflApiPlayerUnitPlan,
+  type AflApiRosterFamilyPlan,
 } from './afl-api-settle-plan';
 import {
   applyAttendanceEnrichment,
@@ -189,6 +190,10 @@ const MATCH_IDENTITY_ISSUE_TYPE = 'afl_api_match_identity_refusal';
  * finding is opened on an otherwise-resolved match and is expected to
  * self-heal (resolve) the run after the map/venues row is corrected. */
 const VENUE_IDENTITY_ISSUE_TYPE = 'afl_api_venue_unmapped';
+/** AFLDB-ISSUE-276: a planned match whose roster family was refused because its
+ * cumulative period scores do not reproduce the fixture's final score. Opened
+ * on the refusal and resolved the run the roster no longer contradicts it. */
+const PERIOD_SCORES_ISSUE_TYPE = 'afl_api_period_scores_contradiction';
 
 /* ------------------------------------------------------------------ *
  * Bundle assembly (DB-free) — S3/S6-B/S6-C, offline, before any connection.
@@ -676,6 +681,63 @@ async function writeVenueIdentityIssue(
       reason: input.reason,
     },
   }, counters);
+}
+
+/**
+ * AFLDB-ISSUE-276: the roster family's cumulative period scores contradict the
+ * fixture's final score (§9 assertion 4), so no `match_period_scores` row is
+ * proposed for it. The match family is unaffected. `entityId` is null for a
+ * `new_target` match (the row does not exist yet).
+ */
+async function writePeriodScoreContradictionIssue(
+  tx: Tx,
+  input: {
+    externalRecordId: string; targetId: number | null; reason: string; detail: string;
+    homeScore: number; awayScore: number;
+  },
+  counters: AflApiSettleCounters,
+): Promise<void> {
+  await writeSettleDataIssue(tx, {
+    entityType: 'matches',
+    entityId: input.targetId,
+    issueType: PERIOD_SCORES_ISSUE_TYPE,
+    issueKey: periodScoresIssueKeyOf(input.externalRecordId),
+    severity: 'error',
+    description: `afl_api match '${input.externalRecordId}' period scores were not written: ${input.reason} — `
+      + `${input.detail}.`,
+    details: {
+      owner: SETTLE_ISSUE_OWNER,
+      source_key: SETTLE_SOURCE_KEY,
+      family: 'match_roster',
+      external_record_id: input.externalRecordId,
+      target_table: 'match_period_scores',
+      reason: input.reason,
+      detail: input.detail,
+      fixture_home_score: input.homeScore,
+      fixture_away_score: input.awayScore,
+      issue: 'AFLDB-ISSUE-276',
+    },
+  }, counters);
+}
+
+function periodScoresIssueKeyOf(externalRecordId: string): string {
+  return settleIssueKey(SETTLE_SOURCE_KEY, 'match_roster', externalRecordId, 'match_period_scores');
+}
+
+/**
+ * AFLDB-ISSUE-276: closes an open period-score contradiction finding, and only on POSITIVE
+ * evidence: the roster was actually processed (`planned`, so neither deferred, blocked nor
+ * refused) AND its own-match period scores reproduce the fixture's final score
+ * (`=== true`). `null` (no own-match score entry) is absence of evidence and resolves nothing.
+ * Shared by the planned and the corroborated match branches so the two cannot drift.
+ */
+async function resolvePeriodScoresFindingOnPositiveEvidence(
+  tx: Tx, bundle: AflApiMatchBundle, rosterPlan: AflApiRosterFamilyPlan,
+): Promise<void> {
+  if (rosterPlan.status !== 'planned' || bundle.periodScoresReproduceFinalScore !== true) return;
+  await resolveRestoredDisagreements(
+    tx, PERIOD_SCORES_ISSUE_TYPE, SETTLE_ISSUE_OWNER, new Set([periodScoresIssueKeyOf(bundle.match.sourceRecordId)]),
+  );
 }
 
 async function writeImportRejection(
@@ -1388,6 +1450,15 @@ async function settleMatchUnit(
     } else {
       await resolveRestoredDisagreements(tx, SETTLE_ISSUE_TYPE, SETTLE_ISSUE_OWNER, new Set([issueKey]));
     }
+    // AFLDB-ISSUE-276: afl_api never writes a corroborated match's period scores, but a
+    // contradiction finding opened while this match did not yet exist (a review-first
+    // `new_target`, or an INSERT the applier declined) is still open once another source
+    // creates the row. `matches.source_id` is never changed on an UPDATE (canonical-apply.ts
+    // §19.1(e)), so that is the one way a finding meets this branch. Positive roster evidence
+    // closes it exactly as on the planned path. A roster that still contradicts, has no
+    // own-match score entry, is deferred or refused leaves it untouched: nothing is opened,
+    // refreshed or resolved here without evidence.
+    await resolvePeriodScoresFindingOnPositiveEvidence(tx, bundle, plan.roster);
     // I244-F030: a corroborated (foreign-owned) match is never applied, so an
     // apply-time `canonical_apply_failed` refusal an earlier run left for its
     // `matches` / `match_period_scores` targets — the `possible_existing_match`
@@ -1455,7 +1526,22 @@ async function settleMatchUnit(
       });
     }
 
-    if (plan.roster.status === 'planned') {
+    if (plan.roster.status === 'refused') {
+      // AFLDB-ISSUE-276: no `match_period_scores` target is built, so neither the
+      // automatic path nor a review-first candidate can carry the contradiction.
+      await writePeriodScoreContradictionIssue(tx, {
+        externalRecordId: bundle.match.sourceRecordId,
+        targetId: plan.match.targetId,
+        reason: plan.roster.reason,
+        detail: plan.roster.detail,
+        homeScore: bundle.match.homeScore,
+        awayScore: bundle.match.awayScore,
+      }, counters);
+    } else if (plan.roster.status === 'planned') {
+      // Resolved only on POSITIVE evidence that the roster now reproduces the fixture's
+      // final score. A `planned` roster with a `null` check (no own-match score entry) is
+      // skipped, not corrected: absent evidence leaves an earlier finding open.
+      await resolvePeriodScoresFindingOnPositiveEvidence(tx, bundle, plan.roster);
       const periodProposed = proposedPeriodScoreValues(bundle.roster.periodScores, matchIdentity);
       if (periodProposed !== null) {
         const currentPeriods = plan.roster.targetMatchId === null ? null : await currentPeriodScoreValues(tx, plan.roster.targetMatchId);

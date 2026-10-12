@@ -35,7 +35,37 @@ commit.
   pinned to a SHA or tag or a `--detach` worktree. The scan then covers the base ref, `main`, `origin/main`, every
   unmerged ref and every worktree; genuine Git failures, including any output on the detached-HEAD exit, still stop it.
 
-### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; merged to main `6f99b58d` under a readiness exception; installed on DEV 12 October 2026 and accepted on synthetic fixtures, first nightly pending; not deployed to PROD, behind the ISSUE-265 hold; issue open) - 12 October 2026
+### The AFL API settle refuses a roster family whose period scores contradict the final score (AFLDB-ISSUE-276; committed as `5b0ab6dc`, on `main` as `3ec76f28`; focused `afldb_test` acceptance supported; installed on DEV 13 October 2026, real-data nightly acceptance pending; not on PROD; issue open) - 12 October 2026
+
+- **DEV installation (operator-run, 13 October 2026, 06:26:00-06:28:27 AEDT).** `3ec76f28a7899652957a259a0b06549a417f41df` installed on DEV: preflight and final gate passed, 110 migrations already applied (nothing applied; no migration,
+  dependency, `deploy/` or `tools/` change), BUILD_ID `5sDQtjtkxAIUBO5bVn6mY`, service MainPID 2609207 (started 06:28:25, `NRestarts` 2). Installation checks exit 0: 24/24 healthy probes across all four workers, controls on/4/10,
+  reviewed runtime blobs match, ISSUE-274's three checked runtime blobs unchanged. No fallback required. This establishes installation only: all 218 DEV 2026 matches are `afltables`-owned, so the nightly is not expected to reach
+  the refusal branch, and a clean nightly shows no regression rather than guard behaviour. The 14 October nightly is a combined ISSUE-274 + ISSUE-276 observation (forecast 05:05:07 AEDT; not an exact start time). Detail: runbook §17.8.
+
+- `planAflApiMatchUnit()` now returns a `refused` roster-family plan, reason `period_scores_contradict_final_score`,
+  when the bundle's `periodScoresReproduceFinalScore` (§9 assertion 4) is explicitly `false`. The `match` family and
+  every player unit keep their own outcome; deferral and a blocked match still take precedence.
+- A `null` check (no own-match score entry in the roster payload) is unchanged: skipped, planned as before.
+- The settle writer builds no `match_period_scores` target for a refused roster family (neither an automatic write nor a
+  review-first candidate) and opens an `afl_api_period_scores_contradiction` `data_issues` finding (severity `error`,
+  keyed `afl_api|match_roster|<match id>|match_period_scores`). The finding is resolved on the first run the roster
+  positively reproduces the fixture's final score; a run with no usable score evidence, a deferred roster or a blocked
+  match leaves it open. No existing canonical period row is deleted or rewritten by a refusal.
+- The same resolution rule now applies when the match later resolves as `corroborated` (another source, e.g. AFL Tables, created the row after a review-first
+  or refused INSERT left the finding open): explicit positive roster evidence closes it; a contradicting, absent or deferred roster leaves it untouched.
+- **Validation.** DB-free: settle-plan/match/ingestion-safety suites 428/428; `tsc --noEmit` exit 0. Four writer
+  integration cases in the new, isolated `tests/integration/settle-afl-api-issue276.test.ts` (own namespace, narrow hooks; the ISSUE-228 suite is unchanged).
+  **Operator-run focused `afldb_test` acceptance (12 October 2026, supported):** the first run passed 3 and failed 1 (a test-reader bigint/integer mismatch on `data_issues.entity_id`; the fresh-case steps after it
+  were not executed); after the test-side reader correction the second run (R2, start 21:57:45 AEDT, 65.61 s) passed 4/4 with exit 0 and no skipped cases. The residue query before, after the failed run and after R2 shows
+  every owned/unproven count at 0, no payload or fixture-conflict rows, and captured `seasons`/`club_seasons` (excluding `id`) values identical to the baseline; `club_seasons.id` and sequence positions are deliberately excluded.
+  The baseline `player_season_stats` for 2026 was empty, so a non-empty Brownlow restore was not exercised. This is not whole-suite, restricted-role, live-provider, DEV or PROD acceptance.
+  Earlier (before the run), after a static review the file's setup/teardown and its residue SQL were reworked, test-side only: the shared season-2026
+  derived rows (`seasons`, `club_seasons` including `import_batch_id`, `player_season_stats` brownlow columns) are captured before any write and restored from the capture with
+  an equality assertion instead of being recomputed; fixtures are deleted only when ownership is proven from returned ids and markers (startup is read-only and refuses on any
+  namespace row or foreign conflict); teardown is one transaction with exact row counts and payloads are removed only by retained exact identity, stored-content marker and no
+  surviving citation. `AFLDB-ISSUE-276-RESIDUE.sql` classifies owned versus unproven rows and inspects payload rows; the operator has since executed both (above).
+
+### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; merged to main `6f99b58d` under a readiness exception; installed on DEV 12 October 2026 and accepted on synthetic fixtures, first scheduled nightly (13 October 2026) observed with no regression marker against the documented baseline (one night; the run's revision is supported by the host checkout reflog, not recorded by the run); not deployed to PROD, behind the ISSUE-265 hold; issue open) - 12 October 2026
 
 - **Match-row lock.** `applyCanonicalUnit` (`src/lib/acquisition/canonical-apply.ts`) takes `FOR NO KEY UPDATE` on the
   unit's match-family rows before it reads manual authority (Data Editor overrides) and re-reads the match, so a
@@ -57,7 +87,12 @@ commit.
   ordered ids only); the one review item, `club_seasons_id_seq`, advanced by four (1748 to 1752) during the fixture interval
   and was accepted by the owner as recorded (compare exit 5 preserved; the sequence was not reset). The DEV run itself was in
   State B.
-  Not shown: the real Data Editor, State B durable Match Sheet cases, overlapping settles, or the first scheduled run (13 October).
+  The first scheduled nightly (13 October, one night, read-only checks) completed with no regression marker against the
+  documented baseline: 64 refusals before and after the change and 0 canonical failures, inserts, updates or ledger writes.
+  The host checkout reflog supports, but the run does not record, that it ran `6f99b58d`.
+  Not shown: that the lock fired in that run, the real Data Editor, State B durable Match Sheet cases, overlapping settles,
+  or repeatability beyond the observed 13 October night (later nights are combined ISSUE-274 + ISSUE-276 observations while
+  ISSUE-276 remains installed on DEV).
 
 ### Submission validation can no longer overwrite a concurrent approve, promote or reject (AFLDB-ISSUE-273; merged to main `a34f0721` with readiness accepted under an operator exception; DB-free unit, poller self-test, typecheck and lint passed; `afldb_test` integration passed for `email-intake` (23 passed + 2 expected-fail) and `submission-promotion` (18 passed + 2 expected-fail), with only the existing ISSUE-264 State-B block refused on `match-results-promotion` in the earlier run; installed on DEV 11 October 2026 under a separate scoped deploy-gate exception for the same four files (BUILD_ID `L22XfuX2nngl_51zwuzfH`, no migration) and DEV synthetic-fixture acceptance supported, not exercising the race guard, the decided acknowledgement or a real mailbox; PROD not installed, behind the ISSUE-265 hold; issue open) - 11 October 2026
 

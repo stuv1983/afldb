@@ -480,7 +480,7 @@
   (full-content hashes where collected; `player_match_stats` by row count and ordered ids only); `club_seasons` 1,640 rows with the identical content hash. The one review item, `club_seasons_id_seq`, advanced by four (1748 -> 1752) during the fixture interval; rows 1751/1752
   were removed, the allocation history of 1749/1750 was not captured, so the four values are not attributed solely to the two deleted rows. Owner-accepted as recorded; nothing reset; compare rules unchanged. Health PASS (24/24, 4 workers). Limits: synthetic fixtures and an emulated
   holder, not the real editor, State B durable Match Sheet cases or overlapping settles (the DEV run itself was in State B).
-- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Next action:** commit this documentation now (local only); the first-nightly check after the scheduled run (13 Oct 05:02:27 AEDT) stays **PENDING**. PROD stays behind the ISSUE-265 hold;
+- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Next action:** the first scheduled nightly was **observed with no regression marker against the documented baseline on 13 Oct (one night, read-only checks, runbook §33; run revision `6f99b58d` supported by the host reflog, not recorded by the run; not shown: that the lock fired, the real editor, State B, overlapping settles)**; 64 refusals before and after the change with 0 canonical failures/inserts/updates/ledger writes (§33.8); lock execution and the historical reasons for the other 44 targets NOT PROVEN; the 14 Oct nightly (forecast 05:05:07 AEDT, not an exact start) is a combined ISSUE-274 + ISSUE-276 observation, as is every later night while ISSUE-276 remains installed on DEV (repeatability beyond the observed 13 Oct night is not established by them alone). PROD stays behind the ISSUE-265 hold;
   ISSUE-275 is a separate defect, not fixed by this.
 
 ### AFLDB-ISSUE-275 — A settle can insert period scores under a match it refused because a foreign owner created it concurrently
@@ -491,8 +491,18 @@
 
 ### AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 - **Severity:** Medium. **Area:** AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts`.
-- **State:** Open (2026-10-08), review F-011, code-proven; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-276.md`. **Next action:** fix plus DB-free test; refusal reason name open.
+- **State:** Open (2026-10-08), review F-011, code-proven; implemented 2026-10-12 on `opus/issue-276-period-score-guard`, committed as `5b0ab6dc`
+  (DB-free validation 428/428). **Merged to `main` as `3ec76f28` and installed on DEV 13 October 2026, 06:26:00-06:28:27 AEDT** (operator-verified; runbook §17.8): preflight and final gate passed, 110 migrations already applied
+  (none applied), BUILD_ID `5sDQtjtkxAIUBO5bVn6mY`, MainPID 2609207 (started 06:28:25, `NRestarts` 2), installation checks exit 0 (24/24 healthy probes, all four workers, controls on/4/10, reviewed blobs match, ISSUE-274's
+  three checked runtime blobs unchanged), no fallback. **Installation established; real-data nightly acceptance pending.** Finding lifecycle: resolves only on explicit positive evidence, on the planned AND the corroborated path (a new-then-foreign-owned match is reachable; an afl_api-to-foreign transfer is not).
+  Integration file reworked 2026-10-12 after static review (baseline restore of shared 2026 derived rows with equality assertion; proven fixture ownership, read-only startup that stops on leftovers;
+  atomic teardown and payload-row residue check; runbook §17.5).
+  **Focused `afldb_test` acceptance supported (operator-run, 2026-10-12; runbook §17.7):** first run 3 passed, 1 failed on a test-reader bigint/integer mismatch (fresh-case later steps unexecuted); after the test-side reader fix, R2 passed 4/4
+  (exit 0, no skipped cases, 65.61 s). Residue before, after the failed run and after R2: all 13 owned/unproven counts 0, no payload or fixture-conflict rows, captured `seasons`/`club_seasons` (excl. `id`) values identical to the baseline
+  (`club_seasons.id` and sequences deliberately excluded). Baseline `player_season_stats` for 2026 was empty, so a non-empty Brownlow restore was not exercised. **Not established:** whole-suite, restricted-role, live-provider, DEV behavioural or PROD acceptance.
+- **Runbook:** `issues/open/AFLDB-ISSUE-276.md`. The names `period_scores_contradict_final_score` / `afl_api_period_scores_contradiction` were reviewed and are kept; no naming decision is outstanding.
+  **Limits:** all 218 DEV 2026 matches are `afltables`-owned, so the nightly is not expected to reach the refusal branch or finding lifecycle; a clean nightly shows no regression only. PROD neither installed nor accepted.
+  **Next action:** observe and grade the 14 October nightly AFL API settle on DEV, a **combined ISSUE-274 + ISSUE-276 observation** (forecast 05:05:07 AEDT is not an exact start commitment); no closure recorded.
 
 ### AFLDB-ISSUE-277 — Data Editor edits other than the name to a token-only player are not durable
 - **Severity:** Medium. **Area:** Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py`.

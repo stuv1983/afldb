@@ -343,25 +343,56 @@ function matchTargetOf(matchPlan: AflApiMatchFamilyPlan): MatchTarget {
 // match_roster family (§11.2 target: match_period_scores)
 // ---------------------------------------------------------------------------
 
+/**
+ * AFLDB-ISSUE-276: the refusal reason for a roster family whose cumulative
+ * period scores do not reproduce the match family's own final score (§9
+ * assertion 4, `AflApiMatchBundle.periodScoresReproduceFinalScore === false`).
+ */
+export const PERIOD_SCORES_CONTRADICT_FINAL_SCORE = 'period_scores_contradict_final_score';
+
 export type AflApiRosterFamilyPlan =
   | { status: 'deferred'; reason: AflApiDeferralReason; detail: string }
   /** The match family itself did not resolve to a writable target (refused
    * or HALTed) — this family has nothing to attach period scores to yet. */
   | { status: 'blocked' }
+  /** AFLDB-ISSUE-276: the roster's own period scores contradict the fixture's
+   * final score. The match family still plans; this family proposes no
+   * `match_period_scores` row. A `null` check (no own-match score entry) is
+   * skipped, never refused. */
+  | { status: 'refused'; reason: typeof PERIOD_SCORES_CONTRADICT_FINAL_SCORE; detail: string }
   /** `targetMatchId` is `null` exactly when the match family plan is
    * `new_target` — the writer creates the match row first, in the same
    * unit, before this family can attach to it. */
   | { status: 'planned'; targetMatchId: number | null };
 
+/** The evidence a human needs to see why assertion 4 failed: final cumulative vs the fixture's score. */
+function periodScoreContradictionDetail(bundle: AflApiMatchBundle): string {
+  const finalOf = (side: readonly { cumulativeTotalScore: number }[] | undefined): string =>
+    side && side.length > 0 ? String(side[side.length - 1].cumulativeTotalScore) : 'none';
+  const periods = bundle.roster.periodScores;
+  return `roster period scores end ${finalOf(periods?.home)}-${finalOf(periods?.away)} `
+    + `(${periods?.home.length ?? 0}/${periods?.away.length ?? 0} periods) `
+    + `but the fixture's final score is ${bundle.match.homeScore}-${bundle.match.awayScore}`;
+}
+
 function planRosterFamily(
   rosterRecord: AflApiSettleRecord,
   matchPlan: AflApiMatchFamilyPlan,
+  bundle: AflApiMatchBundle,
 ): AflApiRosterFamilyPlan {
   if (rosterRecord.deferral) {
     return { status: 'deferred', reason: rosterRecord.deferral.reason, detail: rosterRecord.deferral.detail };
   }
   const target = matchTargetOf(matchPlan);
   if (target.blocked) return { status: 'blocked' };
+  // Strictly `=== false`: `null` means "no own-match entry to check" (skipped, not failed).
+  if (bundle.periodScoresReproduceFinalScore === false) {
+    return {
+      status: 'refused',
+      reason: PERIOD_SCORES_CONTRADICT_FINAL_SCORE,
+      detail: periodScoreContradictionDetail(bundle),
+    };
+  }
   return { status: 'planned', targetMatchId: target.targetId };
 }
 
@@ -502,7 +533,7 @@ export async function planAflApiMatchUnit(
     ? { status: 'deferred', reason: matchRecord.deferral.reason, detail: matchRecord.deferral.detail }
     : await planMatchFamily(sql, registry, sourceId, bundle, evidence);
 
-  const rosterPlan = planRosterFamily(rosterRecord, matchPlan);
+  const rosterPlan = planRosterFamily(rosterRecord, matchPlan, bundle);
 
   const players: AflApiPlayerUnitPlan[] = [];
   for (const statRecord of statRecords) {

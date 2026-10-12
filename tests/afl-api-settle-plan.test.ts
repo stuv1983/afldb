@@ -347,6 +347,121 @@ describe('planAflApiMatchUnit (AFLDB-ISSUE-228 S6)', () => {
     }
   });
 
+  describe('AFLDB-ISSUE-276 — roster period scores that contradict the final score (§9 assertion 4)', () => {
+    const OWN_MATCH_ID = 'CD_M20260142801';
+    const planIn = { kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE } as const;
+
+    type PeriodScoreSide = { periodScore: { periodNumber: number; score: Record<string, number> }[] };
+    type RecentEntry = { matchId: string; homeTeamScore: PeriodScoreSide; awayTeamScore: PeriodScoreSide };
+    type RosterWithScores = { recentMatchScores: RecentEntry[] };
+    /** Mutates only the fixture's own `recentMatchScores` entry (the one the bundle derives periods from). */
+    const ownEntryOf = (raw: RosterWithScores): RecentEntry =>
+      raw.recentMatchScores.find((e) => e.matchId === OWN_MATCH_ID) as RecentEntry;
+
+    /** The issue's own trigger: a partial roster payload with three periods only (ends 77-95, not 122-131). */
+    const threePeriodsOnly = (raw: RosterWithScores): void => {
+      const entry = ownEntryOf(raw);
+      entry.homeTeamScore.periodScore = entry.homeTeamScore.periodScore.slice(0, 3);
+      entry.awayTeamScore.periodScore = entry.awayTeamScore.periodScore.slice(0, 3);
+    };
+    /** A stale entry: internally consistent periods (goals*6+behinds) that simply end at the wrong total. */
+    const staleFourthPeriod = (raw: RosterWithScores): void => {
+      const entry = ownEntryOf(raw);
+      for (const side of [entry.homeTeamScore, entry.awayTeamScore]) {
+        side.periodScore[3].score = { totalScore: 6, goals: 1, behinds: 0, superGoals: 0 };
+      }
+    };
+
+    it('the contradicting bundles do report periodScoresReproduceFinalScore === false (the precondition)', () => {
+      expect(loadBundleAndRecords({ roster: threePeriodsOnly }).bundle.periodScoresReproduceFinalScore).toBe(false);
+      expect(loadBundleAndRecords({ roster: staleFourthPeriod }).bundle.periodScoresReproduceFinalScore).toBe(false);
+    });
+
+    it.each([
+      ['three periods only', threePeriodsOnly, 'roster period scores end 77-95 (3/3 periods)'],
+      ['a stale fourth period', staleFourthPeriod, 'roster period scores end 83-101 (4/4 periods)'],
+    ])('REFUSES the roster family (%s): no projection-bearing plan, evidence recorded, match still plans', async (_name, mutate, evidence) => {
+      const { bundle, records } = loadBundleAndRecords({ roster: mutate });
+      const { sql } = planningSql({ matchRespond: () => [], playerRespond: () => [{ playerId: 900 }] });
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, planIn);
+
+      expect(plan.roster).toEqual({
+        status: 'refused',
+        reason: 'period_scores_contradict_final_score',
+        detail: `${evidence} but the fixture's final score is 122-131`,
+      });
+      // Only the roster family is refused: the match and every player unit keep their normal outcome.
+      expect(plan.match.status).toBe('planned');
+      expect(plan.players).toHaveLength(2);
+      for (const player of plan.players) expect(player.status).toBe('planned');
+    });
+
+    it('refuses against an existing afl_api-owned target as well as a new one', async () => {
+      const { bundle, records } = loadBundleAndRecords({ roster: threePeriodsOnly });
+      const { sql } = planningSql({
+        matchRespond: (text) => (text.includes('source_record_id =')
+          ? [{ id: 501, season: 2026, homeClubId: HOME_CLUB_ID, awayClubId: AWAY_CLUB_ID, matchKey: EXPECTED_MATCH_KEY }]
+          : []),
+        ownerRespond: () => [{ sourceKey: 'afl_api', homeScore: 122, awayScore: 131 }],
+        playerRespond: () => [{ playerId: 900 }],
+      });
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, planIn);
+
+      expect(plan.match).toMatchObject({ status: 'planned', mode: 'update_owned', targetId: 501 });
+      expect(plan.roster).toMatchObject({ status: 'refused', reason: 'period_scores_contradict_final_score' });
+    });
+
+    it('a valid score still plans the roster family (unchanged behaviour)', async () => {
+      const { bundle, records } = loadBundleAndRecords();
+      expect(bundle.periodScoresReproduceFinalScore).toBe(true);
+      const { sql } = planningSql({ matchRespond: () => [], playerRespond: () => [{ playerId: 900 }] });
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, planIn);
+
+      expect(plan.roster).toEqual({ status: 'planned', targetMatchId: null });
+    });
+
+    it('missing period evidence (no own-match entry => null) stays skipped, never refused', async () => {
+      const { bundle, records } = loadBundleAndRecords({
+        roster: (raw) => {
+          raw.recentMatchScores = raw.recentMatchScores.filter((e: { matchId: string }) => e.matchId !== OWN_MATCH_ID);
+        },
+      });
+      expect(bundle.periodScoresReproduceFinalScore).toBeNull();
+      const { sql } = planningSql({ matchRespond: () => [], playerRespond: () => [{ playerId: 900 }] });
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, planIn);
+
+      expect(plan.roster).toEqual({ status: 'planned', targetMatchId: null });
+    });
+
+    it('deferral keeps precedence: a not-yet-concluded roster defers rather than refusing', async () => {
+      const { bundle, records } = loadBundleAndRecords({
+        roster: (raw) => { threePeriodsOnly(raw); raw.matchRoster.status = 'LIVE'; },
+      });
+      const { sql } = planningSql({ matchRespond: () => [] });
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, planIn);
+
+      expect(plan.roster).toEqual({ status: 'deferred', reason: 'roster_not_concluded', detail: 'LIVE' });
+    });
+
+    it('a blocked match keeps precedence: the roster stays blocked (the match refusal is the finding)', async () => {
+      const { bundle, records } = loadBundleAndRecords({
+        fixture: (raw) => { delete raw.venue.timezone; },
+        roster: threePeriodsOnly,
+      });
+      const { sql } = planningSql({});
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, planIn);
+
+      expect(plan.match).toMatchObject({ status: 'refused', reason: 'unproved_match_date' });
+      expect(plan.roster).toEqual({ status: 'blocked' });
+    });
+  });
+
   it('is deterministic: the same inputs plan the same way across repeated calls', async () => {
     const { bundle, records } = loadBundleAndRecords();
     const { sql } = planningSql({
