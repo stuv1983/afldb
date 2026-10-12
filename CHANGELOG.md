@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### The AFL API settle refuses a roster family whose period scores contradict the final score (AFLDB-ISSUE-276; implemented locally on `opus/issue-276-period-score-guard`, focused `afldb_test` acceptance supported; uncommitted, not merged, installed or deployed; issue open) - 12 October 2026
+### The AFL API settle refuses a roster family whose period scores contradict the final score (AFLDB-ISSUE-276; committed locally as `5b0ab6dc` on `opus/issue-276-period-score-guard`, focused `afldb_test` acceptance supported; not merged, installed or deployed; issue open) - 12 October 2026
 
 - `planAflApiMatchUnit()` now returns a `refused` roster-family plan, reason `period_scores_contradict_final_score`,
   when the bundle's `periodScoresReproduceFinalScore` (§9 assertion 4) is explicitly `false`. The `match` family and

@@ -5,7 +5,12 @@
 -- One READ ONLY transaction, rolled back: it cannot write. Nothing here is a delete; this file never
 -- produces a statement that removes anything.
 --
--- STATUS: NOT RUN. This script has never been executed against any database.
+-- STATUS: EXECUTED. The operator ran this script against afldb_test on 12 October 2026, before the focused
+-- integration test, after the failed first run and after the second run (R2). All three captures showed clean
+-- residue and matched the captured baselines. (Earlier text here said it had never been run; that was true
+-- only before this execution.) The accepted evidence used SQL SHA256
+-- 3bff95f8bbfd63d78084cd10bdac50f1e571d6eedd54e20c88fb5314039f268b; this comment-only header correction
+-- changes the file hash, and that evidence hash is preserved as history.
 --
 -- WHAT "NAMESPACE" MEANS. A row is IN THE NAMESPACE when it can be FOUND by:
 --   * provider-id prefix        CD_M2026ISSUE276   (A fresh, B existing, C lifecycle, D corroborated)

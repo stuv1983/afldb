@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented locally 2026-10-12 on `opus/issue-276-period-score-guard` (base `6f99b58d`); uncommitted, not merged, installed on DEV or deployed. Focused `afldb_test` acceptance is **SUPPORTED** (2026-10-12, operator-run): after a first run that passed 3 and failed 1 on a test-reader type mismatch (§17.6), the corrected file passed **4/4** (§17.7), with the residue query showing zero owned/unproven rows and the shared 2026 digests identical to the pre-run baseline. This is not whole-suite, restricted-role, live-provider, DEV or PROD acceptance. A static-review correction pass (2026-10-12) reworked the file's shared-state restoration, ownership proof and payload cleanup; see §17.5. See §17.
+- **Status:** Open (2026-10-08). Implemented locally 2026-10-12 on `opus/issue-276-period-score-guard` (base `6f99b58d`); **committed locally as `5b0ab6dc0674b9a3daaf8c3fbbb78675fb04210d`** (12 October 2026; earlier "uncommitted" wording in this runbook is dated history), not merged, pushed, installed on DEV or deployed. Focused `afldb_test` acceptance is **SUPPORTED** (2026-10-12, operator-run): after a first run that passed 3 and failed 1 on a test-reader type mismatch (§17.6), the corrected file passed **4/4** (§17.7), with the residue query showing zero owned/unproven rows and the shared 2026 digests identical to the pre-run baseline. This is not whole-suite, restricted-role, live-provider, DEV or PROD acceptance. A static-review correction pass (2026-10-12) reworked the file's shared-state restoration, ownership proof and payload cleanup; see §17.5. See §17.
 - **Severity:** Medium. **Area:** acquisition / AFL API settle / data integrity.
 - **Key files:** `src/lib/acquisition/afl-api-settle-plan.ts` (`planRosterFamily`), `src/lib/acquisition/afl-api-bundle.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-011; partition note R4b-F02). The main session grepped the flag's consumers.
@@ -73,11 +73,12 @@ DB-free: `tests/afl-api-settle-plan.test.ts` or `tests/afl-api-match.test.ts` wi
 
 - The refusal reason name and its data-issue type (operator or implementation choice).
   **Implementation choice (2026-10-12), reversible before merge:** reason `period_scores_contradict_final_score`
-  (the runbook's own example); data-issue type `afl_api_period_scores_contradiction`. No operator ruling was sought or given.
+  (the runbook's own example); data-issue type `afl_api_period_scores_contradiction`. No operator ruling was sought or given at that time.
+  **Update (12 October 2026):** both names were reviewed and are kept; no naming decision remains outstanding.
 
 ## 16. Next action
 
-The operator-run focused `afldb_test` integration run (§17.4 item 2) and residue captures (§17.4 item 3) are done (§17.7). Next: operator review and commit of the nine-file change set, an operator ruling or acceptance on the two names in §15, then merge, DEV deployment and smoke (§17.4 items 1 and 4). The issue stays open until those are met.
+The operator-run focused `afldb_test` integration run (§17.4 item 2) and residue captures (§17.4 item 3) are done (§17.7). The nine-file change set is committed locally as `5b0ab6dc` (12 October 2026) and the two names in §15 were reviewed and kept. Next: merge readiness (`npm run merge:ready -- --issue 276`), then merge and DEV installation/acceptance (§17.4 item 4). The issue stays open until those are met.
 
 ## 17. Implementation (2026-10-12)
 
@@ -193,7 +194,7 @@ Nothing on the writer branch (finding creation/refresh/resolution on the planned
 
 ### 17.4 Closure requirements still open
 
-> **Status update (2026-10-12):** items 2 and 3 were carried out by the operator and are recorded in §17.7 (item 2: 4/4 passed on the second run; item 3: residue captured before, after the failed run and after the second run). Items 1 and 4 remain open. The "never been run" wording in item 3 is historical.
+> **Status update (2026-10-12):** items 2 and 3 were carried out by the operator and are recorded in §17.7 (item 2: 4/4 passed on the second run; item 3: residue captured before, after the failed run and after the second run). Item 1 is now done (committed locally as `5b0ab6dc`, 12 October 2026; the two names were reviewed and kept); item 4 remains open. The "never been run" wording in item 3 is historical.
 
 1. Operator review and commit of the diff (and an operator ruling, or acceptance, on the two names in §15).
 2. Operator-run focused integration run on `afldb_test` (§17.3 cases): from the worktree root with `AFLDB_TEST_DATABASE_URL` set to the
@@ -293,6 +294,6 @@ A static review of the authored integration file found three classes of defect. 
 **Not established.**
 - Restoration of a **non-empty** Brownlow baseline: `player_season_stats` for 2026 was empty, so that part of the restore path was not exercised with data.
 - Anything beyond the focused file: no whole-suite run, no restricted-role run, no live-provider run, and nothing on DEV or PROD.
-- The two names in §15 are still an unratified implementation choice.
+- (Historical, at the time of the run: the two names in §15 were still an unratified implementation choice. They have since been reviewed and kept; no naming decision remains outstanding.)
 
-**Remaining lifecycle.** §17.4 items 1 and 4: operator review and commit of the change set, merge (`npm run merge:ready -- --issue 276`), DEV deployment and smoke, then closure. ISSUE-276 stays **Open**.
+**Remaining lifecycle.** The change set is committed locally as `5b0ab6dc` (12 October 2026). Remaining: merge readiness (`npm run merge:ready -- --issue 276`), merge, DEV installation and acceptance (§17.4 item 4), then closure. ISSUE-276 stays **Open**.
