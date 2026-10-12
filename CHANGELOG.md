@@ -45,7 +45,7 @@ commit.
   namespace row or foreign conflict); teardown is one transaction with exact row counts and payloads are removed only by retained exact identity, stored-content marker and no
   surviving citation. `AFLDB-ISSUE-276-RESIDUE.sql` classifies owned versus unproven rows and inspects payload rows; the operator has since executed both (above).
 
-### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; committed locally on `opus/issue-274`; not merged, pushed, installed on DEV or deployed; issue open) - 12 October 2026
+### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; merged to main `6f99b58d` under a readiness exception; installed on DEV 12 October 2026 and accepted on synthetic fixtures, first scheduled nightly (13 October 2026) observed with no regression marker against the documented baseline (one night; the run's revision is supported by the host checkout reflog, not recorded by the run); not deployed to PROD, behind the ISSUE-265 hold; issue open) - 12 October 2026
 
 - **Match-row lock.** `applyCanonicalUnit` (`src/lib/acquisition/canonical-apply.ts`) takes `FOR NO KEY UPDATE` on the
   unit's match-family rows before it reads manual authority (Data Editor overrides) and re-reads the match, so a
@@ -58,7 +58,21 @@ commit.
   mutation failed exactly the two discriminator assertions; the import-role lock test passed once; the whole
   `settle-afl-api.test.ts` passed 72/72 (1 case NOT EXERCISED). The whole `settle-afltables` run failed on the
   unrelated ISSUE-099 O1 test (ISSUE-315). The overlapping-settle cycle, the late-candidate case on PostgreSQL and State B
-  were not run. ISSUE-275 is a separate defect and is not fixed by this change; nothing is deployed.
+  were not run. ISSUE-275 is a separate defect and is not fixed by this change.
+- **DEV (12 October 2026).** Installed (BUILD `kKfU7VKifbsWyPAAurnUU`, no migration). A synthetic behavioural acceptance (the
+  real settle as `afldb_import` against season-2093 fixtures, with an emulated Data Editor holder) gave VERDICT FIXED for the
+  edit and delete scenarios. The acceptance fixtures and the derived `club_seasons` rows they produced were removed in one
+  transaction (the acceptance driver's first cleanup failed and rolled back; a corrected cleanup succeeded). All 99 table
+  comparisons against the pre-run census matched (full-content hashes where collected; `player_match_stats` by row count and
+  ordered ids only); the one review item, `club_seasons_id_seq`, advanced by four (1748 to 1752) during the fixture interval
+  and was accepted by the owner as recorded (compare exit 5 preserved; the sequence was not reset). The DEV run itself was in
+  State B.
+  The first scheduled nightly (13 October, one night, read-only checks) completed with no regression marker against the
+  documented baseline: 64 refusals before and after the change and 0 canonical failures, inserts, updates or ledger writes.
+  The host checkout reflog supports, but the run does not record, that it ran `6f99b58d`.
+  Not shown: that the lock fired in that run, the real Data Editor, State B durable Match Sheet cases, overlapping settles,
+  or repeatability beyond the observed 13 October night (later nights are combined ISSUE-274 + ISSUE-276 observations while
+  ISSUE-276 remains installed on DEV).
 
 ### Submission validation can no longer overwrite a concurrent approve, promote or reject (AFLDB-ISSUE-273; merged to main `a34f0721` with readiness accepted under an operator exception; DB-free unit, poller self-test, typecheck and lint passed; `afldb_test` integration passed for `email-intake` (23 passed + 2 expected-fail) and `submission-promotion` (18 passed + 2 expected-fail), with only the existing ISSUE-264 State-B block refused on `match-results-promotion` in the earlier run; installed on DEV 11 October 2026 under a separate scoped deploy-gate exception for the same four files (BUILD_ID `L22XfuX2nngl_51zwuzfH`, no migration) and DEV synthetic-fixture acceptance supported, not exercising the race guard, the decided acknowledgement or a real mailbox; PROD not installed, behind the ISSUE-265 hold; issue open) - 11 October 2026
 
