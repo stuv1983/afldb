@@ -3,6 +3,7 @@
 ## 0. Status
 
 - **Status:** Open (2026-10-08). Implemented locally 2026-10-12 on `opus/issue-276-period-score-guard` (base `6f99b58d`); **committed locally as `5b0ab6dc0674b9a3daaf8c3fbbb78675fb04210d`** (12 October 2026; earlier "uncommitted" wording in this runbook is dated history), not merged, pushed, installed on DEV or deployed. Focused `afldb_test` acceptance is **SUPPORTED** (2026-10-12, operator-run): after a first run that passed 3 and failed 1 on a test-reader type mismatch (§17.6), the corrected file passed **4/4** (§17.7), with the residue query showing zero owned/unproven rows and the shared 2026 digests identical to the pre-run baseline. This is not whole-suite, restricted-role, live-provider, DEV or PROD acceptance. A static-review correction pass (2026-10-12) reworked the file's shared-state restoration, ownership proof and payload cleanup; see §17.5. See §17.
+- **Update (13 October 2026):** the "not merged, pushed, installed on DEV or deployed" wording above is 12 October history. The change is on `main` and `origin/main` as `3ec76f28a7899652957a259a0b06549a417f41df` and was **installed on DEV on 13 October 2026, 06:26:00-06:28:27 AEDT** (operator-run; §17.8). **Installation is established; real-data nightly acceptance is pending.** DEV is not PROD; PROD is unchanged. The issue stays **Open**.
 - **Severity:** Medium. **Area:** acquisition / AFL API settle / data integrity.
 - **Key files:** `src/lib/acquisition/afl-api-settle-plan.ts` (`planRosterFamily`), `src/lib/acquisition/afl-api-bundle.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-011; partition note R4b-F02). The main session grepped the flag's consumers.
@@ -79,6 +80,8 @@ DB-free: `tests/afl-api-settle-plan.test.ts` or `tests/afl-api-match.test.ts` wi
 ## 16. Next action
 
 The operator-run focused `afldb_test` integration run (§17.4 item 2) and residue captures (§17.4 item 3) are done (§17.7). The nine-file change set is committed locally as `5b0ab6dc` (12 October 2026) and the two names in §15 were reviewed and kept. Next: merge readiness (`npm run merge:ready -- --issue 276`), then merge and DEV installation/acceptance (§17.4 item 4). The issue stays open until those are met.
+
+**Update (13 October 2026):** merge and DEV installation are done (§17.8). Next: observe the 14 October nightly AFL API settle on DEV, a combined ISSUE-274 + ISSUE-276 observation (§17.8), and grade it; then assess the remaining closure requirements. The issue stays open until that acceptance is recorded.
 
 ## 17. Implementation (2026-10-12)
 
@@ -194,7 +197,7 @@ Nothing on the writer branch (finding creation/refresh/resolution on the planned
 
 ### 17.4 Closure requirements still open
 
-> **Status update (2026-10-12):** items 2 and 3 were carried out by the operator and are recorded in §17.7 (item 2: 4/4 passed on the second run; item 3: residue captured before, after the failed run and after the second run). Item 1 is now done (committed locally as `5b0ab6dc`, 12 October 2026; the two names were reviewed and kept); item 4 remains open. The "never been run" wording in item 3 is historical.
+> **Status update (2026-10-12):** items 2 and 3 were carried out by the operator and are recorded in §17.7 (item 2: 4/4 passed on the second run; item 3: residue captured before, after the failed run and after the second run). Item 1 is now done (committed locally as `5b0ab6dc`, 12 October 2026; the two names were reviewed and kept); item 4 remains open. **Update (13 October 2026):** item 4's merge and DEV installation are done (§17.8); its acceptance part (the 14 October nightly) is pending. The "never been run" wording in item 3 is historical.
 
 1. Operator review and commit of the diff (and an operator ruling, or acceptance, on the two names in §15).
 2. Operator-run focused integration run on `afldb_test` (§17.3 cases): from the worktree root with `AFLDB_TEST_DATABASE_URL` set to the
@@ -297,3 +300,44 @@ A static review of the authored integration file found three classes of defect. 
 - (Historical, at the time of the run: the two names in §15 were still an unratified implementation choice. They have since been reviewed and kept; no naming decision remains outstanding.)
 
 **Remaining lifecycle.** The change set is committed locally as `5b0ab6dc` (12 October 2026). Remaining: merge readiness (`npm run merge:ready -- --issue 276`), merge, DEV installation and acceptance (§17.4 item 4), then closure. ISSUE-276 stays **Open**.
+
+*Superseded in part by §17.8 (13 October 2026): merge and DEV installation are done; acceptance on real data is pending.*
+
+### 17.8 DEV installation (operator-run, 13 October 2026)
+
+**Result: installation on DEV is established. Behavioural acceptance on real data is not.** ISSUE-276 stays **Open**.
+
+**Evidence** (operator-captured, outside the repository, not edited): `D:\tmp\issue276\preflight-20261013-062055\`. Read for this record: `db-census.txt`, `h4/h4-child.log`, `h4/h4-preflight-output.txt`, `gate-final.txt`, `deploy/sync-dev.txt`, `post/i-checks.txt`. Times are AEDT (UTC+11). Target: `afldb_dev` on the DEV host `streamanator`. No fallback or rollback was required.
+
+| Step | Time (AEDT) | Result |
+|---|---|---|
+| Read-only database census (`db-census-276.sh`; `afldb_dev` as `afldb_owner`, session read-only) | 06:20:57 | Exit 0, PASS. Baseline below. |
+| H-4 preflight, `npm run preflight -- --mode deploy --issue 276 --ssh-host arm@10.0.40.100`, primary checkout on `main` | 06:21:02-06:21:12 | Exit 0, **READY, 0 blockers, 0 warnings**. Tree clean; `main` = recorded `origin/main` = live `main` (`git ls-remote`) = `3ec76f28a7899652957a259a0b06549a417f41df`; migration parity 110/110. |
+| Final gate (`gate-276.sh`) | 06:25:56 | Exit 0, **RESULT: PASS**. Outside the nightly window, next `afl_api` settle timer elapse forecast Wed 2026-10-14 05:05:07 (1,359 min away); DEV checkout at `6f99b58d` (ISSUE-274 as installed), live `main` `3ec76f28`; `afldb` active/running, MainPID 1873114, NRestarts 1, `Restart=always`, four workers, controls `AFLDB_WORKERS=4` / `AFLDB_POOL_MAX=10` / `AFLDB_TRACE_REQUESTS=on`; health ok; all three settle services inactive; Brownlow timer inert; 81 GB free; 110 migration files; pre-deployment BUILD_ID `kKfU7VKifbsWyPAAurnUU`. |
+| DEV deployment (`deploy/sync-dev.ps1`, ISSUE-107 gate on) | 06:26:00-06:28:27 | Exit 0. Fast-forward `6f99b58d..3ec76f28` (9 files); `db:migrate`: **110 migration file(s), 110 already applied, nothing to apply**; build; **BUILD_ID `5sDQtjtkxAIUBO5bVn6mY`**. Passwordless sudo was unavailable, so the service was restarted through the unit `Restart=` policy: MainPID 1873114 -> **2609207**, started 06:28:25 (`NRestarts` 2). Health ready after 2 s / 2 probes; live BUILD_ID matched. |
+| Installation checks (`i-checks-276.sh`) | 06:28:28 | Exit 0, **RESULT: PASS**. |
+
+**Installation checks (I-1 to I-5), as recorded.**
+- Revision `3ec76f28a7899652957a259a0b06549a417f41df` on `main`; the checkout holds only the known operational untracked artefacts (`.env.bak-issue272-u1b-20261010-191158` and nine `settle-*.json` manifests); no tracked modification.
+- The delta from `6f99b58d` is exactly the nine files of the change set; **0 migration, dependency, `deploy/` or `tools/` changes**.
+- BUILD_ID `5sDQtjtkxAIUBO5bVn6mY` differs from the pre-deployment `kKfU7VKifbsWyPAAurnUU`. MainPID 2609207 (started 06:28:25), `NRestarts` 2, active/running; four workers (pids 2609235, 2609239, 2609242, 2609244). Controls on / 4 / 10 (`AFLDB_TRACE_REQUESTS=on`, `AFLDB_WORKERS=4`, `AFLDB_POOL_MAX=10`).
+- **24 of 24 health probes healthy** (HTTP 200, the on-disk build, `health=ok`); **all four workers answered, 6 requests each**.
+- Reviewed blobs match on the host: `afl-api-settle-plan.ts` `a7f4309e444551a7419b74252df6cd66d23dced1`, `settle-afl-api.ts` `98942f13d844cefdeaeae66353d967b925e37886`, `tests/integration/settle-afl-api-issue276.test.ts` `a651e2df3d8363cafd995d375a90bec404eb9999`.
+- **ISSUE-274's three checked runtime blobs are unchanged** (same at `6f99b58d` and at the target): `canonical-apply.ts` `458174b52059686fdc2ff951e0acd806083dff76`, `match-rekey.ts` `f6cf2d4b59b50628d8bc2d71fc26071f377a01af`, `settle-afltables.ts` `94df1e910974db4a210d237e98d3d4a5c9797b74`; `FOR NO KEY UPDATE` still present in `canonical-apply.ts` (2 occurrences). Marker strings present in the deployed sources: `period_scores_contradict_final_score` in `afl-api-settle-plan.ts` (1); `afl_api_period_scores_contradiction` (1) and `resolvePeriodScoresFindingOnPositiveEvidence` (3: definition, planned call, corroborated call) in `settle-afl-api.ts`.
+- All three settle services inactive afterwards. The `afl_api` settle timer was unchanged by the deployment (next elapse Wed 2026-10-14 05:05:07; its previous trigger was Tue 2026-10-13 05:08:42).
+- The check script labels I-5 "installation-only checks (NOT behavioural acceptance)". Its INFO line reports 0 built web-bundle files containing the refusal reason; it is not a gate (the settle jobs run from the checkout, not from the web bundle).
+
+**Pre-installation baseline** (census at 06:20:58, `afldb_dev`, HEAD `6f99b58d`), for grading the nightly:
+- Migrations 110 in the checkout, 110 applied, none unapplied, none orphaned, no checksum drift.
+- `data_issues` of the ISSUE-276 type (`afl_api_period_scores_contradiction`): **0 rows, 0 open**. The only `afl_api*`/apply-refusal type present was `canonical_apply_failed` (65 total: 64 open, 1 resolved).
+- Row counts: `matches` 17,056; `match_period_scores` 136,448; `data_issues` 69; `import_batches` 54; `canonical_applications` 19,987; `promotion_candidates` 0. Sequences: `data_issues_id_seq` 865, `import_batches_id_seq` 121, `canonical_applications_id_seq` 40,027, `club_seasons_id_seq` 1,752, `promotion_candidates_id_seq` 9,985.
+- Season 2026: **218 matches, all owned by `afltables`**, 0 whose last stored period row differs from the final score.
+- `afldb_import` privileges on the relations the settle writes (catalogue as owner, not a functional proof): `data_issues` and `match_period_scores` S/I/U/D all true. `canonical_applications` is S/I only.
+- No session idle in transaction; no prepared transactions.
+
+**Limits retained (this is not behavioural acceptance).**
+- The installation checks prove which code is built and serving, not what the settle does. The census states the nightly reports `corroboratedForeignOwned` = 218 on recent runs and all 218 DEV 2026 matches are `afltables`-owned, so the nightly is not expected to reach the refusal branch or the finding lifecycle on this data; a clean nightly can show no regression, not that the guard works. The refusal, the finding open/refresh/resolve lifecycle and the corroborated close remain evidenced only by the `afldb_test` acceptance (§17.7).
+- Everything under "Not established" in §17.7 still stands: restoration of a non-empty Brownlow baseline, whole-suite, restricted-role and live-provider runs. DEV is not evidence for PROD; **PROD is neither installed nor accepted**.
+- The census privilege matrix is catalogue evidence. The preceding `afldb_test` run is not repeated on DEV.
+
+**Pending: the 14 October 2026 nightly.** The next `afl_api` settle on DEV will be the first nightly on `3ec76f28`, so it is a **combined ISSUE-274 + ISSUE-276 observation**: ISSUE-274 was already installed and observed on 13 October. ISSUE-276 was added afterwards; the 14 October nightly will observe both changes together. A nightly outcome cannot be attributed to one by revision alone. The forecast elapse of 05:05:07 AEDT is a forecast, **not an exact start commitment**. Until that run is observed and graded, real-data acceptance is not established and the issue remains Open. This section records no closure.

@@ -15,7 +15,12 @@ commit.
 
 ## [Unreleased]
 
-### The AFL API settle refuses a roster family whose period scores contradict the final score (AFLDB-ISSUE-276; committed locally as `5b0ab6dc` on `opus/issue-276-period-score-guard`, focused `afldb_test` acceptance supported; not merged, installed or deployed; issue open) - 12 October 2026
+### The AFL API settle refuses a roster family whose period scores contradict the final score (AFLDB-ISSUE-276; committed as `5b0ab6dc`, on `main` as `3ec76f28`; focused `afldb_test` acceptance supported; installed on DEV 13 October 2026, real-data nightly acceptance pending; not on PROD; issue open) - 12 October 2026
+
+- **DEV installation (operator-run, 13 October 2026, 06:26:00-06:28:27 AEDT).** `3ec76f28a7899652957a259a0b06549a417f41df` installed on DEV: preflight and final gate passed, 110 migrations already applied (nothing applied; no migration,
+  dependency, `deploy/` or `tools/` change), BUILD_ID `5sDQtjtkxAIUBO5bVn6mY`, service MainPID 2609207 (started 06:28:25, `NRestarts` 2). Installation checks exit 0: 24/24 healthy probes across all four workers, controls on/4/10,
+  reviewed runtime blobs match, ISSUE-274's three checked runtime blobs unchanged. No fallback required. This establishes installation only: all 218 DEV 2026 matches are `afltables`-owned, so the nightly is not expected to reach
+  the refusal branch, and a clean nightly shows no regression rather than guard behaviour. The 14 October nightly is a combined ISSUE-274 + ISSUE-276 observation (forecast 05:05:07 AEDT; not an exact start time). Detail: runbook §17.8.
 
 - `planAflApiMatchUnit()` now returns a `refused` roster-family plan, reason `period_scores_contradict_final_score`,
   when the bundle's `periodScoresReproduceFinalScore` (§9 assertion 4) is explicitly `false`. The `match` family and

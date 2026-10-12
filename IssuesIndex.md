@@ -483,15 +483,18 @@
 
 ### AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 - **Severity:** Medium. **Area:** AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts`.
-- **State:** Open (2026-10-08), review F-011, code-proven; implemented 2026-10-12 on `opus/issue-276-period-score-guard`, committed locally as `5b0ab6dc`
-  (not merged, pushed, installed or deployed; DB-free validation 428/428). Finding lifecycle: resolves only on explicit positive evidence, on the planned AND the corroborated path (a new-then-foreign-owned match is reachable; an afl_api-to-foreign transfer is not).
+- **State:** Open (2026-10-08), review F-011, code-proven; implemented 2026-10-12 on `opus/issue-276-period-score-guard`, committed as `5b0ab6dc`
+  (DB-free validation 428/428). **Merged to `main` as `3ec76f28` and installed on DEV 13 October 2026, 06:26:00-06:28:27 AEDT** (operator-verified; runbook §17.8): preflight and final gate passed, 110 migrations already applied
+  (none applied), BUILD_ID `5sDQtjtkxAIUBO5bVn6mY`, MainPID 2609207 (started 06:28:25, `NRestarts` 2), installation checks exit 0 (24/24 healthy probes, all four workers, controls on/4/10, reviewed blobs match, ISSUE-274's
+  three checked runtime blobs unchanged), no fallback. **Installation established; real-data nightly acceptance pending.** Finding lifecycle: resolves only on explicit positive evidence, on the planned AND the corroborated path (a new-then-foreign-owned match is reachable; an afl_api-to-foreign transfer is not).
   Integration file reworked 2026-10-12 after static review (baseline restore of shared 2026 derived rows with equality assertion; proven fixture ownership, read-only startup that stops on leftovers;
   atomic teardown and payload-row residue check; runbook §17.5).
   **Focused `afldb_test` acceptance supported (operator-run, 2026-10-12; runbook §17.7):** first run 3 passed, 1 failed on a test-reader bigint/integer mismatch (fresh-case later steps unexecuted); after the test-side reader fix, R2 passed 4/4
   (exit 0, no skipped cases, 65.61 s). Residue before, after the failed run and after R2: all 13 owned/unproven counts 0, no payload or fixture-conflict rows, captured `seasons`/`club_seasons` (excl. `id`) values identical to the baseline
-  (`club_seasons.id` and sequences deliberately excluded). Baseline `player_season_stats` for 2026 was empty, so a non-empty Brownlow restore was not exercised. **Not established:** whole-suite, restricted-role, live-provider, DEV or PROD acceptance.
+  (`club_seasons.id` and sequences deliberately excluded). Baseline `player_season_stats` for 2026 was empty, so a non-empty Brownlow restore was not exercised. **Not established:** whole-suite, restricted-role, live-provider, DEV behavioural or PROD acceptance.
 - **Runbook:** `issues/open/AFLDB-ISSUE-276.md`. The names `period_scores_contradict_final_score` / `afl_api_period_scores_contradiction` were reviewed and are kept; no naming decision is outstanding.
-  **Next action:** merge readiness (`npm run merge:ready -- --issue 276`), then merge and DEV installation/acceptance.
+  **Limits:** all 218 DEV 2026 matches are `afltables`-owned, so the nightly is not expected to reach the refusal branch or finding lifecycle; a clean nightly shows no regression only. PROD neither installed nor accepted.
+  **Next action:** observe and grade the 14 October nightly AFL API settle on DEV, a **combined ISSUE-274 + ISSUE-276 observation** (forecast 05:05:07 AEDT is not an exact start commitment); no closure recorded.
 
 ### AFLDB-ISSUE-277 — Data Editor edits other than the name to a token-only player are not durable
 - **Severity:** Medium. **Area:** Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py`.
