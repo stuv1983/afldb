@@ -138,6 +138,7 @@ import {
   CONTROL_CONNECTION, createCleanupGate, runBehindHolder, SCENARIO_BUDGET, SCENARIO_TIMEOUT_MS,
   UnresolvedWorkError, type BehindHolderSteps,
 } from './behind-holder';
+import { executableStatements } from './executable-statements';
 import { createImportRoleParityHarness } from './import-role-parity';
 
 /* ------------------------------------------------------------------ *
@@ -1610,27 +1611,12 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
    * ---------------------------------------------------------------- */
 
   describe('obligation O1', () => {
-    /**
-     * The SQL the settle modules actually SEND.
-     *
-     * postgres.js issues SQL only through tagged templates, so the executable
-     * statements are exactly the template bodies. Extracting them excludes
-     * every line of prose, which a whole-file grep cannot do: correct prose
-     * naming the forbidden keywords would otherwise have to be contorted, and
-     * a comment could create a false positive.
-     */
-    function executableStatements(source: string): string[] {
-      const statements: string[] = [];
-      for (const match of source.matchAll(/\b(?:tx|sql)(?:<[\s\S]*?>)?`([^`]*)`/g)) {
-        const body = match[1]
-          .replace(/\$\{[^}]*\}/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        if (body) statements.push(body);
-      }
-      return statements;
-    }
-
+    // The SQL the settle modules actually SEND: the `tx`/`sql` tagged templates
+    // as the TypeScript parser reads them (./executable-statements,
+    // AFLDB-ISSUE-315). Extracting them excludes every line of prose, which a
+    // whole-file grep cannot do:
+    // correct prose naming the forbidden keywords would otherwise have to be
+    // contorted, and a comment could create a false positive.
     const settleSource = readFileSync('src/lib/acquisition/settle-afltables.ts', 'utf8');
     const storeSource = readFileSync('src/lib/acquisition/observation-store.ts', 'utf8');
     const cliSource = readFileSync('tools/current-season/settle-afltables.ts', 'utf8');

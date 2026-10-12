@@ -691,8 +691,14 @@
 
 ### AFLDB-ISSUE-315 — The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL
 - **Severity:** Low. **Area:** test maintenance — `tests/integration/settle-afltables.test.ts` (`executableStatements`, `:1612-1654`); the comment at `src/lib/acquisition/settle-afltables.ts:1918-1919`.
-- **State:** Open (2026-10-12), found by ISSUE-274 R2; the same failure reproduced DB-free on `HEAD` and the working tree (comment added by `ad1fd595`, ISSUE-261). No production behaviour affected. Not fixed.
-- **Evidence:** `issues/open/AFLDB-ISSUE-274.md` §26.3, §27.1 (no separate runbook). **Next action:** make the extractor ignore comments (or reword the comment) with a DB-free regression.
+- **State:** Open (2026-10-12), found by ISSUE-274 R2; the same failure reproduced DB-free on `HEAD` and the working tree (comment added by `ad1fd595`, ISSUE-261). No production behaviour affected.
+  **Fixed 2026-10-12** in batch worktree `afldb-batch-315-281-312-288` (base `80f86c39`; settle source unchanged): extractor in `tests/integration/executable-statements.ts` now reads
+  `tx`/`sql` tagged templates with the TypeScript parser (r2; r1's hand lexer could hide statements after a regex); 31 statements (the historical 33 less the two prose bodies),
+  four positive controls kept; DB-free `tests/executable-statements.test.ts` 14/14. `afldb_test` `settle-afltables.test.ts -t "obligation O1"` **passed 2026-10-12** (3/3,
+  exit 0: the two static O1 checks, statement extraction and no DELETE/TRUNCATE, plus the sentinel case, which is a fixture presence check only; census clean
+  before/after, the 12 historical S6 batches preserved). **Committed locally; merge pending** (2026-10-12, its own commit on `opus/batch-315-281-312-288`).
+- **Evidence:** `issues/open/AFLDB-ISSUE-274.md` §26.3, §27.1; implementation record, corrected `afldb_test` plan and result in `issues.md` (no separate runbook). **Next action:**
+  merge after ISSUE-274's first-nightly evidence; close once merged.
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
 decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an

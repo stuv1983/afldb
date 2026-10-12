@@ -66,7 +66,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-312 | Migration safety scan fails on a detached HEAD with a misleading error | Low | Database tooling / migrations / preflight — `tools/db/migration-safety.ts` | Open (2026-10-08); review F-047, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-312.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (r2: detached only for exit 1 with empty stdout and stderr), DB-free 37/37 with disposable repositories; committed locally; merge pending | Merge after ISSUE-274 first nightly; close once merged |
 | AFLDB-ISSUE-313 | Database tooling passes the owner DSN, password included, on the `psql` command line | Low | Database tooling / credential handling — `tools/db/psql.ts` | Open (2026-10-08); review F-048, code-proven, exposure host-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-313.md` | Implementation |
 | AFLDB-ISSUE-314 | `prepare-promotion-source --apply` checks `--record-out` only after committing its writes | Low | Database tooling / production promotion preparation — `tools/db/prepare-promotion-source.ts` | Open (2026-10-08); review F-049, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-314.md` | Implementation |
-| AFLDB-ISSUE-315 | The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL | Low | Test maintenance — `tests/integration/settle-afltables.test.ts` (`executableStatements`, `:1622-1654`); `src/lib/acquisition/settle-afltables.ts:1918-1919` | Open (2026-10-12); found by ISSUE-274 R2, reproduced DB-free on `HEAD` and the working tree; evidence in `issues/open/AFLDB-ISSUE-274.md` §27.1 | Tighten the extractor (or reword the comment), with a DB-free regression |
+| AFLDB-ISSUE-315 | The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL | Low | Test maintenance — `tests/integration/settle-afltables.test.ts` (`executableStatements`, `:1622-1654`); `src/lib/acquisition/settle-afltables.ts:1918-1919` | Open (2026-10-12); found by ISSUE-274 R2, reproduced DB-free on `HEAD` and the working tree; evidence in `issues/open/AFLDB-ISSUE-274.md` §27.1; extractor fixed 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (r2: TypeScript-parser extraction of `tx`/`sql` tagged templates, 31 statements = 33 less the two prose bodies), DB-free 14/14; `afldb_test` `-t "obligation O1"` PASSED 2026-10-12 (3/3: two static checks plus the sentinel case = fixture presence only; census clean, 12 S6 batches preserved); committed locally; merge pending | Merge after ISSUE-274 first nightly; close once merged |
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator-run
 standalone promotion-gate reads on DEV and PROD, graded offline; operator decision D-233-4). Resolved as **AFL API
@@ -50378,5 +50378,120 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   statement the four positive controls do not name would not be noticed.
 - **Relationship to ISSUE-274.** None causal: ISSUE-274 does not touch the comment, the extractor or the assertion. It is recorded separately so that ISSUE-274's R2 result (exit 1) is
   explained rather than waived. **Not fixed in the ISSUE-274 patch.**
-- **Next action.** Either strip `//` and `/* */` comments before extraction (keeping the positive controls), or reword the comment so it contains no backtick after `tx`/`sql`; add a DB-free
-  regression that the extractor ignores comments and still finds the real statements. Optional: a base-export differential run of the suite to confirm the failure pre-dates ISSUE-274.
+- ~~**Next action.** Either strip `//` and `/* */` comments before extraction (keeping the positive controls), or reword the comment so it contains no backtick after `tx`/`sql`; add a DB-free
+  regression that the extractor ignores comments and still finds the real statements. Optional: a base-export differential run of the suite to confirm the failure pre-dates ISSUE-274.~~ Superseded below.
+- **Implementation (2026-10-12, uncommitted; batch worktree `afldb-batch-315-281-312-288`, branch `opus/batch-315-281-312-288`, base `80f86c39`; settle source unchanged).**
+  The extractor moved to `tests/integration/executable-statements.ts` (imported by the O1 block). It first removes `//` and `/* */` comments with a small lexer that keeps string,
+  template and regular-expression literals byte-for-byte, so `//` inside a string or template SQL is not a comment; the template regex and body normalisation are unchanged.
+  **Corrected count: 31 executable statements** (`settle-afltables.ts` 23, `observation-store.ts` 8, the CLI 0). The historical 33 less exactly the two prose bodies
+  (`— a recovered`, `would still be // re-thrown by`); nothing added; all four positive controls present; every body passes the shape check. The integration assertion stays
+  `>= 20`. New DB-free `tests/executable-statements.test.ts` (no existing DB-free home: the integration file needs a test database): 10/10 — the verbatim comment yields prose
+  under the raw regex and nothing now; comments inside a substitution are dropped; `//` and `/*` survive in single/double-quoted strings, template SQL, untagged templates and
+  regex literals; the exact per-file counts (pinned on purpose, so a missed statement is noticed); positive controls; no prose, DELETE or TRUNCATE. Mutation checks: with no
+  comment removal 4 fail; with a naive `//.*` stripper 2 fail (the template cases). Typecheck clean; no lint error in a changed file. *(r1; superseded by r2 below.)*
+- **Correction pass r2 (2026-10-12, same worktree, uncommitted; settle source still unchanged).** r1's hand lexer was not reliable: after `)` it took `/` for a division, so in
+  ``if (ready) /[/*]/.test(input); await tx`SELECT 1`;`` the `/*` inside the regex class opened a "block comment" that blanked the rest of the file and **hid every later
+  statement, a DELETE included**; and it still matched `tx`…`` inside quoted strings. The lexer is gone: `tests/integration/executable-statements.ts` now parses the source with
+  the TypeScript compiler (`ts.createSourceFile`, `typescript` is already a devDependency) and reads only `TaggedTemplateExpression` nodes whose tag is the identifier `tx` or
+  `sql` (type arguments allowed). Bodies are the template's literal text as written with each `${…}` blanked, whitespace collapsed (the r1/original normalisation); substitutions
+  are visited, so a statement nested in another's `${…}` is found too. Comments, string literals, untagged templates and regular expressions are never statements and cannot hide one.
+  **Still 31 statements (23 + 8 + 0), all four positive controls, every body passes the shape check.** A new differential case pins the relation to the raw regex: same 33 less the
+  two prose bodies, same order; two bodies differ because the raw regex stopped them at a template nested inside a `${…}` (the settle `import_batches` notes and the
+  `import_rejections` reason, each left ending in `${`), and the parser reads them whole (`… ) RETURNING id`, `… VALUES ( , , , )`). `tests/executable-statements.test.ts`:
+  **14/14**, including the three required regressions — the regex prefix followed by ``tx`SELECT 1` `` (found), the same prefix followed by ``tx`DELETE FROM t` `` (found, so O1
+  would catch it), and ``tx`DELETE FROM t` `` inside single-, double-quoted and untagged-template text (not a statement). Mutation check: with r1's lexer restored, **4 failed**
+  (both regex-prefix cases, the quoted-string case, the differential case); restored byte-identical. Typecheck exit 0; ESLint on every changed file, 0 errors.
+- **Committed locally; merge pending (2026-10-12).** Operator-reviewed; its own local commit on `opus/batch-315-281-312-288` (the verified batch-r2 bytes, with the
+  run record below); not merged or pushed.
+- **Next action.** Merge with the batch after ISSUE-274's first-nightly evidence; close once
+  merged (the O1 integration result is recorded below).
+- **Plan correction (owner, 2026-10-12, before the run).** `s6_batches` is **not** a cleanup selector that must be 0: it counts the 12 historical `issue122-s6-cli` apply
+  batches (`import_batches` 66–68, 325–327, 543–545, 639–641; see `issues/open/AFLDB-ISSUE-274.md` §26), which are preserved evidence that no `cleanup122` selector matches.
+  Step 1's original wording ("`spine_099` through `s6_batches` = 0") would have refused a correct database. Corrected rule: every genuine selector = 0; the S6 batches are
+  captured as ordered ids plus whole-row `md5(t::text)` before the run and must be unchanged afterwards; never deleted. The SQL below is kept as written; its `s6_batches`
+  column is to be read as that preserved-evidence count (expected 12), not as a zero gate.
+- **`afldb_test` O1 integration (2026-10-12, owner-authorised, run once): PASSED.** Working tree = base `80f86c39` + batch-r2 (diff SHA-256 `7364edc4ea9e4c15…` and all 17
+  post-image blobs verified first, no Git command). One `streamanator` tunnel (PID 27876, only it stopped afterwards), `afldb_owner` DSN from the main `.env` owner line
+  rebuilt in process to `afldb_test`, child environment only, restricted-role variables unset. Before (fresh census, read-only): server-reported `afldb_test` /
+  `afldb_owner`; every genuine selector of this plan and of ISSUE-288 §17.6 = 0, seasons 2091/2093/2094 absent, coach test trigger and function absent; the 12 S6 batches
+  present with the row-hash prefixes ISSUE-274 recorded; `users_n` 5, `sources_n` 14 with per-row hashes. Run
+  `node node_modules/vitest/vitest.mjs run tests/integration/settle-afltables.test.ts -t "obligation O1" --reporter=verbose`: **exit 0, 3 passed, 78 skipped (81)** —
+  "extracts the real statement set, so the proof below is not vacuous", "sends no DELETE and no TRUNCATE at all", and "left both projection sentinels in place across every
+  run", the last being **fixture presence only** (no settle case ran under `-t`; not runtime evidence about a settle pass). After: every selector 0 again; `auth_users`,
+  `sources`, the 12 S6 batches (ids and row hashes) and every recorded total unchanged (`import_batches` 729, whole-table row hash identical). Sequence advances (fixture
+  setup, informational): `external_identities_id_seq`, `import_batches_id_seq`, `matches_id_seq`, `players_id_seq` +1 each. No other session. Artefacts:
+  `D:\tmp\batch-315-281-312-288\run-20261012-db\` (`20-`…`23-`). Not covered: the whole file; restricted-role case (skipped, variable unset).
+- **`afldb_test` O1 plan (r2; operator-run, tunnel, `AFLDB_TEST_DATABASE_URL` in the child environment only, `current_database()` proved first).** *(Executed 2026-10-12 with
+  the plan correction above.)*
+  1. **Before**, run the census below. Require every genuine cleanup-selector column (`spine_099` through `batches_122`) = 0, which includes fixture seasons 2094 and 2093 absent;
+     record `s6_batches` (expected 12, preserved; *corrected 2026-10-12, originally listed as a zero selector*); record
+     `users_n`, `users_fp`, `sources_n`, `sources_fp`. If any selector is non-zero, **stop**: the file-level `beforeAll` runs `cleanupIssue099()` as a pre-clean and the `afterAll`
+     runs it again, deleting whatever those selectors match (season 2094 included, even though the suite's `INSERT … ON CONFLICT DO NOTHING` would not have created it).
+  2. Run only the three O1 cases: `node node_modules/vitest/vitest.mjs run tests/integration/settle-afltables.test.ts -t "obligation O1" --reporter=verbose`. Accept **3 passed**,
+     every other case skipped, exit 0. What each proves in this filtered run: (a) "extracts the real statement set, so the proof below is not vacuous" — the static extraction
+     (`>= 20`, four positive controls, shape); (b) "sends no DELETE and no TRUNCATE at all" — the static proof, plus upsert-only writes to both projections; (c) "left both
+     projection sentinels in place across every run" — **a sentinel presence check only**: under `-t` no settle case runs, so it shows that the `beforeAll` sentinels exist
+     once each and still carry the fixture batch id, i.e. the fixture setup is sound. It is **not** runtime evidence that a settle pass leaves them in place; that needs the
+     whole file, which this plan does not run. The file-level hooks create and remove the ISSUE-099 fixtures (season 2094, the `issue099-` spine, projection sentinels, player
+     `issue099-fixture-player` and its identity, the fixture import batch, the T7 `issue099-match-key-disagree` match and its `external_current_matches` row); the `afltables` and
+     `squiggle_api` sources rows are borrowed if present, created and removed only if absent. The nested ISSUE-122 suites have no selected case, so their hooks
+     (`cleanup122()`, season 2093) are not expected to run; their selectors are in the census as a guard.
+  3. **After**, the same census. Require every genuine cleanup-selector column = 0 again, the S6 batch ids and row hashes unchanged, and `users_n`, `users_fp`, `sources_n`,
+     `sources_fp` identical to the before values.
+
+  ```sql
+  SELECT current_database() AS db,
+    (SELECT count(*) FROM staging.afltables_match WHERE external_record_id LIKE 'issue099-%')
+      + (SELECT count(*) FROM staging.afltables_player_match WHERE external_record_id LIKE 'issue099-%')
+      + (SELECT count(*) FROM staging.source_records WHERE external_record_id LIKE 'issue099-%')
+      + (SELECT count(*) FROM staging.source_record_versions WHERE external_record_id LIKE 'issue099-%')
+      + (SELECT count(*) FROM staging.source_payloads WHERE raw_payload->>'issue099_fixture' IS NOT NULL) AS spine_099,
+    (SELECT count(*) FROM promotion_candidates WHERE external_record_id LIKE 'issue099-%')
+      + (SELECT count(*) FROM import_rejections WHERE source_record_id LIKE 'issue099-%') AS candidates_rejections_099,
+    (SELECT count(*) FROM external_identities WHERE external_id LIKE 'issue099-%') AS identities_099,
+    (SELECT count(*) FROM players WHERE slug = 'issue099-fixture-player') AS players_099,
+    (SELECT count(*) FROM data_issues WHERE issue_key LIKE 'afltables|match|issue099-%') AS data_issues_099,
+    (SELECT count(*) FROM staging.external_current_matches WHERE external_game_id LIKE 'issue099-%') AS ecm_099,
+    (SELECT count(*) FROM data_overrides WHERE entity_type = 'matches' AND entity_key LIKE 'issue099-%') AS overrides_099,
+    (SELECT count(*) FROM matches WHERE match_key LIKE 'issue099-%') AS matches_099,
+    (SELECT count(*) FROM import_batches
+      WHERE tool = 'issue099-settle-fixture' OR notes LIKE '%issue099-settle-test%') AS batches_099,
+    (SELECT count(*) FROM seasons WHERE year IN (2093, 2094)) AS seasons_2093_2094,
+    (SELECT count(*) FROM canonical_applications
+      WHERE external_record_id LIKE 'issue122-%' OR external_record_id LIKE '2093|issue122-%')
+      + (SELECT count(*) FROM staging.afltables_match
+          WHERE external_record_id LIKE 'issue122-%' OR external_record_id LIKE '2093|issue122-%')
+      + (SELECT count(*) FROM staging.afltables_player_match WHERE external_record_id LIKE 'issue122-%')
+      + (SELECT count(*) FROM staging.source_records
+          WHERE external_record_id LIKE 'issue122-%' OR external_record_id LIKE '2093|issue122-%')
+      + (SELECT count(*) FROM staging.source_record_versions
+          WHERE external_record_id LIKE 'issue122-%' OR external_record_id LIKE '2093|issue122-%')
+      + (SELECT count(*) FROM staging.source_payloads WHERE raw_payload->>'issue122_fixture' IS NOT NULL) AS spine_122,
+    (SELECT count(*) FROM promotion_candidates
+      WHERE external_record_id LIKE 'issue122-%' OR external_record_id LIKE '2093|issue122-%')
+      + (SELECT count(*) FROM import_rejections
+          WHERE source_record_id LIKE 'issue122-%' OR source_record_id LIKE '2093|issue122-%')
+      + (SELECT count(*) FROM data_issues WHERE issue_key LIKE '%issue122-%')
+      + (SELECT count(*) FROM data_overrides
+          WHERE (entity_type = 'matches' AND entity_key LIKE 'issue122-%')
+             OR (entity_type = 'player_match_stats' AND entity_key LIKE '2093|issue122-%'))
+      + (SELECT count(*) FROM staging.external_current_matches WHERE external_game_id LIKE 'issue122-%') AS staging_122,
+    (SELECT count(*) FROM matches WHERE match_key LIKE 'issue122-%' OR match_key LIKE '2093|issue122-%')
+      + (SELECT count(*) FROM players WHERE slug LIKE 'issue122-%')
+      + (SELECT count(*) FROM external_identities WHERE external_id LIKE 'issue122-%')
+      + (SELECT count(*) FROM brownlow_round_votes WHERE season = 2093)
+      + (SELECT count(*) FROM club_seasons WHERE season = 2093) AS canonical_122,
+    (SELECT count(*) FROM import_batches
+      WHERE notes LIKE '%issue122-apply-test%'
+         OR (tool = 'repair-match-rekeys.ts' AND notes LIKE '%season=2093%')) AS batches_122,
+    (SELECT count(*) FROM import_batches
+      WHERE tool = 'settle-afltables.ts'
+        AND notes = 'AFLDB-ISSUE-099 settle; snapshot=issue122-s6-cli; season=2093; mode=apply') AS s6_batches,
+    (SELECT count(*) FROM auth_users) AS users_n,
+    (SELECT md5(string_agg(id::text || ':' || coalesce(email, '') || ':' || role::text, ',' ORDER BY id)) FROM auth_users) AS users_fp,
+    (SELECT count(*) FROM sources) AS sources_n,
+    (SELECT md5(string_agg(id::text || ':' || key, ',' ORDER BY id)) FROM sources) AS sources_fp;
+  ```
+
+  The throwaway users the settle file can create (`issue122-authority-test@example.test`, `issue122-apply-test@example.test`) are covered by `users_n`/`users_fp`; the
+  `player_match_stats` / `player_*` rows `cleanup122()` removes by player are covered by `players` (`slug LIKE 'issue122-%'`) being 0.
