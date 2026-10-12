@@ -32,7 +32,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-278 | The destructive `db:test:rebuild` reset never asserts which database it is connected to | Medium (review graded High; regraded by the review's main session) | Database tooling / wrong-target safety — `tools/db/rebuild-test.ts` | Open (2026-10-08); review F-013, missing assertion code-proven, libpq trigger not executed; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-278.md` | Fix (1), optionally (2), then tests; review gating note: before the next `db:test:rebuild`; H-278-1 open |
 | AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | Code fix plus test update, before search indexing is enabled |
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
-| AFLDB-ISSUE-281 | Two public list pages fail on a sort key that names an inherited object property | Low | Public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts` | Open (2026-10-08); review F-016, reproduced DB-free (W5); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-281.md` | Implementation (trivial) |
+| AFLDB-ISSUE-281 | Two public list pages fail on a sort key that names an inherited object property | Low | Public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts` | Open (2026-10-08); review F-016, reproduced DB-free (W5); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-281.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288`, DB-free 14/14; committed locally; merge pending | Merge and DEV smoke after ISSUE-274 first nightly; then close DEV-scoped (PROD behind ISSUE-265 hold) |
 | AFLDB-ISSUE-282 | Replace actions revalidate only the replaced row's public pages | Low | Admin awards / special records / revalidation — `admin-awards.ts`, `admin-special-records.ts` | Open (2026-10-08); review F-017, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-282.md` | Implementation, grouped with ISSUE-283 |
 | AFLDB-ISSUE-283 | The administrative note is not recorded on creation audit rows | Low | Admin awards / special records / audit trail | Open (2026-10-08); review F-018, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-283.md` | Implementation, grouped with ISSUE-282 |
 | AFLDB-ISSUE-284 | Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish | Low | Admin Brownlow — `src/db/queries/admin-brownlow.ts` | Open (2026-10-08); review F-019, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-284.md` | Implementation |
@@ -50070,7 +50070,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Origin.** Review F-016 (R1b-F01) at `20a7a4bb`. Reproduced DB-free by the review (witness W5, not imported).
 - **Defect.** The guards use `in`, which admits `Object.prototype` keys (`constructor`, `toString`, …); the value reaches
   `ORDER BY` via `sql.unsafe`, PostgreSQL rejects it and the page renders its error boundary.
-- **Next action.** Implementation (trivial).
+- **Implementation (2026-10-12, uncommitted; batch worktree `afldb-batch-315-281-312-288`, base `80f86c39`).** Both guards
+  use `Object.hasOwn`, so an inherited key falls back to the existing default order. `tests/catalogue-lookups.test.ts`
+  14/14 (6 new: valid keys, inherited keys, and the ORDER BY each query would send for valid, `constructor`/`toString`,
+  unknown and invalid-direction input); the old guards fail 2 of them. Typecheck clean; no lint error in a changed file.
+  Runbook §17.
+- **Committed locally; merge pending (2026-10-12).** Operator-reviewed; its own local commit on
+  `opus/batch-315-281-312-288` (the verified batch-r2 bytes); not merged, pushed or deployed.
+- **Next action.** Merge and DEV deploy after ISSUE-274's first-nightly evidence;
+  read-only DEV smoke (runbook §17.5); then close DEV-scoped, PROD pending behind the ISSUE-265 hold.
 
 ## AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
 

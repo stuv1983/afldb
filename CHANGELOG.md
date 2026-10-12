@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Public match-log and draft pages ignore a sort key that names an inherited object property (AFLDB-ISSUE-281; DB-free validated; committed locally; merge pending; not yet on DEV or PROD; issue open) - 12 October 2026
+
+- `/players/<slug>/matches?sort=constructor` and `/draft/<year>?sort=toString` (and the other `Object.prototype` names)
+  now fall back to the default order instead of sending invalid SQL and rendering the error page. The two sort guards use
+  `Object.hasOwn`, like the other sort maps.
+
 ### Migration safety scan accepts a detached HEAD (AFLDB-ISSUE-312; DB-free validated; committed locally; merge pending; issue open) - 12 October 2026
 
 - `db:migrate`, `preflight` and `merge:ready` no longer fail with "git symbolic-ref failed: unknown error" on a checkout

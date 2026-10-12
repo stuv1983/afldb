@@ -16,7 +16,7 @@
  * use Object.hasOwn, the same discipline the search specs already apply to
  * their own catalogues (isGridStatKey, isPlayerSort).
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { DATASETS, getDataset } from '@/lib/ingest/datasets';
 
@@ -98,6 +98,121 @@ describe('getRecordCategory', () => {
     // /records/constructor must reach notFound(), not render.
     for (const slug of INHERITED_KEYS) {
       expect(getRecordCategory(slug)).toBeNull();
+    }
+  });
+});
+
+/*
+ * AFLDB-ISSUE-281: the public match-log and draft sort keys. The guards used
+ * `in`, which admits an inherited key; the admitted value is a function, and
+ * its source text was interpolated into ORDER BY through sql.unsafe, so
+ * `?sort=constructor` turned the page into a PostgreSQL syntax error instead
+ * of the default order.
+ *
+ * The queries are exercised against a recording stand-in for @/db/client, so
+ * the ORDER BY each one would send can be read without a database. doMock
+ * applies only to modules loaded after it, so records.ts above keeps the real
+ * (lazily connecting) client and its "before attempting SQL" case stays strict.
+ */
+type Recorded = { strings: readonly string[]; values: unknown[] };
+const recordedQueries: Recorded[] = [];
+
+function fakeFragment(strings: readonly string[], values: unknown[]) {
+  const fragment: Recorded & PromiseLike<unknown[]> = {
+    strings,
+    values,
+    // One row with a window total, so each query returns after its first statement.
+    then: (resolve, reject) => Promise.resolve([{ total: '1' }]).then(resolve, reject),
+  };
+  return fragment;
+}
+
+const fakeSql = Object.assign(
+  (strings: TemplateStringsArray, ...values: unknown[]) => {
+    const fragment = fakeFragment(strings, values);
+    recordedQueries.push(fragment);
+    return fragment;
+  },
+  { unsafe: (text: string) => ({ unsafeText: text }) },
+);
+
+function render(value: unknown): string {
+  if (value && typeof value === 'object' && 'unsafeText' in value) return String(value.unsafeText);
+  if (value && typeof value === 'object' && 'strings' in value && 'values' in value) {
+    const { strings, values } = value as Recorded;
+    return strings.reduce((text, part, i) => text + part + (i < values.length ? render(values[i]) : ''), '');
+  }
+  return '$?';
+}
+
+/** The ORDER BY clause of the last top-level statement, whitespace collapsed. */
+function lastOrderBy(): string {
+  const text = render(recordedQueries.at(-1)).replace(/\s+/g, ' ');
+  const match = /ORDER BY (.*?) LIMIT /.exec(text);
+  if (!match) throw new Error(`no ORDER BY in: ${text}`);
+  return match[1];
+}
+
+vi.doMock('@/db/client', () => ({ sql: fakeSql }));
+const { PLAYER_MATCH_SORTS, getPlayerMatches, isPlayerMatchSort, isPlayerMatchSortDir } = await import(
+  '@/db/queries/players'
+);
+const { DRAFT_SORTS, isDraftSort, isDraftSortDir, listDraftPicks } = await import('@/db/queries/draft');
+
+describe('isPlayerMatchSort and isDraftSort', () => {
+  it('accept every declared sort key', () => {
+    expect(Object.keys(PLAYER_MATCH_SORTS).length).toBeGreaterThan(0);
+    for (const key of Object.keys(PLAYER_MATCH_SORTS)) expect(isPlayerMatchSort(key)).toBe(true);
+    expect(Object.keys(DRAFT_SORTS).length).toBeGreaterThan(0);
+    for (const key of Object.keys(DRAFT_SORTS)) expect(isDraftSort(key)).toBe(true);
+  });
+
+  it('refuse inherited Object properties', () => {
+    for (const key of INHERITED_KEYS) {
+      expect(isPlayerMatchSort(key)).toBe(false);
+      expect(isDraftSort(key)).toBe(false);
+    }
+  });
+
+  it('refuse absent, empty, unknown and case-variant keys', () => {
+    for (const key of [undefined, '', 'nope', 'DATE', ' g']) expect(isPlayerMatchSort(key)).toBe(false);
+    for (const key of [undefined, '', 'nope', 'PICK', ' year']) expect(isDraftSort(key)).toBe(false);
+  });
+});
+
+describe('match-log and draft ORDER BY', () => {
+  const PLAYER_DEFAULT = 'm.match_date DESC, m.id DESC';
+  const DRAFT_DEFAULT = 'dp.draft_year DESC, dp.pick_number NULLS LAST';
+  const draftFilters = { page: 1, pageSize: 50 };
+
+  it('uses the declared column for a valid sort key and direction', async () => {
+    await getPlayerMatches(1, { limit: 10, offset: 0, sort: 'g', dir: 'asc' });
+    expect(lastOrderBy()).toBe(`s.goals ASC NULLS LAST, ${PLAYER_DEFAULT}`);
+    await listDraftPicks({ ...draftFilters, sort: 'pick', dir: 'desc' });
+    expect(lastOrderBy()).toBe(`dp.pick_number DESC NULLS LAST, ${DRAFT_DEFAULT}`);
+  });
+
+  it('falls back to the default order for constructor and toString', async () => {
+    for (const sort of ['constructor', 'toString']) {
+      for (const dir of ['asc', 'desc']) {
+        await getPlayerMatches(1, { limit: 10, offset: 0, sort, dir });
+        expect(lastOrderBy()).toBe(PLAYER_DEFAULT);
+        await listDraftPicks({ ...draftFilters, sort, dir });
+        expect(lastOrderBy()).toBe(DRAFT_DEFAULT);
+      }
+    }
+  });
+
+  it('keeps the existing fallback for an unknown key, a missing key or an invalid direction', async () => {
+    expect(isPlayerMatchSortDir('up')).toBe(false);
+    expect(isDraftSortDir(undefined)).toBe(false);
+    for (const [sort, dir] of [['nope', 'asc'], [undefined, 'asc'], ['g', 'up'], ['g', undefined]] as const) {
+      await getPlayerMatches(1, { limit: 10, offset: 0, sort, dir });
+      expect(lastOrderBy()).toBe(PLAYER_DEFAULT);
+    }
+    for (const [sort, dir] of [['nope', 'asc'], [undefined, 'asc'], ['pick', 'up'], ['pick', undefined]] as const) {
+      await listDraftPicks({ ...draftFilters, sort, dir });
+      expect(lastOrderBy()).toBe(DRAFT_DEFAULT);
     }
   });
 });

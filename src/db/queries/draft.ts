@@ -48,7 +48,7 @@ export const DRAFT_SORTS: Record<string, string> = {
 };
 
 export function isDraftSort(s: string | undefined): s is keyof typeof DRAFT_SORTS {
-  return s !== undefined && s in DRAFT_SORTS;
+  return s !== undefined && Object.hasOwn(DRAFT_SORTS, s);
 }
 
 export function isDraftSortDir(d: string | undefined): d is 'asc' | 'desc' {

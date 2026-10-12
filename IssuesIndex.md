@@ -517,8 +517,11 @@
 
 ### AFLDB-ISSUE-281 — Two public list pages fail on a sort key that names an inherited object property
 - **Severity:** Low. **Area:** public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts`. **State:** Open
-  (2026-10-08), F-016, reproduced by the review (W5); imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-281.md`. **Next action:** implementation (trivial).
+  (2026-10-08), F-016, reproduced by the review (W5); imported 2026-10-10. **Implemented 2026-10-12** in batch worktree
+  `afldb-batch-315-281-312-288` (base `80f86c39`): `Object.hasOwn` in both guards; DB-free 14/14. **Committed locally;
+  merge pending** (2026-10-12, its own commit on `opus/batch-315-281-312-288`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-281.md` §17. **Next action:** merge/DEV deploy after
+  ISSUE-274's first-nightly evidence; read-only DEV smoke; then close DEV-scoped (PROD behind the ISSUE-265 hold).
 
 ### AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
 - **Severity:** Low. **Area:** admin awards / special records / revalidation. **State:** Open (2026-10-08), F-017; imported 2026-10-10.

@@ -617,7 +617,7 @@ export const PLAYER_MATCH_SORTS: Record<string, string> = {
 };
 
 export function isPlayerMatchSort(s: string | undefined): s is keyof typeof PLAYER_MATCH_SORTS {
-  return s !== undefined && s in PLAYER_MATCH_SORTS;
+  return s !== undefined && Object.hasOwn(PLAYER_MATCH_SORTS, s);
 }
 export function isPlayerMatchSortDir(d: string | undefined): d is 'asc' | 'desc' {
   return d === 'asc' || d === 'desc';
