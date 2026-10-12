@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 52 (ISSUE-315, a test-maintenance finding registered 2026-10-12 from the ISSUE-274 validation, is the 52nd)
+**Open issues:** 50 (ISSUE-229, ISSUE-265–270 and 43 of the 44 review findings ISSUE-271–314; ISSUE-312 and ISSUE-315 were resolved on 2026-10-13, merge-scoped, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -32,14 +32,14 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-278 | The destructive `db:test:rebuild` reset never asserts which database it is connected to | Medium (review graded High; regraded by the review's main session) | Database tooling / wrong-target safety — `tools/db/rebuild-test.ts` | Open (2026-10-08); review F-013, missing assertion code-proven, libpq trigger not executed; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-278.md` | Fix (1), optionally (2), then tests; review gating note: before the next `db:test:rebuild`; H-278-1 open |
 | AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | Code fix plus test update, before search indexing is enabled |
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
-| AFLDB-ISSUE-281 | Two public list pages fail on a sort key that names an inherited object property | Low | Public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts` | Open (2026-10-08); review F-016, reproduced DB-free (W5); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-281.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288`, DB-free 14/14; committed locally; merge pending | Merge and DEV smoke after ISSUE-274 first nightly; then close DEV-scoped (PROD behind ISSUE-265 hold) |
+| AFLDB-ISSUE-281 | Two public list pages fail on a sort key that names an inherited object property | Low | Public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts` | Open (2026-10-08); review F-016, reproduced DB-free (W5); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-281.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288`, DB-free 14/14; merged to local `main` `01976be7` 2026-10-13 (not pushed, not deployed) | DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33) and DEV smoke; then close DEV-scoped (PROD behind ISSUE-265 hold) |
 | AFLDB-ISSUE-282 | Replace actions revalidate only the replaced row's public pages | Low | Admin awards / special records / revalidation — `admin-awards.ts`, `admin-special-records.ts` | Open (2026-10-08); review F-017, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-282.md` | Implementation, grouped with ISSUE-283 |
 | AFLDB-ISSUE-283 | The administrative note is not recorded on creation audit rows | Low | Admin awards / special records / audit trail | Open (2026-10-08); review F-018, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-283.md` | Implementation, grouped with ISSUE-282 |
 | AFLDB-ISSUE-284 | Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish | Low | Admin Brownlow — `src/db/queries/admin-brownlow.ts` | Open (2026-10-08); review F-019, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-284.md` | Implementation |
 | AFLDB-ISSUE-285 | Award Replace panel cannot give the duplicate confirmation its action requires | Low | Admin awards UI — `src/app/admin/awards/ReplacePanel.tsx` | Open (2026-10-08); review F-020, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-285.md` | Implementation |
 | AFLDB-ISSUE-286 | Hall of Fame legend and removal years are not bounded server-side | Low | Admin awards / Hall of Fame validation | Open (2026-10-08); review F-021, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-286.md` | Implementation |
 | AFLDB-ISSUE-287 | Source-owned draft pick `null_pick_number` confirmation is unreachable | Low | Admin draft UI — `src/app/admin/draft/SourceFieldsPanel.tsx` | Open (2026-10-08); review F-022, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-287.md` | Implementation |
-| AFLDB-ISSUE-288 | `createCoach` casts an unvalidated `dob` outside its error handling | Low | Admin coaches — `src/db/queries/admin-coaches.ts` | Open (2026-10-08); review F-023, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-288.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (r2 correction pass: Gregorian check without `Date.UTC`, year 0000 refused), DB-free 25/25; `afldb_test` `-t "AFLDB-ISSUE-288"` PASSED 2026-10-12 (2/2: the `createCoach` and the `saveCoachMetadata` refusal case; census clean before/after; runbook §17.7); committed locally; merge pending | Merge and DEV smoke after ISSUE-274 first nightly; then close DEV-scoped (PROD behind ISSUE-265 hold) |
+| AFLDB-ISSUE-288 | `createCoach` casts an unvalidated `dob` outside its error handling | Low | Admin coaches — `src/db/queries/admin-coaches.ts` | Open (2026-10-08); review F-023, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-288.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (r2 correction pass: Gregorian check without `Date.UTC`, year 0000 refused), DB-free 25/25; `afldb_test` `-t "AFLDB-ISSUE-288"` PASSED 2026-10-12 (2/2: the `createCoach` and the `saveCoachMetadata` refusal case; census clean before/after; runbook §17.7); merged to local `main` `01976be7` 2026-10-13 (not pushed, not deployed) | DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33) and DEV smoke; then close DEV-scoped (PROD behind ISSUE-265 hold) |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-290 | Manual draft selections accept out-of-range age, height, weight and pick number | Low | Admin draft / validation | Open (2026-10-08); review F-025, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-290.md` | Implementation |
 | AFLDB-ISSUE-291 | Admin player creation persists unvalidated biographical fields | Low | Admin player creation — `src/db/queries/players.ts` (`createPlayerInTransaction`) | Open (2026-10-08); review F-026, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-291.md` | Implementation |
@@ -63,10 +63,10 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-309 | Multi-target player-link actions stop at the first failure after earlier targets committed | Low | Admin player links — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-044, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-309.md` | Implementation, with ISSUE-308 and ISSUE-311 |
 | AFLDB-ISSUE-310 | AFL API link path derives the stable player identity by a different rule from the forward classifier | Low | AFL API identity / adjudication ledger — `src/db/queries/afl-api-player-links.ts` | Open (2026-10-08); review F-045, divergence code-proven, trigger collation-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-310.md` | Implementation; open question: DEV/PROD collation (operator-run) |
 | AFLDB-ISSUE-311 | Activity audit after a committed player-link mutation is unwrapped or silent | Low | Admin player links / activity audit | Open (2026-10-08); review F-046, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-311.md` | Implementation, with ISSUE-309 |
-| AFLDB-ISSUE-312 | Migration safety scan fails on a detached HEAD with a misleading error | Low | Database tooling / migrations / preflight — `tools/db/migration-safety.ts` | Open (2026-10-08); review F-047, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-312.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (r2: detached only for exit 1 with empty stdout and stderr), DB-free 37/37 with disposable repositories; committed locally; merge pending | Merge after ISSUE-274 first nightly; close once merged |
 | AFLDB-ISSUE-313 | Database tooling passes the owner DSN, password included, on the `psql` command line | Low | Database tooling / credential handling — `tools/db/psql.ts` | Open (2026-10-08); review F-048, code-proven, exposure host-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-313.md` | Implementation |
 | AFLDB-ISSUE-314 | `prepare-promotion-source --apply` checks `--record-out` only after committing its writes | Low | Database tooling / production promotion preparation — `tools/db/prepare-promotion-source.ts` | Open (2026-10-08); review F-049, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-314.md` | Implementation |
-| AFLDB-ISSUE-315 | The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL | Low | Test maintenance — `tests/integration/settle-afltables.test.ts` (`executableStatements`, `:1622-1654`); `src/lib/acquisition/settle-afltables.ts:1918-1919` | Open (2026-10-12); found by ISSUE-274 R2, reproduced DB-free on `HEAD` and the working tree; evidence in `issues/open/AFLDB-ISSUE-274.md` §27.1; extractor fixed 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (r2: TypeScript-parser extraction of `tx`/`sql` tagged templates, 31 statements = 33 less the two prose bodies), DB-free 14/14; `afldb_test` `-t "obligation O1"` PASSED 2026-10-12 (3/3: two static checks plus the sentinel case = fixture presence only; census clean, 12 S6 batches preserved); committed locally; merge pending | Merge after ISSUE-274 first nightly; close once merged |
+
+**AFLDB-ISSUE-312 and AFLDB-ISSUE-315 resolved 2026-10-13** (merge-scoped: implementation commits `5d277ddd` (312) and `9c279f5c` (315), reconciled with `main` `762b46b8` by merge `01976be7` and fast-forwarded onto local `main`; **not pushed, not deployed**). ISSUE-312: `currentBranchRef` in `tools/db/migration-safety.ts` accepts a detached HEAD only for `git symbolic-ref -q HEAD` exit 1 with empty stdout and stderr, and every other failure still throws; DB-free `tests/workflow-preflight.test.ts` 37/37 on disposable repositories, with mutation checks. ISSUE-315: the ISSUE-099 O1 template extractor is now `tests/integration/executable-statements.ts` (TypeScript parser, `tx`/`sql` tagged templates, 31 statements = the historical 33 less two prose bodies), DB-free `tests/executable-statements.test.ts` 14/14, and `afldb_test` `settle-afltables.test.ts -t "obligation O1"` 3/3 (12 Oct 2026, exit 0, census clean). **Accepted limits:** no real detached-checkout `preflight`/`db:migrate` run (optional, ISSUE-312 runbook §17.5); the whole `settle-afltables` file was not re-run after the fix (ISSUE-274 R2's exit 1 stands as recorded history); the O1 sentinel case is fixture presence only; the push to `origin` is the operator's and has not happened. Integration, 13 Oct 2026: `npm run typecheck` exit 0 on the merged tree; `merge:ready` BLOCKED by exactly one blocker (the nine untracked `.agents/skills` files in the primary checkout, an owner exception for those paths only) plus the standing missing-readiness-block warning; merge-mode `preflight` BLOCKED by the same nine paths only. Full record: `issues/closed/AFLDB-ISSUE-312.md` §18 and the ISSUE-315 entry in `issues.md`.
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator-run
 standalone promotion-gate reads on DEV and PROD, graded offline; operator decision D-233-4). Resolved as **AFL API
@@ -50118,10 +50118,8 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   14/14 (6 new: valid keys, inherited keys, and the ORDER BY each query would send for valid, `constructor`/`toString`,
   unknown and invalid-direction input); the old guards fail 2 of them. Typecheck clean; no lint error in a changed file.
   Runbook §17.
-- **Committed locally; merge pending (2026-10-12).** Operator-reviewed; its own local commit on
-  `opus/batch-315-281-312-288` (the verified batch-r2 bytes); not merged, pushed or deployed.
-- **Next action.** Merge and DEV deploy after ISSUE-274's first-nightly evidence;
-  read-only DEV smoke (runbook §17.5); then close DEV-scoped, PROD pending behind the ISSUE-265 hold.
+- **Merged to local `main` (2026-10-13).** Its own local commit `23809fce` on `opus/batch-315-281-312-288`; reconciled with `main` `762b46b8` by merge `01976be7` (code, test and runbook blobs unchanged by the merge) and fast-forwarded onto local `main`; not pushed or deployed.
+- **Next action.** DEV deploy (the ISSUE-274 first-nightly prerequisite is met: runbook 274 §33); read-only DEV smoke (runbook §17.5); then close DEV-scoped, PROD pending behind the ISSUE-265 hold.
 
 ## AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
 
@@ -50199,11 +50197,8 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   gate 9 importer-replay case not run). Census before and after: every fixture selector 0, test trigger and function
   absent, season 2091 absent; shared `auth_users`/`sources` whole-row hashes, the 12 historical S6 batches and every
   recorded total unchanged; four fixture sequences +1. Runbook §17.7.
-- **Committed locally; merge pending (2026-10-12).** Operator-reviewed; its own local commit on
-  `opus/batch-315-281-312-288` (the verified batch-r2 bytes); not merged, pushed or deployed.
-- **Next action.** Merge and
-  DEV deploy after ISSUE-274's first-nightly evidence; DEV refusal smoke; then close DEV-scoped, PROD pending behind the
-  ISSUE-265 hold.
+- **Merged to local `main` (2026-10-13).** Its own local commit `44ea8ce2` on `opus/batch-315-281-312-288`; reconciled with `main` `762b46b8` by merge `01976be7` (code, test and runbook blobs unchanged by the merge) and fast-forwarded onto local `main`; not pushed or deployed.
+- **Next action.** DEV deploy (the ISSUE-274 first-nightly prerequisite is met: runbook 274 §33); DEV refusal smoke; then close DEV-scoped, PROD pending behind the ISSUE-265 hold.
 
 ## AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 
@@ -50401,9 +50396,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-312 — Migration safety scan fails on a detached HEAD with a misleading error
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** database tooling / migrations / preflight. Key files:
+- **Status:** Resolved 2026-10-13 (merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** database tooling / migrations / preflight. Key files:
   `tools/db/migration-safety.ts`, `tools/db/migrate.ts`, `tools/dev/preflight.ts`. **Runbook:**
-  `issues/open/AFLDB-ISSUE-312.md`.
+  `issues/closed/AFLDB-ISSUE-312.md`.
 - **Origin.** Review F-047 (R6a-F01) at `20a7a4bb`. Code-proven.
 - **Implementation (2026-10-12, uncommitted; batch worktree `afldb-batch-315-281-312-288`, base `80f86c39`).**
   `currentBranchRef` treats `git symbolic-ref -q HEAD` exit 1 with empty stderr as a detached HEAD (no symbolic ref
@@ -50415,10 +50410,12 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   **both** stdout and stderr empty; exit 1 with output on stdout throws `git symbolic-ref failed: unexpected output on
   exit 1: …`. That case was added to the genuine-failure test; 37/37; with r1's stderr-only condition restored the test
   fails. Runbook §17.1-§17.3.
-- **Committed locally; merge pending (2026-10-12).** Operator-reviewed; its own local commit on
-  `opus/batch-315-281-312-288` (the verified batch-r2 bytes); not merged or pushed.
-- **Next action.** Merge with the batch after ISSUE-274's first-nightly evidence;
-  close once merged.
+- **Merged to local `main` and RESOLVED (2026-10-13).** Its own local commit `5d277ddd` on `opus/batch-315-281-312-288`; reconciled with `main` `762b46b8` by merge `01976be7` (blobs unchanged by the merge) and fast-forwarded onto local `main`; not pushed or deployed. Closed under the documented merge-scoped criterion (runbook §17.5 item 3; closure record in `issues/closed/AFLDB-ISSUE-312.md` §18). The push (§17.5 item 2) is the operator's and has not happened.
+- **Root cause.** `relevantRefs` called `git symbolic-ref -q HEAD` through `requireGit`, which throws on any non-zero exit; on a detached HEAD that command exits 1 silently, so the scan threw `git symbolic-ref failed: unknown error` and migrate/preflight refused with a misleading message.
+- **Fix.** `currentBranchRef` returns `null` only for exit 1 with both stdout and stderr empty; everything else (exit 128, a message, output on exit 1, git not running, now reported as status -1) still throws.
+- **Validation.** `tests/workflow-preflight.test.ts` 37/37 DB-free (3 new, disposable local repositories plus a pass-through `spawnSync` stub); mutation checks both ways; typecheck clean, and `npm run typecheck` exit 0 on the merged tree (13 Oct 2026). No database or host involved.
+- **Follow-up.** None required. Optional, not a gate: `preflight -- --mode read-only` from a real scratch `git worktree add --detach` checkout (runbook §17.5).
+- **Next action.** None.
 
 ## AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
 
@@ -50437,7 +50434,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-315 — The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL
 
-- **Status:** Open (2026-10-12). **Severity:** Low (test maintenance; no production behaviour is affected). **Area:** tests / settle. Key files:
+- **Status:** Resolved 2026-10-13 (merge-scoped; opened 2026-10-12). **Severity:** Low (test maintenance; no production behaviour is affected). **Area:** tests / settle. Key files:
   `tests/integration/settle-afltables.test.ts` (`executableStatements`, `describe('obligation O1')`, `:1612-1654`); `src/lib/acquisition/settle-afltables.ts:1918-1919`.
   **Runbook:** none; evidence is in `issues/open/AFLDB-ISSUE-274.md` §26.3 and §27.1.
 - **Origin.** Found by the owner-authorised whole-file run R2 of ISSUE-274 on `afldb_test` (2026-10-12), which failed at `:1652`:
@@ -50474,10 +50471,12 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   **14/14**, including the three required regressions — the regex prefix followed by ``tx`SELECT 1` `` (found), the same prefix followed by ``tx`DELETE FROM t` `` (found, so O1
   would catch it), and ``tx`DELETE FROM t` `` inside single-, double-quoted and untagged-template text (not a statement). Mutation check: with r1's lexer restored, **4 failed**
   (both regex-prefix cases, the quoted-string case, the differential case); restored byte-identical. Typecheck exit 0; ESLint on every changed file, 0 errors.
-- **Committed locally; merge pending (2026-10-12).** Operator-reviewed; its own local commit on `opus/batch-315-281-312-288` (the verified batch-r2 bytes, with the
-  run record below); not merged or pushed.
-- **Next action.** Merge with the batch after ISSUE-274's first-nightly evidence; close once
-  merged (the O1 integration result is recorded below).
+- **Merged to local `main` and RESOLVED (2026-10-13).** Its own local commit `9c279f5c` on `opus/batch-315-281-312-288` (the verified batch-r2 bytes, with the run record below); reconciled with `main` `762b46b8` by merge `01976be7` (blobs unchanged by the merge) and fast-forwarded onto local `main`; not pushed or deployed. There is no separate runbook; this entry is the closure record.
+- **Root cause.** The O1 test's global regex treated any `tx`/`sql` followed by a backtick body as SQL, including two prose comment lines at `settle-afltables.ts:1918-1919` (added by `ad1fd595`, ISSUE-261), so the shape assertion rejected `— a recovered`. No production behaviour was affected.
+- **Fix.** The extractor reads `tx`/`sql` tagged templates with the TypeScript parser (`tests/integration/executable-statements.ts`); 31 statements (23 + 8 + 0); the pinned per-file counts are in DB-free `tests/executable-statements.test.ts` (14/14), which also guards against a statement being hidden after a regex literal. Settle source unchanged.
+- **Validation.** DB-free 14/14; `afldb_test` `settle-afltables.test.ts -t "obligation O1"` 3/3, exit 0, census clean (recorded below); `npm run typecheck` exit 0 on the merged tree (13 Oct 2026). The three real files the pins read are byte-identical on `main` `762b46b8` and in the batch.
+- **Follow-up.** Not done and not a gate: the whole `settle-afltables.test.ts` file was not re-run after the fix (ISSUE-274 R2's exit 1 stands as recorded history); the sentinel case is fixture presence only.
+- **Next action.** None.
 - **Plan correction (owner, 2026-10-12, before the run).** `s6_batches` is **not** a cleanup selector that must be 0: it counts the 12 historical `issue122-s6-cli` apply
   batches (`import_batches` 66–68, 325–327, 543–545, 639–641; see `issues/open/AFLDB-ISSUE-274.md` §26), which are preserved evidence that no `cleanup122` selector matches.
   Step 1's original wording ("`spine_099` through `s6_batches` = 0") would have refused a correct database. Corrected rule: every genuine selector = 0; the S6 batches are

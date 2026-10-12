@@ -15,13 +15,13 @@ commit.
 
 ## [Unreleased]
 
-### Public match-log and draft pages ignore a sort key that names an inherited object property (AFLDB-ISSUE-281; DB-free validated; committed locally; merge pending; not yet on DEV or PROD; issue open) - 12 October 2026
+### Public match-log and draft pages ignore a sort key that names an inherited object property (AFLDB-ISSUE-281; DB-free validated; merged to local `main` `01976be7` 13 October 2026, not pushed; not yet on DEV or PROD; issue open) - 12 October 2026
 
 - `/players/<slug>/matches?sort=constructor` and `/draft/<year>?sort=toString` (and the other `Object.prototype` names)
   now fall back to the default order instead of sending invalid SQL and rendering the error page. The two sort guards use
   `Object.hasOwn`, like the other sort maps.
 
-### Coach date of birth is checked as a real date before any SQL (AFLDB-ISSUE-288; DB-free validated; integration cases passed on `afldb_test`; committed locally; merge pending; not yet on DEV or PROD; issue open) - 12 October 2026
+### Coach date of birth is checked as a real date before any SQL (AFLDB-ISSUE-288; DB-free validated; integration cases passed on `afldb_test`; merged to local `main` `01976be7` 13 October 2026, not pushed; not yet on DEV or PROD; issue open) - 12 October 2026
 
 - Creating a coach or saving coach metadata with an impossible date of birth (`2026-02-30`, `2023-02-29`, `31/12/1980`)
   returns "Date of birth "…" is not a real date. Use YYYY-MM-DD." instead of an uncaught Server Action error or a raw
@@ -29,7 +29,7 @@ commit.
   stored as `2027-02-03`. Every year 0001-9999 is checked on its own calendar; year 0000, which PostgreSQL rejects, is
   refused.
 
-### Migration safety scan accepts a detached HEAD (AFLDB-ISSUE-312; DB-free validated; committed locally; merge pending; issue open) - 12 October 2026
+### Migration safety scan accepts a detached HEAD (AFLDB-ISSUE-312; DB-free validated; merged to local `main` `01976be7` 13 October 2026, not pushed; issue resolved) - 12 October 2026
 
 - `db:migrate`, `preflight` and `merge:ready` no longer fail with "git symbolic-ref failed: unknown error" on a checkout
   pinned to a SHA or tag or a `--detach` worktree. The scan then covers the base ref, `main`, `origin/main`, every

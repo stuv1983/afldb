@@ -3,7 +3,7 @@
 ## 0. Status
 
 - **Status:** Open (2026-10-08). **Implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (branch
-  `opus/batch-315-281-312-288`, base `80f86c39`); DB-free validated; committed locally; merge pending; not on DEV or PROD** (§17).
+  `opus/batch-315-281-312-288`, base `80f86c39`); DB-free validated; committed as `23809fce`; merged to local `main` by `01976be7` on 2026-10-13 (not pushed); not on DEV or PROD** (§17).
 - **Severity:** Low. **Area:** public site / query sort allowlists.
 - **Key files:** `src/db/queries/players.ts` (`isPlayerMatchSort`), `src/db/queries/draft.ts` (`isDraftSort`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-016; main-session partition R1b-F01).
@@ -114,8 +114,8 @@ No `afldb_test` check (not needed: SQL unchanged for valid keys, and the fallbac
 ### 17.5 Remaining criteria and next action
 
 1. **Done 2026-10-12:** operator review of the batch diff, then a separate local commit for this issue (with its tracking
-   hunks). Committed locally; merge pending.
-2. Merge/push and DEV deploy, **held until ISSUE-274's first-nightly evidence is captured**.
+   hunks). Committed locally (`23809fce`); merged to local main 2026-10-13 (`01976be7`, not pushed).
+2. Merge/push and DEV deploy, **held until ISSUE-274's first-nightly evidence is captured** (captured: ISSUE-274 runbook §33). **Merged to local main 2026-10-13 (merge `01976be7`); the push and the DEV deploy have not happened.**
 3. DEV smoke (signed in; DEV's beta gate redirects anonymous requests): `/players/<slug>/matches?sort=constructor&dir=asc`
    and `?sort=toString&dir=desc`, `/draft/<year>?sort=toString&dir=desc` and `?sort=constructor&dir=asc` render with the
    default order and no error page; `?sort=g&dir=desc` and `/draft/<year>?sort=pick&dir=asc` still sort; no PostgreSQL

@@ -2,9 +2,9 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). **Implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (branch
-  `opus/batch-315-281-312-288`, base `80f86c39`); DB-free validated with disposable local repositories; committed locally; merge pending**
-  (§17).
+- **Status:** **RESOLVED 2026-10-13 (merge-scoped).** Implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (branch
+  `opus/batch-315-281-312-288`, base `80f86c39`) as commit `5d277ddd`; DB-free validated with disposable local repositories; merged to local `main` by `01976be7`
+  (not pushed or deployed) (§17, §18).
 - **Severity:** Low. **Area:** database tooling / migrations / preflight.
 - **Key files:** `tools/db/migration-safety.ts` (`relevantRefs`, `requireGit`), `tools/db/migrate.ts`, `tools/dev/preflight.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-047; partition note R6a-F01).
@@ -73,7 +73,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Superseded by §17.5.
+~~Implementation.~~ Superseded by §17.5 and closed in §18.
 
 ## 17. Implementation and DB-free validation (2026-10-12, batch with ISSUE-315/281/288; solo, no agents)
 
@@ -128,7 +128,28 @@ applicable beyond the deploy itself (DEV deploys from a branch, `deploy/sync-dev
 1. **Done 2026-10-12:** operator review of the batch diff, then a separate local commit for this issue. Committed
    locally; merge pending.
 2. Merge to main (the merge requirement for closure) and push, with the batch, **after ISSUE-274's first-nightly evidence
-   is captured**.
-3. Close once merged with the DB-free validation above recorded. Optional operator evidence: from a scratch
+   is captured** (captured: ISSUE-274 runbook §33). **Merged to local main 2026-10-13 (§18); the push is the operator's and has not happened.**
+3. Close once merged with the DB-free validation above recorded. **Done 2026-10-13, §18.** Optional operator evidence: from a scratch
    `git worktree add --detach <path> main`, `npm run preflight -- --mode read-only` no longer reports the Git inventory
    failure (only if the operator accepts that command's read-only database probe).
+
+## 18. Closure record (2026-10-13; merged locally, resolved)
+
+Owner-authorised local integration and closure of ISSUE-312 and ISSUE-315 (solo, no agents). No push, deployment, test rerun, capture, service or timer change, or host/database contact.
+
+### 18.1 Integration
+
+- Pinned batch `44ea8ce2fb9d6684e68b0c59a304b985a169d9ba` and pinned main `762b46b83d3ee0327c0abbd45c9f3fe3fbf4790b` (fresh `origin/main` equal). Merge base `80f86c39`.
+- `git merge --no-ff --no-commit 762b46b8`: `CHANGELOG.md` was the only conflicted path. Resolution: the batch's 281/288/312 entries first, then main's complete ISSUE-276 entry and main's updated ISSUE-274 heading and body; the batch's stale ISSUE-274 heading and all markers removed. `IssuesIndex.md` and `issues.md` merged automatically.
+- Merge commit `01976be7` (parents `44ea8ce2`, `762b46b8`; the four implementation commits `5d277ddd`, `9c279f5c`, `23809fce`, `44ea8ce2` preserved). Against pinned main exactly the 17 reviewed batch files differ; all 14 non-tracking blobs equal the batch's; main's ISSUE-274/276 changes are preserved byte-for-byte. The main checkout was then fast-forwarded to the merge commit.
+
+### 18.2 Gates
+
+- `npm run typecheck` on the combined tree: exit 0.
+- `npm run merge:ready -- --issue 312` with the exact 17-file whitelist: branch, clean worktree, main = origin/main, ahead 5 / behind 0, migration parity and declared scope (17 changed, 0 unexpected) PASS; one FAIL, the primary checkout's nine untracked `.agents/skills` files (owner exception for those nine paths only; preserved, sizes and hashes re-checked before and after); one WARN, this runbook has no `afldb-merge-readiness` block (standing). Result: BLOCKED (1 blocker, 1 warning) = the excepted blocker plus the warning, nothing else.
+- `npm run preflight -- --mode merge` from the primary checkout (no `--dsn-env`, so no database contact): the same nine-path cleanliness FAIL only.
+- Evidence: `D:\tmp\batch-315-281-312-288\integration-20261013\` (authorisation, manifest, step logs).
+
+### 18.3 Closure
+
+Closed under §17.5 item 3 (merged, DB-free validation recorded). The retained validation is unchanged: 37/37 and the two mutation checks; the merge changed none of this issue's code or test blobs. Limits: the push is not done; no real detached-checkout `preflight` or `db:migrate` run (optional, §17.5). If the merge is abandoned before it is pushed, reopen this issue.

@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 52 (ISSUE-229, ISSUE-265–270, the 44 review findings ISSUE-271–314 registered on 2026-10-10, and ISSUE-315 registered on 2026-10-12)
+**Open issues:** 50 (ISSUE-229, ISSUE-265–270, and the 43 review findings ISSUE-271–314 other than ISSUE-312, registered on 2026-10-10; ISSUE-312 and ISSUE-315 were resolved on 2026-10-13)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -528,10 +528,10 @@
 ### AFLDB-ISSUE-281 — Two public list pages fail on a sort key that names an inherited object property
 - **Severity:** Low. **Area:** public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts`. **State:** Open
   (2026-10-08), F-016, reproduced by the review (W5); imported 2026-10-10. **Implemented 2026-10-12** in batch worktree
-  `afldb-batch-315-281-312-288` (base `80f86c39`): `Object.hasOwn` in both guards; DB-free 14/14. **Committed locally;
-  merge pending** (2026-10-12, its own commit on `opus/batch-315-281-312-288`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-281.md` §17. **Next action:** merge/DEV deploy after
-  ISSUE-274's first-nightly evidence; read-only DEV smoke; then close DEV-scoped (PROD behind the ISSUE-265 hold).
+  `afldb-batch-315-281-312-288` (base `80f86c39`): `Object.hasOwn` in both guards; DB-free 14/14. **Merged to local `main`**
+  (2026-10-13, commit `23809fce`; merge `01976be7`; not pushed or deployed).
+- **Runbook:** `issues/open/AFLDB-ISSUE-281.md` §17. **Next action:** DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33);
+  read-only DEV smoke; then close DEV-scoped (PROD behind the ISSUE-265 hold).
 
 ### AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
 - **Severity:** Low. **Area:** admin awards / special records / revalidation. **State:** Open (2026-10-08), F-017; imported 2026-10-10.
@@ -566,9 +566,9 @@
   real-date check before any SQL in both mutations (r2: Gregorian arithmetic without `Date.UTC`'s 0-99
   remap, year 0000 refused); DB-free 25/25; `afldb_test` `-t "AFLDB-ISSUE-288"` **passed 2026-10-12** (2/2 — the
   `createCoach` refusal case and the `saveCoachMetadata` refusal case; exit 0; census clean before/after, shared rows
-  unchanged; §17.7). **Committed locally; merge pending** (2026-10-12, its own commit on `opus/batch-315-281-312-288`).
+  unchanged; §17.7). **Merged to local `main`** (2026-10-13, commit `44ea8ce2`; merge `01976be7`; not pushed or deployed).
 - **Runbook:** `issues/open/AFLDB-ISSUE-288.md` §17. **Next action:**
-  merge/DEV deploy after ISSUE-274's first-nightly evidence; DEV refusal smoke; then close DEV-scoped
+  DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33); DEV refusal smoke; then close DEV-scoped
   (PROD behind the ISSUE-265 hold).
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
@@ -688,16 +688,6 @@
 - **Severity:** Low. **Area:** admin player links / activity audit. **State:** Open (2026-10-08), F-046; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-311.md`. **Next action:** implementation, with ISSUE-309.
 
-### AFLDB-ISSUE-312 — Migration safety scan fails on a detached HEAD with a misleading error
-- **Severity:** Low. **Area:** DB tooling / migrations / preflight — `tools/db/migration-safety.ts`. **State:** Open
-  (2026-10-08), F-047; imported 2026-10-10. **Implemented 2026-10-12** in batch worktree `afldb-batch-315-281-312-288`
-  (base `80f86c39`): detached HEAD accepted only for exit 1 with empty stdout and stderr, genuine failures
-  still throw; DB-free 37/37 on
-  disposable repositories. **Committed locally; merge pending** (2026-10-12, its own commit on
-  `opus/batch-315-281-312-288`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-312.md` §17. **Next action:** merge after ISSUE-274's
-  first-nightly evidence; close once merged.
-
 ### AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
 - **Severity:** Low. **Area:** DB tooling / credential handling — `tools/db/psql.ts`. **State:** Open (2026-10-08), F-048;
   imported 2026-10-10.
@@ -708,16 +698,7 @@
   (2026-10-08), F-049; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-314.md`. **Next action:** implementation.
 
-### AFLDB-ISSUE-315 — The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL
-- **Severity:** Low. **Area:** test maintenance — `tests/integration/settle-afltables.test.ts` (`executableStatements`, `:1612-1654`); the comment at `src/lib/acquisition/settle-afltables.ts:1918-1919`.
-- **State:** Open (2026-10-12), found by ISSUE-274 R2; the same failure reproduced DB-free on `HEAD` and the working tree (comment added by `ad1fd595`, ISSUE-261). No production behaviour affected.
-  **Fixed 2026-10-12** in batch worktree `afldb-batch-315-281-312-288` (base `80f86c39`; settle source unchanged): extractor in `tests/integration/executable-statements.ts` now reads
-  `tx`/`sql` tagged templates with the TypeScript parser (r2; r1's hand lexer could hide statements after a regex); 31 statements (the historical 33 less the two prose bodies),
-  four positive controls kept; DB-free `tests/executable-statements.test.ts` 14/14. `afldb_test` `settle-afltables.test.ts -t "obligation O1"` **passed 2026-10-12** (3/3,
-  exit 0: the two static O1 checks, statement extraction and no DELETE/TRUNCATE, plus the sentinel case, which is a fixture presence check only; census clean
-  before/after, the 12 historical S6 batches preserved). **Committed locally; merge pending** (2026-10-12, its own commit on `opus/batch-315-281-312-288`).
-- **Evidence:** `issues/open/AFLDB-ISSUE-274.md` §26.3, §27.1; implementation record, corrected `afldb_test` plan and result in `issues.md` (no separate runbook). **Next action:**
-  merge after ISSUE-274's first-nightly evidence; close once merged.
+**AFLDB-ISSUE-312 and AFLDB-ISSUE-315 resolved 2026-10-13** (merge-scoped; commits `5d277ddd` and `9c279f5c`, merge `01976be7` onto local `main`, not pushed or deployed). ISSUE-312: a detached HEAD no longer breaks the migration safety scan (DB-free 37/37). ISSUE-315: the O1 statement extractor uses the TypeScript parser (DB-free 14/14; `afldb_test` `-t "obligation O1"` 3/3). Limits and the integration gate results are in `issues.md` (resolved note and the ISSUE-315 entry) and `issues/closed/AFLDB-ISSUE-312.md` §18.
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
 decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an
