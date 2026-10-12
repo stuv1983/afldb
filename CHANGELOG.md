@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Migration safety scan accepts a detached HEAD (AFLDB-ISSUE-312; DB-free validated; committed locally; merge pending; issue open) - 12 October 2026
+
+- `db:migrate`, `preflight` and `merge:ready` no longer fail with "git symbolic-ref failed: unknown error" on a checkout
+  pinned to a SHA or tag or a `--detach` worktree. The scan then covers the base ref, `main`, `origin/main`, every
+  unmerged ref and every worktree; genuine Git failures, including any output on the detached-HEAD exit, still stop it.
+
 ### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; merged to main `6f99b58d` under a readiness exception; installed on DEV 12 October 2026 and accepted on synthetic fixtures, first nightly pending; not deployed to PROD, behind the ISSUE-265 hold; issue open) - 12 October 2026
 
 - **Match-row lock.** `applyCanonicalUnit` (`src/lib/acquisition/canonical-apply.ts`) takes `FOR NO KEY UPDATE` on the

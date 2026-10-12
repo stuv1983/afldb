@@ -63,7 +63,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-309 | Multi-target player-link actions stop at the first failure after earlier targets committed | Low | Admin player links — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-044, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-309.md` | Implementation, with ISSUE-308 and ISSUE-311 |
 | AFLDB-ISSUE-310 | AFL API link path derives the stable player identity by a different rule from the forward classifier | Low | AFL API identity / adjudication ledger — `src/db/queries/afl-api-player-links.ts` | Open (2026-10-08); review F-045, divergence code-proven, trigger collation-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-310.md` | Implementation; open question: DEV/PROD collation (operator-run) |
 | AFLDB-ISSUE-311 | Activity audit after a committed player-link mutation is unwrapped or silent | Low | Admin player links / activity audit | Open (2026-10-08); review F-046, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-311.md` | Implementation, with ISSUE-309 |
-| AFLDB-ISSUE-312 | Migration safety scan fails on a detached HEAD with a misleading error | Low | Database tooling / migrations / preflight — `tools/db/migration-safety.ts` | Open (2026-10-08); review F-047, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-312.md` | Implementation |
+| AFLDB-ISSUE-312 | Migration safety scan fails on a detached HEAD with a misleading error | Low | Database tooling / migrations / preflight — `tools/db/migration-safety.ts` | Open (2026-10-08); review F-047, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-312.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (r2: detached only for exit 1 with empty stdout and stderr), DB-free 37/37 with disposable repositories; committed locally; merge pending | Merge after ISSUE-274 first nightly; close once merged |
 | AFLDB-ISSUE-313 | Database tooling passes the owner DSN, password included, on the `psql` command line | Low | Database tooling / credential handling — `tools/db/psql.ts` | Open (2026-10-08); review F-048, code-proven, exposure host-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-313.md` | Implementation |
 | AFLDB-ISSUE-314 | `prepare-promotion-source --apply` checks `--record-out` only after committing its writes | Low | Database tooling / production promotion preparation — `tools/db/prepare-promotion-source.ts` | Open (2026-10-08); review F-049, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-314.md` | Implementation |
 | AFLDB-ISSUE-315 | The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL | Low | Test maintenance — `tests/integration/settle-afltables.test.ts` (`executableStatements`, `:1622-1654`); `src/lib/acquisition/settle-afltables.ts:1918-1919` | Open (2026-10-12); found by ISSUE-274 R2, reproduced DB-free on `HEAD` and the working tree; evidence in `issues/open/AFLDB-ISSUE-274.md` §27.1 | Tighten the extractor (or reword the comment), with a DB-free regression |
@@ -50331,7 +50331,21 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Status:** Open (2026-10-08). **Severity:** Low. **Area:** database tooling / migrations / preflight. Key files:
   `tools/db/migration-safety.ts`, `tools/db/migrate.ts`, `tools/dev/preflight.ts`. **Runbook:**
   `issues/open/AFLDB-ISSUE-312.md`.
-- **Origin.** Review F-047 (R6a-F01) at `20a7a4bb`. Code-proven. **Next action.** Implementation.
+- **Origin.** Review F-047 (R6a-F01) at `20a7a4bb`. Code-proven.
+- **Implementation (2026-10-12, uncommitted; batch worktree `afldb-batch-315-281-312-288`, base `80f86c39`).**
+  `currentBranchRef` treats `git symbolic-ref -q HEAD` exit 1 with empty stderr as a detached HEAD (no symbolic ref
+  scanned); exit 128, a message on stderr, or git not running still throw. `tests/workflow-preflight.test.ts` 37/37
+  (3 new, on disposable local repositories plus a pass-through `spawnSync` stub for the failure cases); the original call
+  fails both detached cases with `git symbolic-ref failed: unknown error`. Typecheck clean; no lint error in a changed
+  file. Runbook §17.
+- **Correction pass r2 (2026-10-12, same worktree, uncommitted).** A detached HEAD is now accepted only for exit 1 with
+  **both** stdout and stderr empty; exit 1 with output on stdout throws `git symbolic-ref failed: unexpected output on
+  exit 1: …`. That case was added to the genuine-failure test; 37/37; with r1's stderr-only condition restored the test
+  fails. Runbook §17.1-§17.3.
+- **Committed locally; merge pending (2026-10-12).** Operator-reviewed; its own local commit on
+  `opus/batch-315-281-312-288` (the verified batch-r2 bytes); not merged or pushed.
+- **Next action.** Merge with the batch after ISSUE-274's first-nightly evidence;
+  close once merged.
 
 ## AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
 

@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { computeChecksumRepresentations } from '../tools/db/migration-checksum';
 import {
+  collectMigrationSources,
   compareAppliedMigrations,
   compareMigrationSets,
   findMigrationConflicts,
@@ -39,6 +40,24 @@ import {
 } from '../tools/dev/preflight-core';
 import { runBootstrap } from '../tools/dev/bootstrap-worktree';
 import { runMergeReadiness } from '../tools/dev/merge-readiness';
+
+/*
+ * A pass-through spawnSync. A test may set `gitOverride` to answer one git invocation itself
+ * (AFLDB-ISSUE-312's genuine-failure cases); every other call, and every call while it is
+ * unset, reaches the real binary.
+ */
+type SpawnSyncResult = { status: number | null; stdout: string | null; stderr: string | null; error?: Error };
+const childProcess = vi.hoisted(() => ({
+  gitOverride: undefined as undefined | ((args: readonly string[]) => SpawnSyncResult | undefined),
+}));
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  const spawnSync = (command: string, args: readonly string[], options: object) => {
+    const answered = command === 'git' ? childProcess.gitOverride?.(args) : undefined;
+    return answered ?? actual.spawnSync(command, args, options);
+  };
+  return { ...actual, spawnSync };
+});
 
 function migration(name: string, contentId = name): MigrationEntry {
   return { name, contentId, checksum: computeChecksumRepresentations(`-- ${contentId}\n`) };
@@ -127,6 +146,7 @@ function commitReadyFeature(target: string, overrides = {}): void {
 }
 
 afterEach(() => {
+  childProcess.gitOverride = undefined;
   for (const root of scratch.splice(0)) {
     rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
   }
@@ -197,6 +217,68 @@ describe('migration collision preflight', () => {
     expect(findings.map((finding) => finding.code).sort()).toEqual([
       'checksum-mismatch', 'pending-migration', 'unknown-applied-migration',
     ]);
+  });
+});
+
+describe('AFLDB-ISSUE-312 migration source inventory on a detached HEAD', () => {
+  const refLabels = (root: string) => collectMigrationSources(root).sources
+    .map((entry) => entry.label).filter((label) => label.startsWith('ref:')).sort();
+
+  it('scans a detached HEAD with the base, main, origin/main and unmerged refs', () => {
+    const fixture = makeRepository();
+    addFeature(fixture.main, fixture.target);
+    // Attached: the checked-out branch is scanned even though it is merged into the base.
+    expect(refLabels(fixture.target)).toEqual([
+      'ref:refs/heads/codex/issue-145', 'ref:refs/heads/main', 'ref:refs/remotes/origin/main',
+    ]);
+
+    git(fixture.target, 'checkout', '--detach');
+    const collected = collectMigrationSources(fixture.target);
+    expect(collected.baseRef).toBe('refs/remotes/origin/main');
+    // Detached: no symbolic ref is added, and the merged branch is no longer reserved.
+    expect(refLabels(fixture.target)).toEqual(['ref:refs/heads/main', 'ref:refs/remotes/origin/main']);
+    expect(collected.current.migrations.map((entry) => entry.name)).toEqual(['001_base.sql']);
+    expect(collected.base.migrations.map((entry) => entry.name)).toEqual(['001_base.sql']);
+  });
+
+  it('still scans an unmerged branch from a detached HEAD', () => {
+    const fixture = makeRepository();
+    git(fixture.main, 'switch', '-c', 'codex/unmerged');
+    writeFileSync(join(fixture.main, 'src', 'db', 'migrations', '002_unmerged.sql'), 'SELECT 2;\n');
+    git(fixture.main, 'add', '.');
+    git(fixture.main, 'commit', '-m', 'unmerged migration');
+    git(fixture.main, 'checkout', '--detach', 'main');
+
+    const collected = collectMigrationSources(fixture.main);
+    const unmerged = collected.sources.find((entry) => entry.label === 'ref:refs/heads/codex/unmerged');
+    expect(unmerged?.migrations.map((entry) => entry.name)).toEqual(['001_base.sql', '002_unmerged.sql']);
+    expect(collected.current.migrations.map((entry) => entry.name)).toEqual(['001_base.sql']);
+  });
+
+  it('still throws on a genuine git symbolic-ref failure', () => {
+    const fixture = makeRepository();
+    const failures: SpawnSyncResult[] = [
+      { status: 128, stdout: '', stderr: 'fatal: not a git repository (or any of the parent directories): .git\n' },
+      // Exit 1 with a message is not the silent detached-HEAD result.
+      { status: 1, stdout: '', stderr: 'fatal: ref HEAD is not a symbolic ref\n' },
+      // Nor is exit 1 with output on stdout and an empty stderr.
+      { status: 1, stdout: 'refs/heads/unexpected\n', stderr: '' },
+      // git did not run at all.
+      { status: null, stdout: null, stderr: null, error: new Error('spawnSync git ENOENT') },
+    ];
+    for (const failure of failures) {
+      childProcess.gitOverride = (args) => (args[0] === 'symbolic-ref' ? failure : undefined);
+      expect(() => collectMigrationSources(fixture.main)).toThrow(/^git symbolic-ref failed: /);
+    }
+    childProcess.gitOverride = (args) => (
+      args[0] === 'symbolic-ref' ? { status: 128, stdout: '', stderr: 'fatal: broken\n' } : undefined
+    );
+    expect(() => collectMigrationSources(fixture.main)).toThrow('git symbolic-ref failed: fatal: broken');
+    childProcess.gitOverride = (args) => (
+      args[0] === 'symbolic-ref' ? { status: 1, stdout: 'refs/heads/unexpected\n', stderr: '' } : undefined
+    );
+    expect(() => collectMigrationSources(fixture.main))
+      .toThrow('git symbolic-ref failed: unexpected output on exit 1: refs/heads/unexpected');
   });
 });
 

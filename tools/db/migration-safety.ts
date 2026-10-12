@@ -176,7 +176,9 @@ type GitResult = { status: number; stdout: string; stderr: string };
 function git(repoRoot: string, args: readonly string[]): GitResult {
   const result = spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8', windowsHide: true });
   return {
-    status: result.status ?? 1,
+    // -1, not a real exit code, when git did not run or was killed by a signal, so that
+    // exit 1 keeps its documented meaning for currentBranchRef.
+    status: result.status ?? -1,
     stdout: result.stdout ?? '',
     stderr: result.stderr ?? result.error?.message ?? '',
   };
@@ -236,12 +238,30 @@ function worktreePaths(repoRoot: string): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * The branch HEAD names, or null on a detached HEAD (AFLDB-ISSUE-312). A detached HEAD (a
+ * checkout pinned to a SHA or tag, or a `git worktree add --detach`) is a normal, fully
+ * determined state: with `-q`, `git symbolic-ref` then exits 1 and prints nothing. Only that
+ * exact result (exit 1, stdout AND stderr both empty) is a detached HEAD. Any other failure
+ * (exit 128 "fatal: ...", any output on exit 1, git not running) still throws.
+ */
+function currentBranchRef(repoRoot: string): string | null {
+  const result = git(repoRoot, ['symbolic-ref', '-q', 'HEAD']);
+  if (result.status === 0) return result.stdout.trim();
+  if (result.status === 1 && result.stdout === '' && result.stderr === '') return null;
+  const detail = result.stderr.trim()
+    || (result.stdout.trim() ? `unexpected output on exit ${result.status}: ${result.stdout.trim()}` : 'unknown error');
+  throw new Error(`git symbolic-ref failed: ${detail}`);
+}
+
 function relevantRefs(repoRoot: string, baseRef: string): string[] {
   const output = requireGit(repoRoot, [
     'for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes',
   ]);
-  const current = requireGit(repoRoot, ['symbolic-ref', '-q', 'HEAD']);
-  const always = new Set([baseRef, current, 'refs/heads/main', 'refs/remotes/origin/main']);
+  // A detached HEAD adds no symbolic ref; the base, main, origin/main and unmerged refs remain.
+  const current = currentBranchRef(repoRoot);
+  const always = new Set([baseRef, 'refs/heads/main', 'refs/remotes/origin/main']);
+  if (current) always.add(current);
   const refs = output.split(/\r?\n/).filter(Boolean).filter((ref) => !ref.endsWith('/HEAD'));
   return refs.filter((ref) => {
     if (always.has(ref)) return true;

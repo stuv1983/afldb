@@ -671,8 +671,13 @@
 
 ### AFLDB-ISSUE-312 — Migration safety scan fails on a detached HEAD with a misleading error
 - **Severity:** Low. **Area:** DB tooling / migrations / preflight — `tools/db/migration-safety.ts`. **State:** Open
-  (2026-10-08), F-047; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-312.md`. **Next action:** implementation.
+  (2026-10-08), F-047; imported 2026-10-10. **Implemented 2026-10-12** in batch worktree `afldb-batch-315-281-312-288`
+  (base `80f86c39`): detached HEAD accepted only for exit 1 with empty stdout and stderr, genuine failures
+  still throw; DB-free 37/37 on
+  disposable repositories. **Committed locally; merge pending** (2026-10-12, its own commit on
+  `opus/batch-315-281-312-288`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-312.md` §17. **Next action:** merge after ISSUE-274's
+  first-nightly evidence; close once merged.
 
 ### AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
 - **Severity:** Low. **Area:** DB tooling / credential handling — `tools/db/psql.ts`. **State:** Open (2026-10-08), F-048;
