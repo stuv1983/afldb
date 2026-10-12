@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; merged to main `6f99b58d` under a readiness exception; installed on DEV 12 October 2026 and accepted on synthetic fixtures, first nightly pending; not deployed to PROD, behind the ISSUE-265 hold; issue open) - 12 October 2026
+### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; merged to main `6f99b58d` under a readiness exception; installed on DEV 12 October 2026 and accepted on synthetic fixtures, first scheduled nightly (13 October 2026) observed clean at `6f99b58d` (one night); not deployed to PROD, behind the ISSUE-265 hold; issue open) - 12 October 2026
 
 - **Match-row lock.** `applyCanonicalUnit` (`src/lib/acquisition/canonical-apply.ts`) takes `FOR NO KEY UPDATE` on the
   unit's match-family rows before it reads manual authority (Data Editor overrides) and re-reads the match, so a
