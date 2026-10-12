@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; committed locally on `opus/issue-274`; not merged, pushed, installed on DEV or deployed; issue open) - 12 October 2026
+### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; merged to main `6f99b58d` under a readiness exception; installed on DEV 12 October 2026 and accepted on synthetic fixtures, first nightly pending; not deployed to PROD, behind the ISSUE-265 hold; issue open) - 12 October 2026
 
 - **Match-row lock.** `applyCanonicalUnit` (`src/lib/acquisition/canonical-apply.ts`) takes `FOR NO KEY UPDATE` on the
   unit's match-family rows before it reads manual authority (Data Editor overrides) and re-reads the match, so a
@@ -28,7 +28,16 @@ commit.
   mutation failed exactly the two discriminator assertions; the import-role lock test passed once; the whole
   `settle-afl-api.test.ts` passed 72/72 (1 case NOT EXERCISED). The whole `settle-afltables` run failed on the
   unrelated ISSUE-099 O1 test (ISSUE-315). The overlapping-settle cycle, the late-candidate case on PostgreSQL and State B
-  were not run. ISSUE-275 is a separate defect and is not fixed by this change; nothing is deployed.
+  were not run. ISSUE-275 is a separate defect and is not fixed by this change.
+- **DEV (12 October 2026).** Installed (BUILD `kKfU7VKifbsWyPAAurnUU`, no migration). A synthetic behavioural acceptance (the
+  real settle as `afldb_import` against season-2093 fixtures, with an emulated Data Editor holder) gave VERDICT FIXED for the
+  edit and delete scenarios. The acceptance fixtures and the derived `club_seasons` rows they produced were removed in one
+  transaction (the acceptance driver's first cleanup failed and rolled back; a corrected cleanup succeeded). All 99 table
+  comparisons against the pre-run census matched (full-content hashes where collected; `player_match_stats` by row count and
+  ordered ids only); the one review item, `club_seasons_id_seq`, advanced by four (1748 to 1752) during the fixture interval
+  and was accepted by the owner as recorded (compare exit 5 preserved; the sequence was not reset). The DEV run itself was in
+  State B.
+  Not shown: the real Data Editor, State B durable Match Sheet cases, overlapping settles, or the first scheduled run (13 October).
 
 ### Submission validation can no longer overwrite a concurrent approve, promote or reject (AFLDB-ISSUE-273; merged to main `a34f0721` with readiness accepted under an operator exception; DB-free unit, poller self-test, typecheck and lint passed; `afldb_test` integration passed for `email-intake` (23 passed + 2 expected-fail) and `submission-promotion` (18 passed + 2 expected-fail), with only the existing ISSUE-264 State-B block refused on `match-results-promotion` in the earlier run; installed on DEV 11 October 2026 under a separate scoped deploy-gate exception for the same four files (BUILD_ID `L22XfuX2nngl_51zwuzfH`, no migration) and DEV synthetic-fixture acceptance supported, not exercising the race guard, the decided acknowledgement or a real mailbox; PROD not installed, behind the ISSUE-265 hold; issue open) - 11 October 2026
 
