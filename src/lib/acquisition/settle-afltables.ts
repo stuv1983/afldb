@@ -2986,8 +2986,10 @@ async function resolveTarget(
       // exists — is only ever reachable on a hit, and refusing it is what stops
       // the ordinary update deepening a duplication that already exists. So
       // this is one indexed probe per match record, not one per lookup miss,
-      // and it is re-derived under `FOR UPDATE` inside the applier's savepoint
-      // before anything is written.
+      // and it is re-derived inside the applier's savepoint before anything is
+      // written (AFLDB-ISSUE-274: unlocked there; the applier locks the
+      // candidates found here BEFORE its authority snapshot, and refuses one
+      // that was not among them).
       const retired = await findRetiredMatchIdentities(
         tx, rekeyIdentityOf(projected, refs),
         { kind: 'run_enumeration', scope: refs.matchRekeyScope },

@@ -133,9 +133,12 @@ function sameFixtureIdentity(sql: Sql, identity: SameFixtureIdentity) {
  * refuses on many and never merges.
  *
  * `lock` takes `FOR UPDATE` on the candidate rows so two concurrent settles
- * cannot both claim one. It is taken inside the applier's savepoint only; the
- * pre-savepoint pass reads without it, exactly as the rest of that pass does,
- * and every answer is re-derived under the lock before anything is written.
+ * cannot both claim one. AFLDB-ISSUE-274: the applier no longer passes it. It
+ * locks the candidates once, in one id-ordered statement BEFORE its authority
+ * snapshot, and re-derives the set unlocked afterwards, refusing any candidate
+ * that was not locked first (a lock taken after the snapshot would be one the
+ * snapshot cannot cover). The parameter has no caller left; it is kept only so
+ * this change stays within the applier.
  *
  * Both callers run this on a canonical lookup HIT as well as a miss. §5.3's
  * would-merge clause is a statement about a fixture that already holds two

@@ -4848,6 +4848,351 @@ describe('ISSUE-257 Slice 4 — settle behaviour under durable Match Sheet autho
     });
   });
 
+  /* AFLDB-ISSUE-274. A unit whose targets are `matches` and/or `match_period_scores`
+     took no row lock before its authority read: a Data Editor score edit committing
+     between that read and `UPDATE matches` was overwritten while its override stayed
+     active. The real two-session proof is in tests/integration/settle-afltables.test.ts;
+     these pin the statement order and the writers' row-count backstop DB-free. */
+  describe('ISSUE-274 — a matches / match_period_scores unit locks its match row first', () => {
+    const MROW = { id: 50, match_key: MK, source_id: 1, home_goals: 13, away_goals: 12, margin: 8 };
+    const MCUR = { home_goals: 13 };
+    const LOCK_TAIL = /FROM matches WHERE match_key .* FOR (NO KEY UPDATE|SHARE|UPDATE)$/;
+    const counted = (count: number) => Object.assign([], { count });
+    const lockIndex = (seen: string[]) => seen.findIndex((t) => LOCK_TAIL.test(t));
+    const authorityIndex = (seen: string[]) => seen.findIndex((t) => t.includes('pg_get_constraintdef'));
+
+    const matchTarget = (proposed: Record<string, number>, current: Record<string, number> | null) => ({
+      targetTable: 'matches' as const, invitation: 'candidate' as const, proposedValues: proposed,
+      renderedFields: Object.keys(proposed),
+      renderedBaselineCanonicalHash: current === null
+        ? null
+        : baselineCanonicalHash(Object.keys(proposed), current),
+      sourceVersionSeq: 1,
+    });
+    const PERIODS = { period_scores: [{ club_id: 1, period: 1, goals: 2, behinds: 1, points: 13 }] };
+    const periodTarget = () => ({
+      targetTable: 'match_period_scores' as const, invitation: 'candidate' as const,
+      proposedValues: PERIODS as never, renderedFields: ['period_scores'],
+      renderedBaselineCanonicalHash: null, sourceVersionSeq: 1,
+    });
+    const matchUnit = (
+      targets: CanonicalApplyUnitInput['targets'], over: Partial<CanonicalApplyUnitInput> = {},
+    ): CanonicalApplyUnitInput => ({
+      family: 'match', externalRecordId: 'M', season: 2026, sourceId: 1,
+      sourceKey: 'afltables', sourceKeysById: new Map([[1, 'afltables']]),
+      batchId: asImportBatchId('1'), inProgressSeasons: [2026], completionProven: true,
+      matchKey: MK, matchRekey: null, playerId: null, brownlowRoundNumber: null,
+      targets, ...over,
+    });
+    const respondMatch = (row: Record<string, unknown> | null = MROW) => (text: string): unknown[] => {
+      if (LOCK_TAIL.test(text)) return row === null ? [] : [{ id: 50 }];
+      if (text.includes('pg_get_constraintdef')) return [{ def: CHECK_AFTER_257 }];
+      if (text.includes('SELECT * FROM matches WHERE match_key')) return row === null ? [] : [row];
+      if (text.includes('SELECT id::int AS id FROM matches WHERE match_key')) {
+        return row === null ? [] : [{ id: 50 }];
+      }
+      if (text.startsWith('UPDATE matches')) return counted(1);
+      if (text.includes('RETURNING (xmax = 0)')) return [{ inserted: true }];
+      return [];
+    };
+
+    it('a matches-only unit takes the row FOR NO KEY UPDATE before the authority and every match read', async () => {
+      const { tx, seen } = fakeUnitTx(respondMatch());
+      const outcome = await applyCanonicalUnit(tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR)]));
+      expect(outcome.results[0]).toMatchObject({ applied: true, verb: 'update', rowsUpdated: 1 });
+      const lock = lockIndex(seen);
+      expect(lock).toBeGreaterThan(-1);
+      expect(seen[lock].endsWith('FOR NO KEY UPDATE')).toBe(true);
+      expect(seen[lock]).toContain(JSON.stringify(MK));
+      expect(seen.filter((t) => LOCK_TAIL.test(t))).toHaveLength(1);
+      expect(authorityIndex(seen)).toBeGreaterThan(lock);
+      for (const read of ['SELECT * FROM matches WHERE match_key', 'SELECT id::int AS id FROM matches WHERE match_key']) {
+        const first = seen.findIndex((t) => t.includes(read) && !LOCK_TAIL.test(t));
+        expect(first, read).toBeGreaterThan(lock);
+      }
+      expect(seen.findIndex((t) => t.startsWith('UPDATE matches'))).toBeGreaterThan(authorityIndex(seen));
+    });
+
+    it('a match_period_scores-only unit takes the same lock, once, before the authority', async () => {
+      const { tx, seen } = fakeUnitTx(respondMatch());
+      await applyCanonicalUnit(tx, matchUnit([periodTarget()]));
+      const lock = lockIndex(seen);
+      expect(lock).toBeGreaterThan(-1);
+      expect(seen[lock].endsWith('FOR NO KEY UPDATE')).toBe(true);
+      expect(seen.filter((t) => LOCK_TAIL.test(t))).toHaveLength(1);
+      expect(authorityIndex(seen)).toBeGreaterThan(lock);
+    });
+
+    it('a matches + match_period_scores family takes ONE lock, and never FOR SHARE as well', async () => {
+      const { tx, seen } = fakeUnitTx(respondMatch());
+      await applyCanonicalUnit(tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR), periodTarget()]));
+      expect(seen.filter((t) => LOCK_TAIL.test(t))).toHaveLength(1);
+      expect(seen.some((t) => t.endsWith('FOR SHARE'))).toBe(false);
+    });
+
+    it('a new fixture (no row yet) locks nothing it can find and still inserts', async () => {
+      const { tx, seen } = fakeUnitTx((text) => (text.startsWith('INSERT INTO matches') ? [{ id: 77 }] : respondMatch(null)(text)));
+      const outcome = await applyCanonicalUnit(tx, matchUnit([matchTarget({ home_goals: 14 }, null)]));
+      expect(outcome.results[0]).toMatchObject({ applied: true, verb: 'insert' });
+      expect(lockIndex(seen)).toBeGreaterThan(-1);
+      expect(authorityIndex(seen)).toBeGreaterThan(lockIndex(seen));
+    });
+
+    it('a non-rekey matches UPDATE never sets a unique-key column, so NO KEY UPDATE is the strength it needs', async () => {
+      // matches' unique columns are id (primary key), match_key and legacy_match_id (migration
+      // 003). PostgreSQL takes FOR UPDATE, not FOR NO KEY UPDATE, for an UPDATE that changes
+      // one of them; only the rekey path (a retired candidate, locked FOR UPDATE above) may.
+      const KEY_COLUMNS = ['id', 'match_key', 'legacy_match_id'];
+      expect(MATCHES_PROPOSED_FIELDS.filter((field) => KEY_COLUMNS.includes(field))).toEqual([]);
+      const { tx, seen } = fakeUnitTx(respondMatch());
+      await applyCanonicalUnit(tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR)]));
+      const update = seen.find((t) => t.startsWith('UPDATE matches'));
+      expect(update).toBeDefined();
+      for (const column of KEY_COLUMNS) expect(update).not.toContain(`"${column}"`);
+    });
+
+    const rekeyMatchUnit = () => matchUnit([matchTarget({ home_goals: 14 }, MCUR)], {
+      matchRekey: {
+        scope: { completeScopeKeys: ['2026'], publishedRecordIds: ['M'] },
+        identity: { roundCode: '1', matchDate: '2026-03-12', homeClubId: 1, awayClubId: 2 },
+      },
+    });
+    const withRetired = (retired: unknown[]) => {
+      const base = respondMatch();
+      return (text: string): unknown[] => (text.includes('JOIN staging.source_records') ? retired : base(text));
+    };
+
+    it('a rekey unit with a retired candidate keeps the FOR UPDATE, id-ordered lock and adds no second one', async () => {
+      const retired = [{ id: 41, matchKey: '2026|1|2026-03-11|Carlton|Collingwood', sourceRecordId: 'OLD' }];
+      const { tx, seen } = fakeUnitTx(withRetired(retired));
+      await applyCanonicalUnit(tx, rekeyMatchUnit()).catch(() => undefined);
+      const locks = seen.filter((t) => t.includes('FROM matches') && /FOR (NO KEY UPDATE|SHARE|UPDATE)$/.test(t)
+        && !t.includes('JOIN staging.source_records'));
+      const first = seen.findIndex((t) => t.includes('FROM matches WHERE id = ANY'));
+      expect(first).toBeGreaterThan(-1);
+      expect(seen[first]).toContain('ORDER BY id');
+      expect(seen[first].endsWith('FOR UPDATE')).toBe(true);
+      expect(authorityIndex(seen)).toBeGreaterThan(first);
+      expect(locks.filter((t) => t.endsWith('NO KEY UPDATE') || t.endsWith('FOR SHARE'))).toEqual([]);
+    });
+
+    it('a rekey unit with no retired candidate takes the FOR NO KEY UPDATE lock by the incoming key', async () => {
+      const { tx, seen } = fakeUnitTx(withRetired([]));
+      await applyCanonicalUnit(tx, rekeyMatchUnit()).catch(() => undefined);
+      expect(seen.some((t) => t.includes('FROM matches WHERE id = ANY'))).toBe(false);
+      const lock = lockIndex(seen);
+      expect(lock).toBeGreaterThan(-1);
+      expect(seen[lock].endsWith('FOR NO KEY UPDATE')).toBe(true);
+      expect(authorityIndex(seen)).toBeGreaterThan(lock);
+    });
+
+    /* §18.1 residual, closed in §19 and tightened in §20. The lock phase searches for
+       retired candidates UNLOCKED. A candidate that is not visible then but is found by
+       `readFreshTarget`'s search was never locked before the authority snapshot, so a Data
+       Editor override committed on it in between is invisible to the unit and would be
+       overwritten. The unit REFUSES such a candidate, and (§20) its search is unlocked, so
+       the refusal does not acquire the late row's lock afterwards either (a locking search
+       would wait for the editor holding it, after the snapshot, only to refuse).
+       Deterministic model: the retired search is the only statement that can see the
+       candidate. The fake records a nested FOR UPDATE OF m fragment as its own statement,
+       so a locking search is visible as that entry. */
+    describe('a retired candidate that is absent at the lock phase and found afterwards', () => {
+      const OLD_KEY = '2026|1|2026-03-11|Carlton|Collingwood';
+      const CAND = { id: 41, match_key: OLD_KEY, source_id: 1, home_goals: 13, away_goals: 12, margin: 8 };
+      const SEARCH_LOCK_FRAGMENT = 'FOR UPDATE OF m';
+      const searchLocks = (seen: string[]) => seen.filter((t) => t === SEARCH_LOCK_FRAGMENT);
+      const lateCandidateRun = async () => {
+        const group = [...matchFieldGroupsFor(['home_goals'])][0];
+        expect(group).toBeTruthy();
+        const editor = { ...CAND };            // the candidate row as the editor leaves it
+        let committed = false;                 // the editor's edit + override are committed
+        let committedBeforeSnapshot = false;
+        let snapshotRead = false;
+        let overwritten = false;
+        let searches = 0;
+        const respond = (text: string): unknown[] => {
+          if (text.includes('JOIN staging.source_records')) {
+            // Search 1 is the lock phase's and sees nothing. Search 2 is `readFreshTarget`'s:
+            // by then the editor has committed on the candidate, which becomes visible.
+            searches += 1;
+            if (searches === 1) return [];
+            committed = true;
+            editor.margin = 15;
+            return [{ id: 41, matchKey: OLD_KEY, sourceRecordId: 'OLD' }];
+          }
+          if (text.includes('pg_get_constraintdef')) return [{ def: CHECK_AFTER_257 }];
+          if (text.includes("entity_type = 'matches'")) {
+            // The first read of the overrides is the unit's snapshot; later reads (the
+            // rekey's override carry) are not.
+            if (!snapshotRead) { snapshotRead = true; committedBeforeSnapshot = committed; }
+            return committed ? [{ entityKey: OLD_KEY, fieldGroup: group }] : [];
+          }
+          if (LOCK_TAIL.test(text)) return [];
+          if (text.includes('SELECT * FROM matches WHERE id = 41')) return [{ ...editor }];
+          if (text.includes('SELECT * FROM matches WHERE match_key')) return [];
+          if (text.includes('SELECT id::int AS id FROM matches WHERE match_key')) return [];
+          if (text.startsWith('UPDATE matches')) { overwritten = true; return counted(1); }
+          return [];
+        };
+        const { tx, seen } = fakeUnitTx(respond);
+        const outcome = await applyCanonicalUnit(tx, rekeyMatchUnit());
+        return { outcome, seen, overwritten, committed, committedBeforeSnapshot, editor, searches };
+      };
+
+      it('is refused unwritten: the editor values stand and no application row is written', async () => {
+        const run = await lateCandidateRun();
+        // The model really exercised the window: the snapshot was read BEFORE the editor
+        // committed, so it cannot contain the override the editor then committed.
+        expect(run.searches).toBe(2);
+        expect(run.committed).toBe(true);
+        expect(run.committedBeforeSnapshot).toBe(false);
+        expect(run.overwritten).toBe(false);
+        expect(run.outcome.failure).toBeNull();
+        expect(run.outcome.results[0]).toMatchObject({ applied: false, refusal: 'stale_canonical_target' });
+        expect(run.seen.some((t) => t.startsWith('UPDATE matches'))).toBe(false);
+        expect(run.seen.some((t) => t.startsWith('INSERT INTO canonical_applications'))).toBe(false);
+        expect(run.editor).toMatchObject({ margin: 15, home_goals: 13, match_key: OLD_KEY });
+      });
+
+      it('acquires no lock on the late candidate, before or after the refusal', async () => {
+        const run = await lateCandidateRun();
+        // Neither search locked, nothing selected the candidate by id, and the only row lock
+        // the unit took is the FOR NO KEY UPDATE on the incoming key, before the snapshot.
+        expect(searchLocks(run.seen)).toEqual([]);
+        expect(run.seen.filter((t) => /FOR UPDATE$/.test(t))).toEqual([]);
+        expect(run.seen.some((t) => t.includes('FROM matches WHERE id = ANY'))).toBe(false);
+        expect(run.seen.some((t) => t.includes('SELECT * FROM matches WHERE id = 41'))).toBe(false);
+        expect(run.seen.filter((t) => LOCK_TAIL.test(t))).toHaveLength(1);
+      });
+
+      it('a second candidate that appears beside a locked one is refused, and only the first was locked', async () => {
+        let searches = 0;
+        const known = { id: 41, matchKey: OLD_KEY, sourceRecordId: 'OLD' };
+        const late = { id: 42, matchKey: '2026|1|2026-03-10|Carlton|Collingwood', sourceRecordId: 'OLDER' };
+        const base = respondMatch();
+        const { tx, seen } = fakeUnitTx((text) => {
+          if (text.includes('JOIN staging.source_records')) {
+            searches += 1;
+            return searches === 1 ? [known] : [known, late];
+          }
+          return base(text);
+        });
+        const outcome = await applyCanonicalUnit(tx, rekeyMatchUnit());
+        expect(searches).toBe(2);
+        expect(outcome.results[0]).toMatchObject({ applied: false, refusal: 'stale_canonical_target' });
+        const locks = seen.filter((t) => t.includes('FROM matches WHERE id = ANY'));
+        expect(locks).toHaveLength(1);
+        expect(locks[0]).toContain('[41]');
+        expect(locks[0]).not.toContain('42');
+        expect(searchLocks(seen)).toEqual([]);
+        expect(seen.some((t) => t.startsWith('UPDATE matches'))).toBe(false);
+      });
+
+      it('a candidate that was locked at the lock phase is not refused', async () => {
+        const known = { id: 41, matchKey: OLD_KEY, sourceRecordId: 'OLD' };
+        const base = respondMatch(null);
+        const { tx, seen } = fakeUnitTx((text) => {
+          if (text.includes('JOIN staging.source_records')) return [known];
+          if (text.includes('SELECT * FROM matches WHERE id = 41')) return [{ ...CAND }];
+          return base(text);
+        });
+        const outcome = await applyCanonicalUnit(tx, rekeyMatchUnit());
+        expect(outcome.results[0]).not.toMatchObject({ refusal: 'stale_canonical_target' });
+        expect(seen.some((t) => t.includes('FROM matches WHERE id = ANY'))).toBe(true);
+        expect(searchLocks(seen)).toEqual([]);
+      });
+    });
+
+    /* A deterministic interleaving, not a database: the Data Editor holds the row
+       FOR UPDATE with its edit (and its override) uncommitted. Any statement that
+       needs the row blocks until it commits, so the first such statement the unit
+       issues is where the edit lands. Before ISSUE-274 that statement was the UPDATE,
+       after the authority snapshot and the baseline read. */
+    describe.each([
+      { name: 'an edit that moves only an unproposed column (override alone is visible)',
+        edited: 'margin', refusal: 'manual_authority_conflict' },
+      { name: 'an edit that moves the proposed field (the baseline moved too)',
+        edited: 'home_goals', refusal: 'stale_canonical_target' },
+    ])('Data Editor edit committed during the settle: $name', ({ edited, refusal }) => {
+      it(`is seen before the authority read and never overwritten (${refusal})`, async () => {
+        const group = [...matchFieldGroupsFor(['home_goals'])][0];
+        expect(group).toBeTruthy();
+        let committed = false;
+        let overwritten = false;
+        const respond = (text: string): unknown[] => {
+          if (LOCK_TAIL.test(text)) { committed = true; return [{ id: 50 }]; }
+          if (text.includes('pg_get_constraintdef')) return [{ def: CHECK_AFTER_257 }];
+          if (text.includes("entity_type = 'matches'")) {
+            return committed ? [{ entityKey: MK, fieldGroup: group }] : [];
+          }
+          if (text.includes('SELECT * FROM matches WHERE match_key')) {
+            return [{ ...MROW, ...(committed ? { [edited]: 15 } : {}) }];
+          }
+          if (text.includes('SELECT id::int AS id FROM matches WHERE match_key')) return [{ id: 50 }];
+          if (text.startsWith('UPDATE matches')) {
+            if (!committed) { committed = true; overwritten = true; }
+            return counted(1);
+          }
+          return [];
+        };
+        const { tx, seen } = fakeUnitTx(respond);
+        const outcome = await applyCanonicalUnit(tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR)]));
+        expect(overwritten).toBe(false);
+        expect(committed).toBe(true);
+        expect(outcome.failure).toBeNull();
+        expect(outcome.results[0]).toMatchObject({ applied: false, refusal });
+        expect(seen.some((t) => t.startsWith('UPDATE matches'))).toBe(false);
+        expect(seen.some((t) => t.startsWith('INSERT INTO canonical_applications'))).toBe(false);
+      });
+    });
+
+    it('a match deleted while the unit waited for the lock is a stale target, not an update of nothing', async () => {
+      // deleteMatch holds the row FOR UPDATE; once it commits the lock finds no row.
+      const { tx, seen } = fakeUnitTx(respondMatch(null));
+      const outcome = await applyCanonicalUnit(tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR)]));
+      expect(outcome.results[0]).toMatchObject({ applied: false, refusal: 'stale_canonical_target' });
+      expect(seen.some((t) => /^(UPDATE|INSERT INTO) matches/.test(t))).toBe(false);
+    });
+
+    describe('the writers refuse to report an UPDATE that matched no row', () => {
+      it('matches', async () => {
+        const base = respondMatch();
+        const { tx, seen } = fakeUnitTx((t) => (t.startsWith('UPDATE matches') ? counted(0) : base(t)));
+        const outcome = await applyCanonicalUnit(tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR)]));
+        expect(outcome.failure).toMatchObject({ targetTable: 'matches' });
+        expect(outcome.failure?.message).toMatch(/matched no row/);
+        expect(outcome.results[0]).toMatchObject({ applied: false, refusal: 'write_failed' });
+        expect(seen.some((t) => t.startsWith('INSERT INTO canonical_applications'))).toBe(false);
+      });
+
+      it('player_match_stats', async () => {
+        const base = respondFor([], ROW);
+        const { tx, seen } = fakeUnitTx((t) => (t.startsWith('UPDATE player_match_stats') ? counted(0) : base(t)));
+        const outcome = await applyCanonicalUnit(tx, unitOf({ kicks: 9 }, CURRENT));
+        expect(outcome.failure).toMatchObject({ targetTable: 'player_match_stats' });
+        expect(outcome.results[0]).toMatchObject({ applied: false, refusal: 'write_failed' });
+        expect(seen.some((t) => t.startsWith('INSERT INTO canonical_applications'))).toBe(false);
+      });
+
+      it('brownlow_round_votes', async () => {
+        const vote = { id: 77, source_id: 1, season: 2026, player_id: 7, round_number: 3, votes: 1 };
+        const base = respondFor([], null);
+        const { tx, seen } = fakeUnitTx((t) => {
+          if (t.includes('SELECT * FROM brownlow_round_votes')) return [vote];
+          if (t.startsWith('UPDATE brownlow_round_votes')) return counted(0);
+          return base(t);
+        });
+        const unit = unitOf({ votes: 2 }, { votes: 1 }, { family: 'player_match_stats', brownlowRoundNumber: 3 });
+        const outcome = await applyCanonicalUnit(tx, {
+          ...unit, targets: [{ ...unit.targets[0], targetTable: 'brownlow_round_votes' }],
+        });
+        expect(outcome.failure).toMatchObject({ targetTable: 'brownlow_round_votes' });
+        expect(outcome.results[0]).toMatchObject({ applied: false, refusal: 'write_failed' });
+        expect(seen.some((t) => t.startsWith('INSERT INTO canonical_applications'))).toBe(false);
+      });
+    });
+  });
+
   describe('the rekey carry (§18.9)', () => {
     const OLD = '2026|1|2026-03-12|Carlton|Collingwood';
     const NEW = '2026|1|2026-03-13|Carlton|Collingwood';
@@ -5201,7 +5546,7 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier contract', () => {
     // through that spread, so this asserts each UPDATE patch is built with
     // the UPDATE-safe helper (no `source_id`) rather than the INSERT one.
     const updatePatches = [...applierCode.matchAll(
-      /const patch = \{ \.\.\.plan\.newValues, \.\.\.(provenance(?:ForUpdate)?)\(unit\) \};\s*\n\s*await sp`\s*\n\s*UPDATE (\w+) SET/g,
+      /const patch = \{ \.\.\.plan\.newValues, \.\.\.(provenance(?:ForUpdate)?)\(unit\) \};\s*\n\s*(?:const updated = )?await sp`\s*\n\s*UPDATE (\w+) SET/g,
     )];
     expect(updatePatches.map((m) => m[2]).sort()).toEqual(
       ['brownlow_round_votes', 'matches', 'player_match_stats'],

@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### A settle unit now locks its match-family rows before reading manual authority (AFLDB-ISSUE-274; committed locally on `opus/issue-274`; not merged, pushed, installed on DEV or deployed; issue open) - 12 October 2026
+
+- **Match-row lock.** `applyCanonicalUnit` (`src/lib/acquisition/canonical-apply.ts`) takes `FOR NO KEY UPDATE` on the
+  unit's match-family rows before it reads manual authority (Data Editor overrides) and re-reads the match, so a
+  concurrent Data Editor score edit can no longer commit between the authority read and the settle's `UPDATE matches`
+  and be overwritten.
+- **Late candidate.** A retired-identity rekey candidate that appears after the lock is refused rather than applied; the
+  re-search is unlocked and the refusal writes nothing.
+- **Zero-row updates.** The writers check the `UPDATE` row count and no longer report a write that changed no row.
+- **Validation (local `afldb_test`, State A only).** Focused `ISSUE-274` integration cases passed once; the lock-removal
+  mutation failed exactly the two discriminator assertions; the import-role lock test passed once; the whole
+  `settle-afl-api.test.ts` passed 72/72 (1 case NOT EXERCISED). The whole `settle-afltables` run failed on the
+  unrelated ISSUE-099 O1 test (ISSUE-315). The overlapping-settle cycle, the late-candidate case on PostgreSQL and State B
+  were not run. ISSUE-275 is a separate defect and is not fixed by this change; nothing is deployed.
+
 ### Submission validation can no longer overwrite a concurrent approve, promote or reject (AFLDB-ISSUE-273; merged to main `a34f0721` with readiness accepted under an operator exception; DB-free unit, poller self-test, typecheck and lint passed; `afldb_test` integration passed for `email-intake` (23 passed + 2 expected-fail) and `submission-promotion` (18 passed + 2 expected-fail), with only the existing ISSUE-264 State-B block refused on `match-results-promotion` in the earlier run; installed on DEV 11 October 2026 under a separate scoped deploy-gate exception for the same four files (BUILD_ID `L22XfuX2nngl_51zwuzfH`, no migration) and DEV synthetic-fixture acceptance supported, not exercising the race guard, the decided acknowledgement or a real mailbox; PROD not installed, behind the ISSUE-265 hold; issue open) - 11 October 2026
 
 - **Validation.** `validateSubmission` computes every row verdict with no lock, then writes the verdicts and the

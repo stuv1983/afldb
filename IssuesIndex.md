@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 51 (ISSUE-229, ISSUE-265–270, and the 44 review findings ISSUE-271–314 registered on 2026-10-10)
+**Open issues:** 52 (ISSUE-229, ISSUE-265–270, the 44 review findings ISSUE-271–314 registered on 2026-10-10, and ISSUE-315 registered on 2026-10-12)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -439,13 +439,47 @@
 ### AFLDB-ISSUE-274 — A settle unit that writes only the `matches` row takes no row lock before its authority read
 - **Severity:** Medium. **Area:** acquisition / settle concurrency — `src/lib/acquisition/canonical-apply.ts`.
 - **State:** Open (2026-10-08), review F-009, code-proven mechanism (interleaving not executed); imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Next action:** fix plus tests, sequenced with ISSUE-275.
+  2026-10-11: fix + DB-free tests implemented LOCALLY on `opus/issue-274` (uncommitted); four integration cases written,
+  NOT run; DB-free failures baselined against an unchanged `416f5f27` export (0 introduced); D-274-1 (lock strength)
+  APPROVED 2026-10-12 (`FOR NO KEY UPDATE`; choice only, §21). After review (§19): the late retired-candidate window is closed by refusing such a unit
+  (DB-free regression fails on the unfixed source); the integration harness bounds every wait and confirms holder, settle and
+  backends gone before fixture cleanup (DB-free tests; PostgreSQL glue unexecuted). 2026-10-12 (§20): the late candidate is
+  refused WITHOUT being locked (unlocked re-search; lock-order claims corrected); observation, termination and close/confirm
+  are bounded and reported (162.2 s worst case, DB-free tests); an unresolved scenario stops the wrapper's and the three
+  `afterAll` fixture removals and later scenarios (`createCleanupGate`). Probe revised (bounded; control options and
+  `pg_terminate_backend` rehearsal), run 2026-10-12 against `afldb_test` and FAILED at State A (exit 1: migration 110 not applied there, §22);
+  its later checks did not run (the relation-presence check ran and passed first: corrected in §22/§24); nothing changed to obtain a pass. 2026-10-12 (§23): the four integration cases do NOT need migration 110 (inherited
+  from the durable Match Sheet wrapper); moved to their own describe with a matches-only precondition and cleanup, DB-free pins updated; a
+  separate matches-only probe MO-1 prepared (not a pass of the original probe, whose FAIL stands). 2026-10-12 (§24): **MO-1 PASSED and the one focused
+  `-t "ISSUE-274"` run PASSED against `afldb_test` (State A, exit 0, 4 passed | 76 skipped | 1 todo)**; baseline and post-run censuses identical (no retained rows or sessions,
+  schema unchanged, migration 110 not applied). Limits: one run; not shown to fail on the unfixed source on PostgreSQL; State B, the rest of the file and other suites not run.
+  2026-10-12 (§25, local files and read-only Git only): provenance check AFTER the run (not a pre-run fingerprint): all seven source/test files are byte-identical to reviewed R4;
+  validation plan written and nothing run (R1 same tests with only the lock block reverted in an isolated copy, expected 2 failed | 2 passed | 1 todo; R2 whole `settle-afltables`;
+  R3 whole `settle-afl-api`, which rewrites season-2026 derived rows; State-A vacuous passes listed as NOT EXERCISED; import-role lock not covered by existing tests, D-274-2).
+  Still untested: overlapping-settle cycle, late-candidate case on PostgreSQL, State B.
+  2026-10-12 (§26, owner-authorised R1/R2 on `afldb_test`, State A): **R1 lock-removal mutation (isolated copy, one file, six lines): exit 1, `2 failed | 2 passed | 76 skipped | 1 todo`, exactly the two
+  `whileBlocked` discriminator failures** (blocked on the final `UPDATE matches`; no overwrite is shown). **R2 whole `settle-afltables`: `1 failed | 78 passed | 1 skipped | 1 todo` in 325 s; the one
+  UNEXPECTED failure is ISSUE-099 O1 "extracts the real statement set" (a text-extraction test reading a prose comment at `settle-afltables.ts:1918` as SQL).** R2 exit 1 stands: 67 exercised and
+  passed, 1 failed, 1 restricted-role skip, 11 durable scenarios reported passed but NOT EXERCISED, 1 todo; not a clean pass. Censuses before/after identical, the 12 pre-existing S6 batches preserved. R3, optional
+  suites and Phase B not run. D-274-2: a direct `afldb_import` lock test is prepared, not run (§26.6).
+  2026-10-12 (§27, local and DB-free): a targeted extractor comparison (not a suite run) gives the same O1 result on `HEAD` and the patch, so it is independent of this patch; registered as **ISSUE-315** (Low).
+  The import-role test was revised (pid-based session confirmation with a visibility control, honest no-fixture failures, key-based cleanup if an INSERT reply is lost); `npm run typecheck` and ESLint on it are clean; not run.
+  2026-10-12 (§28, local and DB-free): that test's cleanup was corrected: both fixture rows carry a per-run marker that every DELETE requires (a row another session put on the key survives and is reported); a lost
+  season INSERT reply is reported as possible residue and the season is never removed; the primary failure, cleanup problems and connection-close failures are all reported. New pure helper plus a DB-free file
+  (13 tests pass); typecheck, ESLint and whitespace clean; the new SQL is unexecuted and the test is still not run. R1/R2 not repeated; R3 pending.
+  2026-10-12 (§29, owner-authorised, ONE run on `afldb_test`, State A): **the D-274-2 import-role lock test PASSED (exit 0, 1 passed, 0 skipped)**. Provenance (R8 patch hash, 14 blobs) and MO-1 verified first; both connections on
+  the same server as `afldb_owner`/`afldb_import`; `matches.notes`/`seasons.notes` writable `text`. The role took `FOR NO KEY UPDATE` on one test-owned row, a competing `FOR UPDATE NOWAIT` was refused with `55P03`, free after rollback.
+  Baseline and post-run censuses identical (no fixture residue, no sessions, schema/grants unchanged, 12 S6 batches unchanged). Runtime lock-permission evidence only, not applier acceptance; one run; DEV/PROD grants not examined. Tunnel closed.
+  2026-10-12 (§30, owner-authorised, ONE run on `afldb_test`, State A): **R3, the whole `settle-afl-api.test.ts`, PASSED (exit 0, 72 passed, 669 s)**. Provenance (R8 patch, 10 blobs, MO-1) verified first; all 54 pre-clean selectors counted 0, so no pre-existing row was at risk. After: fixture selectors 0, no sessions, schema/grants unchanged, all 729 batches preserved, canonical `matches` content-identical. **Retained change: `club_seasons` season 2026 rewritten** by the suite's recompute hook (2 stale rows replaced; only `finals_played` 1 -> 0 differs); 14 sequences advanced. 70 of 72 exercised PostgreSQL, 1 DB-free, 1 NOT EXERCISED (ISSUE-257 §17.8, State A). One run; no test asserts the new lock; State B, overlapping-settle cycle and late candidate on PostgreSQL still unrun. Tunnel closed.
+  2026-10-12 (correction to §30): the unchanged-file provenance was "listed files matched `HEAD` blobs; the ten changed files matched R8", not a complete dependency trace; `club_seasons` 2026 is the only table-content change detected (surrogate ids replaced, `finals_played` 1 -> 0; `player_match_stats`/`brownlow_round_votes` by count and ids only).
+- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Next action:** R3 is completed; local commit, then DEV installation and acceptance (all ahead);
+  sequenced with ISSUE-275 (separate defect, not fixed by this).
 
 ### AFLDB-ISSUE-275 — A settle can insert period scores under a match it refused because a foreign owner created it concurrently
 - **Severity:** Medium. **Area:** acquisition / canonical ownership — `src/lib/acquisition/canonical-apply.ts`.
 - **State:** Open (2026-10-08), review F-010, code-proven mechanism (interleaving not executed); imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Next action:** fix plus integration case, with ISSUE-274; split-ownership
-  census open.
+  census open. Not fixed by ISSUE-274's local match-row lock (2026-10-11); acceptance case is an `it.todo`.
 
 ### AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 - **Severity:** Medium. **Area:** AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts`.
@@ -641,6 +675,11 @@
 - **Severity:** Low. **Area:** DB tooling / promotion preparation — `tools/db/prepare-promotion-source.ts`. **State:** Open
   (2026-10-08), F-049; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-314.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-315 — The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL
+- **Severity:** Low. **Area:** test maintenance — `tests/integration/settle-afltables.test.ts` (`executableStatements`, `:1612-1654`); the comment at `src/lib/acquisition/settle-afltables.ts:1918-1919`.
+- **State:** Open (2026-10-12), found by ISSUE-274 R2; the same failure reproduced DB-free on `HEAD` and the working tree (comment added by `ad1fd595`, ISSUE-261). No production behaviour affected. Not fixed.
+- **Evidence:** `issues/open/AFLDB-ISSUE-274.md` §26.3, §27.1 (no separate runbook). **Next action:** make the extractor ignore comments (or reword the comment) with a DB-free regression.
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
 decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an

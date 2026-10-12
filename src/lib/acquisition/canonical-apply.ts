@@ -413,7 +413,8 @@ type FreshTarget = {
 
 /** What `readFreshTarget()` returns instead of a target when it must refuse. */
 type FreshTargetRefusal =
-  | 'no_canonical_match' | 'rekey_ambiguous' | 'rekey_would_merge' | typeof POSSIBLE_EXISTING_MATCH;
+  | 'no_canonical_match' | 'rekey_ambiguous' | 'rekey_would_merge' | 'stale_canonical_target'
+  | typeof POSSIBLE_EXISTING_MATCH;
 
 /**
  * A `date` column arrives as a Date; every other canonical value arrives as
@@ -480,14 +481,41 @@ function retiredSearchOf(
  *   the RETIRED key, so a lock by the incoming key alone would lock nothing. Both
  *   renderings are locked — the retired candidates by their stable ids and any row
  *   already holding the incoming key — in ONE statement, `ORDER BY id`, `FOR UPDATE`:
- *   the strength `findRetiredMatchIdentities(..., true)` takes on the same rows a
- *   few statements later and the UPDATE that rekeys the row needs anyway, so no lock
- *   is upgraded and the order is deterministic. The candidate ids come from an
- *   unlocked search; `readFreshTarget` still re-derives the set under its own lock.
+ *   the strength the UPDATE that rekeys the row needs anyway, so no lock is upgraded
+ *   and the order is deterministic. The candidate ids come from an unlocked search;
+ *   `readFreshTarget` re-derives the set with a second UNLOCKED search and refuses any
+ *   candidate outside it (below), so it never takes a lock this function did not.
+ * - AFLDB-ISSUE-274: a unit with a `matches` or `match_period_scores` target (and no
+ *   retired candidate) takes its match row FOR NO KEY UPDATE by the incoming key. The
+ *   unit's own non-rekey `UPDATE matches` takes that strength anyway (it sets none of the
+ *   unique columns `id`, `match_key`, `legacy_match_id`, which would make PostgreSQL take
+ *   FOR UPDATE; a test pins the proposed field set), so nothing is upgraded; it
+ *   conflicts with the Data Editor's, `deleteMatch`'s and the Match Sheet's `FOR UPDATE`
+ *   (the match row first, as they take it), so a human edit either committed before the
+ *   authority snapshot below (and is in it, and in the E5 baseline re-read) or waits
+ *   until this settle commits. It is also stronger than the `FOR SHARE` below, which a
+ *   match-family unit never needs to take as well.
  * - Otherwise (unchanged): a unit that writes `player_match_stats` takes its match
  *   row FOR SHARE by the incoming key, which is the key the row carries.
+ *
+ * A key with no row yet locks nothing: an INSERT adopts no existing row, and a row
+ * created in that window is ISSUE-275's concern, not something a row lock can close.
+ *
+ * AFLDB-ISSUE-274 §19. Returns the ids of the retired candidates it locked. The candidate
+ * search above is UNLOCKED, so a candidate that only becomes visible afterwards (committed by
+ * another transaction, or made one by an edit that commits after this search) was NOT locked
+ * before the authority snapshot, and a human override committed on it is not in that
+ * snapshot. `readFreshTarget` therefore refuses any retired candidate outside this set
+ * instead of writing to it, and does so WITHOUT locking it: its search is unlocked, so no
+ * lock is acquired after the authority snapshot. Refusing rather than restarting keeps the
+ * lock order deterministic: a restart would lock a newly found id after higher ids already
+ * held. That covers retired candidates only: the plausible-fixture search of an INSERT
+ * (`findPlausibleCanonicalFixtures`) still locks the rows it returns, after the snapshot,
+ * and ISSUE-275 owns that window.
  */
-async function lockUnitMatchRows(sp: Tx, unit: CanonicalApplyUnitInput): Promise<void> {
+async function lockUnitMatchRows(
+  sp: Tx, unit: CanonicalApplyUnitInput,
+): Promise<ReadonlySet<number>> {
   if (unit.matchRekey !== null) {
     const retired = await findRetiredMatchIdentities(sp, ...retiredSearchOf(unit, unit.matchRekey));
     if (retired.length > 0) {
@@ -497,17 +525,24 @@ async function lockUnitMatchRows(sp: Tx, unit: CanonicalApplyUnitInput): Promise
          ORDER BY id
            FOR UPDATE
       `;
-      return;
+      return new Set(retired.map((row) => row.id));
     }
+  }
+  if (unit.targets.some(
+    (target) => target.targetTable === 'matches' || target.targetTable === 'match_period_scores',
+  )) {
+    await sp`SELECT id::int AS id FROM matches WHERE match_key = ${unit.matchKey} FOR NO KEY UPDATE`;
+    return new Set();
   }
   if (unit.targets.some((target) => target.targetTable === 'player_match_stats')) {
     await sp`SELECT id::int AS id FROM matches WHERE match_key = ${unit.matchKey} FOR SHARE`;
   }
+  return new Set();
 }
 
 async function readFreshTarget(
   sp: Tx, unit: CanonicalApplyUnitInput, target: CanonicalApplyTargetInput,
-  matchId: number | null,
+  matchId: number | null, lockedRetiredIds: ReadonlySet<number>,
 ): Promise<FreshTarget | FreshTargetRefusal> {
   const fields = Object.keys(target.proposedValues);
   const { sourceKeysById } = unit;
@@ -517,14 +552,20 @@ async function readFreshTarget(
       SELECT * FROM matches WHERE match_key = ${unit.matchKey}
     `;
     const targetKey = { match_key: unit.matchKey };
-    // AFLDB-ISSUE-131 §5.3. Re-derived HERE, under `FOR UPDATE`, against state
-    // read inside the savepoint — never carried in from the pass that built
-    // the proposal. Two concurrent settles therefore cannot both claim the
-    // same retired row, and a candidate that stopped being one between the
-    // proposal and the write is simply not one.
-    const retired = unit.matchRekey === null ? [] : await findRetiredMatchIdentities(
-      sp, ...retiredSearchOf(unit, unit.matchRekey), true,
-    );
+    // AFLDB-ISSUE-131 §5.3. Re-derived HERE, against state read inside the
+    // savepoint — never carried in from the pass that built the proposal, so a
+    // candidate that stopped being one between the proposal and the write is simply
+    // not one. AFLDB-ISSUE-274 §20. The search takes NO lock of its own: every
+    // candidate it may legitimately return was locked FOR UPDATE by `lockUnitMatchRows`
+    // before the authority snapshot and is still held, so two concurrent settles
+    // cannot both claim it. A candidate OUTSIDE that set is refused below
+    // unwritten — and, because this search is unlocked, unlocked too: a locking
+    // search would acquire the late row's lock (waiting on its editor) only to refuse.
+    const retired = unit.matchRekey === null
+      ? [] : await findRetiredMatchIdentities(sp, ...retiredSearchOf(unit, unit.matchRekey));
+    if (retired.some((candidate) => !lockedRetiredIds.has(candidate.id))) {
+      return 'stale_canonical_target';
+    }
     if (row) {
       // The incoming rendering already has a row AND a retired one exists:
       // one fixture, two canonical rows, before this run wrote anything.
@@ -547,8 +588,9 @@ async function readFreshTarget(
       const [stale] = await sp<Record<string, unknown>[]>`
         SELECT * FROM matches WHERE id = ${retired[0].id}
       `;
-      // The row was locked a statement ago inside this savepoint, so it is
-      // still there; a disappearance would be a contract breach, not a race.
+      // The row is in the set locked before the authority snapshot and held to the end
+      // of this transaction, so it is still there; a disappearance would be a contract
+      // breach, not a race.
       if (!stale) fail('A locked rekey candidate vanished inside its own savepoint.');
       return {
         identity: {
@@ -773,6 +815,22 @@ function provenanceForUpdate(unit: CanonicalApplyUnitInput): Record<string, Json
 }
 
 /**
+ * AFLDB-ISSUE-274. An UPDATE by primary key touches one row or none, so a count of 0
+ * means the row this unit read is gone (a concurrent delete). The writer must not
+ * report `rowsUpdated: 1` and a ledger row for a write that did not happen: throwing
+ * rolls the unit back and surfaces it as `write_failed`. The match row lock taken
+ * before the authority read makes this unreachable for `matches` and the stats rows;
+ * it is the backstop, and the only protection for `brownlow_round_votes`.
+ */
+function requireRowUpdated(
+  result: { count?: number }, table: CanonicalTargetTable, id: number,
+): void {
+  if (result.count === 0) {
+    fail(`The update of ${table} id ${id} matched no row; it was removed after this unit read it.`);
+  }
+}
+
+/**
  * `matches` — INSERT a new row by the bundle's `match_key` verbatim, or UPDATE
  * an existing one by canonical id, touching only the changed proposed fields.
  *
@@ -804,10 +862,11 @@ async function writeMatch(
     return { rowsInserted: 1, rowsUpdated: 0, targetId: written.id };
   }
   const patch = { ...plan.newValues, ...provenanceForUpdate(unit) };
-  await sp`
+  const updated = await sp`
     UPDATE matches SET ${sp(patch as never)}, imported_at = now()
      WHERE id = ${plan.targetId as number}
   `;
+  requireRowUpdated(updated, 'matches', plan.targetId as number);
   return { rowsInserted: 0, rowsUpdated: 1, targetId: plan.targetId as number };
 }
 
@@ -888,10 +947,11 @@ async function writePlayerMatchStats(
   // to it, unlike the other three targets. Found by the S6 identical-rerun
   // proof, which was the first thing to reach this branch.
   const patch = { ...plan.newValues, ...provenanceForUpdate(unit) };
-  await sp`
+  const updated = await sp`
     UPDATE player_match_stats SET ${sp(patch as never)}
      WHERE id = ${plan.targetId as number}
   `;
+  requireRowUpdated(updated, 'player_match_stats', plan.targetId as number);
   return { rowsInserted: 0, rowsUpdated: 1 };
 }
 
@@ -928,10 +988,11 @@ async function writeBrownlowRoundVotes(
     return { rowsInserted: 1, rowsUpdated: 0 };
   }
   const patch = { ...plan.newValues, ...provenanceForUpdate(unit) };
-  await sp`
+  const updated = await sp`
     UPDATE brownlow_round_votes SET ${sp(patch as never)}, imported_at = now()
      WHERE id = ${plan.targetId as number}
   `;
+  requireRowUpdated(updated, 'brownlow_round_votes', plan.targetId as number);
   return { rowsInserted: 0, rowsUpdated: 1 };
 }
 
@@ -1022,7 +1083,7 @@ export async function applyCanonicalUnit(
       // are locked BEFORE the authority is loaded (see `lockUnitMatchRows`), so the
       // snapshot is read after any concurrent Match Sheet save commits, and no save
       // can commit between this read and the unit's writes.
-      await lockUnitMatchRows(sp, unit);
+      const lockedRetiredIds = await lockUnitMatchRows(sp, unit);
       const authority = await loadManualAuthority(sp, unit.season);
 
       // The canonical match id this unit may write against, RE-READ here
@@ -1062,7 +1123,7 @@ export async function applyCanonicalUnit(
           continue;
         }
 
-        const fresh = await readFreshTarget(sp, unit, target, matchId);
+        const fresh = await readFreshTarget(sp, unit, target, matchId, lockedRetiredIds);
         // AFLDB-ISSUE-131 §5.10 — every one of these writes nothing, opens a
         // finding through the caller and leaves the record for a human. There
         // is no force flag and no adoption.

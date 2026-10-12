@@ -86,3 +86,28 @@ Integration (`tests/integration/settle-afltables.test.ts`): after the run's `loa
 ## 16. Next action
 
 Code fix plus integration case. Sequence with AFLDB-ISSUE-274.
+
+## 17. Interaction with AFLDB-ISSUE-274 (2026-10-11; review only, nothing implemented here)
+
+ISSUE-274's local, uncommitted change (`lockUnitMatchRows` takes the unit's match row `FOR NO KEY UPDATE` before the
+authority read when the unit targets `matches` or `match_period_scores`) **does not fix this defect** and must not be
+reported as doing so:
+
+- The foreign-owned row in the §3 trigger already exists when the unit runs, so the new lock simply locks it. `matchId` is
+  still bound from the `existingMatch` read and again from `matchId = fresh.targetId`; the `matches` target is still refused
+  by E3 (`foreign_source_owner`) and the `pending_match` period-score target still reads an empty set as `new_target` and
+  inserts. Requirement §4 ("no period set when the unit's `matches` target was refused") is unmet.
+- What the lock does give the eventual fix: the row's owner and values cannot change for the rest of the unit, so the
+  decision "the `matches` target was refused, withhold the dependents" is made on stable state.
+- What it cannot give: a row created after a no-row lock, or between the lock and the `existingMatch` read, is not locked
+  (there is nothing to lock). Only withholding the dependent target closes that window, which is this issue's fix.
+- Open design point for the fix (not decided here): which `matches` refusals withhold the period set. `foreign_source_owner`,
+  `ownership_indeterminate` and `stale_canonical_target` plainly should; `nothing_to_write` must not (an unchanged match
+  row must still receive its period set); `manual_authority_conflict` on a score override needs an owner decision.
+- Acceptance is unchanged (§14): `tests/integration/settle-afltables.test.ts` records it as an `it.todo`; it needs the fix and
+  a DB run. The §15 split-ownership census (period rows whose `source_id` differs from the parent match's) is still unrun.
+- 2026-10-11 addendum: ISSUE-274 §19.1 adds one more `matches`-target refusal, `stale_canonical_target`, for a retired candidate
+  that appears after the lock phase. It does not touch this defect (the foreign-owned incoming-key row is not a retired
+  candidate); it is a further refusal this fix must treat as withholding dependents, already in the list above.
+- Locking note for whoever implements it: the `match_period_scores` INSERT takes `FOR KEY SHARE` on the match row through its
+  FK, which does not conflict with ISSUE-274's `FOR NO KEY UPDATE`; no ordering problem is introduced.

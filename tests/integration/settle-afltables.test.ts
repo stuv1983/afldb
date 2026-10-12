@@ -134,6 +134,10 @@ import {
   type RepairOutcome,
 } from '../../tools/current-season/repair-match-rekeys';
 
+import {
+  CONTROL_CONNECTION, createCleanupGate, runBehindHolder, SCENARIO_BUDGET, SCENARIO_TIMEOUT_MS,
+  UnresolvedWorkError, type BehindHolderSteps,
+} from './behind-holder';
 import { createImportRoleParityHarness } from './import-role-parity';
 
 /* ------------------------------------------------------------------ *
@@ -262,6 +266,16 @@ let fixtures: Fixtures;
 /** True only when THIS run created the sources row, so only it may remove one. */
 let createdSourceRow = false;
 let createdProviderSourceRow = false;
+
+/**
+ * AFLDB-ISSUE-274 §20. Set when a `settleBehindHolder` scenario ended with a holder, a settle or
+ * a backend it could not confirm gone. From then on EVERY fixture removal below the scenario
+ * (its wrapper's `finally`, the three `afterAll` hooks that enclose it) goes through this gate
+ * and is skipped, and no further scenario starts: removing rows under live work is worse than
+ * leaving them for the next run's pre-clean. `tests/behind-holder.test.ts` pins the gate DB-free
+ * and pins, from this file's source, that those hooks use it.
+ */
+const cleanupGate = createCleanupGate();
 
 /** Every settle transaction's xid, read back from the batch row it wrote. */
 const settleXids: string[] = [];
@@ -1026,14 +1040,17 @@ beforeAll(async () => {
 
 afterAll(async () => {
   try {
-    await cleanupIssue099(sql);
-    if (createdSourceRow) {
-      await sql`DELETE FROM sources WHERE key = 'afltables'`;
-    }
-    if (createdProviderSourceRow) {
-      await sql`DELETE FROM sources WHERE key = ${PROVIDER_SOURCE_KEY}`;
-    }
+    await cleanupGate.removeFixtures('the ISSUE-099 fixtures and the shared source rows', async () => {
+      await cleanupIssue099(sql);
+      if (createdSourceRow) {
+        await sql`DELETE FROM sources WHERE key = 'afltables'`;
+      }
+      if (createdProviderSourceRow) {
+        await sql`DELETE FROM sources WHERE key = ${PROVIDER_SOURCE_KEY}`;
+      }
+    });
   } finally {
+    // Closing the suite's own pool removes nothing, and it must happen either way.
     await sql.end({ timeout: 10 });
   }
 });
@@ -2385,9 +2402,11 @@ async function apply122(
     manualAuthorityLoader?: (
       tx: postgres.TransactionSql,
     ) => Promise<ManualAuthorityProvider>;
+    /** AFLDB-ISSUE-274 §19: a scenario-owned connection, so it can be stopped on its own. */
+    client?: typeof sql;
   } = {},
 ): Promise<SettleRunResult> {
-  return runSettleAfltables(sql, {
+  return runSettleAfltables(over.client ?? sql, {
     bundle,
     registry,
     apply: over.apply ?? true,
@@ -2685,10 +2704,12 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
   });
 
   afterAll(async () => {
-    await cleanup122(sql);
-    if (createdAdmin122) {
-      await sql`DELETE FROM auth_users WHERE id = ${ids122.adminUserId}`;
-    }
+    await cleanupGate.removeFixtures('the ISSUE-122 fixtures and the created admin', async () => {
+      await cleanup122(sql);
+      if (createdAdmin122) {
+        await sql`DELETE FROM auth_users WHERE id = ${ids122.adminUserId}`;
+      }
+    });
   });
 
   /* ---------------------------------------------------------------- *
@@ -5435,7 +5456,8 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
     });
 
     afterAll(async () => {
-      await cleanupAuthority();
+      await cleanupGate.removeFixtures('the durable-authority rows and audit rows', cleanupAuthority);
+      // The environment is restored either way: it removes no fixture.
       if (priorImportUrl === undefined) delete process.env.AFLDB_IMPORT_DATABASE_URL;
       else process.env.AFLDB_IMPORT_DATABASE_URL = priorImportUrl;
       // The fixture rows (matches, stats, players, identities, spine) are removed
@@ -5447,12 +5469,11 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
         // State A (migration 110 not applied): no durable authority can exist, so
         // there is nothing to prove through the settle.
         if (!storable) return;
-        try {
-          await body();
-        } finally {
-          await cleanupAuthority();
-        }
-      }, 300_000);
+        // AFLDB-ISSUE-274 §20. `cleanupAuthority` runs after the body on every path EXCEPT when
+        // work is unresolved (an `UnresolvedWorkError` from `settleBehindHolder`); the gate also
+        // refuses to start a scenario on top of such work.
+        await cleanupGate.scenario(body, cleanupAuthority);
+      }, SCENARIO_TIMEOUT_MS);
     };
 
     scenario('a corrected field survives the settle, on a retry and when the source moves', async () => {
@@ -5873,5 +5894,369 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
         await side.end({ timeout: 5 });
       }
     });
+
+  });
+
+  /* ---------------------------------------------------------------- *
+   * AFLDB-ISSUE-274 — a settle unit that writes only `matches` / `match_period_scores`.
+   *
+   * SCHEMA STATE: NONE REQUIRED. These cases need no migration 110 and run in State A and
+   * State B alike. What they actually use:
+   *   - the `data_overrides.entity_type` CHECK admits `matches` (migration 095 onwards), which
+   *     the holder's override insert and the real loader both read;
+   *   - `loadManualAuthority` answers from that CHECK and from `matches` overrides; the
+   *     `player_match_stats` half of it returns `NO_PLAYER_MATCH_STATS_AUTHORITY` while no such
+   *     record exists, and `overrideScopeProvenFrom` is true in both states (asserted below);
+   *   - fixtures are `matches` (+ cascading `match_period_scores`) rows from a bundle with NO
+   *     player record, so there is no `player_match_stats` row, no durable Match Sheet
+   *     authority and no Match Sheet writer.
+   * They used to sit inside the durable-authority describe above, whose `scenario()` wrapper
+   * returns early unless migration 110 is applied; they inherited that State-B requirement
+   * without having it. They are deliberately NOT guarded by `storable`.
+   *
+   * KEYS AND CLEANUP. Match keys are `2093|issue122-274-…`: `cleanup122` already sweeps the
+   * `matches`, ledger and staging rows under `2093|issue122-%`, but it sweeps `matches`
+   * OVERRIDES only under the bare `issue122-` prefix, so `cleanupMatchesOnly` removes this
+   * block's override rows (pre-clean, per scenario, and a gated `afterAll`).
+   * ---------------------------------------------------------------- */
+
+  describe('AFLDB-ISSUE-274 — a matches-only settle unit locks the match row (needs no migration 110)', () => {
+    const REC274 = `${PREFIX122}274-`;
+    const KEY_ROOT274 = `${SEASON122}|${REC274}`;
+
+    type Fx = { matchKey: string; scope: string; round: string; roundNumber: number; date: string };
+
+    let tick = 0;
+    /** Strictly increasing observation times, later than every T122 value. */
+    const at = (): string => {
+      tick += 1;
+      const part = (n: number): string => String(n).padStart(2, '0');
+      return `2093-10-02T${part(Math.floor(tick / 3600))}:${part(Math.floor(tick / 60) % 60)}:${part(tick % 60)}Z`;
+    };
+
+    /** One real-world fixture; a distinct `n` gives a distinct date and round. */
+    const fixture = (tag: string, n: number): Fx => ({
+      matchKey: `${KEY_ROOT274}${tag}-1`,
+      scope: `${REC274}scope-${tag}`,
+      round: String(110 + n * 3 + 1),
+      roundNumber: 110 + n * 3 + 1,
+      date: `2093-07-${String(n).padStart(2, '0')}`,
+    });
+
+    /** The first settle: a `matches` target only, no player record at all. */
+    const seed = async (f: Fx): Promise<MatchRow> => {
+      await apply122(bundle122({
+        matches: [{
+          recordId: f.matchKey,
+          matchKey: f.matchKey,
+          scope: f.scope,
+          payloadOver: {
+            round_code: f.round, round_number: f.roundNumber,
+            round_type: 'home_and_away', match_date: f.date,
+          },
+          projectionOver: {
+            round_code: f.round, round_number: f.roundNumber,
+            round_type: 'home_and_away', is_final: false, match_date: f.date,
+          },
+        }],
+        players: [],
+      }), at());
+      const match = await matchRow122(f.matchKey);
+      expect(match, 'the first settle inserts the match').toBeDefined();
+      return match as MatchRow;
+    };
+
+    /** Zero residue: this block's `matches` overrides. The match rows go with `cleanup122`. */
+    const cleanupMatchesOnly = async (): Promise<void> => {
+      await sql`
+        DELETE FROM data_overrides
+         WHERE entity_type = 'matches' AND entity_key LIKE ${`${KEY_ROOT274}%`}
+      `;
+    };
+
+    beforeAll(async () => {
+      await cleanupMatchesOnly();
+    });
+
+    afterAll(async () => {
+      await cleanupGate.removeFixtures('the matches-only override rows', cleanupMatchesOnly);
+    });
+
+    const scenario274 = (name: string, body: () => Promise<void>): void => {
+      it(name, async () => {
+        // No schema-state early return: nothing here depends on migration 110. The gate still
+        // refuses to start on top of unresolved work and skips cleanup after it (§20).
+        await cleanupGate.scenario(body, cleanupMatchesOnly);
+      }, SCENARIO_TIMEOUT_MS);
+    };
+
+    it('ISSUE-274: precondition: the matches-only authority prerequisites hold (read-only; no migration 110 involved)', async () => {
+      // The prerequisites the scenarios below really have, proved from the live database, so a
+      // wrong target fails loudly instead of the scenarios failing confusingly or passing for
+      // the wrong reason. The `player_match_stats` state is deliberately NOT asserted.
+      const definitions = (await sql<{ def: string }[]>`
+        SELECT pg_get_constraintdef(c.oid) AS def FROM pg_constraint c
+         WHERE c.conrelid = 'public.data_overrides'::regclass AND c.contype = 'c'
+      `).map((row) => row.def);
+      const admitted = checkAdmittedEntities(definitions);
+      expect(admitted, 'the entity_type CHECK must read as one allowlist').not.toBeNull();
+      expect(admitted, 'the holder inserts a `matches` override').toContain('matches');
+      expect(overrideScopeProvenFrom(definitions)).toBe(true);
+      // The real loader, run as the settle runs it, must answer `clear` for a matches proposal
+      // with no override: a refusing provider ('indeterminate') would stop the unit before the
+      // lock under test could matter.
+      const authority = await loadManualAuthority(sql, SEASON122);
+      expect(authority({
+        entity: 'matches', targetKey: { match_key: `${KEY_ROOT274}no-such-match` }, fields: ['home_goals'],
+      })).toBe('clear');
+    });
+
+    /*
+     * AFLDB-ISSUE-274. A settle unit that writes only `matches` / `match_period_scores`
+     * took no row lock before its authority read, so a Data Editor edit (or a
+     * `deleteMatch`) committing between that read and `UPDATE matches` was overwritten
+     * (or counted as an update of a vanished row) while its override stayed active.
+     *
+     * Deterministic, no production hook. A side session plays the editor's protocol
+     * (`data-edits.ts`: `matches` row `FOR UPDATE` first, edit and override in one
+     * transaction) and HOLDS the row. The settle is started behind it. Whatever
+     * statement the settle's unit is blocked on is read back from `pg_stat_activity`:
+     * after the fix it is the unit's own `FOR NO KEY UPDATE` lock, taken BEFORE the
+     * authority is read; before the fix it was the final `UPDATE matches`, after the
+     * authority and baseline had already been read. Only then does the holder write and
+     * commit, and the settle resumes.
+     *
+     * §19 completion guarantees (orchestration in ./behind-holder, DB-free tests in
+     * tests/behind-holder.test.ts): every wait is bounded; a timeout is the failure, never
+     * swallowed; the holder, the settle (on its OWN connection) and their backends are all
+     * confirmed gone, using controls that address only this scenario's three uniquely
+     * named sessions, BEFORE the caller's `cleanup` runs; if that cannot be confirmed the
+     * cleanup is skipped and the scenario fails with UnresolvedWorkError.
+     *
+     * §20: the controls are bounded too (observation, termination, close/confirm), on a control
+     * connection with its own statement/lock/connect timeouts; a control that times out or throws
+     * is reported, never a pass. An UnresolvedWorkError is recorded in `cleanupGate`, which makes
+     * the scenario wrapper's `finally` and the three enclosing `afterAll` hooks skip their
+     * fixture removal and stops later scenarios from starting.
+     */
+    const settleBehindHolder = async (
+      corrected: SettleBundle, matchId: number,
+      holderWork: (tx: postgres.TransactionSql) => Promise<void>,
+      steps: BehindHolderSteps<SettleRunResult>,
+    ): Promise<void> => {
+      // Three connections, each with a unique application_name. Every observation and every
+      // stop below is addressed by that name (and `datname = current_database()`), so nothing
+      // can reach a session this scenario did not create. The settle gets its OWN connection
+      // (not the suite's shared `sql`) so it can be waited for, stopped and counted separately.
+      const url = process.env.AFLDB_TEST_DATABASE_URL as string;
+      const tag = `afldb-i274-${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
+      const holderApp = `${tag}-holder`;
+      const settleApp = `${tag}-settle`;
+      const holderSql = postgres(url, {
+        max: 1, onnotice: () => {}, connection: { application_name: holderApp },
+      });
+      const settleSql = postgres(url, {
+        max: 1,
+        onnotice: () => {},
+        transform: { undefined: null },
+        connection: { statement_timeout: 120000, application_name: settleApp },
+      });
+      // The test-owned CONTROL connection (observe, stop, confirm gone). Every one of its
+      // statements and its connect carries its own database/driver timeout, all inside the
+      // harness's `controlBoundMs` (asserted DB-free against `CONTROL_CONNECTION`), so a stuck
+      // control is reported by the database or the driver and not only by the harness's bound.
+      // `lock_timeout` is belt and braces: the statements read `pg_stat_activity` and take no lock.
+      const control = postgres(url, {
+        max: 1,
+        onnotice: () => {},
+        connect_timeout: CONTROL_CONNECTION.connectTimeoutS,
+        connection: {
+          application_name: `${tag}-control`,
+          statement_timeout: CONTROL_CONNECTION.statementTimeoutMs,
+          lock_timeout: CONTROL_CONNECTION.lockTimeoutMs,
+        },
+      });
+      const pause = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
+      const terminate = (app: string) => async (): Promise<void> => {
+        await control`
+          SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+           WHERE application_name = ${app} AND datname = current_database()
+             AND pid <> pg_backend_pid()
+        `;
+      };
+
+      try {
+        await runBehindHolder<SettleRunResult>({
+          // The longest the harness can take is `worstCaseBudgetMs(SCENARIO_BUDGET)` = 162.2 s,
+          // inside the 300 s scenario timeout (asserted DB-free). A control that times out or
+          // throws is reported in the failure and is never treated as a pass.
+          ...SCENARIO_BUDGET,
+          startHolder: () => {
+            let release: () => void = () => {};
+            const gate = new Promise<void>((resolve) => { release = resolve; });
+            let signalHeld: () => void = () => {};
+            const held = new Promise<void>((resolve) => { signalHeld = resolve; });
+            const done = holderSql.begin(async (tx) => {
+              await tx`SELECT id FROM matches WHERE id = ${matchId} FOR UPDATE`;
+              signalHeld();
+              await gate;
+              await holderWork(tx);
+            }).then(() => undefined);
+            return { held, done, release };
+          },
+          startSettle: () => apply122(corrected, at(), { client: settleSql }),
+          observeBlocked: async () => {
+            const blocked = await control<{ query: string }[]>`
+              SELECT b.query FROM pg_stat_activity b
+               WHERE b.application_name = ${settleApp} AND b.datname = current_database()
+                 AND EXISTS (
+                   SELECT 1 FROM pg_stat_activity h
+                    WHERE h.application_name = ${holderApp} AND h.datname = current_database()
+                      AND h.pid = ANY(pg_blocking_pids(b.pid))
+                 )
+            `;
+            return blocked.length > 0 ? blocked[0].query : null;
+          },
+          terminateHolder: terminate(holderApp),
+          terminateSettle: terminate(settleApp),
+          closeAndConfirmGone: async () => {
+            // Closing the clients ends the sessions, but the backends go away asynchronously:
+            // the cleanup that follows must wait until the server shows none of them.
+            await Promise.allSettled([
+              holderSql.end({ timeout: CONTROL_CONNECTION.endTimeoutS }),
+              settleSql.end({ timeout: CONTROL_CONNECTION.endTimeoutS }),
+            ]);
+            const deadline = Date.now() + CONTROL_CONNECTION.confirmWindowMs;
+            for (;;) {
+              const [row] = await control<{ n: number }[]>`
+                SELECT count(*)::int AS n FROM pg_stat_activity
+                 WHERE application_name IN (${holderApp}, ${settleApp}) AND datname = current_database()
+              `;
+              if (row.n === 0) return true;
+              if (Date.now() > deadline) return false;
+              await pause(100);
+            }
+          },
+        }, steps);
+      } catch (error) {
+        // Record it here as well as in the scenario wrapper: whatever calls this helper, the
+        // gate must know before any fixture removal can run. Name the sessions so an operator
+        // can find them if they are still there.
+        if (error instanceof UnresolvedWorkError) {
+          const named = new UnresolvedWorkError(
+            `${error.message} [sessions: application_name LIKE '${tag}-%']`,
+            error.firstFailure, error.controlProblems,
+          );
+          cleanupGate.record(named);
+          throw named;
+        }
+        throw error;
+      } finally {
+        await control.end({ timeout: CONTROL_CONNECTION.endTimeoutS });
+      }
+    };
+
+    const matchLedger = async (matchKey: string): Promise<{ verb: string }[]> => [...await sql<{ verb: string }[]>`
+      SELECT verb FROM canonical_applications
+       WHERE external_record_id = ${matchKey} AND target_table = 'matches' ORDER BY id
+    `];
+
+    const scoreCorrection = (f: Fx): SettleBundle => bundle122({
+      matches: [{
+        recordId: f.matchKey, matchKey: f.matchKey, scope: f.scope,
+        payloadOver: {
+          round_code: f.round, round_number: f.roundNumber, round_type: 'home_and_away',
+          match_date: f.date, home_goals: 16, home_points: 106, margin: 34,
+        },
+        projectionOver: {
+          round_code: f.round, round_number: f.roundNumber, round_type: 'home_and_away',
+          is_final: false, match_date: f.date, home_goals: 16, home_score: 106, margin: 34,
+        },
+      }],
+      players: [],
+    });
+
+    scenario274('ISSUE-274: a Data Editor score edit committed while a matches-only unit is in flight is not overwritten', async () => {
+      const f = fixture('edit', 27);
+      // `cleanupAuthority` covers player_match_stats overrides only: clear this scenario's
+      // own `matches` override before seeding as well as after, so an interrupted earlier
+      // run cannot leave one behind.
+      const clearOverride = async (): Promise<void> => {
+        await sql`DELETE FROM data_overrides WHERE entity_type = 'matches' AND entity_key = ${f.matchKey}`;
+      };
+      await clearOverride();
+      const match = await seed(f);
+      expect(match.homeScore).toBe(100);
+      await settleBehindHolder(scoreCorrection(f), match.id, async (tx) => {
+        // 6*17+10 = 112, |112-72| = 40: every canonical CHECK still holds.
+        await tx`UPDATE matches SET home_goals = 17, home_score = 112, margin = 40 WHERE id = ${match.id}`;
+        await tx`
+          INSERT INTO data_overrides (
+            entity_type, entity_key, field_group, override_values, admin_user_id, is_active
+          ) VALUES (
+            'matches', ${f.matchKey}, 'score', ${tx.json({ home_goals: 17 } as never)},
+            ${ids122.adminUserId}, true
+          )
+          ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE
+            SET is_active = true, override_values = EXCLUDED.override_values
+        `;
+      }, {
+        // PRE-FIX DISCRIMINATOR, checked while the settle is still parked: the unit waited on
+        // its own lock, before any authority read.
+        whileBlocked: (blockedQuery) => {
+          expect(blockedQuery).toContain('FOR NO KEY UPDATE');
+          expect(blockedQuery).not.toMatch(/^\s*UPDATE matches/);
+        },
+        // The editor's value stands, its override is still the authority for it, and the
+        // settle wrote and recorded nothing for the unit.
+        assertions: async ({ run }) => {
+          expect((await matchRow122(f.matchKey))?.homeScore).toBe(112);
+          const [override] = await sql<{ isActive: boolean }[]>`
+            SELECT is_active AS "isActive" FROM data_overrides
+             WHERE entity_type = 'matches' AND entity_key = ${f.matchKey} AND field_group = 'score'
+          `;
+          expect(override?.isActive).toBe(true);
+          expect(run.counters.canonicalRowsUpdated).toBe(0);
+          expect((await matchLedger(f.matchKey)).map((row) => row.verb)).toEqual(['insert']);
+        },
+        // Runs only once the holder, the settle and their backends are all gone.
+        cleanup: clearOverride,
+      });
+    });
+
+    scenario274('ISSUE-274: a match deleted while a matches-only unit waits for its lock is not counted as updated', async () => {
+      const f = fixture('del', 28);
+      const match = await seed(f);
+      await settleBehindHolder(scoreCorrection(f), match.id, async (tx) => {
+        await tx`DELETE FROM match_period_scores WHERE match_id = ${match.id}`;
+        await tx`DELETE FROM matches WHERE id = ${match.id}`;
+      }, {
+        whileBlocked: (blockedQuery) => {
+          expect(blockedQuery).toContain('FOR NO KEY UPDATE');
+        },
+        assertions: async ({ run }) => {
+          expect(await matchRow122(f.matchKey)).toBeUndefined();
+          expect(run.counters.canonicalRowsUpdated).toBe(0);
+          expect((await matchLedger(f.matchKey)).map((row) => row.verb)).toEqual(['insert']);
+        },
+      });
+    });
+
+    it('ISSUE-274: the driver reports count 0 for an UPDATE that matches no row (the writers\' backstop reads it)', async () => {
+      // `requireRowUpdated` in canonical-apply.ts throws on `result.count === 0`. The DB-free
+      // cases feed it a fake result, so this is the one place the REAL driver's shape is
+      // checked: if `count` were absent the backstop would silently never fire. The three
+      // writers' statements are all `UPDATE <table> SET ... WHERE id = $n`.
+      // A key no row can have, so nothing is written; the count of 1 is exercised by every
+      // ordinary settle in this file.
+      const none = await sql`UPDATE matches SET venue_raw = venue_raw WHERE id = -1`;
+      expect(none.count).toBe(0);
+    });
+
+    /* AFLDB-ISSUE-275 is a SEPARATE defect, not fixed by the lock above (it locks a row
+       that exists; 275 is a unit writing period scores under a match whose `matches`
+       target it refused). Its acceptance case is specified in the runbook §14 and is
+       recorded here so that it stays visible; it needs the 275 fix first. */
+    it.todo('AFLDB-ISSUE-275: a refused foreign-owned matches target withholds the same unit\'s match_period_scores');
   });
 });
