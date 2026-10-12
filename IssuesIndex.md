@@ -552,8 +552,14 @@
 
 ### AFLDB-ISSUE-288 — `createCoach` casts an unvalidated `dob` outside its error handling
 - **Severity:** Low. **Area:** admin coaches — `src/db/queries/admin-coaches.ts`. **State:** Open (2026-10-08), F-023;
-  imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-288.md`. **Next action:** implementation.
+  imported 2026-10-10. **Implemented 2026-10-12** in batch worktree `afldb-batch-315-281-312-288` (base `80f86c39`):
+  real-date check before any SQL in both mutations (r2: Gregorian arithmetic without `Date.UTC`'s 0-99
+  remap, year 0000 refused); DB-free 25/25; `afldb_test` `-t "AFLDB-ISSUE-288"` **passed 2026-10-12** (2/2 — the
+  `createCoach` refusal case and the `saveCoachMetadata` refusal case; exit 0; census clean before/after, shared rows
+  unchanged; §17.7). **Committed locally; merge pending** (2026-10-12, its own commit on `opus/batch-315-281-312-288`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-288.md` §17. **Next action:**
+  merge/DEV deploy after ISSUE-274's first-nightly evidence; DEV refusal smoke; then close DEV-scoped
+  (PROD behind the ISSUE-265 hold).
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;

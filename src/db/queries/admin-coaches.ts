@@ -340,6 +340,37 @@ export async function listCoachedClubSlugs(coachId: number): Promise<string[]> {
 
 export type DuplicateCandidate = { coachId: number; label: string; reason: string };
 
+// --- date of birth (AFLDB-ISSUE-288) ------------------------------------
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * The refusal for a date of birth that is not a real calendar day, or null
+ * when it is acceptable. Both coach mutations call this before any SQL: the
+ * value is otherwise cast with `::date`, and `createCoach` runs that cast in
+ * its duplicate checks outside any error handling, so `2026-02-30` threw out
+ * of the Server Action instead of returning a sentence.
+ *
+ * `null` (a blank form field) stays allowed: an unrecorded dob is normal.
+ * Only the strict `YYYY-MM-DD` shape is accepted, so a lenient form such as
+ * `2027-2-3` is refused rather than stored differently from what was typed.
+ * The calendar check is plain Gregorian arithmetic, not `Date.UTC`, which
+ * remaps years 0-99 to 1900-1999; every four-digit year 0001-9999 is checked
+ * as itself. Year 0000 is refused: PostgreSQL's date input rejects it. The
+ * value stored is the operator's string unchanged.
+ */
+export function coachDobError(dob: string | null): string | null {
+  if (dob === null) return null;
+  const parts = ISO_DATE.exec(dob);
+  if (parts) {
+    const [year, month, day] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (year >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= monthDays[month - 1]) return null;
+  }
+  return `Date of birth "${dob}" is not a real date. Use YYYY-MM-DD.`;
+}
+
 // --- mutations (§4.2: one import-role transaction each) ---------------
 
 export type CreateCoachInput = {
@@ -364,6 +395,8 @@ export async function createCoach(input: CreateCoachInput): Promise<CreateCoachR
   if (!displayName) return { ok: false, error: 'Display name is required.' };
   if (displayName.length > 200) return { ok: false, error: 'Display name is limited to 200 characters.' };
   if ((input.notes ?? '').length > 2000) return { ok: false, error: 'Notes are limited to 2000 characters.' };
+  const dobError = coachDobError(input.dob);
+  if (dobError) return { ok: false, error: dobError };
 
   // Hard refusal: a coach already exists with the same normalised name whose
   // dob is unrecorded or agrees (§4.4 rule 1, first half).
@@ -482,6 +515,8 @@ export async function saveCoachMetadata(input: SaveCoachMetadataInput): Promise<
   if (!displayName) return { ok: false, error: 'Display name is required.' };
   if (displayName.length > 200) return { ok: false, error: 'Display name is limited to 200 characters.' };
   if ((input.notes ?? '').length > 2000) return { ok: false, error: 'Notes are limited to 2000 characters.' };
+  const dobError = coachDobError(input.dob);
+  if (dobError) return { ok: false, error: dobError };
 
   return withImportConnection(async (importSql) => {
     try {

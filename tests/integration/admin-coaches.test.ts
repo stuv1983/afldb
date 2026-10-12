@@ -242,6 +242,18 @@ describe('createCoach', () => {
     expect(second.error).toContain('already exists');
   });
 
+  it('refuses an impossible date of birth with a sentence and writes nothing (AFLDB-ISSUE-288)', async () => {
+    const displayName = `${MARKER} Bad Dob Coach`;
+    for (const dob of ['2026-02-30', '2023-02-29', '31/12/1980', '2027-2-3']) {
+      const result = await createCoach({
+        displayName, givenName: null, surname: null, dob, notes: null, adminUserId: actorId,
+      });
+      expect(result).toEqual({ ok: false, error: `Date of birth "${dob}" is not a real date. Use YYYY-MM-DD.` });
+    }
+    const [row] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM coaches WHERE display_name = ${displayName}`;
+    expect(row.n).toBe(0);
+  });
+
   it('asks for confirmation, then proceeds, when the name matches but the dob differs', async () => {
     await createCoach({
       displayName: `${MARKER} Confirm Coach`, givenName: null, surname: null, dob: '1960-06-06', notes: null,
@@ -337,6 +349,24 @@ describe('saveCoachMetadata', () => {
     `;
     expect(edit?.fieldGroup).toBe('identity');
     expect(edit?.newValues.display_name).toBe('Sourced Test Coach (edited)');
+  });
+
+  it('refuses an impossible date of birth before the transaction, not with a PostgreSQL message (AFLDB-ISSUE-288)', async () => {
+    const countEdits = async () => (await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_edits WHERE table_name = 'coaches' AND row_id = ${sourcedCoachId}
+    `)[0].n;
+    const before = { detail: await getCoachAdminDetail(sourcedCoachId), edits: await countEdits() };
+    expect(before.detail).not.toBeNull();
+    for (const dob of ['2026-02-30', '2025-04-31', 'x']) {
+      const result = await saveCoachMetadata({
+        coachId: sourcedCoachId, displayName: 'Should Not Persist', givenName: null, surname: null, dob,
+        notes: null, adminUserId: actorId,
+      });
+      expect(result).toEqual({ ok: false, error: `Date of birth "${dob}" is not a real date. Use YYYY-MM-DD.` });
+    }
+    // The complete admin detail (every coach column it reads, link and provenance), not only the name.
+    expect(await getCoachAdminDetail(sourcedCoachId)).toEqual(before.detail);
+    expect(await countEdits()).toBe(before.edits);
   });
 
   it('§10.2 gate 9: the override above survives a reload that reimports different source values, running the importer\'s own replay SQL verbatim', async () => {

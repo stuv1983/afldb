@@ -39,7 +39,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-285 | Award Replace panel cannot give the duplicate confirmation its action requires | Low | Admin awards UI — `src/app/admin/awards/ReplacePanel.tsx` | Open (2026-10-08); review F-020, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-285.md` | Implementation |
 | AFLDB-ISSUE-286 | Hall of Fame legend and removal years are not bounded server-side | Low | Admin awards / Hall of Fame validation | Open (2026-10-08); review F-021, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-286.md` | Implementation |
 | AFLDB-ISSUE-287 | Source-owned draft pick `null_pick_number` confirmation is unreachable | Low | Admin draft UI — `src/app/admin/draft/SourceFieldsPanel.tsx` | Open (2026-10-08); review F-022, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-287.md` | Implementation |
-| AFLDB-ISSUE-288 | `createCoach` casts an unvalidated `dob` outside its error handling | Low | Admin coaches — `src/db/queries/admin-coaches.ts` | Open (2026-10-08); review F-023, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-288.md` | Implementation |
+| AFLDB-ISSUE-288 | `createCoach` casts an unvalidated `dob` outside its error handling | Low | Admin coaches — `src/db/queries/admin-coaches.ts` | Open (2026-10-08); review F-023, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-288.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (r2 correction pass: Gregorian check without `Date.UTC`, year 0000 refused), DB-free 25/25; `afldb_test` `-t "AFLDB-ISSUE-288"` PASSED 2026-10-12 (2/2: the `createCoach` and the `saveCoachMetadata` refusal case; census clean before/after; runbook §17.7); committed locally; merge pending | Merge and DEV smoke after ISSUE-274 first nightly; then close DEV-scoped (PROD behind ISSUE-265 hold) |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-290 | Manual draft selections accept out-of-range age, height, weight and pick number | Low | Admin draft / validation | Open (2026-10-08); review F-025, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-290.md` | Implementation |
 | AFLDB-ISSUE-291 | Admin player creation persists unvalidated biographical fields | Low | Admin player creation — `src/db/queries/players.ts` (`createPlayerInTransaction`) | Open (2026-10-08); review F-026, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-291.md` | Implementation |
@@ -50138,7 +50138,29 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Origin.** Review F-023 (R2c-F04) at `20a7a4bb`. Code-proven; the rendering of a thrown Server Action is
   framework-defined.
 - **Defect.** A non-date `dob` throws an uncaught PostgreSQL cast error out of the action instead of returning `{ error }`;
-  `saveCoachMetadata` surfaces the raw message. **Next action.** Implementation.
+  `saveCoachMetadata` surfaces the raw message.
+- **Implementation (2026-10-12, uncommitted; batch worktree `afldb-batch-315-281-312-288`, base `80f86c39`).**
+  `coachDobError` (strict `YYYY-MM-DD` plus calendar round-trip, the fixture/leadership policy) runs in `createCoach` and
+  `saveCoachMetadata` before any SQL; `null` (blank) stays allowed; a lenient `2027-2-3` is now refused.
+  `tests/admin-coach-actions.test.ts` 23/23 (7 new: leap years, impossible month/day, non-strict shapes, and both
+  mutations resolving to the refusal); without the guards 2 fail. Two cases added to `tests/integration/admin-coaches.test.ts`,
+  **not run**. Typecheck clean; no lint error in a changed file. Runbook §17.
+- **Correction pass r2 (2026-10-12, same worktree, uncommitted).** The calendar check no longer uses `Date.UTC`, which remaps
+  years 0-99 to 1900-1999 (r1 refused real dates such as `0001-01-01`, `0004-02-29`): plain Gregorian arithmetic checks every
+  four-digit year 0001-9999 as itself, and year `0000` (rejected by PostgreSQL's date input) is refused explicitly. No age
+  or future-date rule. Boundary regressions added beside the leap-year tests; `tests/admin-coach-actions.test.ts` **25/25**;
+  with r1's round-trip restored 1 fails. The integration metadata refusal case now compares the **complete**
+  `getCoachAdminDetail` result before/after (r1: display name only), still **not run**. Runbook §17.1-§17.3.
+- **`afldb_test` integration (2026-10-12, owner-authorised, run once): PASSED.** Working tree = base `80f86c39` + batch-r2
+  (diff SHA-256 and all 17 post-image blobs verified first). `-t "AFLDB-ISSUE-288"`: exit 0, **2 passed**, 13 skipped (the
+  gate 9 importer-replay case not run). Census before and after: every fixture selector 0, test trigger and function
+  absent, season 2091 absent; shared `auth_users`/`sources` whole-row hashes, the 12 historical S6 batches and every
+  recorded total unchanged; four fixture sequences +1. Runbook §17.7.
+- **Committed locally; merge pending (2026-10-12).** Operator-reviewed; its own local commit on
+  `opus/batch-315-281-312-288` (the verified batch-r2 bytes); not merged, pushed or deployed.
+- **Next action.** Merge and
+  DEV deploy after ISSUE-274's first-nightly evidence; DEV refusal smoke; then close DEV-scoped, PROD pending behind the
+  ISSUE-265 hold.
 
 ## AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 
