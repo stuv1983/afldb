@@ -37,7 +37,11 @@ commit.
   ordered ids only); the one review item, `club_seasons_id_seq`, advanced by four (1748 to 1752) during the fixture interval
   and was accepted by the owner as recorded (compare exit 5 preserved; the sequence was not reset). The DEV run itself was in
   State B.
-  Not shown: the real Data Editor, State B durable Match Sheet cases, overlapping settles, or the first scheduled run (13 October).
+  The first scheduled nightly (13 October, one night, read-only checks) completed at `6f99b58d` with 64 refusals before and
+  after the change and 0 canonical failures, inserts, updates or ledger writes.
+  Not shown: that the lock fired in that run, the real Data Editor, State B durable Match Sheet cases, overlapping settles,
+  or repeatability beyond the observed 13 October night (later nights are combined ISSUE-274 + ISSUE-276 observations while
+  ISSUE-276 remains installed on DEV).
 
 ### Submission validation can no longer overwrite a concurrent approve, promote or reject (AFLDB-ISSUE-273; merged to main `a34f0721` with readiness accepted under an operator exception; DB-free unit, poller self-test, typecheck and lint passed; `afldb_test` integration passed for `email-intake` (23 passed + 2 expected-fail) and `submission-promotion` (18 passed + 2 expected-fail), with only the existing ISSUE-264 State-B block refused on `match-results-promotion` in the earlier run; installed on DEV 11 October 2026 under a separate scoped deploy-gate exception for the same four files (BUILD_ID `L22XfuX2nngl_51zwuzfH`, no migration) and DEV synthetic-fixture acceptance supported, not exercising the race guard, the decided acknowledgement or a real mailbox; PROD not installed, behind the ISSUE-265 hold; issue open) - 11 October 2026
 

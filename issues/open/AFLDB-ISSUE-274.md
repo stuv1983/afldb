@@ -1490,7 +1490,7 @@ D-274-DEV-1 the deploy gate (relocate the four files, or a scoped exception; rec
 
 - DEV host contact (`streamanator` only; `ssh` alias for `arm@10.0.40.100`): bash scripts delivered over stdin (nothing written to the host); a `git ls-remote` on the host checkout (writes no ref); a `sudo -n true` test (no effect); read-only `psql` sessions as `afldb_owner` named `i274acc-precheck` and `i274acc-prepare-check` (`default_transaction_read_only=on`, guard first; PREPARE only, nothing executed). The owner DSN line was read in process on the host and by the H-4 child on the workstation; no value was printed or stored. The H-4 tunnel (PID 6472) was closed; no listener remains on 55432.
 - `D:\dev\afldb` was used read-only (status, preflight); its four preserved files were not touched. No Git command that writes (fetch, add, commit, merge, push, checkout) was run.
-- Repository files changed by this step: this runbook (§0 note and §31), `issues.md` and `IssuesIndex.md` (ISSUE-274 entries). `CHANGELOG.md` is not changed: no retained behaviour changed. These edits are UNCOMMITTED in this worktree by design; main's tree is left clean-but-for-the-four-files so the deploy gate is judged on the state H-4 saw. Zero-byte root files `240`, `DEV`, `ISSUE-274`, `owner.end({`, `{})` remain untracked artefacts.
+- Repository files changed by this step: this runbook (§0 note and §31), `issues.md` and `IssuesIndex.md` (ISSUE-274 entries). `CHANGELOG.md` is not changed: no retained behaviour changed. At the time of that step these edits were UNCOMMITTED in this worktree by design (committed later, see §32.12); main's tree is left clean-but-for-the-four-files so the deploy gate is judged on the state H-4 saw. Zero-byte root files `240`, `DEV`, `ISSUE-274`, `owner.end({`, `{})` remain untracked artefacts.
 - Outside the repository: `D:\tmp\issue274\dev-pack-20261012\` (the pack and its evidence).
 
 ### 31.9 State after this step
@@ -1604,7 +1604,7 @@ The checkout HEAD seen now (`6f99b58d`) does not by itself prove which revision 
 
 ### 33.6 Remaining requirements
 
-1. **Repeat on later mornings** (PROCEDURE.md section 11): not met by one night. As first written this item was conditional on ISSUE-276 being installed before 14 Oct 05:00; 33.8 records that the host checkout is now at `3ec76f28` (`canonical-apply.ts`, `match-rekey.ts` and `settle-afltables.ts` blobs identical to `6f99b58d`), so the 14 Oct run is a **combined ISSUE-274 + ISSUE-276 observation** and must be annotated as such. No further ISSUE-274-only night is expected.
+1. **Repeat on later mornings** (PROCEDURE.md section 11): not met by one night. As first written this item was conditional on ISSUE-276 being installed before 14 Oct 05:00; 33.8 records that the host checkout is now at `3ec76f28` (`canonical-apply.ts`, `match-rekey.ts` and `settle-afltables.ts` blobs identical to `6f99b58d`), so the 14 Oct run is a **combined ISSUE-274 + ISSUE-276 observation** and must be annotated as such. **While ISSUE-276 remains installed on DEV, every future night is likewise a combined ISSUE-274 + ISSUE-276 observation**; none can isolate ISSUE-274, so repeatability of the ISSUE-274 lock beyond the observed 13 Oct night is not established by them alone. No further ISSUE-274-only night is expected.
 2. The limits listed in 33.5 and in sections 31.6 and 32.9 stay open.
 3. PROD is not deployed (ISSUE-265 hold); ISSUE-274 closure follows PROD acceptance (CLAUDE.md section 5). **ISSUE-274 stays Open.**
 
