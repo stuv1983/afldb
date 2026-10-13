@@ -34,7 +34,7 @@ import {
   describeAffected, describeScope, parseCensusOutput, rebuildCensusScope, refusalMessage,
   rolloverCensusScope, type CensusScope,
 } from '../../src/lib/rollover/afl-api-ownership-census';
-import { redact, runPsql, type SpawnSyncLike } from './psql';
+import { PsqlCredentialRefused, psqlConnection, redact, runPsql, type SpawnSyncLike } from './psql';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
@@ -126,6 +126,14 @@ function main(argv: string[]): number {
   }
   if (named !== args.database) {
     throw new CensusRefused(`${args.dsnEnv} names database '${named}', not --database '${args.database}'.`);
+  }
+  // AFLDB-ISSUE-313: a credential psql cannot be given privately is a refusal here, before any
+  // evidence is read or any psql is launched (the census itself is read-only).
+  try {
+    psqlConnection(dsn, {});
+  } catch (error) {
+    if (!(error instanceof PsqlCredentialRefused)) throw error;
+    throw new CensusRefused(`${args.dsnEnv} cannot be used with psql. ${error.message}`);
   }
 
   const scope = censusScopeFor(

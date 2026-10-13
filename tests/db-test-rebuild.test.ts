@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -130,13 +131,16 @@ import {
   PSQL_PROBE_ABORT,
   PSQL_PROBE_OK,
   PSQL_PROBE_SQL,
+  PsqlCredentialRefused,
   PsqlUnavailable,
   assertPsqlReachable,
   redact,
   psqlArgv,
+  psqlConnection,
   runPsql,
   type SpawnSyncLike,
 } from '../tools/db/psql';
+import type { PrivilegesSpawn } from '../tools/db/privileges';
 import {
   READ_ONLY_SQL,
   IDENTITY_SQL as VERIFIER_IDENTITY_SQL,
@@ -3297,7 +3301,10 @@ describe('reset proof', () => {
       const dsn = 'postgres://u:p@h:5432/afldb_test';
       const argv = psqlArgv(dsn);
       expect(argv[0]).toBe('-d');
-      expect(argv[1]).toBe(dsn);
+      // AFLDB-ISSUE-313: the SAME connection, minus the password (which travels in the
+      // child environment). A DSN with no password is passed through byte for byte.
+      expect(argv[1]).toBe('postgres://u@h:5432/afldb_test');
+      expect(psqlArgv('postgres://u@h:5432/afldb_test')[1]).toBe('postgres://u@h:5432/afldb_test');
       expect(argv[0].startsWith('-')).toBe(true);
 
       // No element is a positional operand: everything is a flag or a flag's value.
@@ -3339,8 +3346,10 @@ describe('reset proof', () => {
         .split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
       expect(argv[0], 'the DSN must never lead the argv').toMatch(/^-/);
       expect(argv).toContain('ON_ERROR_STOP=1');
-      // The DSN is a `-d` OPTION value, never a positional operand.
-      expect(argv[argv.indexOf('dsn') - 1] ?? argv[argv.length - 2]).toBe('-d');
+      // The DSN is a `-d` OPTION value, never a positional operand — and (ISSUE-313) it is
+      // the PASSWORD-FREE `connection.dsn`, never the raw environment value.
+      expect(argv.slice(-2)).toEqual(['-d', 'connection.dsn']);
+      expect(argv).not.toContain('dsn');
       expect(source).toContain('ON_ERROR_STOP=1');
     });
 
@@ -3389,6 +3398,517 @@ describe('reset proof', () => {
       expect(buildProofSql()).toContain(RESET_SQL.trim());
       expect(proofCode).not.toMatch(/const\s+RESET_SQL\s*=/);
       expect(proofCode).toContain('import { RESET_SQL');
+    });
+  });
+
+  // AFLDB-ISSUE-313 — the password is never an element of psql's argument vector. Every
+  // credential below is a FAKE; nothing here contacts a database or a host.
+  describe('psql credential handling (AFLDB-ISSUE-313)', () => {
+    const SECRET = 'fake-secret-9X';
+    const PARENT = { PATH: '/usr/bin', HOME: '/home/fake', PGCLIENTENCODING: 'UTF8' };
+
+    // tools/db/privileges.ts RUNS when imported (as it did before ISSUE-313) unless this
+    // variable is exactly '1'. It is set for the import only, and removed straight after, so
+    // nothing the tests spawn later inherits it.
+    let privilegesMain: typeof import('../tools/db/privileges').main;
+    beforeAll(async () => {
+      process.env.AFLDB_PRIVILEGES_NO_AUTORUN = '1';
+      try {
+        ({ main: privilegesMain } = await import('../tools/db/privileges'));
+      } finally {
+        delete process.env.AFLDB_PRIVILEGES_NO_AUTORUN;
+      }
+    });
+
+    /** [label, raw DSN, expected password-free DSN, expected password (undefined = none)] */
+    const SUPPORTED: [string, string, string, string | undefined][] = [
+      ['userinfo password',
+        `postgres://afldb_owner:${SECRET}@db.example:5432/afldb_test`,
+        'postgres://afldb_owner@db.example:5432/afldb_test', SECRET],
+      ['postgresql:// scheme',
+        `postgresql://afldb_owner:${SECRET}@db.example/afldb_test`,
+        'postgresql://afldb_owner@db.example/afldb_test', SECRET],
+      ['other parameters kept verbatim, in order',
+        `postgres://u:${SECRET}@h:5432/afldb_test?sslmode=require&application_name=a%20b&connect_timeout=5`,
+        'postgres://u@h:5432/afldb_test?sslmode=require&application_name=a%20b&connect_timeout=5', SECRET],
+      ['percent-encoded password',
+        'postgres://u:p%40ss%3Aw%2Fd%25%26%3F%C3%A9@h/afldb_test',
+        'postgres://u@h/afldb_test', 'p@ss:w/d%&?é'],
+      ['literal "?" in the userinfo password, as libpq reads it',
+        'postgres://u:pa?ss@h/afldb_test',
+        'postgres://u@h/afldb_test', 'pa?ss'],
+      ['percent-encoded user is left alone',
+        `postgres://some%40one:${SECRET}@h/afldb_test`,
+        'postgres://some%40one@h/afldb_test', SECRET],
+      ['empty user',
+        `postgres://:${SECRET}@h/afldb_test`,
+        'postgres://@h/afldb_test', SECRET],
+      ['an empty userinfo password: nothing to hide, string untouched',
+        'postgres://u:@h/afldb_test',
+        'postgres://u:@h/afldb_test', undefined],
+      ['an empty password query parameter: nothing to hide, string untouched',
+        'postgres://u@h/afldb_test?sslmode=require&password=',
+        'postgres://u@h/afldb_test?sslmode=require&password=', undefined],
+      ['a bare password keyword with no value: nothing to hide, string untouched',
+        'postgres://u@h/afldb_test?password',
+        'postgres://u@h/afldb_test?password', undefined],
+      ['password query parameter',
+        `postgres://u@h/afldb_test?password=${SECRET}`,
+        'postgres://u@h/afldb_test', SECRET],
+      ['password query parameter amid others',
+        `postgres://u@h/afldb_test?sslmode=require&password=${SECRET}&application_name=x`,
+        'postgres://u@h/afldb_test?sslmode=require&application_name=x', SECRET],
+      ['percent-encoded password keyword and value',
+        'postgres://u@h/afldb_test?pass%77ord=a%26b%3Dc',
+        'postgres://u@h/afldb_test', 'a&b=c'],
+      ['no password at all',
+        'postgres://u@h:5432/afldb_test?sslmode=require',
+        'postgres://u@h:5432/afldb_test?sslmode=require', undefined],
+      ['no userinfo',
+        'postgres://h:5432/afldb_test',
+        'postgres://h:5432/afldb_test', undefined],
+      ['a bare database name',
+        'afldb_test', 'afldb_test', undefined],
+      ['a key=value string without a password',
+        'host=h port=5432 dbname=afldb_test user=u',
+        'host=h port=5432 dbname=afldb_test user=u', undefined],
+    ];
+
+    for (const [label, raw, safe, password] of SUPPORTED) {
+      it(`moves the password off the command line: ${label}`, () => {
+        const connection = psqlConnection(raw, PARENT);
+        expect(connection.dsn).toBe(safe);
+        expect(connection.env.PGPASSWORD).toBe(password);
+        // Everything else the parent had is inherited unchanged.
+        expect({ ...connection.env, PGPASSWORD: undefined }).toEqual({ ...PARENT, PGPASSWORD: undefined });
+        // And the argument vector is built from the same password-free value, in the
+        // unchanged ISSUE-093 §20 order.
+        expect(psqlArgv(raw)).toEqual(
+          ['-d', safe, '-v', 'ON_ERROR_STOP=1', '--single-transaction', '-q', '-f', '-']);
+        if (password) {
+          for (const element of psqlArgv(raw)) {
+            expect(element).not.toContain(password);
+            expect(element).not.toMatch(/\/\/[^/@]*:[^/@]+@/);       // no user:pass@ authority
+            expect(element).not.toMatch(/password=/i);
+          }
+        }
+      });
+    }
+
+    it('never mutates the parent environment, and overrides an ambient PGPASSWORD for the child only', () => {
+      const parent = { ...PARENT, PGPASSWORD: 'fake-ambient' };
+      const before = JSON.stringify(parent);
+      const connection = psqlConnection(`postgres://u:${SECRET}@h/afldb_test`, parent);
+      expect(JSON.stringify(parent)).toBe(before);
+      expect(connection.env).not.toBe(parent);
+      expect(connection.env.PGPASSWORD).toBe(SECRET);       // the DSN's own password wins, as before
+
+      // With no password in the DSN the ambient value is left to do what it always did.
+      const ambient = psqlConnection('postgres://u@h/afldb_test', parent);
+      expect(ambient.env.PGPASSWORD).toBe('fake-ambient');
+      expect(ambient.env).not.toBe(parent);
+
+      const processBefore = process.env.PGPASSWORD;
+      psqlConnection(`postgres://u:${SECRET}@h/afldb_test`);
+      expect(process.env.PGPASSWORD).toBe(processBefore);
+    });
+
+    it('does not leave a differently-cased PGPASSWORD beside ours on Windows', () => {
+      const original = Object.getOwnPropertyDescriptor(process, 'platform')!;
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      try {
+        const connection = psqlConnection(`postgres://u:${SECRET}@h/afldb_test`, { ...PARENT, PgPassword: 'fake-ambient' });
+        const names = Object.keys(connection.env).filter((n) => n.toUpperCase() === 'PGPASSWORD');
+        expect(names).toEqual(['PGPASSWORD']);
+        expect(connection.env.PGPASSWORD).toBe(SECRET);
+      } finally {
+        Object.defineProperty(process, 'platform', original);
+      }
+    });
+
+    /** Connection strings whose password cannot be moved without guessing libpq's behaviour. */
+    const REFUSED: [string, string][] = [
+      ['a password in the userinfo AND a query parameter', `postgres://u:${SECRET}@h/afldb_test?password=${SECRET}`],
+      ['two password query parameters', `postgres://u@h/afldb_test?password=${SECRET}&password=${SECRET}`],
+      ['an encoded duplicate keyword', `postgres://u@h/afldb_test?password=${SECRET}&pass%77ord=${SECRET}`],
+      ['a secret beside an empty password query parameter', `postgres://u:${SECRET}@h/afldb_test?password=`],
+      ['a secret beside a bare password keyword', `postgres://u:${SECRET}@h/afldb_test?password`],
+      ['a secret query parameter beside an empty userinfo password', `postgres://u:@h/afldb_test?password=${SECRET}`],
+      ['a secret query parameter beside an empty one', `postgres://u@h/afldb_test?password=&password=${SECRET}`],
+      ['a password query parameter with an extra "="', `postgres://u@h/afldb_test?password=${SECRET}=x`],
+      ['an sslpassword parameter', `postgres://u@h/afldb_test?sslmode=require&sslpassword=${SECRET}`],
+      ['an invalid percent-escape in the password', `postgres://u:${SECRET}%zz@h/afldb_test`],
+      ['non-UTF-8 percent-encoding in the password', `postgres://u:${SECRET}%FF@h/afldb_test`],
+      ['%00 in the userinfo password', `postgres://u:${SECRET}%00x@h/afldb_test`],
+      ['%00 in a password query parameter', `postgres://u@h/afldb_test?password=${SECRET}%00x`],
+      ['a key=value string with a password keyword', `host=h dbname=afldb_test user=u password=${SECRET}`],
+      ['a key=value string with spaces around "="', `host=h user=u password = ${SECRET}`],
+      ['a key=value string with an sslpassword keyword', `host=h sslpassword=${SECRET}`],
+    ];
+
+    for (const [label, raw] of REFUSED) {
+      it(`refuses, before spawning anything: ${label}`, () => {
+        let message = '';
+        try { psqlConnection(raw, PARENT); } catch (error) {
+          expect(error).toBeInstanceOf(PsqlCredentialRefused);
+          expect(error).toBeInstanceOf(PsqlUnavailable);   // the reset proof already fails closed on this
+          message = (error as Error).message;
+        }
+        expect(message, 'must refuse').not.toBe('');
+        // The message names the problem, never the string it was given.
+        expect(message).not.toContain(SECRET);
+        expect(message).not.toContain('@h/');
+        expect(message).not.toContain('afldb_test');
+        expect(message).toContain('Nothing has been executed');
+
+        // psqlArgv refuses the same strings, so no caller can build an unsafe vector.
+        expect(() => psqlArgv(raw)).toThrow(PsqlCredentialRefused);
+
+        let spawned = 0;
+        const spawn: SpawnSyncLike = () => { spawned += 1; return { status: 0, stdout: '', stderr: '' }; };
+        expect(() => runPsql(raw, 'SELECT 1;', { spawn })).toThrow(PsqlCredentialRefused);
+        expect(spawned).toBe(0);
+      });
+    }
+
+    it('hands psql the password in the child environment and only there', () => {
+      const calls: { bin: string; argv: string[]; options: Parameters<SpawnSyncLike>[2] }[] = [];
+      const spawn: SpawnSyncLike = (bin, argv, options) => {
+        calls.push({ bin, argv, options });
+        return { status: 0, stdout: '', stderr: '' };
+      };
+      const before = process.env.PGPASSWORD;
+      runPsql(`postgres://afldb_owner:${SECRET}@db.example:5432/afldb_test?sslmode=require`, 'SELECT 1;', { spawn, cwd: '/repo' });
+
+      expect(calls).toHaveLength(1);
+      const [call] = calls;
+      expect(call.bin).toBe(PSQL_BIN);
+      expect(call.argv).toEqual([
+        '-d', 'postgres://afldb_owner@db.example:5432/afldb_test?sslmode=require',
+        '-v', 'ON_ERROR_STOP=1', '--single-transaction', '-q', '-f', '-']);
+      expect(call.argv.join('\0')).not.toContain(SECRET);
+      expect(call.options.env?.PGPASSWORD).toBe(SECRET);
+      // The rest of the contract is untouched: payload, encoding and working directory.
+      expect(call.options.input).toBe('SELECT 1;');
+      expect(call.options.encoding).toBe('utf8');
+      expect(call.options.cwd).toBe('/repo');
+      // The child's environment is a copy: this process's own is as it was.
+      expect(call.options.env).not.toBe(process.env);
+      expect(process.env.PGPASSWORD).toBe(before);
+    });
+
+    it('carries the password on the probe too, so the whole path is proven with the real invocation', () => {
+      const seen: Parameters<SpawnSyncLike>[2][] = [];
+      const spawn: SpawnSyncLike = (_bin, _argv, options) => {
+        seen.push(options);
+        return { status: 3, stdout: '', stderr: `WARNING: ${PSQL_PROBE_OK}\nERROR: ${PSQL_PROBE_ABORT}` };
+      };
+      assertPsqlReachable(`postgres://u:${SECRET}@h/afldb_test`, { spawn });
+      expect(seen).toHaveLength(1);
+      expect(seen[0].env?.PGPASSWORD).toBe(SECRET);
+    });
+
+    it('does not put the password in a launch-failure message either', () => {
+      const spawn: SpawnSyncLike = () => ({
+        status: null, stdout: null, stderr: null, error: new Error('spawnSync psql ENOENT'),
+      });
+      try {
+        runPsql(`postgres://u:${SECRET}@h/afldb_test`, 'SELECT 1;', { spawn });
+        expect.unreachable();
+      } catch (error) {
+        expect(error).toBeInstanceOf(PsqlUnavailable);
+        expect((error as Error).message).not.toContain(SECRET);
+      }
+    });
+
+    describe('the privileges runner', () => {
+      const dsn = `postgres://afldb_owner:${SECRET}@db.example:5432/afldb_test?sslmode=require`;
+      const argvFor = (target?: string) => ['node', 'privileges.ts', ...(target ? ['--target', target] : [])];
+
+      function capture(status: number | null = 0) {
+        const calls: { bin: string; argv: string[]; options: Parameters<PrivilegesSpawn>[2] }[] = [];
+        const spawn: PrivilegesSpawn = (bin, argv, options) => {
+          calls.push({ bin, argv, options });
+          return { status };
+        };
+        return { calls, spawn };
+      }
+
+      it('passes the password-free DSN with -d and the password in PGPASSWORD, flag order unchanged', () => {
+        const { calls, spawn } = capture(0);
+        const code = privilegesMain(argvFor('test'), { ...PARENT, AFLDB_TEST_DATABASE_URL: dsn }, spawn);
+
+        expect(code).toBe(0);
+        expect(calls).toHaveLength(1);
+        expect(calls[0].bin).toBe(PSQL_BIN);
+        expect(calls[0].argv).toEqual([
+          '-v', 'ON_ERROR_STOP=1', '-f', join('tools', 'maintenance', 'privileges.sql'),
+          '-d', 'postgres://afldb_owner@db.example:5432/afldb_test?sslmode=require']);
+        expect(calls[0].argv.join('\0')).not.toContain(SECRET);
+        expect(calls[0].options.env.PGPASSWORD).toBe(SECRET);
+        expect(calls[0].options.env.PATH).toBe(PARENT.PATH);
+        expect(calls[0].options.stdio).toBe('inherit');
+        expect(calls[0].options.encoding).toBe('utf8');
+      });
+
+      it('resolves each target from its own variable and returns psql\'s exit status', () => {
+        const env = {
+          ...PARENT,
+          AFLDB_OWNER_DATABASE_URL: 'postgres://o:fake-owner@h/afldb_dev',
+          AFLDB_TEST_DATABASE_URL: 'postgres://t:fake-test@h/afldb_test',
+          AFLDB_CODE_TEST_DATABASE_URL: 'postgres://c:fake-code@h/code_test_db',
+        };
+        for (const [target, expectedDsn, password] of [
+          [undefined, 'postgres://o@h/afldb_dev', 'fake-owner'],
+          ['dev', 'postgres://o@h/afldb_dev', 'fake-owner'],
+          ['test', 'postgres://t@h/afldb_test', 'fake-test'],
+          ['code-test', 'postgres://c@h/code_test_db', 'fake-code'],
+        ] as const) {
+          const { calls, spawn } = capture(7);
+          expect(privilegesMain(argvFor(target), env, spawn)).toBe(7);
+          expect(calls[0].argv.slice(-2)).toEqual(['-d', expectedDsn]);
+          expect(calls[0].options.env.PGPASSWORD).toBe(password);
+        }
+      });
+
+      it('refuses an unmovable password with exit 1 and without launching psql or echoing it', () => {
+        const { calls, spawn } = capture(0);
+        const errors: string[] = [];
+        const spy = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => { errors.push(a.join(' ')); });
+        try {
+          const code = privilegesMain(
+            argvFor('test'),
+            { ...PARENT, AFLDB_TEST_DATABASE_URL: `postgres://u:${SECRET}@h/afldb_test?password=${SECRET}` },
+            spawn);
+          expect(code).toBe(1);
+        } finally { spy.mockRestore(); }
+        expect(calls).toHaveLength(0);
+        expect(errors.join('\n')).toContain('AFLDB_TEST_DATABASE_URL');
+        expect(errors.join('\n')).not.toContain(SECRET);
+      });
+
+      it('keeps its existing refusals: unknown target, missing target name, unset variable', () => {
+        const { calls, spawn } = capture(0);
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        try {
+          expect(privilegesMain(argvFor('prod'), PARENT, spawn)).toBe(1);
+          expect(privilegesMain(['node', 'privileges.ts', '--target'], PARENT, spawn)).toBe(1);
+          expect(privilegesMain(argvFor('test'), PARENT, spawn)).toBe(1);
+        } finally { spy.mockRestore(); }
+        expect(calls).toHaveLength(0);
+      });
+    });
+
+    describe('compatibility with what the tools supported before', () => {
+      // Every variable these tools hand to psql is ALSO read by postgres.js and `new URL()`
+      // elsewhere (resolveTarget, migrate.ts, the importers), so the supported form is the URL
+      // with the password in its userinfo. For every such DSN the connection psql is given must
+      // be the same one `new URL()` describes, minus only the password.
+      const TOOL_FORMS = [
+        'postgresql://afldb_owner:S3cret@localhost:5432/afldb_test',
+        'postgres://afldb_owner:p%40ss%3Aw%2Frd%25@127.0.0.1:55432/afldb_test?sslmode=require',
+        'postgresql://u:%C3%A9%F0%9F%94%91@db.example/afldb_test?application_name=a%20b&connect_timeout=5',
+        'postgresql://u:p+lus&amp;eq@h:5432/afldb_test',
+        'postgresql://some%40one:pw@h:5432/code_test_db',
+        'postgresql://u:@h/afldb_test',
+        'postgresql://u@h/afldb_test',
+      ];
+
+      for (const raw of TOOL_FORMS) {
+        it(`keeps the connection identity new URL() sees: ${raw.replace(/:[^:@/]*@/, ':<pw>@')}`, () => {
+          const reference = new URL(raw);
+          const connection = psqlConnection(raw, {});
+          const stripped = new URL(connection.dsn);
+          const password = decodeURIComponent(reference.password);
+          expect(connection.env.PGPASSWORD).toBe(password === '' ? undefined : password);
+          expect(stripped.password).toBe('');
+          for (const part of ['protocol', 'username', 'hostname', 'port', 'pathname', 'search', 'hash'] as const) {
+            expect(stripped[part], part).toBe(reference[part]);
+          }
+        });
+      }
+
+      it('accepts every DSN .env.example documents, with nothing but the password removed', () => {
+        const lines = readFileSync(join(root, '.env.example'), 'utf8').split(/\r?\n/);
+        const documented = lines
+          .map((l) => /^#?\s*[A-Z_]+=(postgres(?:ql)?:\/\/\S+)$/.exec(l)?.[1])
+          .filter((v): v is string => v !== undefined);
+        expect(documented.length).toBeGreaterThanOrEqual(8);
+        for (const raw of documented) {
+          const reference = new URL(raw);
+          const connection = psqlConnection(raw, {});
+          const stripped = new URL(connection.dsn);
+          expect(stripped.password).toBe('');
+          expect([stripped.username, stripped.host, stripped.pathname, stripped.search])
+            .toEqual([reference.username, reference.host, reference.pathname, reference.search]);
+          expect(connection.env.PGPASSWORD).toBe(decodeURIComponent(reference.password) || undefined);
+        }
+      });
+
+      it('moves a lone ?password= exactly as psql read it, and still refuses what postgres.js would read differently', () => {
+        // postgres.js takes the password from the userinfo only and ignores `?password=`, so a
+        // DSN carrying both could authenticate as two different passwords depending on the tool.
+        // psql alone honoured the query form, so the lone form is kept; the pair is refused.
+        expect(psqlConnection('postgres://u@h/db?password=lone', {}).env.PGPASSWORD).toBe('lone');
+        expect(() => psqlConnection('postgres://u:one@h/db?password=two', {})).toThrow(PsqlCredentialRefused);
+      });
+    });
+
+    describe('every affected caller refuses an unusable credential before its first stage', () => {
+      const BAD = 'postgres://afldb_owner:fake-secret-9X@127.0.0.1:1/afldb_test?password=fake-secret-9X';
+      const BAD_CODE_TEST = BAD.replace('afldb_test', 'code_test_db');
+
+      it('executeRebuild: nothing runs, whoever built the target', () => {
+        const { deps, commands, sqlRuns, validationRuns } = fakeDeps();
+        const stages = planStages(target(), fitzroy(), OPTS);
+        expect(() => executeRebuild(stages, target({ adminDsn: BAD }), deps)).toThrow(RebuildRefused);
+        expect([commands.length, sqlRuns.length, validationRuns.length]).toEqual([0, 0, 0]);
+        // and a usable DSN still runs the plan
+        expect(executeRebuild(stages, target(), fakeDeps().deps).ok).toBe(true);
+      });
+
+      it('resolveTarget refuses it for each rebuild target, naming that target\'s own variable', () => {
+        for (const [name, spec] of Object.entries(REBUILD_TARGETS)) {
+          const env = {
+            [spec.adminEnv]: name === 'code_test_db' ? BAD_CODE_TEST : BAD,
+            [spec.importEnv]: `postgres://afldb_import:fake-import@127.0.0.1:1/${name}`,
+          };
+          let message = '';
+          try { resolveTarget(env, { target: name }); } catch (error) {
+            expect(error).toBeInstanceOf(RebuildRefused);
+            message = (error as Error).message;
+          }
+          expect(message, name).toContain(spec.adminEnv);
+          expect(message).not.toContain('fake-secret-9X');
+        }
+      });
+
+      it('the PRIVILEGES stage reads the very variable resolveTarget checked, with no environment overlay', () => {
+        const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+        for (const [name, spec] of Object.entries(REBUILD_TARGETS)) {
+          const script: string = pkg.scripts[spec.privilegesScript];
+          const requested = /--target (\S+)/.exec(script)![1];
+          const calls: string[][] = [];
+          const spawn: PrivilegesSpawn = (_bin, argv) => { calls.push(argv); return { status: 0 }; };
+          const usable = `postgres://afldb_owner:fake-pw@127.0.0.1:1/${name}`;
+          expect(privilegesMain(['node', 'privileges.ts', '--target', requested], { [spec.adminEnv]: usable }, spawn)).toBe(0);
+          expect(calls, name).toHaveLength(1);
+          expect(calls[0].slice(-2)).toEqual(['-d', `postgres://afldb_owner@127.0.0.1:1/${name}`]);
+        }
+        const privileges = planStages(target(), fitzroy(), OPTS).find((s) => s.kind === 'privileges')!;
+        expect(privileges.run).toBe('command');
+        expect(privileges.envOverlay).toBeUndefined();
+        expect(privileges.argv).toEqual(['npm', 'run', REBUILD_TARGETS.afldb_test.privilegesScript]);
+      });
+
+      // The CLIs, run for real against a dead address (127.0.0.1:1). If a guard were missing the
+      // run would try to connect there and fail on its own, which these tests would also catch
+      // (the expected refusal text would be absent); nothing can reach a real database.
+      const tsx = join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+      const cli = (args: string[], env: Record<string, string>) => spawnSync(process.execPath, [tsx, ...args], {
+        cwd: root, encoding: 'utf8', timeout: 90_000,
+        env: { ...process.env, ...env, AFLDB_PRIVILEGES_NO_AUTORUN: undefined } as NodeJS.ProcessEnv,
+      });
+
+      it('db:privileges (direct run): runs its work, refusing rather than skipping', () => {
+        const unknown = cli(['tools/db/privileges.ts', '--target', 'no-such-target'], {});
+        expect(unknown.status).toBe(1);
+        expect(unknown.stderr).toContain("unknown privileges target 'no-such-target'");      // it RAN
+        const refused = cli(['tools/db/privileges.ts', '--target', 'test'], { AFLDB_TEST_DATABASE_URL: BAD });
+        expect(refused.status).toBe(1);
+        expect(refused.stderr).toContain('AFLDB_TEST_DATABASE_URL');
+        expect(refused.stderr).toContain('Nothing has been executed');
+        expect(`${refused.stdout}${refused.stderr}`).not.toContain('fake-secret-9X');
+        // The opt-out can never turn a direct run into a silent exit 0.
+        const skipped = spawnSync(process.execPath, [tsx, 'tools/db/privileges.ts', '--target', 'no-such-target'], {
+          cwd: root, encoding: 'utf8', env: { ...process.env, AFLDB_PRIVILEGES_NO_AUTORUN: '1' },
+        });
+        expect(skipped.status).toBe(1);
+        expect(skipped.stderr).toContain('Refusing to skip the privileges work silently');
+      }, 120_000);
+
+      it('the ownership census CLI refuses before reading its evidence or launching psql', () => {
+        const run = cli(['tools/db/afl-api-ownership-census.ts', '--database', 'afldb_test', '--dsn-env', 'VERIFY_313_BAD_DSN'],
+          { VERIFY_313_BAD_DSN: BAD });
+        expect(run.status).toBe(2);
+        expect(run.stderr).toContain('CENSUS NOT TAKEN');
+        expect(run.stderr).toContain('VERIFY_313_BAD_DSN cannot be used with psql');
+        expect(`${run.stdout}${run.stderr}`).not.toContain('fake-secret-9X');
+      }, 120_000);
+
+      it('the reset proof CLI refuses before opening a session or launching psql', () => {
+        const run = cli(['tools/db/prove-reset.ts'], { AFLDB_TEST_DATABASE_URL: BAD });
+        expect(run.status).toBe(1);
+        expect(run.stderr).toContain('REFUSED: AFLDB_TEST_DATABASE_URL cannot be used with psql');
+        expect(`${run.stdout}${run.stderr}`).not.toContain('fake-secret-9X');
+        expect(run.stdout).not.toContain('AFLDB RESET_SQL proof');          // its banner prints after the guard
+      }, 120_000);
+
+      it('the convergence rehearsal refuses before connecting or seeding anything', () => {
+        const parent = mkdtempSync(join(tmpdir(), 'verify-313-'));
+        const out = join(parent, 'never-created');
+        try {
+          const run = cli(['--conditions=react-server', 'tools/db/promotion-convergence-rehearsal.ts', 'run',
+            '--acknowledge', 'code_test_db', '--out', out],
+          { AFLDB_CODE_TEST_DATABASE_URL: BAD_CODE_TEST });
+          expect(run.status).toBe(1);
+          expect(run.stderr).toContain('REFUSED: The owner DSN cannot be used with psql');
+          expect(`${run.stdout}${run.stderr}`).not.toContain('fake-secret-9X');
+          expect(existsSync(out)).toBe(false);                  // runRehearsal's mkdirSync was never reached
+        } finally {
+          rmSync(parent, { recursive: true, force: true });
+        }
+      }, 120_000);
+
+      it('the first-kick-goal rehearsal reaches psql only through resolveTarget and executeRebuild', () => {
+        const source = readFileSync(join(root, 'tools', 'records', 'first-kick-goal-rehearsal.ts'), 'utf8');
+        expect(source.indexOf('resolveTarget(process.env, rebuildOpts)')).toBeGreaterThan(-1);
+        expect(source.indexOf('resolveTarget(process.env, rebuildOpts)'))
+          .toBeLessThan(source.indexOf('runPsql(target.adminDsn'));
+        expect(source.indexOf('resolveTarget(process.env, rebuildOpts)'))
+          .toBeLessThan(source.indexOf('connect(target.adminDsn)'));
+      });
+    });
+
+    it('is applied to the rebuild target before the destructive reset, and names the variable', () => {
+      const target = REBUILD_TARGETS.afldb_test;
+      const base = {
+        [target.adminEnv]: `postgres://afldb_owner:${SECRET}@h:5432/afldb_test`,
+        [target.importEnv]: 'postgres://afldb_import:fake-import@h:5432/afldb_test',
+      };
+      expect(resolveTarget(base).adminDsn).toBe(base[target.adminEnv]);      // unchanged: still the full DSN
+
+      const bad = { ...base, [target.adminEnv]: `postgres://afldb_owner:${SECRET}@h:5432/afldb_test?password=${SECRET}` };
+      let message = '';
+      try { resolveTarget(bad); } catch (error) {
+        expect(error).toBeInstanceOf(RebuildRefused);
+        message = (error as Error).message;
+      }
+      expect(message).toContain(target.adminEnv);
+      expect(message).not.toContain(SECRET);
+    });
+
+    it('leaves no tool building psql\'s -d from a raw DSN', () => {
+      // The structural guard: every `-d` value in tools/**/*.ts is a password-free
+      // `connection.dsn`, never a raw `dsn` / `…Dsn` variable.
+      const offenders: string[] = [];
+      const walk = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          if (entry.name === 'node_modules') continue;
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) walk(full);
+          else if (entry.name.endsWith('.ts') && /'-d',\s*(?!connection\.dsn\b)(?:[\w.]*[dD]sn|[\w.]*[uU]rl)\b/.test(readFileSync(full, 'utf8'))) {
+            offenders.push(full);
+          }
+        }
+      };
+      walk(join(root, 'tools'));
+      expect(offenders).toEqual([]);
+
+      const rehearsal = readFileSync(join(root, 'tools', 'db', 'promotion-convergence-rehearsal.ts'), 'utf8');
+      expect(rehearsal).toContain('psqlConnection(dsn)');
+      expect(rehearsal).toContain("'-d', connection.dsn");
+      expect(rehearsal).toContain('env: { ...connection.env, PGCLIENTENCODING');
     });
   });
 

@@ -47,7 +47,7 @@ import {
 import type { Row } from './catalog-fingerprint';
 import { gateOverrideReplayTargets, readRebuildMarkerPresent, Report, type Query } from './promotion-check';
 import { lineageRemapSql, type ManualIdentityConvergenceEntry } from './promotion-inventory';
-import { redact } from './psql';
+import { PsqlCredentialRefused, psqlConnection, redact } from './psql';
 
 export class ConvergenceRehearsalRefused extends Error {}
 
@@ -494,8 +494,10 @@ type Execution = { status: number | null; stdout: string; stderr: string };
 
 /** Step 2c as the plan runs it: psql -f the file, under ON_ERROR_STOP unless told otherwise. */
 function execute(dsn: string, file: string, onErrorStop = true): Execution {
-  const args = ['-X', ...(onErrorStop ? ['-v', 'ON_ERROR_STOP=1'] : []), '-d', dsn, '-f', file];
-  const r = spawnSync('psql', args, { encoding: 'utf8', env: { ...process.env, PGCLIENTENCODING: 'UTF8' } });
+  // AFLDB-ISSUE-313: password-free `-d`, password in the child's PGPASSWORD (never argv).
+  const connection = psqlConnection(dsn);
+  const args = ['-X', ...(onErrorStop ? ['-v', 'ON_ERROR_STOP=1'] : []), '-d', connection.dsn, '-f', file];
+  const r = spawnSync('psql', args, { encoding: 'utf8', env: { ...connection.env, PGCLIENTENCODING: 'UTF8' } });
   if (r.error) throw new ConvergenceRehearsalRefused(`psql did not start: ${redact(r.error.message)}`);
   return { status: r.status, stdout: redact(r.stdout ?? ''), stderr: redact(r.stderr ?? '') };
 }
@@ -943,6 +945,14 @@ async function main(argv: string[]): Promise<number> {
   const command = parseConvergenceRehearsalArgs(argv);
   const { ownerDsn, database } = resolveRehearsalDsns(process.env, { allowOwnerImportDsn: true });
   if (database !== f.database) throw new ConvergenceRehearsalRefused(`Refusing '${database}': ${f.database} only.`);
+  // AFLDB-ISSUE-313: psql is first launched deep inside the cases, after the fixtures are
+  // seeded. A credential it cannot be given privately is refused here, before any connection.
+  try {
+    psqlConnection(ownerDsn, {});
+  } catch (error) {
+    if (!(error instanceof PsqlCredentialRefused)) throw error;
+    throw new ConvergenceRehearsalRefused(`The owner DSN cannot be used with psql. ${error.message}`);
+  }
   console.log(`AFLDB-ISSUE-242 convergence rehearsal — ${command.step} on ${database}`);
   if (command.step === 'run') return runRehearsal(ownerDsn, resolve(command.out), command.scale);
   const sql = connect(ownerDsn);

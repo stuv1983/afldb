@@ -83,7 +83,7 @@ import {
   ACHIEVEMENT_TYPE as FIRST_KICK_GOAL_TYPE, FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE,
   SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
 } from '../records/first-kick-goal-source';
-import { runPsql, type SpawnSyncLike } from './psql';
+import { PsqlCredentialRefused, psqlConnection, runPsql, type SpawnSyncLike } from './psql';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -461,6 +461,20 @@ export function databaseOf(dsn: string): string {
 }
 
 /**
+ * AFLDB-ISSUE-313: refuse, before any stage, a DSN whose password psql cannot be given
+ * privately (tools/db/psql.ts `psqlConnection`). Only the refusal is of interest; the result
+ * is discarded and nothing is spawned. The message never contains the DSN.
+ */
+export function assertPsqlCanCarry(dsn: string, name: string): void {
+  try {
+    psqlConnection(dsn, {});
+  } catch (error) {
+    if (!(error instanceof PsqlCredentialRefused)) throw error;
+    throw new RebuildRefused(`${name} cannot be used with psql. ${error.message}`);
+  }
+}
+
+/**
  * The target-name contract, §10 points 1-3, in ONE place.
  *
  * `resolveTarget` below and the rollback-only reset proof (tools/db/prove-reset.ts) both
@@ -531,6 +545,12 @@ export function resolveTarget(
       + `'${requested}'. The target is never inferred from a DSN; fix the variable or the `
       + '--target flag so they agree.');
   }
+
+  // AFLDB-ISSUE-313: the reset, the validation streams and (through the same variable) the
+  // PRIVILEGES stage all hand this DSN to psql, which now refuses one whose password cannot be
+  // moved off the command line. Find that here, before anything runs, rather than at the
+  // PRIVILEGES stage two steps after the destructive reset.
+  assertPsqlCanCarry(adminDsn, spec.adminEnv);
 
   // Data stages must run as the restricted import role, never as owner and NEVER with the
   // development DSN this repository's .env sets. ISSUE-083 tracks the missing test import
@@ -2166,6 +2186,10 @@ export function executeRebuild(
   control: { rehearsalStopAfter?: RehearsalStopBoundary } = {},
 ): ExecutionReport {
   const executed: string[] = [];
+
+  // AFLDB-ISSUE-313: whoever built the target (the CLI, the first-kick-goal rehearsal, a
+  // test), the first stage — never mind the destructive one — waits for this.
+  assertPsqlCanCarry(target.adminDsn, 'The admin DSN');
 
   if (control.rehearsalStopAfter !== undefined) {
     assertRehearsalStop({ target: target.database, rehearsalStopAfter: control.rehearsalStopAfter }, target.database);

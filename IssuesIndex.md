@@ -694,9 +694,9 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-311.md`. **Next action:** implementation, with ISSUE-309.
 
 ### AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
-- **Severity:** Low. **Area:** DB tooling / credential handling — `tools/db/psql.ts`. **State:** Open (2026-10-08), F-048;
-  imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-313.md`. **Next action:** implementation.
+- **Severity:** Low. **Area:** DB tooling / credential handling — `tools/db/psql.ts`, `privileges.ts`, `promotion-convergence-rehearsal.ts`. **State:** Open (2026-10-08), F-048;
+  imported 2026-10-10; **implemented and committed locally 2026-10-13** on `sonnet/issue-313` (base `5ffbc563`), DB-free validated (589/589 in the pinned file, 61 new); not merged or pushed. D-313-1 resolved (V6 + DB-free capture accepted for `privileges.ts` transport, not end-to-end).
+- **Runbook:** `issues/open/AFLDB-ISSUE-313.md` (§17–§21). **State:** read-only real-psql pack PASSED 2026-10-13 on `streamanator` (V1–V6, runbook §20.1); D-313-6 approved (compatibility restriction, runbook §17.6). Not end-to-end privileges, Windows, `root`-visibility or PROD acceptance; V5 had 4 samples. **Next action:** integration (`merge:ready` blockers are untracked files; see the readiness record), then push and closure records. Issue stays Open.
 
 **AFLDB-ISSUE-314 resolved 2026-10-13** (merge-scoped; implementation commit `c47709ad475c99c617d0b393af323607d107f2a8`, parent `24ca412b`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). `prepare-promotion-source --apply` now refuses an unusable `--record-out` before it verifies, connects or writes. DB-free: Windows 464 passed | 1 skipped; Linux (`streamanator`, Node v22.23.2) `-t ISSUE-314` 9 selected, 9 passed, 0 failed, 0 skipped. Readiness was accepted under a scoped cleanliness exception, not a clean pass. No real `--apply` or promotion was run; the `cannot be inspected` branch is untested; an unwritable directory, a full disk and a path created after the check are still found only by the final write. Detail: `issues.md` (ISSUE-314 entry) and `issues/closed/AFLDB-ISSUE-314.md` §17.9.
 

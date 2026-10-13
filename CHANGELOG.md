@@ -15,6 +15,19 @@ commit.
 
 ## [Unreleased]
 
+### Database tooling no longer puts the password on the `psql` command line (AFLDB-ISSUE-313; committed locally on `sonnet/issue-313`; DB-free validated; read-only real-`psql` pack PASSED on `streamanator` 2026-10-13; not merged or pushed; issue open) - 13 October 2026
+
+- Every `psql` the TypeScript database tooling launches (`db:test:rebuild` reset and validation streams, the reset proof, the AFL API ownership census, the first-kick-goal rehearsal, `db:privileges*`, and the promotion convergence rehearsal)
+  now receives a password-free `-d` connection string, and the password travels in the child's `PGPASSWORD` instead of its argument vector (which any local user can read through `ps` and `/proc/<pid>/cmdline`). A password in the URL's userinfo, or alone
+  in a `?password=` parameter, is moved (percent-decoded); a connection string with no password is passed through byte for byte and the caller's own environment is never modified. The flag order and `--single-transaction` / `ON_ERROR_STOP` envelope are unchanged.
+- A connection string whose password cannot be moved without assuming libpq's precedence rules is **refused before psql is launched**: a password in both the userinfo and a parameter, two `password` parameters, a secret beside an empty one, `sslpassword`,
+  invalid percent-encoding, `%00`, or a key=value string with a password keyword. Every caller checks before its first stage (`db:test:rebuild` up front and at the top of `executeRebuild`, the reset proof, the ownership census, the convergence rehearsal), so a refusal cannot first appear at the
+  privileges stage after the destructive reset. Messages never contain the connection string. The documented URL form with the password in the userinfo, a lone `?password=`, and every string without a password behave as before; the refused forms were never usable by the other tools that read the same variables.
+- `tools/db/privileges.ts` still runs when started directly; its test-only opt-out (`AFLDB_PRIVILEGES_NO_AUTORUN=1`) makes a direct run refuse with exit 1 rather than exit 0 having done nothing.
+- **Validation (DB-free, Windows).** `tests/db-test-rebuild.test.ts` 589 passed (61 new: fake credentials, a capturing spawn, every DSN in `.env.example`, real child-process runs of the CLIs); seven importing suites 1296 passed | 1 skipped; restoring the raw DSN fails 28 cases; `tsc --noEmit` clean. No database or host was
+  contacted. The read-only real-psql run (a self-contained pack, runbook `issues/open/AFLDB-ISSUE-313.md` §20.1) passed V1–V6 on 2026-10-13, and the compatibility restriction (§17.6, D-313-6) was approved as a documented tooling restriction (D-313-6; the percent-encoded-`=` case is covered by the existing `pass%77ord=a%26b%3Dc` test, not a literal `?password=a%3Db` case). The run was one attempt on one Linux host with 4 V5 samples (periodic, not continuous observation) and a separate credential launcher that sat outside the pack manifest. Integration and push are outstanding; the privileges credential transport is accepted on the DB-free capture plus a read-only invocation-shape check, not as end-to-end
+  privileges acceptance. Windows, visibility to `root` and PROD are unverified. Hand-run `psql "$DSN"` commands in runbooks are out of scope.
+
 ### `prepare-promotion-source --apply` refuses an unusable `--record-out` before it writes anything (AFLDB-ISSUE-314; `c47709ad`, merged and pushed to `main`; DB-free validated on Windows and Linux; resolved) - 13 October 2026
 
 - `npm run db:promotion:prepare-source -- --apply --record-out <path>` now checks the output path straight after parsing its arguments, before the retained snapshots are verified and before any connection is opened.

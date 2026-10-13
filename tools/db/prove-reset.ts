@@ -45,7 +45,8 @@ import { join } from 'node:path';
 
 import { RESET_SQL, RebuildRefused, assertRebuildTargetName, databaseOf } from './rebuild-test';
 import {
-  PsqlUnavailable, assertPsqlReachable, redact, runPsql, type PsqlResult,
+  PsqlCredentialRefused, PsqlUnavailable, assertPsqlReachable, psqlConnection, redact, runPsql,
+  type PsqlResult,
 } from './psql';
 import {
   FINGERPRINT_SECTIONS,
@@ -866,6 +867,13 @@ async function main(): Promise<number> {
   }
   // Refuse on the NAME before a connection is even opened.
   assertRebuildTargetName(dsnDatabase);
+  // AFLDB-ISSUE-313: and on the CREDENTIAL, before any session is opened or psql launched.
+  try {
+    psqlConnection(dsn, {});
+  } catch (error) {
+    if (!(error instanceof PsqlCredentialRefused)) throw error;
+    throw new ProofRefused(`AFLDB_TEST_DATABASE_URL cannot be used with psql. ${error.message}`);
+  }
 
   const psqlDeps = { spawn: spawnSync as never, cwd: REPO_ROOT };
   const postgres = (await import('postgres')).default;
