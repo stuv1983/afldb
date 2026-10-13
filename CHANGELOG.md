@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### `prepare-promotion-source --apply` refuses an unusable `--record-out` before it writes anything (AFLDB-ISSUE-314; implemented locally on `sonnet/issue-314`, uncommitted; DB-free validated on Windows and Linux; not merged; issue open) - 13 October 2026
+
+- `npm run db:promotion:prepare-source -- --apply --record-out <path>` now checks the output path straight after parsing its arguments, before the retained snapshots are verified and before any connection is opened.
+  An existing path (file, directory or link), a missing parent directory or a file in the parent path stops the run with `STOP: --record-out cannot be created. Nothing has been verified, opened or written`. Before, such a path failed only at
+  the final exclusive write, after the apply had committed to `afldb_test`, leaving a prepared source with no preparation record (a rebuild of about 21 minutes). An unwritable directory, a full disk and a path
+  created after the check are still found only by the final write. No preparation step, argument or record format changed.
+- **Validation (DB-free).** Windows: `tests/db-promotion-check.test.ts` 464 passed | 1 skipped (9 new cases; main 456/456); with the guard disabled 4 of the first-pass cases fail. The dangling-symbolic-link case was
+  skipped there (no link privilege). **Linux (`streamanator`, Node v22.23.2, isolated scratch copy of the reviewed tracked tree and a private dependency copy, 13 Oct 2026): `-t ISSUE-314` 9 selected cases, 9 passed, 0 failed, 0 skipped, including the
+  dangling-symbolic-link case** (the other 456 cases were excluded by the filter). The `code_test_db` rehearsal and a real `--apply` were not run. Closure criterion approved by the operator 13 Oct 2026; no real promotion,
+  `--apply`, deployment or DEV/PROD acceptance is claimed. Detail: `issues/open/AFLDB-ISSUE-314.md` §17, §17.8.
+
 ### A settle no longer writes period scores under a match it refused (AFLDB-ISSUE-275; implemented locally on `opus/issue-275`, uncommitted; focused `afldb_test` validation passed; not merged, not deployed; issue open) - 13 October 2026
 
 - **Behaviour.** The canonical applier (`applyCanonicalUnit`, shared by the AFL Tables and AFL API settles) now refuses a unit's `match_period_scores` target, unread, whenever the same unit's `matches` target was not applied for any

@@ -7,7 +7,7 @@
  * database; and the checker's source is asserted to carry no write path.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -201,6 +201,7 @@ import {
 } from '../tools/db/promotion-source-dependencies';
 import {
   parsePrepareArgs,
+  recordOutProblems,
   runPreparePromotionSource,
   verifyAflApiPlayerBridge,
   verifyAflApiRetainedSnapshot,
@@ -8666,6 +8667,114 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
         });
         await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), missing.deps))
           .rejects.toThrow(/no refusal census was reported/);
+      });
+    });
+
+    describe('ISSUE-314: --record-out is checked before anything is verified, opened or written', () => {
+      /** A harness whose every step would be recorded, with the offline verifiers made to fail loudly if reached. */
+      const guarded = (over: Partial<PrepareDeps> = {}) => harness({
+        verifyAflTables: () => { throw new Error('REACHED: offline verification ran'); },
+        verifyAflApi: () => { throw new Error('REACHED: offline verification ran'); },
+        verifyBridge: () => { throw new Error('REACHED: bridge verification ran'); },
+        ...over,
+      });
+      const refusal = /STOP: --record-out cannot be created\. Nothing has been verified, opened or written/;
+
+      it('an existing file is refused before verification, any connection, any settle or any write, and is left untouched', async () => {
+        const target = join(root, 'prep.json');
+        writeFileSync(target, 'EARLIER RECORD');
+        const h = guarded();
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', target]), h.deps))
+          .rejects.toThrow(refusal);
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', target]), h.deps))
+          .rejects.toThrow(/already exists/);
+        expect(h.calls).toEqual([]);          // no prove, no ownership read, no bridge, no settle
+        expect(h.written).toEqual([]);
+        expect(readFileSync(target, 'utf8')).toBe('EARLIER RECORD');
+      });
+
+      it('refuses the same way on the DEFAULT writer, which no other case in this file reaches', async () => {
+        const target = join(root, 'prep.json');
+        writeFileSync(target, 'EARLIER RECORD');
+        const h = guarded({ writeRecord: undefined });
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', target]), h.deps)).rejects.toThrow(refusal);
+        expect(h.calls).toEqual([]);
+        expect(readFileSync(target, 'utf8')).toBe('EARLIER RECORD');
+      });
+
+      it('an existing directory, a missing parent directory and a parent that is a file are each refused with their reason', async () => {
+        mkdirSync(join(root, 'a-directory'));
+        writeFileSync(join(root, 'a-file'), 'x');
+        const cases: [string, RegExp][] = [
+          [join(root, 'a-directory'), /already exists/],
+          [join(root, 'no-such-dir', 'prep.json'), /parent directory .* does not exist/],
+          [join(root, 'a-file', 'prep.json'), /its parent '.*a-file' is not a directory/],
+          // A regular file further up the path (ENOTDIR on POSIX, ENOENT on Windows): refused all the same.
+          [join(root, 'a-file', 'sub', 'prep.json'), /parent directory .*sub' does not exist \(or a component of its path is a file\)/],
+        ];
+        for (const [path, reason] of cases) {
+          const h = guarded();
+          await expect(runPreparePromotionSource(argv(['--apply', '--record-out', path]), h.deps)).rejects.toThrow(reason);
+          expect(h.calls).toEqual([]);
+          expect(h.written).toEqual([]);
+        }
+        expect(existsSync(join(root, 'no-such-dir'))).toBe(false);   // the check creates nothing
+        expect(readFileSync(join(root, 'a-file'), 'utf8')).toBe('x'); // and leaves the file as it was
+      });
+
+      it('a new file in an existing directory still runs to the end on the default writer and writes the record once', async () => {
+        const target = join(root, 'prep.json');
+        const h = harness({ writeRecord: undefined });
+        const out = await runPreparePromotionSource(argv(['--apply', '--record-out', target]), h.deps);
+        expect(out.status).toBe('prepared');
+        expect(JSON.parse(readFileSync(target, 'utf8'))).toMatchObject({ kind: 'afldb_promotion_source_preparation_record' });
+        // ...and a second run to the same path is now refused up front, with the first record intact.
+        const first = readFileSync(target, 'utf8');
+        const again = guarded({ writeRecord: undefined });
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', target]), again.deps)).rejects.toThrow(refusal);
+        expect(again.calls).toEqual([]);
+        expect(readFileSync(target, 'utf8')).toBe(first);
+      });
+
+      it('the other modes have no --record-out and are not affected', async () => {
+        const h = harness();
+        await runPreparePromotionSource(argv(['--validate-only']), h.deps);
+        await runPreparePromotionSource(argv(['--dry-run']), h.deps);
+        expect(h.written).toEqual([]);
+      });
+
+      describe('recordOutProblems', () => {
+        it('is empty for a new path in an existing directory, relative or absolute', () => {
+          expect(recordOutProblems(join(root, 'new.json'))).toEqual([]);
+          expect(recordOutProblems('issue314-never-created.json')).toEqual([]);   // resolved against the working directory
+        });
+
+        it('reports a missing parent directory, and creates neither the path nor its parent', () => {
+          const problems = recordOutProblems(join(root, 'missing', 'x.json'));
+          expect(problems).toHaveLength(1);                 // one reason, not a duplicate for the path itself
+          expect(problems[0]).toMatch(/parent directory/);
+          expect(existsSync(join(root, 'missing'))).toBe(false);
+        });
+
+        it('reports a parent that is a regular file once, and a file further up the path once, never as a second "already exists"', () => {
+          writeFileSync(join(root, 'a-file'), 'x');
+          expect(recordOutProblems(join(root, 'a-file', 'prep.json'))).toEqual([`its parent '${join(root, 'a-file')}' is not a directory`]);
+          const deeper = recordOutProblems(join(root, 'a-file', 'sub', 'prep.json'));
+          expect(deeper).toHaveLength(1);
+          expect(deeper[0]).toMatch(/does not exist \(or a component of its path is a file\)/);
+        });
+
+        it('refuses a dangling symbolic link, which the exclusive write also refuses', (ctx) => {
+          const link = join(root, 'dangling.json');
+          try {
+            symlinkSync(join(root, 'target-that-does-not-exist'), link);
+          } catch {
+            ctx.skip();   // creating a link needs a privilege on some Windows hosts
+            return;
+          }
+          expect(existsSync(link)).toBe(false);                       // exists() says "free"...
+          expect(recordOutProblems(link).join()).toMatch(/already exists/);   // ...lstat does not.
+        });
       });
     });
   });

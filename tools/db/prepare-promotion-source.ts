@@ -44,7 +44,7 @@
  *                  census, which must also be identical between the two; then the record.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -404,6 +404,42 @@ export function verifyAflApiPlayerBridge(
   return outcome;
 }
 
+/**
+ * AFLDB-ISSUE-314 — why the `wx` write of `--record-out` could not succeed, found BEFORE any
+ * connection is opened. The record is written last, after every apply step has committed to
+ * `afldb_test`; a path that cannot be created then leaves a prepared source with no record, and a
+ * source without its record must be rebuilt (`--phase source` requires it). Reads the filesystem
+ * only. `lstat`, not `exists`: `wx` also refuses a symbolic link, dangling or not.
+ *
+ * Not predictable here, and still caught only by the final `wx` write: a directory the process
+ * cannot write to, a full disk, and a path created by someone else after this check.
+ */
+export function recordOutProblems(recordOut: string): string[] {
+  const path = resolve(recordOut);
+  const problems: string[] = [];
+  const parent = dirname(path);
+  try {
+    if (!statSync(parent).isDirectory()) problems.push(`its parent '${parent}' is not a directory`);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    // A file somewhere above the parent is ENOTDIR on POSIX but ENOENT on Windows: one wording for both.
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      problems.push(`its parent directory '${parent}' does not exist (or a component of its path is a file)`);
+    } else {
+      problems.push(`its parent directory '${parent}' cannot be inspected (${code ?? String(error)})`);
+    }
+  }
+  try {
+    lstatSync(path);
+    problems.push(`'${path}' already exists (a file, directory or link); the record is written to a NEW file only`);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    // ENOENT is the wanted answer; ENOTDIR means a parent component is a file, reported above.
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') problems.push(`'${path}' cannot be inspected (${code ?? String(error)})`);
+  }
+  return problems;
+}
+
 // ---------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------
@@ -522,6 +558,15 @@ export async function runPreparePromotionSource(argv: readonly string[], deps: P
   const env = deps.env ?? process.env;
   const log = deps.log ?? ((line: string) => console.log(line));
   const args = parsePrepareArgs(argv);
+
+  // 0. The output path, before anything is verified or written (ISSUE-314). Only --apply has one.
+  if (args.recordOut !== null) {
+    const outputProblems = recordOutProblems(args.recordOut);
+    if (outputProblems.length > 0) {
+      refuse('STOP: --record-out cannot be created. Nothing has been verified, opened or written; '
+        + 'choose a new file in an existing directory and run again.', outputProblems);
+    }
+  }
 
   // 1. Offline. No connection has been opened.
   const inProgress = inProgressSeasonsOf(projectRoot);

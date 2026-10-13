@@ -387,6 +387,12 @@ identity, `foreign_owned_collision`, venue unmapped, manual-authority refusal or
 failure. AFL API canonical-apply **refusals** are judged by their classified census (below), never
 by a count.
 
+`--record-out` must name a **new** file in an **existing** directory. `--apply` refuses an existing
+path (a file, directory or link), or a parent directory that is missing or sits behind a file, before it verifies, connects or writes
+anything (ISSUE-314), because the record is written last and a prepared source without its record
+must be rebuilt. A directory the process cannot write to, or a path created after that check, is
+still found only by the final exclusive write.
+
 `--apply` runs in this order:
 
 1. The **player bridge** (D-252-13): validated read-only, applied by the restricted loader
