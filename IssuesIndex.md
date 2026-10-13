@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 49 (ISSUE-229, ISSUE-265–270, and the 42 review findings ISSUE-271–314 other than ISSUE-312 and ISSUE-314, registered on 2026-10-10; ISSUE-312, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13)
+**Open issues:** 48 (ISSUE-229, ISSUE-265–270, and the 41 review findings ISSUE-271–314 other than ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -693,10 +693,7 @@
 - **Severity:** Low. **Area:** admin player links / activity audit. **State:** Open (2026-10-08), F-046; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-311.md`. **Next action:** implementation, with ISSUE-309.
 
-### AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
-- **Severity:** Low. **Area:** DB tooling / credential handling — `tools/db/psql.ts`, `privileges.ts`, `promotion-convergence-rehearsal.ts`. **State:** Open (2026-10-08), F-048;
-  imported 2026-10-10; **implemented and committed locally 2026-10-13** on `sonnet/issue-313` (base `5ffbc563`), DB-free validated (589/589 in the pinned file, 61 new); not merged or pushed. D-313-1 resolved (V6 + DB-free capture accepted for `privileges.ts` transport, not end-to-end).
-- **Runbook:** `issues/open/AFLDB-ISSUE-313.md` (§17–§21). **State:** read-only real-psql pack PASSED 2026-10-13 on `streamanator` (V1–V6, runbook §20.1); D-313-6 approved (compatibility restriction, runbook §17.6). Not end-to-end privileges, Windows, `root`-visibility or PROD acceptance; V5 had 4 samples. **Next action:** integration (`merge:ready` blockers are untracked files; see the readiness record), then push and closure records. Issue stays Open.
+**AFLDB-ISSUE-313 resolved 2026-10-13** (merge-scoped; implementation commit `d43207c1d349d32d71fc6e135229b5cd5812199c`, parent `5ffbc563`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). Every `psql` the TypeScript database tooling launches now gets a password-free `-d` value and the password in the child's `PGPASSWORD`; unmovable or ambiguous password forms are refused before psql starts (D-313-6, approved). DB-free: `tests/db-test-rebuild.test.ts` 589 passed (61 new); real-psql pack V1–V6 PASS on `streamanator` (psql 16.15). Readiness was accepted under a scoped cleanliness exception, not a clean pass. **Limits:** not end-to-end `privileges.ts` acceptance (D-313-1); V5 had 4 periodic samples; the credential launcher was outside the pack manifest; Windows, `root` visibility and PROD not verified; not deployed. Detail: `issues.md` (ISSUE-313 entry) and `issues/closed/AFLDB-ISSUE-313.md` §22.
 
 **AFLDB-ISSUE-314 resolved 2026-10-13** (merge-scoped; implementation commit `c47709ad475c99c617d0b393af323607d107f2a8`, parent `24ca412b`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). `prepare-promotion-source --apply` now refuses an unusable `--record-out` before it verifies, connects or writes. DB-free: Windows 464 passed | 1 skipped; Linux (`streamanator`, Node v22.23.2) `-t ISSUE-314` 9 selected, 9 passed, 0 failed, 0 skipped. Readiness was accepted under a scoped cleanliness exception, not a clean pass. No real `--apply` or promotion was run; the `cannot be inspected` branch is untested; an unwritable directory, a full disk and a path created after the check are still found only by the final write. Detail: `issues.md` (ISSUE-314 entry) and `issues/closed/AFLDB-ISSUE-314.md` §17.9.
 

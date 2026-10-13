@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 49 (ISSUE-229, ISSUE-265–270 and 42 of the 44 review findings ISSUE-271–314; ISSUE-312, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, merge-scoped, see below)
+**Open issues:** 48 (ISSUE-229, ISSUE-265–270 and 41 of the 44 review findings ISSUE-271–314; ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, merge-scoped, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -63,7 +63,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-309 | Multi-target player-link actions stop at the first failure after earlier targets committed | Low | Admin player links — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-044, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-309.md` | Implementation, with ISSUE-308 and ISSUE-311 |
 | AFLDB-ISSUE-310 | AFL API link path derives the stable player identity by a different rule from the forward classifier | Low | AFL API identity / adjudication ledger — `src/db/queries/afl-api-player-links.ts` | Open (2026-10-08); review F-045, divergence code-proven, trigger collation-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-310.md` | Implementation; open question: DEV/PROD collation (operator-run) |
 | AFLDB-ISSUE-311 | Activity audit after a committed player-link mutation is unwrapped or silent | Low | Admin player links / activity audit | Open (2026-10-08); review F-046, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-311.md` | Implementation, with ISSUE-309 |
-| AFLDB-ISSUE-313 | Database tooling passes the owner DSN, password included, on the `psql` command line | Low | Database tooling / credential handling — `tools/db/psql.ts` | Open (2026-10-08); review F-048, code-proven, exposure host-dependent; imported 2026-10-10; implemented and committed locally 2026-10-13 on `sonnet/issue-313` (base `5ffbc563`), DB-free validated, real-psql pack PASSED, D-313-6 approved; runbook `issues/open/AFLDB-ISSUE-313.md` | Integration (merge, push), then closure records |
 
 **AFLDB-ISSUE-312 and AFLDB-ISSUE-315 resolved 2026-10-13** (merge-scoped: implementation commits `5d277ddd` (312) and `9c279f5c` (315), reconciled with `main` `762b46b8` by merge `01976be7` and fast-forwarded onto local `main`; **not pushed, not deployed**). ISSUE-312: `currentBranchRef` in `tools/db/migration-safety.ts` accepts a detached HEAD only for `git symbolic-ref -q HEAD` exit 1 with empty stdout and stderr, and every other failure still throws; DB-free `tests/workflow-preflight.test.ts` 37/37 on disposable repositories, with mutation checks. ISSUE-315: the ISSUE-099 O1 template extractor is now `tests/integration/executable-statements.ts` (TypeScript parser, `tx`/`sql` tagged templates, 31 statements = the historical 33 less two prose bodies), DB-free `tests/executable-statements.test.ts` 14/14, and `afldb_test` `settle-afltables.test.ts -t "obligation O1"` 3/3 (12 Oct 2026, exit 0, census clean). **Accepted limits:** no real detached-checkout `preflight`/`db:migrate` run (optional, ISSUE-312 runbook §17.5); the whole `settle-afltables` file was not re-run after the fix (ISSUE-274 R2's exit 1 stands as recorded history); the O1 sentinel case is fixture presence only; the push to `origin` is the operator's and has not happened. Integration, 13 Oct 2026: `npm run typecheck` exit 0 on the merged tree; `merge:ready` BLOCKED by exactly one blocker (the nine untracked `.agents/skills` files in the primary checkout, an owner exception for those paths only) plus the standing missing-readiness-block warning; merge-mode `preflight` BLOCKED by the same nine paths only. Full record: `issues/closed/AFLDB-ISSUE-312.md` §18 and the ISSUE-315 entry in `issues.md`.
 
@@ -50430,11 +50429,11 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-313 — Database tooling passes the owner DSN, password included, on the `psql` command line
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** database tooling / credential handling. Key files:
-  `tools/db/psql.ts` (`psqlArgv`, `runPsql`), `tools/db/privileges.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-313.md`.
+- **Status:** Resolved (2026-10-13; opened 2026-10-08). **Severity:** Low. **Area:** database tooling / credential handling. Key files:
+  `tools/db/psql.ts` (`psqlArgv`, `runPsql`), `tools/db/privileges.ts`. **Runbook:** `issues/closed/AFLDB-ISSUE-313.md`.
 - **Origin.** Review F-048 (R6a-F02) at `20a7a4bb`. Code-proven; the practical exposure depends on the host (`/proc`
   `hidepid`). ~~**Next action.** Implementation.~~ Superseded below.
-- **Implementation (2026-10-13, committed locally; worktree `D:\dev\afldb-issue-313`, branch `sonnet/issue-313`, base `5ffbc563` = `main` = `origin/main`; not merged, pushed or deployed).**
+- **Implementation (2026-10-13; commit `d43207c1`, merged and pushed to `main`, see Closure; worktree `D:\dev\afldb-issue-313`, branch `sonnet/issue-313`, base `5ffbc563`; not deployed).**
   New `psqlConnection(dsn, parentEnv)` in `tools/db/psql.ts` splits a `postgres(ql)://` DSN into a password-free `-d` value and a copy of the environment carrying `PGPASSWORD`; `psqlArgv` is built from the
   password-free value and `runPsql` passes the environment to the spawn, which fixes every `runPsql` caller (rebuild reset/validation, reset proof, ownership census, first-kick-goal rehearsal). `tools/db/privileges.ts` takes
   `connection.dsn` / `connection.env` the same way (its `main` is now exported with an injectable spawn). **A third site the review did not list**, `tools/db/promotion-convergence-rehearsal.ts` `execute()`, had the same `-d, dsn`
@@ -50451,9 +50450,14 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Decisions.** **D-313-1 resolved (operator, 2026-10-13):** V6 plus the DB-free capture is accepted as the `privileges.ts` credential-transport criterion, not end-to-end privileges acceptance; `db:privileges:test` is not to be run. **D-313-6 approved (operator, 2026-10-13):** the compatibility restriction of §17.6 is a documented tooling
   restriction — key=value password strings and `sslpassword` are deliberately unsupported by this helper (not invalid libpq syntax); valid encoded URI passwords stay supported. Percent-encoded `=` coverage: `tests/db-test-rebuild.test.ts` `pass%77ord=a%26b%3Dc` → `PGPASSWORD=a&b=c` (accepted in place of a literal `?password=a%3Db` case; none added).
 - **Real-psql verification (2026-10-13, `streamanator`, `afldb_test` as `afldb_owner`, read-only, one attempt):** pack `d22d7d4e…f3d2a5` / id `fafde227…`; V1–V6 all PASS, `RESULT PASS`, exit 0 (psql 16.15, Node v22.23.2; V5 observer: `-d` password-free, `PGPASSWORD` only in a mode-400 `environ`); source files unchanged before/after. Evidence `D:\tmp\issue313\evidence-20261013T032229Z\`, runbook §20.1. One deliberate V4 failed login in the server log. Not end-to-end privileges acceptance (D-313-1); not `root` visibility, Windows or PROD.
-- **Open.** Integration (merge, push) and closure records. The V5 observation was 4 periodic samples, not continuous; the run's credential launcher (`launch-313.mjs`) was outside the pack manifest. Residual: `PGPASSWORD` in the child environment (owner/root readable only); hand-run `psql "$DSN"` commands in
+- **Limits.** The V5 observation was 4 periodic samples, not continuous; the run's credential launcher (`launch-313.mjs`) was outside the pack manifest. Residual: `PGPASSWORD` in the child environment (owner/root readable only); hand-run `psql "$DSN"` commands in
   runbooks and the settle scripts' `[monitor]` hints are out of scope (§12).
-  **Next action.** `merge:ready`, merge and push by the operator; then the closure records.
+- **Closure (2026-10-13; runbook `issues/closed/AFLDB-ISSUE-313.md` §22).** Implementation commit `d43207c1d349d32d71fc6e135229b5cd5812199c` (parent `5ffbc563`, tree `d1448cae…`, exactly the 11 reviewed files; the seven code/test files match the accepted `SOURCE_HASHES.txt`),
+  fast-forwarded to `main` and pushed (`5ffbc563..d43207c1`); local `main`, `origin/main` and the live remote were verified equal to it. Readiness was **accepted under a scoped cleanliness exception, not a clean pass**: `merge:ready` BLOCKED by exactly ten untracked primary-checkout paths
+  (nine `.agents/skills` files and the zero-byte ``20` ``), all left untouched with paths, sizes and hashes re-verified; the merge-mode preflight's only blocker was the same ten paths; existing warnings: no `afldb-merge-readiness` block in the runbook, `psql`/`pg_restore` unavailable; database parity not checked.
+- **Status: Resolved (2026-10-13)**, on the push of the documentation-only closure commit, under the merge-scoped criterion (D-313-1 and runbook §21: helper and callers validated DB-free, real-psql V1–V6 PASS, D-313-6 approved, implementation and closure records merged and pushed).
+  *History: the previous status here was "Open", with integration, push and closure records remaining.* **Preserved limits:** not end-to-end `privileges.ts` acceptance (D-313-1); `db:privileges:test`, integration tests, Windows, `root` visibility and PROD were not run or verified; no deployment is required or implied. Open issues: 49 -> 48.
+  **Next action.** None.
 
 ## AFLDB-ISSUE-314 — `prepare-promotion-source --apply` checks `--record-out` only after committing its writes
 

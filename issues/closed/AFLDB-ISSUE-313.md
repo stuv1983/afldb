@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). **Implemented and committed locally 2026-10-13** (worktree `D:\dev\afldb-issue-313`, branch `sonnet/issue-313`, base `5ffbc563` = `main` = `origin/main`); DB-free validated on Windows; **real-psql pack run on `streamanator` 2026-10-13: RESULT PASS, exit 0 (§20.1); integration, push and closure records are outstanding; D-313-6 (§17.6) APPROVED 2026-10-13**; D-313-1 resolved (V6 plus DB-free capture accepted as the privileges credential-transport criterion; not end-to-end). Not merged, pushed or deployed. Detail: §17–§21.
+- **Status: Resolved (2026-10-13; opened 2026-10-08)**, merge-scoped, on the push of the documentation-only closure commit; implementation commit `d43207c1d349d32d71fc6e135229b5cd5812199c`, merged and pushed to `main` (§22). *History: until the integration the status here was "Open", implemented and committed locally 2026-10-13 (worktree `D:\dev\afldb-issue-313`, branch `sonnet/issue-313`, base `5ffbc563` = `main` = `origin/main`); DB-free validated on Windows; **real-psql pack run on `streamanator` 2026-10-13: RESULT PASS, exit 0 (§20.1); integration, push and closure records are outstanding; D-313-6 (§17.6) APPROVED 2026-10-13**; D-313-1 resolved (V6 plus DB-free capture accepted as the privileges credential-transport criterion; not end-to-end); at that point not merged or pushed.* Not deployed (no deployment is required or implied, §17.5). Detail: §17–§22.
 - **Severity:** Low. **Area:** database tooling / credential handling.
 - **Key files:** `tools/db/psql.ts` (`psqlArgv`, `runPsql`), `tools/db/privileges.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-048; partition note R6a-F02).
@@ -75,10 +75,10 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Superseded: implemented locally (§17), validated DB-free (§18), reviewed (§19). Real-psql pack run PASSED 2026-10-13 (§20.1; D-313-6 approved). Committed locally (one commit on base `5ffbc563`). Next: `merge:ready`, then the operator merges and pushes, then the closure records (§21).
+~~Implementation.~~ Superseded: implemented locally (§17), validated DB-free (§18), reviewed (§19). Real-psql pack run PASSED 2026-10-13 (§20.1; D-313-6 approved). ~~Committed locally; next `merge:ready`, merge, push, closure records.~~ Done: merged, pushed and closed 2026-10-13 (§22). Nothing further.
 
 
-## 17. Implementation (2026-10-13; committed locally, not merged, pushed or deployed)
+## 17. Implementation (2026-10-13; merged and pushed as `d43207c1` — see §22; not deployed)
 
 Worktree `D:\dev\afldb-issue-313`, branch `sonnet/issue-313`, created from `5ffbc5634eca993f124d972fe78236fc11c7f31e`. `main` and a fresh `origin/main` were both at that commit; no earlier ISSUE-313 branch or worktree existed.
 
@@ -213,12 +213,26 @@ The procedure, the harness and its observer are a **self-contained pack** built 
 - **Effect on the server:** one deliberate failed login (`FATAL: password authentication failed for user "afldb_owner"`, application_name not set for the control) expected in the PostgreSQL log at about 03:23 UTC (the server log itself was not read); otherwise one read-only session each for V1, V2, V3, V5 and V6. No writes.
 - **Limits (unchanged):** this proves the helper's transport and process visibility for an unprivileged local observer on one Linux host, not `privileges.ts` end to end (V6 is the invocation shape only; D-313-1), not visibility to `root`, not Windows, not PROD, and the V5 samples number 4 (periodic sampling of one `pg_sleep(6)` run; no claim of continuous observation). The credential launcher `launch-313.mjs` was **outside the pack manifest and self-test**: its correctness is evidenced only by the run it drove, not by a pinned hash in the pack. The `?password=a%3Db` literal case remains untested by design (operator-accepted substitute above).
 
-## 21. Closure requirements (ISSUE-313 stays Open)
+## 21. Closure requirements (all met 2026-10-13; see §22)
 
 1. ~~**Operator review and commit**~~ **Committed locally 2026-10-13** (operator-authorised, one commit on base `5ffbc563`; the seven code/test files byte-identical to the pack's `SOURCE_HASHES.txt`; SHA recorded in `D:\tmp\issue313\commit-record.txt`). Scope: the seven code and test files changed by this work (`tools/db/psql.ts`, `privileges.ts`, `rebuild-test.ts`, `promotion-convergence-rehearsal.ts`, `prove-reset.ts`, `afl-api-ownership-census.ts`, `tests/db-test-rebuild.test.ts`) and the four tracking files (`issues.md`, `IssuesIndex.md`, `CHANGELOG.md`, this runbook). The pack's `code-under-test.patch` and `SOURCE_HASHES.txt` identify the code state it was built from; rebuild the pack if that state changes.
 2. ~~**Real-psql verification** (§20) run on Linux with every check PASS; result and evidence recorded here.~~ **Done 2026-10-13: every V1–V6 check PASS, RESULT PASS, exit 0** (§20.1). Limits in §20.1 still apply; it is not end-to-end privileges acceptance (D-313-1).
 3. ~~**D-313-6** (§17.6): the operator accepts, amends or rejects the compatibility restriction.~~ **Approved by the operator, 2026-10-13** (documented tooling restriction; coverage reference in §17.6).
-4. `npm run merge:ready -- --issue 313`, then the operator merges and pushes. No deployment is required or implied (§17.5).
-5. Close per CLAUDE.md §5: move this runbook to `issues/closed/`, set Resolved in `issues.md`, remove it from the Open Issues table and `IssuesIndex.md`, and update the `CHANGELOG.md` entry from "open" to "resolved".
+4. ~~`npm run merge:ready -- --issue 313`, then the operator merges and pushes.~~ **Done 2026-10-13 under a scoped cleanliness exception** (§22). No deployment is required or implied (§17.5).
+5. ~~Close per CLAUDE.md §5~~ **Done in the documentation-only closure commit** (§22): runbook moved to `issues/closed/`, Resolved set in `issues.md`, removed from the Open Issues table and `IssuesIndex.md`, `CHANGELOG.md` entry updated from "open" to "resolved".
 
 Resolved: **D-313-1** (§17.4). Not affected and to be preserved: the 14 Oct combined ISSUE-274/276 nightly observation (this change touches only operator-run database tooling, not the settle or deployed runtime) and the ISSUE-265 PROD hold (no PROD action here). `db:privileges:test` has not been and is not to be run for this issue.
+
+## 22. Integration and closure (2026-10-13)
+
+**Criterion.** Merge-scoped, per §21 and D-313-1: the helper and its callers validated DB-free, the read-only real-psql pack PASS (V1–V6), D-313-6 approved, the implementation merged and pushed, and the closure records pushed. It is **not** end-to-end `privileges.ts` acceptance, and no deployment, PROD, Windows or `root`-visibility claim is made.
+
+**Implementation.** Commit `d43207c1d349d32d71fc6e135229b5cd5812199c`, parent `5ffbc5634eca993f124d972fe78236fc11c7f31e`, tree `d1448caef434dfb912277ff4f8179154d2b6331f`, exactly the 11 reviewed files (7 code/test, 4 tracking; 990 insertions, 37 deletions). Before the merge the seven code/test blobs were re-hashed against the accepted `SOURCE_HASHES.txt` (LF-normalised): 7 of 7 match. Fast-forwarded onto primary `main` (`git merge --ff-only`, exit 0) and pushed with `git push origin main:main` (`5ffbc563..d43207c1`, exit 0); after a fresh fetch, local `main`, `origin/main` and the live remote `main` were each verified equal to `d43207c1`. No force, rebase, reset or reconciliation was needed: `main`, `origin/main` and the live remote all equalled `5ffbc563` immediately before the merge.
+
+**Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 313` with all 11 `--expected-file` arguments exited 1: one FAIL, "main worktree is clean", naming exactly ten untracked primary-checkout paths (nine `.agents/skills/**` files and the zero-byte ``20` ``); one WARN, the runbook has no `afldb-merge-readiness` block; "committed files match the declared issue scope" PASSED (11 changed, 0 unexpected). Merge-mode `preflight` from primary `main`, no DSN and no database contact, exited 1 with one FAIL, "working tree is clean" (the same ten paths), plus WARNs that `psql` and `pg_restore` are unavailable. The issue worktree was clean. The ten paths were not touched; their paths, sizes and SHA-256 were re-verified against `D:\tmp\issue313\untracked-blockers-manifest.txt` before and after the implementation merge. The exception covered only those main-cleanliness failures. The ISSUE-314 worktree's own stray is outside it.
+
+**Preserved limits (unchanged by closure).** Real-psql evidence is one attempt on one Linux host with 4 periodic V5 samples, not continuous observation; the credential launcher `launch-313.mjs` was outside the pack manifest and self-test; V6 is the invocation shape only; no `privileges.ts` end-to-end run; percent-decoding of exotic passwords against a real role, `root` visibility, Windows process visibility and PROD were not verified; the literal `?password=a%3Db` case is covered by the accepted `pass%77ord=a%26b%3Dc` test (D-313-6); residual `PGPASSWORD` in the child environment; hand-run `psql "$DSN"` commands in runbooks and the settle scripts' `[monitor]` hints are out of scope (§12); integration tests were not run. The 14 Oct combined ISSUE-274/276 observation and the ISSUE-265 PROD hold are unaffected.
+
+**Evidence.** `D:\tmp\issue313\commit-record.txt`, `merge-ready-output.txt`, `preflight-merge-output.txt`, `untracked-blockers-manifest.txt`; close-out records under `D:\tmp\issue313\closeout-20261013T034514Z\`.
+
+**Status: Resolved (2026-10-13)**, on the push of the documentation-only closure commit. Open issues: 49 -> 48.
