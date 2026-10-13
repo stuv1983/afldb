@@ -52,7 +52,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-300 | AFL API control-database read failure is reported as "disabled by a super admin" | Low | Acquisition / diagnostics — `src/lib/acquisition/afl-api-ingestion-control.ts` | Open (2026-10-08); review F-035, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-300.md` | Implementation |
 | AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
-| AFLDB-ISSUE-302 | Lineup bundle records the pinned fitzRoy version as provenance whatever version ran | Low | Acquisition / provenance — `src/lib/acquisition/lineup-bundle.ts` | Open (2026-10-08); review F-037, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-302.md` | Operator decision **D-302-1** (refuse, or record the installed version) |
+| AFLDB-ISSUE-302 | Lineup bundle records the pinned fitzRoy version as provenance whatever version ran | Low | Acquisition / provenance — `src/lib/acquisition/lineup-bundle.ts` | Open (2026-10-08); review F-037, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-302.md` | D-302-1 decided (refuse); guard + tests implemented locally, uncommitted; next: operator review, commit, `merge:ready`, merge, push, then close (runbook §19) |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
 | AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-304.md` | Implementation, after ISSUE-266 |
 | AFLDB-ISSUE-305 | Legacy intake validation accepts values promotion then rejects | Low | Legacy CSV intake validation — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-040, reproduced DB-free (W4); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-305.md` | Implementation; hypothesis H-305-1 open |
@@ -50354,8 +50354,11 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `issues/open/AFLDB-ISSUE-302.md`.
 - **Origin.** Review F-037 (a partition R4b cross-partition lead, verified by the review's main session) at `20a7a4bb`.
   Code-proven.
-- **Decisions.** **D-302-1 (operator, undecided):** refuse a version mismatch, or record the installed version. **Next
-  action.** D-302-1.
+- **Decisions.** **D-302-1 (recorded 2026-10-13):** refuse a lineup manifest unless `fitzroy_version_match === true`.
+- **Implementation (2026-10-13, uncommitted in `D:\dev\afldb-issue-302`, branch `fix/issue-302`).** The guard is in
+  `lineupAcquisitionInput`; four regression tests are in `tests/afl-api-lineup.test.ts`. DB-free validation recorded in the
+  runbook §17. Still Open: merge and push are not done. **Next action.** Operator review and commit, then
+  `merge:ready`, merge, push, and closure per runbook §19.
 
 ## AFLDB-ISSUE-303 — `/admin/upload` promises 5 MB but Server Actions accept 1 MB
 

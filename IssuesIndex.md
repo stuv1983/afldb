@@ -638,7 +638,9 @@
 ### AFLDB-ISSUE-302 — Lineup bundle records the pinned fitzRoy version as provenance whatever version ran
 - **Severity:** Low. **Area:** acquisition / provenance — `src/lib/acquisition/lineup-bundle.ts`. **State:** Open
   (2026-10-08), F-037; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-302.md`. **Next action:** operator decision **D-302-1**.
+- **Runbook:** `issues/open/AFLDB-ISSUE-302.md`. **Current state:** D-302-1 decided (refuse); guard and tests implemented
+  locally on `fix/issue-302`, uncommitted. **Next action:** operator review and commit, `merge:ready`, merge, push, then
+  close (runbook §19).
 
 ### AFLDB-ISSUE-303 — `/admin/upload` promises 5 MB but Server Actions accept 1 MB
 - **Severity:** Low. **Area:** legacy CSV intake UI / framework configuration — `next.config.ts`. **State:** Open

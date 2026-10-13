@@ -368,6 +368,19 @@ export function lineupAcquisitionInput(
       + `${LINEUP_SOURCE_KEY}/${LINEUP_FAMILY}.`,
     );
   }
+  // The bundle records the PINNED version as its provenance, which is only true
+  // when the pinned version is what ran. acquire_lineups.R records a mismatch
+  // rather than refusing it, so the refusal is made here, before any bundle can
+  // be built. Strict `=== true`: a missing, null, string or otherwise malformed
+  // flag is refused exactly as `false` is, as import_fitzroy_core.py does.
+  if (m.fitzroy_version_match !== true) {
+    fail(
+      `The manifest was acquired with fitzRoy ${String(m.fitzroy_version_installed)}, `
+      + `not the pinned ${String(m.fitzroy_version_pinned)} `
+      + `(fitzroy_version_match is ${JSON.stringify(m.fitzroy_version_match) ?? 'absent'}); `
+      + 'refusing to record the pinned version as provenance for an unpinned acquisition.',
+    );
+  }
   const season = m.season;
   const roundNumber = m.round_number;
   if (typeof season !== 'number' || typeof roundNumber !== 'number') {

@@ -487,7 +487,9 @@ describe('acquisition -> emitter assembly', () => {
     snapshot_label: 'afl-api-lineups-2026-r20',
     working_directory: 'data/sources/afl_api/lineups/afl-api-lineups-2026-r20',
     acquisition_kind: 'round_lineup_snapshot',
+    fitzroy_version_installed: '1.8.0',
     fitzroy_version_pinned: '1.8.0',
+    fitzroy_version_match: true,
     observed_columns: [...R20_COLUMNS],
     files: [{ dataset: 'lineup', file: 'l.json', rows: 1, columns: 20, sha256: 'c'.repeat(64) }],
   };
@@ -502,6 +504,52 @@ describe('acquisition -> emitter assembly', () => {
     expect(input.rows[0]['player.captain']).toBe(false);
     expect(input.rows[0]['player.playerJumperNumber']).toBe(47);
     expect(buildLineupBundle(input).records).toHaveLength(1);
+  });
+
+  it('carries the pinned version into the bundle for a matching manifest', () => {
+    const input = lineupAcquisitionInput(lineup, manifest, [row()]);
+    expect(input.acquisition.fitzroyVersion).toBe('1.8.0');
+    expect(input.acquisition.snapshotLabel).toBe('afl-api-lineups-2026-r20');
+    expect(input.acquisition.acquisitionKind).toBe('round_lineup_snapshot');
+    const bundle = buildLineupBundle(input);
+    expect(bundle.fitzroy_version).toBe('1.8.0');
+    expect(bundle.snapshot_label).toBe('afl-api-lineups-2026-r20');
+    expect(bundle.artefact_sha256).toBe('c'.repeat(64));
+    expect(bundle.records).toHaveLength(1);
+  });
+
+  it('refuses a manifest acquired with a fitzRoy other than the pinned one', () => {
+    const mismatched = {
+      ...manifest, fitzroy_version_installed: '1.9.0', fitzroy_version_match: false,
+    };
+    const attempt = () => lineupAcquisitionInput(lineup, mismatched, [row()]);
+    expect(attempt).toThrow(LineupBundleError);
+    // The error names the version that ran and the one that would have been
+    // recorded, so the operator can see exactly what was being misreported.
+    expect(attempt).toThrow(/fitzRoy 1\.9\.0, not the pinned 1\.8\.0/);
+    expect(attempt).toThrow(/fitzroy_version_match is false/);
+  });
+
+  it('refuses a missing or malformed fitzroy_version_match', () => {
+    const { fitzroy_version_match: _omitted, ...missing } = manifest;
+    expect(() => lineupAcquisitionInput(lineup, missing, [row()]))
+      .toThrow(/fitzroy_version_match is absent/);
+    for (const malformed of [null, 'true', 1, 0, [], {}]) {
+      expect(
+        () => lineupAcquisitionInput(
+          lineup, { ...manifest, fitzroy_version_match: malformed }, [row()],
+        ),
+        `fitzroy_version_match = ${JSON.stringify(malformed)}`,
+      ).toThrow(LineupBundleError);
+    }
+  });
+
+  it('refuses a version mismatch before any other manifest shape check or bundle build', () => {
+    // A mismatched manifest that is ALSO malformed elsewhere must be refused
+    // for the version, proving the guard runs ahead of the rest of assembly.
+    expect(() => lineupAcquisitionInput(
+      lineup, { ...manifest, fitzroy_version_match: false, season: '2026', files: [] }, [],
+    )).toThrow(/not the pinned 1\.8\.0/);
   });
 
   it('takes observed columns from the manifest, not from row keys', () => {
