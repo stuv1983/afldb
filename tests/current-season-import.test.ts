@@ -5191,6 +5191,254 @@ describe('ISSUE-257 Slice 4 — settle behaviour under durable Match Sheet autho
         expect(seen.some((t) => t.startsWith('INSERT INTO canonical_applications'))).toBe(false);
       });
     });
+
+    /* AFLDB-ISSUE-275. A unit whose `matches` target is refused because the row is not one
+       it may write against must not insert the dependent period set. `matchId` was bound from
+       that row before E3/E5 decided, and an empty period set reads as `new_target`, so before
+       the fix four period rows and a ledger row were written under a match another source
+       owns. Modelled DB-free exactly as the trigger leaves the unit: the planner's references
+       had no row for the key (null baseline, `pending_match`), the row exists when the unit runs. */
+    describe('ISSUE-275 — a refused matches target withholds the same unit\'s period scores', () => {
+      const SOURCES = new Map([[1, 'afltables'], [2, 'afl_api']]);
+      const pendingPeriods = () => ({ ...periodTarget(), invitation: 'pending_match' as const });
+      const periodWrites = (seen: string[]) =>
+        seen.filter((t) => t.startsWith('INSERT INTO match_period_scores'));
+      const ledgerWrites = (seen: string[]) =>
+        seen.filter((t) => t.startsWith('INSERT INTO canonical_applications'));
+      const writesOf = (seen: string[]) => seen.filter((t) => /^(INSERT INTO|UPDATE) (matches|match_period_scores)/.test(t));
+
+      describe.each([
+        { applier: 'afltables', applierId: 1, owner: 'afl_api', ownerId: 2 },
+        { applier: 'afl_api', applierId: 2, owner: 'afltables', ownerId: 1 },
+      ])('$applier unit, row created by $owner after the plan', ({ applier, applierId, owner, ownerId }) => {
+        const applying = { sourceId: applierId, sourceKey: applier, sourceKeysById: SOURCES };
+
+        it('refuses matches (foreign_source_owner) and writes no period row and no ledger row', async () => {
+          const { tx, seen } = fakeUnitTx(respondMatch({ ...MROW, source_id: ownerId }));
+          const outcome = await applyCanonicalUnit(
+            tx, matchUnit([matchTarget({ home_goals: 14 }, null), pendingPeriods()], applying),
+          );
+          expect(outcome.failure).toBeNull();
+          expect(outcome.results).toHaveLength(2);
+          expect(outcome.results[0]).toMatchObject({
+            targetTable: 'matches', applied: false, refusal: 'foreign_source_owner', ownerSourceKey: owner,
+          });
+          // The dependent carries the parent's reason and the owner E3 judged, as evidence.
+          expect(outcome.results[1]).toMatchObject({
+            targetTable: 'match_period_scores', applied: false, verb: null,
+            rowsInserted: 0, rowsUpdated: 0, refusal: 'foreign_source_owner', ownerSourceKey: owner,
+          });
+          expect(periodWrites(seen)).toEqual([]);
+          expect(ledgerWrites(seen)).toEqual([]);
+          expect(writesOf(seen)).toEqual([]);
+          // Withheld UNREAD: the dependent never looked at the (empty) period set at all.
+          expect(seen.some((t) => t.includes('FROM match_period_scores'))).toBe(false);
+          // Not a rekey statement: the caller must not block the fixture or open rekey findings.
+          expect(outcome.fixtureBlocked).toBeNull();
+          expect(outcome.insertedMatchId).toBeNull();
+        });
+      });
+
+      it('an unowned (source_id NULL) row refuses with ownership_indeterminate and withholds the period set', async () => {
+        const { tx, seen } = fakeUnitTx(respondMatch({ ...MROW, source_id: null }));
+        const outcome = await applyCanonicalUnit(
+          tx, matchUnit([matchTarget({ home_goals: 14 }, null), pendingPeriods()]),
+        );
+        expect(outcome.results.map((r) => [r.targetTable, r.applied, r.refusal])).toEqual([
+          ['matches', false, 'ownership_indeterminate'],
+          ['match_period_scores', false, 'ownership_indeterminate'],
+        ]);
+        expect(outcome.results[1].ownerSourceKey ?? null).toBeNull();
+        expect(writesOf(seen)).toEqual([]);
+        expect(ledgerWrites(seen)).toEqual([]);
+      });
+
+      it('a matches target that is stale at E5 (own row, moved baseline) withholds the period set', async () => {
+        // The row is ours, so E3 passes; the baseline the proposal described (home_goals 99) is not
+        // what the row holds (13).
+        const { tx, seen } = fakeUnitTx(respondMatch());
+        const outcome = await applyCanonicalUnit(
+          tx, matchUnit([matchTarget({ home_goals: 14 }, { home_goals: 99 }), pendingPeriods()]),
+        );
+        expect(outcome.results.map((r) => [r.targetTable, r.applied, r.refusal])).toEqual([
+          ['matches', false, 'stale_canonical_target'],
+          ['match_period_scores', false, 'stale_canonical_target'],
+        ]);
+        expect(writesOf(seen)).toEqual([]);
+        expect(ledgerWrites(seen)).toEqual([]);
+        expect(outcome.fixtureBlocked).toBeNull();
+      });
+
+      it('a retired candidate found after the lock phase (ISSUE-274 §19.1) withholds the period set too', async () => {
+        // The incoming key already has a row (matchId is bound from it) AND a retired candidate
+        // appears in `readFreshTarget`'s search that the lock phase never saw.
+        const OLD = '2026|1|2026-03-11|Carlton|Collingwood';
+        let searches = 0;
+        const base = respondMatch();
+        const { tx, seen } = fakeUnitTx((text) => {
+          if (text.includes('JOIN staging.source_records')) {
+            searches += 1;
+            return searches === 1 ? [] : [{ id: 41, matchKey: OLD, sourceRecordId: 'OLD' }];
+          }
+          return base(text);
+        });
+        const outcome = await applyCanonicalUnit(tx, matchUnit(
+          [matchTarget({ home_goals: 14 }, MCUR), periodTarget()],
+          { matchRekey: {
+            scope: { completeScopeKeys: ['2026'], publishedRecordIds: ['M'] },
+            identity: { roundCode: '1', matchDate: '2026-03-12', homeClubId: 1, awayClubId: 2 },
+          } },
+        ));
+        expect(searches).toBe(2);
+        expect(outcome.results.map((r) => [r.targetTable, r.applied, r.refusal])).toEqual([
+          ['matches', false, 'stale_canonical_target'],
+          ['match_period_scores', false, 'stale_canonical_target'],
+        ]);
+        expect(writesOf(seen)).toEqual([]);
+        expect(ledgerWrites(seen)).toEqual([]);
+      });
+
+      /* Human authority (E4) over the `matches` target. Not an ownership statement, but the same
+         invariant: the unit refused its parent, so it must not write the dependent. The override
+         rows are what `loadManualAuthority` reads (`entity_type = 'matches' AND is_active`). */
+      describe.each([
+        { name: 'manual_authority_conflict', group: [...matchFieldGroupsFor(['home_goals'])][0] },
+        { name: 'manual_authority_indeterminate', group: 'retired_group_the_editor_no_longer_defines' },
+      ])('E4 $name on the matches target', ({ name, group }) => {
+        const withOverride = (groupKey: string) => {
+          const base = respondMatch();
+          return (text: string): unknown[] => (
+            text.includes("FROM data_overrides WHERE entity_type = 'matches' AND is_active")
+              ? [{ entityKey: MK, fieldGroup: groupKey }]
+              : base(text)
+          );
+        };
+
+        it('uses the real field-group mapping for the fixture', () => {
+          expect(group).toBeTruthy();
+          if (name === 'manual_authority_conflict') {
+            expect([...matchFieldGroupsFor(['home_goals'])]).toEqual(['score']);
+          } else {
+            expect(matchGroupKeys()).not.toContain(group);
+          }
+        });
+
+        it('refuses the parent and withholds the period set: no write, no ledger row, no rekey statement', async () => {
+          const { tx, seen } = fakeUnitTx(withOverride(group));
+          const outcome = await applyCanonicalUnit(
+            tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR), periodTarget()]),
+          );
+          expect(outcome.failure).toBeNull();
+          expect(outcome.results.map((r) => [r.targetTable, r.applied, r.refusal])).toEqual([
+            ['matches', false, name],
+            ['match_period_scores', false, name],
+          ]);
+          expect(outcome.results[1]).toMatchObject({ verb: null, rowsInserted: 0, rowsUpdated: 0 });
+          // Evidence of an OWNER is an E3 statement; a human-authority refusal carries none.
+          expect('ownerSourceKey' in outcome.results[1]).toBe(false);
+          expect(writesOf(seen)).toEqual([]);
+          expect(ledgerWrites(seen)).toEqual([]);
+          expect(seen.some((t) => t.includes('FROM match_period_scores'))).toBe(false);
+          expect(outcome.fixtureBlocked).toBeNull();
+          expect(outcome.insertedMatchId).toBeNull();
+        });
+      });
+
+      it('POSITIVE: an override on a group the proposal does not touch is clear, so the family is written', async () => {
+        const base = respondMatch();
+        const { tx, seen } = fakeUnitTx((text) => (
+          text.includes("FROM data_overrides WHERE entity_type = 'matches' AND is_active")
+            ? [{ entityKey: MK, fieldGroup: 'notes' }]
+            : base(text)
+        ));
+        const outcome = await applyCanonicalUnit(
+          tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR), periodTarget()]),
+        );
+        expect(outcome.results.map((r) => [r.targetTable, r.applied, r.refusal])).toEqual([
+          ['matches', true, null],
+          ['match_period_scores', true, null],
+        ]);
+        expect(ledgerWrites(seen)).toHaveLength(2);
+      });
+
+      /* A period-only unit has no `matches` target to refuse, so the invariant is vacuous for
+         it; what the applier does with it is the E5 baseline. The planner (`invitationFor`)
+         can invite a `retry` period target for an existing match whose period set is empty and
+         hand it the baseline of `{period_scores: []}` (a resolved, indeterminately-owned
+         target). The applier re-reads the empty set as `new_target` (no baseline), so E5
+         refuses it before any write. Pinned so a change to either side's baseline is noticed. */
+      it('a planner-shaped period-only retry against an empty set is refused at E5, not inserted', async () => {
+        const { tx, seen } = fakeUnitTx(respondMatch());
+        const retry = {
+          ...periodTarget(),
+          invitation: 'retry' as const,
+          renderedBaselineCanonicalHash: baselineCanonicalHash(['period_scores'], { period_scores: [] }),
+        };
+        const outcome = await applyCanonicalUnit(tx, matchUnit([retry]));
+        expect(outcome.results.map((r) => [r.targetTable, r.applied, r.refusal])).toEqual([
+          ['match_period_scores', false, 'stale_canonical_target'],
+        ]);
+        expect(periodWrites(seen)).toEqual([]);
+        expect(ledgerWrites(seen)).toEqual([]);
+      });
+
+      it('a season gate or incomplete match still refuses both targets with its own reason', async () => {
+        const { tx } = fakeUnitTx(respondMatch());
+        const gated = await applyCanonicalUnit(tx, matchUnit(
+          [matchTarget({ home_goals: 14 }, MCUR), periodTarget()], { inProgressSeasons: [] },
+        ));
+        expect(gated.results.map((r) => r.refusal)).toEqual(['season_not_in_progress', 'season_not_in_progress']);
+        const incomplete = await applyCanonicalUnit(tx, matchUnit(
+          [matchTarget({ home_goals: 14 }, MCUR), periodTarget()], { completionProven: false },
+        ));
+        expect(incomplete.results.map((r) => r.refusal)).toEqual(['match_incomplete', 'match_incomplete']);
+      });
+
+      /* Positive controls: the withholding must not touch an applicable family. */
+      it('POSITIVE: an owned row updates and its period set is written, each with a ledger row', async () => {
+        const { tx, seen } = fakeUnitTx(respondMatch());
+        const outcome = await applyCanonicalUnit(
+          tx, matchUnit([matchTarget({ home_goals: 14 }, MCUR), periodTarget()]),
+        );
+        expect(outcome.failure).toBeNull();
+        expect(outcome.results[0]).toMatchObject({ targetTable: 'matches', applied: true, verb: 'update', rowsUpdated: 1 });
+        expect(outcome.results[1]).toMatchObject({
+          targetTable: 'match_period_scores', applied: true, verb: 'insert', rowsInserted: 1, refusal: null,
+        });
+        expect(periodWrites(seen)).toHaveLength(1);
+        expect(periodWrites(seen)[0]).toContain('VALUES ( 50,');
+        expect(ledgerWrites(seen)).toHaveLength(2);
+      });
+
+      it('POSITIVE: a new fixture inserts the match and its period set against the new id', async () => {
+        const base = respondMatch(null);
+        const { tx, seen } = fakeUnitTx((text) => (text.startsWith('INSERT INTO matches') ? [{ id: 77 }] : base(text)));
+        const outcome = await applyCanonicalUnit(
+          tx, matchUnit([matchTarget({ home_goals: 14 }, null), pendingPeriods()]),
+        );
+        expect(outcome.failure).toBeNull();
+        expect(outcome.insertedMatchId).toBe(77);
+        expect(outcome.results.map((r) => [r.targetTable, r.applied, r.verb])).toEqual([
+          ['matches', true, 'insert'],
+          ['match_period_scores', true, 'insert'],
+        ]);
+        expect(periodWrites(seen)[0]).toContain('VALUES ( 77,');
+        expect(ledgerWrites(seen)).toHaveLength(2);
+      });
+
+      it('POSITIVE: an unchanged matches target (nothing_to_write) does NOT withhold the period set', async () => {
+        const { tx, seen } = fakeUnitTx(respondMatch());
+        const outcome = await applyCanonicalUnit(
+          tx, matchUnit([matchTarget({ home_goals: 13 }, MCUR), periodTarget()]),
+        );
+        expect(outcome.results.map((r) => [r.targetTable, r.applied, r.refusal])).toEqual([
+          ['matches', false, 'nothing_to_write'],
+          ['match_period_scores', true, null],
+        ]);
+        expect(periodWrites(seen)).toHaveLength(1);
+        expect(ledgerWrites(seen)).toHaveLength(1);
+      });
+    });
   });
 
   describe('the rekey carry (§18.9)', () => {

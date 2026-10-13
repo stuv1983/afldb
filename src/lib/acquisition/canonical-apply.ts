@@ -324,6 +324,15 @@ export function isRekeyRefusal(refusal: CanonicalApplyRefusal | null): boolean {
   return refusal !== null && (REKEY_REFUSALS as readonly string[]).includes(refusal);
 }
 
+/**
+ * AFLDB-ISSUE-275. The one `matches` outcome that does NOT withhold the SAME unit's
+ * dependent `match_period_scores` target: an unchanged match row still receives its period
+ * set. Every other unapplied `matches` result is a genuine refusal and withholds it. The
+ * rule is deny-by-default on purpose: it is derived from the parent's actual result, so a
+ * refusal reason added later withholds without anyone remembering to list it.
+ */
+const MATCH_PARENT_NOOP: CanonicalApplyRefusal = 'nothing_to_write';
+
 export type CanonicalApplyTargetResult = {
   targetTable: CanonicalTargetTable;
   applied: boolean;
@@ -334,7 +343,9 @@ export type CanonicalApplyTargetResult = {
   /**
    * AFLDB-ISSUE-252 D-252-12 — evidence only. Present on an E3 ownership refusal alone: the
    * owner source key read inside this unit's savepoint, the same read E3 judged (`null` when
-   * that row's owner was absent or unreadable). It authorises nothing and changes no gate; a
+   * that row's owner was absent or unreadable). AFLDB-ISSUE-275: also carried, unchanged, by a
+   * `match_period_scores` target withheld because that E3 refusal stopped its unit's `matches`
+   * target. It authorises nothing and changes no gate; a
    * caller reports it so a refusal census need not re-derive ownership from a second query.
    */
   ownerSourceKey?: string | null;
@@ -1105,6 +1116,27 @@ export async function applyCanonicalUnit(
         // report still names the evidence that stopped it.
         if (fixtureBlocked !== null) {
           results.push(refused(target.targetTable, fixtureBlocked));
+          continue;
+        }
+        // AFLDB-ISSUE-275. A match family is all or none: a unit never writes the dependent
+        // period set when it refused its own `matches` target, for ANY reason (ownership, an
+        // unreadable owner, staleness, human authority, ...). `matchId` was bound from that very
+        // row before the gates decided, so the period set would read an empty set as
+        // `new_target` and insert rows under a match this unit just declined to write.
+        // Derived from the parent's actual result, not from a list of reasons; only an unchanged
+        // match row (`MATCH_PARENT_NOOP`) lets the period set through. The dependent is refused
+        // unread, with the parent's reason (and, for E3, the owner it judged). This is
+        // deliberately NOT `fixtureBlocked`: the caller reads that as a rekey statement (it
+        // opens rekey findings and blocks the fixture's player rows), which none of these are.
+        const parent = target.targetTable === 'match_period_scores'
+          ? results.find((result) => result.targetTable === 'matches')
+          : undefined;
+        if (parent !== undefined && !parent.applied && parent.refusal !== null
+          && parent.refusal !== MATCH_PARENT_NOOP) {
+          results.push({
+            ...refused(target.targetTable, parent.refusal),
+            ...('ownerSourceKey' in parent ? { ownerSourceKey: parent.ownerSourceKey } : {}),
+          });
           continue;
         }
         // E2. The season gate, re-evaluated rather than inherited from the

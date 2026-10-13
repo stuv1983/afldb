@@ -6239,10 +6239,125 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
       expect(none.count).toBe(0);
     });
 
-    /* AFLDB-ISSUE-275 is a SEPARATE defect, not fixed by the lock above (it locks a row
-       that exists; 275 is a unit writing period scores under a match whose `matches`
-       target it refused). Its acceptance case is specified in the runbook §14 and is
-       recorded here so that it stays visible; it needs the 275 fix first. */
-    it.todo('AFLDB-ISSUE-275: a refused foreign-owned matches target withholds the same unit\'s match_period_scores');
+    /*
+     * AFLDB-ISSUE-275 is a SEPARATE defect from the lock above (the lock holds a row that
+     * exists; 275 is a unit writing period scores under a match whose `matches` target it
+     * refused). Acceptance is the runbook §14 case, deterministic and single-session:
+     *
+     *   1. `runSettleAfltables` takes the gate and runs `loadRefs` (no row for the key), then
+     *      calls `manualAuthorityLoader(tx)` INSIDE its own transaction and BEFORE any unit.
+     *   2. The hook inserts a row owned by a FOREIGN source for that key through the settle's
+     *      own `tx`, which is the second source's commit landing between the plan and the unit.
+     *      The planner reads `refs.matchIdsByKey`, filled in step 1, so it still plans
+     *      `matches` (`new_target`) plus `match_period_scores` (`pending_match`, null baseline).
+     *   3. The applier re-reads the key inside its savepoint, finds the foreign row, and refuses
+     *      `matches` (`foreign_source_owner`). Before the fix the period target then read an empty
+     *      set as `new_target` and wrote four `afltables` rows and a ledger row under it.
+     *
+     * The foreign owner is the file's existing foreign `sources` row (`fixtures.providerSourceId`),
+     * which E3 judges exactly as it would the `afl_api` row of the production trigger. The hook
+     * runs inside the settle's transaction, so the planted row is committed (or rolled back) with
+     * the run and cannot be seen by any other session before then.
+     *
+     * Not vacuous: `canonicalApplyRefusals` must be exactly 2 (the matches refusal and the
+     * withheld period set). If the planner had seen the planted row it would have refused before
+     * the applier (counter 0), and the case fails instead of passing for the wrong reason.
+     * Fixture n = 29/30 give a distinct date and round from every other fixture in this file.
+     */
+    const plantForeignOwnedMatch = async (tx: postgres.TransactionSql, f: Fx): Promise<number> => {
+      const [row] = await tx<{ id: number }[]>`
+        INSERT INTO matches (
+          match_key, season, round_code, round_number, round_type, is_final,
+          match_date, venue_raw, home_club_id, away_club_id,
+          home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
+          result, winner_club_id, margin, attendance_status, source_id
+        ) VALUES (
+          ${f.matchKey}, ${SEASON122}, ${f.round}, ${f.roundNumber}, 'home_and_away'::round_type, false,
+          ${f.date}, ${VENUE_RAW122}, ${fixtures.homeClubId}, ${fixtures.awayClubId},
+          15, 10, 100, 10, 12, 72,
+          'home_win'::match_result, ${fixtures.homeClubId}, 28,
+          'not_collected'::coverage_status, ${fixtures.providerSourceId}
+        )
+        RETURNING id::int AS id
+      `;
+      return row.id;
+    };
+    const ledgerOf = async (matchKey: string): Promise<{ targetTable: string; verb: string }[]> => [
+      ...await sql<{ targetTable: string; verb: string }[]>`
+        SELECT target_table AS "targetTable", verb FROM canonical_applications
+         WHERE external_record_id = ${matchKey} ORDER BY id
+      `,
+    ];
+    const familyBundle = (f: Fx): SettleBundle => bundle122({
+      matches: [{
+        recordId: f.matchKey, matchKey: f.matchKey, scope: f.scope,
+        payloadOver: {
+          round_code: f.round, round_number: f.roundNumber, round_type: 'home_and_away', match_date: f.date,
+        },
+        projectionOver: {
+          round_code: f.round, round_number: f.roundNumber, round_type: 'home_and_away',
+          is_final: false, match_date: f.date,
+        },
+      }],
+      players: [],
+    });
+
+    scenario274('ISSUE-275: a refused foreign-owned matches target withholds the same unit\'s match_period_scores', async () => {
+      const f = fixture('own', 29);
+      expect(await matchRow122(f.matchKey), 'pre-clean: no row at the key before the run').toBeUndefined();
+      const planted: { id: number | null } = { id: null };
+
+      const run = await apply122(familyBundle(f), at(), {
+        manualAuthorityLoader: async (tx) => {
+          planted.id = await plantForeignOwnedMatch(tx, f);
+          return loadManualAuthority(tx, SEASON122);
+        },
+      });
+
+      expect(planted.id, 'the hook planted the competing row inside the run').not.toBeNull();
+      // Not vacuous: both targets reached the applier and were refused.
+      expect(run.counters.canonicalApplyFailures).toBe(0);
+      expect(run.counters.canonicalApplyRefusals).toBe(2);
+      expect(run.counters.canonicalRowsInserted).toBe(0);
+      expect(run.counters.canonicalRowsUpdated).toBe(0);
+      expect(run.counters.canonicalApplicationsLogged).toBe(0);
+
+      // The invariant: no dependent period row and no ledger row under the refused match.
+      expect(await periods122(planted.id as number)).toEqual([]);
+      expect(await ledgerOf(f.matchKey)).toEqual([]);
+      // The match is still the foreign owner's, untouched.
+      expect(await matchRow122(f.matchKey)).toMatchObject({
+        id: planted.id, sourceId: fixtures.providerSourceId, attendance: null,
+      });
+      // Not a rekey statement. `applyRecordCanonically` opens a finding only for a rekey refusal or a
+      // rolled-back unit, and counts every other applier refusal (this one included) in
+      // `canonicalApplyRefusals` alone, so an ownership refusal must leave no finding and no rekey
+      // counter. Were the withholding carried by `fixtureBlocked`, both would be non-zero.
+      expect(run.counters.canonicalRekeyRefusals).toBe(0);
+      expect(
+        (await issues122()).filter(
+          (issue) => issue.issueType === CANONICAL_APPLY_ISSUE_TYPE && issue.issueKey.includes(f.matchKey),
+        ),
+        'the applier opens no canonical_apply_failed finding for this record',
+      ).toEqual([]);
+    });
+
+    scenario274('ISSUE-275 positive control: a fresh fixture with no competing row still writes its match and period set', async () => {
+      const f = fixture('ok', 30);
+      const run = await apply122(familyBundle(f), at());
+
+      const match = await matchRow122(f.matchKey);
+      expect(match, 'the unit inserted the match').toBeDefined();
+      expect(match?.sourceId).not.toBe(fixtures.providerSourceId);
+      expect(run.counters.canonicalApplyFailures).toBe(0);
+      expect(run.counters.canonicalApplyRefusals).toBe(0);
+      // The default projection publishes four period rows (two clubs x periods 1-2).
+      const periods = await periods122((match as MatchRow).id);
+      expect(periods).toHaveLength(4);
+      expect(new Set(periods.map((row) => row.sourceId))).toEqual(new Set([match?.sourceId]));
+      expect((await ledgerOf(f.matchKey)).map((row) => `${row.targetTable}:${row.verb}`)).toEqual([
+        'matches:insert', 'match_period_scores:insert',
+      ]);
+    });
   });
 });

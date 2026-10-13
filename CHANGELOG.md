@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### A settle no longer writes period scores under a match it refused (AFLDB-ISSUE-275; implemented locally on `opus/issue-275`, uncommitted; focused `afldb_test` validation passed; not merged, not deployed; issue open) - 13 October 2026
+
+- **Behaviour.** The canonical applier (`applyCanonicalUnit`, shared by the AFL Tables and AFL API settles) now refuses a unit's `match_period_scores` target, unread, whenever the same unit's `matches` target was not applied for any
+  reason other than "nothing to write". Before, a unit whose `matches` target was refused (for example because another source created the row between the plan and the unit) could still insert four period rows and a ledger row
+  under that match, leaving child rows owned by a different source from their parent. The withheld target carries the parent's refusal reason; an unchanged match row still receives its period set. A withheld target
+  adds one to `canonicalApplyRefusals` (and, for the AFL API settle, one refusal finding and evidence entry); it adds no rekey statement. No migration, schema or caller change; ISSUE-274's match-row locking is unchanged.
+  The fix is forward-only: it repairs no row already written.
+- **Validation (local).** 15 DB-free cases pass; with the rule disabled 7 fail. On `afldb_test` (State A only), one focused run passed 3 selected tests (exit 0; the two ISSUE-275 cases and the ISSUE-274 precondition),
+  and the before/after census was identical, including `match_period_scores` row content. The witness plants the competing row inside the settle's own transaction: it is **not** a two-session concurrency test.
+  No DEV, PROD or durable Match Sheet (State B) evidence. The whole integration file and `settle-afl-api.test.ts` were not run. A known, separate Windows CRLF failure in `tests/current-season-import.test.ts` is unchanged.
+- **Not on DEV or PROD.** DEV install is held until the ISSUE-274 + ISSUE-276 combined nightly observation closes; PROD stays behind the ISSUE-265 hold. Detail: `issues/open/AFLDB-ISSUE-275.md` §26-§28.
+
 ### Public match-log and draft pages ignore a sort key that names an inherited object property (AFLDB-ISSUE-281; DB-free validated; merged to local `main` `01976be7` 13 October 2026, not pushed; not yet on DEV or PROD; issue open) - 12 October 2026
 
 - `/players/<slug>/matches?sort=constructor` and `/draft/<year>?sort=toString` (and the other `Object.prototype` names)

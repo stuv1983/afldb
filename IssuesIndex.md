@@ -486,8 +486,13 @@
 ### AFLDB-ISSUE-275 — A settle can insert period scores under a match it refused because a foreign owner created it concurrently
 - **Severity:** Medium. **Area:** acquisition / canonical ownership — `src/lib/acquisition/canonical-apply.ts`.
 - **State:** Open (2026-10-08), review F-010, code-proven mechanism (interleaving not executed); imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Next action:** fix plus integration case, with ISSUE-274; split-ownership
-  census open. Not fixed by ISSUE-274's local match-row lock (2026-10-11); acceptance case is an `it.todo`.
+  **Implemented locally 2026-10-13, revision 2 the same day** on `opus/issue-275` (`D:\dev\afldb-issue-275`, base `e315c1d3`; uncommitted, not merged or deployed): `canonical-apply.ts` refuses a unit's `match_period_scores` unread whenever the same unit's `matches` target is unapplied for any reason other than `nothing_to_write`
+  (deny-by-default, derived from the parent's result; `manual_authority_*` included; full path table runbook §22.1). DB-free: 15 cases pass (7 witnesses fail with the rule disabled; the 2 authority witnesses alone fail with it narrowed to the first pass's three reasons), five source-scan files 1064 passed + 1 failed (the CRLF baseline,
+  pre-existing and unrelated, runbook §25), `tsc` exit 0. A wrong findings assertion in the witness was found and fixed in review (§24.1).
+  **Focused `afldb_test` validation PASSED 2026-10-13 (runbook §26; evidence `D:\tmp\issue275\run-20261013-105531-v2\`):** target `afldb_owner`/`afldb_test`/`127.0.0.1:55432`, matches-only probe OK, one shell-free Vitest run with filter `ISSUE-274: precondition|ISSUE-275`: exit 0, **3 passed, 79 excluded by the filter, none selected skipped**; fresh pack-v2 baseline/after `CENSUS IDENTICAL`, `match_period_scores` count/key hash/whole-row hash unchanged; all eight repository files unchanged. Earlier attempts (inherited DSN role `arm`; `cmd.exe` split the filter, and its v1 census comparison is invalid) are preserved and are not acceptance evidence.
+  Same-transaction planted-row witness only: no two-session concurrency, no DEV/PROD/State B evidence, no preparation-time pack-v2 hash manifest; the CRLF test failure (§25) is separate. Full-diff review (§27): no CRIT/HIGH/MED finding.
+- **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Next action:** operator commits locally, `npm run merge:ready -- --issue 275`, merge/push (runbook §28). DEV install is **held** until the ISSUE-274 + ISSUE-276 combined nightly observation
+  window closes; PROD stays behind the ISSUE-265 hold. Open: the §15 split-ownership census (unrun; the fix is forward-only). D-275-1 is resolved by the owner's instruction; the period-only retry was traced and is not part of this defect (§23.4).
 
 ### AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 - **Severity:** Medium. **Area:** AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts`.
