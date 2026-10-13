@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### The lineup bundle refuses an acquisition whose fitzRoy version did not match the pin (AFLDB-ISSUE-302; `a48cc256`, merged and pushed to `main`; DB-free validated; not deployed; resolved) - 13 October 2026
+
+- `lineupAcquisitionInput` (`src/lib/acquisition/lineup-bundle.ts`) now throws `LineupBundleError` unless the acquisition manifest's `fitzroy_version_match` is exactly `true`, so `emit_lineup_bundle.ts` stops before it builds or writes a bundle. Before, the bundle's
+  `fitzroy_version` was always the pinned version, so a bundle acquired with a different installed fitzRoy named the pin as its provenance. A missing, `null`, string or numeric flag is refused as `false` is; the message names the installed version, the pinned
+  version and the observed flag. This follows the roster and core acquirers, which already refuse such a mismatch. A manifest that matches behaves as before; `acquire_lineups.R` still records, rather than refuses, a mismatch.
+- **Validation (DB-free).** `tests/afl-api-lineup.test.ts` 42 passed (four new), `npm run typecheck` and `git diff --check` passed. No mutation check, no real acquisition run and no integration test. Tooling only; no deployment, database or host contact.
+  Detail: `issues/closed/AFLDB-ISSUE-302.md` §20 and §21.
+
 ### `db:test:rebuild` and its reset proof now assert which database they are connected to (AFLDB-ISSUE-278; `dd18adb9`, merged and pushed to `main`; DB-free validated; Procedure A and Procedure B attempt 2 PASSED on `afldb_test` 2026-10-13; not deployed; resolved) - 13 October 2026
 
 - Every `psql` stream the rebuild sends (the reset and both validation streams) now begins with an identity assertion: connected to the acknowledged `afldb_test`-family database as `afldb_owner`, with no `SET ROLE` in force, or the stream stops before

@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 47 (ISSUE-229, ISSUE-265–270, and the 40 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13)
+**Open issues:** 46 (ISSUE-229, ISSUE-265–270, and the 39 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -634,13 +634,6 @@
 - **Severity:** Low. **Area:** acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts`. **State:** Open
   (2026-10-08), F-036; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-301.md`. **Next action:** implementation; timeout value open.
-
-### AFLDB-ISSUE-302 — Lineup bundle records the pinned fitzRoy version as provenance whatever version ran
-- **Severity:** Low. **Area:** acquisition / provenance — `src/lib/acquisition/lineup-bundle.ts`. **State:** Open
-  (2026-10-08), F-037; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-302.md`. **Current state:** D-302-1 decided (refuse); guard and tests implemented
-  locally on `fix/issue-302`, uncommitted. **Next action:** operator review and commit, `merge:ready`, merge, push, then
-  close (runbook §19).
 
 ### AFLDB-ISSUE-303 — `/admin/upload` promises 5 MB but Server Actions accept 1 MB
 - **Severity:** Low. **Area:** legacy CSV intake UI / framework configuration — `next.config.ts`. **State:** Open
