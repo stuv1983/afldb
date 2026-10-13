@@ -50094,8 +50094,33 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   is code-proven; the libpq trigger was not executed.
 - **Defect.** The target name is derived from the DSN URL path and checked against the allowlist, but `RESET_SQL` runs
   through psql without asserting `current_database()`/`current_user` on that connection.
-- **Open question.** H-278-1 (libpq query-part precedence; fix (1) stands regardless). **Next action.** Fix (1), optionally
-  (2), then tests. The review's gating note: before the next `db:test:rebuild`.
+- **H-278-1 resolved (2026-10-13)** from PostgreSQL 16 `fe-connect.c`: the URI query string overrides the path; postgres.js
+  ignores it. **Implemented locally (committed locally on `sonnet/issue-278`, not merged)**: identity guard leading the reset and both validation
+  streams, plus `assertDsnPinsTarget` (fix (2), required not optional). Second pass (2026-10-13): rebuild and
+  `prove-reset` psql children now run pinned (inherited `PGHOSTADDR`/`PGPORT`/`PGSERVICE`/... removed from a copy of the
+  environment, `-X`), stage children lose the same variables, and a DSN must name a literal host and an explicit port
+  (compatibility restriction in `docs/deployment.md` §6a). DB-free 670/670 (637 + 32 Tier 2 harness tests + 1 static `"char"` cast guard) + typecheck; see runbook §17.
+  **Procedure A (read-only identity-guard check) PASSED 2026-10-13**, 12/12 checks, evidence in runbook §17.6; the owner
+  confirmed its target and accepted the result without a re-run. **Procedure B prepared 2026-10-13**: a Tier 2
+  fingerprint supplement (`tools/db/fingerprint-tier2.ts`: row digests, sequence positions, definition digests, identity) and
+  a runner with an explicit child environment (runbook §17.7). **Attempt 1 (2026-10-13, owner-authorised) STOPPED at the
+  baseline, before the proof:** Tier 1 passed; the first Tier 2 run on PostgreSQL failed in `definitions:checks` with
+  `operator is not unique: text || "char"`. The reset proof never started and no after-census was taken, so **no
+  state-comparison verdict was established** (evidence `D:\tmp\issue278\evidence\run-B-20261013T050801Z\`, preserved).
+  Corrected locally (owner-authorised, no database contact; runbook §17.8): `::text` casts on `co.contype` ×2 and
+  `c.relkind`, a static no-bare-`"char"` test (670/670, not SQL validation), `tsc` clean, and a fail-fast runner (first
+  failed baseline gate stops everything).
+  **Procedure B attempt 2 PASSED 2026-10-13** (one owner-authorised attempt, `afldb_test` only; evidence
+  `D:\tmp\issue278\evidence\run-B-20261013T053946Z\`). **Proof verdict: PASS** (`RESET_SQL PROVEN`, `psql exit 3`, always-aborted).
+  **Unchanged-observed-state verdict: MATCH** (kept separate): Tier 1 `a39ad96b…4cee` and Tier 2 `4f11fda9…09d9` equal in baseline #1,
+  baseline #2 and the after-census (99 tables, 63 sequences, 1,454,440 rows digested; oid 45428; postmaster
+  `2026-10-13 04:51:00.640018+00` unchanged throughout). The host rebooted after Procedure A (A saw postmaster
+  `2026-10-10 16:01:11.590541`); A stays a historical, accepted result. Not proof that no sequence operation occurred; index/TOAST
+  contents, extended statistics, publications, subscriptions, roles, database settings, large objects and planner statistics are not
+  covered; no real rebuild was run. Full record, hashes and review: runbook §17.9. Committed locally on `sonnet/issue-278`;
+  not merged, pushed or deployed.
+  **Next action.** Merge-readiness on fresh `main`, operator merge/push, DEV sync, then the closure record. The review's gating
+  note: before the next `db:test:rebuild`. **Status stays Open.**
 
 ## AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 

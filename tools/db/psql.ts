@@ -43,6 +43,44 @@ export class PsqlCredentialRefused extends PsqlUnavailable {}
 /** Any string-keyed environment; `NodeJS.ProcessEnv` is stricter than a test fixture needs. */
 export type EnvLike = Record<string, string | undefined>;
 
+/**
+ * AFLDB-ISSUE-278: the libpq environment variables that choose WHERE a connection goes, as which
+ * role, with which session options (PostgreSQL 16, "Environment Variables"). libpq applies each
+ * only to a parameter the connection string left UNSET, but `PGHOSTADDR` is such a parameter even
+ * when the URI names a host: with both set, `hostaddr` gives the network address and `host` is
+ * demoted to an authentication name (fe-connect.c `pqConnectOptions2`, CHT_HOST_ADDRESS first).
+ * `PGSERVICE` / `PGSERVICEFILE` / `PGSYSCONFDIR` select a service file that fills unset
+ * parameters, and `PGPORT` fills an omitted port. postgres.js reads neither `PGHOSTADDR` nor
+ * `PGSERVICE`, and uses `PGHOST` / `PGPORT` only when the URL omits them, so an inherited value
+ * can point psql and a postgres.js observer at DIFFERENT servers.
+ *
+ * Deliberately NOT here: `PGPASSWORD` and `PGPASSFILE` (credentials, not routing: ISSUE-313 keeps
+ * an ambient password working), and the transport-security variables.
+ */
+export const LIBPQ_ROUTING_ENV: readonly string[] = [
+  'PGHOST', 'PGHOSTADDR', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGSERVICE', 'PGSERVICEFILE',
+  'PGSYSCONFDIR', 'PGOPTIONS', 'PGTARGETSESSIONATTRS', 'PGLOADBALANCEHOSTS',
+];
+
+/**
+ * A COPY of `parentEnv` without any LIBPQ_ROUTING_ENV variable (matched case-insensitively,
+ * because a Windows environment is). The parent is never modified.
+ */
+export function withoutLibpqRouting(parentEnv: EnvLike): NodeJS.ProcessEnv {
+  const routing = new Set(LIBPQ_ROUTING_ENV);
+  const copy = { ...parentEnv } as NodeJS.ProcessEnv;
+  for (const name of Object.keys(copy)) if (routing.has(name.toUpperCase())) delete copy[name];
+  return copy;
+}
+
+/**
+ * `pinned` (AFLDB-ISSUE-278) is opt-in, because other tools legitimately lean on an ambient
+ * `PGHOST` / service file with a host-less DSN. The destructive rebuild and its proof opt in:
+ * the child environment loses LIBPQ_ROUTING_ENV and psql is started with `-X`, so neither the
+ * environment nor a `psqlrc` `\connect` can move the connection off the URL.
+ */
+export type PsqlPinning = { pinned?: boolean };
+
 export type PsqlConnection = {
   /** The `-d` value. Carries no password; safe to appear in argv and in error text. */
   dsn: string;
@@ -169,9 +207,10 @@ function splitDsn(dsn: string): { safe: string; password: string | undefined } {
 export function psqlConnection(
   dsn: string,
   parentEnv: EnvLike = process.env,
+  pinning: PsqlPinning = {},
 ): PsqlConnection {
   const { safe, password } = splitDsn(dsn);
-  const env = { ...parentEnv } as NodeJS.ProcessEnv;
+  const env = (pinning.pinned ? withoutLibpqRouting(parentEnv) : { ...parentEnv }) as NodeJS.ProcessEnv;
   if (password !== undefined) {
     // Windows environment names are case-insensitive; a copy of process.env is a plain
     // object, so a differently-cased parent PGPASSWORD would otherwise sit beside ours.
@@ -204,9 +243,17 @@ export function psqlConnection(
  * that ignored `--single-transaction` and `ON_ERROR_STOP=1` would autocommit each statement
  * and still exit 0, which is exactly the shape of the 2026-08-27 incident (§20.12). With no
  * positional operand at all there is nothing for a non-permuting getopt to stop at.
+ *
+ *   -X (pinned only)     do not read the system or user psqlrc. psql reads them even for
+ *                        `-f -`, AFTER connecting and BEFORE the stream, so a `\connect` there
+ *                        would move the stream to another database or server (PostgreSQL 16
+ *                        src/bin/psql/startup.c: `if (!options.no_psqlrc) process_psqlrc()`).
  */
-export function psqlArgv(dsn: string): string[] {
-  return ['-d', psqlConnection(dsn).dsn, '-v', 'ON_ERROR_STOP=1', '--single-transaction', '-q', '-f', '-'];
+export function psqlArgv(dsn: string, pinning: PsqlPinning = {}): string[] {
+  return [
+    ...(pinning.pinned ? ['-X'] : []),
+    '-d', psqlConnection(dsn).dsn, '-v', 'ON_ERROR_STOP=1', '--single-transaction', '-q', '-f', '-',
+  ];
 }
 
 /**
@@ -228,7 +275,7 @@ export type SpawnSyncLike = (
   options: { input: string; encoding: 'utf8'; cwd?: string; env?: NodeJS.ProcessEnv },
 ) => { status: number | null; stdout: string | null; stderr: string | null; error?: Error };
 
-export type PsqlDeps = { spawn: SpawnSyncLike; cwd?: string };
+export type PsqlDeps = { spawn: SpawnSyncLike; cwd?: string } & PsqlPinning;
 
 /**
  * Run one SQL stream through psql. Returns the exit status rather than throwing on a SQL
@@ -239,8 +286,8 @@ export type PsqlDeps = { spawn: SpawnSyncLike; cwd?: string };
  * password cannot be moved off the command line (PsqlCredentialRefused).
  */
 export function runPsql(dsn: string, sql: string, deps: PsqlDeps): PsqlResult {
-  const connection = psqlConnection(dsn);
-  const result = deps.spawn(PSQL_BIN, psqlArgv(dsn), {
+  const connection = psqlConnection(dsn, process.env, { pinned: deps.pinned });
+  const result = deps.spawn(PSQL_BIN, psqlArgv(dsn, { pinned: deps.pinned }), {
     input: sql, encoding: 'utf8', cwd: deps.cwd, env: connection.env,
   });
   if (result.error) {

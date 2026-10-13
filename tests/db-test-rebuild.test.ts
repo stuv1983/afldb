@@ -23,9 +23,14 @@ import {
   draftguruImportArgv,
   draftguruValidateArgv,
   FINAL_VALIDATION_MARKER,
+  REBUILD_IDENTITY_MARKER,
+  REBUILD_OWNER_ROLE,
   RESET_SQL,
   RebuildRefused,
   assertDestructiveAcknowledgement,
+  assertDsnPinsTarget,
+  databaseOf,
+  rebuildIdentityGuardSql,
   assertDraftguruPreflight,
   AWARDS_HONOURS_EXPECTED,
   AWARDS_HONOURS_GROUPS,
@@ -114,6 +119,11 @@ import {
   MIGRATION_TABLE_SQL,
   OTHER_SESSIONS_SQL,
   PROOF_DELIVERY_MARKER,
+  PROOF_EXPECTED_DATABASE,
+  PROOF_EXPECTED_ROLE,
+  PROOF_IDLE_IN_TRANSACTION_TIMEOUT,
+  PROOF_LOCK_TIMEOUT,
+  PROOF_STATEMENT_TIMEOUT,
   PROOF_MARKER,
   PROOF_MARKER_COMMENT,
   PROOF_REQUIRED_MARKERS,
@@ -127,6 +137,7 @@ import {
   type SessionRow,
 } from '../tools/db/prove-reset';
 import {
+  LIBPQ_ROUTING_ENV,
   PSQL_BIN,
   PSQL_PROBE_ABORT,
   PSQL_PROBE_OK,
@@ -138,6 +149,7 @@ import {
   psqlArgv,
   psqlConnection,
   runPsql,
+  withoutLibpqRouting,
   type SpawnSyncLike,
 } from '../tools/db/psql';
 import type { PrivilegesSpawn } from '../tools/db/privileges';
@@ -146,6 +158,33 @@ import {
   IDENTITY_SQL as VERIFIER_IDENTITY_SQL,
   parseArgs,
 } from '../tools/db/fingerprint-test';
+import {
+  BEGIN_SQL as TIER2_BEGIN_SQL,
+  DEFINITION_SECTIONS as TIER2_DEFINITION_SECTIONS,
+  END_SQL as TIER2_END_SQL,
+  IDENTITY_SQL as TIER2_IDENTITY_SQL,
+  OBJECT_COUNTS_SQL as TIER2_COUNTS_SQL,
+  READ_ONLY_SESSION_SQL as TIER2_SESSION_SQL,
+  SEQUENCE_INVENTORY_SQL as TIER2_SEQUENCE_INVENTORY_SQL,
+  SETUP_SQL as TIER2_SETUP_SQL,
+  TABLE_INVENTORY_SQL as TIER2_TABLE_INVENTORY_SQL,
+  Tier2Incomplete,
+  Tier2Refused,
+  allStatements as tier2AllStatements,
+  collectTier2,
+  compareEvidence as compareTier2Evidence,
+  compareRecords as compareTier2Records,
+  computeOverall as computeTier2Overall,
+  describeError as describeTier2Error,
+  incompleteRecord as tier2IncompleteRecord,
+  parseArgs as parseTier2Args,
+  parseRecord as parseTier2Record,
+  sequenceValueSql as tier2SequenceValueSql,
+  tableDigest as tier2TableDigest,
+  tableDigestSql as tier2TableDigestSql,
+  writeEvidence as writeTier2Evidence,
+  type Tier2Record,
+} from '../tools/db/fingerprint-tier2';
 import {
   AFL_API_ADJUDICATION_DSN_ENV,
   AFL_API_ADJUDICATION_TARGET_ENV,
@@ -518,6 +557,441 @@ describe('rebuild target safety', () => {
   });
 });
 
+/*
+ * AFLDB-ISSUE-278 — psql must reach the database the runner validated.
+ *
+ * `databaseOf` reads the URL PATH (and postgres.js reads only the path and authority), but psql
+ * hands the DSN to libpq, whose URI parser stores the path `dbname` first and then lets any
+ * `dbname` / `host` / `port` / ... QUERY parameter replace it (PostgreSQL 16 fe-connect.c,
+ * conninfo_uri_parse_options -> conninfo_uri_parse_params -> conninfo_storeval, which frees the
+ * earlier value). Everything here is DB-free: no libpq, no psql, no connection.
+ */
+describe('AFLDB-ISSUE-278 — the validated target is the target psql reaches', () => {
+  const ENV = (adminDsn: string, importDsn = IMPORT) => ({
+    AFLDB_TEST_DATABASE_URL: adminDsn, AFLDB_TEST_IMPORT_DATABASE_URL: importDsn,
+  });
+  const withQuery = (query: string) => `${OWNER}?${query}`;
+  const message = (run: () => unknown): string => {
+    try { run(); } catch (error) {
+      expect(error).toBeInstanceOf(RebuildRefused);
+      return (error as Error).message;
+    }
+    return '';
+  };
+  const redirects: [string, string][] = [
+    ['dbname', 'dbname=afldb_dev'],
+    ['dbname (percent-encoded keyword, which libpq decodes)', '%64bname=afldb_dev'],
+    ['dbname (after another parameter)', 'sslmode=require&dbname=afldb_dev'],
+    ['dbname (upper case)', 'DBNAME=afldb_dev'],
+    ['host', 'host=other.example'],
+    ['hostaddr', 'hostaddr=10.0.0.9'],
+    ['port', 'port=5433'],
+    ['service', 'service=anything'],
+    ['user', 'user=postgres'],
+    ['options', 'options=-c%20role%3Dpostgres'],
+  ];
+
+  it('W1: the path reading alone accepts a dbname override that libpq would honour', () => {
+    const dsn = withQuery('dbname=afldb_dev');
+    expect(databaseOf(dsn)).toBe('afldb_test');                          // what the allowlist sees
+    expect(new URL(dsn).searchParams.get('dbname')).toBe('afldb_dev');   // what libpq stores last
+  });
+
+  it.each(redirects)('refuses a %s query parameter, naming the variable and never the DSN', (_label, query) => {
+    const dsn = withQuery(query);
+    const said = message(() => resolveTarget(ENV(dsn)));
+    expect(said).toMatch(/query parameter/);
+    expect(said).toContain('AFLDB_TEST_DATABASE_URL');
+    expect(said).not.toContain('pw');
+    expect(said).not.toContain(dsn);
+    expect(message(() => assertDsnPinsTarget(dsn, 'X'))).toMatch(/query parameter/);
+  });
+
+  it('refuses the same parameters on the restricted import DSN, which the importers read through libpq', () => {
+    const said = message(() => resolveTarget(ENV(OWNER, `${IMPORT}?dbname=afldb_dev`)));
+    expect(said).toMatch(/query parameter/);
+    expect(said).toContain('AFLDB_TEST_IMPORT_DATABASE_URL');
+  });
+
+  it('refuses a DSN whose libpq reading of the path could differ from databaseOf', () => {
+    const cases: [string, RegExp][] = [
+      ['POSTGRESQL://afldb_owner:pw@localhost:5432/afldb_test', /lower case/],
+      ['mysql://afldb_owner:pw@localhost:5432/afldb_test', /lower case/],
+      ['postgres://afldb_owner:pw@h1,h2/afldb_test', /more than one host/],
+      ['postgres://afldb_owner:pw@localhost:5432/afldb_%74est', /only explicit rebuild targets/],   // fails the allowlist first
+      ['postgres://afldb_owner:pw@localhost:5432/./afldb_test', /read differently/],
+      ['postgres://afldb_owner:pw@localhost:5432/afldb_test#frag', /read differently/],
+    ];
+    for (const [dsn, pattern] of cases) {
+      expect(message(() => resolveTarget(ENV(dsn))), dsn).toMatch(pattern);
+    }
+  });
+
+  it('turns an unparseable DSN into a refusal, not a raw TypeError, and never echoes it', () => {
+    const said = message(() => assertDsnPinsTarget('postgres://afldb_owner:pw@h:notaport/afldb_test', 'X'));
+    expect(said).toMatch(/host that is not a plain host name|not a valid connection URL/);   // either way: a refusal
+    expect(said).not.toContain('notaport');
+    expect(said).not.toContain('pw');
+  });
+
+  it('keeps accepting the DSN forms the runner is run with (positive controls)', () => {
+    const accepted = [
+      OWNER,
+      OWNER.replace('postgres://', 'postgresql://'),
+      withQuery('sslmode=require'),
+      withQuery('application_name=rebuild&connect_timeout=5'),
+      'postgres://afldb_owner:p,w@localhost:5432/afldb_test',      // a comma in the PASSWORD is not a host list
+      'postgres://afldb_owner:pw@[::1]:5432/afldb_test',
+    ];
+    for (const dsn of accepted) {
+      expect(() => assertDsnPinsTarget(dsn, 'X'), dsn).not.toThrow();
+      expect(resolveTarget(ENV(dsn)).adminDsn, dsn).toBe(dsn);
+    }
+  });
+
+  it('refuses a hand-built target before ANY stage runs, whoever built it', () => {
+    const { deps, commands, sqlRuns, validationRuns } = fakeDeps();
+    const stages = planStages(target(), fitzroy(), OPTS);
+    expect(() => executeRebuild(stages, target({ adminDsn: withQuery('dbname=afldb_dev') }), deps))
+      .toThrow(/query parameter/);
+    expect(() => executeRebuild(stages, target({ database: 'afldb_dev' }), deps))
+      .toThrow(/rejected by name/);
+    expect([commands.length, sqlRuns.length, validationRuns.length]).toEqual([0, 0, 0]);
+  });
+
+  describe('the identity guard that leads every psql stream', () => {
+    const CODE_DSN = 'postgres://afldb_owner:pw@localhost:5432/code_test_db';
+    const codeTargetHere = () => target({ database: 'code_test_db', adminDsn: CODE_DSN, importDsn: CODE_DSN });
+
+    it('asserts database, current_user and session_user, and names the acknowledged target', () => {
+      const guard = rebuildIdentityGuardSql('afldb_test');
+      expect(guard).toContain('current_database()');
+      expect(guard).toContain("IF db <> 'afldb_test' THEN");
+      expect(guard).toContain(`IF cu <> '${REBUILD_OWNER_ROLE}' THEN`);
+      expect(guard).toContain(`IF su <> '${REBUILD_OWNER_ROLE}' THEN`);
+      expect(guard.match(/RAISE EXCEPTION/g)).toHaveLength(3);
+      expect(guard.match(/\$afldb_identity\$/g)).toHaveLength(2);    // one DO block, closed
+      expect(guard).toContain(REBUILD_IDENTITY_MARKER);
+      expect(guard).not.toContain('afldb_dev');
+      expect(rebuildIdentityGuardSql('code_test_db')).toContain("IF db <> 'code_test_db' THEN");
+    });
+
+    it('refuses to build for a name outside the allowlist, so nothing is ever inlined unchecked', () => {
+      expect(() => rebuildIdentityGuardSql('afldb_dev')).toThrow(/rejected by name/);
+      expect(() => rebuildIdentityGuardSql('afldb_prod')).toThrow(RebuildRefused);
+      expect(() => rebuildIdentityGuardSql("afldb_test'; DROP SCHEMA public; --")).toThrow(RebuildRefused);
+      expect(() => rebuildIdentityGuardSql('')).toThrow(RebuildRefused);
+    });
+
+    it('leads the reset and BOTH validation streams for each target', () => {
+      for (const t of [target(), codeTargetHere()]) {
+        const { deps, sqlRuns, validationRuns } = fakeDeps();
+        executeRebuild(planStages(t, fitzroy(), OPTS), t, deps);
+        const guard = rebuildIdentityGuardSql(t.database);
+        expect(sqlRuns).toEqual([guard + RESET_SQL]);
+        expect(validationRuns.map(streamOf)).toEqual(expect.arrayContaining(['census', 'final']));
+        for (const stream of [...sqlRuns, ...validationRuns]) {
+          expect(stream.startsWith(guard), t.database).toBe(true);
+        }
+      }
+    });
+
+    it('does not change RESET_SQL, which the rollback-only proof embeds verbatim', () => {
+      expect(RESET_SQL).not.toContain('current_database');
+      expect(RESET_SQL).not.toContain(REBUILD_IDENTITY_MARKER);
+    });
+
+    it('cannot drift from the proof: same owner role, and the proof database is a rebuild target', () => {
+      expect(REBUILD_OWNER_ROLE).toBe(PROOF_EXPECTED_ROLE);
+      expect(() => rebuildIdentityGuardSql(PROOF_EXPECTED_DATABASE)).not.toThrow();
+    });
+  });
+
+  it('the reset proof refuses the same DSNs, before any session or psql', () => {
+    const source = readFileSync(join(root, 'tools', 'db', 'prove-reset.ts'), 'utf8');
+    const call = source.indexOf("assertDsnPinsTarget(dsn, 'AFLDB_TEST_DATABASE_URL')");
+    expect(call).toBeGreaterThan(-1);
+    expect(call).toBeGreaterThan(source.indexOf('assertRebuildTargetName(dsnDatabase)'));
+    expect(call).toBeLessThan(source.indexOf('psqlConnection(dsn, {})'));
+    expect(call).toBeLessThan(source.indexOf("(await import('postgres'))"));
+  });
+});
+
+/*
+ * AFLDB-ISSUE-278 (second pass) — the CHILD ENVIRONMENT. libpq fills every connection parameter
+ * the URL leaves unset from the environment, and PGHOSTADDR even outranks an explicit URI host
+ * (fe-connect.c pqConnectOptions2 picks CHT_HOST_ADDRESS first). postgres.js reads none of this,
+ * so an inherited value can send psql and the postgres.js observer to different servers. The
+ * pinned psql path scrubs the routing variables from a COPY of the environment and starts psql
+ * with -X. DB-free: a fake spawn records the argv and the environment it was given.
+ */
+describe('AFLDB-ISSUE-278 — inherited libpq routing cannot move the reset (child environments)', () => {
+  // TEST-NET-3 and invented names: nothing here can reach a real host even if it were dialled.
+  const AMBIENT = {
+    PGHOST: 'ambient.invalid', PGHOSTADDR: '203.0.113.9', PGPORT: '6543', PGDATABASE: 'afldb_dev',
+    PGUSER: 'postgres', PGSERVICE: 'ambient-service', PGSERVICEFILE: 'C:/ambient/.pg_service.conf',
+    PGSYSCONFDIR: 'C:/ambient/etc', PGOPTIONS: '-c role=postgres', PGTARGETSESSIONATTRS: 'read-write',
+    PGLOADBALANCEHOSTS: 'random',
+  };
+  const KEEP = { PATH: '/usr/bin', HOME: '/home/fake', PGPASSFILE: '/home/fake/.pgpass', PGSSLMODE: 'require', PGCONNECT_TIMEOUT: '7' };
+  const DSN = 'postgresql://afldb_owner:fake-secret-278@db.example.invalid:55432/afldb_test';
+
+  /** Run `body` with AMBIENT set in the real process.env, then restore it exactly. */
+  function withAmbient<T>(body: () => T, extra: Record<string, string> = {}): T {
+    const names = [...Object.keys(AMBIENT), ...Object.keys(KEEP), ...Object.keys(extra)];
+    const saved = new Map(names.map((n) => [n, process.env[n]]));
+    Object.assign(process.env, AMBIENT, KEEP, extra);
+    try { return body(); } finally {
+      for (const [n, v] of saved) { if (v === undefined) delete process.env[n]; else process.env[n] = v; }
+    }
+  }
+  const recordingSpawn = () => {
+    const calls: { argv: string[]; env: NodeJS.ProcessEnv | undefined; input: string }[] = [];
+    const spawn: SpawnSyncLike = (_bin, argv, opts) => {
+      calls.push({ argv, env: opts.env, input: opts.input });
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    return { spawn, calls };
+  };
+  const quietly = <T>(body: () => T): T => {
+    const out = process.stdout.write; const err = process.stderr.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try { return body(); } finally { process.stdout.write = out; process.stderr.write = err; }
+  };
+
+  it('names every variable the PostgreSQL 16 docs list as choosing the server, database or role', () => {
+    expect([...LIBPQ_ROUTING_ENV].sort()).toEqual(Object.keys(AMBIENT).sort());
+    expect(LIBPQ_ROUTING_ENV).not.toContain('PGPASSWORD');   // credentials are ISSUE-313's, not routing
+    expect(LIBPQ_ROUTING_ENV).not.toContain('PGPASSFILE');
+  });
+
+  it('withoutLibpqRouting copies: strips routing (any case), keeps the rest, never touches the parent', () => {
+    const parent = Object.freeze({ ...AMBIENT, ...KEEP, pghostaddr: '198.51.100.7', PgPort: '1' });
+    const before = JSON.stringify(parent);
+    const child = withoutLibpqRouting(parent);
+    expect(child).toEqual(KEEP);
+    expect(child).not.toBe(parent);
+    expect(JSON.stringify(parent)).toBe(before);
+  });
+
+  it('psqlConnection(pinned) drops PGHOSTADDR & co but still moves the DSN password into PGPASSWORD (ISSUE-313)', () => {
+    const parent = { ...AMBIENT, ...KEEP };
+    const snapshot = JSON.stringify(parent);
+    const pinned = psqlConnection(DSN, parent, { pinned: true });
+    for (const name of Object.keys(AMBIENT)) expect(pinned.env[name], name).toBeUndefined();
+    for (const [name, value] of Object.entries(KEEP)) expect(pinned.env[name], name).toBe(value);
+    expect(pinned.env.PGPASSWORD).toBe('fake-secret-278');
+    expect(pinned.dsn).not.toContain('fake-secret-278');
+    expect(psqlArgv(DSN, { pinned: true }).join(' ')).not.toContain('fake-secret-278');
+    expect(JSON.stringify(parent)).toBe(snapshot);          // the parent environment is unchanged
+    // Not pinned (every other tool): the ambient environment still passes through, as before.
+    const open = psqlConnection(DSN, parent);
+    for (const [name, value] of Object.entries(AMBIENT)) expect(open.env[name], name).toBe(value);
+  });
+
+  it('pinned psql starts with -X and keeps the shared flags; unpinned argv is unchanged', () => {
+    const pinned = psqlArgv(DSN, { pinned: true });
+    expect(pinned[0]).toBe('-X');
+    expect(pinned.slice(1)).toEqual(psqlArgv(DSN));
+    expect(psqlArgv(DSN)).not.toContain('-X');
+    expect(pinned).toContain('ON_ERROR_STOP=1');
+    expect(pinned).toContain('--single-transaction');
+  });
+
+  it('explicit URI host + inherited PGHOSTADDR: the psql child never sees PGHOSTADDR; process.env is left alone', () => {
+    const { spawn, calls } = recordingSpawn();
+    withAmbient(() => {
+      runPsql(DSN, 'SELECT 1;', { spawn, pinned: true });
+      expect(calls).toHaveLength(1);
+      for (const name of Object.keys(AMBIENT)) expect(calls[0].env?.[name], name).toBeUndefined();
+      expect(calls[0].env?.PGPASSWORD).toBe('fake-secret-278');
+      expect(calls[0].env?.PGPASSFILE).toBe(KEEP.PGPASSFILE);
+      expect(calls[0].argv[0]).toBe('-X');
+      expect(calls[0].argv.join(' ')).not.toContain('fake-secret-278');
+      expect(process.env.PGHOSTADDR).toBe(AMBIENT.PGHOSTADDR);            // parent unchanged
+      expect(process.env.PGPASSWORD).toBeUndefined();
+      // Contrast, so the test cannot pass vacuously: the default path DOES inherit it.
+      runPsql(DSN, 'SELECT 1;', { spawn });
+      expect(calls[1].env?.PGHOSTADDR).toBe(AMBIENT.PGHOSTADDR);
+      expect(calls[1].argv).not.toContain('-X');
+    });
+  });
+
+  it('the rebuild\'s real psql path (createCliDeps) is pinned for the reset AND the validation streams', () => {
+    const { spawn, calls } = recordingSpawn();
+    const deps = createCliDeps(spawn as unknown as typeof import('node:child_process').spawnSync);
+    withAmbient(() => quietly(() => {
+      deps.runSql(DSN, RESET_SQL);
+      deps.runValidation(DSN, 'SELECT 1; -- AFLDB-FINAL-VALIDATION-NOT-A-REAL-STREAM');
+    }));
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.argv[0]).toBe('-X');
+      for (const name of Object.keys(AMBIENT)) expect(call.env?.[name], name).toBeUndefined();
+      expect(call.env?.PGPASSWORD).toBe('fake-secret-278');
+    }
+  });
+
+  it('rebuild stage children (Python / npm / tsx importers, which read libpq) get no routing variables either', () => {
+    const seen: (NodeJS.ProcessEnv | undefined)[] = [];
+    const spawn = ((_cmd: string, _args: string[], opts: { env?: NodeJS.ProcessEnv }) => {
+      seen.push(opts.env);
+      return { status: 0, stdout: '', stderr: '' };
+    }) as unknown as typeof import('node:child_process').spawnSync;
+    const deps = createCliDeps(spawn);
+    withAmbient(() => quietly(() => {
+      deps.runCommand(['python', 'tools/migration/x.py'], { AFLDB_IMPORT_DATABASE_URL: IMPORT });
+    }));
+    expect(seen).toHaveLength(1);
+    for (const name of Object.keys(AMBIENT)) expect(seen[0]?.[name], name).toBeUndefined();
+    expect(seen[0]?.AFLDB_IMPORT_DATABASE_URL).toBe(IMPORT);    // the explicit overlay survives
+    expect(seen[0]?.PATH).toBe(KEEP.PATH);                      // and so does the rest
+    expect(seen[0]?.PGPASSFILE).toBe(KEEP.PGPASSFILE);
+  });
+
+  it('the proof runs psql through the same pinned options as the rebuild (source pin)', () => {
+    const source = readFileSync(join(root, 'tools', 'db', 'prove-reset.ts'), 'utf8');
+    expect(source).toMatch(/const psqlDeps = \{[^}]*pinned: true[^}]*\}/);
+    const rebuild = readFileSync(join(root, 'tools', 'db', 'rebuild-test.ts'), 'utf8');
+    const calls = rebuild.match(/runPsql\(dsn, sql, \{[^}]*\}\)/g) ?? [];
+    expect(calls).toHaveLength(2);                              // reset + validation
+    for (const call of calls) expect(call).toContain('pinned: true');
+  });
+
+  describe('a DSN that leaves routing unset is refused (host-less, omitted port)', () => {
+    const cases: [string, string, RegExp][] = [
+      ['no host (empty authority)', 'postgresql:///afldb_test', /names no host/],
+      ['no host (userinfo only)', 'postgres://afldb_owner:pw@/afldb_test', /names no host|not a valid connection URL/],
+      ['omitted port', 'postgres://afldb_owner:pw@localhost/afldb_test', /no usable port/],
+      ['empty port', 'postgres://afldb_owner:pw@localhost:/afldb_test', /no usable port/],
+      ['port 0', 'postgres://afldb_owner:pw@localhost:0/afldb_test', /no usable port/],
+      ['port out of range', 'postgres://afldb_owner:pw@localhost:70000/afldb_test', /no usable port|not a valid connection URL/],
+      ['percent-encoded host (a Unix-socket path to libpq)', 'postgres://afldb_owner:pw@%2Fvar%2Frun%2Fpostgresql:5432/afldb_test', /not a plain host name|not a valid connection URL/],
+    ];
+    it.each(cases)('refuses %s', (_label, dsn, pattern) => {
+      const direct = (() => { try { assertDsnPinsTarget(dsn, 'X'); return ''; } catch (e) { expect(e).toBeInstanceOf(RebuildRefused); return (e as Error).message; } })();
+      expect(direct).toMatch(pattern);
+      expect(direct).not.toContain('pw@');
+      expect(() => resolveTarget({ AFLDB_TEST_DATABASE_URL: dsn, AFLDB_TEST_IMPORT_DATABASE_URL: IMPORT })).toThrow(RebuildRefused);
+    });
+
+    it('still accepts a literal host (name, IPv4, IPv6) with an explicit port', () => {
+      for (const host of ['localhost:5432', '127.0.0.1:55432', 'db.example.invalid:5433', '[::1]:5432']) {
+        expect(() => assertDsnPinsTarget(`postgres://afldb_owner:pw@${host}/afldb_test`, 'X'), host).not.toThrow();
+      }
+    });
+  });
+});
+
+/*
+ * AFLDB-ISSUE-278 (second pass) — an audit of the exact SQL `npm run db:test:prove-reset` sends,
+ * pinned DB-free so the "no durable effects" claim in the verification procedure cannot drift
+ * from the stream. Nothing here can show what PostgreSQL does with the stream; it shows what the
+ * stream CONTAINS and in what order. The live run (procedure B) shows the rest.
+ */
+describe('AFLDB-ISSUE-278 — prove-reset stream audit (what it contains, in what order)', () => {
+  const sql = buildProofSql();
+  const at = (needle: string) => { const i = sql.indexOf(needle); expect(i, needle).toBeGreaterThan(-1); return i; };
+  const identity = () => at('-- 1. IDENTITY');
+  const reset = () => at(RESET_SQL.trim());
+  /** The statements before the identity assertion, comments and DO bodies aside. */
+  const beforeIdentity = () => sql.slice(0, identity())
+    .replace(/--[^\n]*/g, '').replace(/DO \$afldb_proof\$[\s\S]*?END \$afldb_proof\$;/g, 'DO-BLOCK;');
+
+  it('asserts identity before the first statement that touches the target, the marker comment or the reset', () => {
+    expect(identity()).toBeLessThan(at('COMMENT ON DATABASE'));
+    expect(identity()).toBeLessThan(at("pg_stat_activity"));
+    expect(identity()).toBeLessThan(at('CREATE TEMP TABLE afldb_proof_ext'));
+    expect(identity()).toBeLessThan(reset());
+    // and a mismatch RAISES (ON_ERROR_STOP then ends the stream), it does not merely warn
+    const block = sql.slice(identity(), at('-- 2. EXCLUSIVE ACCESS'));
+    expect(block).toContain(`IF db <> '${PROOF_EXPECTED_DATABASE}' THEN`);
+    expect(block).toContain(`IF cu <> '${PROOF_EXPECTED_ROLE}' THEN`);
+    expect(block).toContain(`IF su <> '${PROOF_EXPECTED_ROLE}' THEN`);
+    expect(block.match(/RAISE EXCEPTION/g)!.length).toBeGreaterThanOrEqual(5);   // db, cu, su, 2 x superuser
+  });
+
+  it('does only SET LOCAL, DO blocks and the commit-trap temp table before the identity assertion', () => {
+    const prefix = beforeIdentity();
+    const statements = prefix.split(';').map((s) => s.trim()).filter(Boolean);
+    expect(statements.length).toBeGreaterThan(0);
+    for (const statement of statements) {
+      const ok = /^SET LOCAL (lock_timeout|statement_timeout|idle_in_transaction_session_timeout|client_min_messages) = /.test(statement)
+        || statement === 'DO-BLOCK'
+        || /^CREATE TEMP TABLE afldb_proof_commit_trap \(id int\)$/.test(statement)
+        || /^ALTER TABLE afldb_proof_commit_trap\s+ADD CONSTRAINT afldb_proof_commit_trap_uq UNIQUE \(id\) DEFERRABLE INITIALLY DEFERRED$/.test(statement)
+        || /^INSERT INTO afldb_proof_commit_trap VALUES \(1\), \(1\)$/.test(statement);
+      expect(ok, statement).toBe(true);
+    }
+  });
+
+  it('sets every session option with SET LOCAL (transaction-scoped), never a bare SET', () => {
+    expect(sql).not.toMatch(/^\s*SET\s+(?!LOCAL\b)/im);
+    expect(sql).not.toMatch(/\bset_config\s*\(/i);
+    expect(sql).not.toMatch(/\bALTER\s+(ROLE|DATABASE|SYSTEM)\b/i);
+    expect(RESET_SQL).not.toMatch(/^\s*SET\s/im);
+    // the three timeouts, in force before the first catalog statement
+    const firstCatalog = at('CREATE TEMP TABLE afldb_proof_commit_trap');
+    expect(at(`SET LOCAL lock_timeout = '${PROOF_LOCK_TIMEOUT}'`)).toBeLessThan(firstCatalog);
+    expect(at(`SET LOCAL statement_timeout = '${PROOF_STATEMENT_TIMEOUT}'`)).toBeLessThan(firstCatalog);
+    expect(at(`SET LOCAL idle_in_transaction_session_timeout = '${PROOF_IDLE_IN_TRANSACTION_TIMEOUT}'`)).toBeLessThan(firstCatalog);
+    expect([PROOF_LOCK_TIMEOUT, PROOF_STATEMENT_TIMEOUT, PROOF_IDLE_IN_TRANSACTION_TIMEOUT]).toEqual(['5s', '300s', '60s']);
+  });
+
+  it('performs no sequence operation: nothing that survives a rollback (nextval/setval/lastval/currval/ALTER SEQUENCE)', () => {
+    // setval() and nextval() are NOT transactional, so one here would be a durable effect of a
+    // "rollback-only" proof. DROP SEQUENCE inside RESET_SQL is ordinary transactional DDL.
+    for (const text of [sql, RESET_SQL]) {
+      expect(text).not.toMatch(/\b(nextval|setval|lastval|currval)\s*\(/i);
+      expect(text).not.toMatch(/\bALTER\s+SEQUENCE\b/i);
+      expect(text).not.toMatch(/\bCREATE\s+SEQUENCE\b/i);
+    }
+    expect(RESET_SQL).toContain("WHEN 'S' THEN 'SEQUENCE'");      // sequences are only ever DROPPED
+  });
+
+  it('uses no construct that escapes the transaction (NOTIFY, advisory/large-object, COPY, dblink, terminate, DDL that cannot roll back)', () => {
+    const code = sql.replace(/--[^\n]*/g, '');      // statements only: comments may name what they forbid
+    for (const text of [code, RESET_SQL]) {
+      expect(text).not.toMatch(/\b(NOTIFY|LISTEN|UNLISTEN|COPY|VACUUM|CLUSTER|REINDEX|CHECKPOINT|DISCARD|PREPARE\s+TRANSACTION)\b/i);
+      expect(text).not.toMatch(/\bCREATE\s+(DATABASE|TABLESPACE|SUBSCRIPTION|PUBLICATION|EVENT\s+TRIGGER)\b/i);
+      expect(text).not.toMatch(/\bDROP\s+(DATABASE|TABLESPACE|SUBSCRIPTION|PUBLICATION|EVENT\s+TRIGGER|ROLE|USER)\b/i);
+      expect(text).not.toMatch(/\b(pg_terminate_backend|pg_cancel_backend|pg_advisory\w*|lo_\w+|dblink\w*|pg_reload_conf|pg_notify|pg_switch_wal|pg_create_\w+slot|pg_drop_\w+slot)\s*\(/i);
+      expect(text).not.toMatch(/\b(GRANT|REVOKE|INSERT\s+INTO\s+(?!afldb_proof_commit_trap))/i);
+    }
+    // The only writes are temp tables and one transactional COMMENT ON DATABASE.
+    const created = [...code.matchAll(/\bCREATE\s+(?:TEMP\s+|TEMPORARY\s+)?(\w+)\s+(\w+)/gi)].map((m) => `${m[1]} ${m[2]}`.toLowerCase());
+    expect(created.sort()).toEqual(['table afldb_proof_commit_trap', 'table afldb_proof_ext', 'table afldb_proof_extmem'].sort());
+    expect(code.match(/\bCREATE\s+TEMP\s+TABLE/gi)).toHaveLength(3);
+    expect(code.match(/\bCOMMENT\s+ON\b/gi)).toHaveLength(1);
+  });
+
+  it('every statement after the identity assertion either reads, or is the RESET_SQL constant, or the one transactional COMMENT', () => {
+    // The known statements are swapped for tokens first (the marker comment itself contains a ';').
+    const rest = sql.slice(identity()).replace(RESET_SQL.trim(), 'RESET-SQL;')
+      .replace(`COMMENT ON DATABASE ${PROOF_EXPECTED_DATABASE} IS '${PROOF_MARKER_COMMENT}';`, 'COMMENT-STMT;')
+      .replace(/--[^\n]*/g, '').replace(/DO \$afldb_proof\$[\s\S]*?END \$afldb_proof\$;/g, 'DO-BLOCK;');
+    expect(rest).toContain('COMMENT-STMT;');
+    for (const statement of rest.split(';').map((s) => s.trim()).filter(Boolean)) {
+      const ok = statement === 'DO-BLOCK' || statement === 'RESET-SQL' || statement === 'COMMENT-STMT'
+        || /^CREATE TEMP TABLE afldb_proof_ext(mem)? AS\s+SELECT/.test(statement);
+      expect(ok, statement.slice(0, 80)).toBe(true);
+    }
+  });
+
+  it('ends in the always-raise sentinel, with a server-side commit trap armed before the identity assertion', () => {
+    expect(at('INSERT INTO afldb_proof_commit_trap')).toBeLessThan(identity());
+    expect(sql.lastIndexOf('RAISE EXCEPTION')).toBeGreaterThan(at(`${PROOF_MARKER} extensions preserved`));
+    expect(sql.trimEnd().endsWith('END $afldb_proof$;')).toBe(true);
+  });
+
+  it('is run with ON_ERROR_STOP and --single-transaction on the shared pinned argv, so the first error ends it before the reset', () => {
+    const argv = psqlArgv('postgres://afldb_owner:pw@h:5432/afldb_test', { pinned: true });
+    expect(argv).toEqual(expect.arrayContaining(['ON_ERROR_STOP=1', '--single-transaction']));
+    expect(argv.slice(-2)).toEqual(['-f', '-']);
+  });
+});
+
 describe('explicit --target and the code_test_db rehearsal (AFLDB-ISSUE-146)', () => {
   // Distinctive secrets and host, so a leak into any message is unmistakable.
   const CODE_OWNER = 'postgres://afldb_owner:s3cret-owner-LEAK@db.internal:6543/code_test_db';
@@ -629,11 +1103,12 @@ describe('explicit --target and the code_test_db rehearsal (AFLDB-ISSUE-146)', (
       expect(stages.find((s) => s.id === 'recreate')?.kind).toBe('destructive');
     }
 
-    // executeRebuild's OWN dispatch: the 'sql' branch calls deps.runSql with the RESET_SQL
-    // module constant and nothing else -- never a caller-supplied or stage-specific string.
+    // executeRebuild's OWN dispatch: the 'sql' branch calls deps.runSql with the identity guard
+    // (AFLDB-ISSUE-278) followed by the RESET_SQL module constant and nothing else -- never a
+    // caller-supplied or stage-specific string.
     const source = readFileSync(join(process.cwd(), 'tools', 'db', 'rebuild-test.ts'), 'utf8');
     const sqlBranch = source.slice(source.indexOf("if (stage.run === 'sql')"), source.indexOf("if (stage.run === 'validate')"));
-    expect(sqlBranch).toContain('deps.runSql(target.adminDsn, RESET_SQL)');
+    expect(sqlBranch).toContain('deps.runSql(target.adminDsn, identityGuard + RESET_SQL)');
     expect(sqlBranch).not.toMatch(/dropdb|createdb|pg_restore/);
 
     // No stage's own argv (the command-kind stages) ever names a database-dropping/creating
@@ -2743,8 +3218,9 @@ describe('final validation', () => {
     const { deps, sqlRuns, validationRuns } = fakeDeps();
     executeRebuild(planStages(target(), fitzroy(), OPTS), target(), deps);
     expect(sqlRuns).toHaveLength(1);
-    expect(sqlRuns[0]).toBe(RESET_SQL);
+    expect(sqlRuns[0]).toBe(rebuildIdentityGuardSql('afldb_test') + RESET_SQL);   // AFLDB-ISSUE-278
     expect(validationRuns[0]).not.toBe(RESET_SQL);
+    expect(validationRuns[0]).not.toContain(RESET_SQL.trim());
   });
 
   it('relays the validation output on the SUCCESS path, not only on failure', () => {
@@ -3259,7 +3735,9 @@ describe('reset proof', () => {
       // THE PAYLOAD, not just the argv. The 2026-08-27 live failure was a psql that exited
       // 0 having (apparently) not run the stream, and this test could not have caught it:
       // it recorded `input` and then only asserted the two differed.
-      expect(calls[0].input).toBe(RESET_SQL);                    // real reset: raw body
+      // real reset: the identity guard (AFLDB-ISSUE-278), then the raw body, byte for byte
+      expect(calls[0].input).toBe(rebuildIdentityGuardSql('afldb_test') + RESET_SQL);
+      expect(calls[0].input.endsWith(RESET_SQL)).toBe(true);
       expect(calls[1].input).toContain(RESET_SQL.trim());        // proof: wraps it verbatim
       expect(calls[1].input).toContain(PROOF_ROLLBACK_SENTINEL); // ...and always aborts
       for (const call of calls) expect(call.input.trim().length).toBeGreaterThan(0);
@@ -4044,6 +4522,33 @@ describe('reset proof', () => {
       expect(state.psqlStreams).toHaveLength(0);
     });
 
+    // AFLDB-ISSUE-278: an identity mismatch must stop the proof before RESET_SQL can execute.
+    it('stops before psql is even probed when the server answers as another database', async () => {
+      const { deps, state } = fake({ identity: { database: 'afldb_dev' } });
+      await expect(runResetProof(deps)).rejects.toThrow(/afldb_dev.*afldb_test|afldb_test.*afldb_dev/s);
+      expect(state.psqlProbed).toBe(false);
+      expect(state.psqlStreams).toHaveLength(0);
+      expect(state.openSessions).toBe(0);
+    });
+
+    it('treats an in-stream identity refusal as a failed, rolled-back run that never reached the census or the abort', async () => {
+      // What psql reports when its OWN session is connected to the wrong database: the delivery
+      // marker, then the identity RAISE EXCEPTION, then exit 3 under ON_ERROR_STOP. No later
+      // marker, no sentinel: the reset text after the identity block was never executed.
+      const stderr = `WARNING:  ${PROOF_MARKER} ${PROOF_DELIVERY_MARKER} stream=begins\n`
+        + `WARNING:  ${PROOF_MARKER} trap armed=2 rows\n`
+        + `ERROR:  ${PROOF_MARKER} identity: connected to afldb_dev, not afldb_test\n`;
+      const { deps, state } = fake({ psql: { status: 3, stderr } });
+      const error = await runResetProof(deps).catch((e: Error) => e);
+      expect((error as Error).message).toMatch(/began but failed before its deliberate abort/);
+      expect((error as Error).message).toContain('connected to afldb_dev, not afldb_test');
+      expect((error as Error).message).toMatch(/nothing was committed/i);
+      expect(state.sessionsOpened).toEqual([1]);          // the post-rollback session was never needed
+      // and the stream really does put that refusal ahead of the reset text
+      const stream = buildProofSql();
+      expect(stream.indexOf(`${PROOF_MARKER} identity: connected to`)).toBeLessThan(stream.indexOf(RESET_SQL.trim()));
+    });
+
     it('never carries a live connection handle across phases', () => {
       // Structural: the deps expose a SCOPED session, not a connection. There is no way to
       // hand runResetProof something it can keep open.
@@ -4634,6 +5139,483 @@ describe('read-only fingerprint verifier', () => {
   });
 });
 
+/*
+ * AFLDB-ISSUE-278 — the Tier 2 fingerprint supplement, `npm run db:test:fingerprint-tier2`.
+ *
+ * Everything here is DB-free: a scripted fake stands in for PostgreSQL. That proves the
+ * collection logic (ordering, read-only discipline, fail-closed behaviour, determinism, drift
+ * sensitivity, evidence hygiene). It does NOT prove that the SQL text parses and returns what the
+ * fake returns; that is established only by the harness's first read-only run on the real server,
+ * which Procedure B makes a hard gate before the reset proof.
+ */
+describe('tier 2 fingerprint supplement (AFLDB-ISSUE-278)', () => {
+  const tier2Source = readFileSync(join(root, 'tools', 'db', 'fingerprint-tier2.ts'), 'utf8');
+  const tier2Code = tier2Source.slice(tier2Source.indexOf('*/') + 2);
+
+  type FakeTable = { schema: string; name: string; kind?: string; can?: boolean; rls?: boolean;
+    populated?: boolean; n: string; limbs: [string, string, string, string] };
+  type FakeSeq = { schema: string; name: string; last: string; called: boolean; def?: string };
+  type FakeState = {
+    identity: Record<string, string>;
+    tier1: Record<string, string[]>;
+    defs: Record<string, string[]>;
+    tables: FakeTable[];
+    seqs: FakeSeq[];
+    failOn?: (sql: string) => boolean;
+    countsOverride?: Record<string, string>;
+  };
+
+  const baseState = (): FakeState => ({
+    identity: {
+      database: 'afldb_test', current_user_name: 'afldb_owner', session_user_name: 'afldb_owner',
+      database_oid: '45428', postmaster_start: '2026-10-10 16:01:11.590541+00',
+      server_version: '16.4', server_port: '5432',
+      transaction_read_only: 'on', transaction_isolation: 'repeatable read',
+    },
+    tier1: Object.fromEntries(FINGERPRINT_SECTIONS.map((s) => [s.id, [`${s.id}-line-1`, `${s.id}-line-2`]])),
+    defs: Object.fromEntries(TIER2_DEFINITION_SECTIONS.map((s) => [s.id, [`${s.id}|aaa`, `${s.id}|bbb`]])),
+    tables: [
+      { schema: 'public', name: 'a', n: '2', limbs: ['11', '22', '33', '44'] },
+      { schema: 'public', name: 'b', n: '0', limbs: ['0', '0', '0', '0'] },
+    ],
+    seqs: [{ schema: 'public', name: 'a_id_seq', last: '7', called: true, def: 'type=pg_catalog.int8|cache=1|cycle=false|owned_by=a:public.a.id' }],
+  });
+
+  function fakeQuery(state: FakeState) {
+    const sent: string[] = [];
+    const quoted = (t: { schema: string; name: string }): string => `"${t.schema}"."${t.name}"`;
+    const query = async (sql: string) => {
+      sent.push(sql);
+      if (state.failOn?.(sql)) throw new Error('scripted failure for postgres://u:hunter2@h:1/db');
+      if ([TIER2_SESSION_SQL, TIER2_BEGIN_SQL, TIER2_END_SQL, ...TIER2_SETUP_SQL].includes(sql)) return [];
+      if (sql === TIER2_IDENTITY_SQL) return [state.identity];
+      const tier1 = FINGERPRINT_SECTIONS.find((s) => s.sql === sql);
+      if (tier1) {
+        const lines = tier1.id === 'sequences' ? state.seqs.map((s) => `${s.schema}.${s.name}|seq`) : state.tier1[tier1.id];
+        return lines.map((k) => ({ k }));
+      }
+      if (sql === MIGRATION_TABLE_SQL) return [{ present: false }];
+      const def = TIER2_DEFINITION_SECTIONS.find((s) => s.sql === sql);
+      if (def) return state.defs[def.id].map((k) => ({ k }));
+      if (sql === TIER2_COUNTS_SQL) {
+        return [{
+          tables: String(state.tables.filter((t) => (t.kind ?? 'r') === 'r').length),
+          matviews: String(state.tables.filter((t) => t.kind === 'm').length),
+          sequences: String(state.seqs.length),
+          ...state.countsOverride,
+        }];
+      }
+      if (sql === TIER2_TABLE_INVENTORY_SQL) {
+        return state.tables.map((t) => ({
+          schema_name: t.schema, table_name: t.name, kind: t.kind ?? 'r', qname: quoted(t),
+          populated: t.populated ?? true, can_select: t.can ?? true, rls_may_filter: t.rls ?? false,
+        }));
+      }
+      if (sql === TIER2_SEQUENCE_INVENTORY_SQL) {
+        return state.seqs.map((s) => ({
+          schema_name: s.schema, seq_name: s.name, qname: quoted({ schema: s.schema, name: s.name }),
+          definition: s.def ?? 'type=pg_catalog.int8|cache=1|cycle=false|owned_by=-', can_select: true,
+        }));
+      }
+      const digest = /^SELECT count\(\*\)::text AS n[\s\S]*FROM ONLY (\S+) AS t\) h$/.exec(sql);
+      if (digest) {
+        const t = state.tables.find((x) => quoted(x) === digest[1])!;
+        return [{ n: t.n, s1: t.limbs[0], s2: t.limbs[1], s3: t.limbs[2], s4: t.limbs[3] }];
+      }
+      const seq = /^SELECT last_value::text AS last_value, is_called FROM (\S+)$/.exec(sql);
+      if (seq) {
+        const s = state.seqs.find((x) => quoted(x) === seq[1])!;
+        return [{ last_value: s.last, is_called: s.called }];
+      }
+      throw new Error(`the fake was sent a statement it does not know: ${sql.slice(0, 80)}`);
+    };
+    return { query, sent };
+  }
+
+  const collect = async (state: FakeState): Promise<Tier2Record> =>
+    collectTier2(fakeQuery(state).query, () => 0);
+
+  describe('read-only discipline', () => {
+    it('cannot reach a reset path, psql, a subprocess, or the .env file', () => {
+      for (const forbidden of ['RESET_SQL', 'runPsql', 'prove-reset', 'spawnSync', 'child_process']) {
+        expect(tier2Code).not.toContain(forbidden);
+      }
+      expect(tier2Code).not.toMatch(/['"]\.env['"]/);
+    });
+
+    it('sends only SELECT, SET and the read-only transaction envelope', () => {
+      const statements = tier2AllStatements();
+      expect(statements.length).toBeGreaterThan(40);
+      for (const statement of statements) {
+        expect(statement.trim()).toMatch(/^(SELECT|SET|BEGIN|ROLLBACK)\b/);
+        expect(statement).not.toMatch(
+          /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|CREATE|ALTER|GRANT|REVOKE|COPY|VACUUM|ANALYZE|REINDEX|CLUSTER|REFRESH|NOTIFY|LISTEN|CALL|COMMIT|SAVEPOINT)\b/i);
+        expect(statement).not.toMatch(/\b(nextval|setval|lastval|currval)\s*\(/i);
+        expect(statement).not.toMatch(/\b(set_config|pg_sleep|pg_terminate_backend|pg_cancel_backend|pg_advisory\w*|lo_\w+|dblink\w*)\b/i);
+      }
+      expect(tier2Code).not.toMatch(/\b(nextval|setval|lastval|currval)\s*\(/i);
+    });
+
+    it('uses a READ ONLY REPEATABLE READ transaction that is rolled back, never committed', () => {
+      expect(TIER2_BEGIN_SQL).toBe('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      expect(TIER2_END_SQL).toBe('ROLLBACK');
+      expect(TIER2_SESSION_SQL).toBe('SET default_transaction_read_only = on');
+      expect(tier2Code).not.toMatch(/\bCOMMIT\b/i);
+      for (const setting of TIER2_SETUP_SQL) expect(setting).toMatch(/^SET LOCAL /);
+    });
+
+    it('turns the session read-only first, begins next, rolls back last, and checks both server settings', async () => {
+      const { query, sent } = fakeQuery(baseState());
+      await collectTier2(query, () => 0);
+      expect(sent[0]).toBe(TIER2_SESSION_SQL);
+      expect(sent[1]).toBe(TIER2_BEGIN_SQL);
+      expect(sent.at(-1)).toBe(TIER2_END_SQL);
+      expect(sent.filter((s) => s === TIER2_END_SQL)).toHaveLength(1);
+
+      for (const [field, wrong] of [['transaction_read_only', 'off'], ['transaction_isolation', 'read committed']]) {
+        const state = baseState();
+        state.identity[field] = wrong;
+        await expect(collect(state)).rejects.toThrow(/not (read-only|REPEATABLE READ)/);
+      }
+    });
+
+    it('still rolls back when a statement fails, and returns no record', async () => {
+      const state = baseState();
+      state.failOn = (sql) => sql === TIER2_DEFINITION_SECTIONS.find((s) => s.id === 'triggers')!.sql;
+      const { query, sent } = fakeQuery(state);
+      await expect(collectTier2(query, () => 0)).rejects.toThrow(/definitions:triggers/);
+      expect(sent.at(-1)).toBe(TIER2_END_SQL);
+    });
+  });
+
+  describe('what a record holds', () => {
+    it('records identity, Tier 1, every definition section, every table, every sequence', async () => {
+      const record = await collect(baseState());
+      expect(record.status).toBe('COMPLETE');
+      expect(record.identity).toEqual({
+        database: 'afldb_test', currentUser: 'afldb_owner', sessionUser: 'afldb_owner',
+        databaseOid: '45428', postmasterStart: '2026-10-10 16:01:11.590541+00',
+        serverVersion: '16.4', serverPort: '5432',
+      });
+      expect(Object.keys(record.tier1.sections).sort())
+        .toEqual([...FINGERPRINT_SECTIONS.map((s) => s.id), 'migrations'].sort());
+      expect(Object.keys(record.definitions).sort()).toEqual(TIER2_DEFINITION_SECTIONS.map((s) => s.id).sort());
+      for (const id of ['routines', 'defaults', 'checks', 'indexes', 'foreign_keys', 'triggers', 'policies',
+        'comments', 'relation_options', 'column_options']) {
+        expect(record.definitions[id], id).toBeDefined();
+      }
+      expect(record.tables.map((t) => `${t.schema}.${t.name}`)).toEqual(['public.a', 'public.b']);
+      expect(record.sequences).toEqual([{
+        schema: 'public', name: 'a_id_seq', lastValue: '7', isCalled: true,
+        definition: 'type=pg_catalog.int8|cache=1|cycle=false|owned_by=a:public.a.id',
+      }]);
+      expect(record.totals).toEqual({ tables: 2, materializedViews: 0, sequences: 1, rows: '2' });
+    });
+
+    it('is deterministic: the same observed state gives the same digests', async () => {
+      const a = await collect(baseState());
+      const b = await collect(baseState());
+      expect(b.overall).toBe(a.overall);
+      expect(b.tables).toEqual(a.tables);
+      expect(computeTier2Overall(a)).toBe(a.overall);
+    });
+
+    it('digests a table from its qualified name, count and four summed limbs, independently reimplemented', () => {
+      const expected = createHash('sha256')
+        .update(['afldb-tier2-table', '"public"."a"', '2', '11', '22', '33', '44'].join('\n'), 'utf8').digest('hex');
+      expect(tier2TableDigest('"public"."a"', '2', ['11', '22', '33', '44'])).toBe(expected);
+      // different count, different limb, different table: all different
+      expect(tier2TableDigest('"public"."a"', '3', ['11', '22', '33', '44'])).not.toBe(expected);
+      expect(tier2TableDigest('"public"."a"', '2', ['11', '22', '33', '45'])).not.toBe(expected);
+      expect(tier2TableDigest('"public"."b"', '2', ['11', '22', '33', '44'])).not.toBe(expected);
+    });
+
+    it('builds the row digest as a count plus order-independent summed hashes over ONLY the table', () => {
+      const sql = tier2TableDigestSql('"public"."a"');
+      expect(sql).toContain('FROM ONLY "public"."a" AS t');
+      expect(sql).toContain('sha256(convert_to(t::text');
+      expect(sql).toContain('count(*)::text AS n');
+      for (const from of [1, 17, 33, 49]) expect(sql).toContain(`substr(d, ${from}, 16)`);
+      // exact numeric sums: no overflow, no modulus; an empty table sums to 0, not NULL
+      expect(sql.match(/::bit\(64\)::bigint::numeric/g)).toHaveLength(4);
+      expect(sql.match(/coalesce\(sum\(/g)).toHaveLength(4);
+      expect(sql).not.toMatch(/ORDER BY|DISTINCT|GROUP BY/i);
+    });
+
+    it('reads a sequence with a plain SELECT, and takes its name from the server\'s own quoting', () => {
+      expect(tier2SequenceValueSql('"public"."a_id_seq"'))
+        .toBe('SELECT last_value::text AS last_value, is_called FROM "public"."a_id_seq"');
+      expect(TIER2_TABLE_INVENTORY_SQL).toContain(`format('%I.%I'`);
+      expect(TIER2_SEQUENCE_INVENTORY_SQL).toContain(`format('%I.%I'`);
+    });
+
+    it('covers the sequence settings Tier 1 lacks: type, cache, cycle, owner column', () => {
+      for (const part of ['seqtypid', 'seqcache', 'seqcycle', 'deptype']) {
+        expect(TIER2_SEQUENCE_INVENTORY_SQL).toContain(part);
+      }
+      const tier1Sequences = FINGERPRINT_SECTIONS.find((s) => s.id === 'sequences')!.sql;
+      for (const part of ['seqstart', 'seqincrement', 'seqmin', 'seqmax']) {
+        expect(tier1Sequences).toContain(part);
+        expect(TIER2_SEQUENCE_INVENTORY_SQL).not.toContain(part);
+      }
+    });
+
+    it('covers each definition class the owner asked for, by catalog', () => {
+      const wanted: Record<string, string> = {
+        routines: 'pg_proc', defaults: 'pg_attrdef', checks: 'pg_constraint', indexes: 'pg_index',
+        foreign_keys: 'pg_constraint', triggers: 'pg_trigger', policies: 'pg_policy',
+        comments: 'pg_description', database_comment: 'shobj_description',
+        relation_options: 'reloptions', column_options: 'pg_attribute',
+      };
+      for (const [id, needle] of Object.entries(wanted)) {
+        expect(TIER2_DEFINITION_SECTIONS.find((s) => s.id === id)?.sql, id).toContain(needle);
+      }
+      expect(TIER2_DEFINITION_SECTIONS.find((s) => s.id === 'foreign_keys')!.sql).toContain('confrelid');
+      // predicates and expressions are columns of pg_index, captured by whole-row to_jsonb
+      expect(TIER2_DEFINITION_SECTIONS.find((s) => s.id === 'indexes')!.sql).toContain('to_jsonb(x)');
+      expect(TIER2_DEFINITION_SECTIONS.find((s) => s.id === 'relation_options')!.sql).toContain('toast_reloptions');
+    });
+
+    // STATIC text check only. It is NOT PostgreSQL SQL validation: it never parses or plans a
+    // statement. It guards the one defect Procedure B met on 13 Oct (`text || "char"` is
+    // "operator is not unique"), which no scripted mock can reproduce.
+    it('never concatenates a "char" catalog column without an explicit ::text (static check)', () => {
+      const charColumns = [
+        'contype', 'confupdtype', 'confdeltype', 'confmatchtype', 'relkind', 'relpersistence',
+        'relreplident', 'deptype', 'polcmd', 'tgenabled', 'typtype', 'typcategory', 'typalign',
+        'typstorage', 'attstorage', 'attalign', 'attidentity', 'attgenerated',
+      ].join('|');
+      const bare = new RegExp(`\\|\\|\\s*\\w+\\.(?:${charColumns})\\b(?!\\s*::\\s*text)`);
+      for (const section of TIER2_DEFINITION_SECTIONS) {
+        expect(section.sql, `section ${section.id}`).not.toMatch(bare);
+      }
+      for (const [id, column] of [['checks', 'co.contype'], ['key_constraints', 'co.contype'], ['relation_options', 'c.relkind']]) {
+        expect(TIER2_DEFINITION_SECTIONS.find((s) => s.id === id)!.sql, id).toContain(`|| ${column}::text`);
+      }
+    });
+  });
+
+  describe('fails closed', () => {
+    it('refuses a table the role cannot read', async () => {
+      const state = baseState();
+      state.tables[1].can = false;
+      await expect(collect(state)).rejects.toThrow(/cannot be read by afldb_owner: "public"."b"/);
+    });
+
+    it('refuses a table row level security may filter (an incomplete digest)', async () => {
+      const state = baseState();
+      state.tables[0].rls = true;
+      await expect(collect(state)).rejects.toThrow(/row level security/);
+    });
+
+    it('refuses when the digested tables disagree with the independent catalog count', async () => {
+      const state = baseState();
+      state.countsOverride = { tables: '3' };
+      await expect(collect(state)).rejects.toThrow(/Digested 2 table\(s\).*catalog counts 3/);
+    });
+
+    it('refuses when the sequences read disagree with the catalog count or with Tier 1', async () => {
+      const state = baseState();
+      state.countsOverride = { sequences: '2' };
+      await expect(collect(state)).rejects.toThrow(/Read 1 sequence\(s\); the catalog counts 2/);
+    });
+
+    it('refuses a malformed row-digest or sequence result', async () => {
+      const bad = baseState();
+      bad.tables[0].n = 'two';
+      await expect(collect(bad)).rejects.toThrow(/malformed/);
+      const seq = baseState();
+      seq.seqs[0].last = 'seven';
+      await expect(collect(seq)).rejects.toThrow(/malformed/);
+    });
+
+    it('names the failing statement stage for any section, a table or a sequence', async () => {
+      const cases: [string, (sql: string) => boolean][] = [
+        ['tier1', (sql) => sql === FINGERPRINT_SECTIONS[3].sql],
+        ['definitions:policies', (sql) => sql === TIER2_DEFINITION_SECTIONS.find((s) => s.id === 'policies')!.sql],
+        ['table:"public"."a"', (sql) => sql.includes('FROM ONLY "public"."a"')],
+        ['sequence:"public"."a_id_seq"', (sql) => sql.includes('FROM "public"."a_id_seq"')],
+      ];
+      for (const [stage, failOn] of cases) {
+        const state = baseState();
+        state.failOn = failOn;
+        await expect(collect(state), stage).rejects.toThrow(stage);
+      }
+    });
+
+    it('refuses a connection that is not afldb_test as afldb_owner', async () => {
+      const wrongDb = baseState();
+      wrongDb.identity.database = 'afldb_dev';
+      await expect(collect(wrongDb)).rejects.toThrow(/not 'afldb_test'/);
+      const arm = baseState();
+      arm.identity.current_user_name = 'arm';
+      arm.identity.session_user_name = 'arm';
+      await expect(collect(arm)).rejects.toThrow(/not 'afldb_owner'.*inherited AFLDB_TEST_DATABASE_URL/);
+      const empty = baseState();
+      empty.identity.postmaster_start = '';
+      await expect(collect(empty)).rejects.toThrow(/postmasterStart came back empty/);
+    });
+
+    it('records an unpopulated materialized view as such instead of reading it', async () => {
+      const state = baseState();
+      state.tables.push({ schema: 'public', name: 'mv', kind: 'm', populated: false, n: '0', limbs: ['0', '0', '0', '0'] });
+      const { query, sent } = fakeQuery(state);
+      const record = await collectTier2(query, () => 0);
+      expect(record.tables.find((t) => t.name === 'mv')).toMatchObject({ kind: 'm', populated: false, digest: 'unpopulated' });
+      expect(sent.some((s) => s.includes('"public"."mv"'))).toBe(false);
+    });
+  });
+
+  describe('compares', () => {
+    const json = (record: unknown): string => JSON.stringify(record, null, 2);
+
+    it('matches equal states and words it as unchanged observed state, not proof', async () => {
+      const a = await collect(baseState());
+      const b = await collect(baseState());
+      const { code, lines } = compareTier2Evidence(json(a), json(b));
+      expect(code).toBe(0);
+      const out = lines.join('\n');
+      expect(out).toContain('MATCH — unchanged observed state');
+      expect(out).toContain('does not prove that no sequence operation occurred');
+    });
+
+    it('sees a changed row digest, count, sequence position, definition, Tier 1 section, added table', async () => {
+      const before = await collect(baseState());
+      const drifts: [string, (s: FakeState) => void, RegExp][] = [
+        ['row digest', (s) => { s.tables[0].limbs = ['11', '22', '33', '45']; }, /table:public\.a \(rows 2 -> 2, digest differs\)/],
+        ['row count', (s) => { s.tables[0].n = '3'; }, /table:public\.a \(rows 2 -> 3/],
+        ['sequence value', (s) => { s.seqs[0].last = '8'; }, /sequence:public\.a_id_seq \(last_value 7 -> 8/],
+        ['is_called', (s) => { s.seqs[0].called = false; }, /is_called true -> false/],
+        ['sequence setting', (s) => { s.seqs[0].def = 'type=pg_catalog.int8|cache=20|cycle=false|owned_by=-'; }, /settings differ/],
+        ['routine body', (s) => { s.defs.routines = ['routines|aaa', 'routines|changed']; }, /definitions:routines/],
+        ['comment', (s) => { s.defs.comments = ['comments|new']; }, /definitions:comments/],
+        ['tier 1 section', (s) => { s.tier1.relations = ['relations-line-1']; }, /tier1:relations/],
+        ['added table', (s) => { s.tables.push({ schema: 'public', name: 'c', n: '0', limbs: ['0', '0', '0', '0'] }); }, /table:public\.c \(added\)/],
+      ];
+      for (const [label, mutate, expected] of drifts) {
+        const state = baseState();
+        mutate(state);
+        const after = await collect(state);
+        const comparison = compareTier2Records(before, after);
+        expect(comparison.match, label).toBe(false);
+        expect(comparison.drift.join('\n'), label).toMatch(expected);
+        expect(compareTier2Evidence(json(before), json(after)).code, label).toBe(1);
+      }
+    });
+
+    it('flags a different server run (postmaster start, database oid, version, port) even with equal state', async () => {
+      const before = await collect(baseState());
+      for (const [field, key] of [['postmasterStart', 'postmaster_start'], ['databaseOid', 'database_oid'],
+        ['serverVersion', 'server_version'], ['serverPort', 'server_port']]) {
+        const state = baseState();
+        state.identity[key] = 'different';
+        const comparison = compareTier2Records(before, await collect(state));
+        expect(comparison.match, field).toBe(false);
+        expect(comparison.identityDifferences, field).toEqual([field]);
+      }
+    });
+
+    it('refuses an INCOMPLETE record, so two matching errors can never be a pass', () => {
+      const failure = json(tier2IncompleteRecord('tables:rls', new Error('same error both times')));
+      expect(() => compareTier2Evidence(failure, failure)).toThrow(Tier2Incomplete);
+      expect(() => compareTier2Evidence(failure, failure)).toThrow(/not a COMPLETE record/);
+      expect(failure).toContain('"status": "INCOMPLETE"');
+    });
+
+    it('refuses one failure beside one good record, garbage, a wrong schema, and a tampered file', async () => {
+      const good = json(await collect(baseState()));
+      const failure = json(tier2IncompleteRecord('x', new Error('boom')));
+      expect(() => compareTier2Evidence(good, failure)).toThrow(/after record is not a COMPLETE/);
+      expect(() => compareTier2Evidence(failure, good)).toThrow(/before record is not a COMPLETE/);
+      expect(() => parseTier2Record('not json', 'f')).toThrow(/not valid JSON/);
+      expect(() => parseTier2Record('null', 'f')).toThrow(Tier2Incomplete);
+      expect(() => parseTier2Record(JSON.stringify({ ...JSON.parse(good), schemaVersion: 2 }), 'f'))
+        .toThrow(/unexpected schema version/);
+      const tampered = JSON.parse(good) as Tier2Record;
+      tampered.tables[0].digest = 'f'.repeat(64);
+      expect(() => parseTier2Record(JSON.stringify(tampered), 'f')).toThrow(/consistency check/);
+      const noOverall = JSON.parse(good);
+      delete noOverall.overall;
+      expect(() => parseTier2Record(JSON.stringify(noOverall), 'f')).toThrow(/missing required fields/);
+    });
+  });
+
+  describe('evidence hygiene', () => {
+    it('writes hashes, counts, names and sequence values, with no DSN, password or connection string', async () => {
+      const record = await collect(baseState());
+      const text = JSON.stringify(record);
+      expect(text).not.toMatch(/postgres(ql)?:\/\//i);
+      expect(text).not.toMatch(/password|PGPASSWORD|hunter2|secret/i);
+      expect(Object.keys(record).sort()).toEqual([
+        'collectedUtc', 'definitions', 'elapsedMs', 'identity', 'notes', 'overall', 'schemaVersion',
+        'sequences', 'status', 'tables', 'tier1', 'tool', 'totals', 'transaction']);
+      // a table entry is name, kind, populated, a count and a hash - no column values
+      expect(Object.keys(record.tables[0]).sort()).toEqual(['digest', 'kind', 'name', 'populated', 'rows', 'schema']);
+    });
+
+    it('masks any connection string and password in a recorded error, and bounds its length', () => {
+      const error = describeTier2Error(Object.assign(
+        new Error('connect postgresql://afldb_owner:hunter2@127.0.0.1:55432/afldb_test failed password=hunter2 '
+          + 'x'.repeat(2000)), { code: 'ECONNREFUSED' }));
+      expect(error.message).not.toContain('hunter2');
+      expect(error.message).not.toContain('afldb_owner:');
+      expect(error.message.length).toBeLessThanOrEqual(500);
+      expect(error.code).toBe('ECONNREFUSED');
+      const record = tier2IncompleteRecord('connect', new Error('postgres://u:hunter2@h:1/db'));
+      expect(JSON.stringify(record)).not.toContain('hunter2');
+    });
+
+    it('carries the failure message of a scripted connection error without the credential', async () => {
+      const state = baseState();
+      state.failOn = (sql) => sql === TIER2_COUNTS_SQL;
+      const failure = await collect(state).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(Tier2Incomplete);
+      expect(JSON.stringify(tier2IncompleteRecord((failure as Tier2Incomplete).stage, failure))).not.toContain('hunter2');
+    });
+
+    it('never overwrites existing evidence', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'afldb-tier2-'));
+      try {
+        const path = join(dir, 'evidence.json');
+        writeTier2Evidence(path, { a: 1 });
+        expect(() => writeTier2Evidence(path, { a: 2 })).toThrow(/EEXIST/);
+        expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ a: 1 });
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('command line', () => {
+    it('takes exactly one mode and rejects anything else', () => {
+      expect(parseTier2Args(['--out', 'e.json'])).toEqual({ mode: 'collect', out: 'e.json' });
+      expect(parseTier2Args(['--compare', 'a.json', 'b.json'])).toEqual({ mode: 'compare', before: 'a.json', after: 'b.json' });
+      expect(() => parseTier2Args([])).toThrow(Tier2Refused);
+      expect(() => parseTier2Args(['--out'])).toThrow(/--out needs/);
+      expect(() => parseTier2Args(['--compare', 'a.json'])).toThrow(/two evidence file paths/);
+      expect(() => parseTier2Args(['--compare', 'a.json', '--out'])).toThrow(/two evidence file paths/);
+      expect(() => parseTier2Args(['--out', 'e.json', '--compare', 'a', 'b'])).toThrow(/different modes/);
+      expect(() => parseTier2Args(['--reset'])).toThrow(/Unknown argument/);
+    });
+
+    it('reuses the rebuild target contract, takes the DSN from the environment only, and is its own npm entry point', () => {
+      expect(tier2Code).toContain('assertRebuildTargetName');
+      expect(tier2Code).toContain('assertDsnPinsTarget');
+      expect(tier2Code).toContain('process.env.AFLDB_TEST_DATABASE_URL');
+      expect(tier2Code).not.toMatch(/console\.(log|error)\([^)]*[Dd]sn/);
+      expect(tier2Code).not.toMatch(/\$\{dsn\}/);
+      const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+      expect(pkg.scripts['db:test:fingerprint-tier2']).toBe('tsx tools/db/fingerprint-tier2.ts');
+    });
+
+    it('computes Tier 1 from the one shared implementation, in the same snapshot', () => {
+      expect(tier2Code).toContain("from './catalog-fingerprint'");
+      expect(tier2Code).toContain('await step(\'tier1\', () => collectSections(q))');
+      expect(tier2Code).not.toContain('export const FINGERPRINT_SECTIONS');
+    });
+  });
+});
+
 describe('wiring', () => {
   it('is exposed as the single npm entry point', () => {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -4829,7 +5811,7 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     const ok = fakeDeps();
     const passed = executeRebuild(stages, target(), ok.deps);
     expect(passed.executed.indexOf(CAPTURE)).toBeLessThan(passed.executed.indexOf('recreate'));
-    expect(ok.sqlRuns).toEqual([RESET_SQL]);
+    expect(ok.sqlRuns).toEqual([rebuildIdentityGuardSql('afldb_test') + RESET_SQL]);
   });
 
   it('reinstates only after every player-population stage, draftguru included — never straight after fitzroy', () => {
@@ -8273,7 +9255,9 @@ describe('AFLDB-ISSUE-237 L2 — deterministic rehearsal halt (--rehearsal-stop-
         return { status: failAt === 'capture' && joined.includes(`${AFL_API_ADJUDICATION_TOOL} capture`) ? 1 : 0, stdout: '', stderr: '' };
       },
       runSql: (_dsn, sql) => {
-        events.push(sql === RESET_SQL ? 'sql:RESET_SQL' : 'sql:OTHER');
+        // AFLDB-ISSUE-278: the reset is the identity guard for the target, then RESET_SQL exactly
+        events.push(['afldb_test', 'code_test_db'].some((db) => sql === rebuildIdentityGuardSql(db) + RESET_SQL)
+          ? 'sql:RESET_SQL' : 'sql:OTHER');
         if (failAt === 'recreate') throw new Error('reset failed');
       },
       runValidation: (_dsn, sql) => { events.push(`validation:${streamOf(sql)}`); },

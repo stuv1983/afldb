@@ -83,7 +83,9 @@ import {
   ACHIEVEMENT_TYPE as FIRST_KICK_GOAL_TYPE, FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE,
   SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
 } from '../records/first-kick-goal-source';
-import { PsqlCredentialRefused, psqlConnection, runPsql, type SpawnSyncLike } from './psql';
+import {
+  PsqlCredentialRefused, psqlConnection, runPsql, withoutLibpqRouting, type SpawnSyncLike,
+} from './psql';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -475,6 +477,162 @@ export function assertPsqlCanCarry(dsn: string, name: string): void {
 }
 
 /**
+ * AFLDB-ISSUE-278: libpq keywords that can move a connection off the host, port, database or
+ * role the URL names. In a URI the QUERY string is parsed after the path and authority and
+ * `conninfo_storeval` frees and replaces the earlier value (PostgreSQL 16 fe-connect.c,
+ * `conninfo_uri_parse_options` / `conninfo_uri_parse_params`), so `…/afldb_test?dbname=afldb_dev`
+ * connects psql to afldb_dev while `databaseOf` still reads `afldb_test`. postgres.js ignores
+ * these keys (it reads the path and the authority only), so the two disagree.
+ */
+const LIBPQ_REDIRECT_KEYWORDS = new Set([
+  'dbname', 'host', 'hostaddr', 'port', 'service', 'user', 'options',
+]);
+
+/**
+ * AFLDB-ISSUE-278: refuse, before any stage, a DSN whose libpq reading can differ from the
+ * database name `databaseOf` validated. Each check is a refusal and none a guess:
+ *
+ *   - the scheme is libpq's own URI test (lower-case `postgres://` or `postgresql://`); any other
+ *     spelling is read by libpq as a database name or a key/value string;
+ *   - the authority names ONE literal host AND an explicit port, so no routing parameter is left
+ *     unset for PGHOST / PGHOSTADDR / PGPORT / a service file / a socket default to fill;
+ *   - the query carries none of LIBPQ_REDIRECT_KEYWORDS (keyword percent-decoded, as libpq does);
+ *   - the database libpq extracts from the path (percent-decoded) equals `databaseOf`, so an
+ *     escape, a dot segment or a fragment cannot make the two readings differ.
+ *
+ * COMPATIBILITY: a rebuild / proof DSN must therefore be
+ * `postgres(ql)://user[:password]@HOST:PORT/DATABASE` with a literal host name or IP and a
+ * numeric port. A Unix-socket, host-less or default-port DSN is refused. An inherited
+ * PGHOSTADDR, which would override even an explicit host, is handled by the child environment
+ * (psql.ts `withoutLibpqRouting`), not here.
+ *
+ * What it cannot see: the same host NAME resolving differently for libpq and for a postgres.js
+ * observer (DNS, IPv4 against IPv6), and a second server answering at the named address. The
+ * in-stream identity guard (`rebuildIdentityGuardSql`) names the database and role, not the
+ * server. Messages never contain the DSN.
+ */
+export function assertDsnPinsTarget(dsn: string, name: string): void {
+  const scheme = /^postgres(?:ql)?:\/\//.exec(dsn);
+  if (!scheme) {
+    throw new RebuildRefused(
+      `${name} must be a postgres:// or postgresql:// URL in lower case: libpq reads any other `
+      + 'spelling as a database name or a key/value string, not as the URL this runner validated.');
+  }
+  const body = dsn.slice(scheme[0].length);
+
+  // libpq's userspec rule (and tools/db/psql.ts): an '@' before the first '/' ends it.
+  let at = 0;
+  while (at < body.length && body[at] !== '@' && body[at] !== '/') at += 1;
+  const afterUserspec = body[at] === '@' ? at + 1 : 0;
+  const rest = body.slice(afterUserspec);
+
+  const hostEnd = rest.search(/[/?]/);
+  const hostSpec = hostEnd === -1 ? rest : rest.slice(0, hostEnd);
+  if (hostSpec.includes(',')) {
+    throw new RebuildRefused(
+      `${name} names more than one host. libpq tries a host list in turn, so the server it `
+      + 'reaches is not the one this runner validated; use a single host.');
+  }
+  // Nothing may be left for the environment, a service file or a socket default to fill: a
+  // missing host is a Unix-domain socket or PGHOST / PGHOSTADDR / a service file to libpq, and
+  // a missing port is PGPORT, a service file or the compiled-in default.
+  if (hostSpec === '') {
+    throw new RebuildRefused(
+      `${name} names no host. libpq would take the server from PGHOST, PGHOSTADDR, a service `
+      + 'file or a local socket, none of which this runner validated; write host:port in the URL.');
+  }
+  const hostAndPort = /^(?:\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9._-]+)(?::(\d*))?$/.exec(hostSpec);
+  if (!hostAndPort) {
+    throw new RebuildRefused(
+      `${name} has a host that is not a plain host name or IP address (a percent-encoded host `
+      + 'is a Unix-domain socket path to libpq); write host:port in the URL.');
+  }
+  const port = hostAndPort[1];
+  if (!port || Number(port) < 1 || Number(port) > 65535) {
+    throw new RebuildRefused(
+      `${name} names no usable port (1-65535). libpq would take an omitted port from PGPORT, a `
+      + 'service file or its compiled-in default; write the port in the URL.');
+  }
+
+  const mark = rest.indexOf('?');
+  const pathSpan = hostEnd === -1 || rest[hostEnd] === '?'
+    ? '' : rest.slice(hostEnd + 1, mark === -1 ? undefined : mark);
+  if (mark !== -1) {
+    for (const element of rest.slice(mark + 1).split('&')) {
+      const eq = element.indexOf('=');
+      const raw = eq === -1 ? element : element.slice(0, eq);
+      let keyword: string;
+      try {
+        keyword = decodeURIComponent(raw).toLowerCase();
+      } catch {
+        throw new RebuildRefused(`${name} has a query parameter name that is not valid percent-encoding.`);
+      }
+      if (LIBPQ_REDIRECT_KEYWORDS.has(keyword)) {
+        throw new RebuildRefused(
+          `${name} carries the '${keyword}' query parameter. libpq lets a query parameter override `
+          + 'the host, port, database or role in the URL, so psql could reach a database other than '
+          + 'the one this runner validated. Remove it; the URL path and authority must say it all.');
+      }
+    }
+  }
+
+  let libpqDatabase: string;
+  try {
+    libpqDatabase = decodeURIComponent(pathSpan);
+  } catch {
+    throw new RebuildRefused(`${name} has a database name that is not valid percent-encoding.`);
+  }
+  let validated: string;
+  try {
+    validated = databaseOf(dsn);
+  } catch {
+    throw new RebuildRefused(`${name} is not a valid connection URL.`);
+  }
+  if (libpqDatabase !== validated) {
+    throw new RebuildRefused(
+      `${name} names its database in a form libpq and this runner read differently `
+      + '(percent-escape, dot segment or fragment). Write the plain database name in the URL path.');
+  }
+}
+
+/** The role every rebuild target is owned by, and the one the reset runs as. */
+export const REBUILD_OWNER_ROLE = 'afldb_owner';
+export const REBUILD_IDENTITY_MARKER = 'AFLDB-REBUILD-IDENTITY';
+
+/**
+ * AFLDB-ISSUE-278: the identity assertion the destroying and validating psql streams begin with,
+ * so the connection that acts is checked, not the URL that was parsed. It raises unless the
+ * session is connected to `database` as `afldb_owner` with no SET ROLE in force, exactly as the
+ * rollback-only proof (tools/db/prove-reset.ts, "1. IDENTITY") asserts for the same stream.
+ * `database` must be an allowlisted rebuild target, so it is a plain identifier that is safe to
+ * inline. `RESET_SQL` itself is not altered: the proof embeds it verbatim.
+ */
+export function rebuildIdentityGuardSql(database: string): string {
+  assertRebuildTargetName(database);
+  if (!/^[a-z][a-z0-9_]*$/.test(database)) {
+    throw new RebuildRefused(`Refusing to assert identity for '${database}': not a plain identifier.`);
+  }
+  const m = REBUILD_IDENTITY_MARKER;
+  return `-- AFLDB-ISSUE-278: identity of the connection that acts, asserted in its own session.
+DO $afldb_identity$
+DECLARE db text; cu text; su text;
+BEGIN
+  SELECT current_database(), current_user, session_user INTO db, cu, su;
+  IF db <> '${database}' THEN
+    RAISE EXCEPTION '${m} connected to database %, not ${database}', db;
+  END IF;
+  IF cu <> '${REBUILD_OWNER_ROLE}' THEN
+    RAISE EXCEPTION '${m} current_user is %, not ${REBUILD_OWNER_ROLE}', cu;
+  END IF;
+  IF su <> '${REBUILD_OWNER_ROLE}' THEN
+    RAISE EXCEPTION '${m} session_user is %, not ${REBUILD_OWNER_ROLE}; SET ROLE is not part of the AFLDB credential model', su;
+  END IF;
+  RAISE WARNING '${m} database=% current_user=% session_user=%', db, cu, su;
+END $afldb_identity$;
+`;
+}
+
+/**
  * The target-name contract, §10 points 1-3, in ONE place.
  *
  * `resolveTarget` below and the rollback-only reset proof (tools/db/prove-reset.ts) both
@@ -551,6 +709,9 @@ export function resolveTarget(
   // moved off the command line. Find that here, before anything runs, rather than at the
   // PRIVILEGES stage two steps after the destructive reset.
   assertPsqlCanCarry(adminDsn, spec.adminEnv);
+  // AFLDB-ISSUE-278: and refuse a DSN libpq would read as a different database or server than
+  // the path just validated (the stream's own identity guard is the second line, not the first).
+  assertDsnPinsTarget(adminDsn, spec.adminEnv);
 
   // Data stages must run as the restricted import role, never as owner and NEVER with the
   // development DSN this repository's .env sets. ISSUE-083 tracks the missing test import
@@ -572,6 +733,8 @@ export function resolveTarget(
         `${spec.importEnv} names a different database from ${spec.adminEnv}. `
         + `Both must point at '${requested}'.`);
     }
+    // The importers (Python/psycopg) read this through libpq too.
+    assertDsnPinsTarget(restrictedImportDsn, spec.importEnv);
     importDsn = restrictedImportDsn;
   } else if (opts.allowOwnerImportDsn) {
     importDsn = adminDsn;
@@ -2191,6 +2354,12 @@ export function executeRebuild(
   // test), the first stage — never mind the destructive one — waits for this.
   assertPsqlCanCarry(target.adminDsn, 'The admin DSN');
 
+  // AFLDB-ISSUE-278: and so does the check that psql will reach the database this run names.
+  // `target.database` is the acknowledged, allowlisted name; the guard is built (and refuses a
+  // name outside the allowlist) before any stage, then leads EVERY stream psql is given.
+  assertDsnPinsTarget(target.adminDsn, 'The admin DSN');
+  const identityGuard = rebuildIdentityGuardSql(target.database);
+
   if (control.rehearsalStopAfter !== undefined) {
     assertRehearsalStop({ target: target.database, rehearsalStopAfter: control.rehearsalStopAfter }, target.database);
     const prefix = stages.slice(0, REHEARSAL_REQUIRED_PREFIX.length).map((s) => s.id);
@@ -2207,7 +2376,7 @@ export function executeRebuild(
 
     if (stage.run === 'sql') {
       try {
-        deps.runSql(target.adminDsn, RESET_SQL);
+        deps.runSql(target.adminDsn, identityGuard + RESET_SQL);
       } catch (error) {
         deps.log(`    FAILED: ${(error as Error).message}`);
         return { executed, failedStage: stage.id, ok: false };
@@ -2220,7 +2389,7 @@ export function executeRebuild(
 
     if (stage.run === 'validate') {
       try {
-        deps.runValidation(target.adminDsn, stage.sql!);
+        deps.runValidation(target.adminDsn, identityGuard + stage.sql!);
       } catch (error) {
         deps.log(`    FAILED: ${(error as Error).message}`);
         return { executed, failedStage: stage.id, ok: false };
@@ -3312,7 +3481,10 @@ export function createCliDeps(spawnSync: typeof import('node:child_process').spa
         encoding: 'utf8',
         shell: process.platform === 'win32',
         // The child gets an EXPLICIT import DSN. It never inherits the development value.
-        env: { ...process.env, ...env },
+        // AFLDB-ISSUE-278: nor an inherited libpq routing variable (PGHOSTADDR, PGPORT,
+        // PGSERVICE, ...): the importers read their DSN through libpq (psycopg), which would
+        // apply it to anything the URL leaves unset. The parent environment is not modified.
+        env: { ...withoutLibpqRouting(process.env), ...env },
       });
       if (result.stdout) process.stdout.write(result.stdout);
       if (result.stderr) process.stderr.write(result.stderr);
@@ -3327,7 +3499,8 @@ export function createCliDeps(spawnSync: typeof import('node:child_process').spa
     // called .then/.execute(), so postgres.js NEVER SENT THE RESET and the stage reported
     // success against an untouched database.
     runSql: (dsn, sql) => {
-      const result = runPsql(dsn, sql, { spawn: spawnSync as SpawnSyncLike, cwd: REPO_ROOT });
+      // `pinned` (AFLDB-ISSUE-278): no inherited routing variable, no psqlrc. The proof does the same.
+      const result = runPsql(dsn, sql, { spawn: spawnSync as SpawnSyncLike, cwd: REPO_ROOT, pinned: true });
       if (result.stdout) process.stdout.write(result.stdout);
       if (result.status !== 0) {
         // psql error text names relations and roles, never the DSN or a password.
@@ -3338,7 +3511,7 @@ export function createCliDeps(spawnSync: typeof import('node:child_process').spa
     // writes to STDERR — so unlike the reset, this stream's output must be relayed on the
     // SUCCESS path too. Without it a passing run would print a verdict and no evidence.
     runValidation: (dsn, sql) => {
-      const result = runPsql(dsn, sql, { spawn: spawnSync as SpawnSyncLike, cwd: REPO_ROOT });
+      const result = runPsql(dsn, sql, { spawn: spawnSync as SpawnSyncLike, cwd: REPO_ROOT, pinned: true });
       if (result.stdout) process.stdout.write(result.stdout);
       if (result.stderr) process.stderr.write(result.stderr);
       if (result.status !== 0) {

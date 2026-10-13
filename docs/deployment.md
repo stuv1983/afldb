@@ -290,6 +290,23 @@ retained `*_pre_rebuild_*` database or production.
   credential the runner fails closed; `--allow-owner-import-dsn` is the only, explicit,
   substitution.
 - A bare `--target` with no value is refused rather than falling through to the default.
+- **The DSN must say where it goes, completely (AFLDB-ISSUE-278).** psql hands the DSN to
+  libpq, whose URI parser lets a query parameter override the path and fills anything left
+  unset from the environment. So a rebuild or `db:test:prove-reset` DSN must be
+  `postgres(ql)://user[:password]@HOST:PORT/DATABASE` — lower-case scheme, one literal host
+  name or IP, an explicit numeric port — and is refused if it carries a `dbname`, `host`,
+  `hostaddr`, `port`, `service`, `user` or `options` query parameter, a comma host list, a
+  percent-escaped or dot-segment database name, no host, or no port. **Compatibility:** a
+  Unix-socket, host-less or default-port DSN no longer works for these two commands (write
+  `localhost:5432`); other tools are unchanged. These commands also ignore an inherited
+  `PGHOST`, `PGHOSTADDR`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGSERVICE`, `PGSERVICEFILE`,
+  `PGSYSCONFDIR`, `PGOPTIONS`, `PGTARGETSESSIONATTRS` and `PGLOADBALANCEHOSTS` (removed from the
+  environment their psql and stage children receive; your own shell is not changed), and start
+  psql with `-X` so no `psqlrc` runs. A password in the DSN still travels in `PGPASSWORD`
+  (ISSUE-313); `PGPASSFILE` and the `PGSSL*` settings are left alone.
+- Every psql stream the runner sends (the reset and both validation streams) begins with an
+  identity assertion: connected to the acknowledged database as `afldb_owner`, or the stream
+  stops before anything else runs.
 - No refusal message ever includes a DSN, host or credential — database and variable names
   only.
 

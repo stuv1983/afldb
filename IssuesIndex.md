@@ -517,9 +517,19 @@
 ### AFLDB-ISSUE-278 — The destructive `db:test:rebuild` reset never asserts which database it is connected to
 - **Severity:** Medium (the reviewer graded it High; the review's main session regraded it). **Area:** DB tooling /
   wrong-target safety — `tools/db/rebuild-test.ts`.
-- **State:** Open (2026-10-08), review F-013, assertion gap code-proven, libpq trigger not executed; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-278.md`. **Next action:** fix (1), optionally (2), plus tests; review gating note:
-  before the next `db:test:rebuild`. H-278-1 open.
+- **State:** Open (2026-10-08), review F-013; H-278-1 resolved 2026-10-13 (query string overrides path, from PG16 source);
+  fixes (1)+(2) plus child-environment pinning and host/port requirement implemented locally on `sonnet/issue-278`,
+  committed locally (not merged), DB-free 670/670 (637 + 32 Tier 2 harness tests + 1 static `"char"` cast guard).
+- **Runbook:** `issues/open/AFLDB-ISSUE-278.md` §17 (+ `-VERIFY-A-IDENTITY-GUARD.md`, `-VERIFY-B-RESET-PROOF.md`).
+  **Procedure A PASSED 2026-10-13 and accepted** (read-only, `afldb_test` via the DEV tunnel, owner-confirmed; runbook §17.6).
+  **Procedure B attempt 1 (2026-10-13) STOPPED at the baseline, before the proof** (Tier 2 `definitions:checks`:
+  `text || "char"` ambiguity; evidence `D:\tmp\issue278\evidence\run-B-20261013T050801Z\`): **no proof, no after-census, no
+  state-comparison verdict.** Corrected (`::text` casts, fail-fast runner, 670/670 + tsc; §17.8). **Attempt 2 PASSED 2026-10-13**
+  (`run-B-20261013T053946Z`): **proof PASS** and, separately, **unchanged-observed-state MATCH** (Tier 1 `a39ad96b…4cee`, Tier 2
+  `4f11fda9…09d9`, 1,454,440 rows, oid 45428, postmaster `2026-10-13 04:51:00.64+00` constant; the host rebooted after Procedure A,
+  which stays a historical accepted result); coverage limits and "no real rebuild run" stand (§17.9). **Committed locally; not
+  merged/pushed/deployed.** **Next action:** merge-readiness on fresh `main`, operator merge/push, DEV sync, closure record; review
+  gating note: before the next `db:test:rebuild`.
 
 ### AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 - **Severity:** Medium. **Area:** public site / SEO — `src/app/sitemap.ts`.

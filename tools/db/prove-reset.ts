@@ -43,7 +43,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { RESET_SQL, RebuildRefused, assertRebuildTargetName, databaseOf } from './rebuild-test';
+import { RESET_SQL, RebuildRefused, assertDsnPinsTarget, assertRebuildTargetName, databaseOf } from './rebuild-test';
 import {
   PsqlCredentialRefused, PsqlUnavailable, assertPsqlReachable, psqlConnection, redact, runPsql,
   type PsqlResult,
@@ -867,6 +867,9 @@ async function main(): Promise<number> {
   }
   // Refuse on the NAME before a connection is even opened.
   assertRebuildTargetName(dsnDatabase);
+  // AFLDB-ISSUE-278: and on a DSN libpq would read as another database or server, with the
+  // rebuild's own refusal, so the proof cannot accept a DSN the rebuild would refuse.
+  assertDsnPinsTarget(dsn, 'AFLDB_TEST_DATABASE_URL');
   // AFLDB-ISSUE-313: and on the CREDENTIAL, before any session is opened or psql launched.
   try {
     psqlConnection(dsn, {});
@@ -875,7 +878,9 @@ async function main(): Promise<number> {
     throw new ProofRefused(`AFLDB_TEST_DATABASE_URL cannot be used with psql. ${error.message}`);
   }
 
-  const psqlDeps = { spawn: spawnSync as never, cwd: REPO_ROOT };
+  // AFLDB-ISSUE-278: `pinned`, exactly as the rebuild's createCliDeps runs psql, so the proof
+  // and the reset cannot differ in which server the environment sends them to.
+  const psqlDeps = { spawn: spawnSync as never, cwd: REPO_ROOT, pinned: true };
   const postgres = (await import('postgres')).default;
 
   /**

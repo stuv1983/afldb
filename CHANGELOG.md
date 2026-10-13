@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### `db:test:rebuild` and its reset proof now assert which database they are connected to (AFLDB-ISSUE-278; implemented locally on `sonnet/issue-278` and validated; pending integration, not merged, not pushed, not deployed; issue open) - 13 October 2026
+
+- Every `psql` stream the rebuild sends (the reset and both validation streams) now begins with an identity assertion: connected to the acknowledged `afldb_test`-family database as `afldb_owner`, with no `SET ROLE` in force, or the stream stops before
+  anything else runs. `RESET_SQL` itself is unchanged (the reset proof embeds it verbatim).
+- A rebuild / `db:test:prove-reset` DSN is refused before any stage unless libpq would read it the way the tool did: lower-case `postgres(ql)://`, one literal host and an explicit numeric port, none of the `dbname`, `host`, `hostaddr`, `port`, `service`,
+  `user` or `options` query parameters, and a database path that decodes to the validated name. **Compatibility:** a Unix-socket, host-less or default-port DSN no longer works for these two commands (write `localhost:5432`); other tools are unchanged.
+  Their psql and stage children also lose inherited `PGHOST`, `PGHOSTADDR`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGSERVICE`, `PGSERVICEFILE`, `PGSYSCONFDIR`, `PGOPTIONS`, `PGTARGETSESSIONATTRS` and `PGLOADBALANCEHOSTS` (the caller's shell is not changed), and psql starts with `-X`.
+  The ISSUE-313 `PGPASSWORD` transport is unchanged.
+- New read-only `npm run db:test:fingerprint-tier2` (`tools/db/fingerprint-tier2.ts`): a `REPEATABLE READ` supplement to the Tier 1 catalogue fingerprint recording identity, whole-row multiset digests of every user table, sequence positions and definition digests (hashes and counts only), with a `--compare` mode that refuses anything not `COMPLETE`.
+- **Validation.** DB-free: `tests/db-test-rebuild.test.ts` 670/670, `tsc --noEmit` clean. **Procedure A** (read-only identity-guard check, 2026-10-13, `afldb_test` through the DEV tunnel) PASSED 12/12 and was accepted. **Procedure B attempt 1** stopped at the baseline (Tier 2 `definitions:checks`, `text || "char"`); the proof
+  never started and no state-comparison verdict was established. **Procedure B attempt 2** (corrected `::text` casts, fail-fast runner; `afldb_test` only, one attempt, 2026-10-13 05:39 UTC) **PASSED**: the always-aborted real `RESET_SQL` proof was proven (`psql exit 3`), and the Tier 1 and Tier 2 observations before and after
+  **MATCH** (unchanged observed state: 99 tables, 63 sequences, 1,454,440 rows digested; postmaster start unchanged during the attempt). That is not proof that no sequence operation occurred, and index/TOAST physical contents, extended statistics, publications, subscriptions, roles, database settings, large objects and planner statistics are not covered. No actual rebuild
+  was run; the identity guard in the rebuild streams is proven by Procedure A and the DB-free tests, not by a real rebuild. Detail: `issues/open/AFLDB-ISSUE-278.md` §17.
+
 ### Database tooling no longer puts the password on the `psql` command line (AFLDB-ISSUE-313; `d43207c1`, merged and pushed to `main`; DB-free validated; read-only real-`psql` pack PASSED on `streamanator` 2026-10-13; not deployed; resolved) - 13 October 2026
 
 - Every `psql` the TypeScript database tooling launches (`db:test:rebuild` reset and validation streams, the reset proof, the AFL API ownership census, the first-kick-goal rehearsal, `db:privileges*`, and the promotion convergence rehearsal)

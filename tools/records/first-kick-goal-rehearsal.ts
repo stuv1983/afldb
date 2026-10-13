@@ -888,7 +888,8 @@ async function runner(cmd: Extract<RehearsalCommand, { step: 'runner' }>): Promi
     // Its other domains belong to code_test_db's earlier rebuild and are reported, not judged.
     let stream: { status: number; stdout: string; stderr: string };
     try {
-      stream = runPsql(target.adminDsn, fingerprintSql, { spawn: spawnSync as SpawnSyncLike, cwd: PROJECT_ROOT });
+      // AFLDB-ISSUE-278: pinned like every other psql stream aimed at a resolved rebuild target.
+      stream = runPsql(target.adminDsn, fingerprintSql, { spawn: spawnSync as SpawnSyncLike, cwd: PROJECT_ROOT, pinned: true });
     } catch (error) {
       stream = { status: -1, stdout: '', stderr: (error as Error).message };
     }
