@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 50 (ISSUE-229, ISSUE-265–270, and the 43 review findings ISSUE-271–314 other than ISSUE-312, registered on 2026-10-10; ISSUE-312 and ISSUE-315 were resolved on 2026-10-13)
+**Open issues:** 49 (ISSUE-229, ISSUE-265–270, and the 42 review findings ISSUE-271–314 other than ISSUE-312 and ISSUE-314, registered on 2026-10-10; ISSUE-312, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -698,15 +698,7 @@
   imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-313.md`. **Next action:** implementation.
 
-### AFLDB-ISSUE-314 — `prepare-promotion-source --apply` checks `--record-out` only after committing its writes
-- **Severity:** Low. **Area:** DB tooling / promotion preparation — `tools/db/prepare-promotion-source.ts`. **State:** Open
-  (2026-10-08), F-049; imported 2026-10-10. **Implemented locally 2026-10-13** on `sonnet/issue-314` (`D:\dev\afldb-issue-314`, base `24ca412b`;
-  uncommitted, not merged or pushed): `recordOutProblems()` refuses an existing `--record-out` path (including a link), a missing parent directory or a file in the parent path before anything is verified or
-  opened. Full diff review done (no CRIT/HIGH/MED; one LOW message fix). DB-free `db-promotion-check` 464 passed | 1 skipped on Windows (main 456/456; guard off fails 4 cases; the dangling-link case skipped there).
-  **Linux gate MET 2026-10-13** (`streamanator`, Node v22.23.2): `-t ISSUE-314` 9 selected, 9 passed, 0 failed, 0 skipped, dangling-link case passed (§17.8). The `code_test_db` rehearsal and a real `--apply` were not run.
-  **Closure criterion approved 2026-10-13:** guard validated, change reviewed, implementation and closure records merged and pushed; no promotion or deployment acceptance claimed.
-- **Runbook:** `issues/open/AFLDB-ISSUE-314.md` §17. **Next action:** operator commits the seven files (not `20``, not the skill folders), `npm run merge:ready -- --issue 314` (needs a fresh scoped exception for main's
-  untracked files), merge/push, then the closure-records commit and push (§17.5). The Linux closure gate (operator, 2026-10-13) is met and recorded (§17.8); Python premise checks remain supporting evidence only. Open until merged and pushed.
+**AFLDB-ISSUE-314 resolved 2026-10-13** (merge-scoped; implementation commit `c47709ad475c99c617d0b393af323607d107f2a8`, parent `24ca412b`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). `prepare-promotion-source --apply` now refuses an unusable `--record-out` before it verifies, connects or writes. DB-free: Windows 464 passed | 1 skipped; Linux (`streamanator`, Node v22.23.2) `-t ISSUE-314` 9 selected, 9 passed, 0 failed, 0 skipped. Readiness was accepted under a scoped cleanliness exception, not a clean pass. No real `--apply` or promotion was run; the `cannot be inspected` branch is untested; an unwritable directory, a full disk and a path created after the check are still found only by the final write. Detail: `issues.md` (ISSUE-314 entry) and `issues/closed/AFLDB-ISSUE-314.md` §17.9.
 
 **AFLDB-ISSUE-312 and AFLDB-ISSUE-315 resolved 2026-10-13** (merge-scoped; commits `5d277ddd` and `9c279f5c`, merge `01976be7` onto local `main`, not pushed or deployed). ISSUE-312: a detached HEAD no longer breaks the migration safety scan (DB-free 37/37). ISSUE-315: the O1 statement extractor uses the TypeScript parser (DB-free 14/14; `afldb_test` `-t "obligation O1"` 3/3). Limits and the integration gate results are in `issues.md` (resolved note and the ISSUE-315 entry) and `issues/closed/AFLDB-ISSUE-312.md` §18.
 

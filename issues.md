@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 50 (ISSUE-229, ISSUE-265–270 and 43 of the 44 review findings ISSUE-271–314; ISSUE-312 and ISSUE-315 were resolved on 2026-10-13, merge-scoped, see below)
+**Open issues:** 49 (ISSUE-229, ISSUE-265–270 and 42 of the 44 review findings ISSUE-271–314; ISSUE-312, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, merge-scoped, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -64,7 +64,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-310 | AFL API link path derives the stable player identity by a different rule from the forward classifier | Low | AFL API identity / adjudication ledger — `src/db/queries/afl-api-player-links.ts` | Open (2026-10-08); review F-045, divergence code-proven, trigger collation-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-310.md` | Implementation; open question: DEV/PROD collation (operator-run) |
 | AFLDB-ISSUE-311 | Activity audit after a committed player-link mutation is unwrapped or silent | Low | Admin player links / activity audit | Open (2026-10-08); review F-046, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-311.md` | Implementation, with ISSUE-309 |
 | AFLDB-ISSUE-313 | Database tooling passes the owner DSN, password included, on the `psql` command line | Low | Database tooling / credential handling — `tools/db/psql.ts` | Open (2026-10-08); review F-048, code-proven, exposure host-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-313.md` | Implementation |
-| AFLDB-ISSUE-314 | `prepare-promotion-source --apply` checks `--record-out` only after committing its writes | Low | Database tooling / production promotion preparation — `tools/db/prepare-promotion-source.ts` | Open (2026-10-08); review F-049, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-314.md` | Operator commit, merge and push; then closure records |
 
 **AFLDB-ISSUE-312 and AFLDB-ISSUE-315 resolved 2026-10-13** (merge-scoped: implementation commits `5d277ddd` (312) and `9c279f5c` (315), reconciled with `main` `762b46b8` by merge `01976be7` and fast-forwarded onto local `main`; **not pushed, not deployed**). ISSUE-312: `currentBranchRef` in `tools/db/migration-safety.ts` accepts a detached HEAD only for `git symbolic-ref -q HEAD` exit 1 with empty stdout and stderr, and every other failure still throws; DB-free `tests/workflow-preflight.test.ts` 37/37 on disposable repositories, with mutation checks. ISSUE-315: the ISSUE-099 O1 template extractor is now `tests/integration/executable-statements.ts` (TypeScript parser, `tx`/`sql` tagged templates, 31 statements = the historical 33 less two prose bodies), DB-free `tests/executable-statements.test.ts` 14/14, and `afldb_test` `settle-afltables.test.ts -t "obligation O1"` 3/3 (12 Oct 2026, exit 0, census clean). **Accepted limits:** no real detached-checkout `preflight`/`db:migrate` run (optional, ISSUE-312 runbook §17.5); the whole `settle-afltables` file was not re-run after the fix (ISSUE-274 R2's exit 1 stands as recorded history); the O1 sentinel case is fixture presence only; the push to `origin` is the operator's and has not happened. Integration, 13 Oct 2026: `npm run typecheck` exit 0 on the merged tree; `merge:ready` BLOCKED by exactly one blocker (the nine untracked `.agents/skills` files in the primary checkout, an owner exception for those paths only) plus the standing missing-readiness-block warning; merge-mode `preflight` BLOCKED by the same nine paths only. Full record: `issues/closed/AFLDB-ISSUE-312.md` §18 and the ISSUE-315 entry in `issues.md`.
 
@@ -50438,8 +50437,8 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-314 — `prepare-promotion-source --apply` checks `--record-out` only after committing its writes
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** database tooling / production promotion preparation. Key file:
-  `tools/db/prepare-promotion-source.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-314.md`.
+- **Status:** Resolved (2026-10-13; opened 2026-10-08). **Severity:** Low. **Area:** database tooling / production promotion preparation. Key file:
+  `tools/db/prepare-promotion-source.ts`. **Runbook:** `issues/closed/AFLDB-ISSUE-314.md`.
 - **Origin.** Review F-049 (R6b-F02) at `20a7a4bb`. Code-proven.
 - **Defect.** A pre-existing `--record-out` path fails only at the final write, after the apply committed to `afldb_test`,
   leaving a prepared source with no preparation record. ~~**Next action.** Implementation.~~ Superseded below.
@@ -50462,9 +50461,14 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   **Still not run:** `cannot be inspected` branch, the `code_test_db` rehearsal, a real `--apply`. No real promotion, `--apply` or deployment acceptance is claimed.
 - **Approved closure criterion (operator, 2026-10-13):** the documented pre-connection guard is validated, the complete change is reviewed, and the implementation and closure records are merged and pushed. It claims no real
   promotion or deployment acceptance.
-- **Status: Open.** Remaining: operator commit of the seven files, `merge:ready -- --issue 314` (main's untracked files need a fresh scoped exception), merge and push, then the closure-records commit and push (runbook §17.5);
-  the operator's Linux closure gate (2026-10-13: 9 selected passed, 0 failed, 0 skipped) is **MET** (§17.8; *earlier on 2026-10-13 it read: required, pack authored, not built, not run*). **Next action.** Operator review and commit
-  of the seven files, `merge:ready -- --issue 314`, merge and push, then the closure-records commit and push.
+- **Closure (2026-10-13; runbook `issues/closed/AFLDB-ISSUE-314.md` §17.9).** Implementation commit `c47709ad475c99c617d0b393af323607d107f2a8` (parent `24ca412b`, tree `9408e9cc…`, exactly the seven files; test blob `2778c347…`, tool blob `6eeb7936…`),
+  fast-forwarded to `main` and pushed (`24ca412b..c47709ad`); local `main`, `origin/main` and the live remote were verified equal to it. Readiness was **accepted under a scoped cleanliness exception, not a clean pass**: `merge:ready` BLOCKED by
+  exactly the zero-byte untracked `parseArgs(['--phase'` in the issue worktree and ten untracked paths in the primary worktree (nine `.agents/skills` files and the zero-byte ``20` ``), all left untouched; the merge-mode preflight's only blocker was the same
+  ten paths; existing warnings: no `afldb-merge-readiness` block in the runbook, `psql`/`pg_restore` unavailable; database parity not checked. The Linux closure gate (9 selected passed, 0 failed, 0 skipped) was met earlier (§17.8).
+- **Status: Resolved (2026-10-13)**, on the push of the documentation-only closure commit, under the approved merge-scoped criterion (guard validated, change reviewed, implementation and closure records merged and pushed).
+  *History: the previous status here was "Open", with the commit, merge:ready, merge/push and closure-records steps remaining.* **Preserved limits:** no real `--apply`, promotion, rebuild or deployment acceptance was run or is claimed; the `code_test_db`
+  rehearsal was not run; the `cannot be inspected` branch is untested; an unwritable directory, a full disk and a path created after the check are still found only by the final `wx` write; the Linux `EVIDENCE.sha256` lists `host.txt` as it was
+  before two lines were appended. Open issues: 50 -> 49.
 
 ## AFLDB-ISSUE-315 — The ISSUE-099 obligation O1 test "extracts the real statement set" fails because its template extractor reads two prose comment lines as SQL
 

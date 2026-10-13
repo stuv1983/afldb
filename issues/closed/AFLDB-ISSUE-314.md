@@ -2,8 +2,9 @@
 
 ## 0. Status
 
-- **Status:** **Open** (2026-10-08). **Implemented locally 2026-10-13** on `sonnet/issue-314` (`D:\dev\afldb-issue-314`, base `24ca412b`); DB-free validated (§17);
-  **uncommitted, not merged, not pushed**. Remaining criteria: §17.5.
+- **Status:** **Resolved 2026-10-13**, under the operator-approved merge-scoped criterion (§17.5, §17.9). Implementation commit `c47709ad475c99c617d0b393af323607d107f2a8` merged to `main` and pushed
+  (parent `24ca412b`); validated DB-free on Windows (§17.3) and on Linux (§17.8); this closure record is the documentation-only commit that follows it. No real promotion, `--apply` or deployment acceptance is claimed.
+  *History: Open from 2026-10-08; implemented locally 2026-10-13 on `sonnet/issue-314` (`D:\dev\afldb-issue-314`, base `24ca412b`), DB-free validated (§17), then "uncommitted, not merged, not pushed", with the remaining criteria in §17.5.*
 - **Severity:** Low. **Area:** database tooling / production promotion preparation.
 - **Key file:** `tools/db/prepare-promotion-source.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-049; partition note R6b-F02).
@@ -73,7 +74,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Implemented and DB-free validated 2026-10-13 (§17). Remaining: §17.5.
+None. ~~Implementation.~~ Implemented, validated (§17, §17.8) and merged and pushed 2026-10-13; closed by §17.9.
 
 ## 17. Implementation and DB-free validation (2026-10-13; solo, no agents)
 
@@ -142,9 +143,9 @@ Status against it:
 | Guard validated | DB-free: 464 passed \| 1 skipped (§17.3), two mutation checks. **The dangling-symlink case is skipped on Windows and is not counted as passed there**; *as written 13 Oct 2026 before the Linux run: "Linux premise evidence only (§17.3)"*. **Since the Linux run (§17.8) the case has passed on Linux.** |
 | Complete change reviewed | Assistant full review of all seven files: §17.6, no CRIT/HIGH/MED finding. The operator's own review of the diff is still the commit gate (item 1). |
 | **Linux gate:** 9 selected, 9 passed, 0 failed, 0 skipped | **MET (13 Oct 2026, `streamanator`, Node v22.23.2): 9 selected, 9 passed, 0 failed, 0 skipped, dangling-symlink case passed; evidence §17.8.** *History: earlier on 13 Oct 2026, before the pack was built and run, this row read "NOT MET. Not run. Pack authored, not yet built; no host contacted; prerequisites open (§17.7)."* |
-| Implementation and closure records merged and pushed | **Not done.** Nothing is committed. |
+| Implementation and closure records merged and pushed | **Implementation: DONE 2026-10-13**, `c47709ad475c99c617d0b393af323607d107f2a8` on `main` and `origin/main` (§17.9). **Closure records: this documentation-only commit; the issue is Resolved when it is pushed.** *History: earlier on 13 Oct 2026 this row read "Not done. Nothing is committed."* |
 
-Remaining, in order (operator):
+Remaining, in order (operator) *(history as written 13 Oct 2026; all four executed in the close-out recorded in §17.9, item 5 met in §17.8)*:
 
 1. Review and commit the seven files named in §17.6, explicit paths, as the implementation commit. Not `20`` and not the untracked `.agents/skills/` folders.
 2. `npm run merge:ready -- --issue 314`. Main carries untracked files (the skill folders and `20``), so earlier cleanliness exceptions (ISSUE-273 §22.1) do **not** cover this: the clean-tree check will FAIL on main unless a fresh,
@@ -157,7 +158,7 @@ Remaining, in order (operator):
    **DONE 13 Oct 2026: run, accepted and recorded in §17.8** (the freeze was lifted by the operator for that record). Until it is recorded, the dangling-symlink behaviour is
    shown by Linux premise evidence only, and that evidence does not satisfy the gate.
 
-The issue stays **Open** until items 1-4 are done (item 5 is met, §17.8).
+The issue stayed **Open** until items 1-4 were done (item 5 met, §17.8). Closed by §17.9.
 
 ### 17.6 Full review of the seven-file diff (assistant, 13 Oct 2026; no subagents)
 
@@ -226,4 +227,26 @@ The Python premise checks played no part in the verdict (supporting evidence onl
   Evidence: remote `evidence.tar` (337,920 bytes) SHA-256 `caf6cff6259520479b0eb9f09c3f5e9e3c4d09f495450bd7df71c7c605800e9c`, retrieved by `scp` to `evidence-20261013T015633Z\evidence.tar`, local hash identical to the remote value; extracted at
   `evidence-20261013T015633Z\x\evidence\` (`result.json`, `vitest.json`, `stdout.txt`, `stderr.txt`, `exit.json`, `tree-before.json`, `tree-after.json`, `deps.json`, `live-sentinel-{before,after}.txt`, `host.txt`, `EVIDENCE.sha256`). Full record: `RUN-EVIDENCE-20261013T015633Z.md`.
 - **Limits.** Only the 9 ISSUE-314 cases (all DB-free fakes) ran on Linux; the other 456 cases of the file, `tsc`, the `code_test_db` rehearsal and a real `--apply` did not. **No real promotion, `--apply`, rebuild, deployment or DEV/PROD acceptance is claimed.**
-  The `cannot be inspected` branch remains untested. The result is not a merge: ISSUE-314 stays **Open** until the implementation and closure records are merged and pushed (§17.5 items 1-4).
+  The `cannot be inspected` branch remains untested. The result is not a merge: ISSUE-314 stays **Open** until the implementation and closure records are merged and pushed (§17.5 items 1-4). *(History; closed by §17.9.)*
+
+### 17.9 Close-out and closure record (13 Oct 2026; operator-authorised, solo, no agents)
+
+Evidence outside the repository: `D:\tmp\issue314\closeout-20261013T021336Z\` (authorisation record, baseline and final hashes of the 11 excepted paths, every command with its actual exit code, readiness outputs, push outputs, diffs).
+
+- **Implementation commit** `c47709ad475c99c617d0b393af323607d107f2a8` on `sonnet/issue-314`: parent `24ca412baa531db75cf5ea3a4839b988f6077993` (= `main` = `origin/main` after a fresh fetch), tree `9408e9ccbde4c7e2dfff3d819a91e00fcc06c76d`. Exactly the seven files in §17.6
+  (360 insertions, 8 deletions); `git diff --check` clean. Blob ids unchanged from the executed Linux pack: test `2778c347ad6161760e9568afb7a410ca33b77469`, tool `6eeb7936d8edfc9115b99fef0c6b0141bb3a55cc`.
+- **Readiness, accepted under a scoped cleanliness exception (not a clean pass).** `merge:ready -- --issue 314` with the seven `--expected-file` rules: exit 1, BLOCKED by exactly two cleanliness failures, both inside the exception: the zero-byte
+  untracked `parseArgs(['--phase'` in the issue worktree, and the ten untracked paths in `D:\dev\afldb` (nine `.agents/skills` files under five folders, and the zero-byte ``20` ``). Every other check passed (branch, `main` = `origin/main`, ahead 1 / behind 0,
+  migration collision parity, committed files match the declared scope: 7 changed, 0 unexpected). Existing warning: the runbook has no `afldb-merge-readiness` JSON block. Not performed: database migration parity (INFO, no database in this merge contract).
+  `preflight -- --mode merge --issue 314` from primary `main`, no DSN: exit 1, one blocker, "working tree is clean" (the same ten paths); all other checks passed; warnings: `psql` and `pg_restore` unavailable (not required in this mode).
+  The exception covered only those cleanliness failures; all 11 files were left in place with unchanged paths, sizes and SHA-256 hashes.
+- **Integration.** After a fresh fetch, `origin/main`, live `refs/heads/main` and primary `main` equalled the starting pin; `git merge --ff-only sonnet/issue-314` fast-forwarded primary `main` to `c47709ad`
+  (tree identical, delta from the pin exactly the seven files). Normal `git push origin main:main`, no force: `24ca412b..c47709ad`. After a fetch, local `main`, `origin/main` and the live remote `refs/heads/main` all equalled `c47709ad475c99c617d0b393af323607d107f2a8`.
+- **Closure records (this commit, documentation only):** this runbook moved from `issues/open/` to `issues/closed/AFLDB-ISSUE-314.md` (status Resolved, §0, §16, §17.5 table, this section); `issues.md` (entry status and the Open Issues table row removed, open count 50 -> 49);
+  `IssuesIndex.md` (entry removed, open count 50 -> 49); `CHANGELOG.md` (heading and wording). No implementation, test or unrelated issue file was changed; `docs/production-promotion.md` names no runbook path and was not touched.
+  Open count recalculated by counting both lists before and after: 50 headings in `IssuesIndex.md` and 50 rows in the `issues.md` table before; 49 each after (ISSUE-229, ISSUE-265-270, and the 42 review findings ISSUE-271-313 other than ISSUE-312).
+- **Resolved** on the push of the commit carrying this record, under the operator-approved merge-scoped criterion (§17.5): the pre-connection guard is validated, the complete change is reviewed, and the implementation and closure records are merged and pushed.
+- **Limits preserved.** No real `prepare-promotion-source --apply`, promotion, rebuild, deployment or DEV/PROD acceptance was run or is claimed, and the `code_test_db` rehearsal was not run. The `cannot be inspected` error branch (for example `EACCES` on the parent) has no test.
+  The check is not atomic with the write by design: an unwritable directory, a full disk and a path created after the check are still found only by the final exclusive `wx` write (documented in `docs/production-promotion.md`).
+  `EVIDENCE.sha256` of the Linux run lists `host.txt` as it was before two lines were appended (§17.8); the five optional-package warnings stand. The Linux scratch directory `/home/arm/issue314-verify-20261013T015633Z` was deliberately left in place.
+  The 14 Oct observation and the ISSUE-265 hold are untouched by this issue.

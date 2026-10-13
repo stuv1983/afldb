@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### `prepare-promotion-source --apply` refuses an unusable `--record-out` before it writes anything (AFLDB-ISSUE-314; implemented locally on `sonnet/issue-314`, uncommitted; DB-free validated on Windows and Linux; not merged; issue open) - 13 October 2026
+### `prepare-promotion-source --apply` refuses an unusable `--record-out` before it writes anything (AFLDB-ISSUE-314; `c47709ad`, merged and pushed to `main`; DB-free validated on Windows and Linux; resolved) - 13 October 2026
 
 - `npm run db:promotion:prepare-source -- --apply --record-out <path>` now checks the output path straight after parsing its arguments, before the retained snapshots are verified and before any connection is opened.
   An existing path (file, directory or link), a missing parent directory or a file in the parent path stops the run with `STOP: --record-out cannot be created. Nothing has been verified, opened or written`. Before, such a path failed only at
@@ -24,7 +24,8 @@ commit.
 - **Validation (DB-free).** Windows: `tests/db-promotion-check.test.ts` 464 passed | 1 skipped (9 new cases; main 456/456); with the guard disabled 4 of the first-pass cases fail. The dangling-symbolic-link case was
   skipped there (no link privilege). **Linux (`streamanator`, Node v22.23.2, isolated scratch copy of the reviewed tracked tree and a private dependency copy, 13 Oct 2026): `-t ISSUE-314` 9 selected cases, 9 passed, 0 failed, 0 skipped, including the
   dangling-symbolic-link case** (the other 456 cases were excluded by the filter). The `code_test_db` rehearsal and a real `--apply` were not run. Closure criterion approved by the operator 13 Oct 2026; no real promotion,
-  `--apply`, deployment or DEV/PROD acceptance is claimed. Detail: `issues/open/AFLDB-ISSUE-314.md` §17, §17.8.
+  `--apply`, deployment or DEV/PROD acceptance is claimed. The `cannot be inspected` branch is untested. Readiness was accepted under a scoped cleanliness exception (untracked skill and stray files in the primary worktree), not a clean pass.
+  Detail: `issues/closed/AFLDB-ISSUE-314.md` §17, §17.8, §17.9.
 
 ### A settle no longer writes period scores under a match it refused (AFLDB-ISSUE-275; implemented locally on `opus/issue-275`, uncommitted; focused `afldb_test` validation passed; not merged, not deployed; issue open) - 13 October 2026
 
