@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 48 (ISSUE-229, ISSUE-265–270, and the 41 review findings ISSUE-271–314 other than ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13)
+**Open issues:** 47 (ISSUE-229, ISSUE-265–270, and the 40 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -514,22 +514,7 @@
 - **State:** Open (2026-10-08), review F-012, code-proven; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-277.md`. **Next action:** operator decision **D-277-1** ((a) or (b)), then implementation.
 
-### AFLDB-ISSUE-278 — The destructive `db:test:rebuild` reset never asserts which database it is connected to
-- **Severity:** Medium (the reviewer graded it High; the review's main session regraded it). **Area:** DB tooling /
-  wrong-target safety — `tools/db/rebuild-test.ts`.
-- **State:** Open (2026-10-08), review F-013; H-278-1 resolved 2026-10-13 (query string overrides path, from PG16 source);
-  fixes (1)+(2) plus child-environment pinning and host/port requirement implemented locally on `sonnet/issue-278`,
-  committed locally (not merged), DB-free 670/670 (637 + 32 Tier 2 harness tests + 1 static `"char"` cast guard).
-- **Runbook:** `issues/open/AFLDB-ISSUE-278.md` §17 (+ `-VERIFY-A-IDENTITY-GUARD.md`, `-VERIFY-B-RESET-PROOF.md`).
-  **Procedure A PASSED 2026-10-13 and accepted** (read-only, `afldb_test` via the DEV tunnel, owner-confirmed; runbook §17.6).
-  **Procedure B attempt 1 (2026-10-13) STOPPED at the baseline, before the proof** (Tier 2 `definitions:checks`:
-  `text || "char"` ambiguity; evidence `D:\tmp\issue278\evidence\run-B-20261013T050801Z\`): **no proof, no after-census, no
-  state-comparison verdict.** Corrected (`::text` casts, fail-fast runner, 670/670 + tsc; §17.8). **Attempt 2 PASSED 2026-10-13**
-  (`run-B-20261013T053946Z`): **proof PASS** and, separately, **unchanged-observed-state MATCH** (Tier 1 `a39ad96b…4cee`, Tier 2
-  `4f11fda9…09d9`, 1,454,440 rows, oid 45428, postmaster `2026-10-13 04:51:00.64+00` constant; the host rebooted after Procedure A,
-  which stays a historical accepted result); coverage limits and "no real rebuild run" stand (§17.9). **Committed locally; not
-  merged/pushed/deployed.** **Next action:** merge-readiness on fresh `main`, operator merge/push, DEV sync, closure record; review
-  gating note: before the next `db:test:rebuild`.
+**AFLDB-ISSUE-278 resolved 2026-10-13** (merge-scoped; implementation commit `dd18adb93a0207eb2ed812ac56636a90e2c89239`, parent `e7f84f14`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). `db:test:rebuild` and `db:test:prove-reset` now assert the connected database and role before anything else runs, refuse a DSN that libpq would read differently from postgres.js (query-string redirects, host-less or default-port forms), and run their psql and stage children with the libpq routing variables removed. DB-free: `tests/db-test-rebuild.test.ts` 670/670, `tsc --noEmit` clean. Two verdicts, kept separate: Procedure A (read-only, `afldb_test`) PASSED 12/12 and was accepted; Procedure B attempt 2 (one attempt, `afldb_test` only) gave a **proof PASS** (the always-aborted real `RESET_SQL`, `psql exit 3`) and, separately, an **unchanged-observed-state MATCH** (Tier 1 `a39ad96b…`, Tier 2 `4f11fda9…`; 99 tables, 63 sequences, 1,454,440 rows digested). Attempt 1 stopped at the baseline (`text || "char"`) with no proof and no verdict. **Limits kept:** a MATCH is not proof that no sequence operation occurred; index/TOAST contents, extended statistics, publications, subscriptions, roles, database settings, large objects and planner statistics are not covered; no real rebuild has been run, so the rebuild-stream guard is proven by Procedure A and the DB-free tests only; Procedure A is a historical result about the pre-reboot postmaster; the unpinned control V4c was omitted. Readiness was **accepted under a scoped cleanliness exception, not a clean pass**: `merge:ready` BLOCKED by exactly one blocker (15 untracked primary-checkout paths: nine `.agents/skills` files and six zero-byte stray-named files), all left untouched with sizes and hashes re-verified at every checkpoint; the merge-mode preflight's only blocker was the same 15 paths. Not deployed; no deployment is required or implied. Runbook and both verification procedures: `issues/closed/AFLDB-ISSUE-278*.md` (§18).
 
 ### AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 - **Severity:** Medium. **Area:** public site / SEO — `src/app/sitemap.ts`.

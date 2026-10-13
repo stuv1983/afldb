@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 48 (ISSUE-229, ISSUE-265–270 and 41 of the 44 review findings ISSUE-271–314; ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, merge-scoped, see below)
+**Open issues:** 47 (ISSUE-229, ISSUE-265–270 and 40 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, merge-scoped, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -29,7 +29,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-275 | A settle can insert period scores under a match it refused because a foreign owner created it concurrently | Medium | Acquisition / canonical ownership / provenance — `src/lib/acquisition/canonical-apply.ts` (`applyCanonicalUnit`) | Open (2026-10-08); review F-010, code-proven mechanism, interleaving not executed; imported 2026-10-10; **implemented locally 2026-10-13 on `opus/issue-275` (revision 2 the same day: every genuine `matches` refusal withholds, `manual_authority_*` included; uncommitted, not merged/deployed); DB-free validation passed; focused `afldb_test` validation PASSED 2026-10-13 (3 selected tests passed, exit 0, `CENSUS IDENTICAL`; same-transaction planted-row witness, not two-session concurrency; no DEV/PROD/State B evidence); full-diff review: no CRIT/HIGH/MED finding; DEV install held**; runbook `issues/open/AFLDB-ISSUE-275.md` §26-§28 | Operator commit, `merge:ready`, merge/push; DEV install after the ISSUE-274 + ISSUE-276 observation window; open: read-only split-ownership census |
 | AFLDB-ISSUE-276 | AFL API period scores that contradict the final score are written | Medium | Acquisition / AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts` | Open (2026-10-08); review F-011, code-proven; implemented 2026-10-12, committed as `5b0ab6dc`, merged to `main` as `3ec76f28`; **installed on DEV 13 October 2026, 06:26:00-06:28:27 AEDT** (operator-verified; installation checks exit 0; BUILD_ID `5sDQtjtkxAIUBO5bVn6mY`; MainPID 2609207); focused `afldb_test` acceptance supported 2026-10-12 (4/4 passed on the second run; first run 3 passed, 1 failed on a test-reader type mismatch); no whole-suite, restricted-role, live-provider, real-data DEV or PROD acceptance; names reviewed and kept; runbook `issues/open/AFLDB-ISSUE-276.md` §17.7, §17.8 | Observe and grade the 14 October nightly on DEV (combined ISSUE-274 + ISSUE-276 observation; forecast 05:05:07 AEDT not an exact start) |
 | AFLDB-ISSUE-277 | Data Editor edits other than the name to a token-only player are not durable | Medium | Admin authority / Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py` | Open (2026-10-08); review F-012, code-proven; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-277.md` | Operator decision **D-277-1** (option (a) or (b)), then implementation |
-| AFLDB-ISSUE-278 | The destructive `db:test:rebuild` reset never asserts which database it is connected to | Medium (review graded High; regraded by the review's main session) | Database tooling / wrong-target safety — `tools/db/rebuild-test.ts` | Open (2026-10-08); review F-013, missing assertion code-proven, libpq trigger not executed; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-278.md` | Fix (1), optionally (2), then tests; review gating note: before the next `db:test:rebuild`; H-278-1 open |
 | AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | Code fix plus test update, before search indexing is enabled |
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
 | AFLDB-ISSUE-281 | Two public list pages fail on a sort key that names an inherited object property | Low | Public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts` | Open (2026-10-08); review F-016, reproduced DB-free (W5); imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-281.md`; implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288`, DB-free 14/14; merged to local `main` `01976be7` 2026-10-13 (not pushed, not deployed) | DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33) and DEV smoke; then close DEV-scoped (PROD behind ISSUE-265 hold) |
@@ -50087,15 +50086,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-278 — The destructive `db:test:rebuild` reset never asserts which database it is connected to
 
-- **Status:** Open (2026-10-08). **Severity:** Medium (the reviewer graded it High; the review's main session
+- **Status:** Resolved (2026-10-13; opened 2026-10-08). **Severity:** Medium (the reviewer graded it High; the review's main session
   regraded it Medium: the trigger needs a non-standard DSN form, the consequence would be catastrophic). **Area:** database
   tooling / wrong-target safety. Key files: `tools/db/rebuild-test.ts`, `tools/db/prove-reset.ts`.
-- **Runbook:** `issues/open/AFLDB-ISSUE-278.md`. **Origin.** Review F-013 (R6b-F01) at `20a7a4bb`. The missing assertion
+- **Runbook:** `issues/closed/AFLDB-ISSUE-278.md`. **Origin.** Review F-013 (R6b-F01) at `20a7a4bb`. The missing assertion
   is code-proven; the libpq trigger was not executed.
 - **Defect.** The target name is derived from the DSN URL path and checked against the allowlist, but `RESET_SQL` runs
   through psql without asserting `current_database()`/`current_user` on that connection.
 - **H-278-1 resolved (2026-10-13)** from PostgreSQL 16 `fe-connect.c`: the URI query string overrides the path; postgres.js
-  ignores it. **Implemented locally (committed locally on `sonnet/issue-278`, not merged)**: identity guard leading the reset and both validation
+  ignores it. **Implemented (commit `dd18adb9`, merged and pushed to `main`, see Closure)**: identity guard leading the reset and both validation
   streams, plus `assertDsnPinsTarget` (fix (2), required not optional). Second pass (2026-10-13): rebuild and
   `prove-reset` psql children now run pinned (inherited `PGHOSTADDR`/`PGPORT`/`PGSERVICE`/... removed from a copy of the
   environment, `-X`), stage children lose the same variables, and a DSN must name a literal host and an explicit port
@@ -50117,10 +50116,14 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `2026-10-13 04:51:00.640018+00` unchanged throughout). The host rebooted after Procedure A (A saw postmaster
   `2026-10-10 16:01:11.590541`); A stays a historical, accepted result. Not proof that no sequence operation occurred; index/TOAST
   contents, extended statistics, publications, subscriptions, roles, database settings, large objects and planner statistics are not
-  covered; no real rebuild was run. Full record, hashes and review: runbook §17.9. Committed locally on `sonnet/issue-278`;
-  not merged, pushed or deployed.
-  **Next action.** Merge-readiness on fresh `main`, operator merge/push, DEV sync, then the closure record. The review's gating
-  note: before the next `db:test:rebuild`. **Status stays Open.**
+  covered; no real rebuild was run. Full record, hashes and review: runbook §17.9. Merged and pushed to `main` as `dd18adb9` (see Closure); not deployed.
+- **Closure (2026-10-13; runbook `issues/closed/AFLDB-ISSUE-278.md` §18).** Implementation commit `dd18adb93a0207eb2ed812ac56636a90e2c89239` (parent `e7f84f14ac14591dd929644e6ddf6c6d80a861cb`, tree `bfbd6920062be9870d44e4552b9a4536cdc26b44`, exactly the 14 reviewed files, +2,536/-30),
+  fast-forwarded to `main` and pushed (`e7f84f14..dd18adb9`); local `main`, `origin/main` and the live remote were verified equal to it, and the tree listing digest was identical before and after the fast-forward. Readiness was **accepted under a scoped cleanliness exception, not a clean pass**: `merge:ready` BLOCKED by exactly one blocker
+  (the primary checkout's 15 untracked paths: nine `.agents/skills` files and the six zero-byte files ``0)``, ``20` ``, `` `path ``, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`), all left untouched with paths, sizes and hashes re-verified at every checkpoint; the merge-mode preflight's only blocker was the same 15 paths; existing warnings: no `afldb-merge-readiness` block in the runbook, `psql`/`pg_restore` unavailable; database parity not checked.
+- **Status: Resolved (2026-10-13)**, on the push of the documentation-only closure commit, under the merge-scoped criterion (runbook §17.3/§18: guard and DSN checks validated DB-free 670/670, Procedure A PASSED and accepted, Procedure B attempt 2 PASSED, implementation and closure records merged and pushed).
+  *History: the previous status here was "Open", with merge, push and the closure record remaining; Procedure B attempt 1 had stopped at the baseline before the proof.* **Preserved limits:** the proof verdict (PASS) and the unchanged-observed-state verdict (MATCH) are separate; a MATCH is not proof that no sequence operation occurred; coverage gaps (index/TOAST physical contents, extended statistics, publications, subscriptions, roles, database settings, large objects, planner statistics);
+  no real `db:test:rebuild` has been run, so the rebuild-stream guard is proven by Procedure A and the DB-free tests, not by a rebuild; Procedure A is historical (pre-reboot postmaster); V4c omitted; one attempt on one host; residual: one host name resolving differently for libpq and postgres.js (the guard names database and role, not the server); the literal-host and explicit-port DSN restriction applies to the rebuild and reset-proof commands (and the import DSN). Not deployed; the observation window, the PROD hold and every other issue's status are unchanged. Open issues: 48 -> 47.
+  **Next action.** None.
 
 ## AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 
