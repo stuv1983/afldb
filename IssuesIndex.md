@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 35 (ISSUE-229, ISSUE-266–270, and the 29 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-286, ISSUE-287, ISSUE-288, ISSUE-290, ISSUE-291, ISSUE-297, ISSUE-298, ISSUE-300, ISSUE-302, ISSUE-306, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18), and ISSUE-290 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-290.md` §18), and ISSUE-291 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-291.md` §18), and ISSUE-287 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-287.md` §18), and ISSUE-286 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-286.md` §18), and ISSUE-300 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-300.md` §18), and ISSUE-306 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-306.md` §18), and ISSUE-298 on 2026-10-15 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-298.md` §18); other issues' PROD prerequisites are unchanged)
+**Open issues:** 33 (ISSUE-229, ISSUE-266–270, and the 27 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-286, ISSUE-287, ISSUE-288, ISSUE-290, ISSUE-291, ISSUE-297, ISSUE-298, ISSUE-300, ISSUE-302, ISSUE-306, ISSUE-309, ISSUE-311, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18), and ISSUE-290 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-290.md` §18), and ISSUE-291 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-291.md` §18), and ISSUE-287 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-287.md` §18), and ISSUE-286 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-286.md` §18), and ISSUE-300 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-300.md` §18), and ISSUE-306 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-306.md` §18), and ISSUE-298 on 2026-10-15 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-298.md` §18), and ISSUE-309 and ISSUE-311 on 2026-10-15 (merge-scoped, not deployed; runbooks `issues/closed/AFLDB-ISSUE-309.md` and `issues/closed/AFLDB-ISSUE-311.md` §18); other issues' PROD prerequisites are unchanged)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -538,22 +538,13 @@
 - **Severity:** Low. **Area:** admin player links / revalidation — `src/app/admin/player-links/actions.ts`. **State:** Open
   (2026-10-08), F-043; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-308.md`. **Next action:** choose the mechanism (does the ISSUE-087 hang reproduce on
-  Next 16.3.1?), then implement with ISSUE-309/311.
-
-### AFLDB-ISSUE-309 — Multi-target player-link actions stop at the first failure after earlier targets committed
-- **Severity:** Low. **Area:** admin player links — `src/app/admin/player-links/actions.ts`. **State:** Open (2026-10-08),
-  F-044; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-309.md`. **Next action:** implementation, with ISSUE-308 and ISSUE-311.
+  Next 16.3.1?), then implement (ISSUE-309/311 are resolved and no longer a dependency).
 
 ### AFLDB-ISSUE-310 — AFL API link path derives the stable player identity by a different rule from the forward classifier
 - **Severity:** Low. **Area:** AFL API identity — `src/db/queries/afl-api-player-links.ts`. **State:** Open (2026-10-08),
   F-045 (collation-dependent); imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-310.md`. **Next action:** implementation; DEV/PROD collation question open
   (operator-run).
-
-### AFLDB-ISSUE-311 — Activity audit after a committed player-link mutation is unwrapped or silent
-- **Severity:** Low. **Area:** admin player links / activity audit. **State:** Open (2026-10-08), F-046; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-311.md`. **Next action:** implementation, with ISSUE-309.
 
 **AFLDB-ISSUE-313 resolved 2026-10-13** (merge-scoped; implementation commit `d43207c1d349d32d71fc6e135229b5cd5812199c`, parent `5ffbc563`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). Every `psql` the TypeScript database tooling launches now gets a password-free `-d` value and the password in the child's `PGPASSWORD`; unmovable or ambiguous password forms are refused before psql starts (D-313-6, approved). DB-free: `tests/db-test-rebuild.test.ts` 589 passed (61 new); real-psql pack V1–V6 PASS on `streamanator` (psql 16.15). Readiness was accepted under a scoped cleanliness exception, not a clean pass. **Limits:** not end-to-end `privileges.ts` acceptance (D-313-1); V5 had 4 periodic samples; the credential launcher was outside the pack manifest; Windows, `root` visibility and PROD not verified; not deployed. Detail: `issues.md` (ISSUE-313 entry) and `issues/closed/AFLDB-ISSUE-313.md` §22.
 
