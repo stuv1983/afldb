@@ -110,6 +110,19 @@ describe('current-season external source import contracts', () => {
       .toBeLessThan(importer.indexOf('INSERT INTO staging.external_current_matches'));
   });
 
+  it('records the batch rejection count as the import_rejections rows it writes, which is none (AFLDB-ISSUE-296)', () => {
+    // Migration 001 / ISSUE-244 F008: import_batches.records_rejected equals the batch's
+    // import_rejections rows. The planning count is not such a row, so it is reported only
+    // in validation_result and the column is the literal 0 while no rejection row is written.
+    expect(importer).not.toMatch(/(?:INSERT INTO|UPDATE|DELETE FROM)\s+import_rejections/);
+    expect(importer.match(/UPDATE import_batches/g)).toHaveLength(1);
+    const assigned = [...importer.matchAll(/records_rejected\s*=\s*([^,\r\n]+)/g)].map((m) => m[1].trim());
+    expect(assigned).toEqual(['0']);
+    const update = importer.slice(importer.indexOf('UPDATE import_batches'));
+    const validationResult = update.slice(update.indexOf('validation_result'), update.indexOf('WHERE id = ${batchId}'));
+    expect(validationResult).toContain('rejectedOrConflicted: canonicalPlan.rejectedOrConflicted,');
+  });
+
   it('represents later source absence as state and never as deletion', () => {
     expect(store).toContain('SET absent_since = ${observedAt}');
     expect(store).toContain('AND absent_since IS NULL');
