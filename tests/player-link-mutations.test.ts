@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   fetchSourceEvidence: vi.fn(),
   assessOneSource: vi.fn(),
   readCachedSuggestionVersions: vi.fn(),
+  linkAflApiProvider: vi.fn(),
+  revokeAflApiLink: vi.fn(),
 }));
 
 vi.mock('postgres', () => ({ default: mocks.postgres }));
@@ -38,6 +40,8 @@ import {
   bulkApproveSuggestions,
   confirmUnlinked as confirmUnlinkedAction,
   createAndLinkPlayer,
+  linkPlayer,
+  reviewSuggestion,
 } from '@/app/admin/player-links/actions';
 import {
   confirmUnlinked,
@@ -1069,6 +1073,292 @@ describe('suggested match approval', () => {
       // Only the row that was actually stale is named.
       expect(state.warning).toContain('award_winners:412');
       expect(state.warning).not.toContain('award_winners:413');
+    });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-309 (multi-target actions continue per target) and AFLDB-ISSUE-311 (the activity audit
+ * after a committed mutation never turns a success into a thrown error or a silent gap).
+ *
+ * The real query functions run against the fake import transaction; a target is made to fail by
+ * having its lock query return no row, which is the "resolved meanwhile by another admin" case.
+ */
+describe('AFLDB-ISSUE-309/311: multi-target player-link actions and the activity audit', () => {
+  const ACTIVITY_AUDIT_TEXT = 'The change succeeded, but its administrative activity audit failed.';
+  const NO_ROW = 'No unresolved row with that id — it may already be linked.';
+
+  function form(fields: Record<string, string>): FormData {
+    const data = new FormData();
+    for (const [key, value] of Object.entries(fields)) data.set(key, value);
+    return data;
+  }
+
+  /** Targets whose id is in `gone` have no unresolved row; the rest lock as 'unmatched'. */
+  function installTargets(gone: number[]) {
+    const { tx, seen } = fakeTransaction((text, values) => {
+      if (text.startsWith('SELECT link_status_value::text')) {
+        return gone.some((id) => values.includes(id)) ? [] : [{ status: 'unmatched' }];
+      }
+      if (text.startsWith('INSERT INTO players')) {
+        return [{ id: 777, slug: 'new-player', displayName: 'New Player' }];
+      }
+      return [];
+    });
+    installImportClient(tx);
+    return seen;
+  }
+
+  const resolutionTargets = (seen: SeenQuery[]) => seen
+    .filter((q) => q.text.startsWith('INSERT INTO player_link_resolutions'))
+    .map((q) => q.values[1]);
+
+  const TWO = 'award_winners:412:unmatched,award_winners:413:unmatched';
+
+  describe('linkPlayer', () => {
+    it('a later refusal does not abandon the batch: it revalidates and reports partial success', async () => {
+      const seen = installTargets([413]);
+
+      const state = await linkPlayer({}, form({ targets: TWO, playerId: '1000' }));
+
+      expect(state.error).toBeUndefined();
+      expect(state.message).toBe('Player linked to 1 of 2 record(s).');
+      expect(state.warning).toBe(`1 record(s) were not changed: award_winners:413 — ${NO_ROW}`);
+      expect(resolutionTargets(seen)).toEqual([412]);
+      expect(mocks.audit).toHaveBeenCalledTimes(1);
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/hall-of-fame');
+    });
+
+    it('an earlier refusal does not stop the later target being linked', async () => {
+      const seen = installTargets([412]);
+
+      const state = await linkPlayer({}, form({ targets: TWO, playerId: '1000' }));
+
+      expect(state.message).toBe('Player linked to 1 of 2 record(s).');
+      expect(state.warning).toContain('award_winners:412');
+      expect(resolutionTargets(seen)).toEqual([413]);
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/hall-of-fame');
+    });
+
+    it('when every target is refused it returns the single-target error and revalidates nothing', async () => {
+      installTargets([412, 413]);
+
+      const state = await linkPlayer({}, form({ targets: TWO, playerId: '1000' }));
+
+      expect(state).toEqual({
+        error: `Error on award_winners:412: ${NO_ROW}; Error on award_winners:413: ${NO_ROW}`,
+      });
+      expect(mocks.audit).not.toHaveBeenCalled();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it('an unmixed success keeps its original wording and has no warning', async () => {
+      installTargets([]);
+
+      const state = await linkPlayer({}, form({ targets: TWO, playerId: '1000' }));
+
+      expect(state).toEqual({ message: 'Player linked to 2 record(s).' });
+    });
+  });
+
+  describe('confirmUnlinked', () => {
+    it('continues past a refused target, revalidates and reports partial success', async () => {
+      const seen = installTargets([412]);
+
+      const state = await confirmUnlinkedAction({}, form({ targets: TWO }));
+
+      expect(state.error).toBeUndefined();
+      expect(state.message).toBe('Recorded 1 of 2 record(s) as vetted — genuinely unlinked.');
+      expect(state.warning).toBe(`1 record(s) were not changed: award_winners:412 — ${NO_ROW}`);
+      expect(resolutionTargets(seen)).toEqual([413]);
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/hall-of-fame');
+    });
+
+    it('when every target is refused it returns the single-target error and revalidates nothing', async () => {
+      installTargets([412, 413]);
+
+      const state = await confirmUnlinkedAction({}, form({ targets: TWO }));
+
+      expect(state).toEqual({
+        error: `Error on award_winners:412: ${NO_ROW}; Error on award_winners:413: ${NO_ROW}`,
+      });
+      expect(mocks.audit).not.toHaveBeenCalled();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it('a rejected activity audit is reported as a warning after the commit, and the loop continues', async () => {
+      const seen = installTargets([]);
+      mocks.audit.mockRejectedValue(new Error('auth pool down'));
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const state = await confirmUnlinkedAction({}, form({ targets: TWO }));
+
+      logged.mockRestore();
+      expect(state.error).toBeUndefined();
+      expect(state.message).toBe('Recorded 2 record(s) as vetted — genuinely unlinked.');
+      expect(state.warning).toContain(ACTIVITY_AUDIT_TEXT);
+      expect(resolutionTargets(seen)).toEqual([412, 413]);
+      expect(mocks.audit).toHaveBeenCalledTimes(2);
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/hall-of-fame');
+    });
+  });
+
+  describe('createAndLinkPlayer', () => {
+    const create = { displayName: 'New Player' };
+
+    it('a refusal after the player was created leaves the other targets linked and reports it', async () => {
+      installTargets([413]);
+
+      const state = await createAndLinkPlayer({}, form({ targets: TWO, ...create }));
+
+      expect(state.error).toBeUndefined();
+      expect(state.message).toBe('Created player New Player (ID #777) and linked to 1 of 2 record(s).');
+      expect(state.warning).toBe(`1 record(s) were not changed: award_winners:413 — ${NO_ROW}`);
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/players');
+    });
+
+    it('a refusal of the first target creates no player, so the action stops with its error', async () => {
+      const seen = installTargets([412]);
+
+      const state = await createAndLinkPlayer({}, form({ targets: TWO, ...create }));
+
+      expect(state).toEqual({ error: NO_ROW });
+      expect(seen.some((q) => q.text.startsWith('INSERT INTO players'))).toBe(false);
+      expect(mocks.audit).not.toHaveBeenCalled();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reviewSuggestion', () => {
+    it('a rejected activity audit after the status change is a warning, not a thrown error', async () => {
+      mocks.audit.mockRejectedValue(new Error('auth pool down'));
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const state = await reviewSuggestion({}, form({ suggestionId: '9', status: 'accepted' }));
+
+      logged.mockRestore();
+      expect(state.error).toBeUndefined();
+      expect(state.message).toBe('Suggestion accepted.');
+      expect(state.warning).toContain(ACTIVITY_AUDIT_TEXT);
+    });
+
+    it('a successful audit leaves no warning', async () => {
+      const state = await reviewSuggestion({}, form({ suggestionId: '9', status: 'dismissed' }));
+
+      expect(state).toEqual({ message: 'Suggestion dismissed.' });
+    });
+  });
+
+  describe('AFL API link and revoke actions', () => {
+    const queries = mocks;
+
+    async function loadAflApiActions() {
+      // A private copy of the module, so the mock of its query module cannot reach the
+      // other suites in this file, which use the real one.
+      vi.resetModules();
+      vi.doMock('@/db/queries/afl-api-player-links', () => ({
+        linkAflApiProvider: mocks.linkAflApiProvider,
+        revokeAflApiLink: mocks.revokeAflApiLink,
+      }));
+      return import('@/app/admin/player-links/afl-api/actions');
+    }
+
+    afterAll(() => {
+      vi.doUnmock('@/db/queries/afl-api-player-links');
+    });
+
+    beforeEach(() => {
+      queries.linkAflApiProvider.mockReset().mockResolvedValue({ ok: true });
+      queries.revokeAflApiLink.mockReset().mockResolvedValue({ ok: true });
+    });
+
+    const linkForm = () => form({
+      providerId: 'CD_I1', playerId: '1000', fingerprint: 'fp', note: 'x'.repeat(30),
+    });
+    const revokeForm = () => form({ providerId: 'CD_I1', fingerprint: 'fp', note: 'x'.repeat(30) });
+
+    it('link: a rejected activity audit returns the committed success with the warning', async () => {
+      const { linkAflApiPlayer } = await loadAflApiActions();
+      mocks.audit.mockRejectedValue(new Error('auth pool down'));
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const state = await linkAflApiPlayer({}, linkForm());
+
+      logged.mockRestore();
+      expect(queries.linkAflApiProvider).toHaveBeenCalledOnce();
+      expect(state.error).toBeUndefined();
+      expect(state.message).toBe('Linked CD_I1 — awaiting the next settle.');
+      expect(state.warning).toContain(ACTIVITY_AUDIT_TEXT);
+    });
+
+    it('revoke: a rejected activity audit returns the committed success with the warning', async () => {
+      const { revokeAflApiPlayerLink } = await loadAflApiActions();
+      mocks.audit.mockRejectedValue(new Error('auth pool down'));
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const state = await revokeAflApiPlayerLink({}, revokeForm());
+
+      logged.mockRestore();
+      expect(queries.revokeAflApiLink).toHaveBeenCalledOnce();
+      expect(state.error).toBeUndefined();
+      expect(state.message).toBe('Revoked the link for CD_I1.');
+      expect(state.warning).toContain(ACTIVITY_AUDIT_TEXT);
+    });
+
+    it('a successful audit leaves no warning, and a refused mutation writes no audit', async () => {
+      const { linkAflApiPlayer, revokeAflApiPlayerLink } = await loadAflApiActions();
+
+      expect(await linkAflApiPlayer({}, linkForm()))
+        .toEqual({ message: 'Linked CD_I1 — awaiting the next settle.' });
+      expect(await revokeAflApiPlayerLink({}, revokeForm()))
+        .toEqual({ message: 'Revoked the link for CD_I1.' });
+
+      mocks.audit.mockClear();
+      queries.linkAflApiProvider.mockResolvedValue({ ok: false, error: 'refused' });
+      expect(await linkAflApiPlayer({}, linkForm())).toEqual({ error: 'refused' });
+      expect(mocks.audit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('source contracts', () => {
+    const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+    const actions = read('src', 'app', 'admin', 'player-links', 'actions.ts');
+    const aflApiActions = read('src', 'app', 'admin', 'player-links', 'afl-api', 'actions.ts');
+
+    function functionBody(source: string, name: string): string {
+      const start = source.indexOf(`export async function ${name}`);
+      const next = source.indexOf('export async function', start + 1);
+      return source.slice(start, next === -1 ? undefined : next);
+    }
+
+    it('no multi-target loop returns an error from inside the loop', () => {
+      for (const name of ['linkPlayer', 'confirmUnlinked', 'createAndLinkPlayer']) {
+        const body = functionBody(actions, name);
+        const loop = body.slice(body.indexOf('for (const'));
+        expect(loop, name).not.toMatch(/return \{ error: `Error on/);
+        expect(loop, name).toContain('failed.push');
+        expect(loop, name).toContain('continue;');
+      }
+    });
+
+    it('every audit() after a committed mutation is guarded, in all four mutating actions and both AFL API actions', () => {
+      for (const [name, source] of [
+        ['linkPlayer', actions], ['confirmUnlinked', actions], ['reviewSuggestion', actions],
+        ['createAndLinkPlayer', actions], ['linkAflApiPlayer', aflApiActions],
+        ['revokeAflApiPlayerLink', aflApiActions],
+      ] as const) {
+        const body = functionBody(source, name);
+        const unguarded = [...body.matchAll(/(?<!try \{\s*)await audit\(/g)];
+        expect(unguarded, name).toHaveLength(0);
+        expect(body, name).toContain('ACTIVITY_AUDIT_WARNING');
+      }
+    });
+
+    it('the components that render these actions show the warning', () => {
+      expect(read('src', 'app', 'admin', 'player-links', 'SuggestionControls.tsx')).toContain('state.warning');
+      const formSource = read('src', 'app', 'admin', 'player-links', 'afl-api', 'AflApiAdjudicationForm.tsx');
+      expect(formSource).toContain('linkState.warning ?? revokeState.warning');
+      expect(formSource).toMatch(/\{done && warning && <p className="badge badge-warn">\{warning\}<\/p>\}/);
     });
   });
 });
