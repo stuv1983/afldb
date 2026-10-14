@@ -34,7 +34,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; fix implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-292.md` §17 | Run the read-only DEV/PROD two-path census (needs DEV/PROD contact); then close |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
-| AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-304.md` | Implementation, after ISSUE-266 |
+| AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; implemented and validated DB-free 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-304.md` §17 | Merge, then close (merge-scoped) |
 | AFLDB-ISSUE-307 | Legacy promotion counts every promoted row as inserted | Low | Legacy CSV intake / import batch accounting — `src/lib/ingest/pipeline.ts` | Open (2026-10-08); review F-042, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-307.md` | Implementation (low priority) |
 | AFLDB-ISSUE-308 | Approving a player-link suggestion does not revalidate public pages | Low | Admin player links / revalidation — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-043, code-proven, fix framework-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-308.md` | Choose the mechanism (does the ISSUE-087 hang reproduce on Next 16.3.1?), then implement (ISSUE-309/311 resolved 2026-10-15, no longer a dependency) |
 
@@ -51148,7 +51148,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `src/app/api/admin/email-intake/route.ts`, `tools/email_intake/fetch_and_stage.py`. **Runbook:**
   `issues/open/AFLDB-ISSUE-304.md`.
 - **Origin.** Review F-039 (R5a-F07) at `20a7a4bb`. Code-proven. Related: ISSUE-266.
-- **Next action.** Implementation, after ISSUE-266.
+- ~~**Next action.** Implementation, after ISSUE-266.~~ Superseded below.
+- **Implementation (2026-10-15; branch `sonnet/issue-304`, base `47e596ac`; not deployed).** The poller refuses an attachment over the 5 MiB
+  upload ceiling before it is encoded and posted (filed to Errors, counted as rejected); the route answers a declared `Content-Length`
+  over the base64 limit plus a 16 KiB envelope allowance with 400 before `request.json()`. A body with no or an unreadable length is
+  parsed as before. No migration. Runbook §17.
+- **Validation (DB-free, 15 Oct 2026; runbook §17.3).** A Python self-test over `main()` (at the limit, one over, small; live and
+  `--dry-run`) with a parity check against the app's constant, and five route cases with a spied `json()`; both fail on the unfixed
+  source; 11 of 11 mutants are killed (one first survived and drove an added case). `tsc --noEmit`, `py_compile`, ESLint and
+  `git diff --check` clean. The intake integration file was not run.
 
 ## AFLDB-ISSUE-305 — Legacy intake validation accepts values promotion then rejects
 

@@ -209,3 +209,61 @@ describe('email intake: a validation refused at its first read by the intake sta
     expect(actions()).toEqual(['email_intake.duplicate', 'email_intake.validate_error']);
   });
 });
+
+describe('email intake: the declared body size is bounded before the body is parsed (AFLDB-ISSUE-304)', () => {
+  // Mirrors the route: 4 base64 characters per 3 bytes of the 5 MB ceiling, plus padding, plus the
+  // JSON envelope's slack. Computed here, not imported: the route exports only its handlers.
+  const MAX_BASE64 = Math.ceil((5 * 1024 * 1024) / 3) * 4 + 4;
+  const MAX_BODY = MAX_BASE64 + 16 * 1024;
+
+  function requestDeclaring(contentLength: string | null, secret = 'unit-secret') {
+    const headers = new Headers({ 'x-intake-secret': secret });
+    if (contentLength !== null) headers.set('content-length', contentLength);
+    const json = vi.fn(async () => ({
+      senderEmail: 'admin@example.com',
+      dataset: 'player_bio',
+      contentBase64: Buffer.from('player_id,dob\n1,2000-01-01\n').toString('base64'),
+    }));
+    return { request: { headers, json } as unknown as Request, json };
+  }
+
+  it('answers 400 for a declared body over the limit, and never parses it', async () => {
+    const { request, json } = requestDeclaring(String(MAX_BODY + 1));
+    const res = await POST(request);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'The attachment exceeds the 5 MB limit.' });
+    expect(json).not.toHaveBeenCalled();
+    expect(h.audit).not.toHaveBeenCalled();
+  });
+
+  it('parses a body declared exactly at the limit', async () => {
+    h.reread.mockResolvedValue([{ status: 'approved' }]);
+    const { request, json } = requestDeclaring(String(MAX_BODY));
+    const res = await POST(request);
+    expect(json).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(200);
+  });
+
+  it('parses a body that declares no length, which cannot be bounded here', async () => {
+    h.reread.mockResolvedValue([{ status: 'approved' }]);
+    const { request, json } = requestDeclaring(null);
+    const res = await POST(request);
+    expect(json).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(200);
+  });
+
+  it('treats a length it cannot read as undeclared rather than as oversize', async () => {
+    h.reread.mockResolvedValue([{ status: 'approved' }]);
+    const { request, json } = requestDeclaring('not-a-number');
+    const res = await POST(request);
+    expect(json).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(200);
+  });
+
+  it('still answers a wrong secret 401 before it looks at the size', async () => {
+    const { request, json } = requestDeclaring(String(MAX_BODY * 10), 'not-the-secret');
+    const res = await POST(request);
+    expect(res.status).toBe(401);
+    expect(json).not.toHaveBeenCalled();
+  });
+});

@@ -62,6 +62,14 @@ const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 /** 4 base64 characters per 3 bytes, plus room for padding. */
 const MAX_BASE64_LENGTH = Math.ceil(MAX_UPLOAD_BYTES / 3) * 4 + 4;
 
+/**
+ * The JSON around the base64 is three short fields (an address, a dataset name, a filename of at
+ * most 200 characters) and punctuation; this is generous. A declared body larger than the base64
+ * limit plus this is refused before `request.json()` allocates it (AFLDB-ISSUE-304).
+ */
+const BODY_ENVELOPE_SLACK_BYTES = 16 * 1024;
+const MAX_BODY_BYTES = MAX_BASE64_LENGTH + BODY_ENVELOPE_SLACK_BYTES;
+
 function timingSafeStringEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
@@ -135,6 +143,15 @@ export async function POST(request: Request) {
 
   if (INTAKE_WORK.check(key)) {
     return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
+  }
+
+  // Bound the declared size before the body is parsed. `request.json()` reads and parses the whole
+  // body, so without this a 40 MB attachment is held in an app worker's memory only to be answered
+  // with a 403 or a 400. A body with no Content-Length (chunked) cannot be bounded here; the
+  // poller, the only caller, always sends one, and still has the per-field limits below.
+  const declaredLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: 'The attachment exceeds the 5 MB limit.' }, { status: 400 });
   }
 
   let body: IntakeBody;

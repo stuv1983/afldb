@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). Implemented and validated DB-free 2026-10-15 (§17); not deployed.
 - **Severity:** Low. **Area:** legacy CSV intake / email ingress resource bounds.
 - **Key files:** `src/app/api/admin/email-intake/route.ts`, `tools/email_intake/fetch_and_stage.py`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-039; partition note R5a-F07).
@@ -73,4 +73,28 @@ None.
 
 ## 16. Next action
 
-Implementation (after AFLDB-ISSUE-266).
+~~Implementation (after AFLDB-ISSUE-266).~~ Superseded by §17.
+
+## 17. Implementation and validation (2026-10-15)
+
+### 17.1 Change
+
+- `tools/email_intake/fetch_and_stage.py`: a new `MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024`, the app's upload ceiling (`src/lib/ingest/pipeline.ts` `MAX_UPLOAD_BYTES`). After the CSV attachment is found and before the dry-run branch and the POST, an attachment over it is refused: it is reported (`REJECTED: attachment '<name>' is N bytes, over the 5242880-byte upload limit`), filed to the Errors folder (not in `--dry-run`), counted as rejected, and never base64-encoded or posted. The ceiling is inclusive: an attachment of exactly 5 MiB is still forwarded.
+- `src/app/api/admin/email-intake/route.ts`: after the secret check and the work limiter and before `request.json()`, a declared `Content-Length` larger than the base64 limit plus a 16 KiB envelope allowance (`BODY_ENVELOPE_SLACK_BYTES`: three short fields, a filename of at most 200 characters, and punctuation) is answered `400` with the existing "exceeds the 5 MB limit" message without parsing the body. A body that declares no length, or one that cannot be read as a number, is treated as undeclared and parsed as before: a chunked body cannot be bounded this way, and the only caller, the poller, always sends a length.
+- No migration; nothing deployed. Both changes sit on top of the ISSUE-266 poller already on `main`.
+
+### 17.2 Tests
+
+- `tools/email_intake/test_fetch_and_stage.py` (the dependency-free self-test; no pytest): `test_main_refuses_an_oversize_attachment_before_posting` drives `main()` over three authenticated messages (an attachment of exactly the limit, one byte over, and a small one), live and `--dry-run`: the oversize one is reported with its size, filed to Errors and never posted, the other two are forwarded, the exit code is the rejection code, and `--dry-run` posts and files nothing. `test_upload_limit_matches_the_app` reads `pipeline.ts` and checks the poller's constant equals the app's.
+- `tests/email-intake-route.test.ts` (DB-free): five cases with a stand-in request whose `json()` is a spy: a declared length of the limit plus one is answered 400 and `json()` is never called (and nothing is audited); a length exactly at the limit, no length, and an unreadable length are all parsed; a wrong secret is still answered 401 before the size is looked at.
+
+### 17.3 Results
+
+- **Fixed code.** `python tools/email_intake/test_fetch_and_stage.py`: all checks passed. `tests/email-intake-route.test.ts`: **23 passed**. No database was used. `tests/integration/email-intake.test.ts` was not run: its requests are constructed without a `Content-Length`, which takes the unchanged path.
+- **Unfixed source** (`git checkout HEAD -- src tools/email_intake/fetch_and_stage.py`, the fixed files copied back and sha-256 verified): the Python self-test fails (the poller has no limit constant) and the 400 route case fails.
+- **Mutants** (`D:\tmp\issue304\mutate.mjs`, one at a time, original bytes restored and hash-verified after each): poller: no cap (P1), cap at `>=` so the boundary file is refused (P2), a different limit (P3), the oversize message not filed (P4), not counted as rejected (P5); route: no check (R1), `>=` (R2), no envelope slack (R3), the check after the parse (R4), the check before the secret (R5), an unreadable length treated as oversize (R6). R6 survived the first test set and was killed by the added unreadable-length case. **All 11 killed.**
+- **Static.** `python -m py_compile` of both poller files; `tsc --noEmit` exit 0; `git diff --check` exit 0; ESLint of the route and its test exits 0 on this branch and on unchanged `main`, with the same (empty) problem set.
+
+### 17.4 Limits
+
+- Not deployed; no browser, DEV, PROD, mail or network action. Neither host has an intake timer, so the poller change is dormant until intake is activated (ISSUE-266 runbook §18.10). A chunked request (no `Content-Length`) is not bounded before parsing; no current caller sends one. The poller still holds the whole message in memory while it parses it, and the size is checked after that; only the base64 re-encoding and the POST are avoided. The route's 40 MB case was exercised with a stand-in request, not a real 40 MB body.

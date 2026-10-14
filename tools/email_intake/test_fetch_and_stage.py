@@ -19,6 +19,7 @@ import email
 import importlib.util
 import io
 import os
+import re
 import sys
 import tempfile
 import urllib.error
@@ -378,6 +379,17 @@ def raw_submission(from_: str, auth: str) -> bytes:
     ).encode("ascii")
 
 
+def raw_with_attachment(content: bytes) -> bytes:
+    """A complete, authenticated raw message whose CSV attachment is exactly `content`."""
+    msg = EmailMessage()
+    msg["From"] = "admin@example.com"
+    msg["Authentication-Results"] = PASS
+    msg["Subject"] = "match_results"
+    msg.set_content("see attached")
+    msg.add_attachment(content, maintype="text", subtype="csv", filename="data.csv")
+    return msg.as_bytes()
+
+
 class FakeImap:
     """Just enough IMAP for main(): every message unseen, every call OK."""
 
@@ -461,6 +473,64 @@ def test_main_forwards_the_verified_mailbox() -> None:
     finally:
         poller.load_env, poller.imap_connect, poller.post_to_intake, sys.argv = saved
         restore_env(saved_env)
+
+
+def test_main_refuses_an_oversize_attachment_before_posting() -> None:
+    print("main() refuses an attachment over the upload limit before it is encoded and posted (AFLDB-ISSUE-304)")
+
+    limit = poller.MAX_ATTACHMENT_BYTES
+    messages = [
+        raw_with_attachment(b"x" * limit),          # 1: exactly at the limit: forwarded
+        raw_with_attachment(b"x" * (limit + 1)),    # 2: one byte over: refused, never posted
+        raw_with_attachment(b"a,b\n1,2\n"),          # 3: small: forwarded
+    ]
+    posted: list[int] = []
+
+    def fake_post(base_url, secret, sender_email, dataset, filename, content, timeout):
+        posted.append(len(content))
+        return {"submissionId": len(posted), "rowCount": 1, "report": "ok"}
+
+    keys = ("AFLDB_INTAKE_AUTHSERV_ID", "AFLDB_INTAKE_REQUIRE_AUTH", "AFLDB_EMAIL_INTAKE_SECRET")
+    saved_env = {k: os.environ.get(k) for k in keys}
+    saved = (poller.load_env, poller.imap_connect, poller.post_to_intake, sys.argv)
+    poller.load_env = lambda *args, **kwargs: None
+    poller.post_to_intake = fake_post
+    try:
+        for key in keys:
+            os.environ.pop(key, None)
+        os.environ.update(AFLDB_INTAKE_AUTHSERV_ID="mx.host.com", AFLDB_EMAIL_INTAKE_SECRET="s")
+        for argv in ([], ["--dry-run"]):
+            mode = " ".join(argv) or "live"
+            conn = FakeImap(messages)
+            poller.imap_connect = lambda: conn
+            posted.clear()
+            sys.argv = ["fetch_and_stage.py", *argv]
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                code = poller.main()
+            check(f"{mode}: exit code reports the refusal", code, poller.EXIT_REJECTED)
+            check(f"{mode}: the refusal names the size", "is %d bytes, over the" % (limit + 1) in out.getvalue(), True)
+            if argv:
+                check(f"{mode}: nothing posted", posted, [])
+                check(f"{mode}: nothing filed", conn.filed, [])
+            else:
+                check(f"{mode}: only the attachments within the limit are posted", posted, [limit, 8])
+                check(f"{mode}: the oversize one is filed to Errors, the others to Processed", conn.filed,
+                      [(1, "Processed"), (2, "Errors"), (3, "Processed")])
+    finally:
+        poller.load_env, poller.imap_connect, poller.post_to_intake, sys.argv = saved
+        restore_env(saved_env)
+
+
+def test_upload_limit_matches_the_app() -> None:
+    print("the poller's attachment limit is the app's upload limit (AFLDB-ISSUE-304)")
+
+    pipeline = Path(__file__).resolve().parents[2] / "src" / "lib" / "ingest" / "pipeline.ts"
+    found = re.search(r"export const MAX_UPLOAD_BYTES = ([0-9 *]+);", pipeline.read_text(encoding="utf-8"))
+    check("pipeline.ts declares MAX_UPLOAD_BYTES as a product of integers", found is not None, True)
+    app_limit = 1
+    for factor in found.group(1).split("*"):
+        app_limit *= int(factor)
+    check("MAX_ATTACHMENT_BYTES equals MAX_UPLOAD_BYTES", poller.MAX_ATTACHMENT_BYTES, app_limit)
 
 
 def test_main_files_a_superseded_validation() -> None:
@@ -671,6 +741,8 @@ def main() -> int:
         test_intake_auth_config,
         test_config_failure_leaves_mailbox_untouched,
         test_main_forwards_the_verified_mailbox,
+        test_main_refuses_an_oversize_attachment_before_posting,
+        test_upload_limit_matches_the_app,
         test_main_files_a_superseded_validation,
         test_find_csv_attachment,
         test_load_env,

@@ -477,7 +477,9 @@
 ### AFLDB-ISSUE-304 — Email intake parses the whole body before sender and size checks
 - **Severity:** Low. **Area:** email ingress resource bounds — `src/app/api/admin/email-intake/route.ts`. **State:** Open
   (2026-10-08), F-039; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-304.md`. **Next action:** implementation, after ISSUE-266.
+- **State (2026-10-15):** implemented and validated DB-free (Python self-test over `main()`, 5 route cases; 11 of 11 mutants killed); not deployed (the poller is
+  dormant on both hosts).
+- **Runbook:** `issues/open/AFLDB-ISSUE-304.md` §17. **Next action:** merge, then close (merge-scoped).
 
 ### AFLDB-ISSUE-307 — Legacy promotion counts every promoted row as inserted
 - **Severity:** Low. **Area:** legacy CSV intake / batch accounting — `src/lib/ingest/pipeline.ts`. **State:** Open

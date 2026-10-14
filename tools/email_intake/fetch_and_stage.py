@@ -79,6 +79,11 @@ EXIT_REJECTED = 1
 EXIT_TEMPFAIL = 75  # sysexits.h EX_TEMPFAIL: try again later, nothing is wrong here
 EXIT_CONFIG = 78  # sysexits.h EX_CONFIG: fix the configuration; the mailbox was not opened
 
+# The upload ceiling the app enforces (src/lib/ingest/pipeline.ts MAX_UPLOAD_BYTES). An attachment over
+# it is refused here, before it is base64-encoded into a JSON POST that the route would only reject
+# (AFLDB-ISSUE-304). test_fetch_and_stage.py checks this against the app's constant.
+MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+
 # ---------------------------------------------------------------------------
 # Environment: the same tolerant .env loader every other tool in this repo
 # uses (tools/migration/common.py, tools/admin/create-admin.ts), reimplemented
@@ -719,6 +724,14 @@ def main() -> int:
                 rejected += 1
                 continue
             filename, content = attachment
+
+            if len(content) > MAX_ATTACHMENT_BYTES:
+                print(f"    REJECTED: attachment {filename!r} is {len(content)} bytes, over the "
+                      f"{MAX_ATTACHMENT_BYTES}-byte upload limit")
+                if not args.dry_run:
+                    file_message(conn, msg_id, error_folder)
+                rejected += 1
+                continue
 
             if args.dry_run:
                 print(f"    [dry-run] would stage {filename!r} ({len(content)} bytes) as {dataset!r} from {sender!r}")
