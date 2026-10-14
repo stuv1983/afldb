@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented 2026-10-14 as `fd22d7a9` and `3987afaf` on `sonnet/issue-298` (base `1149e17a`); DB-free validated (§17.1, §17.2); merge pending. **Not deployed.**
+- **Status:** **Resolved (2026-10-15, merge-scoped)**, on the push of the documentation-only closure commit (§18). Implemented as `fd22d7a9` and `3987afaf` on `sonnet/issue-298` (base `1149e17a`), merged and pushed with its records as `54697545`; DB-free validated (§17.1, §17.2). **Not deployed.**
 - **Severity:** Low. **Area:** acquisition / evidence integrity.
 - **Key file:** `src/lib/acquisition/afl-api-snapshot.ts` (`aflApiUnitSourcesFrom`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-033; partition note R4b-F03).
@@ -72,7 +72,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Implemented (§17). Merge and push, then close.
+~~Implementation.~~ Implemented (§17), merged, closed (§18).
 
 ## 17. Implementation record (2026-10-14)
 
@@ -104,3 +104,11 @@ Each mutant changes the real fix, is applied alone and restored from a saved cop
 | H a file counts as listed if any file of its directory is | killed (7) |
 
 All eight fail on `AssertionError`; none survived. The 58 cases pass unmutated.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 298`: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`). `npm run merge:ready -- --issue 298` (raw output, unchanged: `D:\tmp\issue298\merge-ready-raw-1.txt`): every check PASS except **one blocker, "main worktree is clean"**, the primary checkout's **17** untracked paths (nine `.agents/skills` files, seven zero-byte stray-named files including `void`, the literal `$null)`).
+- **Exception.** The owner authorised a fresh exception for this issue, covering only that clean-tree FAIL and the exact 17-path set, compared by full content hash and verified immediately before the merge with `D:\tmp\issue298\exception-check.py` (a copy of the read-only ISSUE-306 script): `precheck-1`, `premerge-1` (with `$null)` pinned to `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500`) and `postmerge-1`, all RESULT OK. The exception covers no other check and no other path.
+- **Merge 1.** `fd22d7a9`, `3987afaf` and the records commit `54697545` fast-forwarded onto `main` (`1149e17a..54697545`) and pushed; local `main`, the fetched `origin/main` and `git ls-remote origin refs/heads/main` all equalled it afterwards. Before the merge a fresh `git fetch` and `ls-remote` showed `main` still at `1149e17a`.
+- **Resolution.** Resolved on the push of the documentation-only closure commit, under §14 ("A DB-free test in `tests/afl-api-player-evidence.test.ts`"), which is DB-free only and met (§17.1); §15 lists no decision. The closure scope is **merge-scoped**: code on `main`, DB-free validated, **not deployed**.
+- **Preserved limits.** Not deployed. No PostgreSQL, integration or network-acquisition run; no real snapshot under `data/sources/afl_api/` was read. A match directory whose `fixture.json` is not listed at all is still not discovered (unchanged, §17).
