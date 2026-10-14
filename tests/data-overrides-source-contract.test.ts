@@ -1586,6 +1586,22 @@ describe('AFLDB-ISSUE-224 §21.3.2 — one deterministic winning authority per f
     expect(refusal).toBeLessThan(playersCode.indexOf('jsonb_object_agg(key, value)'));
   });
 
+  test('the players override key is chosen deterministically from the identity rows (AFLDB-ISSUE-292)', () => {
+    // A player with two accepted AFL Tables paths (a renumbered profile pair) must always be keyed
+    // under the same one: `LIMIT 1` with no ORDER BY answers by physical row order, so two edits
+    // of one group could land under two keys and the players replay would refuse them as
+    // equal-authority overrides that disagree. The replay resolves a key only through
+    // `afltables_profile_url` rows, so those rank first and the smallest path breaks the tie.
+    const code = executableTypeScript(readSource('src/db/queries/data-edits.ts'));
+    const start = code.indexOf("if (entityKey === 'players') {");
+    expect(start).toBeGreaterThan(-1);
+    const branch = code.slice(start, code.indexOf('throw new Error(`Unknown entity key for natural key', start));
+    expect(branch).toContain("s.key = 'afltables'");
+    expect(branch).toMatch(
+      /ORDER BY \(e\.match_method = 'afltables_profile_url'\) DESC NULLS LAST, e\.external_id\s+LIMIT 1/,
+    );
+  });
+
   test('the creation record is kept in step by the editor, in the same transaction', () => {
     const dataEdits = readSource('src/db/queries/data-edits.ts');
     const code = executableTypeScript(dataEdits);

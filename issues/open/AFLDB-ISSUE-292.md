@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). Implemented and validated on `afldb_test` 2026-10-15 (§17); not deployed. **Stays open:** the §15 census has not been run (§17.5).
 - **Severity:** Low. **Area:** Data Editor / override replay.
 - **Key file:** `src/db/queries/data-edits.ts` (`getEntityNaturalKey`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-027; partition note R3-F04).
@@ -72,4 +72,34 @@ A DB-free unit test of the key chooser.
 
 ## 16. Next action
 
-Implementation (small). Consider doing it together with AFLDB-ISSUE-277.
+~~Implementation (small). Consider doing it together with AFLDB-ISSUE-277.~~ Superseded by §17.
+
+## 17. Implementation and validation (2026-10-15)
+
+### 17.1 Change
+
+- `src/db/queries/data-edits.ts` (`getEntityNaturalKey`, players branch): the AFL Tables identity query now ends `ORDER BY (e.match_method = 'afltables_profile_url') DESC NULLS LAST, e.external_id LIMIT 1`. The key is a function of the player's identity rows, not of their physical order. `afltables_profile_url` rows rank first because the players replay resolves a key only through those rows (`tools/migration/common.py` skips any other `afltables` identity), and the smallest path breaks the tie between the two paths of a renumbered pair. This is the runbook's second option. The first (reusing the ISSUE-257 continuing-URL rule) needs the continuity contract loaded inside the editor transaction and would key by the continuing path instead; it was not taken, and nothing in this change precludes it.
+- A player whose only `afltables` identity is not a profile-URL row is keyed as before (no behaviour change for a single row).
+- Existing overrides are not rewritten. No migration.
+
+### 17.2 Tests
+
+- `tests/integration/data-editor.test.ts`: a new block `AFLDB-ISSUE-292`, one case on `afldb_test`. A fixture player holds three `afltables` identity rows: two profile-URL paths (the larger inserted first) and a third that sorts before both but is not a profile-URL identity (no such row exists on `afldb_test` today, where every `afltables` identity is `afltables_profile_url`; the case builds one to pin the ranking). The player's `height_cm` group is edited, the larger path's row is rewritten so the physical order changes, and the group is edited again. Exactly one active override exists, under the smallest profile-URL path, carrying the second value.
+- `tests/data-overrides-source-contract.test.ts` (DB-free): the players branch of `getEntityNaturalKey` contains that exact ORDER BY before its `LIMIT 1`.
+
+### 17.3 Results
+
+- **Authority.** `D:\tmp\issue292\run-int.mjs` (the ISSUE-282 launcher, with extra vitest arguments passed through) derived the owner, importer and auth DSNs in memory from the primary `.env`, pointed them at `afldb_test` on tunnel port 55432 and proved `current_database() = afldb_test` for each before vitest started. No credential was printed or written. Only the case's own fixture player, identity rows, overrides and audit rows were written, and the case removes them in a `finally`. No `afldb_dev`, PROD, migration, rebuild, restore, truncation or repair.
+- **Fixed code.** Filter `AFLDB-ISSUE-292`: **1 passed**, 43 skipped; with the neighbouring `AFLDB-ISSUE-224` name-edit block and `Atomic required audit`: **4 passed**. DB-free `data-overrides-source-contract`: **70 passed**.
+- **Unfixed source** (`git checkout HEAD -- src/`, the fixed file copied back and sha-256 verified): both fail. The integration case fails on the key: the unordered query answered with the first-inserted (larger) path both times in that run, not the smallest, so this run showed the order-dependence of the choice but not two keys for one player; two keys need the planner to flip between the two edits, which the fix removes whatever the planner does.
+- **Mutants** (`D:\tmp\issue292\mutate.mjs`, each against both the integration case and the DB-free case, original bytes restored and hash-verified after each): no ORDER BY (Z1), path descending (Z2), no profile-URL preference (Z3), profile-URL rows ranked last (Z4). **All 4 killed by both.**
+- **Fixture residue.** A read-only census (players named `Issue292%`, `issue292-` identities, overrides, audit rows and override text) read 0 before and after every run, baseline and mutant.
+- **Static.** `tsc --noEmit` exit 0; `git diff --check` exit 0; ESLint of the three changed files exits 1 on this branch and on unchanged `main` with an identical problem set (compared by rule and message): none introduced.
+
+### 17.4 Limits
+
+- Not deployed; no browser, DEV or PROD action. Keys already written under either path are not rewritten, so a player who already carries overrides under both paths still makes the players replay refuse until someone repairs them (§17.5).
+
+### 17.5 Why this issue stays open
+
+§15 asks whether any DEV or PROD player already carries overrides under both paths, answered by a read-only census by `player_id` over the two keys. That needs DEV or PROD contact, which this work was not authorised to make, so the question is unanswered and any repair it implies is unscoped. The code fix is merged and validated; the issue closes when the census has been run and either found nothing or its findings have a repair plan. Not recorded in `blockers.md`, which this work did not edit.

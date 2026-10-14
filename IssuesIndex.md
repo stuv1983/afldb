@@ -460,8 +460,9 @@
 ### AFLDB-ISSUE-292 — Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths
 - **Severity:** Low. **Area:** Data Editor / override replay — `src/db/queries/data-edits.ts`. **State:** Open
   (2026-10-08), F-027 (trigger a hypothesis); imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-292.md`. **Next action:** implementation (small), possibly with ISSUE-277;
-  two-path census open.
+- **State (2026-10-15):** fix merged and validated on `afldb_test` (1 integration case and 1 DB-free case; 4 of 4 mutants killed by both; fixture census 0);
+  not deployed. **Stays open** for the §15 DEV/PROD two-path census, which was outside this authority.
+- **Runbook:** `issues/open/AFLDB-ISSUE-292.md` §17. **Next action:** run the read-only two-path census on DEV and PROD (an operator-authorised step), then close.
 
 ### AFLDB-ISSUE-299 — R lineup and roster acquirers overwrite retained evidence in place
 - **Severity:** Low. **Area:** acquisition tooling — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R`. **State:** Open

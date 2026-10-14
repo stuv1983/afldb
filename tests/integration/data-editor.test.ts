@@ -806,6 +806,88 @@ describe('AFLDB-ISSUE-224 §21.3.2: a name edit repairs the durable creation rec
   });
 });
 
+describe('AFLDB-ISSUE-292: a player with two accepted AFL Tables paths is always keyed under the same one', () => {
+  const ROOT = 'issue292-players/';
+  // Inserted first, but sorts last: an unordered `LIMIT 1` answers with this one until its row moves.
+  const PATH_LATE = `${ROOT}Z/Zeta_Fixture0.html`;
+  const PATH_EARLY = `${ROOT}A/Alpha_Fixture0.html`;
+  // Sorts before both, but is not a profile-URL identity, which is the only kind the replay resolves.
+  const PATH_OTHER = `${ROOT}0/Aardvark_Fixture0.html`;
+
+  it('keys two edits of one group under one path, whatever the physical row order', async () => {
+    let playerId = 0;
+    let token = '';
+    try {
+      await sql.begin(async (tx) => {
+        const created = await createPlayerInTransaction(tx, {
+          displayName: 'Issue292 Fixture', givenName: 'Issue292', surname: 'Fixture',
+        }, { adminUserId });
+        playerId = created.id;
+        const [source] = await tx<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afltables'`;
+        for (const path of [PATH_LATE, PATH_EARLY]) {
+          await tx`
+            INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+            VALUES (${source.id}, ${path}, ${playerId}, 'unique', 'afltables_profile_url')
+          `;
+        }
+        await tx`
+          INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+          VALUES (${source.id}, ${PATH_OTHER}, ${playerId}, 'unique', 'afltables_name_dob')
+        `;
+        const [identity] = await tx<{ externalId: string }[]>`
+          SELECT e.external_id AS "externalId"
+            FROM external_identities e JOIN sources s ON s.id = e.source_id
+           WHERE e.player_id = ${playerId} AND s.key = 'manual_admin_edit'
+        `;
+        token = identity.externalId;
+      });
+
+      const first = await saveEdit({
+        entityKey: 'players', rowId: playerId, groupKey: 'height_cm', raw: { height_cm: '180' }, adminUserId,
+      });
+      expect(first).toMatchObject({ ok: true });
+
+      // The physical order of this player's identity rows changes between the two edits.
+      await sql`
+        UPDATE external_identities SET status = status
+         WHERE player_id = ${playerId} AND external_id = ${PATH_LATE}
+      `;
+
+      const second = await saveEdit({
+        entityKey: 'players', rowId: playerId, groupKey: 'height_cm', raw: { height_cm: '190' }, adminUserId,
+      });
+      expect(second).toMatchObject({ ok: true });
+
+      const rows = await sql<{ entityKey: string; overrideValues: Record<string, unknown> }[]>`
+        SELECT entity_key AS "entityKey", override_values AS "overrideValues"
+          FROM data_overrides
+         WHERE entity_type = 'players' AND field_group = 'height_cm'
+           AND entity_key LIKE ${`afltables:${ROOT}%`} AND is_active
+         ORDER BY entity_key
+      `;
+      // ONE active override, under the smallest profile-URL path, carrying the latest value: not
+      // two keys for one player, which the players replay would refuse as disagreeing overrides.
+      expect(rows).toHaveLength(1);
+      expect(rows[0].entityKey).toBe(`afltables:${PATH_EARLY}`);
+      expect(rows[0].overrideValues).toMatchObject({ height_cm: 190 });
+    } finally {
+      if (playerId > 0) {
+        await sql.begin(async (tx) => {
+          await tx`DELETE FROM data_edits WHERE table_name = 'players' AND row_id = ${playerId}`;
+          await tx`
+            DELETE FROM data_overrides
+             WHERE entity_type = 'players'
+               AND (entity_key LIKE ${`afltables:${ROOT}%`} OR entity_key = ${`manual_admin_edit:${token}`})
+          `;
+          await tx`DELETE FROM external_identities WHERE player_id = ${playerId}`;
+          await tx`DELETE FROM player_career_stats WHERE player_id = ${playerId}`;
+          await tx`DELETE FROM players WHERE id = ${playerId}`;
+        });
+      }
+    }
+  });
+});
+
 describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
   const importSql = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1, onnotice: () => {} });
 

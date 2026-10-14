@@ -130,6 +130,12 @@ async function getEntityNaturalKey(tx: Tx, entityKey: string, rowId: number): Pr
   }
   if (entityKey === 'players') {
     // Identity is profile-URL path through external_identities (afltables).
+    // A player can hold two accepted paths (a renumbered profile pair, ISSUE-136/137), so the
+    // choice must be a function of the data and not of the physical row order: two edits of
+    // one field group made at different times would otherwise be keyed under different paths,
+    // and the players replay refuses equal-authority overrides that disagree (AFLDB-ISSUE-292).
+    // The replay resolves a key only through `afltables_profile_url` rows, so those rank first;
+    // the smallest path breaks the tie.
     const [row] = await tx<{ external_id: string }[]>`
       SELECT e.external_id
         FROM external_identities e
@@ -137,6 +143,7 @@ async function getEntityNaturalKey(tx: Tx, entityKey: string, rowId: number): Pr
        WHERE e.player_id = ${rowId}
          AND s.key = 'afltables'
          AND e.status IN ('unique', 'resolved')
+       ORDER BY (e.match_method = 'afltables_profile_url') DESC NULLS LAST, e.external_id
        LIMIT 1
     `;
     if (!row) return null; // Not source-owned or lacks stable identity

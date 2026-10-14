@@ -31,7 +31,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | Code fix plus test update, before search indexing is enabled |
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
-| AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
+| AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; fix implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-292.md` §17 | Run the read-only DEV/PROD two-path census (needs DEV/PROD contact); then close |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
@@ -50903,8 +50903,18 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   hypothesis.
 - **Defect.** `LIMIT 1` without `ORDER BY` can key two edits of one group under different paths for a renumbered-profile
   player (ISSUE-136/137); differing values then make the players replay refuse.
-- **Open question.** Whether DEV or PROD already carries such overrides (read-only census proposed). **Next action.**
-  Implementation (small); consider with ISSUE-277.
+- **Open question.** Whether DEV or PROD already carries such overrides (read-only census proposed). ~~**Next action.**
+  Implementation (small); consider with ISSUE-277.~~ Superseded below.
+- **Implementation (2026-10-15; branch `sonnet/issue-292`, base `7fbec965`; not deployed).** The players branch of `getEntityNaturalKey` orders
+  its identity query (`afltables_profile_url` rows first, then the smallest path) so the override key does not depend on physical row order.
+  Existing overrides are not rewritten. No migration. Runbook §17.
+- **Validation (`afldb_test`, 15 Oct 2026; runbook §17.3).** One integration case through a launcher that proved `current_database() =
+  afldb_test` for the owner, importer and auth roles before any write (two edits of one group, with the physical order changed between
+  them, leave one active override under the smallest profile-URL path) and a DB-free source-contract case; both fail on the unfixed source
+  and 4 of 4 mutants are killed by both. Fixture census 0. `tsc --noEmit` and `git diff --check` exit 0; ESLint reports the same problem
+  set as unchanged `main`.
+- **Stays open.** The runbook's §15 census (does any DEV or PROD player already carry overrides under two paths?) needs DEV or PROD
+  contact and was not run; any repair it implies is unscoped (runbook §17.5).
 
 ## AFLDB-ISSUE-293 — Settle runs under-report `dataIssuesResolved`
 
