@@ -399,3 +399,151 @@ describe('validateSubmission start-status policy (AFLDB-ISSUE-273)', () => {
     expect(db.committed[1].values.at(-1)).toBe(status);
   });
 });
+
+// ---------------------------------------------------------------------------
+// validateSubmission and the resolved key (AFLDB-ISSUE-306)
+// ---------------------------------------------------------------------------
+// The real pipeline over a scripted database, with the REAL `fileKey` and
+// `resolvedKey` of the two datasets that define one. Only `validateRow` is
+// scripted (it plays the alias resolver): `Home Alias` resolves to `Home FC`.
+
+const { DATASETS: realDatasets } = await vi.importActual<
+  typeof import('@/lib/ingest/datasets')
+>('@/lib/ingest/datasets');
+
+describe('validateSubmission duplicate detection on the resolved key (AFLDB-ISSUE-306)', () => {
+  const clubName = (text: string | null) => (text === 'Home Alias' ? 'Home FC' : text);
+
+  const matchSpec = () => ({
+    ...realDatasets.match_results,
+    validateRow: async (row: Record<string, string | null>) => ({
+      verdict: 'ok' as const,
+      reasons: [],
+      resolved: {
+        season: 2073, round_code: '1',
+        home_club_name: clubName(row.home_club), away_club_name: clubName(row.away_club),
+      },
+    }),
+  });
+
+  const statsSpec = () => ({
+    ...realDatasets.player_match_stats,
+    validateRow: async (row: Record<string, string | null>) => (
+      row.player === 'Nobody'
+        ? { verdict: 'error' as const, reasons: ['player "Nobody" not found for 2073'] }
+        : {
+          verdict: 'ok' as const,
+          reasons: [],
+          resolved: { match_id: 500, player_id: row.player === 'Other Player' ? 901 : 900, club_id: 1 },
+        }
+    ),
+  });
+
+  const fixture = (extra: Record<string, string | null> = {}): Record<string, string | null> => ({
+    season: '2073', round_code: 'R1', round_number: '1', match_date: '2073-03-01',
+    home_club: 'Home FC', away_club: 'Away FC', ...extra,
+  });
+  const statLine = (extra: Record<string, string | null> = {}): Record<string, string | null> => ({
+    season: '2073', round_code: 'R1', home_club: 'Home FC', away_club: 'Away FC',
+    player: 'Fixture Player', club: 'Home FC', ...extra,
+  });
+  const numbered = (...payloads: Record<string, string | null>[]) =>
+    payloads.map((payload, index) => ({ rowNo: index + 1, payload }));
+
+  const written = (db: ReturnType<typeof fakeValidationDb>) =>
+    (db.committed[0].values[0] as { json: Array<{ row_no: number; verdict: string; reasons: { reasons: string[] } }> }).json;
+
+  it('marks the second spelling of one fixture a duplicate, and keeps the first row as it was', async () => {
+    mocks.getDataset.mockReturnValue(matchSpec());
+    const db = fakeValidationDb({
+      start: { dataset: 'match_results', status: 'staged', version: '1' },
+      rows: numbered(fixture(), fixture({ home_club: 'Home Alias' })),
+    });
+
+    const summary = await validateSubmission(17);
+
+    expect(summary).toEqual({ ok: 1, warnings: 0, errors: 1, duplicates: 1 });
+    const [first, second] = written(db);
+    expect(first).toMatchObject({ row_no: 1, verdict: 'ok' });
+    expect(first.reasons.reasons).toEqual([]);
+    expect(second).toMatchObject({ row_no: 2, verdict: 'error' });
+    expect(second.reasons.reasons).toEqual([
+      'duplicate of row 1: the same record once names are resolved (key "2073|1|2073-03-01|Home FC|Away FC")',
+    ]);
+  });
+
+  it('does not touch two genuinely different fixtures', async () => {
+    mocks.getDataset.mockReturnValue(matchSpec());
+    const db = fakeValidationDb({
+      start: { dataset: 'match_results', status: 'staged', version: '1' },
+      rows: numbered(fixture(), fixture({ match_date: '2073-03-08' }), fixture({ home_club: 'Away FC', away_club: 'Home Alias' })),
+    });
+
+    expect(await validateSubmission(17)).toEqual({ ok: 3, warnings: 0, errors: 0, duplicates: 0 });
+    expect(written(db).map((v) => v.verdict)).toEqual(['ok', 'ok', 'ok']);
+  });
+
+  it('counts a row that is a duplicate by both keys once, under the cell-text reason', async () => {
+    mocks.getDataset.mockReturnValue(matchSpec());
+    const db = fakeValidationDb({
+      start: { dataset: 'match_results', status: 'staged', version: '1' },
+      rows: numbered(fixture(), fixture()),
+    });
+
+    expect(await validateSubmission(17)).toEqual({ ok: 1, warnings: 0, errors: 1, duplicates: 1 });
+    expect(written(db)[1].reasons.reasons).toEqual([
+      'duplicate of row 1 (key "2073|1|2073-03-01|Home FC|Away FC")',
+    ]);
+  });
+
+  it('names the first row that claimed the record, for a third spelling', async () => {
+    mocks.getDataset.mockReturnValue(matchSpec());
+    const db = fakeValidationDb({
+      start: { dataset: 'match_results', status: 'staged', version: '1' },
+      rows: numbered(fixture(), fixture({ home_club: 'Home Alias' }), fixture({ round_code: '1' })),
+    });
+
+    // Row 3 repeats row 1 by cell text once the round is read canonically; row 2 is the alias.
+    expect(await validateSubmission(17)).toEqual({ ok: 1, warnings: 0, errors: 2, duplicates: 2 });
+    expect(written(db)[1].reasons.reasons[0]).toMatch(/^duplicate of row 1: the same record once names are resolved/);
+    expect(written(db)[2].reasons.reasons[0]).toMatch(/^duplicate of row 1 \(key /);
+  });
+
+  it('marks the same player-match under two club spellings a duplicate', async () => {
+    mocks.getDataset.mockReturnValue(statsSpec());
+    const db = fakeValidationDb({
+      start: { dataset: 'player_match_stats', status: 'staged', version: '1' },
+      rows: numbered(
+        statLine(),
+        statLine({ home_club: 'Home Alias', club: 'Home Alias' }),
+        statLine({ player: 'Other Player' }),
+      ),
+    });
+
+    expect(await validateSubmission(17)).toEqual({ ok: 2, warnings: 0, errors: 1, duplicates: 1 });
+    const [, second, third] = written(db);
+    expect(second.reasons.reasons).toEqual([
+      'duplicate of row 1: the same record once names are resolved (key "player #900 in match #500")',
+    ]);
+    expect(third).toMatchObject({ row_no: 3, verdict: 'ok' });
+  });
+
+  it('lets a failed row claim nothing, so a later good row is not called its duplicate', async () => {
+    mocks.getDataset.mockReturnValue(statsSpec());
+    const db = fakeValidationDb({
+      start: { dataset: 'player_match_stats', status: 'staged', version: '1' },
+      rows: numbered(statLine({ player: 'Nobody' }), statLine()),
+    });
+
+    expect(await validateSubmission(17)).toEqual({ ok: 1, warnings: 0, errors: 1, duplicates: 0 });
+    expect(written(db).map((v) => v.verdict)).toEqual(['error', 'ok']);
+  });
+
+  it('leaves a dataset without a resolved key exactly as it was', async () => {
+    mocks.getDataset.mockReturnValue(playerBioSpec());
+    const db = fakeValidationDb({ rows: rowsOf('5', '6', '7') });
+
+    expect(await validateSubmission(17)).toEqual({ ok: 3, warnings: 0, errors: 0, duplicates: 0 });
+    expect(written(db).map((v) => v.verdict)).toEqual(['ok', 'ok', 'ok']);
+  });
+});

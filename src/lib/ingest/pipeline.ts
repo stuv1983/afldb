@@ -301,6 +301,7 @@ export async function validateSubmission(
 
   const summary: ValidationSummary = { ok: 0, warnings: 0, errors: 0, duplicates: 0 };
   const seenKeys = new Map<string, number>();
+  const seenResolvedKeys = new Map<string, number>();
   const verdicts: {
     row_no: number;
     verdict: RowVerdict['verdict'];
@@ -333,8 +334,31 @@ export async function validateSubmission(
           reasons: [...verdict.reasons, `duplicate of row ${firstAt} (key "${key}")`],
         };
         summary.duplicates += 1;
-      } else if (key) {
-        seenKeys.set(key, row.rowNo);
+      } else {
+        if (key) seenKeys.set(key, row.rowNo);
+
+        // AFLDB-ISSUE-306: the same record named under two spellings (a club and a recorded alias of it)
+        // passes the cell-text key above; the key the database writes to is built from what validation
+        // resolved. Only a row that resolved anything is checked, and the first row keeps its verdict.
+        const resolvedKey = verdict.verdict !== 'error' && verdict.resolved
+          ? spec.resolvedKey?.(row.payload, verdict.resolved) ?? null
+          : null;
+        if (resolvedKey) {
+          const firstResolvedAt = seenResolvedKeys.get(resolvedKey);
+          if (firstResolvedAt !== undefined) {
+            verdict = {
+              ...verdict,
+              verdict: 'error' as const,
+              reasons: [
+                ...verdict.reasons,
+                `duplicate of row ${firstResolvedAt}: the same record once names are resolved (key "${resolvedKey}")`,
+              ],
+            };
+            summary.duplicates += 1;
+          } else {
+            seenResolvedKeys.set(resolvedKey, row.rowNo);
+          }
+        }
       }
 
       if (verdict.verdict === 'error') summary.errors += 1;

@@ -96,6 +96,19 @@ export type DatasetSpec = {
   requiredColumns: string[];
   /** Duplicate keys within one file are an error. */
   fileKey: (row: Record<string, string | null>) => string;
+  /**
+   * AFLDB-ISSUE-306: optional. The key this row writes to in the database,
+   * built from what validation RESOLVED (club identities, match, player), not
+   * from the cell text. `fileKey` compares the cells as typed, so two rows that
+   * name one record under two spellings (a club and a recorded alias of it)
+   * pass it; this catches them. Returns null for a row that resolved nothing
+   * keyed. Only a dataset whose database key is built from resolved names or
+   * ids defines it.
+   */
+  resolvedKey?: (
+    row: Record<string, string | null>,
+    resolved: Record<string, number | string | null>,
+  ) => string | null;
   validateRow: (
     row: Record<string, string | null>,
     context: ValidationContext,
@@ -946,10 +959,19 @@ const matchResults: DatasetSpec = {
   ],
   // AFLDB-ISSUE-272: the canonical round, so `R1` and `1` for one fixture in one file are duplicates
   // (both now promote to the same match). A row whose round is refused keeps its raw text; it is an error
-  // row anyway. Club spellings are still compared raw (AFLDB-ISSUE-306).
+  // row anyway. Club spellings are compared raw here; `resolvedKey` below catches an alias of the same club
+  // (AFLDB-ISSUE-306).
   fileKey: (row) => {
     const round = readMatchResultsRound(row.round_code, toIntOrNull(row.round_number ?? null));
     return `${row.season}|${round.ok ? round.roundCode : row.round_code}|${row.match_date}|${row.home_club}|${row.away_club}`;
+  },
+  // AFLDB-ISSUE-306: the database key (resolved club names, canonical round), so one fixture named under a club
+  // and a recorded alias of it is a duplicate too. The same string preparePromotion locks on and promoteRow writes.
+  resolvedKey: (row, resolved) => {
+    const { season, round_code: roundCode, home_club_name: homeName, away_club_name: awayName } = resolved;
+    if (typeof season !== 'number' || typeof roundCode !== 'string'
+      || typeof homeName !== 'string' || typeof awayName !== 'string' || !row.match_date) return null;
+    return matchResultsKey(season, roundCode, row.match_date, homeName, awayName);
   },
 
   async validateRow(row, { sql, matchResultsAuthority }) {
@@ -1378,6 +1400,13 @@ const playerMatchStats: DatasetSpec = {
   requiredColumns: ['season', 'round_code', 'home_club', 'away_club', 'player', 'club'],
   fileKey: (row) =>
     `${row.season}|${row.round_code}|${row.home_club}|${row.away_club}|${row.player}|${row.club}`,
+  // AFLDB-ISSUE-306: the upsert key is (player_id, match_id), both resolved, so a club or player named under two
+  // spellings in one file is still one record.
+  resolvedKey: (_row, resolved) => (
+    isPositiveInt(resolved.match_id) && isPositiveInt(resolved.player_id)
+      ? `player #${resolved.player_id} in match #${resolved.match_id}`
+      : null
+  ),
 
   async validateRow(row, { sql, matchSheetAuthority }) {
     // AFLDB-ISSUE-258: every optional count is read before any lookup, so a
@@ -1481,6 +1510,29 @@ const playerMatchStats: DatasetSpec = {
     const bad = rows.find((row) => !isPositiveInt(row.resolved.match_id) || !isPositiveInt(row.resolved.player_id));
     if (bad) {
       throw new Error(`Row ${bad.rowNo} carries no resolved match or player; re-validate the submission.`);
+    }
+    // AFLDB-ISSUE-306: one row per (player, match), checked across the whole file on the very key promoteRow's
+    // ON CONFLICT uses, before any lock or write. A submission validated before the fix compared the cells as
+    // typed, so one player-match named under a club and a recorded alias of it (or two spellings of the player)
+    // can both be stored `ok`; the second would silently overwrite the first and both would be counted. Refused
+    // whole, even with identical values: no winner is chosen.
+    const rowsOfPair = new Map<string, number[]>();
+    for (const row of rows) {
+      const key = `player #${row.resolved.player_id} in match #${row.resolved.match_id}`;
+      const claimed = rowsOfPair.get(key);
+      if (claimed === undefined) rowsOfPair.set(key, [row.rowNo]);
+      else claimed.push(row.rowNo);
+    }
+    const collisions = [...rowsOfPair].filter(([, rowNos]) => rowNos.length > 1)
+      .map(([key, rowNos]) => `rows ${rowNos.join(', ')} are all ${key}`);
+    if (collisions.length > 0) {
+      const shown = collisions.slice(0, 10).join('; ');
+      const more = collisions.length > 10 ? `; and ${collisions.length - 10} more` : '';
+      throw new Error(
+        `Nothing was promoted: ${collisions.length} player-match pair(s) are claimed by more than one row `
+        + `(${shown}${more}). A player may appear once per match in a file, whatever the club or name spelling and `
+        + 'even with identical values; the stored verdicts did not catch it. Upload a corrected file as a new submission.',
+      );
     }
     const matchIds = [...new Set(rows.map((row) => Number(row.resolved.match_id)))].sort((a, b) => a - b);
 

@@ -54,6 +54,8 @@ type StoredBreakdown = {
 const CLUBS: Record<string, { id: number; name: string }> = {
   'Home FC': { id: 1, name: 'Home FC' },
   'Away FC': { id: 2, name: 'Away FC' },
+  // A recorded alias of Home FC (AFLDB-ISSUE-306): resolves to the same club, under a different spelling.
+  'Home Alias': { id: 1, name: 'Home FC' },
 };
 
 /**
@@ -924,7 +926,9 @@ describe('AFLDB-ISSUE-264 player_match_stats against durable Match Sheet authori
 
     it('admits identical and absent protected values at promotion', async () => {
       const { sql } = promotionSql([rec('match_sheet', { goals: 3, club_slug: 'home-fc' })]);
-      await expect(prepare([row({ goals: 3 }), row({ goals: null }, 2)], sql)).resolves.toBeUndefined();
+      // Two submissions, not two rows: ISSUE-306 refuses one player-match claimed by two rows in a file.
+      await expect(prepare([row({ goals: 3 })], sql)).resolves.toBeUndefined();
+      await expect(prepare([row({ goals: null })], sql)).resolves.toBeUndefined();
     });
 
     it('refuses a durable addition whose row is missing, and keeps one whose row exists', async () => {
@@ -1588,5 +1592,143 @@ describe('AFLDB-ISSUE-271 match_results against active Data Editor authority', (
       expect(malformed.reasons[0]).toContain('home_goals "1O"');
       expect(keys).toEqual([]);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-306 -- duplicate detection on the resolved key
+// ---------------------------------------------------------------------------
+// `fileKey` compares the cells as typed. One fixture (or one player-match) named
+// under a club and a recorded alias of it passed it, both rows validated, and
+// the second silently overwrote the first at promotion. `resolvedKey` is the key
+// the database writes to, built from what validation resolved; the pipeline's
+// use of it is covered in tests/submission-review-actions.test.ts.
+
+describe('AFLDB-ISSUE-306 resolved keys', () => {
+  const resolvedKeyOf = async (spec: typeof matchResults, row: Record<string, string | null>) => {
+    const verdict = await spec.validateRow(row, {
+      sql: fakeSql().sql, matchSheetAuthority: noAuthority, matchResultsAuthority: noMatchAuthority,
+    });
+    return { verdict, key: verdict.resolved ? spec.resolvedKey!(row, verdict.resolved) : null };
+  };
+
+  describe('match_results', () => {
+    it('sees one fixture under a club and its alias as one record, where the cell-text key sees two', async () => {
+      const plain = matchRow();
+      const aliased = matchRow({ home_club: 'Home Alias' });
+      expect(matchResults.fileKey(plain)).not.toBe(matchResults.fileKey(aliased));
+
+      const a = await resolvedKeyOf(matchResults, plain);
+      const b = await resolvedKeyOf(matchResults, aliased);
+      expect(a.verdict.verdict).not.toBe('error');
+      expect(b.verdict.verdict).not.toBe('error');
+      expect(a.key).toBe('2073|1|2073-03-01|Home FC|Away FC');
+      expect(b.key).toBe(a.key);
+    });
+
+    it('also joins a round spelling and a club alias in one row', async () => {
+      const a = await resolvedKeyOf(matchResults, matchRow({ round_code: 'R1', round_number: '1' }));
+      const b = await resolvedKeyOf(matchResults, matchRow({ round_code: '1', round_number: '1', home_club: 'Home Alias' }));
+      expect(b.key).toBe(a.key);
+    });
+
+    it.each<[string, Record<string, string | null>]>([
+      ['another date', { match_date: '2073-03-08' }],
+      ['another round', { round_code: 'R2', round_number: '2' }],
+      ['another season', { season: '2074' }],
+      ['the clubs the other way round', { home_club: 'Away FC', away_club: 'Home FC' }],
+    ])('keeps %s a different record', async (_label, extra) => {
+      const base = await resolvedKeyOf(matchResults, matchRow());
+      const other = await resolvedKeyOf(matchResults, matchRow(extra));
+      expect(other.key).not.toBeNull();
+      expect(other.key).not.toBe(base.key);
+    });
+
+    it('gives no key to a row that resolved nothing, or that lacks the pieces', () => {
+      expect(matchResults.resolvedKey!(matchRow(), {})).toBeNull();
+      const resolved = {
+        season: 2073, round_code: '1', home_club_name: 'Home FC', away_club_name: 'Away FC',
+      };
+      expect(matchResults.resolvedKey!(matchRow(), resolved)).toBe('2073|1|2073-03-01|Home FC|Away FC');
+      expect(matchResults.resolvedKey!(matchRow({ match_date: null }), resolved)).toBeNull();
+      expect(matchResults.resolvedKey!(matchRow(), { ...resolved, home_club_name: null })).toBeNull();
+      expect(matchResults.resolvedKey!(matchRow(), { ...resolved, season: '2073' })).toBeNull();
+    });
+  });
+
+  describe('player_match_stats', () => {
+    it('sees one player-match under a club and its alias as one record, where the cell-text key sees two', async () => {
+      const plain = statsRow();
+      const aliased = statsRow({ home_club: 'Home Alias', club: 'Home Alias' });
+      expect(playerMatchStats.fileKey(plain)).not.toBe(playerMatchStats.fileKey(aliased));
+
+      const a = await resolvedKeyOf(playerMatchStats, plain);
+      const b = await resolvedKeyOf(playerMatchStats, aliased);
+      expect(a.verdict.verdict).toBe('ok');
+      expect(b.verdict.verdict).toBe('ok');
+      expect(a.key).toBe('player #900 in match #500');
+      expect(b.key).toBe(a.key);
+    });
+
+    it('keeps another player or another match a different record', () => {
+      const key = (resolved: Record<string, number | string | null>) => playerMatchStats.resolvedKey!(statsRow(), resolved);
+      expect(key({ match_id: 500, player_id: 900 })).not.toBe(key({ match_id: 500, player_id: 901 }));
+      expect(key({ match_id: 500, player_id: 900 })).not.toBe(key({ match_id: 501, player_id: 900 }));
+    });
+
+    it('gives no key to a row that resolved no match or player', () => {
+      expect(playerMatchStats.resolvedKey!(statsRow(), {})).toBeNull();
+      expect(playerMatchStats.resolvedKey!(statsRow(), { match_id: 500, player_id: null })).toBeNull();
+      expect(playerMatchStats.resolvedKey!(statsRow(), { match_id: 0, player_id: 900 })).toBeNull();
+    });
+  });
+
+  it('is defined only where the database key is built from resolved names or ids', () => {
+    expect(Object.values(DATASETS).filter((spec) => spec.resolvedKey).map((spec) => spec.key).sort())
+      .toEqual(['match_results', 'player_match_stats']);
+  });
+});
+
+describe('AFLDB-ISSUE-306 player_match_stats promotion refuses two rows on one player-match', () => {
+  const rowOf = (rowNo: number, resolved: Record<string, number | string | null>, extra: Record<string, string | null> = {}): PromotionRow => ({
+    rowNo,
+    payload: statsRow(extra),
+    resolved: { match_id: 500, player_id: 900, club_id: 1, ...resolved },
+  });
+  const unreachableSql = () => {
+    const calls: string[] = [];
+    const tag = (strings: TemplateStringsArray) => {
+      calls.push(strings.join('?'));
+      throw new Error('SQL_REACHED');
+    };
+    return { sql: tag as unknown as Sql, calls };
+  };
+  const prepare = (rows: PromotionRow[], sql: Sql) => playerMatchStats.preparePromotion!(rows, { sql });
+
+  it('refuses the whole submission before any lock or query, even with identical values', async () => {
+    const { sql, calls } = unreachableSql();
+    // Row 2 names the same club by an alias; a submission validated before the fix stored both `ok`.
+    const rows = [rowOf(1, {}), rowOf(2, {}, { home_club: 'Home Alias', club: 'Home Alias' })];
+    await expect(prepare(rows, sql)).rejects.toThrow(
+      /Nothing was promoted: 1 player-match pair\(s\) are claimed by more than one row \(rows 1, 2 are all player #900 in match #500\)/,
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it('names every collision (up to ten) and counts the rest', async () => {
+    const { sql } = unreachableSql();
+    const rows: PromotionRow[] = [];
+    for (let match = 1; match <= 12; match += 1) {
+      rows.push(rowOf(rows.length + 1, { match_id: 500 + match }), rowOf(rows.length + 1, { match_id: 500 + match }));
+    }
+    await expect(prepare(rows, sql)).rejects.toThrow(/12 player-match pair\(s\).*; and 2 more\)/);
+  });
+
+  it('does not refuse different players, or the same player in different matches', async () => {
+    const { sql, calls } = unreachableSql();
+    const rows = [rowOf(1, {}), rowOf(2, { player_id: 901 }), rowOf(3, { match_id: 501 })];
+    // Past the collision check the hook goes to the database, which this stub refuses.
+    await expect(prepare(rows, sql)).rejects.toThrow('SQL_REACHED');
+    expect(calls.length).toBeGreaterThan(0);
   });
 });
