@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and validated on `afldb_test` 2026-10-15 (§17); not deployed.
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Implemented and merged as `f43d4d59` (fix, tests and records), validated on `afldb_test` (§17), merged and pushed (§18). **Not deployed.**
 - **Severity:** Low. **Area:** admin Brownlow.
 - **Key file:** `src/db/queries/admin-brownlow.ts` (`selectSeasonAggregates`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-019; partition note R2a-F03). The orchestrator confirmed that `player-derived.ts:651` (coverage) uses the facts rule and is unaffected.
@@ -101,3 +101,11 @@ None.
 ### 17.4 Limits
 
 - Not deployed; no browser, DEV or PROD action; the season page and list were not rendered. The whole `admin-brownlow` integration file was not run (the migration, concurrency and reload-precedence blocks are outside the change); the blocks named in §17.3 were. A `final` match whose facts are not a complete 3/2/1 is no longer counted as accounted by the aggregate; that is the gate's own rule, and no fixture or finalise path produces such a match.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 284` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue284\preflight-1.txt`). `npm run merge:ready -- --issue 284` (raw, unchanged: `D:\tmp\issue284\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The nine committed paths were compared with the declared scope by hand: the three source files, the three test files, this runbook, `issues.md` and `IssuesIndex.md`.
+- **Exception (fresh, this issue only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state: the nine `.agents/skills` files, the seven zero-byte stray-named files (`0)`, ``20` ``, ``` `path ```, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`, `void`), the literal `$null)` and the zero-byte `2000)`. Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
+- **Merge.** `f43d4d59` fast-forwarded onto `main` and was pushed (`c675ebe2..f43d4d59`); local `main` and `git ls-remote origin refs/heads/main` both equalled `f43d4d59` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit. §14 asks for an integration case in which a draft on an imported match leaves the season complete and publish accepted; it exists and passes on `afldb_test` (§17.2, §17.3). The closure scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**.
+- **Preserved limits.** Not deployed. No browser, DEV or PROD action; the season page and list were not rendered. The whole `admin-brownlow` integration file was not run. The case runs on its own seeded season (2075) because the shared reserved seasons are mutated by earlier cases.
