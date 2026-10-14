@@ -1026,6 +1026,16 @@ async function findingsFor(providerId: string): Promise<FindingRow[]> {
   `;
 }
 
+/** Every data_issues row naming the provider match that is closed, as `issue_type:resolution`, sorted. */
+async function closedFindingsOf(providerId: string): Promise<string[]> {
+  const rows = await sql<{ issueType: string; resolution: string | null }[]>`
+    SELECT issue_type AS "issueType", resolution::text AS resolution
+      FROM data_issues
+     WHERE issue_key LIKE ${`%|${providerId}|%`} AND resolved_at IS NOT NULL
+  `;
+  return rows.map((row) => `${row.issueType}:${row.resolution}`).sort();
+}
+
 async function onlyFinding(providerId: string): Promise<FindingRow> {
   const rows = await findingsFor(providerId);
   expect(rows).toHaveLength(1);
@@ -1154,6 +1164,8 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
 
     const resolved = await onlyFinding(providerId);
     expect(resolved).toMatchObject({ id: opened.id, resolved: true, resolution: 'source_agreement_restored' });
+    // AFLDB-ISSUE-293: the closed finding is counted (the call's result was discarded).
+    expect(third.counters.dataIssuesResolved).toBe(1);
 
     const periods = await periodRowsOf(matchKey);
     expect(periods).toHaveLength(8);
@@ -1245,6 +1257,14 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
     expect(healed.halt).toBeNull();
     expect(healed.counters.canonicalApplyFailures).toBe(0);
     expect(await onlyFinding(providerId)).toMatchObject({ id: opened.id, resolved: true, resolution: 'source_agreement_restored' });
+    // Two findings close in this run and both are counted (AFLDB-ISSUE-293): the match-identity
+    // refusal the blocked run opened (healed on the way in) and the period-scores contradiction
+    // this roster now disproves (which used to be closed without being counted).
+    expect(await closedFindingsOf(providerId)).toEqual([
+      'afl_api_match_identity_refusal:match_identity_resolved',
+      'afl_api_period_scores_contradiction:source_agreement_restored',
+    ]);
+    expect(healed.counters.dataIssuesResolved).toBe(2);
     const periods = await periodRowsOf(matchKey);
     expect(periods).toHaveLength(8);
     expect(periods.filter((p) => p.clubId === homeClubId).map((p) => p.points)).toEqual([31, 67, 77, 122]);
@@ -1317,6 +1337,7 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
     expect(restored.counters.corroboratedForeignOwned).toBe(1);
     expect(restored.counters.canonicalRowsInserted).toBe(0);
     expect(restored.counters.canonicalRowsUpdated).toBe(0);
+    expect(restored.counters.dataIssuesResolved).toBe(1);
     expect(await onlyFinding(providerId)).toMatchObject({
       id: opened.id, resolved: true, resolution: 'source_agreement_restored',
     });

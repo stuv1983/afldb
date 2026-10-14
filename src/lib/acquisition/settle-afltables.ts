@@ -1897,7 +1897,9 @@ export async function runSettleAfltables(
       // and count the rows PostgreSQL actually updated rather than the keys
       // planned — an ownership or already-resolved mismatch must show as a
       // resolution that did not happen.
-      counters.dataIssuesResolved = await resolveRestoredDisagreements(tx, restoredKeys);
+      // ISSUE-293: `+=`, not `=`. Healed `canonical_apply_failed` findings were
+      // already added to this counter while the run applied; assigning here threw them away.
+      counters.dataIssuesResolved += await resolveRestoredDisagreements(tx, restoredKeys);
 
       // AFLDB-ISSUE-122 §13 / S6. The derived recompute: ONCE per run, after
       // every family, season-scoped, and only when a canonical row actually
@@ -1947,9 +1949,16 @@ export async function runSettleAfltables(
       // (migration 001: running | completed | failed | rolled_back), and the
       // partial index `ix_import_batches_status` keys on it. There is no
       // 'succeeded' member and never was.
+      // ISSUE-294: `clock_timestamp()`, not `now()`. `now()` is the transaction start,
+      // which is exactly `started_at`, so every batch looked instantaneous (the same fix
+      // `finalizeSettleImportBatch` made for AFL API). `records_inserted` is the versions this
+      // run appended to the append-only `staging.source_record_versions`; an unchanged replay
+      // is neither an insert nor an update, so `records_updated` is 0 by construction.
       await tx`
         UPDATE import_batches
-           SET completed_at = now(), status = 'completed',
+           SET completed_at = clock_timestamp(), status = 'completed',
+               records_inserted = ${counters.versionsAppended},
+               records_updated = 0,
                records_rejected = ${rejected.n},
                validation_result = ${tx.json(counters as never)}
          WHERE id = ${runBatchId}

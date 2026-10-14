@@ -1615,6 +1615,58 @@ describe('AFLDB-ISSUE-228 S6 — settle-afl-api.ts against afldb_test', () => {
     expect(typed.n).toBe(0);
   });
 
+  it('§19.1 (AFLDB-ISSUE-293): a score disagreement with the owner opens a finding, and agreement restored closes it and is counted', async () => {
+    const providerId = CASE_IDS.corroborateDisagree;
+    const matchKey = matchKeyFor(providerId);
+    const [ownedMatch] = await sql<{ id: number }[]>`
+      INSERT INTO matches (
+        match_key, season, round_code, round_number, round_type, is_final,
+        match_date, venue_id, venue_raw, home_club_id, away_club_id,
+        home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
+        result, winner_club_id, margin,
+        attendance, attendance_status, attendance_source_id,
+        source_id, source_record_id
+      ) VALUES (
+        ${matchKey}, ${SEASON}, 'PF', ${null}, 'preliminary_final', true,
+        ${matchDateFor(providerId)}, ${venueId}, 'MCG', ${homeClubId}, ${awayClubId},
+        14, 16, 100, 20, 11, 131,
+        'away_win', ${awayClubId}, 31,
+        NULL, 'not_collected', NULL,
+        ${afltablesSourceId}, ${providerId}
+      ) RETURNING id
+    `;
+    const settle = () => runSettleAflApi(sql, {
+      bundle: buildBundle([unitSourceFor(providerId)], registry, identities),
+      registry, apply: true, autoApply: true, inProgressSeasons: [SEASON],
+    });
+    const findings = () => sql<{ resolvedAt: string | null; resolution: string | null }[]>`
+      SELECT resolved_at::text AS "resolvedAt", resolution FROM data_issues
+       WHERE issue_type = 'afl_api_settle' AND issue_key = ${`afl_api|match|${providerId}|matches`}
+    `;
+
+    // The owner says 100-131; the fixture says 122-131. Observed, not written.
+    const disagreeing = await settle();
+    expect(disagreeing.halt).toBeNull();
+    expect(disagreeing.counters.corroboratedForeignOwned).toBe(1);
+    expect(disagreeing.counters.dataIssuesOpened).toBe(1);
+    expect(disagreeing.counters.dataIssuesResolved).toBe(0);
+    expect(await findings()).toEqual([{ resolvedAt: null, resolution: null }]);
+
+    // The owner is corrected to agree; the same observation now restores agreement.
+    await sql`
+      UPDATE matches SET home_goals = 19, home_behinds = 8, home_score = 122,
+                         result = 'away_win', margin = 9
+       WHERE id = ${ownedMatch.id}
+    `;
+    const restored = await settle();
+    expect(restored.halt).toBeNull();
+    expect(restored.counters.corroboratedForeignOwned).toBe(1);
+    expect(restored.counters.dataIssuesOpened).toBe(0);
+    // AFLDB-ISSUE-293: counted (the call's result was discarded).
+    expect(restored.counters.dataIssuesResolved).toBe(1);
+    expect(await findings()).toEqual([{ resolvedAt: expect.any(String), resolution: 'source_agreement_restored' }]);
+  });
+
   it('§19.2: AFL Tables attendance enriches an afl_api-owned match without changing its ownership', async () => {
     const providerId = CASE_IDS.enrichment;
     const matchKey = matchKeyFor(providerId);
@@ -2218,6 +2270,8 @@ describe('AFLDB-ISSUE-228 S6 — settle-afl-api.ts against afldb_test', () => {
     expect(second.counters.venueProviderUnmapped).toBe(0);
     expect(second.counters.venueUnmapped).toBe(0);
     expect(second.counters.canonicalRowsInserted).toBeGreaterThan(0);
+    // AFLDB-ISSUE-293: the finding this run closes is counted (the call's result was discarded).
+    expect(second.counters.dataIssuesResolved).toBe(1);
 
     const [match] = await sql<{ venueId: number | null; venueRaw: string }[]>`
       SELECT venue_id AS "venueId", venue_raw AS "venueRaw" FROM matches WHERE match_key = ${matchKeyFor(providerId)}

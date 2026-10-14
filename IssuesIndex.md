@@ -465,11 +465,15 @@
 
 ### AFLDB-ISSUE-293 — Settle runs under-report `dataIssuesResolved`
 - **Severity:** Low. **Area:** acquisition / settle accounting. **State:** Open (2026-10-08), F-028; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-293.md`. **Next action:** implementation (trivial).
+- **State (2026-10-15):** implemented on `sonnet/issue-293-294` with ISSUE-294 and validated on `afldb_test` (6 integration cases assert the
+  count and fail on the unfixed source; 4 of 4 mutants killed; fixture census unchanged); not deployed.
+- **Runbook:** `issues/open/AFLDB-ISSUE-293.md` §17. **Next action:** merge, then close (merge-scoped).
 
 ### AFLDB-ISSUE-294 — AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count
 - **Severity:** Low. **Area:** acquisition / import batch accounting. **State:** Open (2026-10-08), F-029; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-294.md`. **Next action:** implementation.
+- **State (2026-10-15):** implemented on `sonnet/issue-293-294` with ISSUE-293 and validated on `afldb_test` (AFL Tables and lineup-store batch
+  assertions plus a DB-free guard over three writers; 7 of 7 mutants killed; fixture census unchanged); not deployed.
+- **Runbook:** `issues/open/AFLDB-ISSUE-294.md` §17. **Next action:** merge, then close (merge-scoped).
 
 ### AFLDB-ISSUE-295 — Settle exception report mixes both sources' apply-failure findings
 - **Severity:** Low. **Area:** acquisition / settle reporting — `src/lib/acquisition/settle-report.ts`. **State:** Open

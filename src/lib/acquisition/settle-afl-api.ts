@@ -732,10 +732,11 @@ function periodScoresIssueKeyOf(externalRecordId: string): string {
  * Shared by the planned and the corroborated match branches so the two cannot drift.
  */
 async function resolvePeriodScoresFindingOnPositiveEvidence(
-  tx: Tx, bundle: AflApiMatchBundle, rosterPlan: AflApiRosterFamilyPlan,
+  tx: Tx, bundle: AflApiMatchBundle, rosterPlan: AflApiRosterFamilyPlan, counters: AflApiSettleCounters,
 ): Promise<void> {
   if (rosterPlan.status !== 'planned' || bundle.periodScoresReproduceFinalScore !== true) return;
-  await resolveRestoredDisagreements(
+  // ISSUE-293: the rows actually closed are counted, as every other resolution here is.
+  counters.dataIssuesResolved += await resolveRestoredDisagreements(
     tx, PERIOD_SCORES_ISSUE_TYPE, SETTLE_ISSUE_OWNER, new Set([periodScoresIssueKeyOf(bundle.match.sourceRecordId)]),
   );
 }
@@ -1448,7 +1449,9 @@ async function settleMatchUnit(
         },
       }, counters);
     } else {
-      await resolveRestoredDisagreements(tx, SETTLE_ISSUE_TYPE, SETTLE_ISSUE_OWNER, new Set([issueKey]));
+      counters.dataIssuesResolved += await resolveRestoredDisagreements(
+        tx, SETTLE_ISSUE_TYPE, SETTLE_ISSUE_OWNER, new Set([issueKey]),
+      );
     }
     // AFLDB-ISSUE-276: afl_api never writes a corroborated match's period scores, but a
     // contradiction finding opened while this match did not yet exist (a review-first
@@ -1458,7 +1461,7 @@ async function settleMatchUnit(
     // closes it exactly as on the planned path. A roster that still contradicts, has no
     // own-match score entry, is deferred or refused leaves it untouched: nothing is opened,
     // refreshed or resolved here without evidence.
-    await resolvePeriodScoresFindingOnPositiveEvidence(tx, bundle, plan.roster);
+    await resolvePeriodScoresFindingOnPositiveEvidence(tx, bundle, plan.roster, counters);
     // I244-F030: a corroborated (foreign-owned) match is never applied, so an
     // apply-time `canonical_apply_failed` refusal an earlier run left for its
     // `matches` / `match_period_scores` targets — the `possible_existing_match`
@@ -1498,7 +1501,7 @@ async function settleMatchUnit(
         reason: venueProviderUnmapped ? 'provider_unmapped' : 'legacy_name_unresolved',
       }, counters);
     } else {
-      await resolveRestoredDisagreements(
+      counters.dataIssuesResolved += await resolveRestoredDisagreements(
         tx, VENUE_IDENTITY_ISSUE_TYPE, SETTLE_ISSUE_OWNER,
         new Set([settleIssueKey(SETTLE_SOURCE_KEY, 'match', bundle.match.sourceRecordId, 'venue_id')]),
       );
@@ -1541,7 +1544,7 @@ async function settleMatchUnit(
       // Resolved only on POSITIVE evidence that the roster now reproduces the fixture's
       // final score. A `planned` roster with a `null` check (no own-match score entry) is
       // skipped, not corrected: absent evidence leaves an earlier finding open.
-      await resolvePeriodScoresFindingOnPositiveEvidence(tx, bundle, plan.roster);
+      await resolvePeriodScoresFindingOnPositiveEvidence(tx, bundle, plan.roster, counters);
       const periodProposed = proposedPeriodScoreValues(bundle.roster.periodScores, matchIdentity);
       if (periodProposed !== null) {
         const currentPeriods = plan.roster.targetMatchId === null ? null : await currentPeriodScoreValues(tx, plan.roster.targetMatchId);

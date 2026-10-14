@@ -32,8 +32,8 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
-| AFLDB-ISSUE-293 | Settle runs under-report `dataIssuesResolved` | Low | Acquisition / settle run accounting | Open (2026-10-08); review F-028, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-293.md` | Implementation (trivial) |
-| AFLDB-ISSUE-294 | AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count | Low | Acquisition / import batch accounting | Open (2026-10-08); review F-029, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-294.md` | Implementation |
+| AFLDB-ISSUE-293 | Settle runs under-report `dataIssuesResolved` | Low | Acquisition / settle run accounting | Open (2026-10-08); review F-028, code-proven; imported 2026-10-10; implemented and validated on `afldb_test` 2026-10-15 with ISSUE-294, not deployed; runbook `issues/open/AFLDB-ISSUE-293.md` §17 | Merge, then close (merge-scoped) |
+| AFLDB-ISSUE-294 | AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count | Low | Acquisition / import batch accounting | Open (2026-10-08); review F-029, code-proven; imported 2026-10-10; implemented and validated on `afldb_test` 2026-10-15 with ISSUE-293, not deployed; runbook `issues/open/AFLDB-ISSUE-294.md` §17 | Merge, then close (merge-scoped) |
 | AFLDB-ISSUE-295 | Settle exception report mixes both sources' apply-failure findings | Low | Acquisition / settle reporting — `src/lib/acquisition/settle-report.ts` | Open (2026-10-08); review F-030, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-295.md` | Implementation (trivial) |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
@@ -50914,7 +50914,16 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / settle run accounting. Key files:
   `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/settle-afl-api.ts`. **Runbook:**
   `issues/open/AFLDB-ISSUE-293.md`.
-- **Origin.** Review F-028 (R4a-F03) at `20a7a4bb`. Code-proven. **Next action.** Implementation (trivial).
+- **Origin.** Review F-028 (R4a-F03) at `20a7a4bb`. Code-proven. ~~**Next action.** Implementation (trivial).~~ Superseded below.
+- **Implementation (2026-10-15; branch `sonnet/issue-293-294`, base `359d403c`; not deployed).** The AFL Tables run adds its end-of-run restored
+  count to `dataIssuesResolved` instead of assigning it, and the AFL API run adds the counts of its three discarded
+  `resolveRestoredDisagreements` calls (match-score restore, venue-identity restore, period-scores helper). Only the counting changed.
+  Runbook §17.
+- **Validation (`afldb_test`, 15 Oct 2026; runbook §17.3).** Integration cases through a launcher that proved `current_database() =
+  afldb_test` for the owner, importer and auth roles before any write: a new AFL Tables heal case, a new AFL API score-disagreement
+  restore case, the venue self-heal case and the three ISSUE-276 restore runs now assert the count; the same cases fail on the unfixed
+  source; 4 of 4 mutants are killed. Fixture census unchanged (12 pre-existing S6 batches untouched). `tsc --noEmit` and
+  `git diff --check` exit 0; ESLint reports the same 20 problems as unchanged `main`. Files were run by filter, not whole.
 
 ## AFLDB-ISSUE-294 — AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count
 
@@ -50923,7 +50932,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `src/lib/external-afl/current-season-import.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-294.md`.
 - **Origin.** Review F-029 (R4a-F04) at `20a7a4bb`. Code-proven.
 - **Defect.** `completed_at = now()` inside the run transaction equals `started_at`, and the counts stay 0; `settle-core.ts`
-  already fixed both for AFL API. **Next action.** Implementation.
+  already fixed both for AFL API. ~~**Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-15; branch `sonnet/issue-293-294`, base `359d403c`; not deployed).** The AFL Tables settle closes its batch with
+  `clock_timestamp()`, `records_inserted = versionsAppended` and `records_updated = 0`; the lineup store and the fallback importer
+  close with `clock_timestamp()` (their record counts were already written). No migration, no repair of earlier batches. The legacy CSV
+  promotion batch (`pipeline.ts`, ISSUE-307) is left alone. Runbook §17.
+- **Validation (`afldb_test`, 15 Oct 2026; runbook §17.3).** The AFL Tables first-apply case and the lineup-store batch case assert the
+  counts and `completed_at > started_at`; a DB-free source-contract case covers all three writers (the fallback importer by SQL text
+  only); all fail on the unfixed source and 7 of 7 mutants are killed. Fixture census unchanged (12 pre-existing S6 batches untouched).
+  `tsc --noEmit` and `git diff --check` exit 0; ESLint reports the same 20 problems as unchanged `main`.
 
 ## AFLDB-ISSUE-295 — Settle exception report mixes both sources' apply-failure findings
 

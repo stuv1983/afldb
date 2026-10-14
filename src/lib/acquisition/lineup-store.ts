@@ -484,7 +484,7 @@ export async function persistLineupBundle(
          SET records_inserted = ${counters.projectionsInserted},
              records_updated  = ${counters.projectionsUpdated},
              records_rejected = 0,
-             completed_at = now(),
+             completed_at = clock_timestamp(),
              status = 'completed'
        WHERE id = ${runBatchId}
     `;

@@ -449,13 +449,16 @@ describe('afl_api.lineup persistence', () => {
     expect(typeof batchId).toBe('string');
     const [batch] = await sql<{
       sourceKey: string; tool: string; targetTable: string;
-      recordsRead: number; status: string;
+      recordsRead: number; status: string; completedAfterStart: boolean;
     }[]>`
       SELECT s.key AS "sourceKey", b.tool, b.target_table AS "targetTable",
-             b.records_read::int AS "recordsRead", b.status::text AS status
+             b.records_read::int AS "recordsRead", b.status::text AS status,
+             (b.completed_at > b.started_at) AS "completedAfterStart"
         FROM import_batches b JOIN sources s ON s.id = b.source_id
        WHERE b.id = ${batchId}
     `;
+    // AFLDB-ISSUE-294: `now()` made completion equal to start; the real instant is later.
+    expect(batch.completedAfterStart).toBe(true);
     expect(batch.sourceKey).toBe('afl_api');
     expect(batch.tool).toBe('lineup-store.ts');
     expect(batch.targetTable).toBe('staging.afl_api_lineup');

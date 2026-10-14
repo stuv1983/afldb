@@ -1206,15 +1206,26 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     // refusal above, so three since ISSUE-106 rather than four.
     expect(await countLike('import_rejections', 'source_record_id', `${PREFIX}%`)).toBe(3);
 
-    const [batchRow] = await sql<
-      { status: string; recordsRead: number; recordsRejected: number }[]
-    >`
+    const [batchRow] = await sql<{
+      status: string; recordsRead: number; recordsRejected: number;
+      recordsInserted: number; recordsUpdated: number; completedAfterStart: boolean;
+    }[]>`
       SELECT status, records_read::int AS "recordsRead",
-             records_rejected::int AS "recordsRejected"
+             records_rejected::int AS "recordsRejected",
+             records_inserted::int AS "recordsInserted",
+             records_updated::int AS "recordsUpdated",
+             (completed_at > started_at) AS "completedAfterStart"
         FROM import_batches WHERE id = ${result.batchId}
     `;
     expect(batchRow.status).toBe('completed');
     expect(batchRow.recordsRead).toBe(3);
+    // AFLDB-ISSUE-294: the batch records the versions it appended and a completion instant
+    // that is later than its start (`now()` made them equal); the table is append-only, so
+    // nothing is an update.
+    expect(result.counters.versionsAppended).toBeGreaterThan(0);
+    expect(batchRow.recordsInserted).toBe(result.counters.versionsAppended);
+    expect(batchRow.recordsUpdated).toBe(0);
+    expect(batchRow.completedAfterStart).toBe(true);
     // Migration 001: records_rejected must equal the number of
     // import_rejections rows for the batch — the three asserted above, not the
     // bundle's single rejected record.
@@ -2159,6 +2170,10 @@ const T122 = {
   dateOnlyRerun: '2093-05-13T00:00:00Z',
   renderingBefore: '2093-05-14T00:00:00Z',
   renderingAfter: '2093-05-15T00:00:00Z',
+  // AFLDB-ISSUE-293 — a refused rekey, then the same fixture applied once its cause is gone.
+  healBefore: '2093-05-16T00:00:00Z',
+  healRefused: '2093-05-17T00:00:00Z',
+  healApplied: '2093-05-18T00:00:00Z',
 } as const;
 
 type Ids122 = {
@@ -4842,6 +4857,46 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
       // the ordinary fail-closed path and opens no rekey finding of its own.
       // What matters is that it wrote nothing, which is asserted above.
       expect(await rekeyFindings(RECORD_PLAYER)).toEqual([]);
+    });
+
+    it('counts a healed apply-failure finding in dataIssuesResolved (AFLDB-ISSUE-293)', async () => {
+      const SCOPE = 'issue122-293-heal';
+      const DATE = '2093-09-30';
+      const KEY_BEFORE = 'issue122-293-heal-key-81';
+      const KEY_AFTER = 'issue122-293-heal-key-82';
+      const RECORD_AFTER = 'issue122-293-heal-match-82';
+      const after = () => rekeyBundle({
+        scope: SCOPE, matchRecordId: RECORD_AFTER,
+        matchKey: KEY_AFTER, roundCode: '82', roundNumber: 82, date: DATE,
+      });
+
+      await apply122(rekeyBundle({
+        scope: SCOPE, matchRecordId: 'issue122-293-heal-match-81',
+        matchKey: KEY_BEFORE, roundCode: '81', roundNumber: 81, date: DATE,
+      }), T122.healBefore);
+
+      // Two live decisions, one under each rendering: the rekey is refused and a finding opens.
+      await seedOverride(KEY_BEFORE, 11111);
+      await seedOverride(KEY_AFTER, 22222);
+      const refused = await apply122(after(), T122.healRefused);
+      expect(refused.counters.canonicalRekeyRefusals).toBe(1);
+      expect(refused.counters.dataIssuesResolved).toBe(0);
+      expect(await rekeyFindings(RECORD_AFTER)).toEqual([
+        { refusal: 'rekey_override_conflict', targetTable: 'matches', resolvedAt: null },
+      ]);
+
+      // The cause is removed (one decision withdrawn) and the same observation is applied again:
+      // the rekey now proceeds, and the finding it had opened is closed by that apply. The
+      // run's disagreement pass restores nothing, so only the heal can make the counter 1.
+      await sql`
+        DELETE FROM data_overrides WHERE entity_type = 'matches' AND entity_key = ${KEY_AFTER}
+      `;
+      const healed = await apply122(after(), T122.healApplied);
+      expect(healed.counters.canonicalMatchesRekeyed).toBe(1);
+      expect(healed.counters.canonicalRekeyRefusals).toBe(0);
+      const [finding] = await rekeyFindings(RECORD_AFTER);
+      expect(finding.resolvedAt).not.toBeNull();
+      expect(healed.counters.dataIssuesResolved).toBe(1);
     });
 
     it('rekeys in place when only the match_date moves, and the identical rerun '

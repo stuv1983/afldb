@@ -123,6 +123,28 @@ describe('current-season external source import contracts', () => {
     expect(validationResult).toContain('rejectedOrConflicted: canonicalPlan.rejectedOrConflicted,');
   });
 
+  it('closes each import batch with the real completion instant and an honest count (AFLDB-ISSUE-294)', () => {
+    // `now()` is the transaction start, which is exactly `started_at`, so a batch closed with it
+    // looks instantaneous. The three writers that did so use `clock_timestamp()` (as the AFL API
+    // settle's `finalizeSettleImportBatch` already did); the AFL Tables settle also records the
+    // versions it appended instead of leaving the default 0.
+    const closeOf = (source: string): string => {
+      const at = source.indexOf('completed_at =');
+      expect(at, 'no completed_at assignment').toBeGreaterThan(-1);
+      return source.slice(Math.max(0, at - 200), at + 400);
+    };
+    const lineupStore = readSource('src/lib/acquisition/lineup-store.ts');
+    const afltablesSettle = readSource('src/lib/acquisition/settle-afltables.ts');
+    for (const [name, source] of [
+      ['current-season-import.ts', importer], ['lineup-store.ts', lineupStore],
+      ['settle-afltables.ts', afltablesSettle],
+    ] as const) {
+      expect(source, name).not.toMatch(/completed_at\s*=\s*now\(\)/);
+      expect(closeOf(source), name).toContain('completed_at = clock_timestamp()');
+    }
+    expect(closeOf(afltablesSettle)).toContain('records_inserted = ${counters.versionsAppended}');
+  });
+
   it('represents later source absence as state and never as deletion', () => {
     expect(store).toContain('SET absent_since = ${observedAt}');
     expect(store).toContain('AND absent_since IS NULL');

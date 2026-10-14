@@ -851,7 +851,7 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
     // or found in conflict) is not a rejection row; it stays in `validation_result`.
     await tx`
       UPDATE import_batches
-         SET completed_at = now(), status = 'completed',
+         SET completed_at = clock_timestamp(), status = 'completed',
              records_inserted = ${observationVersionsInserted},
              records_updated = ${observationHeadsRefreshed},
              records_rejected = 0,
