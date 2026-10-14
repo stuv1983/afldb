@@ -513,7 +513,8 @@
 ### AFLDB-ISSUE-300 — AFL API control-database read failure is reported as "disabled by a super admin"
 - **Severity:** Low. **Area:** acquisition / diagnostics — `src/lib/acquisition/afl-api-ingestion-control.ts`. **State:**
   Open (2026-10-08), F-035; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-300.md`. **Next action:** implementation.
+- **Runbook:** `issues/open/AFLDB-ISSUE-300.md` (§17, §17.1). **Next action:** merge and push (implemented 2026-10-14, DB-free
+  validated), then close.
 
 ### AFLDB-ISSUE-301 — AFL API HTTP client has no request timeout and reads the body outside its retry
 - **Severity:** Low. **Area:** acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts`. **State:** Open

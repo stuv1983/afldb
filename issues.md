@@ -42,7 +42,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-296 | Deprecated fallback importer sets `records_rejected` without rejection rows | Low | Acquisition / deprecated fallback — `src/lib/external-afl/current-season-import.ts` | Open (2026-10-08); review F-031, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-296.md` | Implementation, or an operator decision to retire the fallback path |
 | AFLDB-ISSUE-298 | AFL API snapshot companion files are read without manifest verification | Low | Acquisition / evidence integrity — `src/lib/acquisition/afl-api-snapshot.ts` | Open (2026-10-08); review F-033, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-298.md` | Implementation |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
-| AFLDB-ISSUE-300 | AFL API control-database read failure is reported as "disabled by a super admin" | Low | Acquisition / diagnostics — `src/lib/acquisition/afl-api-ingestion-control.ts` | Open (2026-10-08); review F-035, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-300.md` | Implementation |
+| AFLDB-ISSUE-300 | AFL API control-database read failure is reported as "disabled by a super admin" | Low | Acquisition / diagnostics — `src/lib/acquisition/afl-api-ingestion-control.ts` | Open (2026-10-08); review F-035, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-300.md` | Merge and push (implemented 2026-10-14, DB-free validated), then close |
 | AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
 | AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-304.md` | Implementation, after ISSUE-266 |
@@ -50910,7 +50910,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `discover-afl-api-seasons.ts`, `acquire-afl-api-brownlow.ts`. **Runbook:**
   `issues/open/AFLDB-ISSUE-300.md`.
 - **Origin.** Review F-035 (R4b-F05) at `20a7a4bb`. Code-proven. The fail-closed read is correct; only the message misleads.
-- **Next action.** Implementation.
+- ~~**Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-14; commit `47541503` on `sonnet/issue-300`, base `5dff6ea6`; not yet merged).** The reader's result gains an
+  optional, secret-free `readFailure` (unset `DATABASE_URL`, or a connection/query failure with at most a driver error code); the flags stay
+  `false`, so fail-closed behaviour is unchanged. `acquire-afl-api`, `discover-afl-api-seasons --fetch`, `settle-afl-api-fixtures` (a fourth caller of
+  the same reader, brought into line) and `acquire-afl-api-brownlow` now say the switches could not be read instead of telling the operator a
+  super admin must enable them. Runbook §17.
+- **Validation (DB-free, 14 Oct 2026).** Five related suites 435 passed; new cases feed the real reader output into the real CLI entry points
+  (9 tests fail against the base source); `tsc --noEmit`, ESLint and `git diff --check` exit 0; implementation preflight READY. Not run:
+  PostgreSQL, systemd, any live CLI run, DEV/PROD.
 
 ## AFLDB-ISSUE-301 — AFL API HTTP client has no request timeout and reads the body outside its retry
 
