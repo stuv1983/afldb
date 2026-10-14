@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 29 (ISSUE-229, ISSUE-266–270 and 23 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296 and ISSUE-285 on 2026-10-15, merge-scoped and not deployed, see below)
+**Open issues:** 28 (ISSUE-229, ISSUE-266–270 and 22 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285 and ISSUE-282 on 2026-10-15, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -30,8 +30,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-277 | Data Editor edits other than the name to a token-only player are not durable | Medium | Admin authority / Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py` | Open (2026-10-08); review F-012, code-proven; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-277.md` | Operator decision **D-277-1** (option (a) or (b)), then implementation |
 | AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | Code fix plus test update, before search indexing is enabled |
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
-| AFLDB-ISSUE-282 | Replace actions revalidate only the replaced row's public pages | Low | Admin awards / special records / revalidation — `admin-awards.ts`, `admin-special-records.ts` | Open (2026-10-08); review F-017, code-proven; imported 2026-10-10; implemented `9baba193` and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-282.md` | Merge, then close (ISSUE-283 is separate) |
-| AFLDB-ISSUE-283 | The administrative note is not recorded on creation audit rows | Low | Admin awards / special records / audit trail | Open (2026-10-08); review F-018, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-283.md` | Implementation, grouped with ISSUE-282 |
+| AFLDB-ISSUE-283 | The administrative note is not recorded on creation audit rows | Low | Admin awards / special records / audit trail | Open (2026-10-08); review F-018, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-283.md` | Implementation (ISSUE-282, formerly grouped with it, is resolved) |
 | AFLDB-ISSUE-284 | Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish | Low | Admin Brownlow — `src/db/queries/admin-brownlow.ts` | Open (2026-10-08); review F-019, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-284.md` | Implementation |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
@@ -50646,9 +50645,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin awards, Hall of Fame, honour teams and special records
-  / public cache revalidation. Key files: `src/db/queries/admin-awards.ts`, `src/db/queries/admin-special-records.ts`.
-  **Runbook:** `issues/open/AFLDB-ISSUE-282.md`.
+- **Status:** Resolved (2026-10-15, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** admin awards, Hall of Fame, honour teams
+  and special records / public cache revalidation. Key files: `src/db/queries/admin-awards.ts`, `src/db/queries/admin-special-records.ts`.
+  **Runbook:** `issues/closed/AFLDB-ISSUE-282.md`.
 - **Origin.** Review F-017 (R2a-F01 and R2c-F02, grouped) at `20a7a4bb`. Code-proven.
 - **Defect.** The five replace transactions return the old row's revalidation paths only; the replacement's pages stay
   stale until ISR expiry (up to a day).
@@ -50665,6 +50664,19 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   created-only, no de-duplication) are killed; fixture residue read 0 on 14 selectors before, between and after. `tsc --noEmit`, ESLint
   and `git diff --check` exit 0. The python replay tests of the awards file and the whole integration files were not run. A DB-free
   neighbour (`awards-admin`, migration 108 grant text) fails identically on unchanged `main`.
+- **Readiness and merge (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `preflight --mode implementation
+  --issue 282` READY; `merge:ready -- --issue 282` (raw `D:\tmp\issue282\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one
+  blocker, the primary worktree not clean; every other check PASSed (declared scope 7 changed, 0 unexpected). The owner authorised that
+  exception for this issue only, covering only that clean-tree FAIL under the exact 18-path state (nine `.agents/skills` files, seven
+  zero-byte stray-named files, `$null)` and the zero-byte `2000)`); paths, no tracked or staged change and full hashes were verified by
+  script immediately before and after the merge (`precheck-1`, `premerge-1`, `postmerge-1`; `$null)` `d9edb146…2500` identical throughout).
+  `9baba193` and `5906e426` fast-forwarded to `main` and pushed (`9fcefb9c..5906e426`); local `main` and the live remote both equalled
+  `5906e426` afterwards.
+- **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit. Runbook §14 asks for integration assertions
+  that the new row's path is in `revalidatePaths`; they exist for all five replace families and pass on `afldb_test`. The closure scope is
+  **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:** no browser, DEV or PROD action; the
+  action layer's revalidation of the returned paths was not exercised; the whole integration files (and the awards file's python replay
+  tests) were not run; ISSUE-283 is not addressed.
 
 ## AFLDB-ISSUE-283 — The administrative note is not recorded on creation audit rows
 
@@ -50674,7 +50686,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Origin.** Review F-018 (R2a-F02 and R2c-F03, grouped) at `20a7a4bb`. Code-proven.
 - **Defect.** The forms promise the note is kept with the audit entry (both entries on replace), but the creation half of
   each write drops it.
-- **Next action.** Implementation, grouped with ISSUE-282.
+- **Next action.** Implementation (ISSUE-282, formerly grouped with it, is resolved 2026-10-15 and did not change the audit-note plumbing).
 
 ## AFLDB-ISSUE-284 — Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish
 

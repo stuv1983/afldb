@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### A replacement revalidates the created row's public pages as well as the voided row's (AFLDB-ISSUE-282; `9baba193`, merged and pushed to `main` with records as `5906e426`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
+
+- The five admin replace transactions (award winner, Hall of Fame inductee, honour-team member, first-kick goal, after-the-siren kick) returned the revalidation paths of the voided row only. A replacement that named a different award, season, recipient, club, match or team therefore left the correct pages stale until their ISR window expired, up to a day. Each now reads the created row inside the transaction and returns the de-duplicated union of both rows' paths; the mutations, actions and allowlists are unchanged. No data effect, no migration.
+- **Validation (`afldb_test`).** Focused integration cases (`admin-awards` 4, `admin-special-records` 2), including new replace cases for honour-team members and after-the-siren kicks that had none, pass; the same cases fail 4 and 2 against the unfixed source; 16 of 16 mutants are killed; fixture residue read 0 throughout. `tsc --noEmit`, ESLint and `git diff --check` exit 0. Readiness was accepted under a scoped cleanliness exception, not a clean pass. **Not done:** any deployment, a browser check, the whole integration files or the awards file's python replay tests. ISSUE-283 (the administrative note) is separate. Detail: `issues/closed/AFLDB-ISSUE-282.md` §17 and §18.
+
 ### The fallback current-season importer records zero rejected records instead of a planning count (AFLDB-ISSUE-296; `03fb5bcd`, `074667eb`, merged and pushed to `main` with records as `10548157`; DB-free validated; not deployed; resolved) - 15 October 2026
 
 - The deprecated fallback current-season importer set `import_batches.records_rejected` to the canonical plan's `rejectedOrConflicted` count while writing no `import_rejections` rows, so a batch could report rejections that do not exist as rows; the column's contract (migration 001, ISSUE-244 F008) is that it equals the batch's rejection rows. It now writes `0`, as the lineup writer does; the planning count remains in the batch's `validation_result` and in the importer's report. Earlier batch rows are not repaired.
