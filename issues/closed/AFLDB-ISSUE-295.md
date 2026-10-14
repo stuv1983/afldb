@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and validated on `afldb_test` 2026-10-15 (§17); not deployed.
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Implemented and merged as `dba8b2d0` (fix, tests and records), validated on `afldb_test` (§17), merged and pushed (§18). **Not deployed.**
 - **Severity:** Low. **Area:** acquisition / settle reporting.
 - **Key file:** `src/lib/acquisition/settle-report.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-030; partition note R4a-F05).
@@ -97,3 +97,11 @@ None.
 ### 17.4 Limits
 
 - Not deployed; no browser, DEV or PROD action. A finding written by a writer that stamped no `source_key` would now be excluded from both reports; no current writer does so. The report CLI itself and the rendered text were not run; only the report builder was exercised against real rows. The file was run by filter, not whole.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 295` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue295\preflight-1.txt`). `npm run merge:ready -- --issue 295` (raw, unchanged: `D:\tmp\issue295\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The five committed paths were compared with the declared scope by hand: `settle-report.ts`, the AFL Tables integration test, this runbook, `issues.md` and `IssuesIndex.md`.
+- **Exception (fresh, this issue only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state: the nine `.agents/skills` files, the seven zero-byte stray-named files (`0)`, ``20` ``, ``` `path ```, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`, `void`), the literal `$null)` and the zero-byte `2000)`. Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
+- **Merge.** `dba8b2d0` fast-forwarded onto `main` and was pushed (`2e3c050f..dba8b2d0`); local `main` and `git ls-remote origin refs/heads/main` both equalled `dba8b2d0` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit. §14 asks for an integration case that opens one finding per source and asserts each report lists only its own; it exists and passes on `afldb_test` (§17.2, §17.3), with the cut-hiding case added. The closure scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**.
+- **Preserved limits.** Not deployed. No browser, DEV or PROD action. The report CLI and its rendered text were not run; only the report builder was exercised against real rows. The test file was run by filter, not whole.

@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Each settle exception report lists only its own source's apply failures (AFLDB-ISSUE-295; `dba8b2d0`, merged and pushed to `main`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
+
+- The settle exception report listed open `canonical_apply_failed` findings by type and owner only, which the AFL Tables and AFL API settles share. Each report therefore showed the other source's failures as its own, and a source's own failures could be hidden behind the "more than 20 open" cut by the other's. The apply-failure section is now narrowed by `details.source_key`, which every writer stamps. Reporting only: no finding changes. No migration.
+- **Validation (`afldb_test`).** Two integration cases (one finding per source; 21 AFL API findings plus one AFL Tables finding) fail against the unfixed source and pass fixed; 4 of 4 mutants are killed; `tsc --noEmit`, ESLint and `git diff --check` exit 0. Readiness was accepted under a scoped cleanliness exception, not a clean pass. **Not done:** any deployment, a browser check, running the report CLI, or a whole-file run. Detail: `issues/closed/AFLDB-ISSUE-295.md` §17 and §18.
+
 ### AFL Tables, lineup and fallback import batches record a real completion time (AFLDB-ISSUE-294; `8e49a9da`, merged and pushed to `main`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
 
 - The AFL Tables settle, the lineup store and the deprecated fallback importer closed their `import_batches` row with `completed_at = now()` (the transaction start), so completion equalled start and run durations could not be read from the ledger or the admin settle panel; the AFL Tables settle also left `records_inserted` at 0. All three now use `clock_timestamp()`, and the AFL Tables settle records the versions it appended (`records_updated` 0: the table is append-only). Batches closed before deployment are not repaired.

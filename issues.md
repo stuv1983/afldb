@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 24 (ISSUE-229, ISSUE-266–270 and 18 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293 and ISSUE-294 on 2026-10-15, merge-scoped and not deployed, see below)
+**Open issues:** 23 (ISSUE-229, ISSUE-266–270 and 17 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294 and ISSUE-295 on 2026-10-15, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -32,7 +32,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
-| AFLDB-ISSUE-295 | Settle exception report mixes both sources' apply-failure findings | Low | Acquisition / settle reporting — `src/lib/acquisition/settle-report.ts` | Open (2026-10-08); review F-030, code-proven; imported 2026-10-10; implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-295.md` §17 | Merge, then close (merge-scoped) |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
@@ -50965,8 +50964,8 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-295 — Settle exception report mixes both sources' apply-failure findings
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / settle reporting. Key file:
-  `src/lib/acquisition/settle-report.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-295.md`.
+- **Status:** Resolved (2026-10-15, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** acquisition / settle reporting. Key file:
+  `src/lib/acquisition/settle-report.ts`. **Runbook:** `issues/closed/AFLDB-ISSUE-295.md`.
 - **Origin.** Review F-030 (R4a-F05) at `20a7a4bb`. Code-proven.
 - **Defect.** Open `canonical_apply_failed` findings are not filtered by `source_key`, so each source's report shows the
   other's failures and can push its own past the 20-row cut. ~~**Next action.** Implementation (trivial).~~ Superseded below.
@@ -50977,6 +50976,17 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   afldb_test` for the owner, importer and auth roles before any write: each report lists only its own source's failures, and 21 AFL API
   findings no longer hide the one AFL Tables finding. Both cases fail on the unfixed source; 4 of 4 mutants are killed; the fixture census
   is unchanged (12 pre-existing S6 batches untouched). `tsc --noEmit`, ESLint and `git diff --check` exit 0. The file was run by filter.
+- **Readiness and merge (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `preflight --mode implementation
+  --issue 295` READY; `merge:ready -- --issue 295` (raw `D:\tmp\issue295\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one blocker, the
+  primary worktree not clean; every other check PASSed. The owner authorised that exception for this issue only, covering only that
+  clean-tree FAIL under the exact 18-path state (nine `.agents/skills` files, seven zero-byte stray-named files, `$null)` and the
+  zero-byte `2000)`); paths, no tracked or staged change and full hashes were verified by script immediately before and after the merge
+  (`$null)` `d9edb146…2500` identical throughout). `dba8b2d0` fast-forwarded to `main` and pushed (`2e3c050f..dba8b2d0`); local `main` and the
+  live remote both equalled `dba8b2d0` afterwards.
+- **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit. Runbook §14 asks for an integration case with
+  one finding per source and each report listing only its own; it exists and passes on `afldb_test`. The closure scope is
+  **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:** no browser, DEV or PROD action; the
+  report CLI and its rendered text were not run; the test file was run by filter, not whole.
 
 ## AFLDB-ISSUE-296 — Deprecated fallback importer sets `records_rejected` without rejection rows
 
