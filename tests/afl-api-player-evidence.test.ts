@@ -933,9 +933,74 @@ describe('S9 refactor: the shared AFL API snapshot reader', () => {
     const { files } = verifyAflApiSnapshotManifest(snapshotDir);
     expect(files).toHaveLength(4);
     // The absent entry still names a `fixture.json`, so it is discovered as a
-    // match directory — and reading it would fail. Unit discovery is
-    // unchanged from the settle CLI, so this documents the existing contract.
-    expect(() => aflApiUnitSourcesFrom(snapshotDir, files)).toThrow();
+    // match directory. It was not hashed, so the unit is refused as unverified
+    // (AFLDB-ISSUE-298), not left to fail when the file is read.
+    expect(() => aflApiUnitSourcesFrom(snapshotDir, files))
+      .toThrow(/Match 'CD_M20260100002' is not fully verified by the manifest: CD_M20260100002\/fixture\.json, CD_M20260100002\/match-roster\.json, CD_M20260100002\/player-stats\.json /);
+  });
+
+  describe('AFLDB-ISSUE-298: a unit is read only when all three of its files are listed and hashed', () => {
+    const unlist = (name: string) => (files: { file: string }[]) => {
+      files.splice(files.findIndex((f) => f.file === `CD_M20260100001/${name}`), 1);
+    };
+    const markAbsent = (name: string) => (files: { file: string; status?: string }[]) => {
+      const entry = files.find((f) => f.file === `CD_M20260100001/${name}`);
+      if (entry) entry.status = 'fixture_absent';
+    };
+
+    it('refuses a match-roster.json the manifest does not list, although it is on disk', () => {
+      const { snapshotDir } = snapshotFixture({ fileOverrides: unlist('match-roster.json') });
+      const { files } = verifyAflApiSnapshotManifest(snapshotDir);
+      expect(() => aflApiUnitSourcesFrom(snapshotDir, files))
+        .toThrow("Match 'CD_M20260100001' is not fully verified by the manifest: CD_M20260100001/match-roster.json not listed");
+    });
+
+    it('refuses a player-stats.json the manifest does not list, although it is on disk', () => {
+      const { snapshotDir } = snapshotFixture({ fileOverrides: unlist('player-stats.json') });
+      const { files } = verifyAflApiSnapshotManifest(snapshotDir);
+      expect(() => aflApiUnitSourcesFrom(snapshotDir, files))
+        .toThrow("Match 'CD_M20260100001' is not fully verified by the manifest: CD_M20260100001/player-stats.json not listed");
+    });
+
+    it.each(['match-roster.json', 'player-stats.json', 'fixture.json'])(
+      'refuses %s listed as fixture_absent, although it is on disk and unhashed',
+      (name) => {
+        const { snapshotDir } = snapshotFixture({ fileOverrides: markAbsent(name) });
+        const { files } = verifyAflApiSnapshotManifest(snapshotDir);
+        expect(() => aflApiUnitSourcesFrom(snapshotDir, files))
+          .toThrow(`Match 'CD_M20260100001' is not fully verified by the manifest: CD_M20260100001/${name} not listed`);
+      },
+    );
+
+    it('names every unverified file of the unit, not just the first', () => {
+      const { snapshotDir } = snapshotFixture({
+        fileOverrides: (files) => { unlist('match-roster.json')(files); markAbsent('player-stats.json')(files); },
+      });
+      const { files } = verifyAflApiSnapshotManifest(snapshotDir);
+      expect(() => aflApiUnitSourcesFrom(snapshotDir, files))
+        .toThrow('CD_M20260100001/match-roster.json, CD_M20260100001/player-stats.json not listed');
+    });
+
+    it('refuses the whole snapshot when only one of two units is incomplete', () => {
+      const { snapshotDir } = snapshotFixture();
+      const { files } = verifyAflApiSnapshotManifest(snapshotDir);
+      // A second unit with a hashed fixture.json only: a complete unit 1 must not let it through.
+      mkdirSync(join(snapshotDir, 'CD_M20260100002'), { recursive: true });
+      const text = `${JSON.stringify({ providerId: 'CD_M20260100002' })}\n`;
+      writeFileSync(join(snapshotDir, 'CD_M20260100002', 'fixture.json'), text, 'utf8');
+      const partial = [
+        ...files,
+        { file: 'CD_M20260100002/fixture.json', sha256: createHash('sha256').update(text).digest('hex') },
+      ];
+      expect(() => aflApiUnitSourcesFrom(snapshotDir, partial))
+        .toThrow("Match 'CD_M20260100002' is not fully verified by the manifest: CD_M20260100002/match-roster.json, CD_M20260100002/player-stats.json not listed");
+    });
+
+    it('still reads a unit whose three files are all listed and hashed', () => {
+      const { snapshotDir } = snapshotFixture();
+      const { files } = verifyAflApiSnapshotManifest(snapshotDir);
+      expect(aflApiUnitSourcesFrom(snapshotDir, files)).toHaveLength(1);
+    });
   });
 
   it('reports the manifest\'s own sha256 for artefact provenance', () => {
