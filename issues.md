@@ -50870,8 +50870,12 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `src/lib/external-afl/current-season-import.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-296.md`.
 - **Origin.** Review F-031 (R4a-F06) at `20a7a4bb`. Code-proven. Contradicts the ISSUE-244 F008 contract
   (`records_rejected` equals the batch's rejection rows).
-- **Open question.** Whether the fallback path should simply be retired (operator). **Next action.** Implementation, or a
-  retirement decision.
+- **Implemented 2026-10-15** (`03fb5bcd` fix, `074667eb` test, `sonnet/issue-296`; runbook §17). `writeMatches` writes
+  `records_rejected = 0`; the planning count stays in `validation_result`. DB-free: one new source-contract case, 6 of 6
+  mutants killed, `tsc` and `eslint` exit 0; the file's one failure (ISSUE-122 S6 derived-helper wiring) is identical on
+  unchanged `main`.
+- **Open question.** Whether the fallback path should simply be retired (operator): not a gate, unaffected by the fix.
+  **Next action.** Merge.
 
 ## AFLDB-ISSUE-297 — AFL API provider id is used unvalidated as a file path and URL path segment
 
