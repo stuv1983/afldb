@@ -50746,7 +50746,13 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `src/app/admin/draft/actions.ts`, `src/db/queries/admin-draft.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-290.md`.
 - **Origin.** Review F-025 (R2c-F06) at `20a7a4bb`. Code-proven.
 - **Defect.** Manual picks accept any positive integer and persist it into the replayed `selection` payload; the
-  source-owned path enforces the `EDITABLE_ENTITIES.draft_picks` ranges. **Next action.** Implementation.
+  source-owned path enforces the `EDITABLE_ENTITIES.draft_picks` ranges. ~~**Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-14; commit `a48646d8` on `sonnet/issue-290`, base `99fcc4f0`; not yet merged).** `validateManualPickMeasures`
+  (`src/db/queries/admin-draft.ts`) applies the `draft_picks` ranges (pick 1-200, age 14-50, height 120-230, weight 40-160) in
+  `createManualPick`, `createPlayerAndDraftPick` and `saveManualPick` before any connection opens. Runbook §17.
+- **Validation (DB-free, 14 Oct 2026).** `tests/admin-draft-actions.test.ts` 56/56 (12 new; the four action-level cases fail with the
+  call sites disabled); `tsc` exit 0; ESLint of the two files exit 0; `git diff --check` exit 0. One pre-existing, unrelated failure in
+  `player-link-mutations` (identical at `99fcc4f0`). Not run: integration, DEV/PROD, browser.
 
 ## AFLDB-ISSUE-291 — Admin player creation persists unvalidated biographical fields
 

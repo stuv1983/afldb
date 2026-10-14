@@ -483,7 +483,8 @@
 
 ### AFLDB-ISSUE-290 — Manual draft selections accept out-of-range age, height, weight and pick number
 - **Severity:** Low. **Area:** admin draft / validation. **State:** Open (2026-10-08), F-025; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-290.md`. **Next action:** implementation.
+- **Runbook:** `issues/open/AFLDB-ISSUE-290.md` (§17, §17.1). **Next action:** merge and push `a48646d8` (implemented 2026-10-14,
+  DB-free validated), then close.
 
 ### AFLDB-ISSUE-291 — Admin player creation persists unvalidated biographical fields
 - **Severity:** Low. **Area:** admin player creation — `src/db/queries/players.ts` (`createPlayerInTransaction`).
