@@ -109,6 +109,39 @@ const HALL_OF_FAME_CATEGORIES = new Set([
   'Player', 'Coach', 'Umpire', 'Media', 'Administrator', 'Pioneer',
 ]);
 
+/** The span every Hall of Fame year is held to; the Hall began in 1996 (AFLDB-ISSUE-286). */
+export const HALL_OF_FAME_YEAR_MIN = 1996;
+export const HALL_OF_FAME_YEAR_MAX = 2100;
+
+/**
+ * The one rule for a Hall of Fame legend year and removal year, shared by the
+ * create, replace and correct paths so they cannot drift (AFLDB-ISSUE-286).
+ *
+ * A Legend needs a legend year; a removal year is optional. Each supplied year
+ * is a whole number from the induction year (or 1996 when the row has none)
+ * to 2100. A year outside that span would otherwise be stored and shown
+ * publicly, or, above 32767, fail on the `smallint` cast with a raw error.
+ * `undefined` for a year means "not supplied, leave it": it is not checked.
+ * Returns a sentence for the administrator, or null when the years stand.
+ */
+export function hallOfFameYearsRefusal(years: {
+  inductedYear: number | null;
+  isLegend: boolean;
+  legendYear: number | null | undefined;
+  removedYear: number | null | undefined;
+}): string | null {
+  const floor = Math.max(HALL_OF_FAME_YEAR_MIN, years.inductedYear ?? HALL_OF_FAME_YEAR_MIN);
+  const within = (year: number) => Number.isInteger(year) && year >= floor && year <= HALL_OF_FAME_YEAR_MAX;
+  if (years.isLegend && (years.legendYear === null || years.legendYear === undefined
+      || !within(years.legendYear))) {
+    return 'Legend year must be from the induction year to 2100.';
+  }
+  if (years.removedYear !== null && years.removedYear !== undefined && !within(years.removedYear)) {
+    return 'Removal year must be from the induction year to 2100.';
+  }
+  return null;
+}
+
 /**
  * The frozen cross-language identity of the `honour_team_members` advisory
  * lock. Byte-identical to `HONOUR_TEAM_LOCK_NAMESPACE`/`_KEY` in
@@ -1786,6 +1819,16 @@ export async function correctHallOfFameInductee(
       && !HALL_OF_FAME_CATEGORIES.has(f.category.trim())) {
     return refuse('validation', 'Invalid Hall of Fame category.');
   }
+  // What can be judged without the row is judged before a connection opens: a
+  // supplied year outside 1996..2100 never reaches the transaction or a
+  // `smallint` cast. The row-relative floor is the precheck's (AFLDB-ISSUE-286).
+  const suppliedYears = hallOfFameYearsRefusal({
+    inductedYear: null,
+    isLegend: f.isLegend === true && f.legendYear !== undefined,
+    legendYear: f.legendYear,
+    removedYear: f.removedYear,
+  });
+  if (suppliedYears) return refuse('validation', suppliedYears);
 
   return runHonourEdit({
     ...input,
@@ -1801,23 +1844,23 @@ export async function correctHallOfFameInductee(
       const h = row.row;
       const legend = f.isLegend ?? h.isLegend;
       const legendYear = f.legendYear === undefined ? h.legendYear : f.legendYear;
-      if (legend && (legendYear === null
-          || (h.inductedYear !== null && legendYear < h.inductedYear))) {
-        return refuse('validation',
-          'A Legend needs an elevation year from the induction year onwards.');
-      }
-      if (f.removedYear !== undefined && f.removedYear !== null
-          && h.inductedYear !== null && f.removedYear < h.inductedYear) {
-        return refuse('validation', 'The removal year cannot precede the induction year.');
-      }
-      return null;
+      const years = hallOfFameYearsRefusal({
+        inductedYear: h.inductedYear, isLegend: legend, legendYear, removedYear: f.removedYear,
+      });
+      return years ? refuse('validation', years) : null;
     },
     apply: async ({ tx, row }) => {
       const h = row.row;
+      const legend = f.isLegend ?? h.isLegend;
+      // A legend year belongs to a Legend. Un-ticking Legend, or naming a year
+      // for a non-Legend, clears it, as creation does; a row the correction
+      // does not touch on this axis keeps what it has (AFLDB-ISSUE-286).
+      const clearLegendYear = !legend && (f.isLegend === false || f.legendYear !== undefined);
       const next = {
         category: f.category === undefined ? h.category : (f.category?.trim() || null),
-        isLegend: f.isLegend ?? h.isLegend,
-        legendYear: f.legendYear === undefined ? h.legendYear : f.legendYear,
+        isLegend: legend,
+        legendYear: clearLegendYear ? null
+          : (f.legendYear === undefined ? h.legendYear : f.legendYear),
         clubNameRaw: f.clubNameRaw === undefined ? h.clubNameRaw : (f.clubNameRaw?.trim() || null),
         state: f.state === undefined ? h.state : (f.state?.trim() || null),
         playingCareer: f.playingCareer === undefined
@@ -1976,6 +2019,14 @@ async function insertHallOfFame(tx: Tx, input: CreateHallOfFameInput & {
   if (!HALL_OF_FAME_CATEGORIES.has(category)) {
     throw new RollbackRefusal('validation', 'Invalid Hall of Fame category.');
   }
+  // The replace path reaches here after its void; a refusal rolls both back.
+  const yearsRefusal = hallOfFameYearsRefusal({
+    inductedYear: input.inductedYear, isLegend: input.isLegend ?? false,
+    legendYear: input.legendYear, removedYear: input.removedYear,
+  });
+  if (yearsRefusal) throw new RollbackRefusal('validation', yearsRefusal);
+  // A legend year belongs to a Legend; none is stored for anyone else.
+  const legendYear = input.isLegend ? (input.legendYear ?? null) : null;
 
   // THE SUPPLIED NAME IS CANONICAL, and this is the one place `hall_of_fame`
   // deliberately diverges from `award_winners` and `honour_team_members`.
@@ -2043,7 +2094,7 @@ async function insertHallOfFame(tx: Tx, input: CreateHallOfFameInput & {
     ) VALUES (
       ${name}, ${input.playerId ?? null}, ${input.playerId ? 'resolved' : 'unmatched'}::link_status,
       ${category}, ${input.inductedYear}::smallint,
-      ${input.isLegend ?? false}, ${input.legendYear ?? null}::smallint,
+      ${input.isLegend ?? false}, ${legendYear}::smallint,
       ${input.clubNameRaw?.trim() || null}, ${input.state?.trim() || null},
       ${input.playingCareer?.trim() || null}, ${input.removedYear ?? null}::smallint,
       ${input.notes?.trim() || null}, 'active', ${sourceId}
@@ -2056,7 +2107,7 @@ async function insertHallOfFame(tx: Tx, input: CreateHallOfFameInput & {
     player_identity: playerIdentity,
     category,
     is_legend: input.isLegend ?? false,
-    legend_year: input.legendYear ?? null,
+    legend_year: legendYear,
     club_name_raw: input.clubNameRaw?.trim() || null,
     state: input.state?.trim() || null,
     playing_career: input.playingCareer?.trim() || null,
@@ -2095,18 +2146,26 @@ async function insertHallOfFame(tx: Tx, input: CreateHallOfFameInput & {
   return { rowId: inserted.id, entityKey };
 }
 
+/** Everything a new Hall of Fame row can be refused for before a connection opens. */
+function hallOfFameInputRefusal(
+  input: Omit<CreateHallOfFameInput, 'adminUserId'>,
+): HonourRefusal | null {
+  if (!Number.isInteger(input.inductedYear)
+      || input.inductedYear < HALL_OF_FAME_YEAR_MIN || input.inductedYear > HALL_OF_FAME_YEAR_MAX) {
+    return refuse('validation', 'Inducted year must be from 1996 to 2100.');
+  }
+  const years = hallOfFameYearsRefusal({
+    inductedYear: input.inductedYear, isLegend: input.isLegend ?? false,
+    legendYear: input.legendYear, removedYear: input.removedYear,
+  });
+  return years ? refuse('validation', years) : null;
+}
+
 export async function createHallOfFameInductee(
   input: CreateHallOfFameInput,
 ): Promise<HonourMutationResult> {
-  if (!Number.isInteger(input.inductedYear)
-      || input.inductedYear < 1996 || input.inductedYear > 2100) {
-    return refuse('validation', 'Inducted year must be from 1996 to 2100.');
-  }
-  if (input.isLegend && (!Number.isInteger(input.legendYear)
-      || (input.legendYear as number) < input.inductedYear
-      || (input.legendYear as number) > 2100)) {
-    return refuse('validation', 'Legend year must be from the induction year to 2100.');
-  }
+  const invalid = hallOfFameInputRefusal(input);
+  if (invalid) return invalid;
   return withImportConnection(async (importSql) => {
     try {
       return await importSql.begin(async (tx) => {
@@ -2141,6 +2200,8 @@ export async function replaceHallOfFameInductee(
 ): Promise<HonourMutationResult<HonourReplacementResult>> {
   const reason = input.reason.trim();
   if (!reason) return refuse('validation', 'Give a reason for replacing this entry.');
+  const invalid = hallOfFameInputRefusal(input.replacement);
+  if (invalid) return invalid;
   const replacementId = randomUUID();
 
   return withImportConnection(async (importSql) => {

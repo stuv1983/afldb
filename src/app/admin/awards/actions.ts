@@ -16,6 +16,7 @@ import {
   voidAwardWinner as voidAwardWinnerQuery,
   voidHallOfFameInductee as voidHallOfFameQuery,
   voidHonourTeamMember as voidHonourTeamQuery,
+  hallOfFameYearsRefusal,
   type AwardWinnerCorrection,
   type CreateAwardWinnerInput,
   type CreateHallOfFameInput,
@@ -468,12 +469,15 @@ function hallOfFameFacts(formData: FormData, prefix = ''): {
   const isLegend = parseCheckbox(at('isLegend'));
   const legendYear = parseNullableInt(at('legendYear'));
   if (!legendYear.ok) return { ok: false, error: 'Legend year must be a four-digit year, or blank.' };
-  if (isLegend && (legendYear.value === null || legendYear.value < inductedYear || legendYear.value > 2100)) {
-    return { ok: false, error: 'Legend year must be from the induction year to 2100.' };
-  }
 
   const removedYear = parseNullableInt(at('removedYear'));
   if (!removedYear.ok) return { ok: false, error: 'Removal year must be a four-digit year, or blank.' };
+  // The same rule the query layer applies, so a bad year is named here rather
+  // than after the round trip (AFLDB-ISSUE-286).
+  const years = hallOfFameYearsRefusal({
+    inductedYear, isLegend, legendYear: legendYear.value, removedYear: removedYear.value,
+  });
+  if (years) return { ok: false, error: years };
 
   return {
     ok: true,
