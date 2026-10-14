@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). Implemented and DB-free validated 2026-10-15 (§17); not yet merged.
 - **Severity:** Low. **Area:** legacy CSV intake validation.
 - **Key file:** `src/lib/ingest/datasets.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-040; partition note R5a-F08).
@@ -77,4 +77,40 @@ DB-free `validateRow` cases in `tests/ingest-datasets.test.ts`.
 
 ## 16. Next action
 
-Implementation.
+Implementation (done, §17). Merge.
+
+## 17. Implementation record (2026-10-15)
+
+- **Commits:** `d82e891e6dbf52891b4123924a777b40ea317424` (fix) and `5282322ba0ffd1f1ad701a13b3e924df55144bc7` (tests), on `sonnet/issue-305`, base `1185bad3`. Single agent, no subagents.
+- **Shape (§13).** Two private helpers in `src/lib/ingest/datasets.ts`: `isRealIsoDate` (strict `YYYY-MM-DD` shape plus plain Gregorian arithmetic; not `Date.UTC`, which remaps years 0-99; year 0000 refused as PostgreSQL's date input does, the same rule as `coachDobError`) and `isWholeNumberCell` (`^\d+$` plus a range). `match_results` `match_date` and `player_bio` `dob` use the first; `player_bio` `height_cm` and `weight_kg` use the second. Reason texts keep their wording, with "a real date" added to the date ones. The boundary is exactly §13: a stricter reading than the cast (for example `+180`, which PostgreSQL would cast) is refused, which is the safe direction.
+- **Not changed (reported).** `toIntOrNull` (`season`, `round_number`, scores) still reads `1e2` as 100; those values reach promotion as numbers (`resolved.*`), never as text cast in SQL, so they cannot fail a cast. `player_bio.player_id` likewise. `match_attendance` is ISSUE-268 and untouched.
+- **H-305-1 determined (not a fix).** `award_nominations` (`src/db/migrations/005_brownlow_awards.sql:113-131`) has `votes smallint` with **no CHECK**, and no later migration adds one (the only `award_nominations` constraint after 005 is the `source_uq` unique key, migration 042). The `rising_star` `validateRow` never reads `votes` or the stat-line columns at all; `promoteRow` reads them through `toIntOrNull`, so a negative value is stored as given and an unreadable one is silently dropped to null. By reading (not executed), a `votes` above 32,767 would fail the `smallint` parameter at promotion, the same class as this issue. Deliberately **not** changed: which `rising_star` cells to refuse (negative? blank? unreadable?) alters what existing uploads are accepted and is a behaviour decision outside §13. Recorded as a follow-up for an operator decision, not a gate.
+
+## 17.1 Validation (2026-10-15, assistant-run on the owner's explicit authorisation; Windows, DB-free)
+
+- New cases: 39, in a new `describe('AFLDB-ISSUE-305 validation refuses what promotion cannot cast')` of `tests/ingest-datasets.test.ts` (the suite the runbook names): `match_date` refusals (impossible days in 30/31-day months, non-leap Feb 29 including the 1900 and 2100 century years, month 13 and 00, day 00, year 0000, short forms) and real dates still admitted (leap days 2024 and 2000, year-end, year 0001); `player_bio` dob refusals, `height_cm` and `weight_kg` refusals (`1.8e2`, `18e1`, `0xB4`, `180.0`, `+180`, embedded space, text, and for weight `8e1`, `8.0e1`, `0x50`, `80.0`), out-of-range and huge-digit heights still refused, every bad column named in one report, and plain real values (including a leading-zero weight and blank cells) still admitted.
+- Result: `tests/ingest-datasets.test.ts` **299 passed (299)** (260 before). The six DB-free test files that import `@/lib/ingest/datasets`: 513 passed, **2 failed**: both in `tests/honours-lifecycle-public-contract.test.ts` ("filters every scan it makes", `src/db/queries/awards.ts`), identical on unchanged `main` `1185bad3` (re-run in the primary checkout: 2 failed), unrelated and untouched. `npx tsc --noEmit` exit 0, `npx eslint` of both files exit 0, `git diff --check` exit 0.
+- **Against the pre-fix source** (`datasets.ts` restored to `1185bad3`, then back): **25 of the 39 `ISSUE-305` cases fail**; the 14 that pass either way are the "still admits" controls.
+
+## 17.2 Mutation checks of the tests (2026-10-15, assistant-run; Windows, DB-free)
+
+Each mutant changes the real fix, is applied alone and restored from the saved bytes (verified identical afterwards); only the `ISSUE-305` cases are run. Script and raw output: `D:\tmp\issue305\mutate.py`, `mutation.txt`.
+
+| Mutant | Result |
+|---|---|
+| M1 day limit ignored (always 31) | killed (9) |
+| M2 century rule dropped from the leap test | killed (2) |
+| M3 year 0 allowed | killed (1) |
+| M4 month upper bound dropped | **survived: equivalent mutant.** An out-of-range month indexes `monthDays` at `undefined`, so `day <= undefined` is false and the day bound already refuses it; the explicit bound is defence in depth |
+| M5 height back to `Number()` | killed (6) |
+| M6 weight back to `Number()` | killed (6) |
+| M7 dob back to shape-only | killed (5) |
+| M8 `match_date` back to shape-only | killed (9) |
+| M9 whole-number reader loses its upper bound | killed (2) |
+| M10 whole-number reader loses its digits-only shape | killed (11) |
+
+9 of 10 killed; the one survivor is equivalent.
+
+## 17.3 Limits
+
+Not deployed. No PostgreSQL, integration, browser, DEV or PROD action: the `::date` and `::smallint` casts are PostgreSQL's, so "promotion cannot write it" is established from the cast rules and the review's account of the failure, not by a promotion run. The validators are exercised through a fake `sql` tag. The `rising_star` `votes` observation above is code reading, not executed.

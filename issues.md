@@ -51000,8 +51000,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `src/lib/ingest/datasets.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-305.md`.
 - **Origin.** Review F-040 (R5a-F08) at `20a7a4bb`. Reproduced DB-free by the review (witness W4, not imported). Example:
   dates are checked only against `^\d{4}-\d{2}-\d{2}$`, so `2024-02-30` validates.
-- **Open question.** Hypothesis H-305-1 (`rising_star` negative values; depends on whether `award_nominations` has a CHECK).
-  **Next action.** Implementation.
+- **Implemented 2026-10-15** (`d82e891e` fix, `5282322b` tests, `sonnet/issue-305`; runbook §17). `match_date` and `dob` are
+  checked as real calendar dates; `height_cm` and `weight_kg` as digits-only whole numbers in range. DB-free: 39 new cases (25
+  of the 39 `ISSUE-305` cases fail on the old source), file 299 passed, `tsc` and `eslint` exit 0, 9 of 10 mutants killed (the
+  tenth is equivalent). Six importing test files: 2 pre-existing failures in `honours-lifecycle-public-contract.test.ts`,
+  identical on unchanged `main`.
+- **H-305-1 determined, not a fix.** `award_nominations` has no CHECK on `votes` (`smallint`); `rising_star` `validateRow` never
+  reads `votes` or the stat-line values, so a negative is stored and an unreadable value is dropped silently. Not changed: it
+  alters which uploads are accepted. Follow-up for an operator decision, not a gate.
+  **Next action.** Merge.
 
 ## AFLDB-ISSUE-306 — Legacy intake duplicate detection compares raw club text
 
