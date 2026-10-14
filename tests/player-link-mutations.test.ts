@@ -3661,3 +3661,112 @@ describe('AFLDB-ISSUE-235 S6: fixture ownership (DB-free)', () => {
     expect(i17).not.toMatch(/beforeAll|beforeEach/);
   });
 });
+
+/**
+ * AFLDB-ISSUE-310: the human link path takes the player's stable identity from the same
+ * forward classifier as replay, promotion-check and Match Sheet authority, and maps
+ * `ambiguous` / `no_identity` to T7. DB-free: a scripted transaction answers the query
+ * shapes `linkAflApiProvider` issues up to its decision.
+ */
+describe('AFLDB-ISSUE-310: linkAflApiProvider stable identity (DB-free)', () => {
+  const PROVIDER = 'CD_I310001';
+  const PLAYER = 4242;
+
+  type IdentityRow = { playerId: number; externalId: string; sourceKey: string };
+  const afltables = (...ids: string[]): IdentityRow[] =>
+    ids.map((externalId) => ({ playerId: PLAYER, externalId, sourceKey: 'afltables' }));
+  const manual = (...ids: string[]): IdentityRow[] =>
+    ids.map((externalId) => ({ playerId: PLAYER, externalId, sourceKey: 'manual_admin_edit' }));
+
+  async function link(identityRows: IdentityRow[]) {
+    const { adjudicationFingerprint } = await import('@/lib/acquisition/afl-api-adjudication');
+    const { linkAflApiProvider } = await import('@/db/queries/afl-api-player-links');
+    const { tx, seen } = fakeTransaction((text) => {
+      if (text.includes('FROM sources WHERE key')) return [{ id: 9 }];
+      // `identity` is what the pre-ISSUE-310 single-row query selected (the afltables-first,
+      // collation-first row), so this script answers both the old and the new reader.
+      if (text.includes('JOIN sources s ON s.id = ei.source_id')) {
+        const first = [...identityRows].sort((a, b) =>
+          Number(a.sourceKey !== 'afltables') - Number(b.sourceKey !== 'afltables')
+          || a.externalId.localeCompare(b.externalId))[0];
+        return identityRows.map((r) => ({ ...r, identity: first?.externalId }));
+      }
+      if (text.includes('FROM promotion_candidates c')) return [];
+      if (text.includes('FROM promotion_candidates')) return [{ id: 1, sourceVersionSeq: 1, season: 2025 }];
+      if (text.includes('AND player_id =') && text.includes('external_id <>')) return [];
+      if (text.includes('FROM external_identities')) return [];
+      if (text.includes('FROM afl_api_identity_adjudications')) return [];
+      if (text.includes('SELECT surname FROM players')) return [{ surname: null }];
+      return [];
+    });
+    installImportClient(tx);
+    const fingerprint = adjudicationFingerprint({
+      providerId: PROVIDER,
+      existing: null,
+      pendingCandidates: [{ id: 1, sourceVersionSeq: 1 }],
+      latestAdjudicationId: null,
+      chosenPlayerId: 0,
+      chosenPlayerExistingRows: [],
+    });
+    const result = await linkAflApiProvider({
+      providerId: PROVIDER, playerId: PLAYER, adminUserId: 5, note: 'ISSUE-310 stable identity witness',
+      surnameAcknowledged: false, fingerprint,
+    });
+    const ledger = seen.find((q) => q.text.startsWith('INSERT INTO afl_api_identity_adjudications'));
+    return { result, seen, ledger };
+  }
+
+  const wrote = (seen: SeenQuery[]) => seen.some((q) => q.text.startsWith('INSERT'));
+
+  it('two AFL Tables paths that no tracked continuity rule names are refused as T7, with no write', async () => {
+    const { result, seen } = await link(afltables('players/A/Alex_Example.html', 'players/A/Alex_Example2.html'));
+    expect(result).toMatchObject({ ok: false, code: 'T7_player_not_stable' });
+    expect(wrote(seen)).toBe(false);
+  });
+
+  it('three AFL Tables paths and two manual tokens are each refused as T7', async () => {
+    const three = await link(afltables('players/A/A1.html', 'players/A/A2.html', 'players/A/A3.html'));
+    expect(three.result).toMatchObject({ ok: false, code: 'T7_player_not_stable' });
+    const tokens = await link(manual('manual:one', 'manual:two'));
+    expect(tokens.result).toMatchObject({ ok: false, code: 'T7_player_not_stable' });
+    expect(wrote(three.seen) || wrote(tokens.seen)).toBe(false);
+  });
+
+  it('a player with no accepted identity is still T7', async () => {
+    const { result, seen } = await link([]);
+    expect(result).toMatchObject({ ok: false, code: 'T7_player_not_stable' });
+    expect(wrote(seen)).toBe(false);
+  });
+
+  it('a tracked continuity pair stores the rule\'s continuing path whichever order the rows arrive in', async () => {
+    const continuing = 'players/C/Charlie_Cameron.html';
+    const renumbered = 'players/C/Charlie_Cameron3.html';
+    for (const order of [[continuing, renumbered], [renumbered, continuing]]) {
+      const { result, ledger } = await link(afltables(...order));
+      expect(result).toEqual({ ok: true });
+      expect(ledger?.values).toContain(continuing);
+      expect(ledger?.values).not.toContain(renumbered);
+    }
+  });
+
+  it('a single AFL Tables path wins over a manual token, and one manual token alone is accepted', async () => {
+    const withPath = await link([...manual('manual:one'), ...afltables('players/B/Bo_Example.html')]);
+    expect(withPath.result).toEqual({ ok: true });
+    expect(withPath.ledger?.values).toContain('players/B/Bo_Example.html');
+    const tokenOnly = await link(manual('manual:one'));
+    expect(tokenOnly.result).toEqual({ ok: true });
+    expect(tokenOnly.ledger?.values).toContain('manual:one');
+  });
+
+  it('the revoke records an identity even when the player has since become ambiguous (player_identity is NOT NULL)', () => {
+    const source = readFileSync(join(process.cwd(), 'src', 'db', 'queries', 'afl-api-player-links.ts'), 'utf8');
+    const revoke = source.slice(source.indexOf('export async function revokeAflApiLink'));
+    expect(revoke).toContain('readPlayerRecordedIdentity(tx, existing.playerId!)');
+    const recorded = source.slice(
+      source.indexOf('async function readPlayerRecordedIdentity'),
+      source.indexOf('async function readPlayerOtherAflApiRow'),
+    );
+    expect(recorded).toContain('readPlayerStableIdentity(db, playerId)');
+    expect(source).not.toContain('ORDER BY (s.key <> \'afltables\'), ei.external_id');
+  });
+});
