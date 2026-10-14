@@ -33,7 +33,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-282 | Replace actions revalidate only the replaced row's public pages | Low | Admin awards / special records / revalidation — `admin-awards.ts`, `admin-special-records.ts` | Open (2026-10-08); review F-017, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-282.md` | Implementation, grouped with ISSUE-283 |
 | AFLDB-ISSUE-283 | The administrative note is not recorded on creation audit rows | Low | Admin awards / special records / audit trail | Open (2026-10-08); review F-018, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-283.md` | Implementation, grouped with ISSUE-282 |
 | AFLDB-ISSUE-284 | Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish | Low | Admin Brownlow — `src/db/queries/admin-brownlow.ts` | Open (2026-10-08); review F-019, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-284.md` | Implementation |
-| AFLDB-ISSUE-285 | Award Replace panel cannot give the duplicate confirmation its action requires | Low | Admin awards UI — `src/app/admin/awards/ReplacePanel.tsx` | Open (2026-10-08); review F-020, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-285.md` | Implementation |
+| AFLDB-ISSUE-285 | Award Replace panel cannot give the duplicate confirmation its action requires | Low | Admin awards UI — `src/app/admin/awards/ReplacePanel.tsx` | Open (2026-10-08); review F-020, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-285.md` | Merge and push (implemented 2026-10-14, DB-free validated), then close |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
 | AFLDB-ISSUE-293 | Settle runs under-report `dataIssuesResolved` | Low | Acquisition / settle run accounting | Open (2026-10-08); review F-028, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-293.md` | Implementation (trivial) |
@@ -50686,7 +50686,17 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Origin.** Review F-020 (R2a-F04) at `20a7a4bb`. Code-proven.
 - **Defect.** The action returns `needsConfirmation` for a `duplicate` replacement, but the panel only ever sends
   `confirmReplace`, so the confirmation cannot be given.
-- **Next action.** Implementation.
+- ~~**Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-14; commit `70af9ae3` on `sonnet/issue-285`, base `ea792f43`; not yet merged).** After a `duplicate`
+  refusal of an award-winner replacement, the panel's confirmation step now offers the create form's checkbox ("this really is a second,
+  separate selection…"), for the refused preview only, and the confirm button posts `confirmDuplicate` (unprefixed, as the action reads
+  it) only when ticked. Hall of Fame and honour-team replacements are unchanged: their actions do not read the flag, so no control is
+  offered. The confirmation step is now an exported `ReplaceConfirmation` component with two pure helpers. Runbook §17.
+- **Validation (DB-free, 14 Oct 2026).** New `tests/awards-replace-panel.test.ts` 15 passed (rendered control present/absent, when the
+  control is offered, what the confirm button posts, the real `replaceAwardWinnerAction` round trip with a mocked query, and a wiring
+  contract); all 15 fail against the base `ReplacePanel.tsx` (it lacks the exports and wiring); `tsc --noEmit`, ESLint of the two
+  changed files and `git diff --check` exit 0; implementation preflight READY. Not run: PostgreSQL, the integration variant, a browser,
+  DEV/PROD; the panel's React state transitions are not exercised (no DOM in this suite).
 
 ## AFLDB-ISSUE-286 — Hall of Fame legend and removal years are not bounded server-side
 
