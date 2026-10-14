@@ -21,6 +21,109 @@ const REPLACE_ACTIONS = {
 } as const;
 
 /**
+ * Whether the confirmation step should offer the duplicate checkbox
+ * (AFLDB-ISSUE-285).
+ *
+ * Only an award-winner replacement can be confirmed this way: the action
+ * answers a `duplicate` refusal for any domain with `needsConfirmation`, but
+ * only `award_winners` reads `confirmDuplicate` (R-5, the 1984 All-Australian
+ * club and state selections). And only for the preview that was refused — the
+ * flag in `state` outlives a return to the details, and a new preview of a
+ * different player must not inherit a confirmation given for another one.
+ */
+export function offersDuplicateConfirmation(
+  domain: HonourDomain,
+  state: { needsConfirmation?: boolean },
+  refusedPending: unknown,
+  pending: unknown,
+): boolean {
+  return domain === 'winners'
+    && state.needsConfirmation === true
+    && pending !== null
+    && refusedPending === pending;
+}
+
+/**
+ * The flags the confirm button adds to the replacement before it is
+ * submitted. `confirmDuplicate` is read UNPREFIXED by the action (it is not a
+ * `new:` field), and is sent only when the administrator ticked it.
+ */
+export function withReplaceConfirmation(data: FormData, duplicateConfirmed: boolean): FormData {
+  data.set('confirmReplace', '1');
+  if (duplicateConfirmed) data.set('confirmDuplicate', '1');
+  else data.delete('confirmDuplicate');
+  return data;
+}
+
+/**
+ * Step two: what will be voided, what will be recorded, and — after a
+ * duplicate refusal of an award-winner replacement — the checkbox that lets
+ * the same preview be submitted again as a second, separate selection.
+ */
+export function ReplaceConfirmation({
+  currentSummary, reason, summary, offerDuplicateConfirmation, duplicateConfirmed,
+  onDuplicateConfirmedChange, isPending, onConfirm, onBack, confirmRef,
+}: {
+  currentSummary: string;
+  reason: string;
+  summary: string[];
+  offerDuplicateConfirmation: boolean;
+  duplicateConfirmed: boolean;
+  onDuplicateConfirmedChange: (confirmed: boolean) => void;
+  isPending: boolean;
+  onConfirm: () => void;
+  onBack: () => void;
+  confirmRef?: React.Ref<HTMLButtonElement>;
+}) {
+  return (
+    <div style={{ display: 'grid', gap: '0.75rem', maxWidth: '40rem' }}>
+      <p role="alert" className="notice">
+        Confirm this replacement. It is one change and it does both halves.
+      </p>
+      <div>
+        <h3 style={{ fontSize: '1rem', margin: '0 0 0.3rem' }}>Void</h3>
+        <p style={{ margin: 0 }}>{currentSummary}</p>
+        <p className="muted" style={{ margin: '0.2rem 0 0', fontSize: '0.85rem' }}>
+          Reason: {reason}
+        </p>
+      </div>
+      <div>
+        <h3 style={{ fontSize: '1rem', margin: '0 0 0.3rem' }}>Then record</h3>
+        <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+          {summary.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      </div>
+      {offerDuplicateConfirmation && (
+        <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'start', fontSize: '0.85rem', minHeight: '44px' }}>
+          <input
+            type="checkbox" name="confirmDuplicate" checked={duplicateConfirmed}
+            onChange={(e) => onDuplicateConfirmedChange(e.target.checked)}
+          />
+          <span>
+            Yes — this really is a second, separate selection for the same player in the same
+            season. Record it.
+          </span>
+        </label>
+      )}
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <button
+          ref={confirmRef} type="button" className="btn btn-primary"
+          disabled={isPending} onClick={onConfirm}
+        >
+          {isPending ? 'Replacing…' : 'Confirm replacement'}
+        </button>
+        <button
+          type="button" className="btn btn-secondary"
+          disabled={isPending} onClick={onBack}
+        >
+          Back to the details
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Replace one record with the right one, as a single atomic change
  * (AFLDB-ISSUE-165 §6.5).
  *
@@ -57,7 +160,13 @@ export function ReplacePanel({
   const confirmRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<{ data: FormData; summary: string[] } | null>(null);
+  // The preview last submitted, and whether its duplicate was confirmed (ISSUE-285).
+  const [submitted, setSubmitted] = useState<typeof pending>(null);
+  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
   const replace = useAwardsActionSubmit(REPLACE_ACTIONS[domain]);
+  const offerDuplicateConfirmation = offersDuplicateConfirmation(
+    domain, replace.state, submitted, pending,
+  );
 
   useEffect(() => {
     if (replace.state.ok && replace.state.createdId && !replace.state.warning) {
@@ -97,13 +206,20 @@ export function ReplacePanel({
     const data = new FormData(event.currentTarget);
     data.set('rowId', String(rowId));
     data.set('expectedUpdatedAt', expectedUpdatedAt);
+    setDuplicateConfirmed(false);
     setPending({ data, summary: describe(data) });
   };
 
   const onConfirm = () => {
     if (!pending) return;
-    pending.data.set('confirmReplace', '1');
+    withReplaceConfirmation(pending.data, offerDuplicateConfirmation && duplicateConfirmed);
+    setSubmitted(pending);
     replace.submit(pending.data, confirmRef.current);
+  };
+
+  const onBack = () => {
+    setDuplicateConfirmed(false);
+    setPending(null);
   };
 
   if (replace.state.ok) {
@@ -141,38 +257,18 @@ export function ReplacePanel({
       {replace.state.error && <p className="notice" role="alert">{replace.state.error}</p>}
 
       {pending ? (
-        <div style={{ display: 'grid', gap: '0.75rem', maxWidth: '40rem' }}>
-          <p role="alert" className="notice">
-            Confirm this replacement. It is one change and it does both halves.
-          </p>
-          <div>
-            <h3 style={{ fontSize: '1rem', margin: '0 0 0.3rem' }}>Void</h3>
-            <p style={{ margin: 0 }}>{currentSummary}</p>
-            <p className="muted" style={{ margin: '0.2rem 0 0', fontSize: '0.85rem' }}>
-              Reason: {(pending.data.get('reason') ?? '').toString()}
-            </p>
-          </div>
-          <div>
-            <h3 style={{ fontSize: '1rem', margin: '0 0 0.3rem' }}>Then record</h3>
-            <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-              {pending.summary.map((line) => <li key={line}>{line}</li>)}
-            </ul>
-          </div>
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <button
-              ref={confirmRef} type="button" className="btn btn-primary"
-              disabled={replace.isPending} onClick={onConfirm}
-            >
-              {replace.isPending ? 'Replacing…' : 'Confirm replacement'}
-            </button>
-            <button
-              type="button" className="btn btn-secondary"
-              disabled={replace.isPending} onClick={() => setPending(null)}
-            >
-              Back to the details
-            </button>
-          </div>
-        </div>
+        <ReplaceConfirmation
+          currentSummary={currentSummary}
+          reason={(pending.data.get('reason') ?? '').toString()}
+          summary={pending.summary}
+          offerDuplicateConfirmation={offerDuplicateConfirmation}
+          duplicateConfirmed={duplicateConfirmed}
+          onDuplicateConfirmedChange={setDuplicateConfirmed}
+          isPending={replace.isPending}
+          onConfirm={onConfirm}
+          onBack={onBack}
+          confirmRef={confirmRef}
+        />
       ) : (
         <form ref={formRef} onSubmit={onPreview} style={{ display: 'grid', gap: '0.75rem', maxWidth: '52rem' }}>
           <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
