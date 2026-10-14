@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### The AFL API client refuses provider ids that are not `CD_M<digits>` / `CD_S<digits>` (AFLDB-ISSUE-297; `9c5ba69c`, merged and pushed to `main` as `38783e3c`; DB-free validated; not deployed; resolved) - 14 October 2026
+
+- `parseAflApiSeasonMatchesEnvelope` (`src/lib/acquisition/afl-api-client.ts`) now throws on a season-feed entry whose `providerId` is not `CD_M<digits>`, and the four CFS plan helpers (player stats, match roster, Brownlow season and leaderboard) refuse a match id that is not `CD_M<digits>` or a season id that is not `CD_S<digits>`. Before, any non-empty string was accepted and joined into a snapshot directory name and a token-bearing CFS URL path, so an id such as `../../escape` could write outside the snapshot tree. `acquire-afl-api.ts` parses the feed before it writes any file or makes a per-match request, so a hostile feed now stops there.
+- **Behaviour change after deployment:** the settle's season-enumeration read uses the same parser, so a feed entry with any other id shape now makes it throw. The measured shape is `CD_M<digits>`; no counter-example is known and no live feed has been observed against the new rule.
+- The `code_test_db` rekey rehearsal's synthetic ids changed from `CD_M2026231R<letters>` to `CD_M20262319<nn>` so they satisfy the same rule; the rehearsal itself was not re-run.
+- **Validation (DB-free).** `afl-api-match`, `afl-api-brownlow-acquire` and `afl-api-ingestion-safety` 386/386; the four new cases fail on the unfixed source; `tsc --noEmit` exit 0. No integration test, rehearsal, deployment or live-feed run. Readiness was accepted under a scoped cleanliness exception, not a clean pass. Detail: `issues/closed/AFLDB-ISSUE-297.md` §17 and §18.
+
 ### The ISSUE-274 + ISSUE-276 combined DEV observation window is closed (D-OBS-274276-20261014; documentation and retained validation state only; both issues stay open) - 14 October 2026
 
 - The 14 October 2026 AFL API nightly on DEV (batch 122, 05:04:09-05:06:13, `Result=success`) was graded PASS with no regression against the 13 October baseline: 64 refusals, 0 canonical failures/inserts/updates/ledger writes, `data_issues_id_seq` 865 -> 929 explained by the 64 refresh upserts, A1/A2 captures sealed. Runbook ISSUE-274 section 33.10 and ISSUE-276 section 17.10.

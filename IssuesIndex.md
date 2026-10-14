@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 43 (ISSUE-229, ISSUE-266–270, and the 37 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-288, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; other issues' PROD prerequisites are unchanged)
+**Open issues:** 42 (ISSUE-229, ISSUE-266–270, and the 36 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-288, ISSUE-297, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18); other issues' PROD prerequisites are unchanged)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -514,14 +514,6 @@
   **State:** Open (2026-10-08), F-031; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-296.md`. **Next action:** implementation, or an operator decision to retire the
   fallback path.
-
-### AFLDB-ISSUE-297 — AFL API provider id is used unvalidated as a file path and URL path segment
-- **Severity:** Low. **Area:** AFL API client — `src/lib/acquisition/afl-api-client.ts`. **State:** Open (2026-10-08),
-  F-032; imported 2026-10-10. **Implemented 2026-10-14, commit `9c5ba69c` on `sonnet/issue-297`** (parser + four CFS plan helpers
-  refuse ids that are not `CD_M<digits>` / `CD_S<digits>`; DB-free 386/386; not merged, pushed or deployed). `merge:ready` BLOCKED:
-  the primary has 16 untracked paths (the 15 preserved plus a session-created zero-byte `void`), outside the owner's exception.
-- **Runbook:** `issues/open/AFLDB-ISSUE-297.md` §17. **Next action:** owner removes `void` or extends the exception; then merge,
-  push and the closure records.
 
 ### AFLDB-ISSUE-298 — AFL API snapshot companion files are read without manifest verification
 - **Severity:** Low. **Area:** acquisition / evidence integrity — `src/lib/acquisition/afl-api-snapshot.ts`. **State:**

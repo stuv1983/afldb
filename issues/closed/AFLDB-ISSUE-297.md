@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). **Implemented and committed 2026-10-14** as `9c5ba69c` on `sonnet/issue-297` (base `839e084c`); DB-free validation passed (§17); **not merged or pushed** — readiness is BLOCKED (§17.4). Not deployed.
+- **Status:** **Resolved (2026-10-14, merge-scoped)**, on the push of the documentation-only closure commit (§18). Implemented as `9c5ba69c` (base `839e084c`), merged and pushed with its records as `38783e3c`; DB-free validated (§17.2). **Not deployed.**
 - **Severity:** Low. **Area:** acquisition / AFL API client and acquisition tool.
 - **Key files:** `src/lib/acquisition/afl-api-client.ts` (`parseAflApiSeasonMatchesEnvelope`, `plan*Request`), `tools/current-season/acquire-afl-api.ts`, `src/lib/acquisition/afl-api-snapshot.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-032; partition note R4b-F01). The main session re-read the parser and the acquisition loop.
@@ -75,7 +75,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Done 2026-10-14 (§17). Remaining: merge and push (§17.4), then the closure records.
+~~Implementation.~~ Done 2026-10-14 (§17). ~~Remaining: merge and push (§17.4), then the closure records.~~ Done (§18).
 
 ## 17. Implementation record (2026-10-14)
 
@@ -103,3 +103,20 @@ None.
 ### 17.4 Readiness (2026-10-14)
 
 `npm run merge:ready -- --issue 297` (raw output preserved at `D:\tmp\issue297\merge-ready-raw-1.txt`, SHA-256 `f3125173…`): **BLOCKED**, one blocker (`FAIL main worktree is clean: D:/dev/afldb`), two metadata warnings (no `afldb-merge-readiness` block in the runbook; no unexpected-file classification). Every other check passed (branch, issue worktree clean, local `main` = recorded `origin/main` = `839e084c`, ahead 1 / behind 0, migration parity). The primary listed **16** untracked paths — the 15 preserved paths (nine `.agents/skills` files and six zero-byte stray-named files) **plus a zero-byte file `void`, created at 16:17:12 on 2026-10-14 during this session by the tooling**. The owner's exception covers exactly the 15; deleting `void` was refused by the permission classifier, so it was not removed and the exception was **not applied**. Merge, push and closure are waiting on the owner (remove `void`, or extend the exception to it).
+
+### 17.5 The exception (owner, 2026-10-14; supersedes the last sentence of §17.4)
+
+The permission classifier denied the assistant's deletion of `void` ("Irreversible Local Destruction"); the assistant did not retry or work around the denial and left `void` in place. The owner then authorised amending the ISSUE-297-specific readiness exception to the original 15 untracked paths plus `D:\dev\afldb\void`, for this issue's implementation and closure merges only, covering only the primary clean-tree FAIL. Preconditions, captured before the second run in `D:\tmp\issue297\exception-precheck.txt` (taken 16:40 AEDT):
+
+- `void`: regular file, not a link, size 0, SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` (the empty-input digest), birth/modify 2026-10-14 16:17:12 +1100, untracked, nothing staged.
+- The primary's untracked set was exactly the 16 paths (nine `.agents/skills` files; ``0)``, ``20` ``, `` `path ``, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`, `void`); `git status --porcelain --untracked-files=no` was empty.
+- 18 ISSUE-274/276 source and test blobs (the ten ISSUE-274 files named in its runbook §29 and the four ISSUE-276 files plus `afl-api-bundle.ts`) were equal at `839e084c` and on `sonnet/issue-297`; the branch changed only the six files of this issue. The first listing in the evidence file contains three wrong-path guesses (marked `DIFF`/`MISSING`); the corrected listing directly below it supersedes them.
+
+Second `merge:ready` run (`D:\tmp\issue297\merge-ready-raw-2.txt`, SHA-256 `d6641914…`; the first run's raw output `merge-ready-raw-1.txt` is `f3125173…`, preserved unchanged): the same single blocker, now with the exact 16 paths; every other check passed; the same two metadata warnings. The exception was applied to that FAIL only.
+
+## 18. Closure (2026-10-14)
+
+- **Merge.** `38783e3cb06bf97fdf5a940f68c882394ddd8f02` (`9c5ba69c` plus the records commit) was fast-forwarded to `main` from `839e084c` and pushed; the live remote (`git ls-remote`) was verified equal. Readiness was **accepted under the scoped cleanliness exception of §17.5, not a clean pass.**
+- **Criteria.** §14 item 1 (DB-free) is satisfied: `parseAflApiSeasonMatchesEnvelope('{"matches":[{"providerId":"../escape",…}]}')` throws, and `runAcquisition` refuses before writing a file or making a per-match request (§17.2). §14 item 2 is not applicable to this issue. No other closure criterion is recorded in §0–§16.
+- **Limits kept.** Not deployed on DEV or PROD. No real-feed observation: the parser is also used by the settle's season-enumeration read (`afl-api-season-enumeration.ts:160`), so after deployment a feed with an id shape other than `CD_M<digits>` would make that read throw; none is known. The `code_test_db` rekey rehearsal was not re-run after its synthetic ids changed. No integration test was run. Other feed fields, the snapshot reader's manifest-driven paths and the R acquirers remain out of scope (§12).
+- **Tracking.** `issues.md` (table row removed, entry Resolved), `IssuesIndex.md` (entry removed, header updated) and `CHANGELOG.md`; open issues 43 → 42. The runbook moved from `issues/open/` to `issues/closed/`. No `blockers.md` row names ISSUE-297.

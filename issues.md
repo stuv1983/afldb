@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 43 (ISSUE-229, ISSUE-266–270 and 37 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, see below)
+**Open issues:** 42 (ISSUE-229, ISSUE-266–270 and 36 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -44,7 +44,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-294 | AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count | Low | Acquisition / import batch accounting | Open (2026-10-08); review F-029, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-294.md` | Implementation |
 | AFLDB-ISSUE-295 | Settle exception report mixes both sources' apply-failure findings | Low | Acquisition / settle reporting — `src/lib/acquisition/settle-report.ts` | Open (2026-10-08); review F-030, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-295.md` | Implementation (trivial) |
 | AFLDB-ISSUE-296 | Deprecated fallback importer sets `records_rejected` without rejection rows | Low | Acquisition / deprecated fallback — `src/lib/external-afl/current-season-import.ts` | Open (2026-10-08); review F-031, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-296.md` | Implementation, or an operator decision to retire the fallback path |
-| AFLDB-ISSUE-297 | AFL API provider id is used unvalidated as a file path and URL path segment | Low | Acquisition / AFL API client — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-032, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-297.md` | Implementation |
 | AFLDB-ISSUE-298 | AFL API snapshot companion files are read without manifest verification | Low | Acquisition / evidence integrity — `src/lib/acquisition/afl-api-snapshot.ts` | Open (2026-10-08); review F-033, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-298.md` | Implementation |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-300 | AFL API control-database read failure is reported as "disabled by a super admin" | Low | Acquisition / diagnostics — `src/lib/acquisition/afl-api-ingestion-control.ts` | Open (2026-10-08); review F-035, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-300.md` | Implementation |
@@ -50803,16 +50802,23 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-297 — AFL API provider id is used unvalidated as a file path and URL path segment
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / AFL API client and acquisition tool. Key files:
+- **Status:** Resolved (2026-10-14, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** acquisition / AFL API client and acquisition tool. Key files:
   `src/lib/acquisition/afl-api-client.ts`, `tools/current-season/acquire-afl-api.ts`,
-  `src/lib/acquisition/afl-api-snapshot.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-297.md`.
+  `src/lib/acquisition/afl-api-snapshot.ts`. **Runbook:** `issues/closed/AFLDB-ISSUE-297.md`.
 - **Origin.** Review F-032 (R4b-F01) at `20a7a4bb`. Code-proven. ~~**Next action.** Implementation.~~ Superseded below.
-- **Implementation (2026-10-14; commit `9c5ba69c` on `sonnet/issue-297`, base `839e084c`; not merged, pushed or deployed).** `parseAflApiSeasonMatchesEnvelope` refuses a `providerId` that is not `CD_M<digits>`, and the four CFS plan helpers
+- **Implementation (2026-10-14; commit `9c5ba69c` on `sonnet/issue-297`, base `839e084c`; merged and pushed with its records as `38783e3c`; not deployed).** `parseAflApiSeasonMatchesEnvelope` refuses a `providerId` that is not `CD_M<digits>`, and the four CFS plan helpers
   refuse a match id that is not `CD_M<digits>` or a season id that is not `CD_S<digits>`; the `code_test_db` rekey rehearsal's synthetic ids became digit-only (`CD_M20262319nn`). Runbook §17.
 - **Validation (DB-free, 14 Oct 2026).** `afl-api-match`, `afl-api-brownlow-acquire`, `afl-api-ingestion-safety` 386/386; the four new cases fail on the unfixed source; `tsc` exit 0; no new ESLint error (3 pre-existing `any` errors in the
   test file at base); the 11 non-integration failures of a whole-suite run are identical before and after (stash differential). Not run: any integration test, the `code_test_db` rehearsal, any DEV/PROD action.
-- **Readiness: BLOCKED (not applied).** `merge:ready` found the primary at 16 untracked paths — the 15 preserved paths plus a zero-byte `void` created this session — outside the owner's 15-path exception; removal of `void` was refused.
-  **Status: Open.** **Next action.** Owner removes `void` or extends the exception, then merge, push and closure records (runbook §17.4).
+- **Readiness (14 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 297` BLOCKED by exactly one blocker, the primary worktree not clean. The first run (raw `D:\tmp\issue297\merge-ready-raw-1.txt`)
+  showed 16 untracked paths, one more than the owner's 15-path exception: a zero-byte `void`, created at 16:17:12 that day by the session's tooling. The assistant's deletion of it was **refused by the permission classifier** and was not retried or worked around.
+  The owner then amended the ISSUE-297-specific exception to the original 15 paths plus `void`, for this issue's implementation and closure merges only; preconditions were verified and preserved first (`D:\tmp\issue297\exception-precheck.txt`: `void` a
+  regular, zero-byte, untracked, unstaged file, SHA-256 `e3b0c442…b855`; exactly the 16-path set; no tracked primary change; 18 ISSUE-274/276 source and test blobs equal at base and on the branch). The second run (raw `merge-ready-raw-2.txt`) had that
+  one blocker and nothing else; existing warnings: no `afldb-merge-readiness` block in the runbook, no unexpected-file classification; database parity not checked. All 16 paths were left in place.
+- **Merge.** `38783e3c` (implementation `9c5ba69c` plus the records commit) fast-forwarded to `main` and pushed (`839e084c..38783e3c`); the live remote was verified equal.
+- **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's satisfied DB-free criteria (§14 item 1: the parser and the plan helpers refuse the hostile ids, and `runAcquisition` refuses before writing).
+  **Preserved limits:** not deployed; no live-feed observation (the parser is also used by the settle's season-enumeration read, so a real feed with another id shape would make that read throw after deployment; none is known); the `code_test_db`
+  rekey rehearsal was not re-run after its synthetic ids changed; no integration test was run; §14 item 2 does not apply to this issue. Open issues: 43 -> 42.
 
 ## AFLDB-ISSUE-298 — AFL API snapshot companion files are read without manifest verification
 
