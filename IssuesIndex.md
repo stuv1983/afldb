@@ -454,7 +454,9 @@
 
 ### AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
 - **Severity:** Low. **Area:** admin awards / special records / revalidation. **State:** Open (2026-10-08), F-017; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-282.md`. **Next action:** implementation, with ISSUE-283.
+- **State (2026-10-15):** implemented (`9baba193`), validated on `afldb_test` (6 focused integration cases, 16 of 16 mutants killed,
+  fixture residue 0); not deployed.
+- **Runbook:** `issues/open/AFLDB-ISSUE-282.md` §17. **Next action:** merge, then close (merge-scoped). ISSUE-283 is separate.
 
 ### AFLDB-ISSUE-283 — The administrative note is not recorded on creation audit rows
 - **Severity:** Low. **Area:** admin awards / special records / audit. **State:** Open (2026-10-08), F-018; imported 2026-10-10.

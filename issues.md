@@ -30,7 +30,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-277 | Data Editor edits other than the name to a token-only player are not durable | Medium | Admin authority / Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py` | Open (2026-10-08); review F-012, code-proven; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-277.md` | Operator decision **D-277-1** (option (a) or (b)), then implementation |
 | AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | Code fix plus test update, before search indexing is enabled |
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
-| AFLDB-ISSUE-282 | Replace actions revalidate only the replaced row's public pages | Low | Admin awards / special records / revalidation — `admin-awards.ts`, `admin-special-records.ts` | Open (2026-10-08); review F-017, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-282.md` | Implementation, grouped with ISSUE-283 |
+| AFLDB-ISSUE-282 | Replace actions revalidate only the replaced row's public pages | Low | Admin awards / special records / revalidation — `admin-awards.ts`, `admin-special-records.ts` | Open (2026-10-08); review F-017, code-proven; imported 2026-10-10; implemented `9baba193` and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-282.md` | Merge, then close (ISSUE-283 is separate) |
 | AFLDB-ISSUE-283 | The administrative note is not recorded on creation audit rows | Low | Admin awards / special records / audit trail | Open (2026-10-08); review F-018, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-283.md` | Implementation, grouped with ISSUE-282 |
 | AFLDB-ISSUE-284 | Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish | Low | Admin Brownlow — `src/db/queries/admin-brownlow.ts` | Open (2026-10-08); review F-019, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-284.md` | Implementation |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
@@ -50652,7 +50652,19 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Origin.** Review F-017 (R2a-F01 and R2c-F02, grouped) at `20a7a4bb`. Code-proven.
 - **Defect.** The five replace transactions return the old row's revalidation paths only; the replacement's pages stay
   stale until ISR expiry (up to a day).
-- **Next action.** Implementation, grouped with ISSUE-283.
+- ~~**Next action.** Implementation, grouped with ISSUE-283.~~ Superseded below.
+- **Implementation (2026-10-15; commit `9baba193` on `sonnet/issue-282`, base `9fcefb9c`; not deployed).** Each of the five replace
+  transactions now reads the row it just created and returns the de-duplicated union of the voided row's and the created row's public
+  paths (new `replacementPaths` helper in `admin-awards.ts` and `admin-special-records.ts`; three new in-transaction readers for the
+  awards file). No migration, no change to the actions or the allowlists. Runbook §17.
+- **Validation (`afldb_test`, 15 Oct 2026; runbook §17.3).** Focused integration cases, run through a launcher that proved
+  `current_database() = afldb_test` for the owner, importer and auth roles before any write: `admin-awards` 4 passed (the two existing
+  replace cases now assert the union; new cases for a Hall of Fame move across induction years and an honour-team move across teams and
+  players, which had no replace case), `admin-special-records` 2 passed (first-kick union; a new after-the-siren case). Against the unfixed
+  source the same filters give 4 and 2 failures on the missing created-row path; 16 of 16 mutants (helper and per-function, voided-only,
+  created-only, no de-duplication) are killed; fixture residue read 0 on 14 selectors before, between and after. `tsc --noEmit`, ESLint
+  and `git diff --check` exit 0. The python replay tests of the awards file and the whole integration files were not run. A DB-free
+  neighbour (`awards-admin`, migration 108 grant text) fails identically on unchanged `main`.
 
 ## AFLDB-ISSUE-283 — The administrative note is not recorded on creation audit rows
 
