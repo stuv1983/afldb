@@ -33,6 +33,9 @@ export type AflApiSnapshotManifest = {
   files: readonly AflApiManifestFile[];
 };
 
+/** The three files every acquired match directory must carry, all hash-bound (ISSUE-298). */
+const AFL_API_UNIT_FILES = ['fixture.json', 'match-roster.json', 'player-stats.json'] as const;
+
 /** `data/sources/afl_api/matches` under a project root (§5.4). */
 export function aflApiSnapshotRoot(projectRoot: string): string {
   return join(projectRoot, 'data', 'sources', 'afl_api', 'matches');
@@ -85,14 +88,34 @@ export function verifyAflApiSnapshotManifest(snapshotDir: string): AflApiSnapsho
  * Discover every acquired match directory (one per `CD_M...` provider id)
  * from the manifest's own file list, rather than re-listing the directory —
  * the manifest is the one proof of what acquisition actually wrote (§5.4).
+ *
+ * AFLDB-ISSUE-298: a unit is read only when all three of its files are listed
+ * AND were hashed. `verifyAflApiSnapshotManifest()` re-hashes only the listed
+ * files and skips a `fixture_absent` entry, so a companion read by naming
+ * convention, or a file the manifest marks absent, would reach the settle as
+ * bytes nothing verified. Such a unit refuses the whole snapshot rather than
+ * being dropped, because a partial settle would look complete.
  */
 export function aflApiUnitSourcesFrom(
   snapshotDir: string, files: readonly AflApiManifestFile[],
 ): AflApiSettleUnitSource[] {
+  const verified = new Set<string>();
+  for (const entry of files) {
+    if (entry.status !== 'fixture_absent') verified.add(entry.file);
+  }
   const matchDirs = new Set<string>();
   for (const entry of files) {
     const parts = entry.file.split('/');
     if (parts.length === 2 && parts[1] === 'fixture.json') matchDirs.add(parts[0]);
+  }
+  for (const dir of [...matchDirs].sort()) {
+    const unverified = AFL_API_UNIT_FILES.map((name) => `${dir}/${name}`).filter((file) => !verified.has(file));
+    if (unverified.length > 0) {
+      throw new Error(
+        `Match '${dir}' is not fully verified by the manifest: ${unverified.join(', ')} `
+        + 'not listed with a hash (absent, or marked fixture_absent) — refusing to settle it.',
+      );
+    }
   }
   return [...matchDirs].sort().map((dir) => ({
     fixtureRaw: readJson(join(snapshotDir, dir, 'fixture.json')),
