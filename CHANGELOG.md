@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### The source-owned draft pick form can confirm a selection that has no pick number (AFLDB-ISSUE-287; `dcc6a61c`, merged and pushed to `main` as `8cea1a45`; DB-free validated; not deployed; resolved) - 14 October 2026
+
+- On `/admin/draft/[id]`, clearing the pick number of a source-owned (DraftGuru) selection whose kind carries pick numbers, and which has a pick note, makes the action ask for confirmation. The "Pick number and club" form (`SourceFieldsPanel`) never sent that confirmation, so the save could never complete. It now shows a "Confirm this selection has no pick number." checkbox beside the request, keeps Save disabled until it is ticked, and sends `confirmed=1` for that one save only. The server-side rule is unchanged.
+- **Behaviour change after deployment:** that correction, previously impossible from this form, becomes possible. Other field groups are unchanged.
+- **Validation (DB-free).** `admin-draft-actions` + `draft-linkage-invariants` 68 passed (8 new; 2 fail against the previous panel); `tsc --noEmit` exit 0. No integration test, browser check (`VISUAL: UNVERIFIED`), deployment or DEV/PROD action. Readiness was accepted under a scoped cleanliness exception, not a clean pass. Detail: `issues/closed/AFLDB-ISSUE-287.md` §17 and §18.
+
 ### Sitemap segments render under Next.js 16 (AFLDB-ISSUE-279; `c206d1d1`, merged and pushed to `main` as `cf1d49c3`; DB-free validated; not deployed; still open) - 14 October 2026
 
 - `src/app/sitemap.ts` awaits the segment `id`, which Next 16 passes as a `Promise<string>`; it was read as a number, so `Number(promise)` was `NaN` and every `/sitemap/<n>.xml` was an empty `<urlset>` while the `/sitemap.xml` index still listed it. The plain-string and number forms still work. No effect today (indexing is off); it matters once indexing is enabled.

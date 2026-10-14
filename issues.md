@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 40 (ISSUE-229, ISSUE-266–270 and 34 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below)
+**Open issues:** 39 (ISSUE-229, ISSUE-266–270 and 33 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -35,7 +35,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-284 | Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish | Low | Admin Brownlow — `src/db/queries/admin-brownlow.ts` | Open (2026-10-08); review F-019, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-284.md` | Implementation |
 | AFLDB-ISSUE-285 | Award Replace panel cannot give the duplicate confirmation its action requires | Low | Admin awards UI — `src/app/admin/awards/ReplacePanel.tsx` | Open (2026-10-08); review F-020, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-285.md` | Implementation |
 | AFLDB-ISSUE-286 | Hall of Fame legend and removal years are not bounded server-side | Low | Admin awards / Hall of Fame validation | Open (2026-10-08); review F-021, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-286.md` | Implementation |
-| AFLDB-ISSUE-287 | Source-owned draft pick `null_pick_number` confirmation is unreachable | Low | Admin draft UI — `src/app/admin/draft/SourceFieldsPanel.tsx` | Open (2026-10-08); review F-022, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-287.md` | Implementation |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
 | AFLDB-ISSUE-293 | Settle runs under-report `dataIssuesResolved` | Low | Acquisition / settle run accounting | Open (2026-10-08); review F-028, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-293.md` | Implementation (trivial) |
@@ -50699,13 +50698,13 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-287 — Source-owned draft pick `null_pick_number` confirmation is unreachable
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin draft UI. Key files:
+- **Status:** Resolved (2026-10-14, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** admin draft UI. Key files:
   `src/app/admin/draft/SourceFieldsPanel.tsx`, `src/app/admin/draft/actions.ts`. **Runbook:**
-  `issues/open/AFLDB-ISSUE-287.md`.
+  `issues/closed/AFLDB-ISSUE-287.md`.
 - **Origin.** Review F-022 (R2c-F01) at `20a7a4bb`. Code-proven.
 - **Defect.** The action asks for J-5 `null_pick_number` confirmation, but the panel never sends `confirmed`, so the
   operation can never complete. ~~**Next action.** Implementation.~~ Superseded below.
-- **Implementation (2026-10-14; `dcc6a61c` on `sonnet/issue-287`, base `b3975136`; not yet merged).** `SourceFieldsPanel`
+- **Implementation (2026-10-14; commit `dcc6a61c` on `sonnet/issue-287`, base `b3975136`; merged and pushed with its records as `8cea1a45`; not deployed).** `SourceFieldsPanel`
   shows a "Confirm this selection has no pick number." checkbox when the action asks for `null_pick_number`, holds the
   pick-number Save until it is ticked, and sends `confirmed=1` through the pure helper `sourceFieldsConfirmed`
   (`validation.ts`), only for the `selection_facts` group, only after the request and only when ticked; the tick is cleared
@@ -50714,6 +50713,13 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   panel at `HEAD`, 2 of the new cases fail; `tsc --noEmit`, ESLint of the three files and `git diff --check` exit 0;
   implementation preflight READY. Not run: integration, DEV/PROD, browser (`VISUAL: UNVERIFIED`); the click path is
   covered by a helper truth table and a source contract, not a DOM event.
+- **Readiness (14 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 287` (raw `D:	mpissue287merge-ready-raw-1.txt`, unchanged)
+  BLOCKED by exactly one blocker, the primary worktree not clean: the 17 untracked paths (nine `.agents/skills` files, seven zero-byte stray-named files including `void`, and the literal `$null)`), for this issue only, as authorised by the owner.
+  Preconditions were verified first (`D:	mpissue287exception-precheck.txt`): exactly that set; each a regular, untracked, unstaged file; the nine non-empty files equal their full SHA-256 and length to the 13 Oct manifest; the zero-byte files `e3b0c442…b855`;
+  `$null)` (rewritten by the SessionStart hook each session) hashed afresh as `D9EDB146…2500` and unchanged across the merge; primary `HEAD` equal to the live remote. `worktree:bootstrap` was BLOCKED by the same paths (`bootstrap-raw-1.txt`), so the worktree was created with the one `git worktree add` it would have run. Existing warnings: no `afldb-merge-readiness` block in the runbook, no unexpected-file classification; database parity not checked. All 17 paths were left in place.
+- **Merge.** `dcc6a61c` plus the records commit `8cea1a45` fast-forwarded to `main` and pushed (`b3975136..8cea1a45`); the live remote was verified equal.
+- **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's satisfied DB-free criterion (§14: a render test asserting the control exists).
+  **Preserved limits:** not deployed; `VISUAL: UNVERIFIED` (no browser capture); the click path is covered by a helper truth table and a source contract, not a DOM event; no integration test or DEV/PROD check was run. Open issues: 40 -> 39.
 
 ## AFLDB-ISSUE-288 — `createCoach` casts an unvalidated `dob` outside its error handling
 
