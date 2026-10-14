@@ -50766,7 +50766,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   create-and-link). Key files: `src/app/admin/data-editor/actions.ts`, `src/app/admin/player-links/actions.ts`,
   `src/db/queries/players.ts` (`createPlayerInTransaction`). **Runbook:** `issues/open/AFLDB-ISSUE-291.md`.
 - **Origin.** Review F-026 (R3-F05 and R5b-F05, grouped on the shared primitive) at `20a7a4bb`. Code-proven.
-- **Next action.** Implementation.
+- ~~**Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-14; `sonnet/issue-291`, base `4277d017`; not yet merged).** `validateNewPlayerFacts`
+  (`src/db/queries/players.ts`) applies the `EDITABLE_ENTITIES.players` rules (real `YYYY-MM-DD` date, confidence enumeration,
+  height 120-230, weight 40-160) inside `createPlayerInTransaction` before any statement; both actions return the refusal as a typed
+  error. Runbook §17.
+- **Validation (DB-free, 14 Oct 2026).** `player-link-mutations` "player creation facts" 17 passed (12 new; 9 fail with the call
+  disabled); `tsc` exit 0; `git diff --check` exit 0; ESLint of the two files 22 problems, identical to the unchanged tree.
+  Pre-existing unrelated failures not rerun (`player-link-mutations` I14 CRLF assertion; `register-issue224-s9-dev-write-gate`
+  `DATABASE_URL is not set`). Not run: integration, DEV/PROD, browser.
 
 ## AFLDB-ISSUE-292 — Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths
 

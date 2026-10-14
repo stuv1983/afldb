@@ -484,7 +484,8 @@
 ### AFLDB-ISSUE-291 — Admin player creation persists unvalidated biographical fields
 - **Severity:** Low. **Area:** admin player creation — `src/db/queries/players.ts` (`createPlayerInTransaction`).
   **State:** Open (2026-10-08), F-026; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-291.md`. **Next action:** implementation.
+- **Runbook:** `issues/open/AFLDB-ISSUE-291.md` (§17, §17.1). **Next action:** merge and push (implemented 2026-10-14, DB-free
+  validated), then close.
 
 ### AFLDB-ISSUE-292 — Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths
 - **Severity:** Low. **Area:** Data Editor / override replay — `src/db/queries/data-edits.ts`. **State:** Open
