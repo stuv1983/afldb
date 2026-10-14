@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 38 (ISSUE-229, ISSUE-266–270 and 32 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below)
+**Open issues:** 37 (ISSUE-229, ISSUE-266–270 and 31 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -42,7 +42,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-296 | Deprecated fallback importer sets `records_rejected` without rejection rows | Low | Acquisition / deprecated fallback — `src/lib/external-afl/current-season-import.ts` | Open (2026-10-08); review F-031, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-296.md` | Implementation, or an operator decision to retire the fallback path |
 | AFLDB-ISSUE-298 | AFL API snapshot companion files are read without manifest verification | Low | Acquisition / evidence integrity — `src/lib/acquisition/afl-api-snapshot.ts` | Open (2026-10-08); review F-033, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-298.md` | Implementation |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
-| AFLDB-ISSUE-300 | AFL API control-database read failure is reported as "disabled by a super admin" | Low | Acquisition / diagnostics — `src/lib/acquisition/afl-api-ingestion-control.ts` | Open (2026-10-08); review F-035, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-300.md` | Merge and push (implemented 2026-10-14, DB-free validated), then close |
 | AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
 | AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-304.md` | Implementation, after ISSUE-266 |
@@ -50905,13 +50904,13 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-300 — AFL API control-database read failure is reported as "disabled by a super admin"
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / operational diagnostics. Key files:
+- **Status:** Resolved (2026-10-14, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** acquisition / operational diagnostics. Key files:
   `src/lib/acquisition/afl-api-ingestion-control.ts`, `tools/current-season/acquire-afl-api.ts`,
   `discover-afl-api-seasons.ts`, `acquire-afl-api-brownlow.ts`. **Runbook:**
-  `issues/open/AFLDB-ISSUE-300.md`.
+  `issues/closed/AFLDB-ISSUE-300.md`.
 - **Origin.** Review F-035 (R4b-F05) at `20a7a4bb`. Code-proven. The fail-closed read is correct; only the message misleads.
 - ~~**Next action.** Implementation.~~ Superseded below.
-- **Implementation (2026-10-14; commit `47541503` on `sonnet/issue-300`, base `5dff6ea6`; not yet merged).** The reader's result gains an
+- **Implementation (2026-10-14; commit `47541503` on `sonnet/issue-300`, base `5dff6ea6`; merged and pushed with its records as `597242cd`; not deployed).** The reader's result gains an
   optional, secret-free `readFailure` (unset `DATABASE_URL`, or a connection/query failure with at most a driver error code); the flags stay
   `false`, so fail-closed behaviour is unchanged. `acquire-afl-api`, `discover-afl-api-seasons --fetch`, `settle-afl-api-fixtures` (a fourth caller of
   the same reader, brought into line) and `acquire-afl-api-brownlow` now say the switches could not be read instead of telling the operator a
@@ -50919,6 +50918,13 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Validation (DB-free, 14 Oct 2026).** Five related suites 435 passed; new cases feed the real reader output into the real CLI entry points
   (9 tests fail against the base source); `tsc --noEmit`, ESLint and `git diff --check` exit 0; implementation preflight READY. Not run:
   PostgreSQL, systemd, any live CLI run, DEV/PROD.
+- **Readiness (14 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 300` (raw `D:\tmp\issue300\merge-ready-raw-1.txt`, unchanged)
+  BLOCKED by exactly one blocker, the primary worktree not clean: the 17 untracked paths (nine `.agents/skills` files, seven zero-byte stray-named files including `void`, and the literal `$null)`), for this issue only, as authorised by the owner.
+  Every other check PASSed; warnings as before (no runbook readiness block, no unexpected-file classification; database parity not checked). `worktree:bootstrap` is blocked by the same paths, so the worktree was created with `git worktree add -b` at the live-remote-verified tip.
+  The exact 17-path set and the full content hashes were verified **immediately before each of the two merges** (`D:\tmp\issue300\precheck-1`, `premerge-1`, `postmerge-1`, `premerge-2`, `postmerge-2`; script `exception-check.py`), all RESULT OK. `$null)` (143 bytes, mtime 20:00:49) hashed in full in this session as `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500`, identical at every check; it names an earlier session's id, so this session's hook had not rewritten it. Current equality with the saved 13 Oct snapshots, not continuous preservation.
+- **Merge.** `47541503` and `597242cd` fast-forwarded to `main` and pushed (`5dff6ea6..597242cd`); local `main`, the fetched `origin/main` and the live remote all equalled `597242cd` afterwards.
+- **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's §14 criterion (DB-free unit tests with an unreachable stub: met, §17.1).
+  **Preserved limits:** not deployed; no live CLI, systemd, PostgreSQL-restart, timeout or missing-table observation; the unreachable case is a local refused-port stub; settle CLIs that use `proveAflApiIngestionPreflight` were already correct and untouched.
 
 ## AFLDB-ISSUE-301 — AFL API HTTP client has no request timeout and reads the body outside its retry
 

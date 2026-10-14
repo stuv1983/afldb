@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### An unreadable AFL API control database is reported as a read failure, not as a disabled switch (AFLDB-ISSUE-300; `47541503`, merged and pushed to `main` as `597242cd`; DB-free validated; not deployed; resolved) - 14 October 2026
+
+- The AFL API acquire, season-discovery (`--fetch`), fixtures-settle and Brownlow-acquire tools read two super-admin switches from the control database and fail closed when they cannot. Previously an unset `DATABASE_URL`, a refused connection, a timeout or a missing `site_settings` table gave the same result as a switched-off setting, so the tool told the operator "A super admin must enable it". The reader now also returns a secret-free `readFailure`, and those four tools say the switches could not be read (and why, in a fixed phrase plus at most a driver error code, never the driver message or any part of the DSN). Fail-closed behaviour, the exit codes and the settle failure marker are unchanged; the message for a genuinely stored "disabled" is unchanged.
+- **Behaviour change after deployment:** only the refusal text for an unreadable control database. The Brownlow message states the deployment gate and says the admin setting is unknown.
+- **Validation (DB-free).** Five related suites 435 passed; nine tests fail against the previous source (eight new cases and one existing case extended to check the read failure); `tsc --noEmit`, ESLint of the changed files and `git diff --check` exit 0. No live CLI run, PostgreSQL restart, systemd run, deployment or DEV/PROD action. Readiness was accepted under a scoped cleanliness exception, not a clean pass. Detail: `issues/closed/AFLDB-ISSUE-300.md` §17 and §18.
+
 ### Hall of Fame legend and removal years are bounded on every server path (AFLDB-ISSUE-286; `f2c6b675`, merged and pushed to `main` as `c2b1d65e`; DB-free validated; not deployed; resolved) - 14 October 2026
 
 - On `/admin/awards/hall-of-fame`, a legend year or removal year outside 1996 to 2100, or before the entry's induction year, is now refused with a sentence on create, replace and correct. Previously a correction accepted any integer (so `legend_year = 20999` was stored and shown publicly, and a value above 32767 failed on the `smallint` cast with a raw error), the removal year was never bounded, and replace relied on the form alone. One rule, `hallOfFameYearsRefusal`, now serves all three; year-only checks run before a connection opens.
