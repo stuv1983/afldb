@@ -442,8 +442,9 @@
 
 ### AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 - **Severity:** Medium. **Area:** public site / SEO — `src/app/sitemap.ts`.
-- **State:** Open (2026-10-08), review F-014, reproduced DB-free by the review (W6); imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-279.md`. **Next action:** fix plus test update, before search indexing is enabled.
+- **State:** Open (2026-10-08), review F-014, reproduced DB-free by the review (W6); imported 2026-10-10. Implemented
+  2026-10-14 (`c206d1d1`), DB-free validated; merge pending.
+- **Runbook:** `issues/open/AFLDB-ISSUE-279.md` (§17, §17.1). **Next action:** merge and push, then close.
 
 ### AFLDB-ISSUE-280 — Beta magic link is consumed by any GET, including a mail scanner's prefetch
 - **Severity:** Low. **Area:** beta gate — `src/app/beta/verify/route.ts`. **State:** Open (2026-10-08), F-015; imported 2026-10-10.

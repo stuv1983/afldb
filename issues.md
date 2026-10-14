@@ -50617,13 +50617,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** public site / SEO / framework upgrade. Key files:
+- **Status:** Open (2026-10-08); implemented 2026-10-14, DB-free validated, merge pending. **Severity:** Medium. **Area:** public site / SEO / framework upgrade. Key files:
   `src/app/sitemap.ts`, `tests/seo.test.ts`, `tests/e2e/seo.spec.ts`.
 - **Runbook:** `issues/open/AFLDB-ISSUE-279.md`. **Origin.** Review F-014 (R1c-F01) at `20a7a4bb`. Reproduced DB-free by
   the review (witness W6, not imported) and confirmed against the installed `next@16.3.1` documentation.
 - **Defect.** Next 16 passes the segment `id` as a `Promise<string>`; `Number(promise)` is `NaN`, so every
   `/sitemap/<n>.xml` is an empty `<urlset>` while the index still advertises them.
-- **Decisions.** None. **Next action.** Code fix plus test update, before search indexing is enabled (review gating note).
+- **Decisions.** None. ~~**Next action.** Code fix plus test update, before search indexing is enabled (review gating note).~~ Superseded below.
+- **Implementation (2026-10-14; commit `c206d1d1` on `sonnet/issue-279`, base `a7f7a713`; not merged yet; not deployed).** `src/app/sitemap.ts` reads the segment id as `Number(await rawId)` and accepts `Promise<string | undefined> | string | number | undefined`, so the Next 16 `Promise<string>` contract and the earlier contracts all select the right segment. Runbook §17.
+- **Validation (DB-free, 14 Oct 2026).** `tests/seo.test.ts` 25 passed (new: every segment 0/1/100/200/300 non-empty under `Promise<string>` and equal to the string and number contracts, with exact URLs for 100 and 200; an unmatched id renders nothing); 2 fail against the previous `sitemap.ts`; `tsc --noEmit`, ESLint of the two files and `git diff --check` exit 0. Not run: integration, e2e, DEV/PROD, browser, build; the §14 DEV check (indexing on, `/sitemap/0.xml` contains a `<url>`) is outstanding.
 
 ## AFLDB-ISSUE-280 — Beta magic link is consumed by any GET, including a mail scanner's prefetch
 

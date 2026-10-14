@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). Implemented 2026-10-14 (§17) and DB-free validated (§17.1); merge pending.
 - **Severity:** Medium. **Area:** public site / SEO / framework upgrade.
 - **Key files:** `src/app/sitemap.ts`, `tests/seo.test.ts`, `tests/e2e/seo.spec.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-014; main-session partition R1c-F01).
@@ -90,4 +90,17 @@ None.
 
 ## 16. Next action
 
-Code fix plus test update. This must be done before indexing is enabled.
+~~Code fix plus test update. This must be done before indexing is enabled.~~ Done (§17). Merge and push, then close.
+
+## 17. Implementation record (2026-10-14)
+
+- **Commit:** `c206d1d1` on `sonnet/issue-279`, base `a7f7a713`. Files: `src/app/sitemap.ts`, `tests/seo.test.ts`.
+- **Fix.** The default export now types `id` as `Promise<string | undefined> | string | number | undefined` and reads it as `Number(await rawId)`. The Next 16 loader passes `Promise<string>` (`next-metadata-route-loader.js`, `handler({ id: targetIdPromise })`, with `.xml` stripped and `undefined` when absent); the earlier plain-string and number contracts still work (awaiting a plain value is a no-op) so the Number coercion that fixed the original `id === 0` mismatch is kept. `generateSitemaps` and the `/sitemap.xml` index route are unchanged.
+- **Tests (DB-free, `tests/seo.test.ts`, `sitemap`).** The three existing calls moved to the Promise contract. New: every segment 0, 1, 100, 200, 300 is non-empty under `Promise<string>` and equal to the string and number contracts (segments 100 and 200 are given one player and one match row through a mutable `@/db/client` mock, so they have something to list, and their exact URLs are asserted); an id that names no segment (`'999'`, `undefined`, `'not-a-number'`) renders nothing. The shared mock stays empty for every other test.
+- **Not changed.** `tests/e2e/seo.spec.ts` still reads only the index, never a segment (§2); the DEV check in §14 item 2 (indexing on, `/sitemap/0.xml` containing a `<url>`) was not run. The e2e read would need a database and a running server.
+
+## 17.1 Validation (2026-10-14, assistant-run on the operator's explicit authorisation; Windows, DB-free)
+
+- `npx vitest run tests/seo.test.ts`: **25 passed**. **Negative control:** with the previous `src/app/sitemap.ts` restored, 2 fail (the new all-segments case, and the club-comparison case, which now reads segment 0 under the Promise contract and finds it empty); the fixed file was restored afterwards and the 25 pass again.
+- `npx tsc --noEmit`: exit 0. `npx eslint src/app/sitemap.ts tests/seo.test.ts`: exit 0, no problems. `git diff --check`: exit 0.
+- **Not run:** any integration file (`tests/integration/admin-awards.test.ts` calls `sitemap({ id: 1 })` with the number contract, which still type-checks and behaves the same), the e2e spec, any DEV/PROD action, any browser check, `npm run build`.
