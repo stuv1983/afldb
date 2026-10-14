@@ -922,6 +922,16 @@ function honourTeamPaths(row: {
   return [...new Set(paths)];
 }
 
+/**
+ * A replacement changes two rows' public pages, not one: the voided row's
+ * (its award, season, player or club stop listing it) and the created row's
+ * (they start listing it). The two sets overlap in the common case and share
+ * nothing in the advertised one, so the result is their de-duplicated union.
+ */
+function replacementPaths(voided: string[], created: string[]): string[] {
+  return [...new Set([...voided, ...created])];
+}
+
 // --- the shared edit core (§6.3) -----------------------------------------
 
 /**
@@ -1708,6 +1718,7 @@ export async function replaceAwardWinner(
 
         await recomputeAwardSpan(tx as Tx, row.row.awardId);
 
+        const createdRow = await readAwardWinnerInTx(tx as Tx, created.rowId);
         return {
           ok: true as const,
           table: 'award_winners' as const,
@@ -1716,7 +1727,9 @@ export async function replaceAwardWinner(
           voidedEntityKey: row.entityKey,
           voidedRowId: row.id,
           replacementId,
-          revalidatePaths: row.revalidatePaths,
+          revalidatePaths: replacementPaths(
+            row.revalidatePaths, createdRow ? awardWinnerPaths(createdRow) : [],
+          ),
         };
       }) as HonourMutationResult<HonourReplacementResult>;
     } catch (error) {
@@ -2170,12 +2183,7 @@ export async function createHallOfFameInductee(
     try {
       return await importSql.begin(async (tx) => {
         const created = await insertHallOfFame(tx as Tx, input);
-        const row = await (async () => {
-          const rows = await (tx as Tx).unsafe(
-            `SELECT ${HALL_OF_FAME_COLUMNS} WHERE h.id = $1`, [created.rowId],
-          ) as unknown as HallOfFameRow[];
-          return rows[0] ?? null;
-        })();
+        const row = await readHallOfFameInTx(tx as Tx, created.rowId);
         return {
           ok: true as const,
           table: 'hall_of_fame' as const,
@@ -2188,6 +2196,13 @@ export async function createHallOfFameInductee(
       return rolledBackRefusal(error) ?? refuse('failed', mutationFailure(error));
     }
   });
+}
+
+async function readHallOfFameInTx(tx: Tx, id: number): Promise<HallOfFameRow | null> {
+  const rows = await tx.unsafe(
+    `SELECT ${HALL_OF_FAME_COLUMNS} WHERE h.id = $1`, [id],
+  ) as unknown as HallOfFameRow[];
+  return rows[0] ?? null;
 }
 
 export type ReplaceHallOfFameInput = HonourEditBase & {
@@ -2262,6 +2277,7 @@ export async function replaceHallOfFameInductee(
           note: input.note,
         });
 
+        const createdRow = await readHallOfFameInTx(tx as Tx, created.rowId);
         return {
           ok: true as const,
           table: 'hall_of_fame' as const,
@@ -2270,7 +2286,9 @@ export async function replaceHallOfFameInductee(
           voidedEntityKey: row.entityKey,
           voidedRowId: row.id,
           replacementId,
-          revalidatePaths: row.revalidatePaths,
+          revalidatePaths: replacementPaths(
+            row.revalidatePaths, createdRow ? hallOfFamePaths(createdRow) : [],
+          ),
         };
       }) as HonourMutationResult<HonourReplacementResult>;
     } catch (error) {
@@ -2717,6 +2735,15 @@ export async function createHonourTeamMember(
   });
 }
 
+async function readHonourTeamMemberInTx(
+  tx: Tx, id: number,
+): Promise<HonourTeamMemberRow | null> {
+  const rows = await tx.unsafe(
+    `SELECT ${HONOUR_TEAM_COLUMNS} WHERE m.id = $1`, [id],
+  ) as unknown as HonourTeamMemberRow[];
+  return rows[0] ?? null;
+}
+
 export type ReplaceHonourTeamInput = HonourEditBase & {
   reason: string;
   replacement: Omit<CreateHonourTeamMemberInput, 'adminUserId'>;
@@ -2787,6 +2814,7 @@ export async function replaceHonourTeamMember(
           note: input.note,
         });
 
+        const createdRow = await readHonourTeamMemberInTx(tx as Tx, created.rowId);
         return {
           ok: true as const,
           table: 'honour_team_members' as const,
@@ -2795,7 +2823,9 @@ export async function replaceHonourTeamMember(
           voidedEntityKey: row.entityKey,
           voidedRowId: row.id,
           replacementId,
-          revalidatePaths: row.revalidatePaths,
+          revalidatePaths: replacementPaths(
+            row.revalidatePaths, createdRow ? honourTeamPaths(createdRow) : [],
+          ),
         };
       }) as HonourMutationResult<HonourReplacementResult>;
     } catch (error) {

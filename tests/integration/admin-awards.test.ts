@@ -48,6 +48,7 @@ import {
   reinstateHonourTeamMember,
   replaceAwardWinner,
   replaceHallOfFameInductee,
+  replaceHonourTeamMember,
   voidAwardWinner,
   voidHallOfFameInductee,
   voidHonourTeamMember,
@@ -66,6 +67,8 @@ import {
 } from '@/db/queries/awards';
 import { axisPlayerIds } from '@/db/queries/grid-solver';
 import { runQueryBuilder } from '@/db/queries/query-builder';
+import { honourTeamPath, playerPath, seasonPath } from '@/lib/format';
+import { honourTeamSlug } from '@/lib/slugs';
 import type { GridAxisState } from '@/search/grid-solver-spec';
 import type { QueryBuilderState } from '@/search/query-builder-spec';
 import sitemap from '@/app/sitemap';
@@ -275,6 +278,12 @@ async function seedSourceWinner(awardId: number, recordId: string, over: {
             ${over.note ?? null}, ${wikipediaSourceId}, ${recordId})
     RETURNING id`;
   return row.id;
+}
+
+/** The public player page the application revalidates for this fixture player. */
+async function playerPageOf(playerId: number): Promise<string> {
+  const [row] = await admin<{ slug: string }[]>`SELECT slug FROM players WHERE id = ${playerId}`;
+  return playerPath(row.slug, playerId);
 }
 
 async function winnerRow(id: number) {
@@ -682,6 +691,13 @@ describe('award_winners — correction, void, reinstate, replace', () => {
     expect(result.ok, JSON.stringify(result)).toBe(true);
     if (!result.ok) return;
 
+    // ISSUE-282: both rows' public pages are revalidated, not only the voided
+    // row's. The old player's page stops listing the award; the new player's
+    // page starts to.
+    expect(result.revalidatePaths).toContain(await playerPageOf(linkedPlayerId));
+    expect(result.revalidatePaths).toContain(await playerPageOf(secondPlayerId));
+    expect(new Set(result.revalidatePaths).size).toBe(result.revalidatePaths.length);
+
     expect((await winnerRow(id))!.status).toBe('void');
     const replacement = await readAwardWinner(result.rowId);
     expect(replacement!.status).toBe('active');
@@ -1032,6 +1048,12 @@ describe('hall_of_fame — removed_year is not lifecycle, and replacement re-use
     expect(result.ok, JSON.stringify(result)).toBe(true);
     if (!result.ok) return;
 
+    // ISSUE-282: the voided entry was unlinked and the replacement links a
+    // player, so the linked player's page is a path only the created row has.
+    expect(result.revalidatePaths).toContain('/hall-of-fame');
+    expect(result.revalidatePaths).toContain(await playerPageOf(linkedPlayerId));
+    expect(new Set(result.revalidatePaths).size).toBe(result.revalidatePaths.length);
+
     expect((await readHallOfFameInductee(seeded.id))!.status).toBe('void');
     const replacement = await readHallOfFameInductee(result.rowId);
     expect(replacement!.status).toBe('active');
@@ -1061,6 +1083,34 @@ describe('hall_of_fame — removed_year is not lifecycle, and replacement re-use
     });
     expect(duplicate.ok).toBe(false);
     if (!duplicate.ok) expect(duplicate.reason).toBe('duplicate');
+  });
+
+  it('replacing an entry into another induction year revalidates both years (ISSUE-282)', async () => {
+    const name = `${MARKER} Moved Inductee`;
+    const [seeded] = await admin<{ id: number }[]>`
+      INSERT INTO hall_of_fame (name, link_status_value, category, inducted_year, source_id)
+      VALUES (${name}, 'unmatched'::link_status, 'Player', 1998, ${wikipediaSourceId})
+      RETURNING id`;
+    const row = await readHallOfFameInductee(seeded.id);
+
+    const result = await replaceHallOfFameInductee({
+      rowId: seeded.id,
+      expectedUpdatedAt: row!.updatedAt,
+      adminUserId: actorId,
+      reason: 'inducted in a different year',
+      replacement: { name, inductedYear: 2001, playerId: linkedPlayerId, category: 'Player' },
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+
+    // The voided entry's season page (1998) and the created entry's (2001) are
+    // both stale until revalidated; the union is returned, once each.
+    for (const path of [
+      '/hall-of-fame', seasonPath(1998), seasonPath(2001), await playerPageOf(linkedPlayerId),
+    ]) {
+      expect(result.revalidatePaths, path).toContain(path);
+    }
+    expect(new Set(result.revalidatePaths).size).toBe(result.revalidatePaths.length);
   });
 });
 
@@ -1120,6 +1170,40 @@ describe('honour_team_members — both identity axes', () => {
     // claimed by the voided row's own record. Refused in a sentence (§ the
     // `refuseClaimedKey` rule), never by silently overwriting that record.
     if (!again.ok) expect(again.reason).toBe('conflict');
+  });
+
+  it('replacing a selection revalidates the old AND the new team and player pages (ISSUE-282)', async () => {
+    const oldTeam = `${MARKER} Replace Old Team`;
+    const newTeam = `${MARKER} Replace New Team`;
+    const original = await createHonourTeamMember({
+      teamName: oldTeam, playerId: linkedPlayerId, position: 'FB', adminUserId: actorId,
+    });
+    expect(original.ok, JSON.stringify(original)).toBe(true);
+    if (!original.ok) return;
+
+    const result = await replaceHonourTeamMember({
+      rowId: original.rowId,
+      expectedUpdatedAt: (await readHonourTeamMember(original.rowId))!.updatedAt,
+      adminUserId: actorId,
+      reason: 'selected in a different team, and it was another player',
+      replacement: { teamName: newTeam, playerId: secondPlayerId, position: 'HB' },
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+
+    expect((await readHonourTeamMember(original.rowId))!.status).toBe('void');
+    expect((await readHonourTeamMember(result.rowId))!.status).toBe('active');
+
+    // The union of both rows: neither team page nor player page is missing.
+    for (const path of [
+      honourTeamPath(honourTeamSlug(oldTeam)),
+      honourTeamPath(honourTeamSlug(newTeam)),
+      await playerPageOf(linkedPlayerId),
+      await playerPageOf(secondPlayerId),
+    ]) {
+      expect(result.revalidatePaths, path).toContain(path);
+    }
+    expect(new Set(result.revalidatePaths).size).toBe(result.revalidatePaths.length);
   });
 });
 

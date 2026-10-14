@@ -768,6 +768,15 @@ function specialRecordPaths(
   return [...new Set(paths)];
 }
 
+/**
+ * A replacement changes two rows' public pages, not one: the suppressed row's
+ * (its player, club and match stop listing it) and the created row's (they
+ * start listing it). The result is their de-duplicated union.
+ */
+function replacementPaths(suppressed: string[], created: string[]): string[] {
+  return [...new Set([...suppressed, ...created])];
+}
+
 // --- the shared edit core ------------------------------------------------
 
 export type SpecialRecordEditBase = {
@@ -1675,6 +1684,7 @@ export async function replaceFirstKickGoal(
           note: input.note,
         });
 
+        const createdRow = await readFirstKickGoalInTx(tx as Tx, created.rowId);
         return {
           ok: true as const,
           table: 'player_achievements' as const,
@@ -1683,7 +1693,9 @@ export async function replaceFirstKickGoal(
           suppressedEntityKey: row.entityKey,
           suppressedRowId: row.id,
           replacementId,
-          revalidatePaths: row.revalidatePaths,
+          revalidatePaths: replacementPaths(
+            row.revalidatePaths, createdRow ? specialRecordPaths('first-kick-goal', createdRow) : [],
+          ),
         };
       }) as SpecialRecordMutationResult<SpecialRecordReplacementResult>;
     } catch (error) {
@@ -2232,6 +2244,7 @@ export async function replaceAfterSirenKick(
           note: input.note,
         });
 
+        const createdRow = await readAfterSirenKickInTx(tx as Tx, created.rowId);
         return {
           ok: true as const,
           table: 'after_siren_kicks' as const,
@@ -2240,7 +2253,9 @@ export async function replaceAfterSirenKick(
           suppressedEntityKey: row.entityKey,
           suppressedRowId: row.id,
           replacementId,
-          revalidatePaths: row.revalidatePaths,
+          revalidatePaths: replacementPaths(
+            row.revalidatePaths, createdRow ? specialRecordPaths('after-the-siren', createdRow) : [],
+          ),
         };
       }) as SpecialRecordMutationResult<SpecialRecordReplacementResult>;
     } catch (error) {

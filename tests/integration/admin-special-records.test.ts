@@ -35,12 +35,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   correctAfterSirenKick, correctFirstKickGoal, createAfterSirenKick, createFirstKickGoal,
   listAfterSirenKicks, listFirstKickGoals, readAfterSirenKick, readFirstKickGoal,
-  reinstateFirstKickGoal, replaceFirstKickGoal, specialRecordLifecycleCounts,
+  reinstateFirstKickGoal, replaceAfterSirenKick, replaceFirstKickGoal,
+  specialRecordLifecycleCounts,
   suppressFirstKickGoal,
 } from '@/db/queries/admin-special-records';
 import { deleteMatch } from '@/db/queries/match-admin';
 import { getFirstKickGoalList } from '@/db/queries/player-achievements';
 import { isAllowedRevalidatePath } from '@/app/admin/records/revalidate-paths';
+import { playerPath } from '@/lib/format';
 import { specialRecordEntityKey } from '@/lib/special-records/identity';
 import { replaySpecialRecordOverrides } from '../../tools/records/special-records-replay';
 
@@ -343,6 +345,12 @@ async function seedAfterSiren(recordId: string, overrides: {
       ${overrides.playerId ?? null}, ${overrides.matchId ?? null}
     ) RETURNING id::int AS id`;
   return row.id;
+}
+
+/** The public player page the application revalidates for this fixture player. */
+async function playerPageOf(playerId: number): Promise<string> {
+  const [row] = await owner<{ slug: string }[]>`SELECT slug FROM players WHERE id = ${playerId}`;
+  return playerPath(row.slug, playerId);
 }
 
 const overridesFor = (table: string, entityKey: string) => owner<{
@@ -955,6 +963,18 @@ describe('Stage 6 — replace is one transaction, and it is not an identity edit
     expect(result.ok, result.ok ? '' : result.error).toBe(true);
     if (!result.ok) return;
 
+    // ISSUE-282: the suppressed row was unlinked and the replacement links a
+    // player, so that player's page is a path only the created row has. The
+    // public list page is common to both and stays listed once.
+    expect(result.revalidatePaths).toContain('/records/first-kick-goal');
+    expect(result.revalidatePaths).toContain(await playerPageOf(s6PlayerId));
+    expect(result.revalidatePaths).toContain(`/admin/records/first-kick-goal/${id}`);
+    expect(result.revalidatePaths).toContain(`/admin/records/first-kick-goal/${result.rowId}`);
+    expect(new Set(result.revalidatePaths).size).toBe(result.revalidatePaths.length);
+    for (const path of result.revalidatePaths) {
+      expect(isAllowedRevalidatePath(path), `${path} is not allowlisted`).toBe(true);
+    }
+
     // The old row is SUPPRESSED, not deleted, and keeps its own identity.
     const old = await readFirstKickGoal(id);
     expect(old!.status).toBe('void');
@@ -984,6 +1004,41 @@ describe('Stage 6 — replace is one transaction, and it is not an identity edit
     expect(newAudit).toHaveLength(1);
     expect(oldAudit[0].newValues.replacement_id).toBe(result.replacementId);
     expect(newAudit[0].newValues.replacement_id).toBe(result.replacementId);
+  });
+
+  it('revalidates the old AND the new after-siren record\'s pages (ISSUE-282)', async () => {
+    const recordId = nextKey('asr');
+    const id = await seedAfterSiren(recordId);
+    const before = await readAfterSirenKick(id);
+
+    const result = await replaceAfterSirenKick({
+      rowId: id,
+      expectedUpdatedAt: before!.updatedAt,
+      adminUserId: actorId,
+      reason: `${S6} the kick was credited to the wrong player`,
+      replacement: {
+        clubNameRaw: S6, opponentNameRaw: S6, competition: S6, premiershipSeason: false,
+        season: 1897, roundRaw: S6, kickScored: 'goal', kickEffect: 'none', kickerResult: 'loss',
+        kickerScoreRaw: '12.10 (82)', opponentScoreRaw: '12.4 (76)',
+        kickerPoints: 76, opponentPoints: 82, playerId: s6PlayerId, notes: S6,
+      },
+    });
+    expect(result.ok, result.ok ? '' : result.error).toBe(true);
+    if (!result.ok) return;
+
+    expect((await readAfterSirenKick(id))!.status).toBe('void');
+    expect((await readAfterSirenKick(result.rowId))!.status).toBe('active');
+
+    // The suppressed row was unlinked, so the player's page belongs to the
+    // created row alone; the old record's admin page belongs to the old row.
+    expect(result.revalidatePaths).toContain('/records/after-the-siren');
+    expect(result.revalidatePaths).toContain(await playerPageOf(s6PlayerId));
+    expect(result.revalidatePaths).toContain(`/admin/records/after-the-siren/${id}`);
+    expect(result.revalidatePaths).toContain(`/admin/records/after-the-siren/${result.rowId}`);
+    expect(new Set(result.revalidatePaths).size).toBe(result.revalidatePaths.length);
+    for (const path of result.revalidatePaths) {
+      expect(isAllowedRevalidatePath(path), `${path} is not allowlisted`).toBe(true);
+    }
   });
 });
 
