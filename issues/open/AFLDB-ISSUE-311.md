@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). Implemented 2026-10-15 on `sonnet/issue-309` (shared with ISSUE-309); DB-free validated; not yet merged. See §17.
 - **Severity:** Low. **Area:** admin player links / activity audit.
 - **Key files:** `src/app/admin/player-links/actions.ts`, `src/app/admin/player-links/afl-api/actions.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-046; partition note R5b-F04).
@@ -78,3 +78,13 @@ None.
 ## 16. Next action
 
 Implementation (with AFLDB-ISSUE-309).
+
+## 17. Implementation record (2026-10-15)
+
+- **Commits:** `adbe6329` (fix) and `c7e583e0` (tests), shared by ISSUE-309 and ISSUE-311, on `sonnet/issue-309`, base `f959e68f`. Source: `src/app/admin/player-links/actions.ts`, `src/app/admin/player-links/afl-api/actions.ts`, and the two components that render the new state, `SuggestionControls.tsx` and `afl-api/AflApiAdjudicationForm.tsx`.
+- **Shape (§13).** `confirmUnlinked` and `reviewSuggestion` wrap `audit()` as `linkPlayer` does and return the committed success with `ACTIVITY_AUDIT_WARNING` (for `confirmUnlinked` once per batch, merged with any other warning). `linkAflApiPlayer` and `revokeAflApiPlayerLink` keep their `console.error` but now also return that warning; `AflApiAdjudicationActionState` gains `warning`. The AFL API module repeats the 2-line wording locally because a `'use server'` module may export only async functions.
+- **Components.** A returned warning would be invisible without these two additions: `SuggestionControls` appends the warning to its success text and `AflApiAdjudicationForm` shows it under the success line. `ResolveControls` and `BulkApproveControls` already rendered `warning`.
+- **Scope kept.** `auditInTransaction` (deliberately throwing, §12) and the `refreshSuggestions` audit are untouched.
+
+See ISSUE-309 §17.1 and §17.2 for the shared validation (one new `describe`, 17 cases covering both issues), the pre-existing unrelated failure and the 16-mutant check; for this issue the relevant cases are the `confirmUnlinked` rejected-audit case, both `reviewSuggestion` cases, the three AFL API cases and the guard and render contracts (mutants M04, M05, M08–M12).
+
