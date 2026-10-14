@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 45 (ISSUE-229, ISSUE-266–270, and the 39 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; other issues' PROD prerequisites are unchanged)
+**Open issues:** 44 (ISSUE-229, ISSUE-266–270, and the 38 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 on 2026-10-14 (DEV-scoped; PROD installation and acceptance pending, runbook `issues/closed/AFLDB-ISSUE-281.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; other issues' PROD prerequisites are unchanged)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -448,14 +448,6 @@
 ### AFLDB-ISSUE-280 — Beta magic link is consumed by any GET, including a mail scanner's prefetch
 - **Severity:** Low. **Area:** beta gate — `src/app/beta/verify/route.ts`. **State:** Open (2026-10-08), F-015; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-280.md`. **Next action:** implementation (low priority).
-
-### AFLDB-ISSUE-281 — Two public list pages fail on a sort key that names an inherited object property
-- **Severity:** Low. **Area:** public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts`. **State:** Open
-  (2026-10-08), F-016, reproduced by the review (W5); imported 2026-10-10. **Implemented 2026-10-12** in batch worktree
-  `afldb-batch-315-281-312-288` (base `80f86c39`): `Object.hasOwn` in both guards; DB-free 14/14. **Merged to `main`**
-  (2026-10-13, commit `23809fce`; merge `01976be7`; pushed: an ancestor of the live `origin/main`, verified 2026-10-14; installed on DEV 2026-10-14, runbook 275 §30; DEV smoke NOT YET DONE).
-- **Runbook:** `issues/open/AFLDB-ISSUE-281.md` §17. **Next action:** DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33, and the combined observation window is closed; the DEV deployment was approved (D-DEV-275-281-288-1) and done 2026-10-14, runbook 275 §30);
-  read-only DEV smoke; then close DEV-scoped (the ISSUE-265-specific PROD hold was released by `a862d192`; PROD still needs its own reviewed procedure (`blockers.md` R6)).
 
 ### AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
 - **Severity:** Low. **Area:** admin awards / special records / revalidation. **State:** Open (2026-10-08), F-017; imported 2026-10-10.
