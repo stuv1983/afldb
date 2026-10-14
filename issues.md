@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 45 (ISSUE-229, ISSUE-266–270 and 39 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265 on 2026-10-14 with its closure documentation prepared locally, merge-scoped, see below)
+**Open issues:** 45 (ISSUE-229, ISSUE-266–270 and 39 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -48649,7 +48649,7 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 
-- **Status:** Resolved (2026-10-14, owner decision D-PROD-10; opened 2026-10-04). **Closure documentation prepared locally on `fix/issue-265-close`; commit, merge and push PENDING.** **Severity:** Medium (raised from Low, operator, 2026-10-05,
+- **Status:** Resolved (2026-10-14, owner decision D-PROD-10; opened 2026-10-04). **Closure documentation merged and pushed as `b8040018` (operator-verified); the ISSUE-265-specific PROD deployment hold is RELEASED (2026-10-14, runbook §28.33).** **Severity:** Medium (raised from Low, operator, 2026-10-05,
   D-265-12). **Area:** data integrity / concurrency, source
   settles versus legacy file intake. Key files:
   - `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows` :490, taken inside the unit savepoint
@@ -49405,7 +49405,7 @@ retained behaviour under `Unreleased`.
   - Limitations kept: no contention or refusal path on PROD, missed per-night evidence for 9–13 Oct, the web journal's unpreserved line, `copytruncate` rotation on 11 Oct.
 - **Next action (as at 2026-10-07; superseded by the one below).** N1 on 2026-10-08 after 06:00 with `--c1` and `--prev` = the C1 folder (instructions
   `D:\tmp\issue265\n1-instructions-20261008\N1-INSTRUCTIONS.md`). **Done: see the N1 grade above.**
-- **D-PROD-10 decided; RESOLVED on the owner's decision (2026-10-14; runbook §28.31). Closure documentation prepared locally; commit, merge and push PENDING.**
+- **D-PROD-10 decided; RESOLVED on the owner's decision (2026-10-14; runbook §28.31). Closure documentation merged and pushed as `b8040018` and verified by the operator (runbook §28.33).**
   - **Owner decision D-PROD-10.** Accept the §28.6 passive-acceptance result as satisfied retrospectively: N1 (2026-10-08, batch 47) and the scheduled 2026-10-14
     invocation `55a9060a041d4092bb62e27ad3828af3` (batch 53, independently COUNTED) are two counted runs within seven nights; the earlier missed nights (9–13 October)
     remain uncounted. Closure is authorised on that basis, preserving every §28.7 limitation and the additional disclosed evidence gaps. This is **not** contention
@@ -49425,14 +49425,14 @@ retained behaviour under `Unreleased`.
     are proved on `afldb_test` only; writers outside the gate (Match Sheet and Data Editor saves, `player_bio`, direct SQL; ISSUE-261 is separate) are not covered; nights
     9–13 October have no per-night evidence and stay uncounted; the web journal's single line is unpreserved; the `copytruncate` rotation on 11 October; the 36 open
     `canonical_apply_failed` findings (first detected 2026-09-28) are not attributed to this change.
-  - **PROD hold.** The ISSUE-265-specific PROD deployment hold releases **only after the closure documentation is merged, pushed and verified**. Until then it remains
-    active; it is **not released** by this entry. Other issues' independent PROD prerequisites are unchanged. No deployment is authorised.
+  - **PROD hold: RELEASED (2026-10-14, runbook §28.33).** The ISSUE-265-specific PROD deployment hold was conditional on the closure documentation being merged, pushed and verified. The operator verified `main`, `origin/main` and the live remote equal at `b8040018`, so the condition is met and the hold is released. It authorises no deployment. The earlier wording follows as history: it released **only after the closure documentation is merged, pushed and verified**. Until then it remained
+    active (historical: it was not released by the §28.31 entry). Other issues' independent PROD prerequisites are unchanged. No deployment is authorised.
   - **Separate and unchanged.** B1 (D-PROD-3, the Match Sheet player-statistic pause) stays a separate pause. D-PROD-11 (a deploy-mode tooling issue) stays a separate
     follow-up, not a closure prerequisite and not opened here. Rollback, any 110 reversal, restarts, timer changes and re-runs stay NOT authorised.
   - **Records moved.** The runbook is now `issues/closed/AFLDB-ISSUE-265.md`, with `issues/closed/AFLDB-ISSUE-265-phase-a/` and
     `issues/closed/AFLDB-ISSUE-265-prod-settle-timing.sql`; `eslint.config.mjs` names the relocated Phase A preload. Entries above name the original `issues/open/`
     locations as historical provenance.
-  - **Pending (operator).** Stage, commit, `merge:ready -- --issue 265 --runbook issues/closed/AFLDB-ISSUE-265.md`, merge, push, then verify the closure documentation is
+  - **Done (operator, verified; runbook §28.33).** The closure documentation was staged, committed, merged and pushed as `b8040018`; the steps were: stage, commit, `merge:ready -- --issue 265 --runbook issues/closed/AFLDB-ISSUE-265.md`, merge, push, then verify the closure documentation is
     on `origin/main`.
 
 ## AFLDB-ISSUE-266 — Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin
