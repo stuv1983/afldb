@@ -454,7 +454,9 @@
 
 ### AFLDB-ISSUE-283 — The administrative note is not recorded on creation audit rows
 - **Severity:** Low. **Area:** admin awards / special records / audit. **State:** Open (2026-10-08), F-018; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-283.md`. **Next action:** implementation (ISSUE-282, formerly grouped with it, is resolved).
+- **State (2026-10-15):** implemented on `sonnet/issue-283` and validated on `afldb_test` (7 + 4 focused integration cases and 5 DB-free
+  cases; 18 of 18 mutants killed; one fixture-residue incident cleaned by id, final census 0); not deployed.
+- **Runbook:** `issues/open/AFLDB-ISSUE-283.md` §17. **Next action:** merge, then close (merge-scoped).
 
 ### AFLDB-ISSUE-284 — Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish
 - **Severity:** Low. **Area:** admin Brownlow — `src/db/queries/admin-brownlow.ts`. **State:** Open (2026-10-08), F-019;

@@ -367,9 +367,19 @@ const auditRows = (table: string, rowId: number) => owner<{
     FROM data_edits WHERE table_name = ${table} AND row_id = ${rowId}
    ORDER BY id`;
 
+const auditEntries = (table: string, rowId: number) => owner<{
+  fieldGroup: string; note: string | null; newValues: Record<string, unknown>;
+}[]>`
+  SELECT field_group AS "fieldGroup", note, new_values AS "newValues"
+    FROM data_edits WHERE table_name = ${table} AND row_id = ${rowId}
+   ORDER BY id`;
+
 async function purgeStage6(): Promise<void> {
+  // ISSUE-283: a plain create's audit entry names the marker but not the source
+  // key, so the second pattern is what removes it.
   await owner`DELETE FROM data_edits WHERE table_name IN ('player_achievements', 'after_siren_kicks')
-                AND new_values::text LIKE ${`%${S6_SOURCE_KEY}%`}`;
+                AND (new_values::text LIKE ${`%${S6_SOURCE_KEY}%`}
+                     OR new_values::text LIKE ${`%${S6}%`})`;
   await owner`DELETE FROM data_overrides
                WHERE entity_type IN ('player_achievements', 'after_siren_kicks')
                  AND (entity_key LIKE ${`${S6_SOURCE_KEY}:%`}
@@ -1039,6 +1049,91 @@ describe('Stage 6 — replace is one transaction, and it is not an identity edit
     for (const path of result.revalidatePaths) {
       expect(isAllowedRevalidatePath(path), `${path} is not allowlisted`).toBe(true);
     }
+  });
+});
+
+describe('Stage 6 — the replace panel\'s administrative note reaches both audit halves (ISSUE-283)', () => {
+  const ADMIN_NOTE = 'checked against the club record, ISSUE-283';
+
+  it('records the note on the suppressed AND the created first-kick audit entry', async () => {
+    const id = await seedFirstKick(nextKey('fkg'));
+    const result = await replaceFirstKickGoal({
+      rowId: id,
+      expectedUpdatedAt: (await readFirstKickGoal(id))!.updatedAt,
+      adminUserId: actorId,
+      reason: `${S6} the source record id belongs to a different kick`,
+      note: ADMIN_NOTE,
+      replacement: {
+        playerId: s6PlayerId, clubNameRaw: S6, season: 1897, roundRaw: `${S6}-note`,
+        notes: S6,
+      },
+    });
+    expect(result.ok, result.ok ? '' : result.error).toBe(true);
+    if (!result.ok) return;
+    const [suppressed] = await auditEntries('player_achievements', id);
+    const [created] = await auditEntries('player_achievements', result.rowId);
+    expect(suppressed.note).toBe(ADMIN_NOTE);
+    expect(created.note).toBe(ADMIN_NOTE);
+    expect(created.fieldGroup).toBe('first_kick_goal_created');
+    expect(created.newValues.notes).toBe(S6);
+    expect(created.newValues.replacement_id).toBe(result.replacementId);
+  });
+
+  it('records the note on the suppressed AND the created after-siren audit entry', async () => {
+    const id = await seedAfterSiren(nextKey('asr'));
+    const result = await replaceAfterSirenKick({
+      rowId: id,
+      expectedUpdatedAt: (await readAfterSirenKick(id))!.updatedAt,
+      adminUserId: actorId,
+      reason: `${S6} the kick was credited to the wrong player`,
+      note: ADMIN_NOTE,
+      replacement: {
+        clubNameRaw: S6, opponentNameRaw: S6, competition: S6, premiershipSeason: false,
+        season: 1897, roundRaw: S6, kickScored: 'goal', kickEffect: 'none', kickerResult: 'loss',
+        kickerScoreRaw: '12.10 (82)', opponentScoreRaw: '12.4 (76)',
+        kickerPoints: 76, opponentPoints: 82, playerId: s6PlayerId, notes: S6,
+      },
+    });
+    expect(result.ok, result.ok ? '' : result.error).toBe(true);
+    if (!result.ok) return;
+    const [suppressed] = await auditEntries('after_siren_kicks', id);
+    const [created] = await auditEntries('after_siren_kicks', result.rowId);
+    expect(suppressed.note).toBe(ADMIN_NOTE);
+    expect(created.note).toBe(ADMIN_NOTE);
+    expect(created.fieldGroup).toBe('after_siren_created');
+    expect(created.newValues.notes).toBe(S6);
+  });
+
+  it('a replacement without an admin note leaves the created entry\'s note empty, not the record text', async () => {
+    const id = await seedFirstKick(nextKey('fkg'));
+    const result = await replaceFirstKickGoal({
+      rowId: id,
+      expectedUpdatedAt: (await readFirstKickGoal(id))!.updatedAt,
+      adminUserId: actorId,
+      reason: `${S6} no admin note`,
+      replacement: {
+        playerId: s6PlayerId, clubNameRaw: S6, season: 1897, roundRaw: `${S6}-nonote`,
+        notes: S6,
+      },
+    });
+    expect(result.ok, result.ok ? '' : result.error).toBe(true);
+    if (!result.ok) return;
+    const [suppressed] = await auditEntries('player_achievements', id);
+    const [created] = await auditEntries('player_achievements', result.rowId);
+    expect(suppressed.note).toBeNull();
+    expect(created.note).toBeNull();
+    expect(created.newValues.notes).toBe(S6);
+  });
+
+  it('a plain create has no admin-note field and still records the record text (out of scope)', async () => {
+    const created = await createFirstKickGoal({
+      playerId: s6PlayerId, clubNameRaw: S6, season: 1897, roundRaw: `${S6}-plain`,
+      notes: S6, adminUserId: actorId,
+    });
+    expect(created.ok, created.ok ? '' : created.error).toBe(true);
+    if (!created.ok) return;
+    const [entry] = await auditEntries('player_achievements', created.rowId);
+    expect(entry.note).toBe(S6);
   });
 });
 

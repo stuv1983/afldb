@@ -1401,6 +1401,12 @@ export type CreateAwardWinnerInput = {
    * refused outright and never silently allowed.
    */
   confirmDuplicate?: boolean;
+  /**
+   * The administrator's own note (ISSUE-283), distinct from `note` (the row's
+   * public citation). It is the `data_edits.note` of the creation audit entry
+   * and nothing else: the row's `note` stays in the audit `new_values`.
+   */
+  adminNote?: string | null;
 };
 
 type CreatedWinner = { rowId: number; entityKey: string; sourceRecordId: string };
@@ -1578,7 +1584,7 @@ async function insertAwardWinner(tx: Tx, input: CreateAwardWinnerInput & {
       ...(input.auditExtra ?? {}),
     },
     adminUserId: input.adminUserId,
-    note: input.note,
+    note: input.adminNote,
   });
 
   await recomputeAwardSpan(tx, input.awardId);
@@ -1682,6 +1688,7 @@ export async function replaceAwardWinner(
         const created = await insertAwardWinner(tx as Tx, {
           ...input.replacement,
           adminUserId: input.adminUserId,
+          adminNote: input.note,
           replacesKey: row.entityKey,
           auditExtra: { replacement_id: replacementId, replaces: row.entityKey },
         });
@@ -2022,6 +2029,8 @@ export type CreateHallOfFameInput = {
   notes?: string | null;
   removedYear?: number | null;
   adminUserId: number;
+  /** The administrator's own note (ISSUE-283); see `CreateAwardWinnerInput`. */
+  adminNote?: string | null;
 };
 
 async function insertHallOfFame(tx: Tx, input: CreateHallOfFameInput & {
@@ -2153,7 +2162,7 @@ async function insertHallOfFame(tx: Tx, input: CreateHallOfFameInput & {
       ...(input.auditExtra ?? {}),
     },
     adminUserId: input.adminUserId,
-    note: input.notes,
+    note: input.adminNote,
   });
 
   return { rowId: inserted.id, entityKey };
@@ -2247,6 +2256,7 @@ export async function replaceHallOfFameInductee(
         const created = await insertHallOfFame(tx as Tx, {
           ...input.replacement,
           adminUserId: input.adminUserId,
+          adminNote: input.note,
           replacesKey: row.entityKey,
           auditExtra: { replacement_id: replacementId, replaces: row.entityKey },
         });
@@ -2610,6 +2620,8 @@ export type CreateHonourTeamMemberInput = {
   sortOrder?: number;
   note?: string | null;
   adminUserId: number;
+  /** The administrator's own note (ISSUE-283); see `CreateAwardWinnerInput`. */
+  adminNote?: string | null;
 };
 
 async function insertHonourTeamMember(tx: Tx, input: CreateHonourTeamMemberInput & {
@@ -2703,7 +2715,7 @@ async function insertHonourTeamMember(tx: Tx, input: CreateHonourTeamMemberInput
       ...(input.auditExtra ?? {}),
     },
     adminUserId: input.adminUserId,
-    note: input.note,
+    note: input.adminNote,
   });
 
   return { rowId: inserted.id, entityKey };
@@ -2784,6 +2796,7 @@ export async function replaceHonourTeamMember(
         const created = await insertHonourTeamMember(tx as Tx, {
           ...input.replacement,
           adminUserId: input.adminUserId,
+          adminNote: input.note,
           replacesKey: row.entityKey,
           auditExtra: { replacement_id: replacementId, replaces: row.entityKey },
         });

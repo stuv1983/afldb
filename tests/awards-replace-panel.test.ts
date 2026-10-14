@@ -23,6 +23,11 @@ const mocks = vi.hoisted(() => ({
   requireCapability: vi.fn(async () => ({ id: 9, email: 'admin@example.test' })),
   audit: vi.fn(async () => undefined),
   replaceAwardWinner: vi.fn(),
+  replaceHallOfFameInductee: vi.fn(),
+  replaceHonourTeamMember: vi.fn(),
+  createAwardWinner: vi.fn(),
+  createHallOfFameInductee: vi.fn(),
+  createHonourTeamMember: vi.fn(),
   postgres: vi.fn(),
 }));
 
@@ -82,10 +87,25 @@ vi.mock('@/lib/auth/session', () => ({
 }));
 vi.mock('@/db/queries/admin-awards', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/db/queries/admin-awards')>();
-  return { ...actual, replaceAwardWinner: mocks.replaceAwardWinner };
+  return {
+    ...actual,
+    replaceAwardWinner: mocks.replaceAwardWinner,
+    replaceHallOfFameInductee: mocks.replaceHallOfFameInductee,
+    replaceHonourTeamMember: mocks.replaceHonourTeamMember,
+    createAwardWinner: mocks.createAwardWinner,
+    createHallOfFameInductee: mocks.createHallOfFameInductee,
+    createHonourTeamMember: mocks.createHonourTeamMember,
+  };
 });
 
-import { replaceAwardWinnerAction } from '@/app/admin/awards/actions';
+import {
+  createAwardWinnerAction,
+  createHallOfFameAction,
+  createHonourTeamMemberAction,
+  replaceAwardWinnerAction,
+  replaceHallOfFameAction,
+  replaceHonourTeamAction,
+} from '@/app/admin/awards/actions';
 import type { HonourDomain } from '@/app/admin/awards/labels';
 import {
   offersDuplicateConfirmation,
@@ -125,6 +145,11 @@ function confirmation(over: Partial<Parameters<typeof ReplaceConfirmation>[0]> =
 
 beforeEach(() => {
   mocks.replaceAwardWinner.mockReset();
+  mocks.replaceHallOfFameInductee.mockReset();
+  mocks.replaceHonourTeamMember.mockReset();
+  mocks.createAwardWinner.mockReset();
+  mocks.createHallOfFameInductee.mockReset();
+  mocks.createHonourTeamMember.mockReset();
 });
 
 describe('ReplaceConfirmation: the duplicate checkbox', () => {
@@ -232,6 +257,90 @@ describe('replaceAwardWinnerAction: the round trip the panel makes', () => {
     expect(input.replacement.confirmDuplicate).toBe(true);
     expect(input.replacement).toMatchObject({ awardId: 4, season: 1984, playerId: 77 });
     expect(input).toMatchObject({ rowId: 41, adminUserId: 9 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The administrative note (AFLDB-ISSUE-283). The forms and the replace panel
+// promise it is "kept with the audit entry"; the create actions never read it.
+// What the query layer then writes is covered by the integration suites.
+// ---------------------------------------------------------------------------
+
+describe('the administrative note reaches the query layer apart from the record text (ISSUE-283)', () => {
+  const created = { ok: true, rowId: 42, entityKey: 'award_winners:42', revalidatePaths: ['/awards'] };
+  const form = (fields: Array<[string, string]>): FormData => {
+    const data = new FormData();
+    for (const [key, value] of fields) data.set(key, value);
+    return data;
+  };
+
+  it('createAwardWinnerAction passes adminNote, and keeps the citation as the row note', async () => {
+    mocks.createAwardWinner.mockResolvedValue(created);
+    await createAwardWinnerAction({}, form([
+      ['awardId', '4'], ['season', '1984'], ['playerId', '77'],
+      ['note', 'public citation'], ['adminNote', 'checked against the club record'],
+    ]));
+    expect(mocks.createAwardWinner.mock.calls[0][0]).toMatchObject({
+      adminUserId: 9, note: 'public citation', adminNote: 'checked against the club record',
+    });
+  });
+
+  it('createHallOfFameAction passes adminNote, and keeps the biography as the row notes', async () => {
+    mocks.createHallOfFameInductee.mockResolvedValue({ ...created, table: 'hall_of_fame' });
+    await createHallOfFameAction({}, form([
+      ['name', 'Test Inductee'], ['inductedYear', '2003'],
+      ['notes', 'public biography'], ['adminNote', 'checked against the club record'],
+    ]));
+    expect(mocks.createHallOfFameInductee.mock.calls[0][0]).toMatchObject({
+      adminUserId: 9, notes: 'public biography', adminNote: 'checked against the club record',
+    });
+  });
+
+  it('createHonourTeamMemberAction passes adminNote, and keeps the selection note as the row note', async () => {
+    mocks.createHonourTeamMember.mockResolvedValue({ ...created, table: 'honour_team_members' });
+    await createHonourTeamMemberAction({}, form([
+      ['teamName', 'Test Team'], ['playerId', '77'], ['sortOrder', '0'],
+      ['note', 'public selection note'], ['adminNote', 'checked against the club record'],
+    ]));
+    expect(mocks.createHonourTeamMember.mock.calls[0][0]).toMatchObject({
+      adminUserId: 9, note: 'public selection note', adminNote: 'checked against the club record',
+    });
+  });
+
+  it('a create with no admin note passes none, rather than the record text', async () => {
+    mocks.createAwardWinner.mockResolvedValue(created);
+    await createAwardWinnerAction({}, form([
+      ['awardId', '4'], ['season', '1984'], ['playerId', '77'], ['note', 'public citation'],
+    ]));
+    expect(mocks.createAwardWinner.mock.calls[0][0].adminNote ?? null).toBeNull();
+  });
+
+  it('the three replace actions pass the admin note as `note`, outside the replacement', async () => {
+    const replaced = { ...created, voidedEntityKey: 'k', voidedRowId: 41, replacementId: 'r' };
+    mocks.replaceAwardWinner.mockResolvedValue(replaced);
+    mocks.replaceHallOfFameInductee.mockResolvedValue(replaced);
+    mocks.replaceHonourTeamMember.mockResolvedValue(replaced);
+    const base: Array<[string, string]> = [
+      ['rowId', '41'], ['expectedUpdatedAt', '2026-10-14T00:00:00.000Z'],
+      ['reason', 'recorded wrongly'], ['confirmReplace', '1'],
+      ['adminNote', 'checked against the club record'],
+    ];
+    await replaceAwardWinnerAction({}, form([
+      ...base, ['new:awardId', '4'], ['new:season', '1984'], ['new:playerId', '77'],
+    ]));
+    await replaceHallOfFameAction({}, form([
+      ...base, ['new:name', 'Test Inductee'], ['new:inductedYear', '2003'],
+    ]));
+    await replaceHonourTeamAction({}, form([
+      ...base, ['new:teamName', 'Test Team'], ['new:playerId', '77'], ['new:sortOrder', '0'],
+    ]));
+    for (const mock of [
+      mocks.replaceAwardWinner, mocks.replaceHallOfFameInductee, mocks.replaceHonourTeamMember,
+    ]) {
+      const input = mock.mock.calls[0][0];
+      expect(input.note).toBe('checked against the club record');
+      expect(input.replacement).not.toHaveProperty('adminNote');
+    }
   });
 });
 

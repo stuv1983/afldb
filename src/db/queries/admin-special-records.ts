@@ -1471,6 +1471,12 @@ type CreatedSpecialRecord = { rowId: number; entityKey: string; sourceRecordId: 
 async function insertFirstKickGoal(tx: Tx, input: CreateFirstKickGoalInput & {
   replacesKey?: string | null;
   auditExtra?: Record<string, unknown>;
+  /**
+   * ISSUE-283: the replace panel's administrative note for the created half.
+   * Absent (a plain create, which deliberately has no admin-note field) keeps
+   * the row's own `notes` as the audit note.
+   */
+  adminNote?: string | null;
 }): Promise<CreatedSpecialRecord> {
   let playerNameRaw = input.playerNameRaw?.trim() || '';
   if (input.playerId) {
@@ -1552,7 +1558,7 @@ async function insertFirstKickGoal(tx: Tx, input: CreateFirstKickGoalInput & {
       ...(input.auditExtra ?? {}),
     },
     adminUserId: input.adminUserId,
-    note: input.notes,
+    note: input.adminNote === undefined ? input.notes : input.adminNote,
   });
 
   return { rowId: inserted.id, entityKey, sourceRecordId };
@@ -1642,6 +1648,7 @@ export async function replaceFirstKickGoal(
         const created = await insertFirstKickGoal(tx as Tx, {
           ...input.replacement,
           adminUserId: input.adminUserId,
+          adminNote: input.note ?? null,
           replacesKey: row.entityKey,
           auditExtra: { replacement_id: replacementId, replaces: row.entityKey },
         });
@@ -2050,6 +2057,8 @@ function validateAfterSirenCreate(input: CreateAfterSirenKickInput): string | nu
 async function insertAfterSirenKick(tx: Tx, input: CreateAfterSirenKickInput & {
   replacesKey?: string | null;
   auditExtra?: Record<string, unknown>;
+  /** ISSUE-283: see `insertFirstKickGoal`. */
+  adminNote?: string | null;
 }): Promise<CreatedSpecialRecord> {
   let playerNameRaw = input.playerNameRaw?.trim() || '';
   if (input.playerId) {
@@ -2134,7 +2143,7 @@ async function insertAfterSirenKick(tx: Tx, input: CreateAfterSirenKickInput & {
       ...(input.auditExtra ?? {}),
     },
     adminUserId: input.adminUserId,
-    note: input.notes,
+    note: input.adminNote === undefined ? input.notes : input.adminNote,
   });
 
   return { rowId: inserted.id, entityKey, sourceRecordId };
@@ -2204,6 +2213,7 @@ export async function replaceAfterSirenKick(
         const created = await insertAfterSirenKick(tx as Tx, {
           ...input.replacement,
           adminUserId: input.adminUserId,
+          adminNote: input.note ?? null,
           replacesKey: row.entityKey,
           auditExtra: { replacement_id: replacementId, replaces: row.entityKey },
         });

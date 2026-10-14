@@ -309,7 +309,10 @@ export async function createAwardWinnerAction(
   const facts = awardWinnerFacts(formData);
   if (!facts.ok) return { error: facts.error };
 
-  const result = await createAwardWinnerQuery({ ...facts.value, adminUserId: admin.id });
+  const result = await createAwardWinnerQuery({
+    ...facts.value, adminUserId: admin.id,
+    adminNote: optionalText(formData.get('adminNote'), 2000),
+  });
   return settle(result, {
     action: 'create_award_winner',
     auditAction: 'awards.winner_created',
@@ -506,7 +509,10 @@ export async function createHallOfFameAction(
   const facts = hallOfFameFacts(formData);
   if (!facts.ok) return { error: facts.error };
 
-  const result = await createHallOfFameQuery({ ...facts.value, adminUserId: admin.id });
+  const result = await createHallOfFameQuery({
+    ...facts.value, adminUserId: admin.id,
+    adminNote: optionalText(formData.get('adminNote'), 2000),
+  });
   return settle(result, {
     action: 'create_hall_of_fame',
     auditAction: 'awards.hall_of_fame_created',
@@ -678,7 +684,10 @@ export async function createHonourTeamMemberAction(
   const facts = honourTeamFacts(formData);
   if (!facts.ok) return { error: facts.error };
 
-  const result = await createHonourTeamQuery({ ...facts.value, adminUserId: admin.id });
+  const result = await createHonourTeamQuery({
+    ...facts.value, adminUserId: admin.id,
+    adminNote: optionalText(formData.get('adminNote'), 2000),
+  });
   return settle(result, {
     action: 'create_honour_team',
     auditAction: 'awards.honour_team_created',

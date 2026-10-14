@@ -311,6 +311,13 @@ async function auditRows(table: string, rowId: number) {
       FROM data_edits WHERE table_name = ${table} AND row_id = ${rowId} ORDER BY id`;
 }
 
+/** The audit entries of one row with the `note` column, which `auditRows` leaves out. */
+async function auditEntries(table: string, rowId: number) {
+  return admin<{ fieldGroup: string; note: string | null; newValues: Record<string, unknown> }[]>`
+    SELECT field_group AS "fieldGroup", note, new_values AS "newValues"
+      FROM data_edits WHERE table_name = ${table} AND row_id = ${rowId} ORDER BY id`;
+}
+
 /**
  * Remove every row this suite can create, keyed on two STABLE prefixes so a
  * crashed earlier run is cleaned up too. Runs in `beforeAll` AND `afterAll`.
@@ -1208,6 +1215,136 @@ describe('honour_team_members — both identity axes', () => {
 });
 
 // -------------------------------------------------------------------------
+
+describe('the administrative note is recorded on creation audit rows (ISSUE-283)', () => {
+  const ADMIN_NOTE = 'checked against the club record, ISSUE-283';
+  const only = async (table: string, rowId: number, fieldGroup: string) => {
+    const entries = (await auditEntries(table, rowId)).filter((e) => e.fieldGroup === fieldGroup);
+    expect(entries, `${table}#${rowId} ${fieldGroup}`).toHaveLength(1);
+    return entries[0];
+  };
+
+  it('an award winner create records the admin note, and keeps the row note in new_values', async () => {
+    const awardId = await makeAward('adminnote-create');
+    const created = await createAwardWinner({
+      awardId, season, playerId: linkedPlayerId, adminUserId: actorId,
+      note: 'public citation', adminNote: ADMIN_NOTE,
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    if (!created.ok) return;
+    const entry = await only('award_winners', created.rowId, 'award_winner_created');
+    expect(entry.note).toBe(ADMIN_NOTE);
+    expect(entry.newValues.note).toBe('public citation');
+    expect((await readAwardWinner(created.rowId))!.note).toBe('public citation');
+  });
+
+  it('a create without an admin note leaves the audit note empty rather than copying the row note', async () => {
+    const awardId = await makeAward('adminnote-none');
+    const created = await createAwardWinner({
+      awardId, season, playerId: linkedPlayerId, adminUserId: actorId, note: 'public citation',
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    if (!created.ok) return;
+    const entry = await only('award_winners', created.rowId, 'award_winner_created');
+    expect(entry.note).toBeNull();
+    expect(entry.newValues.note).toBe('public citation');
+  });
+
+  it('a Hall of Fame create records the admin note, and keeps the biography in new_values', async () => {
+    const created = await createHallOfFameInductee({
+      name: `${MARKER} Noted Inductee`, inductedYear: 2003, category: 'Player',
+      notes: 'public biography', adminNote: ADMIN_NOTE, adminUserId: actorId,
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    if (!created.ok) return;
+    const entry = await only('hall_of_fame', created.rowId, 'hall_of_fame_created');
+    expect(entry.note).toBe(ADMIN_NOTE);
+    expect(entry.newValues.notes).toBe('public biography');
+  });
+
+  it('an honour-team create records the admin note, and keeps the row note in new_values', async () => {
+    const created = await createHonourTeamMember({
+      teamName: `${MARKER} Noted Team`, playerId: linkedPlayerId, position: 'FB',
+      note: 'public selection note', adminNote: ADMIN_NOTE, adminUserId: actorId,
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    if (!created.ok) return;
+    const entry = await only('honour_team_members', created.rowId, 'honour_team_created');
+    expect(entry.note).toBe(ADMIN_NOTE);
+    expect(entry.newValues.note).toBe('public selection note');
+  });
+
+  it('an award winner replacement records the admin note on BOTH audit halves', async () => {
+    const awardId = await makeAward('adminnote-replace');
+    const id = await seedSourceWinner(awardId, `${MARKER}:adminnote-replace`);
+    const result = await replaceAwardWinner({
+      rowId: id,
+      expectedUpdatedAt: (await winnerRow(id))!.updatedAt,
+      adminUserId: actorId,
+      reason: 'the wrong player was recorded',
+      note: ADMIN_NOTE,
+      replacement: { awardId, season, playerId: secondPlayerId, note: 'public citation' },
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const voided = await only('award_winners', id, 'award_winner_voided');
+    const created = await only('award_winners', result.rowId, 'award_winner_created');
+    expect(voided.note).toBe(ADMIN_NOTE);
+    expect(created.note).toBe(ADMIN_NOTE);
+    expect(created.newValues.note).toBe('public citation');
+    expect(created.newValues.replacement_id).toBe(result.replacementId);
+  });
+
+  it('a Hall of Fame replacement records the admin note on BOTH audit halves', async () => {
+    const name = `${MARKER} Noted Replacement`;
+    const [seeded] = await admin<{ id: number }[]>`
+      INSERT INTO hall_of_fame (name, link_status_value, category, inducted_year, source_id)
+      VALUES (${name}, 'unmatched'::link_status, 'Player', 1999, ${wikipediaSourceId})
+      RETURNING id`;
+    const result = await replaceHallOfFameInductee({
+      rowId: seeded.id,
+      expectedUpdatedAt: (await readHallOfFameInductee(seeded.id))!.updatedAt,
+      adminUserId: actorId,
+      reason: 'inducted in a different year',
+      note: ADMIN_NOTE,
+      replacement: { name, inductedYear: 2002, category: 'Player', notes: 'public biography' },
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const voided = await only('hall_of_fame', seeded.id, 'hall_of_fame_voided');
+    const created = await only('hall_of_fame', result.rowId, 'hall_of_fame_created');
+    expect(voided.note).toBe(ADMIN_NOTE);
+    expect(created.note).toBe(ADMIN_NOTE);
+    expect(created.newValues.notes).toBe('public biography');
+  });
+
+  it('an honour-team replacement records the admin note on BOTH audit halves', async () => {
+    const original = await createHonourTeamMember({
+      teamName: `${MARKER} Noted Old Team`, playerId: linkedPlayerId, position: 'FB',
+      adminUserId: actorId,
+    });
+    expect(original.ok, JSON.stringify(original)).toBe(true);
+    if (!original.ok) return;
+    const result = await replaceHonourTeamMember({
+      rowId: original.rowId,
+      expectedUpdatedAt: (await readHonourTeamMember(original.rowId))!.updatedAt,
+      adminUserId: actorId,
+      reason: 'selected in a different team',
+      note: ADMIN_NOTE,
+      replacement: {
+        teamName: `${MARKER} Noted New Team`, playerId: secondPlayerId, position: 'HB',
+        note: 'public selection note',
+      },
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const voided = await only('honour_team_members', original.rowId, 'honour_team_voided');
+    const created = await only('honour_team_members', result.rowId, 'honour_team_created');
+    expect(voided.note).toBe(ADMIN_NOTE);
+    expect(created.note).toBe(ADMIN_NOTE);
+    expect(created.newValues.note).toBe('public selection note');
+  });
+});
 
 describe.runIf(canReplay)('reload and rebuild survival — the real Python', () => {
   it('an ORDINARY reload leaves the lifecycle alone and reverts a correction', async () => {
