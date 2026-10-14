@@ -37,6 +37,7 @@ import {
   approveSuggestion,
   bulkApproveSuggestions,
   confirmUnlinked as confirmUnlinkedAction,
+  createAndLinkPlayer,
 } from '@/app/admin/player-links/actions';
 import {
   confirmUnlinked,
@@ -45,7 +46,7 @@ import {
   resolveLink,
   resolveLinkFromSuggestion,
 } from '@/db/queries/player-links';
-import { createPlayer } from '@/db/queries/players';
+import { createPlayer, validateNewPlayerFacts } from '@/db/queries/players';
 import type {
   AflApiCandidateIdentityRow,
   AflApiForwardIdentityResult,
@@ -622,6 +623,68 @@ describe('player creation facts (AFLDB-ISSUE-160 §5, gate 3)', () => {
     await expect(createPlayer({ displayName: 'Unattributed' }, { adminUserId: 0 }))
       .rejects.toThrow('valid administrator id');
     expect(seen.some((q) => q.text.startsWith('INSERT INTO players'))).toBe(false);
+  });
+
+  it.each([
+    ['height below range', { heightCm: -5 }, 'Height (cm) must be at least 120.'],
+    ['height above range', { heightCm: 999 }, 'Height (cm) must be at most 230.'],
+    ['weight below range', { weightKg: 3 }, 'Weight (kg) must be at least 40.'],
+    ['weight above range', { weightKg: 500 }, 'Weight (kg) must be at most 160.'],
+    ['an unknown dob confidence', { dob: '1990-01-01', dobConfidence: 'bogus' }, 'DOB confidence must be one of: sourced, estimated, derived, unknown.'],
+    ['an impossible date', { dob: '1954-02-31' }, 'Date of birth is not a real date.'],
+    ['a malformed date', { dob: '31/02/1954' }, 'Date of birth must be YYYY-MM-DD.'],
+  ] as const)('AFLDB-ISSUE-291: createPlayer refuses %s before any INSERT', async (_label, facts, error) => {
+    const { tx, seen } = fakeTransaction(() => []);
+    installImportClient(tx);
+    await expect(createPlayer(
+      { displayName: 'Bad Facts', ...facts } as Parameters<typeof createPlayer>[0],
+      { adminUserId: 5 },
+    )).rejects.toThrow(error);
+    expect(seen).toEqual([]);
+  });
+
+  it('AFLDB-ISSUE-291: accepts facts on the range boundaries and blank optional facts', () => {
+    expect(validateNewPlayerFacts({ heightCm: 120, weightKg: 40 })).toBeNull();
+    expect(validateNewPlayerFacts({ heightCm: 230, weightKg: 160, dob: '2006-07-08', dobConfidence: 'estimated' })).toBeNull();
+    expect(validateNewPlayerFacts({ heightCm: null, weightKg: null, dob: null })).toBeNull();
+    expect(validateNewPlayerFacts({})).toBeNull();
+  });
+
+  it('AFLDB-ISSUE-291: the Data Editor action returns the refusal as a typed error and audits nothing', async () => {
+    const { tx, seen } = fakeTransaction(() => []);
+    installImportClient(tx);
+    const formData = new FormData();
+    formData.set('displayName', 'Bad Height');
+    formData.set('heightCm', '999');
+
+    const result = await createPlayerAction({}, formData);
+
+    expect(result).toEqual({ error: 'Could not create player: Height (cm) must be at most 230.' });
+    expect(seen).toEqual([]);
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it('AFLDB-ISSUE-291: create-and-link returns the refusal and writes no player or link', async () => {
+    const { tx, seen } = fakeTransaction((text) => {
+      if (text.startsWith('SELECT draft_person_id AS')) return [{ draftPersonId: 901 }];
+      if (text.startsWith('SELECT link_status::text')) return [{ status: 'unmatched', playerId: null }];
+      if (text.startsWith('SELECT link_status_value::text')) return [{ status: 'unmatched', draftPersonId: 901 }];
+      return [];
+    });
+    installImportClient(tx);
+    const formData = new FormData();
+    formData.set('targets', 'draft_picks:41');
+    formData.set('displayName', 'Bad Weight');
+    formData.set('weightKg', '-5');
+
+    const result = await createAndLinkPlayer({}, formData);
+
+    expect(result).toEqual({
+      error: 'The player and link could not be created: Weight (kg) must be at least 40.',
+    });
+    expect(seen.some((q) => q.text.startsWith('INSERT INTO players'))).toBe(false);
+    expect(seen.some((q) => q.text.startsWith('UPDATE draft_picks'))).toBe(false);
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
 
   it('does not fall back to the read-only application connection', async () => {

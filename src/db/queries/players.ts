@@ -8,6 +8,7 @@ import postgres from 'postgres';
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import { EDITABLE_ENTITIES, validateFieldValue } from '@/lib/edit/spec';
 import type { FilterValues } from '@/search/table-filters';
 
 export type PlayerListRow = {
@@ -270,6 +271,32 @@ export type CreatePlayerInput = {
 export type CreatedPlayer = { id: number; slug: string; displayName: string };
 
 /**
+ * AFLDB-ISSUE-291: the biographical facts of a new player obey the same rules
+ * the Data Editor applies to an edit (`EDITABLE_ENTITIES.players`: date shape,
+ * confidence enumeration, height 120-230, weight 40-160). They are copied into
+ * the durable `manual_admin_edit` creation record that replay re-creates on
+ * every rebuild, so a bad value is refused here, before any INSERT, rather
+ * than stored or surfaced as a raw PostgreSQL error. Returns the first
+ * refusal message, or null.
+ */
+export function validateNewPlayerFacts(
+  input: Pick<CreatePlayerInput, 'dob' | 'dobConfidence' | 'heightCm' | 'weightKg'>,
+): string | null {
+  const fields = EDITABLE_ENTITIES.players.fields;
+  const checks: [string, string][] = [];
+  const dob = input.dob?.trim();
+  if (dob) checks.push(['dob', dob]);
+  if (input.dobConfidence) checks.push(['dob_confidence', input.dobConfidence]);
+  if (input.heightCm != null) checks.push(['height_cm', String(input.heightCm)]);
+  if (input.weightKg != null) checks.push(['weight_kg', String(input.weightKg)]);
+  for (const [fieldKey, raw] of checks) {
+    const result = validateFieldValue(fields[fieldKey], raw);
+    if (!result.ok) return result.error;
+  }
+  return null;
+}
+
+/**
  * The transaction-scoped half of player creation, and the ONE player-creation
  * primitive in `src/` (AFLDB-ISSUE-160 §5). Compound import mutations --
  * "create and link" (`player-links.ts`) and "create player + draft selection"
@@ -318,6 +345,8 @@ export async function createPlayerInTransaction(
   if (!Number.isInteger(actor.adminUserId) || actor.adminUserId <= 0) {
     throw new Error('A valid administrator id is required to create a player.');
   }
+  const factsError = validateNewPlayerFacts(input);
+  if (factsError) throw new Error(factsError);
   let givenName = input.givenName?.trim() || null;
   let surname = input.surname?.trim() || null;
 
