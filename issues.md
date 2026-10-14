@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 23 (ISSUE-229, ISSUE-266–270 and 17 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294 and ISSUE-295 on 2026-10-15, merge-scoped and not deployed, see below)
+**Open issues:** 22 (ISSUE-229, ISSUE-266–270 and 16 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294, ISSUE-295 and ISSUE-301 on 2026-10-15, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -33,7 +33,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; fix implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-292.md` §17 | Run the read-only DEV/PROD two-path census (needs DEV/PROD contact); then close |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
-| AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; implemented and validated DB-free 2026-10-15 (60 s per-attempt default is an implementation choice), not deployed; runbook `issues/open/AFLDB-ISSUE-301.md` §17 | Merge, then close (merge-scoped) |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
 | AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-304.md` | Implementation, after ISSUE-266 |
 | AFLDB-ISSUE-307 | Legacy promotion counts every promoted row as inserted | Low | Legacy CSV intake / import batch accounting — `src/lib/ingest/pipeline.ts` | Open (2026-10-08); review F-042, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-307.md` | Implementation (low priority) |
@@ -51081,8 +51080,8 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-301 — AFL API HTTP client has no request timeout and reads the body outside its retry
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / network resilience. Key file:
-  `src/lib/acquisition/afl-api-client.ts` (`requestAflApi`). **Runbook:** `issues/open/AFLDB-ISSUE-301.md`.
+- **Status:** Resolved (2026-10-15, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** acquisition / network resilience. Key file:
+  `src/lib/acquisition/afl-api-client.ts` (`requestAflApi`). **Runbook:** `issues/closed/AFLDB-ISSUE-301.md`.
 - **Origin.** Review F-036 (R4b-F06) at `20a7a4bb`. Code-proven.
 - ~~**Open choice.** The timeout value (operator or implementation). **Next action.** Implementation.~~ Superseded below.
 - **Implementation (2026-10-15; branch `sonnet/issue-301`, base `1d2ec9fb`; not deployed).** `requestAflApi` runs each attempt, body read
@@ -51093,6 +51092,16 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Validation (DB-free, 15 Oct 2026; runbook §17.3).** Five fake-timer cases with stub transports (a transport that never answers, a stalled
   body, a failing body read, the default budget, invalid values) fail on the unfixed source and pass fixed; 449 neighbouring DB-free cases
   pass; 7 of 7 mutants are killed. `tsc --noEmit` and `git diff --check` exit 0; ESLint reports the same problem set as unchanged `main`.
+- **Readiness and merge (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `preflight --mode implementation
+  --issue 301` READY; `merge:ready -- --issue 301` (raw `D:\tmp\issue301\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one blocker, the
+  primary worktree not clean; every other check PASSed. The owner authorised that exception for this issue only, covering only that
+  clean-tree FAIL under the exact 18-path state; paths, no tracked or staged change and full hashes were verified by script immediately
+  before and after the merge (`$null)` `d9edb146…2500` identical throughout). `0d3d03b5` fast-forwarded to `main` and pushed (`1d2ec9fb..0d3d03b5`);
+  local `main` and the live remote both equalled `0d3d03b5` afterwards.
+- **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit. Runbook §14 asks for a DB-free check that a stub
+  fetch that never resolves makes `requestAflApi` reject within the budget; it exists and passes. The open value was settled as an
+  **implementation default of 60 s per attempt** (permitted by the runbook; not an owner decision). The closure scope is **merge-scoped**: code
+  on `main`, validated DB-free, **not deployed**. **Preserved limits:** no network, DEV or PROD action; the real upstream is not exercised.
 
 ## AFLDB-ISSUE-302 — Lineup bundle records the pinned fitzRoy version as provenance whatever version ran
 

@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Each AFL API request attempt, body read included, runs under a timeout (AFLDB-ISSUE-301; `0d3d03b5`, merged and pushed to `main`; DB-free validated; not deployed; resolved) - 15 October 2026
+
+- The AFL API HTTP client called `fetch` with no timeout and read the response body outside its retry, so an upstream that accepted a connection and stalled lost the whole nightly window to one request, and a failure while streaming the body escaped as a bare `TypeError` past the backoff and the 401/403 reissue logic. Each attempt, including the body read, now runs under a deadline (`AbortSignal` plus a race), and a timeout or a failed body read is retried like a network failure. The default budget is **60 s per attempt, an implementation choice** (the runbook left the value to the operator or the implementation); callers may pass `RetryOptions.timeoutMs`.
+- **Validation (DB-free).** Five fake-timer cases with stub transports fail against the unfixed source and pass fixed; 449 neighbouring cases pass; 7 of 7 mutants are killed; `tsc --noEmit` and `git diff --check` exit 0. Readiness was accepted under a scoped cleanliness exception, not a clean pass. **Not done:** any deployment or a run against the real upstream. Detail: `issues/closed/AFLDB-ISSUE-301.md` §17 and §18.
+
 ### Each settle exception report lists only its own source's apply failures (AFLDB-ISSUE-295; `dba8b2d0`, merged and pushed to `main`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
 
 - The settle exception report listed open `canonical_apply_failed` findings by type and owner only, which the AFL Tables and AFL API settles share. Each report therefore showed the other source's failures as its own, and a source's own failures could be hidden behind the "more than 20 open" cut by the other's. The apply-failure section is now narrowed by `details.source_key`, which every writer stamps. Reporting only: no finding changes. No migration.

@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and validated DB-free 2026-10-15 (§17); not deployed.
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Implemented and merged as `0d3d03b5` (fix, tests and records), validated DB-free (§17), merged and pushed (§18). **Not deployed.**
 - **Severity:** Low. **Area:** acquisition / network resilience.
 - **Key file:** `src/lib/acquisition/afl-api-client.ts` (`requestAflApi`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-036; partition note R4b-F06).
@@ -97,3 +97,11 @@ DB-free: a stub fetch that never resolves makes `requestAflApi` reject within th
 ### 17.4 Limits
 
 - Not deployed; no network, DEV or PROD action. The behaviour against the real upstream is not exercised: the transports are stubs. The §5 observation that a SIGTERM skips the acquire CLI's cleanup is not changed; the point of the timeout is that a stalled request now fails the run visibly, with `finally` running, long before systemd's limit. The 60 s default is an implementation choice that an owner may change.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 301` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue301\preflight-1.txt`). `npm run merge:ready -- --issue 301` (raw, unchanged: `D:\tmp\issue301\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The five committed paths were compared with the declared scope by hand: `afl-api-client.ts`, the AFL API match test, this runbook, `issues.md` and `IssuesIndex.md`.
+- **Exception (fresh, this issue only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state (the nine `.agents/skills` files, the seven zero-byte stray-named files, the literal `$null)` and the zero-byte `2000)`). Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
+- **Merge.** `0d3d03b5` fast-forwarded onto `main` and was pushed (`1d2ec9fb..0d3d03b5`); local `main` and `git ls-remote origin refs/heads/main` both equalled `0d3d03b5` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit. §14 asks for a DB-free check that a stub fetch that never resolves makes `requestAflApi` reject within the budget; it exists and passes, with the body-read cases (§17.2, §17.3). §15's open value was settled as an **implementation default of 60 s per attempt**, which the runbook permitted ("operator or implementation choice"); it is recorded as such and is not an owner decision. The closure scope is **merge-scoped**: code on `main`, validated DB-free, **not deployed**.
+- **Preserved limits.** Not deployed. No network, DEV or PROD action; the behaviour against the real upstream is not exercised. The 60 s default may be changed by the owner. The SIGTERM cleanup observation in §5 is not changed in itself.
