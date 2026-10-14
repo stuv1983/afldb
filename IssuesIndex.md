@@ -506,8 +506,8 @@
 
 ### AFLDB-ISSUE-298 — AFL API snapshot companion files are read without manifest verification
 - **Severity:** Low. **Area:** acquisition / evidence integrity — `src/lib/acquisition/afl-api-snapshot.ts`. **State:**
-  Open (2026-10-08), F-033; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-298.md`. **Next action:** implementation.
+  Open (2026-10-08), F-033; imported 2026-10-10. Implemented 2026-10-14 (`fd22d7a9`, `3987afaf`), DB-free validated; merge pending.
+- **Runbook:** `issues/open/AFLDB-ISSUE-298.md` (§17). **Next action:** merge and push, then close.
 
 ### AFLDB-ISSUE-299 — R lineup and roster acquirers overwrite retained evidence in place
 - **Severity:** Low. **Area:** acquisition tooling — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R`. **State:** Open
