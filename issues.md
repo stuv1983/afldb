@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 39 (ISSUE-229, ISSUE-266–270 and 33 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below)
+**Open issues:** 38 (ISSUE-229, ISSUE-266–270 and 32 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -34,7 +34,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-283 | The administrative note is not recorded on creation audit rows | Low | Admin awards / special records / audit trail | Open (2026-10-08); review F-018, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-283.md` | Implementation, grouped with ISSUE-282 |
 | AFLDB-ISSUE-284 | Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish | Low | Admin Brownlow — `src/db/queries/admin-brownlow.ts` | Open (2026-10-08); review F-019, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-284.md` | Implementation |
 | AFLDB-ISSUE-285 | Award Replace panel cannot give the duplicate confirmation its action requires | Low | Admin awards UI — `src/app/admin/awards/ReplacePanel.tsx` | Open (2026-10-08); review F-020, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-285.md` | Implementation |
-| AFLDB-ISSUE-286 | Hall of Fame legend and removal years are not bounded server-side | Low | Admin awards / Hall of Fame validation | Open (2026-10-08); review F-021, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-286.md` | Merge and push (implemented 2026-10-14, DB-free validated), then close |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
 | AFLDB-ISSUE-293 | Settle runs under-report `dataIssuesResolved` | Low | Acquisition / settle run accounting | Open (2026-10-08); review F-028, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-293.md` | Implementation (trivial) |
@@ -50692,12 +50691,12 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-286 — Hall of Fame legend and removal years are not bounded server-side
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin awards / Hall of Fame validation. Key files:
-  `src/app/admin/awards/actions.ts`, `src/db/queries/admin-awards.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-286.md`.
+- **Status:** Resolved (2026-10-14, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** admin awards / Hall of Fame validation. Key files:
+  `src/app/admin/awards/actions.ts`, `src/db/queries/admin-awards.ts`. **Runbook:** `issues/closed/AFLDB-ISSUE-286.md`.
 - **Origin.** Review F-021 (R2a-F05) at `20a7a4bb`. Code-proven. ~~**Next action.** Implementation.~~ Superseded below.
 - **Defect.** Legend and removal years were checked only against the induction year, only on creation (the removal year not at all);
   a correction took any integer, a non-Legend could keep a legend year, and a value above 32767 failed on the `smallint` cast with a raw error.
-- **Implementation (2026-10-14; commit `f2c6b675` on `sonnet/issue-286`, base `c514b731`; not yet merged).** One exported rule,
+- **Implementation (2026-10-14; commit `f2c6b675` on `sonnet/issue-286`, base `c514b731`; merged and pushed with its records as `c2b1d65e`; not deployed).** One exported rule,
   `hallOfFameYearsRefusal` in `admin-awards.ts`: a Legend needs a legend year; each supplied year is a whole number from the induction year
   (or 1996) to 2100. Create and replace apply it before a connection opens (and again inside the insert, so a replace refused after its void rolls
   back); correct applies what it can before a connection and the row-relative floor under the row lock. Only a Legend stores a legend year;
@@ -50707,6 +50706,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   connection was opened or no `UPDATE` issued; written values asserted); 33 of 42 fail against the base `src/`. Neighbouring awards suites: 115 passed,
   3 failed identically at the unmodified base (pre-existing). `tsc --noEmit`, ESLint of the three files and `git diff --check` exit 0; implementation
   preflight READY. Not run: integration, DEV/PROD, browser.
+- **Readiness (14 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 286` (raw `D:\tmp\issue286\merge-ready-raw-1.txt`, unchanged)
+  BLOCKED by exactly one blocker, the primary worktree not clean: the 17 untracked paths (nine `.agents/skills` files, seven zero-byte stray-named files including `void`, and the literal `$null)`), for this issue only, as authorised by the owner.
+  Every other check PASSed; warnings as before (no runbook readiness block, no unexpected-file classification; database parity not checked). `worktree:bootstrap` was BLOCKED by the same paths (its output was not saved to a file), so the worktree was created with the one `git worktree add -b` it would have run, at the verified tip.
+  Preconditions (`D:\tmp\issue286\precheck-1.txt`, then `premerge-1.txt` immediately before the merge and `postmerge-1.txt` after it; script `exception-check.py`): `git status -uall` listed exactly those 17 paths, all `??`; each a regular file; the nine non-empty files equal their **full SHA-256 and length** to both saved 13 Oct snapshots (`D:\tmp\issue313\untracked-blockers-manifest.txt`, `D:\tmp\issue314\closeout-20261013T021336Z\untracked-after.json`); the seven zero-byte files `e3b0c442…b855`;
+  `$null)` (143 bytes, mtime 20:00:49) hashed in full in this session as `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500`, identical at all three checks. Its content names the previous session's id (`faae9b3b…`), not this one's, so this session's hook had not rewritten it. Primary `HEAD` equalled the live remote (`git ls-remote`) before the merge.
+- **Hash wording corrected (`3f657ae2`, same push).** The ISSUE-279 reconciliation (runbook §18.1; ledger) said the stray paths were "unchanged since 13 Oct". It now states current equality with the saved 13 Oct snapshots, not continuous preservation, and keeps the limitation that no full-hash evidence from the merge instant exists.
+- **Merge.** `3f657ae2`, `f2c6b675` and `c2b1d65e` fast-forwarded to `main` and pushed (`c514b731..c2b1d65e`); local `main`, the fetched `origin/main` and the live remote all equalled `c2b1d65e` afterwards.
+- **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's §14 criterion (DB-free validation unit cases where possible: met, §17.1).
+  **Preserved limits:** not deployed; no integration test or PostgreSQL case was run (the real `smallint` columns, the row lock and the atomic write are not exercised); existing rows with an implausible stored year were not looked for and nothing was repaired; no browser check (no markup changed). Open issues: 39 -> 38.
 
 ## AFLDB-ISSUE-287 — Source-owned draft pick `null_pick_number` confirmation is unreachable
 

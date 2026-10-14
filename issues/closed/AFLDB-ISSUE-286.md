@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented 2026-10-14 as `f2c6b675` on `sonnet/issue-286` (base `c514b731`); DB-free validated (§17.1); not yet merged.
+- **Status:** **Resolved (2026-10-14, merge-scoped)**, on the push of the documentation-only closure commit (§18). Implemented as `f2c6b675` on `sonnet/issue-286` (base `c514b731`), merged and pushed with its records as `c2b1d65e`; DB-free validated (§17.1). **Not deployed.**
 - **Severity:** Low. **Area:** admin awards / Hall of Fame validation.
 - **Key files:** `src/app/admin/awards/actions.ts`, `src/db/queries/admin-awards.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-021; partition note R2a-F05).
@@ -83,7 +83,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Done 2026-10-14 (§17). Next: readiness, merge and push, then close (§18).
+~~Implementation.~~ Done 2026-10-14 (§17); merged and closed (§18).
 
 ## 17. Implementation record (2026-10-14)
 
@@ -100,3 +100,11 @@ None.
 - Neighbouring suites `tests/awards-admin.test.ts`, `tests/honours-lifecycle-public-contract.test.ts`, `tests/hall-of-fame-source.test.ts`: 115 passed, 3 failed. The same 3 fail identically at the unmodified base `c514b731` in the primary checkout (`widens data_edits by SELECT alone in 108`, and the two public-read-model lifecycle-filter scans of `awards.ts` and `grid-solver.ts`; none touches this change), so they are pre-existing, not caused by it.
 - `npx tsc --noEmit` exit 0; `npx eslint` of the three files exit 0; `git diff --check` exit 0. `npm run preflight -- --mode implementation --issue 286`: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; `D:\tmp\issue286\preflight-impl.txt`).
 - **Not run / limits:** `tests/integration/admin-awards.test.ts` and any PostgreSQL case (the real `smallint` columns, the row lock, the atomic override and audit write); the fake transaction proves the decisions and the values passed to the statements, not that PostgreSQL accepts them. No browser check: no layout or markup changed. No deployment, DEV or PROD action. Existing rows with an implausible stored year were not looked for.
+
+## 18. Readiness, merge and closure (2026-10-14)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 286`: READY (§17.1). `npm run merge:ready -- --issue 286` (raw output, unchanged: `D:\tmp\issue286\merge-ready-raw-1.txt`): every check PASS except **one blocker, "main worktree is clean"**, the primary checkout's **17** untracked paths (nine `.agents/skills` files, seven zero-byte stray-named files including `void`, and the literal `$null)`). Existing warnings: no `afldb-merge-readiness` block in this runbook; no unexpected-file classification (7 committed files); database parity not checked. `worktree:bootstrap` was BLOCKED by the same paths (its output was not saved to a file), so the worktree was created with the one `git worktree add -b sonnet/issue-286 <path> c514b731` it would have run, at the tip verified equal to the live remote.
+- **Exception.** The owner authorised a fresh exception for this issue, covering only that clean-tree FAIL and the exact 17-path set, compared by full content hash. `D:\tmp\issue286\exception-check.py` (read-only) was run as `precheck-1`, again as `premerge-1` immediately before the merge and as `postmerge-1` after the push; all three RESULT OK. It checks: `git status --porcelain -z -uall` lists exactly the 17 paths, all `??` (no tracked change, nothing staged); each a regular file; the nine non-empty files equal their **full 64-hex SHA-256 and length** to both saved 13 Oct snapshots (`D:\tmp\issue313\untracked-blockers-manifest.txt`, `D:\tmp\issue314\closeout-20261013T021336Z\untracked-after.json`); the seven zero-byte files are `e3b0c442…b855`. `$null)` (143 bytes, mtime 2026-10-14 20:00:49) was hashed in full in this session as `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500` and was identical at all three checks; its content names the previous session's id (`faae9b3b-a5a0-4405-8817-1c8bc76507ba`), not this one's, so this session's hook had not rewritten it. That hash is valid for this session only. Earlier exceptions were not reused. All 17 paths were left in place. This is current equality with the saved snapshots; it is not evidence of continuous preservation since 13 Oct (see the ISSUE-279 correction, `3f657ae2`).
+- **Merge.** `3f657ae2` (ISSUE-279 hash wording), `f2c6b675` (fix) and `c2b1d65e` (records) fast-forwarded onto `main` (`c514b731..c2b1d65e`) and pushed; local `main`, the fetched `origin/main` and `git ls-remote origin refs/heads/main` all equalled `c2b1d65e` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit, under the satisfied §14 criterion (DB-free validation unit cases where possible, §17.1).
+- **Preserved limits.** Not deployed. No integration test or PostgreSQL case was run: the real `smallint` columns, the row lock and the atomic override and audit write are not exercised, and the fake transaction proves the decisions and the values handed to the statements, not that PostgreSQL accepts them. Rows already stored with an implausible year were not searched for and nothing was repaired. No browser check (no markup changed). No database constraint was added (the review did not ask for one). The legacy `src/db/queries/awards-admin.ts` still carries its older, looser create check; it is not reached by the awards actions.

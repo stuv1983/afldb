@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### Hall of Fame legend and removal years are bounded on every server path (AFLDB-ISSUE-286; `f2c6b675`, merged and pushed to `main` as `c2b1d65e`; DB-free validated; not deployed; resolved) - 14 October 2026
+
+- On `/admin/awards/hall-of-fame`, a legend year or removal year outside 1996 to 2100, or before the entry's induction year, is now refused with a sentence on create, replace and correct. Previously a correction accepted any integer (so `legend_year = 20999` was stored and shown publicly, and a value above 32767 failed on the `smallint` cast with a raw error), the removal year was never bounded, and replace relied on the form alone. One rule, `hallOfFameYearsRefusal`, now serves all three; year-only checks run before a connection opens.
+- A legend year is stored only for a Legend: un-ticking Legend, or naming a year for a non-Legend, clears it, as creation already did. A correction that touches neither leaves a stored value alone. No migration or database constraint; existing rows are not changed or assessed.
+- **Behaviour change after deployment:** an out-of-range or pre-induction year that was previously accepted is refused.
+- **Validation (DB-free).** New `tests/admin-awards-hall-of-fame-years.test.ts` 42 passed (33 fail against the previous source); `tsc --noEmit`, ESLint of the three files and `git diff --check` exit 0. No integration test, browser check, deployment or DEV/PROD action. Readiness was accepted under a scoped cleanliness exception, not a clean pass. Detail: `issues/closed/AFLDB-ISSUE-286.md` §17 and §18.
+- Also corrected: the ISSUE-279 reconciliation no longer says the untracked stray paths were "unchanged since 13 Oct"; it states current equality with the saved snapshots and keeps the missing merge-time evidence limitation (`3f657ae2`).
+
 ### The source-owned draft pick form can confirm a selection that has no pick number (AFLDB-ISSUE-287; `dcc6a61c`, merged and pushed to `main` as `8cea1a45`; DB-free validated; not deployed; resolved) - 14 October 2026
 
 - On `/admin/draft/[id]`, clearing the pick number of a source-owned (DraftGuru) selection whose kind carries pick numbers, and which has a pick note, makes the action ask for confirmation. The "Pick number and club" form (`SourceFieldsPanel`) never sent that confirmation, so the save could never complete. It now shows a "Confirm this selection has no pick number." checkbox beside the request, keeps Save disabled until it is ticked, and sends `confirmed=1` for that one save only. The server-side rule is unchanged.
