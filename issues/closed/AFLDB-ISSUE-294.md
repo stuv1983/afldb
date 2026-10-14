@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and validated on `afldb_test` 2026-10-15 with ISSUE-293 (§17); not deployed.
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Implemented and merged as `8e49a9da` with ISSUE-293 (fix, tests and records), validated on `afldb_test` (§17), merged and pushed (§18). **Not deployed.**
 - **Severity:** Low. **Area:** acquisition / import batch accounting.
 - **Key files:** `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/lineup-store.ts`, `src/lib/external-afl/current-season-import.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-029; partition note R4a-F04).
@@ -104,3 +104,11 @@ None.
 ### 17.4 Limits
 
 - Not deployed; no browser, DEV or PROD action. The fallback importer's close is proved by source text, not by a live batch row. Earlier batches keep `completed_at = started_at`; nothing is repaired. Operators will see real completion times only for batches closed after deployment. The AFL Tables file's S6 CLI block was not run.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** ISSUE-294 was implemented, tested, committed and merged together with ISSUE-293 (shared files and harness); readiness was run once for the group, as `--issue 293`. `npm run preflight -- --mode implementation --issue 293` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue293-294\preflight-1.txt`). `npm run merge:ready -- --issue 293` (raw, unchanged: `D:\tmp\issue293-294\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The thirteen committed paths were compared with the declared scope by hand: four source files, five test files, the two runbooks, `issues.md` and `IssuesIndex.md`.
+- **Exception (fresh, for this group only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state: the nine `.agents/skills` files, the seven zero-byte stray-named files (`0)`, ``20` ``, ``` `path ```, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`, `void`), the literal `$null)` and the zero-byte `2000)`. Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
+- **Merge.** `8e49a9da` fast-forwarded onto `main` and was pushed (`359d403c..8e49a9da`); local `main` and `git ls-remote origin refs/heads/main` both equalled `8e49a9da` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit. §14 asks for an integration assertion after an apply that `completed_at > started_at` and `records_inserted = counters.versionsAppended`; it exists for the AFL Tables settle, the lineup store is asserted for the completion instant, and the fallback importer is covered by its SQL text (§17.2, §17.3). The closure scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**.
+- **Preserved limits.** Not deployed. No browser, DEV or PROD action. The fallback importer's close is proved by source text, not by a live batch row. Batches closed before deployment keep `completed_at = started_at`; nothing is repaired. The legacy CSV promotion batch (ISSUE-307) is unchanged. The test files were run by filter, not whole.
