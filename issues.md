@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 22 (ISSUE-229, ISSUE-266–270 and 16 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294, ISSUE-295 and ISSUE-301 on 2026-10-15, merge-scoped and not deployed, see below)
+**Open issues:** 21 (ISSUE-229, ISSUE-266–270 and 15 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294, ISSUE-295, ISSUE-301 and ISSUE-304 on 2026-10-15, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -34,7 +34,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; fix implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-292.md` §17 | Run the read-only DEV/PROD two-path census (needs DEV/PROD contact); then close |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
-| AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; implemented and validated DB-free 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-304.md` §17 | Merge, then close (merge-scoped) |
 | AFLDB-ISSUE-307 | Legacy promotion counts every promoted row as inserted | Low | Legacy CSV intake / import batch accounting — `src/lib/ingest/pipeline.ts` | Open (2026-10-08); review F-042, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-307.md` | Implementation (low priority) |
 | AFLDB-ISSUE-308 | Approving a player-link suggestion does not revalidate public pages | Low | Admin player links / revalidation — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-043, code-proven, fix framework-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-308.md` | Choose the mechanism (does the ISSUE-087 hang reproduce on Next 16.3.1?), then implement (ISSUE-309/311 resolved 2026-10-15, no longer a dependency) |
 
@@ -51144,9 +51143,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-304 — Email intake parses the whole body before sender and size checks
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** legacy CSV intake / email ingress resource bounds. Key files:
+- **Status:** Resolved (2026-10-15, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** legacy CSV intake / email ingress resource bounds. Key files:
   `src/app/api/admin/email-intake/route.ts`, `tools/email_intake/fetch_and_stage.py`. **Runbook:**
-  `issues/open/AFLDB-ISSUE-304.md`.
+  `issues/closed/AFLDB-ISSUE-304.md`.
 - **Origin.** Review F-039 (R5a-F07) at `20a7a4bb`. Code-proven. Related: ISSUE-266.
 - ~~**Next action.** Implementation, after ISSUE-266.~~ Superseded below.
 - **Implementation (2026-10-15; branch `sonnet/issue-304`, base `47e596ac`; not deployed).** The poller refuses an attachment over the 5 MiB
@@ -51157,6 +51156,16 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `--dry-run`) with a parity check against the app's constant, and five route cases with a spied `json()`; both fail on the unfixed
   source; 11 of 11 mutants are killed (one first survived and drove an added case). `tsc --noEmit`, `py_compile`, ESLint and
   `git diff --check` clean. The intake integration file was not run.
+- **Readiness and merge (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `preflight --mode implementation
+  --issue 304` READY; `merge:ready -- --issue 304` (raw `D:\tmp\issue304\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one blocker, the
+  primary worktree not clean; every other check PASSed. The owner authorised that exception for this issue only, covering only that
+  clean-tree FAIL under the exact 18-path state; paths, no tracked or staged change and full hashes were verified by script immediately
+  before and after the merge (`$null)` `d9edb146…2500` identical throughout). `074c01ae` fast-forwarded to `main` and pushed (`47e596ac..074c01ae`);
+  local `main` and the live remote both equalled `074c01ae` afterwards.
+- **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit. Runbook §14 asks for a Python unit test for the
+  poller cap and a route test with an oversized `Content-Length` expecting 400 without parsing; both exist and pass. The closure scope is
+  **merge-scoped**: code on `main`, validated DB-free, **not deployed**. **Preserved limits:** no mail, network, DEV or PROD action; the poller
+  is dormant on both hosts; a body with no `Content-Length` is not bounded before parsing; the intake integration file was not run.
 
 ## AFLDB-ISSUE-305 — Legacy intake validation accepts values promotion then rejects
 

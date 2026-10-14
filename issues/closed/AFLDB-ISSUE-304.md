@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and validated DB-free 2026-10-15 (§17); not deployed.
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Implemented and merged as `074c01ae` (fix, tests and records), validated DB-free (§17), merged and pushed (§18). **Not deployed.**
 - **Severity:** Low. **Area:** legacy CSV intake / email ingress resource bounds.
 - **Key files:** `src/app/api/admin/email-intake/route.ts`, `tools/email_intake/fetch_and_stage.py`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-039; partition note R5a-F07).
@@ -98,3 +98,11 @@ None.
 ### 17.4 Limits
 
 - Not deployed; no browser, DEV, PROD, mail or network action. Neither host has an intake timer, so the poller change is dormant until intake is activated (ISSUE-266 runbook §18.10). A chunked request (no `Content-Length`) is not bounded before parsing; no current caller sends one. The poller still holds the whole message in memory while it parses it, and the size is checked after that; only the base64 re-encoding and the POST are avoided. The route's 40 MB case was exercised with a stand-in request, not a real 40 MB body.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 304` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue304\preflight-1.txt`). `npm run merge:ready -- --issue 304` (raw, unchanged: `D:\tmp\issue304\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The seven committed paths were compared with the declared scope by hand: the route and its test, the poller and its self-test, this runbook, `issues.md` and `IssuesIndex.md`.
+- **Exception (fresh, this issue only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state (the nine `.agents/skills` files, the seven zero-byte stray-named files, the literal `$null)` and the zero-byte `2000)`). Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
+- **Merge.** `074c01ae` fast-forwarded onto `main` and was pushed (`47e596ac..074c01ae`); local `main` and `git ls-remote origin refs/heads/main` both equalled `074c01ae` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit. §14 asks for a Python unit test for the poller cap and a route test with an oversized `Content-Length` expecting 400 without parsing; both exist and pass (§17.2, §17.3). The "after ISSUE-266" ordering is met in the repository (the ISSUE-266 poller is on `main`); ISSUE-266 itself remains open for PROD and this issue does not depend on its closure. The closure scope is **merge-scoped**: code on `main`, validated DB-free, **not deployed**.
+- **Preserved limits.** Not deployed; no mail, network, DEV or PROD action; the poller is dormant on both hosts. A body with no `Content-Length` is not bounded before parsing. The intake integration file was not run.

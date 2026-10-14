@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Email intake refuses an oversize attachment before it is posted and bounds the declared body before parsing it (AFLDB-ISSUE-304; `074c01ae`, merged and pushed to `main`; DB-free validated; not deployed; resolved) - 15 October 2026
+
+- The email poller forwarded an attachment of any size, base64-encoded into one JSON POST, and `POST /api/admin/email-intake` parsed the whole body before it checked the sender or the base64 length, so a very large attachment from a mail-authenticated sender was held in an app worker's memory only to be rejected. The poller now refuses an attachment over the 5 MiB upload ceiling before encoding it (it is filed to Errors and counted as rejected), and the route answers a declared `Content-Length` above the base64 limit plus a 16 KiB allowance with 400 before parsing, after the secret check. A request that declares no readable length is parsed as before. No data effect, no migration.
+- **Validation (DB-free).** A Python self-test over the poller's `main()` and five route cases fail against the unfixed source and pass fixed; 11 of 11 mutants are killed; `tsc --noEmit`, `py_compile` and `git diff --check` are clean. Readiness was accepted under a scoped cleanliness exception, not a clean pass. **Not done:** any deployment, a mail or network run, or the intake integration file. Detail: `issues/closed/AFLDB-ISSUE-304.md` §17 and §18.
+
 ### Each AFL API request attempt, body read included, runs under a timeout (AFLDB-ISSUE-301; `0d3d03b5`, merged and pushed to `main`; DB-free validated; not deployed; resolved) - 15 October 2026
 
 - The AFL API HTTP client called `fetch` with no timeout and read the response body outside its retry, so an upstream that accepted a connection and stalled lost the whole nightly window to one request, and a failure while streaming the body escaped as a bare `TypeError` past the backoff and the 401/403 reissue logic. Each attempt, including the body read, now runs under a deadline (`AbortSignal` plus a race), and a timeout or a failed body read is retried like a network failure. The default budget is **60 s per attempt, an implementation choice** (the runbook left the value to the operator or the implementation); callers may pass `RetryOptions.timeoutMs`.
