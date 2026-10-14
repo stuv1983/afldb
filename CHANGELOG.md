@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Sitemap segments render under Next.js 16 (AFLDB-ISSUE-279; `c206d1d1`, merged and pushed to `main` as `cf1d49c3`; DB-free validated; not deployed; still open) - 14 October 2026
+
+- `src/app/sitemap.ts` awaits the segment `id`, which Next 16 passes as a `Promise<string>`; it was read as a number, so `Number(promise)` was `NaN` and every `/sitemap/<n>.xml` was an empty `<urlset>` while the `/sitemap.xml` index still listed it. The plain-string and number forms still work. No effect today (indexing is off); it matters once indexing is enabled.
+- **Validation (DB-free).** `tests/seo.test.ts` 25 passed (every segment non-empty under the Promise contract; 2 fail against the previous file); `tsc --noEmit`, ESLint of the two files and `git diff --check` exit 0. **Not run: the DEV check with indexing on, which the runbook requires before the issue closes.** Readiness was accepted under a scoped cleanliness exception, not a clean pass. Detail: `issues/open/AFLDB-ISSUE-279.md` §17 and §18.
+
 ### Admin player creation refuses an implausible height or weight, a bad date of birth or an unknown confidence (AFLDB-ISSUE-291; `fd9443ff`, merged and pushed to `main` as `0bd64fc7`; DB-free validated; not deployed; resolved) - 14 October 2026
 
 - `createPlayerInTransaction` (`src/db/queries/players.ts`), the one player-creation primitive behind the Data Editor's "Add new player" and the player-links "Create and link", now applies the Data Editor's own rules through a new `validateNewPlayerFacts` before any statement: a real `YYYY-MM-DD` date of birth, a known confidence (`sourced`, `estimated`, `derived`, `unknown`), height 120-230 cm and weight 40-160 kg. Both actions return the refusal as a typed error and nothing is written, so an implausible figure is no longer stored or copied into the durable `manual_admin_edit` creation record that replay re-creates on every rebuild, and a bad enum or impossible date no longer surfaces as a raw PostgreSQL error.

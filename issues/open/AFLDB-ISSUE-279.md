@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented 2026-10-14 (§17) and DB-free validated (§17.1); merge pending.
+- **Status:** Open (2026-10-08). Implemented 2026-10-14 (§17), DB-free validated (§17.1), merged to `main` as `cf1d49c3` (§18), not deployed. **Open** until the §14 item 2 DEV check passes.
 - **Severity:** Medium. **Area:** public site / SEO / framework upgrade.
 - **Key files:** `src/app/sitemap.ts`, `tests/seo.test.ts`, `tests/e2e/seo.spec.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-014; main-session partition R1c-F01).
@@ -90,7 +90,7 @@ None.
 
 ## 16. Next action
 
-~~Code fix plus test update. This must be done before indexing is enabled.~~ Done (§17). Merge and push, then close.
+~~Code fix plus test update. This must be done before indexing is enabled.~~ Done and merged (§17, §18). **Remaining:** deploy to DEV and run the §14 item 2 check with indexing on; close only when it passes.
 
 ## 17. Implementation record (2026-10-14)
 
@@ -104,3 +104,10 @@ None.
 - `npx vitest run tests/seo.test.ts`: **25 passed**. **Negative control:** with the previous `src/app/sitemap.ts` restored, 2 fail (the new all-segments case, and the club-comparison case, which now reads segment 0 under the Promise contract and finds it empty); the fixed file was restored afterwards and the 25 pass again.
 - `npx tsc --noEmit`: exit 0. `npx eslint src/app/sitemap.ts tests/seo.test.ts`: exit 0, no problems. `git diff --check`: exit 0.
 - **Not run:** any integration file (`tests/integration/admin-awards.test.ts` calls `sitemap({ id: 1 })` with the number contract, which still type-checks and behaves the same), the e2e spec, any DEV/PROD action, any browser check, `npm run build`.
+
+## 18. Readiness, merge and status (2026-10-14)
+
+- Readiness: **accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 279`: READY (0 blockers, 3 warnings; `D:\tmp\issue279\preflight-impl.txt`). `npm run merge:ready -- --issue 279` (raw output, unchanged: `merge-ready-raw-1.txt` run first and `merge-ready-raw-2.txt` after the exception was authorised, both in `D:\tmp\issue279\`): every check PASS except **one blocker, "main worktree is clean"**, the primary checkout's **17** untracked paths. Existing warnings: no `afldb-merge-readiness` block in this runbook; no unexpected-file classification; database parity not checked.
+- Exception: the owner authorised a fresh exception for this issue only, covering exactly those 17 paths: the 16 previously recorded (nine `.agents/skills` files and six stray-named files, plus the zero-byte `void`) and the literal `$null)`. `$null)` is new this session: a regular, untracked, unstaged 143-byte file created 19:40:10 on 14 Oct 2026, whose content is a cmd.exe error quoting this session's hook JSON (its origin as a session-hook artifact is an inference). SHA-256 `82E23AB9F8D5D957C23CE1FCC0252829A6C4DEFB5BF01844F316AE94102E6EFF`, equal to its copy `D:\tmp\issue279\stray-dollar-null-paren.bak` (a copy made this session before the exception; the file itself was left in place; an attempt to delete it was refused by the permission classifier and was not retried or worked around). Preconditions verified before the merge (`exception-precheck.txt` for the first look, `exception-precheck-2.txt` for the authorised set): exactly the 17-path set; the 16 established paths unchanged in length and hash; `void` regular, length 0, SHA-256 `e3b0c442…b855`, untracked; no tracked primary change, nothing staged; the 15 ISSUE-274/ISSUE-276 source and test file blobs (two issues, 15 files) equal at `839e084c`, at the base `a7f7a713` and on the branch. Earlier exceptions were not reused. All 17 paths were left in place.
+- Merge: `c206d1d1` plus the records commit `cf1d49c3` fast-forwarded to `main` and pushed (`a7f7a713..cf1d49c3`); local `main`, the fetched `origin/main` and the live remote were verified equal to `a7f7a713` before the merge and to `cf1d49c3` after it.
+- **Status: remains OPEN.** The fix is merged to `main` but **not deployed**. §14 item 2 is a stated validation criterion and has not run: **on DEV with `AFLDB_INDEXING=on` (and the beta gate off), `/sitemap/0.xml` must contain at least one `<url>`** (the `/sitemap.xml` index lists the segments; a sample of the others, e.g. `/sitemap/1.xml`, would strengthen it). The DB-free tests do not substitute for it. Nothing in this entry changes the indexing flag, the beta gate or any indexing policy; the DEV check needs a deployment and a configuration change that nobody has authorised.

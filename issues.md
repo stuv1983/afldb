@@ -50617,15 +50617,18 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 
-- **Status:** Open (2026-10-08); implemented 2026-10-14, DB-free validated, merge pending. **Severity:** Medium. **Area:** public site / SEO / framework upgrade. Key files:
+- **Status:** Open (2026-10-08); implemented 2026-10-14, DB-free validated, **merged to `main` as `cf1d49c3`, not deployed; remains Open pending the DEV check**. **Severity:** Medium. **Area:** public site / SEO / framework upgrade. Key files:
   `src/app/sitemap.ts`, `tests/seo.test.ts`, `tests/e2e/seo.spec.ts`.
 - **Runbook:** `issues/open/AFLDB-ISSUE-279.md`. **Origin.** Review F-014 (R1c-F01) at `20a7a4bb`. Reproduced DB-free by
   the review (witness W6, not imported) and confirmed against the installed `next@16.3.1` documentation.
 - **Defect.** Next 16 passes the segment `id` as a `Promise<string>`; `Number(promise)` is `NaN`, so every
   `/sitemap/<n>.xml` is an empty `<urlset>` while the index still advertises them.
 - **Decisions.** None. ~~**Next action.** Code fix plus test update, before search indexing is enabled (review gating note).~~ Superseded below.
-- **Implementation (2026-10-14; commit `c206d1d1` on `sonnet/issue-279`, base `a7f7a713`; not merged yet; not deployed).** `src/app/sitemap.ts` reads the segment id as `Number(await rawId)` and accepts `Promise<string | undefined> | string | number | undefined`, so the Next 16 `Promise<string>` contract and the earlier contracts all select the right segment. Runbook §17.
+- **Implementation (2026-10-14; commit `c206d1d1` on `sonnet/issue-279`, base `a7f7a713`; merged and pushed with its records as `cf1d49c3`; not deployed).** `src/app/sitemap.ts` reads the segment id as `Number(await rawId)` and accepts `Promise<string | undefined> | string | number | undefined`, so the Next 16 `Promise<string>` contract and the earlier contracts all select the right segment. Runbook §17.
 - **Validation (DB-free, 14 Oct 2026).** `tests/seo.test.ts` 25 passed (new: every segment 0/1/100/200/300 non-empty under `Promise<string>` and equal to the string and number contracts, with exact URLs for 100 and 200; an unmatched id renders nothing); 2 fail against the previous `sitemap.ts`; `tsc --noEmit`, ESLint of the two files and `git diff --check` exit 0. Not run: integration, e2e, DEV/PROD, browser, build; the §14 DEV check (indexing on, `/sitemap/0.xml` contains a `<url>`) is outstanding.
+- **Readiness (14 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 279` (raw `D:\tmp\issue279\merge-ready-raw-1.txt` and `-2.txt`, unchanged) BLOCKED by exactly one blocker, the primary worktree not clean: **17** untracked paths (the 16 previously recorded plus the literal `$null)`, a 143-byte file created this session, SHA-256 `82E23AB9…6EFF`), for this issue's merge only, as authorised by the owner. Preconditions were verified first (`exception-precheck-2.txt`: exactly that set; the 16 unchanged; `void` zero bytes, `e3b0c442…b855`; no tracked primary change, nothing staged; the 15 ISSUE-274/276 source and test file blobs (two issues, 15 files) equal at `839e084c`, the base and the branch). Existing warnings: no runbook readiness block, no unexpected-file classification; database parity not checked. All 17 paths were left in place; deletion of `$null)` was refused by the permission classifier and not retried. Runbook §18.
+- **Merge.** `c206d1d1` plus `cf1d49c3` fast-forwarded to `main` and pushed (`a7f7a713..cf1d49c3`); the live remote was verified equal.
+- **Status: remains OPEN, not closed.** Merged, **not deployed**. The runbook's §14 item 2 is unmet: **on DEV with `AFLDB_INDEXING=on` and the beta gate off, `/sitemap/0.xml` must contain at least one `<url>`.** The DB-free result does not replace it. No deployment, host or database action and no indexing change was made. Open issues stay at 40.
 
 ## AFLDB-ISSUE-280 — Beta magic link is consumed by any GET, including a mail scanner's prefetch
 
