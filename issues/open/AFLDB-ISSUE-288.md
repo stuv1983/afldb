@@ -4,7 +4,7 @@
 
 - **Status:** Open (2026-10-08). **Implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (branch
   `opus/batch-315-281-312-288`, base `80f86c39`); DB-free validated; both `afldb_test` integration refusal cases passed (§17.7);
-  committed as `44ea8ce2`; merged to `main` by `01976be7` on 2026-10-13 (pushed: an ancestor of the live `origin/main`, verified 2026-10-14); not on DEV or PROD** (§17).
+  committed as `44ea8ce2`; merged to `main` by `01976be7` on 2026-10-13 (pushed: an ancestor of the live `origin/main`, verified 2026-10-14); INSTALLED ON DEV 2026-10-14 13:52 AEDT (TARGET `17514052`, runbook 275 §30; installation checks PASS), DEV smoke and visual evidence NOT YET DONE (`VISUAL: UNVERIFIED`); not on PROD** (§17).
 - **Severity:** Low. **Area:** admin coaches.
 - **Key files:** `src/db/queries/admin-coaches.ts` (`createCoach`, `saveCoachMetadata`), `src/app/admin/coaches/actions.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-023; partition note R2c-F04).
@@ -159,7 +159,7 @@ Worktree `D:\dev\afldb-batch-315-281-312-288`, branch `opus/batch-315-281-312-28
       is not part of this run; it is covered in §17.3.)
    3. **After**, run the same census and require: every cleanup-selector column = 0 again, and `users_n`, `users_fp`,
       `sources_n`, `sources_fp` identical to the before values (shared users and sources preserved).
-3. Merge/push and DEV deploy, **held until ISSUE-274's first-nightly evidence is captured** (captured: ISSUE-274 runbook §33). **Merged to main 2026-10-13 (merge `01976be7`) and pushed (verified 2026-10-14); the DEV deploy has not happened.**
+3. Merge/push and DEV deploy, **held until ISSUE-274's first-nightly evidence is captured** (captured: ISSUE-274 runbook §33). **Merged to main 2026-10-13 (merge `01976be7`) and pushed (verified 2026-10-14); the DEV deploy happened 2026-10-14 13:52 AEDT (runbook 275 §30); the smoke and the mandatory visual evidence have not been done (`VISUAL: UNVERIFIED`).**
 4. DEV smoke as Super Admin on `/admin/coaches`: submit an impossible dob (`2026-02-30`) on Create and on an existing
    coach's metadata form (the browser's date picker blocks it, so change the input's type to text in devtools or paste
    the value); expect the sentence above, no error page, no new coach, metadata unchanged. Leave the form blank once and

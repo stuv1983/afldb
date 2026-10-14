@@ -3,7 +3,7 @@
 ## 0. Status
 
 - **Status:** Open (2026-10-08). **Implemented 2026-10-12 in batch worktree `afldb-batch-315-281-312-288` (branch
-  `opus/batch-315-281-312-288`, base `80f86c39`); DB-free validated; committed as `23809fce`; merged to `main` by `01976be7` on 2026-10-13 (pushed: an ancestor of the live `origin/main`, verified 2026-10-14); not on DEV or PROD** (§17).
+  `opus/batch-315-281-312-288`, base `80f86c39`); DB-free validated; committed as `23809fce`; merged to `main` by `01976be7` on 2026-10-13 (pushed: an ancestor of the live `origin/main`, verified 2026-10-14); INSTALLED ON DEV 2026-10-14 13:52 AEDT (TARGET `17514052`, runbook 275 §30; installation checks PASS), DEV smoke NOT YET DONE; not on PROD** (§17).
 - **Severity:** Low. **Area:** public site / query sort allowlists.
 - **Key files:** `src/db/queries/players.ts` (`isPlayerMatchSort`), `src/db/queries/draft.ts` (`isDraftSort`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-016; main-session partition R1b-F01).
@@ -115,7 +115,7 @@ No `afldb_test` check (not needed: SQL unchanged for valid keys, and the fallbac
 
 1. **Done 2026-10-12:** operator review of the batch diff, then a separate local commit for this issue (with its tracking
    hunks). Committed locally (`23809fce`); merged to main 2026-10-13 (`01976be7`; pushed: an ancestor of the live `origin/main`, verified 2026-10-14).
-2. Merge/push and DEV deploy, **held until ISSUE-274's first-nightly evidence is captured** (captured: ISSUE-274 runbook §33). **Merged to main 2026-10-13 (merge `01976be7`) and pushed (verified 2026-10-14); the DEV deploy has not happened.**
+2. Merge/push and DEV deploy, **held until ISSUE-274's first-nightly evidence is captured** (captured: ISSUE-274 runbook §33). **Merged to main 2026-10-13 (merge `01976be7`) and pushed (verified 2026-10-14); the DEV deploy happened 2026-10-14 13:52 AEDT (runbook 275 §30); the section 17.5 smoke has not been done.**
 3. DEV smoke (signed in; DEV's beta gate redirects anonymous requests): `/players/<slug>/matches?sort=constructor&dir=asc`
    and `?sort=toString&dir=desc`, `/draft/<year>?sort=toString&dir=desc` and `?sort=constructor&dir=asc` render with the
    default order and no error page; `?sort=g&dir=desc` and `/draft/<year>?sort=pick&dir=asc` still sort; no PostgreSQL

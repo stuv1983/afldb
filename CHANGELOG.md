@@ -67,7 +67,7 @@ commit.
   `--apply`, deployment or DEV/PROD acceptance is claimed. The `cannot be inspected` branch is untested. Readiness was accepted under a scoped cleanliness exception (untracked skill and stray files in the primary worktree), not a clean pass.
   Detail: `issues/closed/AFLDB-ISSUE-314.md` §17, §17.8, §17.9.
 
-### A settle no longer writes period scores under a match it refused (AFLDB-ISSUE-275; committed as `24ca412b` and on `origin/main` (verified 14 October 2026); focused `afldb_test` validation passed; not deployed; issue open) - 13 October 2026
+### A settle no longer writes period scores under a match it refused (AFLDB-ISSUE-275; committed as `24ca412b` and on `origin/main` (verified 14 October 2026); focused `afldb_test` validation passed; installed on DEV 14 October 2026, acceptance not met; not on PROD; issue open) - 13 October 2026
 
 - **Behaviour.** The canonical applier (`applyCanonicalUnit`, shared by the AFL Tables and AFL API settles) now refuses a unit's `match_period_scores` target, unread, whenever the same unit's `matches` target was not applied for any
   reason other than "nothing to write". Before, a unit whose `matches` target was refused (for example because another source created the row between the plan and the unit) could still insert four period rows and a ledger row
@@ -77,15 +77,15 @@ commit.
 - **Validation (local).** 15 DB-free cases pass; with the rule disabled 7 fail. On `afldb_test` (State A only), one focused run passed 3 selected tests (exit 0; the two ISSUE-275 cases and the ISSUE-274 precondition),
   and the before/after census was identical, including `match_period_scores` row content. The witness plants the competing row inside the settle's own transaction: it is **not** a two-session concurrency test.
   No DEV, PROD or durable Match Sheet (State B) evidence. The whole integration file and `settle-afl-api.test.ts` were not run. A known, separate Windows CRLF failure in `tests/current-season-import.test.ts` is unchanged.
-- **Not on DEV or PROD.** The ISSUE-274 + ISSUE-276 combined DEV observation window closed on 14 October 2026 (D-OBS-274276-20261014); a DEV install still needs the owner's explicit decision. The ISSUE-265-specific PROD hold was released (`a862d192`); PROD still needs its own reviewed procedure. Detail: `issues/open/AFLDB-ISSUE-275.md` §26-§28.
+- **On DEV (installed 14 October 2026 13:52 AEDT, TARGET `17514052`; installation checks passed), not on PROD.** The ISSUE-274 + ISSUE-276 combined DEV observation window closed on 14 October 2026 (D-OBS-274276-20261014); the owner then approved the DEV install (D-DEV-275-281-288-1) and it was done the same day. Acceptance is not met: the first attributable nightly, State B and the split-ownership census remain. The ISSUE-265-specific PROD hold was released (`a862d192`); PROD still needs its own reviewed procedure. Detail: `issues/open/AFLDB-ISSUE-275.md` §26-§28.
 
-### Public match-log and draft pages ignore a sort key that names an inherited object property (AFLDB-ISSUE-281; DB-free validated; merged to `main` `01976be7` 13 October 2026, pushed (verified 14 October 2026); not yet on DEV or PROD; issue open) - 12 October 2026
+### Public match-log and draft pages ignore a sort key that names an inherited object property (AFLDB-ISSUE-281; DB-free validated; merged to `main` `01976be7` 13 October 2026, pushed (verified 14 October 2026); installed on DEV 14 October 2026, DEV smoke pending; not on PROD; issue open) - 12 October 2026
 
 - `/players/<slug>/matches?sort=constructor` and `/draft/<year>?sort=toString` (and the other `Object.prototype` names)
   now fall back to the default order instead of sending invalid SQL and rendering the error page. The two sort guards use
   `Object.hasOwn`, like the other sort maps.
 
-### Coach date of birth is checked as a real date before any SQL (AFLDB-ISSUE-288; DB-free validated; integration cases passed on `afldb_test`; merged to `main` `01976be7` 13 October 2026, pushed (verified 14 October 2026); not yet on DEV or PROD; issue open) - 12 October 2026
+### Coach date of birth is checked as a real date before any SQL (AFLDB-ISSUE-288; DB-free validated; integration cases passed on `afldb_test`; merged to `main` `01976be7` 13 October 2026, pushed (verified 14 October 2026); installed on DEV 14 October 2026, DEV smoke pending; not on PROD; issue open) - 12 October 2026
 
 - Creating a coach or saving coach metadata with an impossible date of birth (`2026-02-30`, `2023-02-29`, `31/12/1980`)
   returns "Date of birth "…" is not a real date. Use YYYY-MM-DD." instead of an uncaught Server Action error or a raw
