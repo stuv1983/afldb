@@ -33,6 +33,14 @@ export type AflApiIngestionControls = {
   currentSeasonEnabled: boolean;
   /** site_settings 'acquisition.afl_api_brownlow_enabled'. One half of a two-key gate — see `combineAflApiBrownlowGates`. */
   brownlowAdminEnabled: boolean;
+  /**
+   * AFLDB-ISSUE-300 — set ONLY when the switches could not be read, never for a
+   * stored `false`. Both flags are then `false` (fail closed) but unknown, not
+   * switched off, so a CLI must not tell the operator a super admin disabled
+   * them. A fixed, secret-free description: it never carries a driver message,
+   * which can embed connection details.
+   */
+  readFailure?: string;
 };
 
 export const DISABLED_AFL_API_INGESTION_CONTROLS: AflApiIngestionControls = {
@@ -44,18 +52,40 @@ const CONNECT_TIMEOUT_S = 10;
 const END_TIMEOUT_S = 5;
 
 /**
+ * A driver error code (`ECONNREFUSED`, `CONNECT_TIMEOUT`, SQLSTATE `42P01`) is
+ * safe to show; anything else about the error is not (DSN fragments).
+ */
+function readFailureReason(error: unknown): string {
+  const code = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
+  const suffix = typeof code === 'string' && /^[A-Za-z0-9_]{2,40}$/.test(code) ? ` (${code})` : '';
+  return `the control database could not be read${suffix}`;
+}
+
+/**
+ * The operator-facing sentence for a result that carries `readFailure`, or
+ * `null` for a genuinely stored switch value. One wording for every CLI.
+ */
+export function describeAflApiIngestionReadFailure(controls: AflApiIngestionControls): string | null {
+  if (!controls.readFailure) return null;
+  return `the ingestion switches could not be read: ${controls.readFailure}. `
+    + 'This is a read failure, not a super-admin "disabled" setting; the tool is failing closed. '
+    + 'Check that PostgreSQL is reachable and that DATABASE_URL is set for this process.';
+}
+
+/**
  * Reads both switches in one round trip through a dedicated `afldb_app`
  * connection. Never throws: any failure (unset DSN, refused connection,
- * timeout, missing table) resolves to `DISABLED_AFL_API_INGESTION_CONTROLS`,
- * matching this table's own read path (`src/db/queries/site-settings.ts`
- * `getSiteSettings()`) for the one failure mode it also swallows — a
- * database that has not run migration 034 yet.
+ * timeout, missing table) resolves to the disabled flags — still fail closed —
+ * but now with `readFailure` set, so callers can tell "could not read" from
+ * "a super admin switched it off". This matches this table's own read path
+ * (`src/db/queries/site-settings.ts` `getSiteSettings()`) for the one failure
+ * mode it also swallows — a database that has not run migration 034 yet.
  */
 export async function readAflApiIngestionControls(
   env: Partial<Record<string, string | undefined>> = process.env,
 ): Promise<AflApiIngestionControls> {
   const dsn = env.DATABASE_URL;
-  if (!dsn) return DISABLED_AFL_API_INGESTION_CONTROLS;
+  if (!dsn) return { ...DISABLED_AFL_API_INGESTION_CONTROLS, readFailure: 'DATABASE_URL is not set' };
 
   let sql: postgres.Sql | null = null;
   try {
@@ -74,8 +104,8 @@ export async function readAflApiIngestionControls(
       currentSeasonEnabled: settings.aflApiCurrentSeasonEnabled,
       brownlowAdminEnabled: settings.aflApiBrownlowEnabled,
     };
-  } catch {
-    return DISABLED_AFL_API_INGESTION_CONTROLS;
+  } catch (error) {
+    return { ...DISABLED_AFL_API_INGESTION_CONTROLS, readFailure: readFailureReason(error) };
   } finally {
     if (sql) await sql.end({ timeout: END_TIMEOUT_S });
   }

@@ -26,6 +26,7 @@ import {
 } from 'vitest';
 
 import type { FetchLike } from '@/lib/acquisition/afl-api-client';
+import { readAflApiIngestionControls } from '@/lib/acquisition/afl-api-ingestion-control';
 import {
   buildAflApiBrownlowLabel,
   cleanupPartialBrownlowSnapshot,
@@ -170,6 +171,19 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
           ingestionControls: { currentSeasonEnabled: false, brownlowAdminEnabled: false },
         },
       )).rejects.toThrow(/two-key safety/);
+    });
+
+    it('AFLDB-ISSUE-300: an unreadable control database is reported as a read failure, not as a disabled admin switch', async () => {
+      const projectRoot = projectRoot0();
+      const { fetchImpl } = stubFetch([]);
+      const controls = await readAflApiIngestionControls({});
+
+      const refusal = runBrownlowAcquisition(
+        { season: 2025 },
+        { fetchImpl, projectRoot, env: BROWNLOW_ENV, retryOpts: { sleep: noSleep }, ingestionControls: controls },
+      );
+      await expect(refusal).rejects.toThrow(/refused: deployment gate \(\w+\) is enabled, and super-admin setting .* is unknown because the ingestion switches could not be read: DATABASE_URL is not set/);
+      await expect(refusal).rejects.not.toThrow(/is disabled outside the live count window/);
     });
 
     it('refuses when the admin DB switch is enabled but the deployment env gate is not', async () => {

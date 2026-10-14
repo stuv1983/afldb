@@ -42,6 +42,7 @@ import {
 import { BROWNLOW_ENABLE_ENV, isAflApiBrownlowEnabled } from '../../src/lib/acquisition/afl-api-brownlow';
 import {
   combineAflApiBrownlowGates,
+  describeAflApiIngestionReadFailure,
   readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
@@ -146,6 +147,16 @@ export async function runBrownlowAcquisition(
   const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls(env);
   const gate = combineAflApiBrownlowGates(deploymentGateEnabled, ingestionControls.brownlowAdminEnabled);
   if (!gate.effectiveEnabled) {
+    // AFLDB-ISSUE-300: when the admin switch could not be read, say so instead of
+    // reporting it as "disabled"; the deployment gate is still reported either way.
+    const readFailure = describeAflApiIngestionReadFailure(ingestionControls);
+    if (readFailure) {
+      throw new Error(
+        'Brownlow acquisition refused: '
+        + `deployment gate (${BROWNLOW_ENABLE_ENV}) is ${deploymentGateEnabled ? 'enabled' : 'disabled'}, `
+        + `and super-admin setting (site_settings '${SETTING_KEYS.aflApiBrownlowEnabled}') is unknown because ${readFailure}`,
+      );
+    }
     throw new Error(
       'Brownlow acquisition is disabled outside the live count window (§10, §D two-key safety): '
       + `deployment gate (${BROWNLOW_ENABLE_ENV}) is ${deploymentGateEnabled ? 'enabled' : 'disabled'}, `

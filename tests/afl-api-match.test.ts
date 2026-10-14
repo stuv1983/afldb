@@ -99,6 +99,7 @@ import {
   semanticHash,
 } from '@/lib/acquisition/afl-api-bundle';
 import { buildAflApiFixtureRecords } from '@/lib/acquisition/afl-api-fixture-identity';
+import { readAflApiIngestionControls } from '@/lib/acquisition/afl-api-ingestion-control';
 import {
   type AflApiMatchIdentity,
   resolveAflApiMatch,
@@ -559,6 +560,21 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
           ingestionControls: { currentSeasonEnabled: false, brownlowAdminEnabled: false },
         },
       )).rejects.toThrow(/current-season ingestion is disabled/);
+
+      expect(calls).toHaveLength(0);
+    });
+
+    it('AFLDB-ISSUE-300: an unreadable control database is reported as a read failure, not as a disabled switch, before any network request', async () => {
+      const projectRoot = makeProjectRoot();
+      const { fetchImpl, calls } = stubFetch(happyPathHandlers());
+      const controls = await readAflApiIngestionControls({});
+
+      const refusal = runAcquisition(
+        { season: 2026, status: null, since: null, match: [] },
+        { fetchImpl, projectRoot, retryOpts: { sleep: noSleep }, ingestionControls: controls },
+      );
+      await expect(refusal).rejects.toThrow(/ingestion refused: the ingestion switches could not be read: DATABASE_URL is not set/);
+      await expect(refusal).rejects.not.toThrow(/A super admin must enable it/);
 
       expect(calls).toHaveLength(0);
     });
@@ -2891,6 +2907,17 @@ describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', ()
           ingestionControls: { ...ENABLED_INGESTION_CONTROLS, currentSeasonEnabled: false },
         },
       )).rejects.toThrow(/ingestion is disabled/);
+      expect(existsSync(join(dir, 'raw.json'))).toBe(false);
+    });
+
+    it('AFLDB-ISSUE-300: --fetch reports an unreadable control database as a read failure, not a disabled switch', async () => {
+      dir = mkdtempSync(join(tmpdir(), 'afldb-issue300-'));
+      const refusal = runDiscoverAflApiSeasons(
+        ['--fetch', '--save-raw', join(dir, 'raw.json'), '--output', join(dir, 'p.json')],
+        { log: () => {}, fetchImpl: noFetch, ingestionControls: await readAflApiIngestionControls({}) },
+      );
+      await expect(refusal).rejects.toThrow(/ingestion refused: the ingestion switches could not be read: DATABASE_URL is not set/);
+      await expect(refusal).rejects.not.toThrow(/A super admin must enable it/);
       expect(existsSync(join(dir, 'raw.json'))).toBe(false);
       expect(existsSync(join(dir, 'p.json'))).toBe(false);
     });

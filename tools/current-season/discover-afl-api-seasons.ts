@@ -32,6 +32,7 @@ import {
   type FetchLike,
 } from '../../src/lib/acquisition/afl-api-client';
 import {
+  describeAflApiIngestionReadFailure,
   readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
@@ -122,6 +123,9 @@ export async function runDiscoverAflApiSeasons(
     refuseExisting(args.saveRaw, 'Raw response file');
     const controls = deps.ingestionControls ?? await readAflApiIngestionControls();
     if (!controls.currentSeasonEnabled) {
+      // AFLDB-ISSUE-300: an unreadable control database is not a "disabled" switch.
+      const readFailure = describeAflApiIngestionReadFailure(controls);
+      if (readFailure) throw new Error(`AFL API current-season ingestion refused: ${readFailure}`);
       throw new Error(
         `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
         + 'A super admin must enable it from /admin/current-season before this tool will make a network request.',

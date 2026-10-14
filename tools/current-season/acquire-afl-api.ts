@@ -47,6 +47,7 @@ import {
 } from '../../src/lib/acquisition/afl-api-client';
 import { AFL_API_FIXTURE_ACQUISITION_KIND } from '../../src/lib/acquisition/afl-api-fixture-identity';
 import {
+  describeAflApiIngestionReadFailure,
   readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
@@ -215,6 +216,9 @@ export async function runAcquisition(
   // tools (e.g. `isAflApiBrownlowEnabled` in acquire-afl-api-brownlow.ts).
   const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls();
   if (!ingestionControls.currentSeasonEnabled) {
+    // AFLDB-ISSUE-300: an unreadable control database is not a "disabled" switch.
+    const readFailure = describeAflApiIngestionReadFailure(ingestionControls);
+    if (readFailure) throw new Error(`AFL API current-season ingestion refused: ${readFailure}`);
     throw new Error(
       `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
       + 'A super admin must enable it from /admin/current-season before this tool will make a network request.',

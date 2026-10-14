@@ -195,7 +195,8 @@ describe('runAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate cover
     // (rather than a hand-built disabled object) proves the wrapper itself
     // receives and honours that fail-closed result.
     const controls = await readAflApiIngestionControls({});
-    expect(controls).toEqual(DISABLED_AFL_API_INGESTION_CONTROLS);
+    expect(controls).toMatchObject(DISABLED_AFL_API_INGESTION_CONTROLS);
+    expect(controls.readFailure).toBe('DATABASE_URL is not set');
 
     await expect(runAflApiSettleCli(
       ['--label', label, '--dry-run'],
@@ -239,6 +240,21 @@ describe('runAflApiFixturesSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI ga
       ['--label', label, flag],
       { projectRoot, sql, ingestionControls: DISABLED_AFL_API_INGESTION_CONTROLS },
     )).rejects.toThrow(/current-season ingestion is disabled/);
+
+    expect(touched.value).toBe(false);
+  });
+
+  it('AFLDB-ISSUE-300: an unreadable control database is reported as a read failure, not a disabled switch', async () => {
+    const { projectRoot, label } = setupSnapshot();
+    const { sql, touched } = makeSqlStub();
+    const controls = await readAflApiIngestionControls({});
+
+    const refusal = runAflApiFixturesSettleCli(
+      ['--label', label, '--dry-run'],
+      { projectRoot, sql, ingestionControls: controls },
+    );
+    await expect(refusal).rejects.toThrow(/ingestion refused: the ingestion switches could not be read: DATABASE_URL is not set/);
+    await expect(refusal).rejects.not.toThrow(/A super admin must enable it/);
 
     expect(touched.value).toBe(false);
   });
