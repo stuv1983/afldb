@@ -86,13 +86,14 @@ commit.
   `Object.hasOwn`, like the other sort maps.
 - **DEV acceptance (14 October 2026, read-only).** On DEV, the invalid sorts returned the same rows in the same order as the default on every page (player log 357 rows over 4 pages; `/draft/2024` 160 rows over 4 pages); the valid sorts still sort (goals descending, picks ascending, plus a pick-descending control). The player route is `/players/<slug>-<id>/matches`: the bare-slug URL in the original checklist is an app 404. Draft order within a shared pick number is not guaranteed by the query. Sign-in status was not established. The DEV service journal showed no matching error. Not on PROD. Detail: `issues/closed/AFLDB-ISSUE-281.md` §18.
 
-### Coach date of birth is checked as a real date before any SQL (AFLDB-ISSUE-288; DB-free validated; integration cases passed on `afldb_test`; merged to `main` `01976be7` 13 October 2026, pushed (verified 14 October 2026); installed on DEV 14 October 2026, DEV smoke pending; not on PROD; issue open) - 12 October 2026
+### Coach date of birth is checked as a real date before any SQL (AFLDB-ISSUE-288; DB-free validated; integration cases passed on `afldb_test`; merged to `main` `01976be7` 13 October 2026, pushed (verified 14 October 2026); installed on DEV 14 October 2026; DEV browser acceptance passed 14 October 2026; resolved DEV-scoped 14 October 2026, PROD installation and acceptance pending) - 12 October 2026
 
 - Creating a coach or saving coach metadata with an impossible date of birth (`2026-02-30`, `2023-02-29`, `31/12/1980`)
   returns "Date of birth "…" is not a real date. Use YYYY-MM-DD." instead of an uncaught Server Action error or a raw
   PostgreSQL message. A blank date of birth is still allowed. A lenient form such as `2027-2-3` is now refused rather than
   stored as `2027-02-03`. Every year 0001-9999 is checked on its own calendar; year 0000, which PostgreSQL rejects, is
   refused.
+- **DEV acceptance (14 October 2026).** On DEV, as Super Admin, the Create form and an existing coach's metadata form (Mick Malthouse), each given the date of birth `2026-02-30` once, returned the sentence above with no error page; the coach list stayed at 386 with unchanged rows and Malthouse's metadata (including `1953-08-17`) was unchanged; the two refusals each wrote one audit row (retained, not cleaned up); the DEV service journal showed no matching error. The paired before-and-after screenshots were graded PASS under the revised criterion; the original single-screen criterion was not met, because the date control resets after a refusal. Not on PROD. Detail: `issues/closed/AFLDB-ISSUE-288.md` §18.
 
 ### Migration safety scan accepts a detached HEAD (AFLDB-ISSUE-312; DB-free validated; merged to local `main` `01976be7` 13 October 2026, not pushed; issue resolved) - 12 October 2026
 

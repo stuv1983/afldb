@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 44 (ISSUE-229, ISSUE-266–270, and the 38 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 on 2026-10-14 (DEV-scoped; PROD installation and acceptance pending, runbook `issues/closed/AFLDB-ISSUE-281.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; other issues' PROD prerequisites are unchanged)
+**Open issues:** 43 (ISSUE-229, ISSUE-266–270, and the 37 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-288, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; other issues' PROD prerequisites are unchanged)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -475,17 +475,6 @@
 - **Severity:** Low. **Area:** admin draft UI — `src/app/admin/draft/SourceFieldsPanel.tsx`. **State:** Open (2026-10-08),
   F-022; imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-287.md`. **Next action:** implementation.
-
-### AFLDB-ISSUE-288 — `createCoach` casts an unvalidated `dob` outside its error handling
-- **Severity:** Low. **Area:** admin coaches — `src/db/queries/admin-coaches.ts`. **State:** Open (2026-10-08), F-023;
-  imported 2026-10-10. **Implemented 2026-10-12** in batch worktree `afldb-batch-315-281-312-288` (base `80f86c39`):
-  real-date check before any SQL in both mutations (r2: Gregorian arithmetic without `Date.UTC`'s 0-99
-  remap, year 0000 refused); DB-free 25/25; `afldb_test` `-t "AFLDB-ISSUE-288"` **passed 2026-10-12** (2/2 — the
-  `createCoach` refusal case and the `saveCoachMetadata` refusal case; exit 0; census clean before/after, shared rows
-  unchanged; §17.7). **Merged to `main`** (2026-10-13, commit `44ea8ce2`; merge `01976be7`; pushed: an ancestor of the live `origin/main`, verified 2026-10-14; installed on DEV 2026-10-14, runbook 275 §30; DEV smoke NOT YET DONE).
-- **Runbook:** `issues/open/AFLDB-ISSUE-288.md` §17. **Next action:**
-  DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33, and the combined observation window is closed; the DEV deployment was approved (D-DEV-275-281-288-1) and done 2026-10-14, runbook 275 §30); DEV refusal smoke (288's visual evidence is mandatory for its DEV acceptance); then close DEV-scoped
-  (the ISSUE-265-specific PROD hold was released by `a862d192`; PROD still needs its own reviewed procedure (`blockers.md` R6)).
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;
