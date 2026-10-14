@@ -109,8 +109,8 @@ export function aflApiRefusalMessage(code: AflApiRefusalCode, detail?: string): 
     case 'T6_stale_fingerprint':
       return 'The evidence changed after this page was loaded; reload and review again.';
     case 'T7_player_not_stable':
-      return 'The chosen player has no stable identity (an AFL Tables profile or an '
-        + 'administrator-created identity); this action cannot proceed.';
+      return 'The chosen player has no single stable identity (one AFL Tables profile, a tracked '
+        + 'profile continuity pair, or one administrator-created identity); this action cannot proceed.';
     case 'T8_anomalous_row':
       return 'This provider is in an anomalous state and cannot be actioned from this surface.';
     case 'T9_surname_ack_required':

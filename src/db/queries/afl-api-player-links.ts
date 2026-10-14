@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { join } from 'node:path';
+
 import postgres from 'postgres';
 
 import aflApiIdentitiesJson from '../../../data/reference/afl-api-identities.json';
@@ -13,6 +15,7 @@ import {
   AFL_API_LEDGER_CHECKS,
   AFL_API_PLAYER_REFERENCE_MANIFEST,
   aflApiRefusalMessage,
+  classifyAflApiForwardIdentityRows,
   classifyAflApiIdentityState,
   decideAflApiLink,
   decideAflApiRevoke,
@@ -28,6 +31,8 @@ import {
   type AflApiLedgerNetAction,
 } from '@/lib/acquisition/afl-api-adjudication';
 import { parseAflApiIdentities } from '@/lib/acquisition/afl-api-bundle';
+import type { ValidatedFitzroyProfileContinuityRules } from '@/lib/acquisition/fitzroy-profile-continuity';
+import { loadContinuityRulesFailClosed } from '@/lib/acquisition/match-sheet-authority';
 import {
   buildAflApiPlayerEvidence,
   normaliseSurname,
@@ -71,20 +76,57 @@ async function readExistingIdentity(
   return row ?? null;
 }
 
-/** D6-3: the player's own stable identity, the same rule the promotion-inventory lineage ref uses. */
-async function readPlayerStableIdentity(db: Sql | Tx, playerId: number): Promise<string | null> {
-  const [row] = await db<{ identity: string }[]>`
-    SELECT ei.external_id AS identity
+const CONTINUITY_CONTRACT_SEGMENTS = ['tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'] as const;
+
+/** The player's accepted identity rows, the two namespaces §5's forward lookup reads. */
+async function readPlayerIdentityRows(
+  db: Sql | Tx, playerId: number,
+): Promise<{ playerId: number; externalId: string; sourceKey: string }[]> {
+  return db<{ playerId: number; externalId: string; sourceKey: string }[]>`
+    SELECT ei.player_id AS "playerId", ei.external_id AS "externalId", s.key AS "sourceKey"
       FROM external_identities ei
       JOIN sources s ON s.id = ei.source_id
      WHERE ((s.key = 'afltables' AND ei.match_method = 'afltables_profile_url')
             OR (s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'))
        AND ei.status IN ('unique', 'resolved')
        AND ei.player_id = ${playerId}
-     ORDER BY (s.key <> 'afltables'), ei.external_id
-     LIMIT 1
   `;
-  return row?.identity ?? null;
+}
+
+/**
+ * D6-3 / AFLDB-ISSUE-310: the player's own stable identity by the SAME rule as every forward
+ * lookup -- `classifyAflApiForwardIdentity`, never the collation-dependent first row. `null`
+ * covers both `no_identity` and `ambiguous` (two paths no tracked continuity rule names, or
+ * two manual tokens): T7 refuses a link to such a player, as the rebuild would refuse it.
+ * An unreadable continuity contract is only consulted for exactly two paths and fails closed
+ * to `ambiguous` (an empty rule set names no pair).
+ */
+async function readPlayerStableIdentity(db: Sql | Tx, playerId: number): Promise<string | null> {
+  const rows = await readPlayerIdentityRows(db, playerId);
+  const twoPaths = new Set(rows.filter((r) => r.sourceKey === 'afltables').map((r) => r.externalId)).size === 2;
+  const loaded = twoPaths
+    ? loadContinuityRulesFailClosed(join(process.cwd(), ...CONTINUITY_CONTRACT_SEGMENTS))
+    : null;
+  const continuityRules = loaded?.ok
+    ? loaded.rules
+    : ([] as unknown as ValidatedFitzroyProfileContinuityRules);
+  const result = classifyAflApiForwardIdentityRows({ playerIds: [playerId], rows, continuityRules }).get(playerId);
+  return result?.ok ? result.identity : null;
+}
+
+/**
+ * The identity string for a REVOKE's ledger row. Undoing a link must stay possible even when
+ * the player has since gained a second path, and `player_identity` is NOT NULL, so this keeps
+ * the forward identity when there is one and otherwise the deterministic first accepted row.
+ * Only the link path (and the page that previews it) is gated on the strict rule.
+ */
+async function readPlayerRecordedIdentity(db: Sql | Tx, playerId: number): Promise<string | null> {
+  const forward = await readPlayerStableIdentity(db, playerId);
+  if (forward !== null) return forward;
+  const rows = await readPlayerIdentityRows(db, playerId);
+  rows.sort((a, b) => Number(a.sourceKey !== 'afltables') - Number(b.sourceKey !== 'afltables')
+    || (a.externalId < b.externalId ? -1 : a.externalId > b.externalId ? 1 : 0));
+  return rows[0]?.externalId ?? null;
 }
 
 /** D6-2: does this player already hold a DIFFERENT afl_api provider row? */
@@ -874,13 +916,14 @@ export async function revokeAflApiLink(input: RevokeAflApiLinkInput): Promise<Re
       if (!decision.allow) return { ok: false, error: decision.message, code: decision.code };
 
       await tx`DELETE FROM external_identities WHERE source_id = ${sourceId} AND external_id = ${input.providerId}`;
+      const recordedIdentity = await readPlayerRecordedIdentity(tx, existing.playerId!);
       await tx`
         INSERT INTO afl_api_identity_adjudications
               (source_key, external_id, action, player_id, player_identity, previous_state,
                evidence, evidence_sha256, surname_disagreement_acknowledged, supersedes_id,
                admin_user_id, note)
         VALUES (${AFL_API_SOURCE_KEY}, ${input.providerId}, 'revoked', ${existing.playerId},
-                ${await readPlayerStableIdentity(tx, existing.playerId!)}, ${jsonb(tx, existing)},
+                ${recordedIdentity}, ${jsonb(tx, existing)},
                 ${jsonb(tx, { nonUseProof: nonUse })}, ${recomputedFingerprint}, false,
                 ${latestAdjudicationId}, ${input.adminUserId}, ${input.note})
       `;
