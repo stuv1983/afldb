@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** **Open (2026-10-08).** Implemented as `70af9ae3` on `sonnet/issue-285` (base `ea792f43`), merged and pushed with its records as `848f13f1`; DB-free validated (§17.1, §17.2). **Not deployed. Not resolved at 848f13f1:** §14 item 2 (the integration variant) was outstanding and a closure pushed as `5f440acf` was withdrawn (§18). The integration variant was written and passed on `afldb_test` on 2026-10-15 (§19, `39f996c8`).
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Implemented as `70af9ae3` on `sonnet/issue-285` (base `ea792f43`), merged and pushed with its records as `848f13f1`; DB-free validated (§17.1, §17.2). **Not deployed. Not resolved at 848f13f1:** §14 item 2 (the integration variant) was outstanding and a closure pushed as `5f440acf` was withdrawn (§18). The integration variant was written and passed on `afldb_test` on 2026-10-15 (§19, `39f996c8`).
 - **Severity:** Low. **Area:** admin awards UI.
 - **Key files:** `src/app/admin/awards/ReplacePanel.tsx`, `src/app/admin/awards/actions.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-020; partition note R2a-F04).
@@ -74,7 +74,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Done 2026-10-14 (§17); merged (§18). Integration variant: done 2026-10-15 (§19). Next: merge and close.
+~~Implementation.~~ Done 2026-10-14 (§17); merged (§18). None. Resolved (§20). Not deployed.
 
 ## 17. Implementation record (2026-10-14)
 
@@ -123,3 +123,11 @@ The component-level mutants (A2, B2, B3) survived behaviourally in the first 15 
 - **Negative controls.** Two mutants of `insertAwardWinner` in `src/db/queries/admin-awards.ts`, each applied alone and restored from a saved copy (sha-256 verified equal; `git status` shows the source file clean). **M1**, the duplicate check ignores `confirmDuplicate` (always runs): killed at the confirmed step (`expected false to be true`, the message being the `duplicate` refusal). **M2**, the duplicate check never runs: killed at the refusal step (`expected true to be false`). Evidence: `int-mutant-M1.txt`, `int-mutant-M2.txt`.
 - **Fixture cleanup.** After the runs a read-only count on `afldb_test` found 0 fixture awards, award winners, players, overrides and audit rows (`int-residue.txt`, repeated after the whole-file run).
 - **Limits.** Not deployed. No browser, DEV or PROD action. The panel's React wiring is covered by `tests/awards-replace-panel.test.ts` (DB-free, §17) and the query layer by this case; the two are not joined in one end-to-end run.
+
+## 20. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 285`: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue285\preflight-impl-int.txt`, run after the test was committed). `npm run merge:ready -- --issue 285` with five `--expected-file` rules (raw output, unchanged: `D:\tmp\issue285\merge-ready-raw-int-1.txt`): every check PASS (branch, clean issue worktree, `main` equals recorded `origin/main`, ahead 2 / behind 0, migration parity, declared scope 5 changed / 0 unexpected) except **one blocker, "main worktree is clean"**; one warning (no runbook readiness block); database parity not checked. The raw output ends `Merge readiness: BLOCKED (1 blocker(s), 1 warning(s))`.
+- **Exception (fresh, this issue only).** The owner authorised an exception for the integration-variant work on ISSUE-285, covering only that clean-tree FAIL under the exact **18**-path primary state: the nine `.agents/skills` files, the seven zero-byte stray-named files (`0)`, ``20` ``, ``` `path ```, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`, `void`), the literal `$null)` and the zero-byte `2000)`. No earlier ratification was reused. The path set, no tracked or staged change, and full content hashes were verified by `D:\tmp\issue285\exception-check-int.py` (an adaptation of the ISSUE-296 script): `precheck-int-1` and `premerge-int-1` before, and `postmerge-int-1` after, the push, all RESULT OK. The nine skill files equal the 13 Oct manifests; the seven zero-byte files and `2000)` are regular, 0 bytes, sha-256 `e3b0c442...b855`; `$null)` is 143 bytes, mtime 2026-10-14 20:00:49, full sha-256 `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500`, captured fresh at `precheck-int-1` and identical at every later check. This is current equality, not continuous preservation. No additional path or changed content appeared.
+- **Merge.** A fresh `git fetch` and `git ls-remote` showed `main` at `cc38c669` immediately before the merge. `39f996c8` (the integration case) and `fbe9715c` (its records) fast-forwarded onto `main` and were pushed (`cc38c669..fbe9715c`); local `main` and `git ls-remote origin refs/heads/main` both equalled `fbe9715c` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit. §14 lists two items and both are met: item 1, the DB-free render of the control, by §17.1 and §17.2 (20 cases, six mutants killed by behavioural assertions); item 2, the integration variant of the `admin-awards` :670 case, by §19 (run on `afldb_test`, 1 passed, the file 33 of 33, two mutants killed, fixture residue zero). The closure scope is **merge-scoped**: code on `main`, validated DB-free and on `afldb_test`, **not deployed**.
+- **Preserved limits.** Not deployed. No browser, DEV or PROD action. The painted page and real React rendering were not exercised; the panel wiring and the query layer are proved by separate suites, not one end-to-end run. The whole integration suite was not run.
