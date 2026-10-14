@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and DB-free validated 2026-10-15 (§17); not yet merged.
+- **Status:** Resolved (2026-10-15, merge-scoped; opened 2026-10-08). Implementation §17; readiness, merge and closure §18.
 - **Severity:** Low. **Area:** acquisition / deprecated fallback staging refresh.
 - **Key file:** `src/lib/external-afl/current-season-import.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-031; partition note R4a-F06).
@@ -71,7 +71,7 @@ Whether the fallback path should simply be retired. Operator.
 
 ## 16. Next action
 
-Implementation (done, §17). Merge. The retirement question (§15) is not a gate and stays with the operator.
+None. Resolved (§18). The retirement question (§15) waits for an operator decision and is not a gate.
 
 ## 17. Implementation record (2026-10-15)
 
@@ -103,3 +103,11 @@ Each mutant changes the real source, is applied alone and restored from the save
 ## 17.3 Limits
 
 Not deployed. The assertion is a **source contract on the SQL text**, the established unit style of this importer's suite and of the F008 assertions in `tests/afl-api-ingestion-safety.test.ts`; it is not an assertion on a real `import_batches` row. `writeMatches` is private and needs a database, so it was not executed: no PostgreSQL, integration, browser, network-acquisition, DEV or PROD action. The 0 is established from the column contract and from the absence of any rejection-row write in the file, by reading.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 296`: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue296\preflight-impl-raw.txt`). `npm run merge:ready -- --issue 296` with eight `--expected-file` rules (raw output, unchanged: `D:\tmp\issue296\merge-ready-raw-1.txt`, sha-256 `fb0242a4a29787050b8123394e3da318449a9e90fb9f1f20a4858b141080ec6d`): every check PASS (branch, clean issue worktree, `main` equals recorded `origin/main`, ahead 3 / behind 0, migration parity, declared scope 4 changed / 0 unexpected) except **one blocker, "main worktree is clean"**; one warning (no runbook readiness block); database parity not checked. The raw output ends `Merge readiness: BLOCKED (1 blocker(s), 1 warning(s))`.
+- **Exception (fresh, this issue only).** The owner authorised an exception for ISSUE-296, covering only that clean-tree FAIL under the exact **18**-path primary state: the nine `.agents/skills` files, the seven zero-byte stray-named files (`0)`, ``20` ``, ``` `path ```, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`, `void`), the literal `$null)` and the zero-byte `2000)`. No earlier ratification was reused. The path set, no tracked or staged change, and full content hashes were verified by `D:\tmp\issue296\exception-check.py` (an adaptation of the ISSUE-305 script): `precheck-1` and `premerge-1` before, and `postmerge-1` after, the first push, all RESULT OK. The nine skill files equal the 13 Oct manifests; the seven zero-byte files and `2000)` are regular, 0 bytes, sha-256 `e3b0c442...b855`; `$null)` is 143 bytes, mtime 2026-10-14 20:00:49 (not rewritten this session), full sha-256 `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500`, captured fresh at `precheck-1` and identical at every later check. This is current equality, not continuous preservation. No additional path or changed content appeared.
+- **Merge.** Fresh `git fetch` and `git ls-remote` showed `main` at `981ba5a1` immediately before the merge. `03fb5bcd`, `074667eb` and the records commit `10548157` fast-forwarded onto `main` and were pushed (`981ba5a1..10548157`); local `main`, the fetched `origin/main` and `git ls-remote origin refs/heads/main` all equalled `10548157` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit, under §14: its one item (a unit assertion on the batch's `records_rejected` write) is met by §17.1 as a source-contract assertion, with 6 of 6 mutants killed (§17.2). §15's question (retire the fallback path) is an operator decision that the fix neither answers nor needs; it does not gate closure. The closure scope is **merge-scoped**: code on `main`, DB-free validated, **not deployed**.
+- **Preserved limits.** Not deployed. The assertion is on the SQL text, not on a live `import_batches` row, and `writeMatches` was not executed: no PostgreSQL, integration, browser, network-acquisition, DEV or PROD action. Existing batch rows written by this tool keep their earlier `records_rejected`; none was inspected or repaired. One pre-existing unrelated failure in `tests/current-season-import.test.ts` (ISSUE-122 S6 derived-helper wiring) is untouched and identical on unchanged `main`.

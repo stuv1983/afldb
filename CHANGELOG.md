@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### The fallback current-season importer records zero rejected records instead of a planning count (AFLDB-ISSUE-296; `03fb5bcd`, `074667eb`, merged and pushed to `main` with records as `10548157`; DB-free validated; not deployed; resolved) - 15 October 2026
+
+- The deprecated fallback current-season importer set `import_batches.records_rejected` to the canonical plan's `rejectedOrConflicted` count while writing no `import_rejections` rows, so a batch could report rejections that do not exist as rows; the column's contract (migration 001, ISSUE-244 F008) is that it equals the batch's rejection rows. It now writes `0`, as the lineup writer does; the planning count remains in the batch's `validation_result` and in the importer's report. Earlier batch rows are not repaired.
+- **Validation (DB-free).** One new source-contract case in `tests/current-season-import.test.ts`; 6 of 6 mutants killed; `tsc --noEmit` and `eslint` exit 0. The file's one failure (ISSUE-122 S6 derived-helper wiring) is identical on unchanged `main`. No PostgreSQL, integration, browser, DEV or PROD run. Readiness was accepted under a scoped cleanliness exception, not a clean pass. Whether to retire the fallback path remains an operator decision. Detail: `issues/closed/AFLDB-ISSUE-296.md` §17 and §18.
+
 ### Legacy intake validation refuses an impossible date and a non-digit height or weight (AFLDB-ISSUE-305; `d82e891e`, `5282322b`, merged and pushed to `main` with records as `1ba75b06`; DB-free validated; not deployed; resolved) - 15 October 2026
 
 - The legacy CSV intake checked `match_results` `match_date` and `player_bio` `dob` against the `YYYY-MM-DD` shape only, and read `player_bio` `height_cm` and `weight_kg` with `Number()`. A file with `2024-02-30`, `1.8e2`, `0x50` or `80.0` therefore validated clean and, after approval, failed at promotion on the `::date` / `::smallint` cast, rolling the whole submission back to `failed` with a PostgreSQL message. Validation now requires a real calendar date (Gregorian, leap years and century rules included) and plain decimal digits within range, so the row is refused at upload with a sentence naming the cell.

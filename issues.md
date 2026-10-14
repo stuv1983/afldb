@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 31 (ISSUE-229, ISSUE-266–270 and 25 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310 and ISSUE-305 on 2026-10-15, merge-scoped and not deployed, see below)
+**Open issues:** 30 (ISSUE-229, ISSUE-266–270 and 24 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305 and ISSUE-296 on 2026-10-15, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -39,7 +39,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-293 | Settle runs under-report `dataIssuesResolved` | Low | Acquisition / settle run accounting | Open (2026-10-08); review F-028, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-293.md` | Implementation (trivial) |
 | AFLDB-ISSUE-294 | AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count | Low | Acquisition / import batch accounting | Open (2026-10-08); review F-029, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-294.md` | Implementation |
 | AFLDB-ISSUE-295 | Settle exception report mixes both sources' apply-failure findings | Low | Acquisition / settle reporting — `src/lib/acquisition/settle-report.ts` | Open (2026-10-08); review F-030, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-295.md` | Implementation (trivial) |
-| AFLDB-ISSUE-296 | Deprecated fallback importer sets `records_rejected` without rejection rows | Low | Acquisition / deprecated fallback — `src/lib/external-afl/current-season-import.ts` | Open (2026-10-08); review F-031, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-296.md` | Implementation, or an operator decision to retire the fallback path |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
@@ -50866,8 +50865,8 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-296 — Deprecated fallback importer sets `records_rejected` without rejection rows
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / deprecated fallback staging refresh. Key file:
-  `src/lib/external-afl/current-season-import.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-296.md`.
+- **Status:** Resolved (2026-10-15, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** acquisition / deprecated
+  fallback staging refresh. Key file: `src/lib/external-afl/current-season-import.ts`. **Runbook:** `issues/closed/AFLDB-ISSUE-296.md`.
 - **Origin.** Review F-031 (R4a-F06) at `20a7a4bb`. Code-proven. Contradicts the ISSUE-244 F008 contract
   (`records_rejected` equals the batch's rejection rows).
 - **Implemented 2026-10-15** (`03fb5bcd` fix, `074667eb` test, `sonnet/issue-296`; runbook §17). `writeMatches` writes
@@ -50875,7 +50874,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   mutants killed, `tsc` and `eslint` exit 0; the file's one failure (ISSUE-122 S6 derived-helper wiring) is identical on
   unchanged `main`.
 - **Open question.** Whether the fallback path should simply be retired (operator): not a gate, unaffected by the fix.
-  **Next action.** Merge.
+- **Readiness (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 296` (raw `D:\tmp\issue296\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one blocker, the primary worktree not clean, for this issue only, under a fresh owner authorisation covering the exact 18-path state; every other check PASSed (declared scope 4 changed, 0 unexpected). Paths, no tracked or staged change and full content hashes verified immediately before and after the merge (`D:\tmp\issue296\precheck-1`, `premerge-1`, `postmerge-1`; script `exception-check.py`).
+- **Merge.** `03fb5bcd`, `074667eb` and the records commit `10548157` fast-forwarded to `main` and pushed (`981ba5a1..10548157`); local `main`, the fetched `origin/main` and the live remote all equalled it afterwards.
+- **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit, under the runbook's §14 (a unit assertion on the batch's `records_rejected` write: met as a source-contract case, §17.1). **Preserved limits:** not deployed; the assertion is on the SQL text, not a live batch row; no PostgreSQL, integration, browser, DEV or PROD run; historical batch rows not inspected or repaired; one pre-existing unrelated failure in `current-season-import.test.ts` untouched; the retire-or-keep question is open for the operator.
 
 ## AFLDB-ISSUE-297 — AFL API provider id is used unvalidated as a file path and URL path segment
 
