@@ -347,11 +347,15 @@ async function unresolvedRecordOf(
 }
 
 async function openFindingsOf(
-  db: Db, issueType: string, owner: string,
+  db: Db, issueType: string, owner: string, sourceKey: string | null = null,
 ): Promise<{ findings: OpenFinding[]; truncated: boolean }> {
   // Not season-scoped: `data_issues` carries no season, and inferring one
   // from a record id would be a guess. Ownership keeps it to the findings
-  // these two writers actually wrote.
+  // these two writers actually wrote. `sourceKey` (AFLDB-ISSUE-295) narrows
+  // further to one source: the apply-failure type and owner are shared by both
+  // settles, and every writer stamps `details.source_key`, so without it each
+  // report listed the other source's failures as its own and could be filled to
+  // the cut by them.
   const rows = await db<OpenFinding[]>`
     SELECT d.issue_type AS "issueType", d.issue_key AS "issueKey",
            d.severity::text AS severity,
@@ -360,6 +364,7 @@ async function openFindingsOf(
      WHERE d.issue_type = ${issueType}
        AND d.resolved_at IS NULL
        AND d.details->>'owner' = ${owner}
+       AND (${sourceKey}::text IS NULL OR d.details->>'source_key' = ${sourceKey})
      ORDER BY d.severity DESC, d.issue_key
      LIMIT ${OPEN_FINDING_LIMIT + 1}
   `;
@@ -418,7 +423,9 @@ export async function buildSettleExceptionReport(
     }
   }
 
-  const failures = await openFindingsOf(db, CANONICAL_APPLY_ISSUE_TYPE, CANONICAL_APPLY_ISSUE_OWNER);
+  const failures = await openFindingsOf(
+    db, CANONICAL_APPLY_ISSUE_TYPE, CANONICAL_APPLY_ISSUE_OWNER, sourceKey,
+  );
   const disagreements = await openFindingsOf(db, disagreementIssueType, disagreementIssueOwner);
   return {
     sourceKey,

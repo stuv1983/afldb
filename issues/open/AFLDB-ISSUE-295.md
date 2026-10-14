@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). Implemented and validated on `afldb_test` 2026-10-15 (§17); not deployed.
 - **Severity:** Low. **Area:** acquisition / settle reporting.
 - **Key file:** `src/lib/acquisition/settle-report.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-030; partition note R4a-F05).
@@ -72,4 +72,28 @@ None.
 
 ## 16. Next action
 
-Implementation (trivial).
+~~Implementation (trivial).~~ Superseded by §17.
+
+## 17. Implementation and validation (2026-10-15)
+
+### 17.1 Change
+
+- `src/lib/acquisition/settle-report.ts`: `openFindingsOf` takes an optional `sourceKey` and adds `AND (sourceKey IS NULL OR details->>'source_key' = sourceKey)`. `buildSettleExceptionReport` passes its `sourceKey` for the apply-failure section, so each source's report lists only the `canonical_apply_failed` findings that source wrote and the 20-row cut applies to those. The disagreement section is unchanged (its issue type already differs per source). Every writer of the apply-failure type stamps `details.source_key` (AFL Tables' failure and rekey-refusal findings, and the AFL API settle through its apply-finding scope); AFL Tables has stamped it since the finding type was introduced.
+- No migration, no write path, no change to the rendering.
+
+### 17.2 Tests
+
+- `tests/integration/settle-afltables.test.ts`: a new top-level block `AFLDB-ISSUE-295`, two cases on `afldb_test`. Open `canonical_apply_failed` rows are inserted directly under a private `issue295-` key prefix, because the report is a read and what it is proved against is the rows it reads. (1) One finding per source: the AFL Tables report lists its own and not the AFL API one, and the AFL API report the reverse. (2) Twenty-one AFL API findings plus one AFL Tables finding: the AFL Tables report still lists its own (an unscoped report was filled to its 20-row cut by the AFL API rows, which sort first, and hid it), and the AFL API report lists only AFL API rows and reports itself truncated. The block purges its own rows before and after.
+
+### 17.3 Results
+
+- **Authority.** `D:\tmp\issue295\run-int.mjs` (the ISSUE-282 launcher, with extra vitest arguments passed through) derived the owner, importer and auth DSNs in memory from the primary `.env`, pointed them at `afldb_test` on tunnel port 55432 and proved `current_database() = afldb_test` for each before vitest started. No credential was printed or written. Only the block's own `data_issues` rows were written and removed. No `afldb_dev`, PROD, migration, rebuild, restore, truncation or repair.
+- **Fixed code.** Filter `AFLDB-ISSUE-295`: **2 passed**, 83 skipped. DB-free `current-season-import`, `settle-season-revalidation` and `admin-current-season-settle`: 485 passed, 1 failed (`reuses the four player-derived helpers`, the ISSUE-122 S6 derived-helper wiring, identical on unchanged `main`).
+- **Unfixed source** (`git checkout HEAD -- src/`, the fixed file copied back and sha-256 verified): both cases fail.
+- **Mutants** (`D:\tmp\issue295\mutate.mjs`, original bytes restored and hash-verified after each): the predicate removed (Y1), inverted (Y2), the key not passed (Y3), and a fixed key passed (Y4). **All 4 killed.**
+- **Fixture census.** The same read-only census as ISSUE-293/294 (extended with the `issue295-` prefix) read identically before and after every run, baseline and mutant: 12 pre-existing S6 CLI batches (3 Oct 2026, untouched), 0 everywhere else.
+- **Static.** `tsc --noEmit` exit 0; ESLint of the two changed files exit 0 (and 0 on unchanged `main`); `git diff --check` exit 0.
+
+### 17.4 Limits
+
+- Not deployed; no browser, DEV or PROD action. A finding written by a writer that stamped no `source_key` would now be excluded from both reports; no current writer does so. The report CLI itself and the rendered text were not run; only the report builder was exercised against real rows. The file was run by filter, not whole.

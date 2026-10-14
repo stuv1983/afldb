@@ -32,7 +32,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
-| AFLDB-ISSUE-295 | Settle exception report mixes both sources' apply-failure findings | Low | Acquisition / settle reporting — `src/lib/acquisition/settle-report.ts` | Open (2026-10-08); review F-030, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-295.md` | Implementation (trivial) |
+| AFLDB-ISSUE-295 | Settle exception report mixes both sources' apply-failure findings | Low | Acquisition / settle reporting — `src/lib/acquisition/settle-report.ts` | Open (2026-10-08); review F-030, code-proven; imported 2026-10-10; implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-295.md` §17 | Merge, then close (merge-scoped) |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
 | AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
@@ -50969,7 +50969,14 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `src/lib/acquisition/settle-report.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-295.md`.
 - **Origin.** Review F-030 (R4a-F05) at `20a7a4bb`. Code-proven.
 - **Defect.** Open `canonical_apply_failed` findings are not filtered by `source_key`, so each source's report shows the
-  other's failures and can push its own past the 20-row cut. **Next action.** Implementation (trivial).
+  other's failures and can push its own past the 20-row cut. ~~**Next action.** Implementation (trivial).~~ Superseded below.
+- **Implementation (2026-10-15; branch `sonnet/issue-295`, base `2e3c050f`; not deployed).** The apply-failure section of the settle
+  exception report is narrowed by `details.source_key` to the source being reported, so the 20-row cut applies to that source's own
+  failures. One query predicate; the disagreement section is unchanged. No migration. Runbook §17.
+- **Validation (`afldb_test`, 15 Oct 2026; runbook §17.3).** A two-case block through a launcher that proved `current_database() =
+  afldb_test` for the owner, importer and auth roles before any write: each report lists only its own source's failures, and 21 AFL API
+  findings no longer hide the one AFL Tables finding. Both cases fail on the unfixed source; 4 of 4 mutants are killed; the fixture census
+  is unchanged (12 pre-existing S6 batches untouched). `tsc --noEmit`, ESLint and `git diff --check` exit 0. The file was run by filter.
 
 ## AFLDB-ISSUE-296 — Deprecated fallback importer sets `records_rejected` without rejection rows
 

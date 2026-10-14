@@ -106,6 +106,7 @@ import {
 } from '@/lib/acquisition/observations';
 import {
   canonicalApplyIssueKey,
+  CANONICAL_APPLY_ISSUE_OWNER,
   CANONICAL_APPLY_ISSUE_TYPE,
   runSettleAfltables,
   settleIssueKey,
@@ -120,6 +121,7 @@ import {
 } from '@/lib/acquisition/source-families';
 import {
   buildSettleExceptionReport,
+  OPEN_FINDING_LIMIT,
   SETTLE_BATCH_TOOL,
 } from '@/lib/acquisition/settle-report';
 import { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
@@ -6414,5 +6416,52 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
         'matches:insert', 'match_period_scores:insert',
       ]);
     });
+  });
+});
+
+describe('AFLDB-ISSUE-295 — the settle exception report lists only the apply failures of its own source', () => {
+  // `canonical_apply_failed` and its owner stamp are shared by both settles; every writer stamps
+  // `details.source_key`. Rows here are inserted directly: the report is a read, so what it is
+  // proved against is the rows it reads.
+  const ROOT = 'issue295-';
+  const failure = (sourceKey: string, n: number) => sql`
+    INSERT INTO data_issues (entity_type, entity_id, issue_type, issue_key, severity, description, details)
+    VALUES ('matches', NULL, ${CANONICAL_APPLY_ISSUE_TYPE}, ${`${ROOT}${sourceKey}|${n}`},
+            'error'::issue_severity, ${`ISSUE-295 fixture failure ${sourceKey} ${n}`},
+            ${sql.json({
+              owner: CANONICAL_APPLY_ISSUE_OWNER, source_key: sourceKey,
+              external_record_id: `${ROOT}${n}`, target_table: 'matches',
+            } as never)})
+  `;
+  const purge = async () => { await sql`DELETE FROM data_issues WHERE issue_key LIKE ${`${ROOT}%`}`; };
+  const afltablesReport = () => buildSettleExceptionReport(sql, { season: SEASON122 });
+  const aflApiReport = () => buildSettleExceptionReport(sql, {
+    season: SEASON122, sourceKey: 'afl_api', tool: 'settle-afl-api.ts',
+    disagreementIssueType: 'afl_api_settle', disagreementIssueOwner: 'settle-afl-api.ts',
+  });
+  const ownKeys = (report: { applyFailures: readonly { issueKey: string }[] }) => report.applyFailures
+    .map((row) => row.issueKey).filter((key) => key.startsWith(ROOT)).sort();
+
+  beforeAll(purge);
+  afterAll(purge);
+
+  it('shows each source only the failures it wrote', async () => {
+    await failure('afltables', 1);
+    await failure('afl_api', 1);
+    expect(ownKeys(await afltablesReport())).toEqual([`${ROOT}afltables|1`]);
+    expect(ownKeys(await aflApiReport())).toEqual([`${ROOT}afl_api|1`]);
+    await purge();
+  });
+
+  it('does not let the failures of the other source fill the cut and hide its own', async () => {
+    // Twenty-one afl_api failures sort ahead of the one AFL Tables failure, so an unscoped
+    // report cut at OPEN_FINDING_LIMIT (20) would not show it at all.
+    for (let n = 1; n <= OPEN_FINDING_LIMIT + 1; n += 1) await failure('afl_api', n);
+    await failure('afltables', 1);
+    expect(ownKeys(await afltablesReport())).toEqual([`${ROOT}afltables|1`]);
+    const afl = await aflApiReport();
+    expect(ownKeys(afl).every((key) => key.startsWith(`${ROOT}afl_api|`))).toBe(true);
+    expect(afl.findingsTruncated).toBe(true);
+    await purge();
   });
 });
