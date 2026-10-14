@@ -412,7 +412,7 @@ const { DATASETS: realDatasets } = await vi.importActual<
 >('@/lib/ingest/datasets');
 
 describe('validateSubmission duplicate detection on the resolved key (AFLDB-ISSUE-306)', () => {
-  const clubName = (text: string | null) => (text === 'Home Alias' ? 'Home FC' : text);
+  const clubName = (text: string | null) => (text === 'Home Alias' || text === 'Home Alias 2' ? 'Home FC' : text);
 
   const matchSpec = () => ({
     ...realDatasets.match_results,
@@ -423,6 +423,17 @@ describe('validateSubmission duplicate detection on the resolved key (AFLDB-ISSU
         season: 2073, round_code: '1',
         home_club_name: clubName(row.home_club), away_club_name: clubName(row.away_club),
       },
+    }),
+  });
+
+  /** Like matchSpec, but a row at the venue `Refused` is a failed row that still carries what it had resolved. */
+  const matchSpecWithRefusedRow = () => ({
+    ...matchSpec(),
+    validateRow: async (row: Record<string, string | null>) => ({
+      ...(await matchSpec().validateRow(row)),
+      ...(row.venue === 'Refused'
+        ? { verdict: 'error' as const, reasons: ['venue is refused'] }
+        : {}),
     }),
   });
 
@@ -496,7 +507,36 @@ describe('validateSubmission duplicate detection on the resolved key (AFLDB-ISSU
     ]);
   });
 
-  it('names the first row that claimed the record, for a third spelling', async () => {
+  it('names the FIRST row that claimed the record, not the latest, however many spellings follow', async () => {
+    mocks.getDataset.mockReturnValue(matchSpec());
+    const db = fakeValidationDb({
+      start: { dataset: 'match_results', status: 'staged', version: '1' },
+      rows: numbered(
+        fixture(),
+        fixture({ home_club: 'Home Alias' }),
+        fixture({ home_club: 'Home Alias 2' }),
+      ),
+    });
+
+    expect(await validateSubmission(17)).toEqual({ ok: 1, warnings: 0, errors: 2, duplicates: 2 });
+    const reasons = written(db).map((v) => v.reasons.reasons[0]);
+    expect(reasons[1]).toMatch(/^duplicate of row 1: /);
+    expect(reasons[2]).toMatch(/^duplicate of row 1: /);
+  });
+
+  it('lets a refused row claim nothing even when it carries a resolved value', async () => {
+    mocks.getDataset.mockReturnValue(matchSpecWithRefusedRow());
+    const db = fakeValidationDb({
+      start: { dataset: 'match_results', status: 'staged', version: '1' },
+      rows: numbered(fixture({ venue: 'Refused' }), fixture({ home_club: 'Home Alias' })),
+    });
+
+    // Row 1 is refused (so it never claims the fixture); row 2 is then the first good row.
+    expect(await validateSubmission(17)).toEqual({ ok: 1, warnings: 0, errors: 1, duplicates: 0 });
+    expect(written(db).map((v) => v.verdict)).toEqual(['error', 'ok']);
+  });
+
+  it('keeps the cell-text reason for a repeat of a row that is also an alias duplicate', async () => {
     mocks.getDataset.mockReturnValue(matchSpec());
     const db = fakeValidationDb({
       start: { dataset: 'match_results', status: 'staged', version: '1' },
