@@ -81,7 +81,7 @@ Integration (`tests/integration/settle-afltables.test.ts`): after the run's `loa
 
 ## 15. Decisions / unresolved questions
 
-- Whether any DEV or PROD fixture already has split ownership. Read-only census: period rows whose `source_id` differs from the parent match's.
+- Whether any DEV or PROD fixture already has split ownership. Read-only census: period rows whose `source_id` differs from the parent match's. **DEV component DONE 2026-10-14 (§31): no row has both sources set and different; 134,704 period rows carry a NULL (unattributed) `source_id`. PROD component NOT done.**
 
 ## 16. Next action
 
@@ -430,7 +430,7 @@ Scope: the whole six-file diff (650 insertions, 12 deletions): the source change
 1. **Commit** the reviewed change locally (operator; see the proposed scope in the session report), then `npm run merge:ready -- --issue 275`, then merge/push. Nothing is committed, merged, pushed or deployed.
 2. **Hold the DEV install** until the ISSUE-274 + ISSUE-276 combined nightly observation window closes (14 October nightly and every later night while ISSUE-276 remains installed on DEV). On DEV, all 218 2026 matches are `afltables`-owned and the AFL API builds no period target for a corroborated match, so this change is not expected to alter a DEV nightly's counters, which is a further reason to keep the observation clean rather than a reason to install early. **PROD stays behind the ISSUE-265 hold.**
 3. **DEV acceptance after install** (own nightly observation) and **State B durable Match Sheet** behaviour: unrun.
-4. **§15 split-ownership census** (period rows whose `source_id` differs from the parent match's) on DEV and PROD: unrun; the fix is forward-only and repairs nothing already written.
+4. **§15 split-ownership census** (period rows whose `source_id` differs from the parent match's) on DEV and PROD: *(Update 2026-10-14: the DEV component is DONE, §31; the PROD component is NOT done and PROD was not contacted.)* The fix is forward-only and repairs nothing already written.
 5. **Optional wider guard** (§20 step 3, owner's call): the whole `settle-afltables.test.ts` and `settle-afl-api.test.ts`, each with its own before/after census using `pack-v2`.
 6. **Optional:** a test that pins the `matches`-before-`match_period_scores` order, and a PostgreSQL negative control for the witness. Neither is required by the verdict; neither is scheduled.
 7. The CRLF baseline test failure (§25) remains the owner's call to register.
@@ -456,4 +456,28 @@ Scope: the whole six-file diff (650 insertions, 12 deletions): the source change
 
 **Interim web-journal check (`smoke-journal.sh`, window from 13:52:23, exit 0, PASS).** 27 web journal lines, 0 matching lines (`syntax error`, `invalid input syntax`, date/time out of range, `unhandled`, audit-write failure, `ERROR` all 0). This was taken before any browser step; it is not the section 8 smoke journal check and does not replace it.
 
-**What this proves and does not prove.** The code is installed and healthy. **ISSUE-275 acceptance is NOT met and the issue stays Open:** (1) the first nightly on the new revision (forecast 2026-10-15 05:07:43 AEDT) is not yet observed, and attributing it to TARGET needs independent evidence covering the whole run (a single HEAD/BUILD snapshot proves an instant only; the nightly script never prints ATTRIBUTABLE); (2) State B durable Match Sheet behaviour is unrun; (3) the section 15 split-ownership census is unrun. DEV on all-corroborated data cannot reach the refusal branch, so a clean night is evidence of no regression only. ISSUE-274 and ISSUE-276 stay Open (their closure follows PROD acceptance). ISSUE-281's read-only smoke and ISSUE-288's refusal smoke with its mandatory visual evidence (`VISUAL: UNVERIFIED` until images exist) are NOT done: they need an authenticated DEV session; neither issue is closed.
+**What this proves and does not prove.** The code is installed and healthy. **ISSUE-275 acceptance is NOT met and the issue stays Open:** (1) the first nightly on the new revision (forecast 2026-10-15 05:07:43 AEDT) is not yet observed, and attributing it to TARGET needs independent evidence covering the whole run (a single HEAD/BUILD snapshot proves an instant only; the nightly script never prints ATTRIBUTABLE); (2) State B durable Match Sheet behaviour is unrun; (3) the section 15 split-ownership census: the DEV component was run later the same day (section 31); the PROD component is not done. DEV on all-corroborated data cannot reach the refusal branch, so a clean night is evidence of no regression only. ISSUE-274 and ISSUE-276 stay Open (their closure follows PROD acceptance). ISSUE-281's read-only smoke and ISSUE-288's refusal smoke with its mandatory visual evidence (`VISUAL: UNVERIFIED` until images exist) are NOT done: they need an authenticated DEV session; neither issue is closed.
+
+## 31. DEV split-ownership census record (2026-10-14; DEV component of the section 15 census DONE; PROD component NOT done)
+
+**Authority and method.** Read-only; run on `streamanator` by the pack's `Invoke-Remote.ps1` after the DEV installation (section 30), with the DEV checkout at `17514052b5fce1326e24a786564dce4c7eee807b`. Each capture was one `psql` session as `afldb_import` on `afldb_dev` (loopback host asserted; non-superuser; `default_transaction_read_only` on; the in-session write probe was refused by the server), then `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY`, SELECTs only, `ROLLBACK`. The password reached `psql` only through the child environment; a scan of both logs found no credential text. Nothing was changed or repaired, and PROD was not contacted.
+
+**Evidence** (outside the repository, `D:\tmp\issue275\split-census-20261014\`; the files were re-verified against `SHA256SUMS.txt` before this record was written, all four OK):
+
+| Capture | Started (AEDT) | Exit statuses | SHA-256 of the saved log | SHA-256 of the script |
+|---|---|---|---|---|
+| Census (`census-run.txt`) | 2026-10-14 14:09:47 | psql 0; Invoke-Remote 0, `# RESULT: PASS` | `600866f5c2850e17bc975c72b904007014bca7cc04faab5f5fb3e673dbefbbc7` | `cbbcbc2578fada991de0e02e5cf1d3c737e5c2a5a4f10b4f3fa28e7c9796573c` (embedded SQL `f125833cba90a000c88d2c89b879290a4db7a9ad1b6432e13a09011d793744f4`) |
+| Browser-example lookup (`examples-run.txt`) | 2026-10-14 14:10:49 | psql 0; Invoke-Remote 0, `# RESULT: PASS` | `30c5582a3d744e7a51610097cd4f33bc737896542cb8bd8e95292a58c5c3c4f9` | `6bb6f32d9c3395cfaddbf15a1e877680269b5fed5ee411ba2c435c7982dce9a7` (embedded SQL `32ed19ae30fcd700d6dee62d93e523a4394bba916140a03f69daeefed79b08bf`) |
+
+The second capture only looked up existing player, draft-year and coach examples for the 281/288 browser checklist; it is not part of the census result. Snapshot of the census: `pg_current_snapshot` `623301:623301:`.
+
+**Result (DEV, `afldb_dev`).**
+- 17,056 matches (all with `source_id` 10, `afltables`) and 136,448 `match_period_scores` rows; every match has period rows.
+- **1,744** period rows across **218** matches carry `source_id` 10, the same as the parent.
+- **134,704** period rows across **16,838** matches carry a NULL `source_id` (and a NULL `import_batch_id`) under a parent with `source_id` 10.
+- **0** rows have both sources set and different; **0** matches have period rows from more than one distinct source (NULL counted as its own value).
+- Fingerprints: `match_period_scores` 136,448 rows `4d74711b8e81fb5ce0792308e75c6e74`; `matches(id,source_id,import_batch_id)` 17,056 rows `7d9df9881f4a763533df100170f8d1a2`; ordered list of the 134,704 rows whose period `source_id` differs from the parent's (NULL counted as differing) `41ecfa1edd0296c61313707b92baa6cb`.
+
+**Reading.** NULL means unattributed, not owned by a foreign source. The 200 listed matches (the first 200 by match id, of 16,838) show the period rows' `imported_at` equal to the parent's, but matching timestamps do not prove who wrote the rows, and the census cannot. What it does show is that no DEV period row is attributed to a source other than its parent's. It is a point-in-time DEV data state: it does not show that the defect is fixed, that no foreign-owner split ever existed, or that PROD is clean. The fix remains forward-only and this census repaired nothing.
+
+**What stays open.** The PROD component of the census; State B durable Match Sheet behaviour; the first attributable nightly (forecast 2026-10-15 05:07:43 AEDT) with independent evidence covering the whole run. A single HEAD/BUILD snapshot is not checkout continuity. ISSUE-281 and ISSUE-288 browser acceptance (288 `VISUAL: UNVERIFIED`) is pending the operator's evidence. ISSUE-275, 274, 276, 281 and 288 all stay Open; DEV stays deployed at `17514052`.
