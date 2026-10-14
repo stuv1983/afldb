@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Admin player creation refuses an implausible height or weight, a bad date of birth or an unknown confidence (AFLDB-ISSUE-291; `fd9443ff`, merged and pushed to `main` as `0bd64fc7`; DB-free validated; not deployed; resolved) - 14 October 2026
+
+- `createPlayerInTransaction` (`src/db/queries/players.ts`), the one player-creation primitive behind the Data Editor's "Add new player" and the player-links "Create and link", now applies the Data Editor's own rules through a new `validateNewPlayerFacts` before any statement: a real `YYYY-MM-DD` date of birth, a known confidence (`sourced`, `estimated`, `derived`, `unknown`), height 120-230 cm and weight 40-160 kg. Both actions return the refusal as a typed error and nothing is written, so an implausible figure is no longer stored or copied into the durable `manual_admin_edit` creation record that replay re-creates on every rebuild, and a bad enum or impossible date no longer surfaces as a raw PostgreSQL error.
+- **Behaviour change after deployment:** a height or weight outside those ranges, which was previously accepted, is now refused with a message; the draft "create player and selection" path gets the same date and confidence refusals.
+- **Validation (DB-free).** `player-link-mutations` "player creation facts" 17 passed (12 new; 9 fail with the call disabled); `tsc --noEmit` exit 0. No integration test, browser check, deployment or DEV/PROD action. Readiness was accepted under a scoped cleanliness exception, not a clean pass. Detail: `issues/closed/AFLDB-ISSUE-291.md` §17 and §18.
+
 ### Manual draft selections refuse an out-of-range pick number, draft age, height or weight (AFLDB-ISSUE-290; `a48646d8`, merged and pushed to `main` as `19969669`; DB-free validated; not deployed; resolved) - 14 October 2026
 
 - `createManualPick`, `createPlayerAndDraftPick` and `saveManualPick` (`src/db/queries/admin-draft.ts`) now apply the same `draft_picks` ranges as the source-owned correction path (pick number 1-200, draft age 14-50, height 120-230 cm, weight 40-160 kg) through a new `validateManualPickMeasures`, and refuse with reason `validation` before any connection opens. An implausible figure is no longer stored, shown on public player and draft pages, or copied into the durable `selection` payload that replay re-creates.
