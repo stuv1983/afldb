@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 37 (ISSUE-229, ISSUE-266–270, and the 31 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-286, ISSUE-287, ISSUE-288, ISSUE-290, ISSUE-291, ISSUE-297, ISSUE-300, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18), and ISSUE-290 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-290.md` §18), and ISSUE-291 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-291.md` §18), and ISSUE-287 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-287.md` §18), and ISSUE-286 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-286.md` §18), and ISSUE-300 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-300.md` §18); other issues' PROD prerequisites are unchanged)
+**Open issues:** 36 (ISSUE-229, ISSUE-266–270, and the 30 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-286, ISSUE-287, ISSUE-288, ISSUE-290, ISSUE-291, ISSUE-297, ISSUE-300, ISSUE-302, ISSUE-306, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18), and ISSUE-290 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-290.md` §18), and ISSUE-291 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-291.md` §18), and ISSUE-287 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-287.md` §18), and ISSUE-286 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-286.md` §18), and ISSUE-300 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-300.md` §18), and ISSUE-306 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-306.md` §18); other issues' PROD prerequisites are unchanged)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -533,12 +533,6 @@
 - **Severity:** Low. **Area:** legacy CSV intake validation — `src/lib/ingest/datasets.ts`. **State:** Open (2026-10-08),
   F-040, reproduced by the review (W4); imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-305.md`. **Next action:** implementation; H-305-1 open.
-
-### AFLDB-ISSUE-306 — Legacy intake duplicate detection compares raw club text
-- **Severity:** Low. **Area:** legacy CSV intake validation — `src/lib/ingest/datasets.ts` (`fileKey`). **State:** Open
-  (2026-10-08), F-041; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-306.md` (§17, §17.1, §17.2). **Next action:** merge and push (implemented 2026-10-14,
-  DB-free validated), then close.
 
 ### AFLDB-ISSUE-307 — Legacy promotion counts every promoted row as inserted
 - **Severity:** Low. **Area:** legacy CSV intake / batch accounting — `src/lib/ingest/pipeline.ts`. **State:** Open

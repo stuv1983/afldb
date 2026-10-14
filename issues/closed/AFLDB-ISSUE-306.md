@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). **Implemented and DB-free validated 2026-10-14** (§17, §17.1, §17.2) as `3372667f` and `e060cb49` on `sonnet/issue-306` (base `18faa58e`); not yet merged. Not deployed.
+- **Status:** **Resolved (2026-10-14, merge-scoped)**, on the push of the documentation-only closure commit (§18). Implemented as `3372667f` and `e060cb49` on `sonnet/issue-306` (base `18faa58e`), merged and pushed with its records as `cf58e03d`; DB-free validated (§17.1, §17.2). **Not deployed.**
 - **Severity:** Low. **Area:** legacy CSV intake validation.
 - **Key files:** `src/lib/ingest/datasets.ts` (`fileKey`), `src/lib/ingest/pipeline.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-041; partition note R5a-F09).
@@ -71,7 +71,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation, alongside AFLDB-ISSUE-272.~~ Done 2026-10-14 (§17). Next: merge and push, then close.
+~~Implementation, alongside AFLDB-ISSUE-272.~~ Done 2026-10-14 (§17); merged and closed (§18).
 
 ## 17. Implementation record (2026-10-14)
 
@@ -108,3 +108,11 @@ Each mutant changes the real fix, is applied alone to a clean tree and restored 
 | M12 a resolved key is registered on a dataset that should not have one | killed (1) |
 
 All twelve fail on `AssertionError`. The two survivors were strengthened (a third spelling must name the first claimant; a refused row with a resolved value must claim nothing) and the full set re-run. The 291 cases pass unmutated.
+
+## 18. Readiness, merge and closure (2026-10-14)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 306`: READY (§17.1). `npm run merge:ready -- --issue 306` (raw output, unchanged: `D:\tmp\issue306\merge-ready-raw-1.txt`): every check PASS except **one blocker, "main worktree is clean"**, the primary checkout's **17** untracked paths (nine `.agents/skills` files, seven zero-byte stray-named files including `void`, and the literal `$null)`). Existing warnings: no `afldb-merge-readiness` block in this runbook; no unexpected-file classification (7 committed files); database parity not checked. The worktree was created with `git worktree add -b sonnet/issue-306 <path> 18faa58e` (the tip verified equal to the live remote by `git ls-remote`) and a `node_modules` junction, because `worktree:bootstrap` is blocked by the same strays.
+- **Exception.** The owner authorised a fresh exception for this issue, covering only that clean-tree FAIL and the exact 17-path set, compared by full content hash, **verified immediately before each merge**. `D:\tmp\issue306\exception-check.py` (a copy of the read-only ISSUE-285 script) was run as `precheck-1`, as `premerge-1` immediately before the implementation merge and `postmerge-1` after its push, and again as `premerge-2` immediately before the closure merge and `postmerge-2` after it; every run RESULT OK. `$null)` (143 bytes, mtime 20:00:49) was hashed in full before each merge as `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500` and the check was run with that fresh value. Current equality with the saved 13 Oct snapshots, not continuous preservation. No stray was modified, moved or deleted.
+- **Merge 1.** `3372667f`, `e060cb49` and the records commit `cf58e03d` fast-forwarded onto `main` (`18faa58e..cf58e03d`) and pushed; local `main`, the fetched `origin/main` and `git ls-remote origin refs/heads/main` all equalled it afterwards. Before the merge a fresh `git fetch` and `ls-remote` showed `main` still at `18faa58e`.
+- **Resolution.** Resolved on the push of the documentation-only closure commit, under §14 ("DB-free unit tests with a stub alias resolver"), which is DB-free only and met (§17.1); §15 lists no open decision. The closure scope is **merge-scoped**: code on `main`, DB-free validated, **not deployed**.
+- **Preserved limits.** Not deployed. No PostgreSQL or integration run: the real alias resolver against `club_aliases` and the promotion transaction are the existing integration surface, whose multi-row fixtures were read (distinct fixtures and dates) but not run. The scripted `validateRow` in the pipeline cases plays the resolver. An older validated `player_match_stats` submission that already holds two rows on one player-match is now refused at promotion and must be re-uploaded corrected. No historical data was assessed or repaired.
