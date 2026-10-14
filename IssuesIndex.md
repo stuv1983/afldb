@@ -543,8 +543,8 @@
 ### AFLDB-ISSUE-310 — AFL API link path derives the stable player identity by a different rule from the forward classifier
 - **Severity:** Low. **Area:** AFL API identity — `src/db/queries/afl-api-player-links.ts`. **State:** Open (2026-10-08),
   F-045 (collation-dependent); imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-310.md`. **Next action:** implementation; DEV/PROD collation question open
-  (operator-run).
+- **Runbook:** `issues/open/AFLDB-ISSUE-310.md` (§17). **Next action:** merge; implemented and DB-free validated on
+  `sonnet/issue-310` (2026-10-15). The DEV/PROD collation question stays open (operator-run) and does not gate the fix.
 
 **AFLDB-ISSUE-313 resolved 2026-10-13** (merge-scoped; implementation commit `d43207c1d349d32d71fc6e135229b5cd5812199c`, parent `5ffbc563`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). Every `psql` the TypeScript database tooling launches now gets a password-free `-d` value and the password in the child's `PGPASSWORD`; unmovable or ambiguous password forms are refused before psql starts (D-313-6, approved). DB-free: `tests/db-test-rebuild.test.ts` 589 passed (61 new); real-psql pack V1–V6 PASS on `streamanator` (psql 16.15). Readiness was accepted under a scoped cleanliness exception, not a clean pass. **Limits:** not end-to-end `privileges.ts` acceptance (D-313-1); V5 had 4 periodic samples; the credential launcher was outside the pack manifest; Windows, `root` visibility and PROD not verified; not deployed. Detail: `issues.md` (ISSUE-313 entry) and `issues/closed/AFLDB-ISSUE-313.md` §22.
 
