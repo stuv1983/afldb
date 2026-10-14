@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). **Implemented 2026-10-14 as `a48646d8` (§17); DB-free validated (§17.1); not yet merged.**
+- **Status:** **Resolved (2026-10-14, merge-scoped)**, on the push of the documentation-only closure commit (§18). Implemented as `a48646d8`, merged and pushed with its records as `19969669`; DB-free validated (§17.1). **Not deployed.**
 - **Severity:** Low. **Area:** admin draft / validation.
 - **Key files:** `src/app/admin/draft/actions.ts`, `src/db/queries/admin-draft.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-025; partition note R2c-F06).
@@ -89,3 +89,11 @@ Implementation.
 - `npx tsc --noEmit`: exit 0. `npx eslint src/db/queries/admin-draft.ts tests/admin-draft-actions.test.ts`: exit 0. `git diff --check`: exit 0.
 - Related DB-free files: `data-overrides-source-contract` 69/69 and `afl-api-match` 213/213 passed. `player-link-mutations` has **one pre-existing failure** (`AFLDB-ISSUE-235 S6 ... I14 owns its actor`, a CRLF source-text assertion on Windows); it fails identically in the unchanged ISSUE-297 worktree at `99fcc4f0`, so it is not caused by this change.
 - **Not run:** `tests/integration/admin-draft.test.ts` (needs `afldb_test`; its fixtures use pick numbers 50-78 and in-range figures, so no case is expected to change, but this is read from the source, not executed); any DEV/PROD action; any browser check. The runbook's section 14 asks only for DB-free unit tests.
+
+## 18. Readiness, merge and closure (2026-10-14)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 290`: READY (0 blockers, 3 warnings; `D:\tmp\issue290\preflight-impl.txt`). `npm run merge:ready -- --issue 290` (raw output, unchanged: `D:\tmp\issue290\merge-ready-raw-1.txt`): every check PASS except **one blocker, "main worktree is clean"**, the primary checkout's 16 untracked paths (nine `.agents/skills` files and six stray-named files, the 15 previously recorded, plus the zero-byte `void`). Existing warnings: no `afldb-merge-readiness` block in this runbook; no unexpected-file classification; database parity not checked.
+- **Exception.** The owner authorised a fresh exception for this issue only, valid for the set of exactly those 16 paths with no tracked changes, unchanged ISSUE-274/ISSUE-276 blobs, and `void` a regular, zero-byte, untracked, unstaged file. All four were verified before the merge (`D:\tmp\issue290\exception-precheck.txt`, 19:08 AEDT): exact 16-path set; no tracked primary change, nothing staged; `void` regular, length 0, SHA-256 `e3b0c442…b855`, untracked; all 15 listed blobs equal at `839e084c` (ISSUE-297's exception base), at `99fcc4f0` (this base) and on the branch. ISSUE-297's exception was not reused. All 16 paths were left in place; no deletion was attempted.
+- **Merge.** `a48646d8` (fix) and `19969669` (records) fast-forwarded onto local `main` (`99fcc4f0..19969669`) and pushed; `git ls-remote origin refs/heads/main` equalled the local tip.
+- **Resolution.** Resolved on the push of the documentation-only closure commit, under the satisfied §14 criterion (DB-free unit tests in `tests/admin-draft-actions.test.ts`, §17.1).
+- **Preserved limits.** Not deployed. `tests/integration/admin-draft.test.ts`, any browser check and any DEV/PROD action were not run. An existing manual selection holding an out-of-range figure must be corrected before it can be saved again. No historical data was assessed or repaired.

@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 42 (ISSUE-229, ISSUE-266–270 and 36 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below)
+**Open issues:** 41 (ISSUE-229, ISSUE-266–270 and 35 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -37,7 +37,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-286 | Hall of Fame legend and removal years are not bounded server-side | Low | Admin awards / Hall of Fame validation | Open (2026-10-08); review F-021, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-286.md` | Implementation |
 | AFLDB-ISSUE-287 | Source-owned draft pick `null_pick_number` confirmation is unreachable | Low | Admin draft UI — `src/app/admin/draft/SourceFieldsPanel.tsx` | Open (2026-10-08); review F-022, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-287.md` | Implementation |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
-| AFLDB-ISSUE-290 | Manual draft selections accept out-of-range age, height, weight and pick number | Low | Admin draft / validation | Open (2026-10-08); review F-025, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-290.md` | Implementation |
 | AFLDB-ISSUE-291 | Admin player creation persists unvalidated biographical fields | Low | Admin player creation — `src/db/queries/players.ts` (`createPlayerInTransaction`) | Open (2026-10-08); review F-026, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-291.md` | Implementation |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-292.md` | Implementation (small), possibly with ISSUE-277; open question: read-only two-path census |
 | AFLDB-ISSUE-293 | Settle runs under-report `dataIssuesResolved` | Low | Acquisition / settle run accounting | Open (2026-10-08); review F-028, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-293.md` | Implementation (trivial) |
@@ -50742,17 +50741,24 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-290 — Manual draft selections accept out-of-range age, height, weight and pick number
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin draft / validation. Key files:
-  `src/app/admin/draft/actions.ts`, `src/db/queries/admin-draft.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-290.md`.
+- **Status:** Resolved (2026-10-14, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** admin draft / validation. Key files:
+  `src/app/admin/draft/actions.ts`, `src/db/queries/admin-draft.ts`. **Runbook:** `issues/closed/AFLDB-ISSUE-290.md`.
 - **Origin.** Review F-025 (R2c-F06) at `20a7a4bb`. Code-proven.
 - **Defect.** Manual picks accept any positive integer and persist it into the replayed `selection` payload; the
   source-owned path enforces the `EDITABLE_ENTITIES.draft_picks` ranges. ~~**Next action.** Implementation.~~ Superseded below.
-- **Implementation (2026-10-14; commit `a48646d8` on `sonnet/issue-290`, base `99fcc4f0`; not yet merged).** `validateManualPickMeasures`
+- **Implementation (2026-10-14; commit `a48646d8` on `sonnet/issue-290`, base `99fcc4f0`; merged and pushed with its records as `19969669`; not deployed).** `validateManualPickMeasures`
   (`src/db/queries/admin-draft.ts`) applies the `draft_picks` ranges (pick 1-200, age 14-50, height 120-230, weight 40-160) in
   `createManualPick`, `createPlayerAndDraftPick` and `saveManualPick` before any connection opens. Runbook §17.
 - **Validation (DB-free, 14 Oct 2026).** `tests/admin-draft-actions.test.ts` 56/56 (12 new; the four action-level cases fail with the
   call sites disabled); `tsc` exit 0; ESLint of the two files exit 0; `git diff --check` exit 0. One pre-existing, unrelated failure in
   `player-link-mutations` (identical at `99fcc4f0`). Not run: integration, DEV/PROD, browser.
+- **Readiness (14 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 290` (raw `D:\tmp\issue290\merge-ready-raw-1.txt`, unchanged)
+  BLOCKED by exactly one blocker, the primary worktree not clean: the 16 untracked paths (the original 15 plus the zero-byte `void`), for this issue's implementation and closure merges only, as authorised by the owner.
+  Preconditions were verified first (`D:\tmp\issue290\exception-precheck.txt`: exactly that 16-path set; no tracked primary change; `void` a regular, zero-byte, untracked, unstaged file, SHA-256 `e3b0c442…b855`;
+  all 15 ISSUE-274/276 source and test blobs equal at the earlier exception base `839e084c`, at this base and on the branch). Existing warnings: no `afldb-merge-readiness` block in the runbook, no unexpected-file classification; database parity not checked. All 16 paths were left in place; `void` was not touched.
+- **Merge.** `a48646d8` plus the records commit `19969669` fast-forwarded to `main` and pushed (`99fcc4f0..19969669`); the live remote was verified equal.
+- **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's satisfied DB-free criterion (§14: unit tests in `tests/admin-draft-actions.test.ts`).
+  **Preserved limits:** not deployed; no integration test, browser or DEV/PROD check was run; an existing manual selection holding an out-of-range figure must be corrected before it can be saved again; no historical data was assessed or repaired. Open issues: 42 -> 41.
 
 ## AFLDB-ISSUE-291 — Admin player creation persists unvalidated biographical fields
 

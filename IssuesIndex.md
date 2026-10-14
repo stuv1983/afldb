@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 42 (ISSUE-229, ISSUE-266–270, and the 36 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-288, ISSUE-297, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18); other issues' PROD prerequisites are unchanged)
+**Open issues:** 41 (ISSUE-229, ISSUE-266–270, and the 35 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-288, ISSUE-290, ISSUE-297, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18), and ISSUE-290 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-290.md` §18); other issues' PROD prerequisites are unchanged)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -480,11 +480,6 @@
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;
   imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-289.md`. **Next action:** operator decision **D-289-1** ((a) or (b)).
-
-### AFLDB-ISSUE-290 — Manual draft selections accept out-of-range age, height, weight and pick number
-- **Severity:** Low. **Area:** admin draft / validation. **State:** Open (2026-10-08), F-025; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-290.md` (§17, §17.1). **Next action:** merge and push `a48646d8` (implemented 2026-10-14,
-  DB-free validated), then close.
 
 ### AFLDB-ISSUE-291 — Admin player creation persists unvalidated biographical fields
 - **Severity:** Low. **Area:** admin player creation — `src/db/queries/players.ts` (`createPlayerInTransaction`).

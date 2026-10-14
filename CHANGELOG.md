@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Manual draft selections refuse an out-of-range pick number, draft age, height or weight (AFLDB-ISSUE-290; `a48646d8`, merged and pushed to `main` as `19969669`; DB-free validated; not deployed; resolved) - 14 October 2026
+
+- `createManualPick`, `createPlayerAndDraftPick` and `saveManualPick` (`src/db/queries/admin-draft.ts`) now apply the same `draft_picks` ranges as the source-owned correction path (pick number 1-200, draft age 14-50, height 120-230 cm, weight 40-160 kg) through a new `validateManualPickMeasures`, and refuse with reason `validation` before any connection opens. An implausible figure is no longer stored, shown on public player and draft pages, or copied into the durable `selection` payload that replay re-creates.
+- **Behaviour change after deployment:** an existing manual selection that already holds an out-of-range figure must be corrected (or the figure cleared) before the form will save it. No existing data is read or rewritten.
+- **Validation (DB-free).** `tests/admin-draft-actions.test.ts` 56/56 (12 new; the four action-level cases fail with the call sites disabled); `tsc --noEmit` and ESLint of the two files exit 0. No integration test, browser check, deployment or DEV/PROD action. Readiness was accepted under a scoped cleanliness exception, not a clean pass. Detail: `issues/closed/AFLDB-ISSUE-290.md` §17 and §18.
+
 ### The AFL API client refuses provider ids that are not `CD_M<digits>` / `CD_S<digits>` (AFLDB-ISSUE-297; `9c5ba69c`, merged and pushed to `main` as `38783e3c`; DB-free validated; not deployed; resolved) - 14 October 2026
 
 - `parseAflApiSeasonMatchesEnvelope` (`src/lib/acquisition/afl-api-client.ts`) now throws on a season-feed entry whose `providerId` is not `CD_M<digits>`, and the four CFS plan helpers (player stats, match roster, Brownlow season and leaderboard) refuse a match id that is not `CD_M<digits>` or a season id that is not `CD_S<digits>`. Before, any non-empty string was accepted and joined into a snapshot directory name and a token-bearing CFS URL path, so an id such as `../../escape` could write outside the snapshot tree. `acquire-afl-api.ts` parses the feed before it writes any file or makes a per-match request, so a hostile feed now stops there.
