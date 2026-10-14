@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and validated on `afldb_test` 2026-10-15 (§17); not deployed.
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Implemented and merged as `f0a0c917` (fix, tests and records), validated on `afldb_test` (§17), merged and pushed (§18). **Not deployed.**
 - **Severity:** Low. **Area:** admin awards and special records / audit trail.
 - **Key files:** `src/app/admin/awards/actions.ts`, `src/db/queries/admin-awards.ts`, `src/db/queries/admin-special-records.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-018; partition notes R2a-F02 and R2c-F03, grouped: the same field is dropped on the creation half of each write).
@@ -107,3 +107,11 @@ None.
 ### 17.4 Limits
 
 - Not deployed; no browser, DEV or PROD action. The create actions are proved by the DB-free harness against a mocked query layer, and the query layer by the integration suites; no real Server Action was driven with a session and a database together. The whole integration files and the awards file's python replay tests were not run. Rows created before this change keep the audit note they were written with; nothing is repaired.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 283`: the first run, made after the edits and before the commit, was BLOCKED only by the issue worktree's own uncommitted changes (raw `D:\tmp\issue283\preflight-impl.txt`, unchanged); after the commit the same command was READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; `preflight-impl-clean.txt`). `npm run merge:ready -- --issue 283` (raw, unchanged: `D:\tmp\issue283\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed (issue worktree clean, local `main` equal to recorded `origin/main`, ahead 1 / behind 0, migration parity), with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The nine committed paths were compared with the declared scope by hand: the three source files, three test files, this runbook, `issues.md` and `IssuesIndex.md`.
+- **Exception (fresh, this issue only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state: the nine `.agents/skills` files, the seven zero-byte stray-named files (`0)`, ``20` ``, ``` `path ```, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`, `void`), the literal `$null)` and the zero-byte `2000)`. Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
+- **Merge.** A fresh `git fetch` and `git ls-remote` showed `main` at `0c069484` immediately before the merge. `f0a0c917` fast-forwarded onto `main` and was pushed (`0c069484..f0a0c917`); local `main` and `git ls-remote origin refs/heads/main` both equalled `f0a0c917` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit. §14 asks for an integration test that creates and replaces with a note and asserts `data_edits.note` for the new row; it exists for all three award families and both special-record replace families and passes on `afldb_test` (§17.2, §17.3), with the action layer's forwarding proved separately DB-free. The closure scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**.
+- **Preserved limits.** Not deployed. No browser, DEV or PROD action. No real Server Action was driven with a session and a database together. The whole integration files (and the awards file's python replay tests) were not run. Audit rows written before the change are not repaired. One fixture-residue incident during validation was cleaned by id and is recorded in §17.3.
