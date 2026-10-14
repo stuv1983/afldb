@@ -405,19 +405,18 @@
   (full-content hashes where collected; `player_match_stats` by row count and ordered ids only); `club_seasons` 1,640 rows with the identical content hash. The one review item, `club_seasons_id_seq`, advanced by four (1748 -> 1752) during the fixture interval; rows 1751/1752
   were removed, the allocation history of 1749/1750 was not captured, so the four values are not attributed solely to the two deleted rows. Owner-accepted as recorded; nothing reset; compare rules unchanged. Health PASS (24/24, 4 workers). Limits: synthetic fixtures and an emulated
   holder, not the real editor, State B durable Match Sheet cases or overlapping settles (the DEV run itself was in State B).
-- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Next action:** the first scheduled nightly was **observed with no regression marker against the documented baseline on 13 Oct (one night, read-only checks, runbook §33; run revision `6f99b58d` supported by the host reflog, not recorded by the run; not shown: that the lock fired, the real editor, State B, overlapping settles)**; 64 refusals before and after the change with 0 canonical failures/inserts/updates/ledger writes (§33.8); lock execution and the historical reasons for the other 44 targets NOT PROVEN; the 14 Oct nightly (forecast 05:05:07 AEDT, not an exact start) is a combined ISSUE-274 + ISSUE-276 observation, as is every later night while ISSUE-276 remains installed on DEV (repeatability beyond the observed 13 Oct night is not established by them alone). PROD stays behind the ISSUE-265 hold;
+- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Next action:** the first scheduled nightly was **observed with no regression marker against the documented baseline on 13 Oct (one night, read-only checks, runbook §33; run revision `6f99b58d` supported by the host reflog, not recorded by the run; not shown: that the lock fired, the real editor, State B, overlapping settles)**; 64 refusals before and after the change with 0 canonical failures/inserts/updates/ledger writes (§33.8); lock execution and the historical reasons for the other 44 targets NOT PROVEN; the 14 Oct nightly (batch 122, 05:04:09-05:06:13) was the combined ISSUE-274 + ISSUE-276 observation and was graded **PASS, no regression**; the combined ISSUE-274 + ISSUE-276 DEV observation window is CLOSED (owner decision D-OBS-274276-20261014; 14 Oct nightly batch 122 PASS, no regression; runbook 274 section 33.10, 276 section 17.10; lock execution and the ISSUE-276 guard branch remain NOT PROVEN / NOT OBSERVED) (repeatability beyond the observed nights is not established by them alone). PROD: the ISSUE-265-specific PROD hold was released by `a862d192`; PROD still needs its own reviewed procedure (`blockers.md` R6);
   ISSUE-275 is a separate defect, not fixed by this.
 
 ### AFLDB-ISSUE-275 — A settle can insert period scores under a match it refused because a foreign owner created it concurrently
 - **Severity:** Medium. **Area:** acquisition / canonical ownership — `src/lib/acquisition/canonical-apply.ts`.
 - **State:** Open (2026-10-08), review F-010, code-proven mechanism (interleaving not executed); imported 2026-10-10.
-  **Implemented locally 2026-10-13, revision 2 the same day** on `opus/issue-275` (`D:\dev\afldb-issue-275`, base `e315c1d3`; uncommitted, not merged or deployed): `canonical-apply.ts` refuses a unit's `match_period_scores` unread whenever the same unit's `matches` target is unapplied for any reason other than `nothing_to_write`
+  **Implemented locally 2026-10-13, revision 2 the same day** on `opus/issue-275` (`D:\dev\afldb-issue-275`, base `e315c1d3`; **since committed as `24ca412b` and on `origin/main` (verified 2026-10-14); not deployed**): `canonical-apply.ts` refuses a unit's `match_period_scores` unread whenever the same unit's `matches` target is unapplied for any reason other than `nothing_to_write`
   (deny-by-default, derived from the parent's result; `manual_authority_*` included; full path table runbook §22.1). DB-free: 15 cases pass (7 witnesses fail with the rule disabled; the 2 authority witnesses alone fail with it narrowed to the first pass's three reasons), five source-scan files 1064 passed + 1 failed (the CRLF baseline,
   pre-existing and unrelated, runbook §25), `tsc` exit 0. A wrong findings assertion in the witness was found and fixed in review (§24.1).
   **Focused `afldb_test` validation PASSED 2026-10-13 (runbook §26; evidence `D:\tmp\issue275\run-20261013-105531-v2\`):** target `afldb_owner`/`afldb_test`/`127.0.0.1:55432`, matches-only probe OK, one shell-free Vitest run with filter `ISSUE-274: precondition|ISSUE-275`: exit 0, **3 passed, 79 excluded by the filter, none selected skipped**; fresh pack-v2 baseline/after `CENSUS IDENTICAL`, `match_period_scores` count/key hash/whole-row hash unchanged; all eight repository files unchanged. Earlier attempts (inherited DSN role `arm`; `cmd.exe` split the filter, and its v1 census comparison is invalid) are preserved and are not acceptance evidence.
   Same-transaction planted-row witness only: no two-session concurrency, no DEV/PROD/State B evidence, no preparation-time pack-v2 hash manifest; the CRLF test failure (§25) is separate. Full-diff review (§27): no CRIT/HIGH/MED finding.
-- **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Next action:** operator commits locally, `npm run merge:ready -- --issue 275`, merge/push (runbook §28). DEV install is **held** until the ISSUE-274 + ISSUE-276 combined nightly observation
-  window closes; PROD stays behind the ISSUE-265 hold. Open: the §15 split-ownership census (unrun; the fix is forward-only). D-275-1 is resolved by the owner's instruction; the period-only retry was traced and is not part of this defect (§23.4).
+- **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Next action:** the merge and push are done (`24ca412b` on `origin/main`). The ISSUE-274 + ISSUE-276 observation window is **closed** (D-OBS-274276-20261014), so the hold on a DEV install is released; **deployment still needs the owner's explicit decision (D-DEV-275-281-288-1)**. PROD: the ISSUE-265-specific PROD hold was released by `a862d192`; PROD still needs its own reviewed procedure (`blockers.md` R6). Open: the §15 split-ownership census (unrun; the fix is forward-only). D-275-1 is resolved by the owner's instruction; the period-only retry was traced and is not part of this defect (§23.4).
 
 ### AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 - **Severity:** Medium. **Area:** AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts`.
@@ -432,7 +431,7 @@
   (`club_seasons.id` and sequences deliberately excluded). Baseline `player_season_stats` for 2026 was empty, so a non-empty Brownlow restore was not exercised. **Not established:** whole-suite, restricted-role, live-provider, DEV behavioural or PROD acceptance.
 - **Runbook:** `issues/open/AFLDB-ISSUE-276.md`. The names `period_scores_contradict_final_score` / `afl_api_period_scores_contradiction` were reviewed and are kept; no naming decision is outstanding.
   **Limits:** all 218 DEV 2026 matches are `afltables`-owned, so the nightly is not expected to reach the refusal branch or finding lifecycle; a clean nightly shows no regression only. PROD neither installed nor accepted.
-  **Next action:** observe and grade the 14 October nightly AFL API settle on DEV, a **combined ISSUE-274 + ISSUE-276 observation** (forecast 05:05:07 AEDT is not an exact start commitment); no closure recorded.
+  **Next action:** the 14 October nightly (batch 122, 05:04:09-05:06:13) was observed as the combined ISSUE-274 + ISSUE-276 observation and graded **PASS, no regression**; the window is **closed** (D-OBS-274276-20261014; runbook 276 section 17.10) on the minimum evidence. The guard branch is NOT OBSERVED on DEV (all 218 matches are `afltables`-owned). PROD installation and acceptance remain; no closure recorded.
 
 ### AFLDB-ISSUE-277 — Data Editor edits other than the name to a token-only player are not durable
 - **Severity:** Medium. **Area:** Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py`.
@@ -453,10 +452,10 @@
 ### AFLDB-ISSUE-281 — Two public list pages fail on a sort key that names an inherited object property
 - **Severity:** Low. **Area:** public site / sort allowlists — `src/db/queries/players.ts`, `draft.ts`. **State:** Open
   (2026-10-08), F-016, reproduced by the review (W5); imported 2026-10-10. **Implemented 2026-10-12** in batch worktree
-  `afldb-batch-315-281-312-288` (base `80f86c39`): `Object.hasOwn` in both guards; DB-free 14/14. **Merged to local `main`**
-  (2026-10-13, commit `23809fce`; merge `01976be7`; not pushed or deployed).
-- **Runbook:** `issues/open/AFLDB-ISSUE-281.md` §17. **Next action:** DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33);
-  read-only DEV smoke; then close DEV-scoped (PROD behind the ISSUE-265 hold).
+  `afldb-batch-315-281-312-288` (base `80f86c39`): `Object.hasOwn` in both guards; DB-free 14/14. **Merged to `main`**
+  (2026-10-13, commit `23809fce`; merge `01976be7`; pushed: an ancestor of the live `origin/main`, verified 2026-10-14; not deployed).
+- **Runbook:** `issues/open/AFLDB-ISSUE-281.md` §17. **Next action:** DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33, and the combined observation window is closed; deployment needs the owner's decision D-DEV-275-281-288-1);
+  read-only DEV smoke; then close DEV-scoped (the ISSUE-265-specific PROD hold was released by `a862d192`; PROD still needs its own reviewed procedure (`blockers.md` R6)).
 
 ### AFLDB-ISSUE-282 — Replace actions revalidate only the replaced row's public pages
 - **Severity:** Low. **Area:** admin awards / special records / revalidation. **State:** Open (2026-10-08), F-017; imported 2026-10-10.
@@ -491,10 +490,10 @@
   real-date check before any SQL in both mutations (r2: Gregorian arithmetic without `Date.UTC`'s 0-99
   remap, year 0000 refused); DB-free 25/25; `afldb_test` `-t "AFLDB-ISSUE-288"` **passed 2026-10-12** (2/2 — the
   `createCoach` refusal case and the `saveCoachMetadata` refusal case; exit 0; census clean before/after, shared rows
-  unchanged; §17.7). **Merged to local `main`** (2026-10-13, commit `44ea8ce2`; merge `01976be7`; not pushed or deployed).
+  unchanged; §17.7). **Merged to `main`** (2026-10-13, commit `44ea8ce2`; merge `01976be7`; pushed: an ancestor of the live `origin/main`, verified 2026-10-14; not deployed).
 - **Runbook:** `issues/open/AFLDB-ISSUE-288.md` §17. **Next action:**
-  DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33); DEV refusal smoke; then close DEV-scoped
-  (PROD behind the ISSUE-265 hold).
+  DEV deploy (the ISSUE-274 first-nightly prerequisite is met, runbook 274 §33, and the combined observation window is closed; deployment needs the owner's decision D-DEV-275-281-288-1); DEV refusal smoke (288's visual evidence is mandatory for its DEV acceptance); then close DEV-scoped
+  (the ISSUE-265-specific PROD hold was released by `a862d192`; PROD still needs its own reviewed procedure (`blockers.md` R6)).
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;

@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### The ISSUE-274 + ISSUE-276 combined DEV observation window is closed (D-OBS-274276-20261014; documentation and retained validation state only; both issues stay open) - 14 October 2026
+
+- The 14 October 2026 AFL API nightly on DEV (batch 122, 05:04:09-05:06:13, `Result=success`) was graded PASS with no regression against the 13 October baseline: 64 refusals, 0 canonical failures/inserts/updates/ledger writes, `data_issues_id_seq` 865 -> 929 explained by the 64 refresh upserts, A1/A2 captures sealed. Runbook ISSUE-274 section 33.10 and ISSUE-276 section 17.10.
+- Limits unchanged: lock execution NOT PROVEN, the ISSUE-276 guard branch and finding lifecycle NOT OBSERVED (all 218 DEV 2026 matches are `afltables`-owned), contention not exercised. PROD is neither installed nor accepted. The decision releases only the preparation prerequisite for the combined ISSUE-275/281/288 DEV deployment; it authorises no deployment.
+
 ### The lineup bundle refuses an acquisition whose fitzRoy version did not match the pin (AFLDB-ISSUE-302; `a48cc256`, merged and pushed to `main`; DB-free validated; not deployed; resolved) - 13 October 2026
 
 - `lineupAcquisitionInput` (`src/lib/acquisition/lineup-bundle.ts`) now throws `LineupBundleError` unless the acquisition manifest's `fitzroy_version_match` is exactly `true`, so `emit_lineup_bundle.ts` stops before it builds or writes a bundle. Before, the bundle's
@@ -62,7 +67,7 @@ commit.
   `--apply`, deployment or DEV/PROD acceptance is claimed. The `cannot be inspected` branch is untested. Readiness was accepted under a scoped cleanliness exception (untracked skill and stray files in the primary worktree), not a clean pass.
   Detail: `issues/closed/AFLDB-ISSUE-314.md` §17, §17.8, §17.9.
 
-### A settle no longer writes period scores under a match it refused (AFLDB-ISSUE-275; implemented locally on `opus/issue-275`, uncommitted; focused `afldb_test` validation passed; not merged, not deployed; issue open) - 13 October 2026
+### A settle no longer writes period scores under a match it refused (AFLDB-ISSUE-275; committed as `24ca412b` and on `origin/main` (verified 14 October 2026); focused `afldb_test` validation passed; not deployed; issue open) - 13 October 2026
 
 - **Behaviour.** The canonical applier (`applyCanonicalUnit`, shared by the AFL Tables and AFL API settles) now refuses a unit's `match_period_scores` target, unread, whenever the same unit's `matches` target was not applied for any
   reason other than "nothing to write". Before, a unit whose `matches` target was refused (for example because another source created the row between the plan and the unit) could still insert four period rows and a ledger row
@@ -72,15 +77,15 @@ commit.
 - **Validation (local).** 15 DB-free cases pass; with the rule disabled 7 fail. On `afldb_test` (State A only), one focused run passed 3 selected tests (exit 0; the two ISSUE-275 cases and the ISSUE-274 precondition),
   and the before/after census was identical, including `match_period_scores` row content. The witness plants the competing row inside the settle's own transaction: it is **not** a two-session concurrency test.
   No DEV, PROD or durable Match Sheet (State B) evidence. The whole integration file and `settle-afl-api.test.ts` were not run. A known, separate Windows CRLF failure in `tests/current-season-import.test.ts` is unchanged.
-- **Not on DEV or PROD.** DEV install is held until the ISSUE-274 + ISSUE-276 combined nightly observation closes; PROD stays behind the ISSUE-265 hold. Detail: `issues/open/AFLDB-ISSUE-275.md` §26-§28.
+- **Not on DEV or PROD.** The ISSUE-274 + ISSUE-276 combined DEV observation window closed on 14 October 2026 (D-OBS-274276-20261014); a DEV install still needs the owner's explicit decision. The ISSUE-265-specific PROD hold was released (`a862d192`); PROD still needs its own reviewed procedure. Detail: `issues/open/AFLDB-ISSUE-275.md` §26-§28.
 
-### Public match-log and draft pages ignore a sort key that names an inherited object property (AFLDB-ISSUE-281; DB-free validated; merged to local `main` `01976be7` 13 October 2026, not pushed; not yet on DEV or PROD; issue open) - 12 October 2026
+### Public match-log and draft pages ignore a sort key that names an inherited object property (AFLDB-ISSUE-281; DB-free validated; merged to `main` `01976be7` 13 October 2026, pushed (verified 14 October 2026); not yet on DEV or PROD; issue open) - 12 October 2026
 
 - `/players/<slug>/matches?sort=constructor` and `/draft/<year>?sort=toString` (and the other `Object.prototype` names)
   now fall back to the default order instead of sending invalid SQL and rendering the error page. The two sort guards use
   `Object.hasOwn`, like the other sort maps.
 
-### Coach date of birth is checked as a real date before any SQL (AFLDB-ISSUE-288; DB-free validated; integration cases passed on `afldb_test`; merged to local `main` `01976be7` 13 October 2026, not pushed; not yet on DEV or PROD; issue open) - 12 October 2026
+### Coach date of birth is checked as a real date before any SQL (AFLDB-ISSUE-288; DB-free validated; integration cases passed on `afldb_test`; merged to `main` `01976be7` 13 October 2026, pushed (verified 14 October 2026); not yet on DEV or PROD; issue open) - 12 October 2026
 
 - Creating a coach or saving coach metadata with an impossible date of birth (`2026-02-30`, `2023-02-29`, `31/12/1980`)
   returns "Date of birth "…" is not a real date. Use YYYY-MM-DD." instead of an uncaught Server Action error or a raw
