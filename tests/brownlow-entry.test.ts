@@ -40,6 +40,7 @@ import {
   validateSelection,
   votesForPlayer,
 } from '@/lib/brownlow/entry';
+import { incompleteMatchCount } from '@/app/admin/brownlow/labels';
 
 const HOME = 1;
 const AWAY = 2;
@@ -727,6 +728,31 @@ describe('refusal messages', () => {
 
   it('promises nothing was written when the database refuses', () => {
     expect(brownlowRefusalMessage('db_error')).toContain('nothing was written');
+  });
+});
+
+describe('incompleteMatchCount (ISSUE-284)', () => {
+  it('is what is left after the accounted matches, not after final + voided + imported', () => {
+    // A drafted match whose source votes are complete is accounted but is none of
+    // final, voided or imported: one of two left, not two of two.
+    expect(incompleteMatchCount({ expected: 2, accounted: 1 })).toBe(1);
+    expect(incompleteMatchCount({ expected: 2, accounted: 2 })).toBe(0);
+  });
+
+  it('never goes negative', () => {
+    expect(incompleteMatchCount({ expected: 2, accounted: 3 })).toBe(0);
+    expect(incompleteMatchCount({ expected: 0, accounted: 0 })).toBe(0);
+  });
+
+  it('is the only accounting rule the season page and the season list use', () => {
+    // Neither the season page nor the list may rebuild `accounted` from the
+    // display counts: that was the defect. The query layer's count is the one the
+    // publish gate agrees with.
+    const page = readFileSync(join(process.cwd(), 'src/app/admin/brownlow/[season]/page.tsx'), 'utf8');
+    expect(page).toContain('const accounted = overview.accounted;');
+    expect(page).not.toMatch(/overview\.final\s*\+\s*overview\.voided/);
+    const labels = readFileSync(join(process.cwd(), 'src/app/admin/brownlow/labels.ts'), 'utf8');
+    expect(labels).not.toMatch(/summary\.final|summary\.voided|summary\.imported/);
   });
 });
 

@@ -116,6 +116,13 @@ export type BrownlowSeasonCounts = {
   voided: number;
   /** No workflow row, but the source's own facts are a complete 3/2/1. */
   imported: number;
+  /**
+   * Matches the publish gate and the per-round tables count as accounted: voided,
+   * or a complete 3/2/1 in the facts, whatever the workflow row says (ISSUE-284).
+   * A drafted match whose source votes are complete is in this count and in
+   * `draft`, so it is not `final + voided + imported`.
+   */
+  accounted: number;
   /** No workflow row and a positive but incomplete set of facts. */
   importedPartial: number;
   notEntered: number;
@@ -151,6 +158,7 @@ type SeasonAggregateRow = {
   draft: number;
   voided: number;
   imported: number;
+  accounted: number;
   importedPartial: number;
   notEntered: number;
   participantsIncomplete: number;
@@ -211,6 +219,9 @@ async function selectSeasonAggregates(season: number | null): Promise<SeasonAggr
              count(*) FILTER (WHERE entry_status = 'draft')::int                 AS draft,
              count(*) FILTER (WHERE entry_status = 'void')::int                  AS voided,
              count(*) FILTER (WHERE entry_status IS NULL AND facts_complete)::int AS imported,
+             -- The gate's rule (publishBrownlowSeason) and the per-round tables': a void
+             -- decision, or a complete 3/2/1 whatever the workflow row is (ISSUE-284).
+             count(*) FILTER (WHERE entry_status = 'void' OR facts_complete)::int AS accounted,
              count(*) FILTER (WHERE entry_status IS NULL AND facts_any
                                 AND NOT facts_complete)::int                     AS "importedPartial",
              count(*) FILTER (WHERE entry_status IS NULL AND NOT facts_any)::int AS "notEntered",
@@ -222,7 +233,7 @@ async function selectSeasonAggregates(season: number | null): Promise<SeasonAggr
     SELECT p.season,
            av.coverage::text                       AS coverage,
            p.expected, p.final, p.draft, p.voided,
-           p.imported, p."importedPartial", p."notEntered",
+           p.imported, p.accounted, p."importedPartial", p."notEntered",
            p."participantsIncomplete", p.started,
            COALESCE(u.unresolved, 0)::int          AS unresolved,
            COALESCE(b.season_rows, 0)::int         AS "seasonRows",
@@ -258,7 +269,7 @@ function toSeasonSummary(row: SeasonAggregateRow): BrownlowSeasonSummary {
     ? 'none'
     : (row.manualRows > 0 ? 'manual' : 'source');
 
-  const accounted = row.final + row.voided + row.imported;
+  const accounted = row.accounted;
   const complete = row.expected > 0 && accounted >= row.expected;
 
   return {
@@ -286,6 +297,7 @@ function toSeasonSummary(row: SeasonAggregateRow): BrownlowSeasonSummary {
     draft: row.draft,
     voided: row.voided,
     imported: row.imported,
+    accounted: row.accounted,
     importedPartial: row.importedPartial,
     notEntered: row.notEntered,
     unresolved: row.unresolved,

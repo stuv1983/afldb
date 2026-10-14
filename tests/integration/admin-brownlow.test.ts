@@ -50,6 +50,7 @@ import { playerMatchStatsAuthorityStorable } from '@/lib/acquisition/manual-auth
 import { AUTHORITY_UNAVAILABLE_REFUSAL } from '@/lib/acquisition/match-sheet-authority';
 import { BROWNLOW_MANUAL_SOURCE_KEY } from '@/lib/brownlow/entry';
 import {
+  BROWNLOW_ACCOUNTING_SEASON,
   BROWNLOW_MAIN_SEASON,
   BROWNLOW_NO_MEDAL_SEASON,
   BROWNLOW_SHORT_SEASON,
@@ -2132,5 +2133,85 @@ describe('the season list', () => {
     const unpolled = byYear.get(noMedal.season)!;
     expect(unpolled.polled).toBe(false);
     expect(unpolled.status).toBe('not_polled');
+  });
+});
+
+describe('one accounting rule for the season aggregate (ISSUE-284)', () => {
+  // Its own season, seeded here: no earlier case has drafted, finalised, voided or
+  // attached source votes in it, so the counts below are exactly this case's.
+  let accounting: BrownlowFixture;
+
+  beforeAll(async () => {
+    accounting = await seedBrownlowSeason(BROWNLOW_ACCOUNTING_SEASON);
+  }, 600_000);
+
+  // The source's own complete 3/2/1: the state every real historical match
+  // starts in.
+  async function seedSourceVotes(match: BrownlowFixture['matches'][number]) {
+    for (const [playerId, votes, index] of [
+      [match.homePlayerIds[0], 3, 0],
+      [match.homePlayerIds[1], 2, 1],
+      [match.awayPlayerIds[0], 1, 2],
+    ] as const) {
+      await sql`
+        INSERT INTO brownlow_round_votes
+              (season, player_id, round_number, match_id, played, votes,
+               source_id, source_record_id, imported_at)
+        VALUES (${accounting.season}, ${playerId}, ${match.roundNumber},
+                ${match.matchId}, true, ${votes}, ${afltablesSourceId},
+                ${`issue284:${match.matchId}:${index}`}, now())
+      `;
+    }
+  }
+
+  it('counts a drafted match whose source votes are complete, so the season reads complete', async () => {
+    const [drafted, untouched] = accounting.matches;
+    await seedSourceVotes(drafted);
+    await seedSourceVotes(untouched);
+
+    const before = await getBrownlowSeasonOverview(accounting.season);
+    expect(before!.expected).toBe(2);
+    expect(before!.imported).toBe(2);
+    expect(before!.accounted).toBe(2);
+    expect(before!.complete).toBe(true);
+
+    // An Admin presses "Save draft" on one of them. It is still a complete 3/2/1.
+    const draft = await saveDraftBrownlowMatch({
+      matchId: drafted.matchId,
+      selection: {
+        three: drafted.homePlayerIds[0], two: drafted.homePlayerIds[1],
+        one: drafted.awayPlayerIds[0],
+      },
+      expectedRevision: await currentRevision(drafted.matchId),
+      actorId,
+    });
+    expect(draft.ok, JSON.stringify(draft)).toBe(true);
+
+    const overview = await getBrownlowSeasonOverview(accounting.season);
+    expect(overview!.draft).toBe(1);
+    // `imported` is the display count of matches with NO workflow row, so the
+    // drafted match moves out of it; it stays accounted, as the per-round table
+    // and the publish gate both say.
+    expect(overview!.imported).toBe(1);
+    expect(overview!.accounted).toBe(2);
+    expect(overview!.complete).toBe(true);
+    expect(overview!.status).toBe('entered');
+    expect(overview!.rounds.map((round) => [round.roundNumber, round.accounted])).toEqual([[1, 2]]);
+
+    const listed = (await listBrownlowSeasons()).find((entry) => entry.season === accounting.season)!;
+    expect(listed.accounted).toBe(2);
+    expect(listed.complete).toBe(true);
+    expect(listed.status).toBe('entered');
+
+    // The gate the Publish control stands for counts the same two matches, so the
+    // read model and the transaction now agree.
+    const published = await publishBrownlowSeason({
+      season: accounting.season,
+      ineligiblePlayerIds: [],
+      expectedRevision: overview!.revision,
+      actorId,
+      note: 'issue-284 accounting rule',
+    });
+    expect(published.ok, JSON.stringify(published)).toBe(true);
   });
 });

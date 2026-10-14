@@ -37,7 +37,7 @@ export default async function BrownlowSeasonPage({
   if (!overview) notFound();
 
   const polledPlayers = overview.polled ? await listSeasonPolledPlayers(season) : [];
-  const accounted = overview.final + overview.voided + overview.imported;
+  const accounted = overview.accounted;
 
   return (
     <>

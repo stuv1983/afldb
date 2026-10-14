@@ -96,14 +96,14 @@ export function badgeClass(tone: LabelTone): string {
 }
 
 /**
- * The count of home-and-away matches still without a finalise/void/complete
- * source decision, from a season summary's own fields (§27.9 `complete`).
+ * The count of home-and-away matches still not accounted for (§27.9 `complete`),
+ * from a season summary's own fields. `accounted` is the query layer's count, the
+ * one the publish gate uses; it is not `final + voided + imported`, which misses a
+ * drafted match whose source votes are already complete (ISSUE-284).
  */
 export function incompleteMatchCount(summary: {
   expected: number;
-  final: number;
-  voided: number;
-  imported: number;
+  accounted: number;
 }): number {
-  return Math.max(0, summary.expected - summary.final - summary.voided - summary.imported);
+  return Math.max(0, summary.expected - summary.accounted);
 }

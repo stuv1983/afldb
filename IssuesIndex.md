@@ -455,7 +455,9 @@
 ### AFLDB-ISSUE-284 — Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish
 - **Severity:** Low. **Area:** admin Brownlow — `src/db/queries/admin-brownlow.ts`. **State:** Open (2026-10-08), F-019;
   imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-284.md`. **Next action:** implementation.
+- **State (2026-10-15):** implemented on `sonnet/issue-284` and validated on `afldb_test` (1 integration case on its own seeded season, 32
+  passed with its neighbouring blocks; 3 DB-free cases; 7 of 7 mutants killed; fixture residue 0); not deployed.
+- **Runbook:** `issues/open/AFLDB-ISSUE-284.md` §17. **Next action:** merge, then close (merge-scoped).
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;

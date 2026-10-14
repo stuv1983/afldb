@@ -30,6 +30,10 @@
  *                   publish-while-incomplete are provable.
  *   2084  NO_MEDAL  one home-and-away match in a season whose coverage grid
  *                   says no medal was awarded — the 1942-45 shape.
+ *   2075  ACCOUNTING two full home-and-away matches in one round, for the one
+ *                   case (ISSUE-284) that needs a season no earlier case has
+ *                   touched. Seeded by that case's own `beforeAll`, not the
+ *                   file-level one, and swept with the others.
  *
  * FAILS CLOSED on a key collision, like the ISSUE-129 fixture: a row already
  * sitting on an ISSUE-155 key is an unknown row, and adopting it would corrupt
@@ -48,6 +52,7 @@ import {
 export const BROWNLOW_MAIN_SEASON = 2089;
 export const BROWNLOW_SHORT_SEASON = 2085;
 export const BROWNLOW_NO_MEDAL_SEASON = 2084;
+export const BROWNLOW_ACCOUNTING_SEASON = 2075;
 
 /** §27.6: fewer than this on either side and a match cannot be finalised. */
 const FULL_SIDE = 18;
@@ -242,6 +247,15 @@ const SHAPES: Record<number, FixtureShape> = {
     homeAndAway: [
       { home: 0, away: 1, round: 1, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
       { home: 2, away: 3, round: 1, homeSide: FULL_SIDE, awaySide: SHORT_SIDE },
+    ],
+    finals: false,
+    sourcePublishedPlayers: 0,
+    coverage: 'complete',
+  },
+  [BROWNLOW_ACCOUNTING_SEASON]: {
+    homeAndAway: [
+      { home: 0, away: 1, round: 1, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
+      { home: 2, away: 3, round: 1, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
     ],
     finals: false,
     sourcePublishedPlayers: 0,
