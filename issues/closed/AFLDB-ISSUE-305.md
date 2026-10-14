@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and DB-free validated 2026-10-15 (§17); not yet merged.
+- **Status:** Resolved (2026-10-15, merge-scoped; opened 2026-10-08). Implementation §17; readiness, merge and closure §18.
 - **Severity:** Low. **Area:** legacy CSV intake validation.
 - **Key file:** `src/lib/ingest/datasets.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-040; partition note R5a-F08).
@@ -77,7 +77,7 @@ DB-free `validateRow` cases in `tests/ingest-datasets.test.ts`.
 
 ## 16. Next action
 
-Implementation (done, §17). Merge.
+None. Resolved (§18). The H-305-1 follow-up (§17) waits for an operator decision.
 
 ## 17. Implementation record (2026-10-15)
 
@@ -114,3 +114,11 @@ Each mutant changes the real fix, is applied alone and restored from the saved b
 ## 17.3 Limits
 
 Not deployed. No PostgreSQL, integration, browser, DEV or PROD action: the `::date` and `::smallint` casts are PostgreSQL's, so "promotion cannot write it" is established from the cast rules and the review's account of the failure, not by a promotion run. The validators are exercised through a fake `sql` tag. The `rising_star` `votes` observation above is code reading, not executed.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 305`: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue305\preflight-impl-raw.txt`). `npm run merge:ready -- --issue 305` with eight `--expected-file` rules (raw output, unchanged: `D:\tmp\issue305\merge-ready-raw-1.txt`, sha-256 `e199b090c8354764c7c4bffb842595a4aeeec9e751213ba70954b683837ed3ac`): every check PASS (branch, clean issue worktree, `main` equals recorded `origin/main`, ahead 3 / behind 0, migration parity, declared scope 4 changed / 0 unexpected) except **one blocker, "main worktree is clean"**; one warning (no runbook readiness block); database parity not checked. The raw output ends `Merge readiness: BLOCKED (1 blocker(s), 1 warning(s))`.
+- **Exception (fresh, this issue only).** The owner authorised an exception for ISSUE-305, covering only that clean-tree FAIL under the exact **18**-path primary state: the nine `.agents/skills` files, the seven zero-byte stray-named files (`0)`, ``20` ``, ``` `path ```, `i`, `q(sequenceValueSql(qname))))[0]`, `t.kind`, `void`), the literal `$null)` and the zero-byte `2000)`. No earlier ratification was reused. The path set, no tracked or staged change, and full content hashes were verified by `D:\tmp\issue305\exception-check.py` (an adaptation of the ISSUE-310 script): `precheck-1` and `premerge-1` before, and `postmerge-1` after, the first push, all RESULT OK. The nine skill files equal the 13 Oct manifests; the seven zero-byte files and `2000)` are regular, 0 bytes, sha-256 `e3b0c442...b855`; `$null)` is 143 bytes, mtime 2026-10-14 20:00:49 (not rewritten this session), full sha-256 `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500`, identical at every check. This is current equality, not continuous preservation. No additional path or changed content appeared.
+- **Merge.** Fresh `git fetch` and `git ls-remote` showed `main` at `1185bad3` immediately before the merge. `d82e891e`, `5282322b` and the records commit `1ba75b06` fast-forwarded onto `main` and were pushed (`1185bad3..1ba75b06`); local `main`, the fetched `origin/main` and `git ls-remote origin refs/heads/main` all equalled `1ba75b06` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit, under §14: its one item (DB-free `validateRow` cases in `tests/ingest-datasets.test.ts`) is met by §17.1. §15's H-305-1 is a hypothesis whose deciding evidence (the `award_nominations` DDL) is now read and recorded in §17; it asked for no fix, and the change it would imply (which `rising_star` cells to refuse) is a behaviour decision, so it does not gate closure. The closure scope is **merge-scoped**: code on `main`, DB-free validated, **not deployed**.
+- **Preserved limits.** Not deployed. No PostgreSQL, integration, browser, network-acquisition, DEV or PROD action; no promotion was run, so "promotion would have failed" rests on the cast rules and the review's account. **Open follow-up (operator decision, not a gate):** `rising_star` `votes` and stat-line cells are not validated (negative accepted, unreadable dropped, `votes` above 32,767 would fail at promotion by reading). Two pre-existing unrelated failures in `tests/honours-lifecycle-public-contract.test.ts` are untouched and identical on unchanged `main`.
