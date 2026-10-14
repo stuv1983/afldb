@@ -472,7 +472,9 @@
 ### AFLDB-ISSUE-301 — AFL API HTTP client has no request timeout and reads the body outside its retry
 - **Severity:** Low. **Area:** acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts`. **State:** Open
   (2026-10-08), F-036; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-301.md`. **Next action:** implementation; timeout value open.
+- **State (2026-10-15):** implemented and validated DB-free (5 fake-timer cases; 7 of 7 mutants killed); the timeout is an **implementation default of
+  60 s per attempt**, not an owner decision; not deployed.
+- **Runbook:** `issues/open/AFLDB-ISSUE-301.md` §17. **Next action:** merge, then close (merge-scoped).
 
 ### AFLDB-ISSUE-303 — `/admin/upload` promises 5 MB but Server Actions accept 1 MB
 - **Severity:** Low. **Area:** legacy CSV intake UI / framework configuration — `next.config.ts`. **State:** Open

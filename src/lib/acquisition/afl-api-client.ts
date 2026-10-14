@@ -227,21 +227,62 @@ export type RetryOptions = {
   /** Total attempts, including the first. §17: "3x backoff per request". */
   attempts?: number;
   baseDelayMs?: number;
+  /**
+   * The budget for ONE attempt, request and body together (AFLDB-ISSUE-301).
+   * An attempt that exceeds it is abandoned and retried like any other transport failure.
+   */
+  timeoutMs?: number;
   /** Injected so tests never wait on real timers. */
   sleep?: (ms: number) => Promise<void>;
 };
 
 const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_RETRY_BASE_DELAY_MS = 500;
+/**
+ * An implementation default, not a measured or owner-decided figure (AFLDB-ISSUE-301 left the
+ * value open): the feeds are small JSON documents, so a healthy attempt finishes in seconds, and
+ * three attempts at this budget plus backoff stay well inside the nightly unit's window.
+ */
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 /**
- * Issues `plan`, retrying on a network failure or non-2xx response with
- * exponential backoff, up to `attempts` total tries. A 401/403 is NOT
+ * Runs one attempt under a deadline. The `AbortSignal` is handed to the transport so a real
+ * `fetch` stops reading, and the race rejects at the deadline regardless, so a transport that
+ * ignores the signal cannot hang the run either.
+ */
+async function attemptWithDeadline<T>(
+  plan: AflApiRequestPlan, timeoutMs: number, attempt: number,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const error = new AflApiRequestError(
+        `${plan.method} ${plan.url} timed out after ${timeoutMs} ms`, plan.url, null, attempt,
+      );
+      controller.abort(error);
+      reject(error);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([run(controller.signal), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Issues `plan`, retrying on a network failure, a timeout, a failed body read or a non-2xx
+ * response with exponential backoff, up to `attempts` total tries. A 401/403 is NOT
  * retried here — it means the token, not the transport, is the problem, so
  * it is thrown immediately for the caller's reissue-once policy
  * (`fetchAflApiCfsResource`) to decide what happens next; retrying the same
  * rejected token would only burn the attempt budget for nothing.
+ *
+ * Each attempt, including reading the body, is bounded by `timeoutMs` (AFLDB-ISSUE-301): an
+ * upstream that accepts the connection and then stalls costs one attempt, not the run.
  */
 export async function requestAflApi(
   fetchImpl: FetchLike, plan: AflApiRequestPlan, opts: RetryOptions = {},
@@ -249,24 +290,34 @@ export async function requestAflApi(
   const attempts = opts.attempts ?? DEFAULT_RETRY_ATTEMPTS;
   const baseDelayMs = opts.baseDelayMs ?? DEFAULT_RETRY_BASE_DELAY_MS;
   const sleep = opts.sleep ?? defaultSleep;
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new RangeError(`timeoutMs must be a positive finite number of milliseconds, got ${String(timeoutMs)}.`);
+  }
 
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     let response: Response;
+    let bodyText: string | null;
     try {
-      response = await fetchImpl(plan.url, { method: plan.method, headers: plan.headers });
-    } catch (networkError) {
-      lastError = networkError;
+      // The body of a 2xx response is read inside the same attempt and the same deadline, so a
+      // stream that fails or stalls part-way is retried like any other transport failure.
+      ({ response, bodyText } = await attemptWithDeadline(plan, timeoutMs, attempt, async (signal) => {
+        const received = await fetchImpl(plan.url, { method: plan.method, headers: plan.headers, signal });
+        return { response: received, bodyText: received.ok ? await received.text() : null };
+      }));
+    } catch (transportError) {
+      lastError = transportError;
       if (attempt < attempts) {
         await sleep(baseDelayMs * 2 ** (attempt - 1));
         continue;
       }
       break;
     }
-    if (response.ok) {
+    if (bodyText !== null) {
       return {
         status: response.status,
-        bodyText: await response.text(),
+        bodyText,
         etag: response.headers.get('etag'),
         cacheControl: response.headers.get('cache-control'),
         retrievedAt: new Date().toISOString(),

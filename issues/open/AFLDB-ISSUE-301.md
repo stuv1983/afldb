@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). Implemented and validated DB-free 2026-10-15 (§17); not deployed.
 - **Severity:** Low. **Area:** acquisition / network resilience.
 - **Key file:** `src/lib/acquisition/afl-api-client.ts` (`requestAflApi`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-036; partition note R4b-F06).
@@ -72,4 +72,28 @@ DB-free: a stub fetch that never resolves makes `requestAflApi` reject within th
 
 ## 16. Next action
 
-Implementation.
+~~Implementation.~~ Superseded by §17.
+
+## 17. Implementation and validation (2026-10-15)
+
+### 17.1 Change
+
+- `src/lib/acquisition/afl-api-client.ts` (`requestAflApi`): each attempt is now one unit under a deadline. A new private `attemptWithDeadline` creates an `AbortController`, passes its signal to the injected `fetch`, reads the body of a 2xx response inside the same unit, and races the unit against a timer. At the deadline it aborts the signal and rejects with an `AflApiRequestError` (`timed out after N ms`, status `null`), so a transport that ignores the signal cannot hang the run either. A timeout, a failed body read and a network failure all go through the existing retry and backoff; a 401/403 is still thrown immediately for the reissue-once policy.
+- `RetryOptions.timeoutMs` (optional) carries the per-attempt budget; a value that is not a positive finite number is refused with a `RangeError` before any request.
+- **The budget (§15's open value).** The runbook allows either an operator or an implementation choice. This change takes an **implementation default of 60 000 ms per attempt**, recorded here as such: it is not a measured figure and not an owner decision. The feeds are small JSON documents, so a healthy attempt takes seconds, and three attempts at 60 s plus backoff (about 3 minutes worst case per request) stay far inside the nightly unit's 3 600 s and are the same order as the Brownlow unit's 180 s. Any caller can pass another value; no environment variable was added.
+- No change to the callers (the CLIs pass the global `fetch`), the retry count or the backoff.
+
+### 17.2 Tests
+
+`tests/afl-api-match.test.ts` (DB-free; the existing `requestAflApi` block), five cases with fake timers and stub transports, none of which touches a network: a transport that never answers and ignores the signal is abandoned at the budget with its signal aborted and the next attempt given a fresh one, and the call rejects after the last attempt with the timeout error and the attempt count; a 200 whose body never arrives is abandoned and retried and a later attempt can succeed (the body is inside the retry and the deadline); a body read that throws is retried with the normal backoff instead of escaping as a bare `TypeError`; every attempt receives a signal and the default budget is 60 s (59 999 ms is still pending, 60 000 ms rejects); a non-positive or non-finite `timeoutMs` is refused with no request made.
+
+### 17.3 Results
+
+- **Fixed code.** `tests/afl-api-match.test.ts`: **220 passed** (5 new). With `afl-api-ingestion-safety`, `afl-api-brownlow-acquire`, `afl-api-brownlow` and `afl-api-rounds`: **449 passed** in 5 files. No database was used.
+- **Unfixed source** (`git checkout HEAD -- src/`, the fixed file copied back and sha-256 verified): all 5 new cases fail (run with a 2 s test timeout, because the unfixed client hangs on the stalled transport, which is the defect).
+- **Mutants** (`D:\tmp\issue301\mutate.mjs`, one at a time, original bytes restored and hash-verified after each): no signal passed (W1), the deadline never rejecting (W2), the signal never aborted (W3), the body read outside the deadline (W4), the default budget 30 s (W5), no validation (W6), and a timeout not retried (W7). **All 7 killed.**
+- **Static.** `tsc --noEmit` exit 0; `git diff --check` exit 0; ESLint of the two changed files exits 1 on this branch and on unchanged `main` with an identical problem set (compared by rule and message): none introduced.
+
+### 17.4 Limits
+
+- Not deployed; no network, DEV or PROD action. The behaviour against the real upstream is not exercised: the transports are stubs. The §5 observation that a SIGTERM skips the acquire CLI's cleanup is not changed; the point of the timeout is that a stalled request now fails the run visibly, with `finally` running, long before systemd's limit. The 60 s default is an implementation choice that an owner may change.

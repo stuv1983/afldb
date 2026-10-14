@@ -33,7 +33,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; fix implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-292.md` §17 | Run the read-only DEV/PROD two-path census (needs DEV/PROD contact); then close |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
-| AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-301.md` | Implementation; timeout value open |
+| AFLDB-ISSUE-301 | AFL API HTTP client has no request timeout and reads the body outside its retry | Low | Acquisition / network resilience — `src/lib/acquisition/afl-api-client.ts` | Open (2026-10-08); review F-036, code-proven; imported 2026-10-10; implemented and validated DB-free 2026-10-15 (60 s per-attempt default is an implementation choice), not deployed; runbook `issues/open/AFLDB-ISSUE-301.md` §17 | Merge, then close (merge-scoped) |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
 | AFLDB-ISSUE-304 | Email intake parses the whole body before sender and size checks | Low | Legacy CSV intake / email ingress resource bounds | Open (2026-10-08); review F-039, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-304.md` | Implementation, after ISSUE-266 |
 | AFLDB-ISSUE-307 | Legacy promotion counts every promoted row as inserted | Low | Legacy CSV intake / import batch accounting — `src/lib/ingest/pipeline.ts` | Open (2026-10-08); review F-042, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-307.md` | Implementation (low priority) |
@@ -51084,7 +51084,15 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / network resilience. Key file:
   `src/lib/acquisition/afl-api-client.ts` (`requestAflApi`). **Runbook:** `issues/open/AFLDB-ISSUE-301.md`.
 - **Origin.** Review F-036 (R4b-F06) at `20a7a4bb`. Code-proven.
-- **Open choice.** The timeout value (operator or implementation). **Next action.** Implementation.
+- ~~**Open choice.** The timeout value (operator or implementation). **Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-15; branch `sonnet/issue-301`, base `1d2ec9fb`; not deployed).** `requestAflApi` runs each attempt, body read
+  included, under a deadline (`AbortSignal` handed to `fetch` plus a race, so a transport that ignores the signal cannot hang the run); a
+  timeout or a failed body read is retried like a network failure. **Timeout value: an implementation default of 60 s per attempt, taken
+  here under the runbook's "operator or implementation choice"; not a measured figure and not an owner decision** (overridable via
+  `RetryOptions.timeoutMs`). Runbook §17.
+- **Validation (DB-free, 15 Oct 2026; runbook §17.3).** Five fake-timer cases with stub transports (a transport that never answers, a stalled
+  body, a failing body read, the default budget, invalid values) fail on the unfixed source and pass fixed; 449 neighbouring DB-free cases
+  pass; 7 of 7 mutants are killed. `tsc --noEmit` and `git diff --check` exit 0; ESLint reports the same problem set as unchanged `main`.
 
 ## AFLDB-ISSUE-302 — Lineup bundle records the pinned fitzRoy version as provenance whatever version ran
 

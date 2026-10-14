@@ -14,7 +14,7 @@
  * `tests/afl-api-rounds.test.ts`) and are deliberately out of scope here.
  */
 import {
-  afterEach, describe, expect, it,
+  afterEach, describe, expect, it, vi,
 } from 'vitest';
 
 import type postgres from 'postgres';
@@ -361,6 +361,103 @@ describe('afl-api-client (AFLDB-ISSUE-228 §7.1)', () => {
       expect(error).toBeInstanceOf(AflApiRequestError);
       expect((error as AflApiRequestError).status).toBe(401);
       expect(calls).toHaveLength(1);
+    });
+
+    describe('per-attempt timeout and the body read (AFLDB-ISSUE-301)', () => {
+      afterEach(() => { vi.useRealTimers(); });
+
+      /** A transport that accepts the call and never answers, and ignores the signal it is given. */
+      const neverAnswers = (signals: AbortSignal[]): FetchLike => (async (_url: string | URL, init?: RequestInit) => {
+        if (init?.signal) signals.push(init.signal);
+        return new Promise<Response>(() => {});
+      }) as FetchLike;
+
+      /** A 200 whose body never arrives. */
+      const stalledBody = (): Response => ({
+        ok: true, status: 200, headers: new Headers(), text: () => new Promise<string>(() => {}),
+      } as unknown as Response);
+
+      it('abandons an attempt that never answers, aborts its signal, and rejects within the budget', async () => {
+        vi.useFakeTimers();
+        const signals: AbortSignal[] = [];
+        const settled = requestAflApi(neverAnswers(signals), plan, {
+          attempts: 2, timeoutMs: 1000, sleep: noSleep,
+        }).then(() => null, (error: unknown) => error);
+
+        await vi.advanceTimersByTimeAsync(1000); // first attempt abandoned, second begins
+        expect(signals).toHaveLength(2);
+        expect(signals[0].aborted).toBe(true);
+        expect(signals[1].aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(1000); // second attempt abandoned, none left
+
+        const error = await settled;
+        expect(error).toBeInstanceOf(AflApiRequestError);
+        expect((error as AflApiRequestError).message).toContain('timed out after 1000 ms');
+        expect((error as AflApiRequestError).attempts).toBe(2);
+        expect(signals[1].aborted).toBe(true);
+      });
+
+      it('bounds the body read too: a 200 whose body stalls is retried, and a later attempt can succeed', async () => {
+        vi.useFakeTimers();
+        let n = 0;
+        const { fetchImpl, calls } = stubFetch([
+          { test: () => true, respond: () => { n += 1; return n < 3 ? stalledBody() : jsonResponse({ ok: true }); } },
+        ]);
+        const settled = requestAflApi(fetchImpl, plan, { timeoutMs: 500, sleep: noSleep });
+
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(500);
+        const response = await settled;
+        expect(JSON.parse(response.bodyText)).toEqual({ ok: true });
+        expect(calls).toHaveLength(3);
+      });
+
+      it('retries a body read that fails part-way, with the normal backoff, instead of throwing a bare TypeError', async () => {
+        let n = 0;
+        const sleeps: number[] = [];
+        const { fetchImpl, calls } = stubFetch([
+          {
+            test: () => true,
+            respond: () => {
+              n += 1;
+              if (n === 1) {
+                return {
+                  ok: true, status: 200, headers: new Headers(),
+                  text: async () => { throw new TypeError('terminated'); },
+                } as unknown as Response;
+              }
+              return jsonResponse({ ok: true });
+            },
+          },
+        ]);
+        const response = await requestAflApi(fetchImpl, plan, { sleep: async (ms) => { sleeps.push(ms); } });
+        expect(response.status).toBe(200);
+        expect(calls).toHaveLength(2);
+        expect(sleeps).toEqual([500]);
+      });
+
+      it('gives every attempt a signal, and the default budget is sixty seconds', async () => {
+        vi.useFakeTimers();
+        const signals: AbortSignal[] = [];
+        let finished = false;
+        const settled = requestAflApi(neverAnswers(signals), plan, { attempts: 1, sleep: noSleep })
+          .then(() => null, (error: unknown) => error)
+          .finally(() => { finished = true; });
+        expect(signals).toHaveLength(1);
+
+        await vi.advanceTimersByTimeAsync(59_999);
+        expect(finished).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(((await settled) as AflApiRequestError).message).toContain('timed out after 60000 ms');
+      });
+
+      it('refuses a timeout that is not a positive finite number', async () => {
+        const { fetchImpl, calls } = stubFetch([{ test: () => true, respond: () => jsonResponse({}) }]);
+        for (const timeoutMs of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+          await expect(requestAflApi(fetchImpl, plan, { timeoutMs, sleep: noSleep })).rejects.toBeInstanceOf(RangeError);
+        }
+        expect(calls).toHaveLength(0);
+      });
     });
   });
 
