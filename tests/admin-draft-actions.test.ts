@@ -14,8 +14,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SourceFieldsPanel } from '@/app/admin/draft/SourceFieldsPanel';
 import { isAllowedRevalidatePath } from '@/app/admin/draft/revalidate-paths';
 import {
   optionalText,
@@ -23,12 +26,26 @@ import {
   parseNullablePickNumber,
   parsePositiveInt,
   requiredText,
+  sourceFieldsConfirmed,
 } from '@/app/admin/draft/validation';
 
-const mocks = vi.hoisted(() => ({ postgres: vi.fn(), sql: vi.fn(), authSql: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  postgres: vi.fn(),
+  sql: vi.fn(),
+  authSql: vi.fn(),
+  // What the mocked draft submit hook reports as the action's last answer (ISSUE-287 render cases).
+  panelState: {} as Record<string, unknown>,
+}));
 vi.mock('postgres', () => ({ default: mocks.postgres }));
 vi.mock('@/db/client', () => ({ sql: mocks.sql }));
 vi.mock('@/db/authClient', () => ({ authSql: mocks.authSql }));
+vi.mock('@/app/admin/draft/actions', () => ({
+  saveSourcePickFieldsAction: vi.fn(),
+  retireSourcePickOverrideAction: vi.fn(),
+}));
+vi.mock('@/app/admin/draft/submit-helper', () => ({
+  useDraftActionSubmit: () => ({ state: mocks.panelState, isPending: false, submit: vi.fn() }),
+}));
 
 import {
   AFLTABLES_PROFILE_PATH_RE,
@@ -574,5 +591,65 @@ describe('the J-18 revision read (§18)', () => {
     mocks.authSql.mockResolvedValue([]);
     await expect(readDraftPickRevision(17, null)).resolves.toBe('0');
     expect(mocks.sql).not.toHaveBeenCalled();
+  });
+});
+
+describe('AFLDB-ISSUE-287 -- source-owned selection J-5 confirmation is reachable', () => {
+  const render = (state: Record<string, unknown>) => {
+    mocks.panelState = state;
+    return renderToStaticMarkup(createElement(SourceFieldsPanel, {
+      pickId: 17,
+      clubs: [{ slug: 'carlton', name: 'Carlton' }],
+      values: {
+        playerNameRaw: 'Sam Example', originalClubRaw: null, draftAge: null, heightCm: null,
+        weightKg: null, pickNote: 'Father-son, no board position recorded', detail: null,
+        pickNumber: null, clubSlug: 'carlton',
+      },
+      activeGroups: new Set<string>(),
+      expectedRevision: '0',
+    }));
+  };
+  const SAVE = 'Save pick number and club';
+  const CONFIRM_LABEL = 'Confirm this selection has no pick number.';
+  const saveDisabled = (markup: string) => new RegExp(`<button[^>]*disabled=""[^>]*>${SAVE}<`).test(markup);
+
+  it('offers a confirmation control, and holds the save back until it is ticked, once the action asks', () => {
+    const markup = render({
+      needsConfirmation: true,
+      confirm: 'null_pick_number',
+      error: 'Every national selection carries a pick number. Confirm that this one genuinely has none.',
+    });
+    expect(markup).toContain('Confirm that this one genuinely has none.');
+    expect(markup).toContain(CONFIRM_LABEL);
+    expect(markup).toMatch(/<input type="checkbox"/);
+    expect(saveDisabled(markup)).toBe(true);
+  });
+
+  it('shows no confirmation control for an ordinary refusal or before the action has answered', () => {
+    for (const state of [{}, { error: 'Pick 5 of the 2024 national draft is already held.' }]) {
+      const markup = render(state);
+      expect(markup, JSON.stringify(state)).not.toContain(CONFIRM_LABEL);
+      expect(markup).not.toMatch(/<input type="checkbox"/);
+      expect(saveDisabled(markup)).toBe(false);
+    }
+  });
+
+  it('sends confirmed only for the pick-number group, after the action asked, and only when ticked', () => {
+    expect(sourceFieldsConfirmed('selection_facts', true, true)).toBe(true);
+    expect(sourceFieldsConfirmed('selection_facts', true, false)).toBe(false);
+    // A tick left over from an earlier answer cannot confirm a later, unasked save.
+    expect(sourceFieldsConfirmed('selection_facts', false, true)).toBe(false);
+    expect(sourceFieldsConfirmed('selection_facts', undefined, true)).toBe(false);
+    // The other groups never ask, so they never confirm.
+    for (const group of ['player_info', 'measurements', 'notes']) {
+      expect(sourceFieldsConfirmed(group, true, true), group).toBe(false);
+    }
+  });
+
+  it('wires the helper into the submit and clears the tick after each pick-number save (source contract)', () => {
+    const source = readFileSync(join(process.cwd(), 'src/app/admin/draft/SourceFieldsPanel.tsx'), 'utf8');
+    expect(source).toContain("sourceFieldsConfirmed(groupKey, selectionFacts.state.needsConfirmation, confirmed)");
+    expect(source).toContain("formData.set('confirmed', '1')");
+    expect(source).toContain("if (groupKey === 'selection_facts') setConfirmed(false)");
   });
 });

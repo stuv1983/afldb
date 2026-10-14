@@ -32,6 +32,21 @@ export function optionalText(value: FormDataEntryValue | null, maxLength: number
   return s.slice(0, maxLength);
 }
 
+/**
+ * Whether a source-field save may carry `confirmed=1` (AFLDB-ISSUE-287). Only the
+ * `selection_facts` group can ask for the J-5 `null_pick_number` confirmation, and
+ * only while the action's last answer is that request AND the admin has ticked the
+ * box beside it -- so a tick left over from an earlier answer never rides on a later
+ * save.
+ */
+export function sourceFieldsConfirmed(
+  groupKey: string,
+  lastAnswerNeedsConfirmation: boolean | undefined,
+  ticked: boolean,
+): boolean {
+  return groupKey === 'selection_facts' && lastAnswerNeedsConfirmation === true && ticked;
+}
+
 export function requiredText(value: FormDataEntryValue | null, maxLength: number): string | null {
   const s = (value ?? '').toString().trim();
   if (s === '') return null;

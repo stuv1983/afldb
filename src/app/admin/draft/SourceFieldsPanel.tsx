@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { retireSourcePickOverrideAction, saveSourcePickFieldsAction } from '@/app/admin/draft/actions';
 import { useDraftActionSubmit } from '@/app/admin/draft/submit-helper';
+import { sourceFieldsConfirmed } from '@/app/admin/draft/validation';
 
 type Values = {
   playerNameRaw: string;
@@ -48,6 +49,9 @@ export function SourceFieldsPanel({
   const notesRef = useRef<HTMLFormElement>(null);
   const selectionFactsRef = useRef<HTMLFormElement>(null);
 
+  // J-5 `null_pick_number` (AFLDB-ISSUE-287): the box appears only after the action asks.
+  const [confirmed, setConfirmed] = useState(false);
+
   const isPending = playerInfo.isPending || measurements.isPending || notes.isPending
     || selectionFacts.isPending || retire.isPending;
 
@@ -62,6 +66,11 @@ export function SourceFieldsPanel({
     formData.set('pickId', String(pickId));
     formData.set('groupKey', groupKey);
     formData.set('expectedRevision', expectedRevision);
+    if (sourceFieldsConfirmed(groupKey, selectionFacts.state.needsConfirmation, confirmed)) {
+      formData.set('confirmed', '1');
+    }
+    // A tick answers one request only; the next one must be asked and ticked afresh.
+    if (groupKey === 'selection_facts') setConfirmed(false);
     group.submit(formData, event.currentTarget);
   };
 
@@ -191,7 +200,12 @@ export function SourceFieldsPanel({
           </select>
         </label>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-          <button type="button" className="btn btn-primary" disabled={isPending} onClick={(e) => submitGroup(selectionFacts, selectionFactsRef, 'selection_facts', e)}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={isPending || (selectionFacts.state.needsConfirmation === true && !confirmed)}
+            onClick={(e) => submitGroup(selectionFacts, selectionFactsRef, 'selection_facts', e)}
+          >
             {selectionFacts.isPending ? 'Saving…' : 'Save pick number and club'}
           </button>
           {activeGroups.has('selection_facts') && (
@@ -203,6 +217,10 @@ export function SourceFieldsPanel({
         {selectionFacts.state.needsConfirmation && (
           <div className="notice" role="alert">
             <p style={{ margin: '0 0 0.4rem' }}>{selectionFacts.state.error}</p>
+            <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.85rem' }}>
+              <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+              Confirm this selection has no pick number.
+            </label>
           </div>
         )}
         {!selectionFacts.state.needsConfirmation && selectionFacts.state.error && (
