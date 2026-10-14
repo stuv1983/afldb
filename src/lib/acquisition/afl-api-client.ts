@@ -136,6 +136,22 @@ export function planAflApiCompSeasonsRequest(
   return { url: url.toString(), method: 'GET', headers: { ...ACCEPT_JSON, 'User-Agent': userAgent(env) } };
 }
 
+/**
+ * AFLDB-ISSUE-297: provider ids from the upstream feed are interpolated into CFS
+ * URL paths (which carry the media token) and joined into snapshot directory
+ * names, so they are untrusted. The measured shapes are `CD_M<digits>` (match)
+ * and `CD_S<digits>` (season).
+ */
+export const AFL_API_MATCH_PROVIDER_ID_PATTERN = /^CD_M\d+$/;
+export const AFL_API_SEASON_PROVIDER_ID_PATTERN = /^CD_S\d+$/;
+
+function assertProviderId(value: string, name: string, pattern: RegExp): void {
+  if (!value) throw new Error(`${name} is required.`);
+  if (!pattern.test(value)) {
+    throw new Error(`${name} ${JSON.stringify(value.slice(0, 64))} does not match ${pattern}.`);
+  }
+}
+
 function cfsMediaRequest(
   bases: AflApiEndpointBases, path: string, token: string, env: EnvLike,
 ): AflApiRequestPlan {
@@ -150,7 +166,7 @@ function cfsMediaRequest(
 export function planAflApiPlayerStatsRequest(
   bases: AflApiEndpointBases, matchProviderId: string, token: string, env: EnvLike = process.env,
 ): AflApiRequestPlan {
-  if (!matchProviderId) throw new Error('matchProviderId is required.');
+  assertProviderId(matchProviderId, 'matchProviderId', AFL_API_MATCH_PROVIDER_ID_PATTERN);
   return cfsMediaRequest(bases, `/afl/playerStats/match/${matchProviderId}`, token, env);
 }
 
@@ -158,7 +174,7 @@ export function planAflApiPlayerStatsRequest(
 export function planAflApiMatchRosterRequest(
   bases: AflApiEndpointBases, matchProviderId: string, token: string, env: EnvLike = process.env,
 ): AflApiRequestPlan {
-  if (!matchProviderId) throw new Error('matchProviderId is required.');
+  assertProviderId(matchProviderId, 'matchProviderId', AFL_API_MATCH_PROVIDER_ID_PATTERN);
   return cfsMediaRequest(bases, `/afl/matchRoster/full/${matchProviderId}`, token, env);
 }
 
@@ -166,7 +182,7 @@ export function planAflApiMatchRosterRequest(
 export function planAflApiBrownlowSeasonRequest(
   bases: AflApiEndpointBases, seasonProviderId: string, token: string, env: EnvLike = process.env,
 ): AflApiRequestPlan {
-  if (!seasonProviderId) throw new Error('seasonProviderId is required.');
+  assertProviderId(seasonProviderId, 'seasonProviderId', AFL_API_SEASON_PROVIDER_ID_PATTERN);
   return cfsMediaRequest(bases, `/afl/bfawards/season/${seasonProviderId}`, token, env);
 }
 
@@ -174,7 +190,7 @@ export function planAflApiBrownlowSeasonRequest(
 export function planAflApiBrownlowLeaderboardRequest(
   bases: AflApiEndpointBases, seasonProviderId: string, token: string, env: EnvLike = process.env,
 ): AflApiRequestPlan {
-  if (!seasonProviderId) throw new Error('seasonProviderId is required.');
+  assertProviderId(seasonProviderId, 'seasonProviderId', AFL_API_SEASON_PROVIDER_ID_PATTERN);
   return cfsMediaRequest(bases, `/afl/bfawards/leaderboard/season/${seasonProviderId}`, token, env);
 }
 
@@ -371,6 +387,12 @@ export function parseAflApiSeasonMatchesEnvelope(bodyText: string): AflApiSeason
     const providerId = record?.providerId;
     if (typeof providerId !== 'string' || providerId.length === 0) {
       throw new Error(`Season matches response entry ${index} carried no string providerId.`);
+    }
+    if (!AFL_API_MATCH_PROVIDER_ID_PATTERN.test(providerId)) {
+      throw new Error(
+        `Season matches response entry ${index} carried a providerId ${JSON.stringify(providerId.slice(0, 64))} `
+        + `that does not match ${AFL_API_MATCH_PROVIDER_ID_PATTERN}.`,
+      );
     }
     const status = record?.status;
     if (typeof status !== 'string' || status.length === 0) {

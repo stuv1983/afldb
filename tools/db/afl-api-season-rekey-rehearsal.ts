@@ -22,7 +22,7 @@
  * disposable rehearsal database.
  *
  * FIXTURES. The tracked 2026 unit (`tests/fixtures/afl_api/match/01-…03-…`) renamed onto
- * `CD_M2026231R*` provider ids and moved onto June 2026 dates (AEST, UTC+10, so the §11.1
+ * `CD_M20262319*` provider ids (digits only: AFLDB-ISSUE-297 refuses any other `CD_M` shape at parse time) and moved onto June 2026 dates (AEST, UTC+10, so the §11.1
  * local-time cross-check still proves the date), in the home-and-away rounds api Rd 1/Rd 2. Every
  * season feed is the retained 2026 feed (`tests/fixtures/afl_api/seasons/00-season-matches-2026.raw.json`,
  * a sanitised derivative of the captured response 9c358984…75ee, sha256 4f8235e0…babb) with the
@@ -100,21 +100,21 @@ export const REKEY_REHEARSAL = {
   season: 2026,
   scopeKey: 'season=2026',
   compSeasonProviderId: 'CD_S2026014',
-  providerPrefix: 'CD_M2026231R',
-  providerLike: 'CD_M2026231R%',
+  providerPrefix: 'CD_M20262319',
+  providerLike: 'CD_M20262319%',
   labelPrefix: 'issue231-rekey-rehearsal',
 } as const;
 
 /** Provider ids, dates and api round numbers per role. Two ids never share a (round, date). */
 export const REKEY_CASES = {
   // S1/S2/S4–S10: OLD at (Rd 1, 06-02); NEW one date step later at (Rd 1, 06-03).
-  old: { providerId: `${REKEY_REHEARSAL.providerPrefix}OLD`, date: '2026-06-02', apiRound: 1 },
-  new: { providerId: `${REKEY_REHEARSAL.providerPrefix}NEW`, date: '2026-06-03', apiRound: 1 },
+  old: { providerId: `${REKEY_REHEARSAL.providerPrefix}01`, date: '2026-06-02', apiRound: 1 },
+  new: { providerId: `${REKEY_REHEARSAL.providerPrefix}02`, date: '2026-06-03', apiRound: 1 },
   // S3: NEW differs from A by date only and from B by round only; A and B differ in both, so the
   // real writer's own F030 guard lets the second seed through.
-  ambiguousA: { providerId: `${REKEY_REHEARSAL.providerPrefix}AMA`, date: '2026-06-09', apiRound: 1 },
-  ambiguousB: { providerId: `${REKEY_REHEARSAL.providerPrefix}AMB`, date: '2026-06-10', apiRound: 2 },
-  ambiguousNew: { providerId: `${REKEY_REHEARSAL.providerPrefix}AMN`, date: '2026-06-10', apiRound: 1 },
+  ambiguousA: { providerId: `${REKEY_REHEARSAL.providerPrefix}03`, date: '2026-06-09', apiRound: 1 },
+  ambiguousB: { providerId: `${REKEY_REHEARSAL.providerPrefix}04`, date: '2026-06-10', apiRound: 2 },
+  ambiguousNew: { providerId: `${REKEY_REHEARSAL.providerPrefix}05`, date: '2026-06-10', apiRound: 1 },
 } as const;
 
 export type RekeyCase = (typeof REKEY_CASES)[keyof typeof REKEY_CASES];
@@ -704,7 +704,7 @@ async function run(): Promise<number> {
         const outcome = await acknowledge(outer, { providerId: OLD, findingId: finding.id, feedText: listingText, apply, label: 's8' });
         const after = await findingsOf(outer, absenceKey(OLD));
         check(`S8 ${apply ? 'apply' : 'validate-only'}: a complete feed listing the id again is refused, no write`,
-          outcome instanceof AflApiMatchAbsenceAckRefused && /lists 'CD_M2026231ROLD' again/.test(outcome.message)
+          outcome instanceof AflApiMatchAbsenceAckRefused && /lists 'CD_M2026231901' again/.test(outcome.message)
             && after.length === 1 && after[0].open && (await absentSinceOf(outer, OLD))?.absentSince === null,
           outcome instanceof Error ? outcome.message : 'not refused');
       }

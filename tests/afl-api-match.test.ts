@@ -32,6 +32,8 @@ import {
   fetchAflApiToken,
   type FetchLike,
   parseAflApiSeasonMatchesEnvelope,
+  planAflApiBrownlowLeaderboardRequest,
+  planAflApiBrownlowSeasonRequest,
   planAflApiCompSeasonsRequest,
   planAflApiMatchRosterRequest,
   planAflApiPlayerStatsRequest,
@@ -221,6 +223,24 @@ describe('afl-api-client (AFLDB-ISSUE-228 §7.1)', () => {
       expect(() => planAflApiMatchRosterRequest(bases, '', 'tok', {})).toThrow(/matchProviderId/);
     });
 
+    it('AFLDB-ISSUE-297: refuses a per-match providerId that is not CD_M<digits>, so no token-bearing request is planned', () => {
+      for (const bad of ['../../escape', '../escape', 'CD_M1/../x', 'CD_M1?x=1', 'CD_M1#x', 'CD_M1\n', 'CD_M', 'cd_m1', 'CD_S2026014', ' CD_M1']) {
+        expect(() => planAflApiPlayerStatsRequest(bases, bad, 'tok', {}), bad).toThrow(/matchProviderId/);
+        expect(() => planAflApiMatchRosterRequest(bases, bad, 'tok', {}), bad).toThrow(/matchProviderId/);
+      }
+    });
+
+    it('AFLDB-ISSUE-297: refuses a Brownlow season providerId that is not CD_S<digits>', () => {
+      expect(planAflApiBrownlowSeasonRequest(bases, 'CD_S2026014', 'tok', {}).url)
+        .toBe('https://api.afl.com.au/cfs/afl/bfawards/season/CD_S2026014');
+      expect(planAflApiBrownlowLeaderboardRequest(bases, 'CD_S2026014', 'tok', {}).url)
+        .toBe('https://api.afl.com.au/cfs/afl/bfawards/leaderboard/season/CD_S2026014');
+      for (const bad of ['', '../../escape', 'CD_S1/..', 'CD_M20260142801', 'CD_S']) {
+        expect(() => planAflApiBrownlowSeasonRequest(bases, bad, 'tok', {}), bad).toThrow(/seasonProviderId/);
+        expect(() => planAflApiBrownlowLeaderboardRequest(bases, bad, 'tok', {}), bad).toThrow(/seasonProviderId/);
+      }
+    });
+
     it('a redirected CFS base changes the CFS-family plans but leaves the season-matches plan alone', () => {
       const simulator = resolveAflApiEndpointBases({ AFLDB_AFL_API_CFS_BASE_URL: 'http://127.0.0.1:22880' });
       expect(planAflApiTokenRequest(simulator, {}).url).toBe('http://127.0.0.1:22880/afl/WMCTok');
@@ -256,6 +276,20 @@ describe('afl-api-client (AFLDB-ISSUE-228 §7.1)', () => {
     it('throws when an entry carries no providerId', () => {
       expect(() => parseAflApiSeasonMatchesEnvelope(JSON.stringify({ matches: [{ status: 'CONCLUDED' }] })))
         .toThrow(/providerId/);
+    });
+
+    it('AFLDB-ISSUE-297: throws when an entry carries a providerId that is not CD_M<digits>', () => {
+      const body = (providerId: string) => JSON.stringify({ matches: [{ providerId, status: 'CONCLUDED' }] });
+      expect(() => parseAflApiSeasonMatchesEnvelope(body('../escape'))).toThrow(/providerId/);
+      expect(() => parseAflApiSeasonMatchesEnvelope(body('../../escape'))).toThrow(/does not match/);
+      expect(() => parseAflApiSeasonMatchesEnvelope(body('CD_M1/x'))).toThrow(/does not match/);
+      expect(() => parseAflApiSeasonMatchesEnvelope(body('CD_M1\n'))).toThrow(/does not match/);
+      expect(() => parseAflApiSeasonMatchesEnvelope(body('CD_T10'))).toThrow(/does not match/);
+      // The refusal names the entry index, and one bad entry refuses the whole envelope.
+      expect(() => parseAflApiSeasonMatchesEnvelope(JSON.stringify({
+        matches: [{ providerId: 'CD_M1', status: 'CONCLUDED' }, { providerId: '..', status: 'CONCLUDED' }],
+      }))).toThrow(/entry 1/);
+      expect(parseAflApiSeasonMatchesEnvelope(body('CD_M20260142801'))[0].providerId).toBe('CD_M20260142801');
     });
 
     it('defaults selection to status CONCLUDED', () => {
@@ -527,6 +561,36 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
       )).rejects.toThrow(/current-season ingestion is disabled/);
 
       expect(calls).toHaveLength(0);
+    });
+
+    it('AFLDB-ISSUE-297: a traversal providerId in the season feed refuses before any file or CFS request, leaving only the claimed directory', async () => {
+      const projectRoot = makeProjectRoot();
+      const hostile = {
+        matches: [
+          { providerId: 'CD_M1', status: 'CONCLUDED', utcStartTime: '2026-03-05T04:40:00Z' },
+          { providerId: '../../escape', status: 'CONCLUDED', utcStartTime: '2026-03-06T04:40:00Z' },
+        ],
+      };
+      const { fetchImpl, calls } = stubFetch([
+        { test: (u: string) => u.endsWith('/afl/WMCTok'), respond: () => jsonResponse({ token: 'tok-1' }) },
+        { test: (u: string) => u.includes('/afl/v2/matches'), respond: () => jsonResponse(hostile) },
+      ]);
+      const now = new Date('2026-09-19T14:30:00Z');
+      const matchesRoot = join(projectRoot, 'data', 'sources', 'afl_api', 'matches');
+      const snapshotDir = join(matchesRoot, buildAflApiLabel(2026, now));
+
+      await expect(runAcquisition(
+        { season: 2026, status: null, since: null, match: [] },
+        { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
+      )).rejects.toThrow(/entry 1.*does not match/);
+
+      // Only the token and the public season feed were requested: no CFS per-match request carried the token anywhere.
+      expect(calls.map((c) => c.url).some((u) => u.includes('/playerStats/') || u.includes('/matchRoster/'))).toBe(false);
+      // Nothing was written, inside or outside the claimed snapshot directory, and no manifest exists.
+      expect(existsSync(join(snapshotDir, 'manifest.json'))).toBe(false);
+      expect(existsSync(join(snapshotDir, 'CD_M1'))).toBe(false);
+      expect(existsSync(join(matchesRoot, 'escape'))).toBe(false);
+      expect(existsSync(join(projectRoot, 'data', 'sources', 'escape'))).toBe(false);
     });
 
     it('an explicit --match selects regardless of status', async () => {
@@ -2403,7 +2467,7 @@ describe('AFL API season enumeration (AFLDB-ISSUE-231)', () => {
     });
 
     it('refuses a snapshot whose acquired match is missing from its own feed', () => {
-      const seasonFeed = assessAflApiSeasonEnumeration(feed([entry('CD_M_OTHER', 'CONCLUDED')]), EXPECTED);
+      const seasonFeed = assessAflApiSeasonEnumeration(feed([entry('CD_M99', 'CONCLUDED')]), EXPECTED);
       expect(() => buildAflApiSettleBundle({ ...base, seasonFeed }))
         .toThrow(/CD_M20260142801' was acquired but is not listed/);
     });
@@ -2535,7 +2599,7 @@ describe('AFL API match absence, D-231-3 (AFLDB-ISSUE-231)', () => {
       expect(() => proveAflApiMatchAbsenceFeed({ ...base, seasonFeedText: listing, seasonFeedSha256: sha(listing) }))
         .toThrow(AflApiMatchAbsenceAckRefused);
       expect(() => proveAflApiMatchAbsenceFeed({ ...base, seasonFeedText: listing, seasonFeedSha256: sha(listing) }))
-        .toThrow(/lists 'CD_M2026231ROLD' again/);
+        .toThrow(/lists 'CD_M2026231901' again/);
     });
 
     it('refuses an incomplete feed, which proves nothing about absence', () => {
@@ -2622,7 +2686,7 @@ describe('AFL API match absence, D-231-3 (AFLDB-ISSUE-231)', () => {
         runAcknowledgeAflApiMatchAbsence(argv, { projectRoot, sql: untouchable(), log: () => {} });
 
       it('refuses, before any connection, a snapshot whose complete feed lists the id again', async () => {
-        await expect(run(snapshot(listing))).rejects.toThrow(/lists 'CD_M2026231ROLD' again/);
+        await expect(run(snapshot(listing))).rejects.toThrow(/lists 'CD_M2026231901' again/);
       });
 
       it('refuses a snapshot of another season, or one that retained no feed', async () => {
