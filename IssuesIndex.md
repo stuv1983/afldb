@@ -471,8 +471,9 @@
   wiring all killed by behavioural assertions), **merged and pushed to `main` as `848f13f1`, not deployed. Not resolved:** a first
   closure was withdrawn the same day because the runbook's §14 lists two validation items and never says the DB-free one alone
   suffices.
-- **Runbook:** `issues/open/AFLDB-ISSUE-285.md` (§14, §17, §17.1, §18). **Next action:** operator-run integration variant of the
-  `admin-awards` :670 case (replace onto an existing same-player row with `confirmDuplicate`) on `afldb_test`, then close.
+- **Runbook:** `issues/open/AFLDB-ISSUE-285.md` (§14, §17, §17.1, §18). **Next action:** merge, then close. The §14 item 2
+  integration variant (the `admin-awards` :670 case, replace onto an existing same-player row with `confirmDuplicate`) passed on
+  `afldb_test` on 2026-10-15 (`39f996c8`, runbook §19).
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;

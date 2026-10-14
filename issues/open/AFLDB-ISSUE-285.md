@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** **Open (2026-10-08).** Implemented as `70af9ae3` on `sonnet/issue-285` (base `ea792f43`), merged and pushed with its records as `848f13f1`; DB-free validated (§17.1, §17.2). **Not deployed. Not resolved:** §14 item 2 (the integration variant) is outstanding; a closure pushed as `5f440acf` was withdrawn (§18).
+- **Status:** **Open (2026-10-08).** Implemented as `70af9ae3` on `sonnet/issue-285` (base `ea792f43`), merged and pushed with its records as `848f13f1`; DB-free validated (§17.1, §17.2). **Not deployed. Not resolved at 848f13f1:** §14 item 2 (the integration variant) was outstanding and a closure pushed as `5f440acf` was withdrawn (§18). The integration variant was written and passed on `afldb_test` on 2026-10-15 (§19, `39f996c8`).
 - **Severity:** Low. **Area:** admin awards UI.
 - **Key files:** `src/app/admin/awards/ReplacePanel.tsx`, `src/app/admin/awards/actions.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-020; partition note R2a-F04).
@@ -66,7 +66,7 @@ Render a `confirmDuplicate` checkbox when `state.needsConfirmation` is true, and
 ## 14. Proposed validation
 
 1. A DB-free component render asserting the control appears.
-2. An integration variant of the `admin-awards` :670 case.
+2. An integration variant of the `admin-awards` :670 case. **Met 2026-10-15, §19.**
 
 ## 15. Decisions / unresolved questions
 
@@ -74,7 +74,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Done 2026-10-14 (§17); merged (§18). Next: the operator runs the §14 item 2 integration variant on `afldb_test`, then close.
+~~Implementation.~~ Done 2026-10-14 (§17); merged (§18). Integration variant: done 2026-10-15 (§19). Next: merge and close.
 
 ## 17. Implementation record (2026-10-14)
 
@@ -114,3 +114,12 @@ The component-level mutants (A2, B2, B3) survived behaviourally in the first 15 
 - **Merge 1.** `70af9ae3` (fix) and `848f13f1` (records) fast-forwarded onto `main` (`ea792f43..848f13f1`) and pushed.
 - **Closure withdrawn.** `5f440acf` closed the issue "under §14 item 1" and moved this runbook to `issues/closed/`. That over-read §14: it lists a DB-free render **and** an integration variant of the `admin-awards` :670 case and nowhere says the first suffices (the other closed review findings' §14 sections say so explicitly), and an unchanged query layer is not a reason to drop a listed criterion. The closure was reverted; the runbook is back in `issues/open/` and the issue is **Open**.
 - **Remaining.** §14 item 2 on `afldb_test`, run by the operator (it needs the database), then close. Not deployed. The panel's React state transitions are now covered by a DOM-free harness (§17.2); the painted page and a browser are not.
+
+## 19. Integration variant on `afldb_test` (2026-10-15)
+
+- **Test.** `39f996c8` on `sonnet/issue-285-integration` (base `cc38c669`): `tests/integration/admin-awards.test.ts`, one new case after the `replaces the wrong winner…` case, plus an optional `season` on the `seedSourceWinner` helper. The case builds its own fixture award with a wrong-season active row and an existing active row for the same player in the right season, then calls the real `replaceAwardWinner` twice. **Without `confirmDuplicate`:** refused with reason `duplicate` naming the existing entry; the wrong-season row is still active with its original `updated_at`, the existing row is unchanged, no row was inserted, and no `data_overrides` or `data_edits` row exists for the target (the void runs before the duplicate check inside the transaction, so this proves the refusal rolled it back). **With `confirmDuplicate: true`:** succeeds; the wrong-season row is `void` with its reason; the replacement is an active `manual_admin_edit` row in the right season for the same player; the player holds two active rows there; the old key's `lifecycle` override names `replaced_by_key`, the new key's `record` override names `replaces_key`, both by natural key; the audit has one `award_winner_voided` and one `award_winner_created` row sharing `replacement_id`.
+- **Authority and guards.** `D:\tmp\issue285\run-int.mjs` derives the owner, importer and auth DSNs in memory, points them at `afldb_test` on the tunnel port and, before vitest starts, proves `current_database() = afldb_test` for each (`afldb_owner`, `afldb_import`, `afldb_auth`); the suite's own `tests/integration/guard.ts` and importer-role parity check then run. Credentials were never printed or written. No `afldb_dev`, PROD, migration, rebuild, restore, truncation or data repair. The only writes were the suite's prefix-keyed fixtures (`AFLDB-ISSUE-165-TEST`, `afldb-issue-165-test-*`) through its own `purgeFixtures()`.
+- **Result.** The new case: **1 passed** (`D:\tmp\issue285\int-run-1.txt`, `int-run-final.txt`). The whole `admin-awards.test.ts` file, run once to cover the helper change: **33 of 33 passed** (`int-run-file.txt`). The whole integration suite was not run.
+- **Negative controls.** Two mutants of `insertAwardWinner` in `src/db/queries/admin-awards.ts`, each applied alone and restored from a saved copy (sha-256 verified equal; `git status` shows the source file clean). **M1**, the duplicate check ignores `confirmDuplicate` (always runs): killed at the confirmed step (`expected false to be true`, the message being the `duplicate` refusal). **M2**, the duplicate check never runs: killed at the refusal step (`expected true to be false`). Evidence: `int-mutant-M1.txt`, `int-mutant-M2.txt`.
+- **Fixture cleanup.** After the runs a read-only count on `afldb_test` found 0 fixture awards, award winners, players, overrides and audit rows (`int-residue.txt`, repeated after the whole-file run).
+- **Limits.** Not deployed. No browser, DEV or PROD action. The panel's React wiring is covered by `tests/awards-replace-panel.test.ts` (DB-free, §17) and the query layer by this case; the two are not joined in one end-to-end run.
