@@ -50806,7 +50806,13 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Status:** Open (2026-10-08). **Severity:** Low. **Area:** acquisition / AFL API client and acquisition tool. Key files:
   `src/lib/acquisition/afl-api-client.ts`, `tools/current-season/acquire-afl-api.ts`,
   `src/lib/acquisition/afl-api-snapshot.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-297.md`.
-- **Origin.** Review F-032 (R4b-F01) at `20a7a4bb`. Code-proven. **Next action.** Implementation.
+- **Origin.** Review F-032 (R4b-F01) at `20a7a4bb`. Code-proven. ~~**Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-14; commit `9c5ba69c` on `sonnet/issue-297`, base `839e084c`; not merged, pushed or deployed).** `parseAflApiSeasonMatchesEnvelope` refuses a `providerId` that is not `CD_M<digits>`, and the four CFS plan helpers
+  refuse a match id that is not `CD_M<digits>` or a season id that is not `CD_S<digits>`; the `code_test_db` rekey rehearsal's synthetic ids became digit-only (`CD_M20262319nn`). Runbook §17.
+- **Validation (DB-free, 14 Oct 2026).** `afl-api-match`, `afl-api-brownlow-acquire`, `afl-api-ingestion-safety` 386/386; the four new cases fail on the unfixed source; `tsc` exit 0; no new ESLint error (3 pre-existing `any` errors in the
+  test file at base); the 11 non-integration failures of a whole-suite run are identical before and after (stash differential). Not run: any integration test, the `code_test_db` rehearsal, any DEV/PROD action.
+- **Readiness: BLOCKED (not applied).** `merge:ready` found the primary at 16 untracked paths — the 15 preserved paths plus a zero-byte `void` created this session — outside the owner's 15-path exception; removal of `void` was refused.
+  **Status: Open.** **Next action.** Owner removes `void` or extends the exception, then merge, push and closure records (runbook §17.4).
 
 ## AFLDB-ISSUE-298 — AFL API snapshot companion files are read without manifest verification
 

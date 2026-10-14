@@ -517,8 +517,11 @@
 
 ### AFLDB-ISSUE-297 — AFL API provider id is used unvalidated as a file path and URL path segment
 - **Severity:** Low. **Area:** AFL API client — `src/lib/acquisition/afl-api-client.ts`. **State:** Open (2026-10-08),
-  F-032; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-297.md`. **Next action:** implementation.
+  F-032; imported 2026-10-10. **Implemented 2026-10-14, commit `9c5ba69c` on `sonnet/issue-297`** (parser + four CFS plan helpers
+  refuse ids that are not `CD_M<digits>` / `CD_S<digits>`; DB-free 386/386; not merged, pushed or deployed). `merge:ready` BLOCKED:
+  the primary has 16 untracked paths (the 15 preserved plus a session-created zero-byte `void`), outside the owner's exception.
+- **Runbook:** `issues/open/AFLDB-ISSUE-297.md` §17. **Next action:** owner removes `void` or extends the exception; then merge,
+  push and the closure records.
 
 ### AFLDB-ISSUE-298 — AFL API snapshot companion files are read without manifest verification
 - **Severity:** Low. **Area:** acquisition / evidence integrity — `src/lib/acquisition/afl-api-snapshot.ts`. **State:**
