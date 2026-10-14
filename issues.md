@@ -50704,7 +50704,16 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `issues/open/AFLDB-ISSUE-287.md`.
 - **Origin.** Review F-022 (R2c-F01) at `20a7a4bb`. Code-proven.
 - **Defect.** The action asks for J-5 `null_pick_number` confirmation, but the panel never sends `confirmed`, so the
-  operation can never complete. **Next action.** Implementation.
+  operation can never complete. ~~**Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-14; `dcc6a61c` on `sonnet/issue-287`, base `b3975136`; not yet merged).** `SourceFieldsPanel`
+  shows a "Confirm this selection has no pick number." checkbox when the action asks for `null_pick_number`, holds the
+  pick-number Save until it is ticked, and sends `confirmed=1` through the pure helper `sourceFieldsConfirmed`
+  (`validation.ts`), only for the `selection_facts` group, only after the request and only when ticked; the tick is cleared
+  after each pick-number save. Backend untouched. Runbook §17.
+- **Validation (DB-free, 14 Oct 2026).** `admin-draft-actions` + `draft-linkage-invariants` 68 passed (8 new); with the
+  panel at `HEAD`, 2 of the new cases fail; `tsc --noEmit`, ESLint of the three files and `git diff --check` exit 0;
+  implementation preflight READY. Not run: integration, DEV/PROD, browser (`VISUAL: UNVERIFIED`); the click path is
+  covered by a helper truth table and a source contract, not a DOM event.
 
 ## AFLDB-ISSUE-288 — `createCoach` casts an unvalidated `dob` outside its error handling
 

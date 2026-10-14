@@ -477,7 +477,8 @@
 ### AFLDB-ISSUE-287 — Source-owned draft pick `null_pick_number` confirmation is unreachable
 - **Severity:** Low. **Area:** admin draft UI — `src/app/admin/draft/SourceFieldsPanel.tsx`. **State:** Open (2026-10-08),
   F-022; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-287.md`. **Next action:** implementation.
+- **Runbook:** `issues/open/AFLDB-ISSUE-287.md` (§17, §17.1). **Next action:** merge and push (implemented 2026-10-14, DB-free
+  validated), then close.
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;
