@@ -35,6 +35,7 @@ import {
 
 const matchResults = DATASETS.match_results;
 const playerMatchStats = DATASETS.player_match_stats;
+const playerBio = DATASETS.player_bio;
 
 /** No Match Sheet authority at all (AFLDB-ISSUE-264): today's answer for most matches. */
 const noAuthority: MatchSheetAuthorityReader = async () => ({
@@ -1730,5 +1731,92 @@ describe('AFLDB-ISSUE-306 player_match_stats promotion refuses two rows on one p
     // Past the collision check the hook goes to the database, which this stub refuses.
     await expect(prepare(rows, sql)).rejects.toThrow('SQL_REACHED');
     expect(calls.length).toBeGreaterThan(0);
+  });
+});
+
+describe('AFLDB-ISSUE-305 validation refuses what promotion cannot cast', () => {
+  /** Answers only the player lookup `player_bio` makes; any other query is a failure. */
+  const bioSql = (() => {
+    const tag = (strings: TemplateStringsArray) => {
+      const text = strings.join('?');
+      if (/FROM players WHERE id/.test(text)) return Promise.resolve([{ id: 900, name: 'Fixture Player' }]);
+      throw new Error(`unexpected query: ${text}`);
+    };
+    return tag as unknown as Sql;
+  })();
+  const bioRow = (extra: Record<string, string | null>) => ({ player_id: '900', ...extra });
+
+  describe('match_results match_date', () => {
+    it.each([
+      ['2024-02-30'], ['2023-02-29'], ['1900-02-29'], ['2100-02-29'], ['2024-04-31'],
+      ['2024-13-01'], ['2024-00-10'], ['2024-01-00'], ['0000-01-01'], ['2024-1-5'], ['24-02-10'],
+    ])('refuses %j before any club lookup', async (cell) => {
+      const { sql, queries } = fakeSql();
+      const result = await matchResults.validateRow(matchRow({ match_date: cell }), { sql });
+      expect(result.verdict).toBe('error');
+      expect(result.reasons).toHaveLength(1);
+      expect(result.reasons[0]).toContain(`match_date "${cell}"`);
+      expect(result.resolved).toBeUndefined();
+      expect(queries.some((q) => /FROM club_aliases/.test(q))).toBe(false);
+    });
+
+    it.each([['2024-02-29'], ['2000-02-29'], ['2024-12-31'], ['2073-03-01'], ['0001-01-01']])(
+      'still admits the real date %j', async (cell) => {
+        const { sql } = fakeSql();
+        const result = await matchResults.validateRow(
+          matchRow({ match_date: cell }), { sql, matchResultsAuthority: noMatchAuthority },
+        );
+        expect(result.verdict).not.toBe('error');
+      },
+    );
+  });
+
+  describe('player_bio', () => {
+    it.each([['2024-02-30'], ['1999-02-29'], ['2024-13-01'], ['1954-04-31'], ['31/02/1954']])(
+      'refuses the dob %j', async (cell) => {
+        const result = await playerBio.validateRow(bioRow({ dob: cell }), { sql: bioSql });
+        expect(result.verdict).toBe('error');
+        expect(result.reasons).toEqual(['dob must be a real date, YYYY-MM-DD']);
+      },
+    );
+
+    it.each([['1.8e2'], ['18e1'], ['0xB4'], ['180.0'], ['+180'], ['1 80'], ['one80']])(
+      'refuses the height_cm %j', async (cell) => {
+        const result = await playerBio.validateRow(bioRow({ height_cm: cell }), { sql: bioSql });
+        expect(result.verdict).toBe('error');
+        expect(result.reasons).toEqual(['height_cm must be a whole number between 120 and 230']);
+      },
+    );
+
+    it.each([['8e1'], ['8.0e1'], ['0x50'], ['80.0'], ['+80'], ['eighty']])(
+      'refuses the weight_kg %j', async (cell) => {
+        const result = await playerBio.validateRow(bioRow({ weight_kg: cell }), { sql: bioSql });
+        expect(result.verdict).toBe('error');
+        expect(result.reasons).toEqual(['weight_kg must be a whole number between 40 and 160']);
+      },
+    );
+
+    it.each([['119'], ['231'], ['99999999999999999999']])('still refuses the out-of-range height_cm %j', async (cell) => {
+      const result = await playerBio.validateRow(bioRow({ height_cm: cell }), { sql: bioSql });
+      expect(result.verdict).toBe('error');
+    });
+
+    it('names every bad column in one report', async () => {
+      const result = await playerBio.validateRow(
+        bioRow({ dob: '2024-02-30', height_cm: '1.8e2', weight_kg: '80.0' }), { sql: bioSql },
+      );
+      expect(result.verdict).toBe('error');
+      expect(result.reasons.map((r) => r.split(' ')[0])).toEqual(['dob', 'height_cm', 'weight_kg']);
+    });
+
+    it('still admits plain real values, and leaves blank cells alone', async () => {
+      const full = await playerBio.validateRow(
+        bioRow({ dob: '2000-02-29', height_cm: '180', weight_kg: '0080' }), { sql: bioSql },
+      );
+      expect(full.verdict).toBe('ok');
+      expect(full.resolved).toEqual({ player_id: 900 });
+      const partial = await playerBio.validateRow(bioRow({ dob: null, height_cm: '230', weight_kg: '' }), { sql: bioSql });
+      expect(partial.verdict).toBe('ok');
+    });
   });
 });
