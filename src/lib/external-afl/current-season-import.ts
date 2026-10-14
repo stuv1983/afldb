@@ -845,12 +845,16 @@ async function writeMatches(sql: postgres.Sql, matches: ExternalCurrentMatch[], 
       tx, enumeratedMatchScopes(sourceIds, matches), batchId, observedAt,
     );
 
+    // AFLDB-ISSUE-296: `records_rejected` is the number of `import_rejections` rows for
+    // the batch (migration 001; ISSUE-244 F008). This importer writes none, so the
+    // column is 0. The planning count (observations the canonical plan would refuse
+    // or found in conflict) is not a rejection row; it stays in `validation_result`.
     await tx`
       UPDATE import_batches
          SET completed_at = now(), status = 'completed',
              records_inserted = ${observationVersionsInserted},
              records_updated = ${observationHeadsRefreshed},
-             records_rejected = ${canonicalPlan.rejectedOrConflicted},
+             records_rejected = 0,
              validation_result = ${tx.json({
                observationsFetched: matches.length,
                observationsStaged,
