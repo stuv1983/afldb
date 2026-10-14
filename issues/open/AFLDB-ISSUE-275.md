@@ -20,7 +20,7 @@
   - `:589-604`: an empty period set → `new_target`, with no parent-owner check.
 - `src/lib/acquisition/settle-afltables.ts:2199-2230, :2414-2440`: the `pending_match` invitation with a null baseline.
 - The module's own rules: "a match family is all or none" (`canonical-apply.ts:30-35`), and `settle-afltables.ts:3088-3092`, which forbids a period set under a foreign-owned or source-less match.
-- Overlap evidence: both timers run nightly (`deploy/afldb-settle-afltables.timer` 04:30 + 15 min; `deploy/afldb-settle-afl-api.timer` 05:00 + 15 min). Both take the settle gate SHARED (`settle-core.ts:408`). ISSUE-265's runbook measured AFL Tables starts inside AFL API intervals (`issues/open/AFLDB-ISSUE-265.md:718-721`).
+- Overlap evidence: both timers run nightly (`deploy/afldb-settle-afltables.timer` 04:30 + 15 min; `deploy/afldb-settle-afl-api.timer` 05:00 + 15 min). Both take the settle gate SHARED (`settle-core.ts:408`). ISSUE-265's runbook measured AFL Tables starts inside AFL API intervals (`issues/closed/AFLDB-ISSUE-265.md:778-781`).
 
 ## 3. Trigger
 

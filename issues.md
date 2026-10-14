@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 46 (ISSUE-229, ISSUE-265–270 and 39 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, merge-scoped, see below)
+**Open issues:** 45 (ISSUE-229, ISSUE-266–270 and 39 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265 on 2026-10-14 with its closure documentation prepared locally, merge-scoped, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -15,7 +15,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Medium | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated; 2026-10-05 investigation (runbook §10–§15): F-265-1 AFL API attendance enrichment can lose the whole run, `match_attendance` is a third unordered writer, in-run unit retry futile in the main shapes; 2026-10-05 operator: D-265-1..12 accepted (Option 3 advisory gate incl. `match_attendance`; severity Medium); 2026-10-05 operator: D-265-5 accepted (300 s settle gate wait with a 330 s gate-statement bound; an operator judgement, PROD records cannot validate it; the D-265-13 query is context only), D-265-14 (Phase B case B11) and D-265-15 (Phase A tooling archived unchanged in `issues/open/AFLDB-ISSUE-265-phase-a/`); Phase A window 2 (2026-10-05 16:22) PASSED 3/3, census CLEAN (runbook §17.14); Phase A retired, Phase B replaces it; final plan and Phase B assertions in runbook §18–§20; S0 checkpoint committed (62f2cd67); **2026-10-05 mitigation IMPLEMENTED in the working tree, uncommitted (runbook §21): shared settle gate (300 s / 330 s), exclusive gate in the three legacy hooks, `match_attendance` ascending hook, database-free pins, Phase B harness B1–B11; Phase B PASSED 11/11 (2026-10-05, runbook §23); regression window FAILED twice on test-teardown residue, cause fixed (§24), then PASSED (2026-10-06, §25.1); build PASSED (2026-10-06, §25.8: exit 0, 1,515 static pages, standalone ready, census CLEAN, two warnings recorded and not claimed pre-existing); commit, deployment and DEV acceptance pending** | Operator reviews and commits the eighteen files in runbook §25.7, then `npm run merge:ready -- --issue 265`, merge/push, `deploy/sync-dev.ps1` and DEV acceptance (§18.2) |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
 | AFLDB-ISSUE-266 | Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin | High | Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py` | Open (2026-10-08); 2026-10-08 full code review F-001; reproduced DB-free (W1; W2 adds substring injection and an unbound pass); D-266-1 and D-266-2 decided 2026-10-09; implemented and committed as `077af7ee`, merged and pushed to main; pre-commit review fixed two parser gaps (runbook §18.8); DB-free suite 160/160 on Windows Python 3.12.10 and 3.14.4 and on Linux (streamanator, CPython 3.12.3, 2026-10-09; runbook §18.9); **deployed to DEV only** (`7adfb3e8` → `077af7ee`, 2026-10-09; deployed suite 160/160, operator-reported; build and service unchanged; DEV `preflight` BLOCKED by nine untracked settle manifests, not passed; runbook §18.10); PROD inspected, not deployed (held at `cd3cf782` during ISSUE-265 observation); neither host has an intake timer, cron reference, IMAP settings or authserv-id in the places checked, so the fix is dormant; live mail not tested, no host accepted | Before intake is activated on any host: verify the receiving server's header insertion, forged-header removal, authserv-id and a legitimate message's format, set `AFLDB_INTAKE_AUTHSERV_ID`, then `--dry-run` a legitimate and a non-passing message (runbook §18.6, §18.10.8); PROD gets the code after ISSUE-265's observation |
 | AFLDB-ISSUE-267 | Override replay writes NULL period scores from a partial `score` override | High | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-002; implemented 2026-10-09 with ISSUE-269; **operator integration run 2026-10-09 FAILED (6 failed)**: replay `matches_score_components_ck` 23514 (components and totals written in two UPDATEs) and fixture cleanup `club_seasons_season_fkey` (score save derived 2 `club_seasons` rows; baseline 1,624 → 1,626); second fix pass: one atomic UPDATE, cleanup owns the derived ladder rows in one transaction; `py_compile`, `tsc` and source-contract 69/69 green; residue recovery dry run passed and rolled back, commit attempt refused before any DELETE (ladder rows already absent; remover unknown), fresh census empty with `club_seasons_total` 1,624; **second integration run 2026-10-09 10:47:03 PASSED on `afldb_test` (`afldb_owner`): 6 passed, 37 filtered skips, 33.80 s; implementation validated on `afldb_test`**; **DEV exposure census complete 2026-10-09** (operator-run before deployment; `afldb_dev`, `afldb_import`, read-only; 0 active `matches` overrides, sections 1–5 no rows, no replay blockers); **committed as `86e2d19fa6936f73872da45c7b5cb3200e274543`, merged to `main` and pushed; DEV deployed 2026-10-09** (operator-confirmed: `common.py` no working-tree diff from HEAD; migrations 110/110, nothing to apply; build OK, `BUILD_ID` `Jlf_U7HZnqispmedF-TaS`; respawn 844885 → 849656, active since 11:40:00 AEDT; readiness after 2 s; health ok, database ok, 28 ms); the deployment did not exercise the Python matches replay; **PROD exposure census complete 2026-10-09** (operator-run; `afldb_prod` via SSH alias `afldb`, `postgres`, read-only, `== Done.`, psql exit 0; 0 active `matches` overrides, sections 1–5 no rows, no section-3/4 replay blockers; does not establish the fix is installed on PROD); `merge:ready -- --issue 267` READY twice (after a fresh fetch too), 0 blockers, 2 metadata warnings (no `afldb-merge-readiness` JSON block in the ISSUE-267 runbook; no automated unexpected-file classification metadata); PROD installation deferred (PROD held at `cd3cf782` for ISSUE-265's observation; `cd3cf782..86e2d19f` measured at 9 commits, 40 files (assistant read-only review of GitHub's comparison, not operator-run Git evidence), no migration/package/deploy/next.config.ts change, but includes ISSUE-261's settle/retry change); historical corruption not established, historical impact remains unassessed, nothing repaired; runbook `issues/open/AFLDB-ISSUE-267.md` §17.10–§17.15 | The applicable after the ISSUE-265 observation hold at `cd3cf782` lifts, prepare and review a deployment procedure for this release (r6 pack must not be reused; range includes ISSUE-266 and ISSUE-261; preflight manifest FAILs expected), then the PROD deployment acceptance (§17.15: verify the installed `common.py`); then resolve with ISSUE-269 |
@@ -48650,7 +48649,7 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 
-- **Status:** Open (2026-10-04). **Severity:** Medium (raised from Low, operator, 2026-10-05,
+- **Status:** Resolved (2026-10-14, owner decision D-PROD-10; opened 2026-10-04). **Closure documentation prepared locally on `fix/issue-265-close`; commit, merge and push PENDING.** **Severity:** Medium (raised from Low, operator, 2026-10-05,
   D-265-12). **Area:** data integrity / concurrency, source
   settles versus legacy file intake. Key files:
   - `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows` :490, taken inside the unit savepoint
@@ -48723,7 +48722,7 @@ retained behaviour under `Unreleased`.
     This removes every settle–promotion cycle between these participants. Its costs: promotions are
     refused while a settle runs, and promotions serialise with each other.
   - Independent review: `afldb-reviewer`, no CRIT. HIGH F-001 (`match_attendance`) is folded in.
-- **Runbook.** `issues/open/AFLDB-ISSUE-265.md`.
+- **Runbook.** `issues/closed/AFLDB-ISSUE-265.md` (moved from `issues/open/` on 2026-10-14; entries below name the original location as historical provenance).
 - **Decisions (operator, 2026-10-05; runbook §14.1).**
   - D-265-1..12 are accepted as recommended:
     - Option 3, an advisory gate: settles shared, the promotions exclusive, key `(717275, 4)`;
@@ -48932,12 +48931,509 @@ retained behaviour under `Unreleased`.
   - **Working tree:** the same eighteen modified tracked files (runbook §25.7); no new tracked change from the build; only the
     three zero-byte strays are untracked.
   - **ISSUE-265 remains OPEN:** commit, `merge:ready`, deployment and DEV acceptance are pending.
+- **DEV acceptance: revision 3 REFUSED at candidate selection; D-DEV-5 APPROVED; revision 4 pack PREPARED, not run (2026-10-06;
+  runbook §26).** `cd3cf782` is on DEV (rollback `ebbe2c00`, `BUILD_ID` `299AIEC7YxKq3a00-SUNJ`).
+  - **Revision 3 refused (operator-run):** "zero historical matches before 2025 are already `manual_admin_edit` with complete
+    attendance and no open finding". It refused before the upload, so nothing was staged, armed, settled or promoted. The
+    refusal and its DEV evidence folder are preserved, and revision 3 is unchanged.
+  - **D-DEV-5 (operator, approved):** DEV acceptance uses **`match_results` with exact restatement**. The pipeline-rendered
+    `match_key` equals the stored key. Every upsert-written column equals its stored value. Omitted optional fields and the
+    provenance quartet are unchanged. The refused attempt keeps every column and `xmin`. The manual retry keeps every column,
+    moves `xmin`, adds no match (census 1/1, unchanged season count, batch `matches_owned = 0`), and leaves exactly one explained
+    `match_results` batch. D-DEV-1, D-DEV-3, D-DEV-4, R and G/S/D grading are unchanged. `player_match_stats` was rejected, because
+    its upsert overwrites `import_batch_id`.
+  - **Revision 4 pack:** `D:\tmp\issue265\dev-acceptance-cd3cf782-rev4-pack\` (23 files plus `MANIFEST.sha256`). It is complete:
+    the operator does no assembly or patching. The agent ran the offline checks on the final folder: `bash -n`, `node --check`,
+    `SELFTEST-OK` and `EVIDENCE-SELFTEST-OK`. No SQL has ever executed. No host or database was contacted, and no Git command
+    or evidence change was made.
+  - **ISSUE-265 remains OPEN:** this is preparation, not acceptance.
+- **DEV acceptance PASSED (operator-run 2026-10-06 13:34–13:47 +11:00; verified by the agent from the saved evidence; runbook
+  §27).** Evidence: `D:\tmp\issue265\run-20261006-133026-DevAcceptance\`, `MANIFEST.sha256` `c0adf47f…038ac`, 52/52 files OK.
+  The agent made no host or database contact and no re-run; the graders were re-run locally on the saved files.
+  - **Deployed:** DEV checkout `HEAD` `cd3cf782` (active since 09:44:40). `BUILD_ID` does not appear in this folder, so it is not
+    re-verified here.
+  - **G PASS:** the real AFL Tables settle (pid 1546082, label `settle-2026-2026-10-06-1334`) held a granted shared `(717275,4)`.
+    One promotion of submission 68 (`match_results`, match 16407, 2024 R1 Sydney v Melbourne) received the exact retryable refusal
+    after **5,070.650 ms** (server wait 4,992–5,023 ms). The agent tallied 227 samples over 4,976 ms with the lock held and the
+    promotion waiting; the promotion was never granted and no other session appeared. Nothing was written.
+  - **S SUCCESS:** batch **107** completed: 0 canonical rows inserted or updated, 0 apply failures, 0 refused at the write, **0 units
+    rolled back**, `AFLDB_SETTLE_SUCCESS`, no gate timeout, no post-commit failure.
+  - **D PASS:** sections D, E and F are empty after the settle and after the retry; `deadlock_findings|0|none` in all five snapshots;
+    `canonical_apply_failed` unchanged at 60/60.
+  - **P PASS** (`REFUSED_PATH_CHECK=PASS`, reproduced): `xmin` 407714 and the whole row identical from S0 through S2; census 1/1/216.
+  - **R PASS** (`RETRY_CHECK=PASS`, reproduced): manual UI Promote → batch **108** (owns 0 matches; `started_at = completed_at =
+    promoted_at`). `xmin` 407714 → 610398; every value and provenance column unchanged; no additional match; exactly the four
+    submission fields changed; one sequence advance (17278 → 17279).
+  - **Audit:** staged (1052), validated 1/0/0/0 (1053), approved (1054), promoted batch 108 (1055). There is no audit row for the
+    automatic attempt, as designed, and no `promote_failed`.
+  - **Recorded deviations (criteria unaffected):** `unit-final.txt` has a blank `InvocationID`, so G1 identity is proven by pid and
+    label in the journal instead. The Brownlow timer exception: the 13:20, 13:25 and 13:30 runs exited at the disabled flag before
+    acquisition or database access, and the timer was enabled at arm. The 13:35 firing is not in the saved journal, but the gate
+    samples saw no other session. Baseline S0 files were inherited from `out-20261006-122525` with their origin recorded; earlier
+    aborted attempts remain separate.
+  - **Not shown on DEV:** the AFL API settle, the reverse-direction 300 s settle wait, and writers outside the gate.
+  - **ISSUE-265 remains OPEN: PROD acceptance pending.** Superseded: the "commit, `merge:ready`, deployment and DEV acceptance
+    pending" lines above (the change is commit `cd3cf782`, deployed to DEV).
+- **PROD deployment and acceptance plan prepared, NOT EXECUTED (2026-10-06; runbook §28).** The agent read local files only.
+  No host, database, Git command, fetch, deployment, settle or promotion was involved.
+  - **Target:** exactly `cd3cf782`, deployed by SHA. Local `main`, `origin/main` (as last updated by the operator's push) and the
+    branch all hold it. No later documentation commit exists locally, and the remote's freshness is unverified.
+  - **Range:** PROD's last recorded HEAD is `1111ab19`, at ledger 109/109 (ISSUE-220). The range therefore carries **migration 110
+    (ISSUE-257)**, whose mandatory order is application first, and the other unreleased work (ISSUE-257, -258 with R-258-1, and
+    -264). ISSUE-265 itself adds no migration.
+  - **Method:** C0 read-only capture; a daytime detached deployment behind a settle-idle guard (G-START); C1 identity checks
+    (HEAD, a new BUILD_ID, a fresh MainPID, effective units).
+  - **Rollback:** to the captured `$PREV`, with the ISSUE-257 guard if 110 was applied.
+  - **Acceptance:** passive, at least two counted scheduled AFL Tables runs (plus an AFL API run if that unit is installed),
+    within at most 7 nights. Deadlock checks cover the journals, the PostgreSQL log and `data_issues`, using content and `xmin`
+    fingerprints.
+  - **The controlled PROD promotion (P-CTRL) is a proposal only.**
+  - **Decisions open:** D-PROD-1..10.
+- **§28 refined; read-only C0 pack prepared offline (2026-10-06; runbook §28.10). NOT RUN; §28 still NOT EXECUTED.** The agent
+  used local files and read-only Git object reads only. There was no host or database contact and no fetch, deployment or
+  migration.
+  - **In-place release vs ISSUE-257's guidance: compatible.** The `player_match_stats` replay and gate A4.4 in
+    `docs/production-promotion.md` exist because a rebuild re-creates canonical rows, and they bind only a rebuilt-database
+    promotion. ISSUE-257 §18.13 designed an in-place PROD sequence ("PROD: no mutation required").
+  - **Migration 110 order.** State A is fail-closed and evidenced on DB-free, `afldb_test`/`code_test_db` and real DEV data. It does
+    refuse every Match Sheet save that changes a player row. A multi-night State A is therefore not supported. D-PROD-3 is revised
+    to **B1**: 110 in the same window after the deployment checks pass, with Match Sheet player-statistic corrections paused until
+    the first counted night. The choice waits for C0.
+  - **The checkout is not the ledger.** Nothing applies 110 except `tools/db/migrate.ts`, whose default target is `dev`
+    (`AFLDB_OWNER_DATABASE_URL`). `npm run db:status` runs owner DDL (IF NOT EXISTS) and is not read-only. `deploy/sync-dev.ps1`
+    migrates before it builds and must not be used for PROD.
+  - **Preflight.** Deploy mode FAILs on any untracked path because the classification exists for promotion only. Read-only mode
+    drops about ten deploy checks and still FAILs on pending 110. **D-PROD-4 is revised:** deploy mode unmodified, accepted only
+    with two exact FAILs (classified known manifests; pending 110 before D7). D-PROD-11 (new): a separate tooling issue, or not.
+  - **Range computed offline:** 26 commits. The deployment-relevant changes are migration 110 and the two AFL API unit deny lists
+    (`6661eb66`).
+  - **Pack:** `D:\tmp\issue265\prod-c0-pack-r1\` (21 files plus manifest `e27217be…1f8c`); archive `prod-c0-pack-r1.tar` sha256
+    `2f22cd3a…f1e8`.
+    - Offline checks passed: `bash -n`, `node --check`, an 8-case classifier fixture test, and a stubbed end-to-end dry run.
+    - All PROD SQL is untested.
+- **Next action** *(superseded by the C0 entry below)*.
+  1. The operator runs C0 (pack README §3) and returns `run-<stamp>-ProdC0`. D-PROD-1, -2, -4, -8, -10 and -11 can be decided now.
+     D-PROD-3, -5, -6, -7 and -9 wait for C0. The D5 script is written only after that.
+  2. Optional context: the D-265-13 query (runbook §16.2). It is now pack item `p50`.
+- **PROD C0 ran and is graded (operator-run 2026-10-06 18:16:57–18:17:06 +11:00; agent-graded from the saved copy; runbook
+  §28.11). Deployment NOT AUTHORISED; ISSUE-265 stays open.** The agent read the evidence and the repository only, with
+  read-only local Git object reads. No host, database, fetch, Git mutation, migration, unit change or evidence edit.
+  - **Integrity:** `D:\tmp\issue265\run-20261006-181657-ProdC0\`, `MANIFEST.sha256` file hash `dbb3e5cc…1b09` as expected; 46/46
+    listed files verified, inventory 47 = 46 + the manifest. 42 items, 8 non-zero.
+  - **The eight non-zero items:** AFL API, Brownlow and e-mail intake services and three timers **not installed**
+    (`No files found …`, `LoadState=not-found`); polkit directory **not readable** by `arm`; `AFLDB_PROD_IMPORT_DATABASE_URL` and
+    `AFLDB_PROD_AUTH_DATABASE_URL` **not defined** in `.env` (exit 2 by the pack's own convention); deploy-mode preflight
+    **one FAIL**, the working tree, whose 36 paths are exactly the classified known settle manifests (tracked 0, unknown 0,
+    collisions 0; parity 109/109); disk item exit 2 is a **pack defect** (`ls` of an absent path). None is a deployment blocker.
+    The preflight exception is not approved here: it is graded again at D5.
+  - **PROD state:** HEAD `1111ab19` on `main`, `origin/main` equal as of PROD's last fetch, T absent; BUILD_ID
+    `rjrdXKga5b7MBY_LjXA06`; web active since 2026-10-01 18:09:58, health ok; ledger 109, `ledger_110 = f`; CHECK 13 literals
+    without `player_match_stats`, guard 0 (**State A**); `players` overrides 92; batches max 45, none running; 36 open
+    `canonical_apply_failed` from one transaction; gate 0; no `data_submissions` row (R-258-1 census 0); no `acquisition.%` switch
+    row; Brownlow flag 0; no on-demand trigger; `[2026]`; 65 GB free.
+  - **Unit drift:** the installed AFL Tables service is the 2026-09-02 revision `887263a5` (lacks `AFLDB_DEV_DATABASE_URL` in
+    `UnsetEnvironment=`, plus comments). That name is not in PROD's `.env`, so it has no effect today, and the range does not touch
+    the unit. New decision D-PROD-12.
+  - **Journals and deadlocks:** 9 visible AFL Tables runs (batches 37–45, 2026-09-28 12:20 → 2026-10-06 04:38), all successful
+    no-ops; batches 29, 32 and 34–36 have no unit-journal line. No deadlock text in any visible journal or in `data_issues`.
+    systemd's own lines and the PostgreSQL log are unreadable by `arm`, so the authoritative deadlock baseline is missing.
+    New decision D-PROD-13 (N-k evidence access); optional sudo captures O1/O2 are prepared, not run.
+  - **Range (corrects the §28.10 line above):** 26 commits, 115 files. Besides migration 110 and the two AFL API unit files, it
+    changes web behaviour (ISSUE-256 NL, -257 Match Sheet, -258 and -264 legacy intake, -265 gate, -232 units panel), settle code
+    from `git merge` (ISSUE-255, -257, -265), rebuild/promotion tooling (ISSUE-257) and tracked captaincy data (ISSUE-225, no PROD
+    reload). Obligations: 110 after the application; R-258-1 (nothing to re-validate at C0).
+- **Next action** *(superseded by the decisions entry below)*.
+  1. Operator decisions: D-PROD-3 (B1, now evidenced by State A), D-PROD-12 (recommended: do not reinstall the AFL Tables unit in
+     this window), D-PROD-13 (recommended: sudo reads of the server log and systemd lines in N-k), plus those §28.10.8 marks
+     "now". Optional: O1/O2 (runbook §28.11.8), on its own authorisation.
+  2. Then, offline: the D5, C1 and N-k scripts. No deployment script exists yet.
+- **Decisions recorded and gates pack prepared (2026-10-06; runbook §28.12). Deployment NOT AUTHORISED; D-PROD-4 NOT approved,
+  so the current deploy-mode preflight FAIL is not an accepted exception.**
+  - **Approved by the operator:** D-PROD-3 = **B1** (110 in the same window after the deployment checks; Match Sheet
+    player-statistic corrections paused until the first counted night); D-PROD-12 = do not reinstall the AFL Tables unit in this
+    window (C1 compares against C0's installed hash); D-PROD-13 = interactive sudo read-only journal and server-log captures.
+  - **D2 and D5, what is possible now.** D2 is a `git fetch` on PROD, so it is operator-run (the workstation only knows its own
+    `origin/main` = `cd3cf782` from the 09:41 push). D5 can be graded only when it runs; what exists is the grader and a static
+    prediction. Before the checkout, after D2: three FAILs (the manifests, behind 26, missing-base 110). At D5: the manifests plus
+    exactly pending 110. After D7: the manifests only. No migration collision is predicted from the refs known locally.
+  - **Gates pack r1:** `D:\tmp\issue265\prod-gates-pack-r1\` (20 files, manifest `071dc08e…3c67`); archive
+    `prod-gates-pack-r1.tar` sha256 `e4ec2313…e27b`.
+    - `g2-fetch-and-range.sh --i-authorise-d2-fetch`: D2 freshness verdict, D3 range diffed against the offline expectation, the
+      collision prediction, and the post-fetch preflight baseline.
+    - `g4-gstart.sh`: D4, 13 read-only checks including R-258-1.
+    - `lib/grade-preflight.mjs`: D5 re-grading, FAIL by FAIL. Fully in-class still grades `BLOCKED-PENDING-D-PROD-4`.
+    - `sudo-capture.sh`: D-PROD-13.
+    - Offline: syntax checks OK; grader on the real C0 files as expected; self-test 18/18; stubbed dry runs in a throwaway clone
+      and remote. `sql/g4-gstart.sql` has never run. Nothing ran on PROD.
+- **Next action** *(superseded by the supplement entry below)*.
+  1. Operator, one PROD session: the C0 sudo supplement (`sudo-capture.sh C0SUPP-20261006-181657 …`, authorised by D-PROD-13) and,
+     on its own authorisation, D2 (`g2-fetch-and-range.sh --i-authorise-d2-fetch`); copy both folders back for grading.
+  2. Operator: D-PROD-4 (without it D5 cannot pass) and the other open decisions (D-PROD-1, -2, -5..-11).
+  3. Agent, offline, after 1–2: the D5, C1 and N-k scripts. No deployment script exists yet.
+- **C0 sudo supplement graded (operator-run on PROD 2026-10-06 19:19:44–19:19:48 +11:00; agent-graded from the saved copy; runbook
+  §28.13). Deployment NOT AUTHORISED; ISSUE-265 stays open; D2 not run.** The agent did local reads only. There was no host,
+  database, fetch or Git command, and no evidence edit.
+  - **Integrity:** `D:\tmp\issue265\run-SUDO-C0SUPP-20261006-181657-20261006-191944-Prod\`, manifest file hash `533706af…a4a` as
+    expected; 12/12 listed files verified; inventory 13 = 12 + the manifest. 11 items, all exit 0, which shows only that each capture
+    completed. The pack self-verified on the host (`071dc08e…3c67`).
+  - **Server log (cluster-wide, 8 files, about 2026-08-16 → 2026-10-06 18:17:22):** `deadlock detected` matched nothing, and the
+    per-file counts are `deadlock=0` and `lock_timeout=0` in all eight. With no blocks, there is nothing to attribute by date,
+    database or statement.
+    - The basis is content, not exits: sudo was valid in each item, stderr was captured with no reader error, and two independent
+      passes agree. C0 shows `log_min_messages = warning` and `log_min_error_statement = error`.
+    - Limits: there is no positive control (no per-file line count or first/last line); `log_line_prefix` was not captured; and
+      statement-timeout and `NOWAIT` lock errors were not counted.
+  - **Historical versus release:** no historical failure appears in any captured source. Everything ran on `1111ab19`, with no
+    promotion, no AFL API unit and no gate on PROD in the window. The settle-versus-promotion interaction therefore never had the
+    opportunity to occur. The zero is a **pre-deployment baseline**, not acceptance evidence. The 36 open `canonical_apply_failed`
+    findings (batch 32) are historical and not deadlocks.
+  - **systemd:** nine AFL Tables invocations (batches 37–45). Each has `Starting` → wrapper → `AFLDB_SETTLE_SUCCESS label=…` →
+    `Deactivated successfully` → `Finished` with `JOB_RESULT=done`. There is no `Failed` line, all nine are on one boot, and each
+    takes 33–41 s. Run 9's `InvocationID` `77933f8a…` equals C0's, so D-PROD-13's method works on PROD.
+    - The service **did not run under systemd** between 2026-09-22 18:17 and 2026-09-28 12:20 (retention reaches 2026-09-04), so
+      batches 29, 32 and 34–36 did not come from the unit. Their starter, and why the timer was inactive, are not established.
+    - Run 1 began 21 ms after the timer itself was started, consistent with the `Persistent=yes` catch-up.
+    - The journal is 611 M, with default `journald.conf` limits.
+    - The web unit's journal has 8 stop/start pairs, the last at 2026-10-01 18:09:58 (= C0), with no crash or lock text.
+  - **Missing units versus logs:** the AFL API and Brownlow units are **absent units** (C0 `LoadState=not-found`; no line under
+    sudo), not inaccessible logs. The server log and systemd's lines are now read, which closes C0's two gaps.
+  - **Findings:** no MED or higher.
+    - **S-5 (LOW):** the wrapper's start banner contains `AFLDB_SETTLE_FAILURE`, so the N-k grader must match only a message that
+      begins `AFLDB_SETTLE_(SUCCESS|FAILURE) label=`, plus `Finished`/`Failed` and `JOB_RESULT`, per `INVOCATION_ID`.
+    - **S-6 (LOW):** for the N-k revision of `sudo-capture.sh`: add a positive control, `Stopped`/`Stopping`, and
+      `log_line_prefix`.
 - **Next action.**
-  1. The operator reviews and commits the eighteen files listed in runbook §25.7 (explicit paths; not the three zero-byte
-     strays; nothing under `D:\tmp\`).
-  2. `npm run merge:ready -- --issue 265`, the operator merges and pushes, `deploy/sync-dev.ps1`, then DEV acceptance and smoke
-     (runbook §18.2).
-  4. Optional context: the D-265-13 query (runbook §16.2).
+  1. Operator: D2 + D3 (`g2-fetch-and-range.sh --i-authorise-d2-fetch`), on its own authorisation, outside 04:15–06:00, with the AFL
+     Tables unit inactive. Keep `origin/main` at `cd3cf782` until then. Any push to `main` (these tracker edits included) makes `g2`
+     return `DOC-ONLY-SUCCESSOR`, which needs D-PROD-1 option B. Otherwise decide D-PROD-1 first.
+  2. Operator: D-PROD-4 (the binding decision; D2 alone cannot unblock D5) and D-PROD-1, -2, -5..-11.
+  3. Agent, offline, after 1–2: the D5, C1 and N-k scripts (N-k takes S-5 and S-6). No deployment script exists yet.
+  *(Superseded by the D2 entry below.)*
+- **D2 graded (operator-run on PROD 2026-10-06 19:35:19–19:35:32 +11:00; agent-graded from the saved copy; runbook §28.14) and the
+  deploy pack r1 prepared offline. Deployment NOT AUTHORISED; D-PROD-4 NOT approved; ISSUE-265 stays open.** The agent did local
+  reads, sha256 checks, read-only `git --no-optional-locks log` of the workstation repository, offline pack work and stubbed dry runs
+  in the session scratchpad. There was no host, SSH or database contact, no fetch, push or other Git mutation in a real repository,
+  and no evidence edit. (In the first dry run a harness PATH defect let a real `npm ci` run inside a throwaway scratchpad clone; it is
+  disclosed in §28.14 and touched nothing outside the scratchpad.)
+  - **Integrity:** `D:\tmp\issue265\run-D2-20261006-193519-Prod\`, manifest file hash `5eebb526…c32b` as expected; 26/26 verified;
+    inventory 27 = 26 + the manifest, exactly `g2`'s `FRESH T-EXACT` file set. 15 items; 14 exit 0; the 70 preflight's exit 1 is its
+    expected `BLOCKED` baseline. The pack self-verified on the host (`071dc08e…3c67`).
+  - **Refs and worktree:** HEAD and `main` `1111ab19` before and after; 59 refs before and after, with exactly two changed
+    (`origin/HEAD`, `origin/main` → `cd3cf782`); `FETCH_HEAD` rewritten; the index matched HEAD before, and the porcelain status is
+    byte-identical before, after and at item 71 (36 known manifests). The fetch changed remote-tracking refs only.
+  - **Verdicts (preparation, not acceptance):** freshness `FRESH T-EXACT` (`ls-remote` before and after = `cd3cf782`); D3 range
+    IDENTICAL on commits (26), `--no-renames` paths (116), migration blobs (110), `deploy/` hashes (17) and added paths (36), exactly
+    `A 110` and the two AFL API units; `PREDICTED-COLLISION-FREE` over PROD's three unmerged remote refs; post-fetch preflight
+    `AS-PREDICTED` (WT 36 = C0's 36, behind 26, missing-base 110; parity 109/109). It approves nothing.
+  - **Range (all 26 commits):** 14 docs-only, 2 test/hygiene, 1 data/tooling (ISSUE-225, only on reload), and 9 that change runtime
+    behaviour (web at restart; settles at merge). Infrastructure is carried by two of them: the AFL API unit files (not installed on
+    PROD: no effect) and migration 110 with its rollback guard. `package*.json`, `next.config.ts`, `server-cluster.mjs`, the web and
+    AFL Tables units, the wrapper, privileges, `tools/dev` and `migrate.ts` are unchanged.
+  - **Findings:** no MED or higher. **P-1 (LOW):** `next build` deletes `.next` (except `cache`) first, so the live web runs from deleted
+    files during every in-place build and a failed build leaves no bundle; the recovery copy (D-PROD-9) is now the basis of build
+    recovery. **P-2 (LOW, fixed before sealing):** the dry run showed that a failed bundle moved aside inside the checkout would be an
+    unknown untracked path; aside folders now go under `~/afldb-recovery/`.
+  - **Deploy pack r1:** `D:\tmp\issue265\prod-deploy-pack-r1\` (39 files + manifest `d8413f73…7e5a`); archive
+    `prod-deploy-pack-r1.tar` sha256 `d5e61848…12d8`. `d5-deploy.sh` (detached D5 with G-START, recovery copy, merge, `npm ci`,
+    preflight grade, rollback guard, pins, build, build recovery, restart); `c1-capture.sh --phase ds|c1` (20 checks);
+    `d7-migrate-110.sh` (B1); `r-rollback.sh` (the migration-110 guard run at T, roll-forward-only on REFUSED, the reversal only with its
+    own flag, then PREV); `nk-capture.sh` (journal JSON by invocation id, anchored markers, server-log positive controls); every
+    command's exit captured. Every open decision is a required flag with no default.
+  - **Checks:** `bash -n`, `node --check`, no CR, copies byte-equal; reversal constants equal C0's `p01`; preflight grader 18/18;
+    journal grader 19/19, including the real PROD journal JSON of the C0 supplement; stubbed dry runs of every refusal, the happy path
+    (D5 → DS 20/20 → D7 → C1 → N-k counted), rollback REFUSED (exit 2) and permitted, build failure with restore, and N-k negative
+    controls. **Untested:** everything on PROD; the three new SQL files have never run.
+- **Next action.**
+  1. Operator: D-PROD-4 (binding), and D-PROD-1, -2, -5, -9, -14, -15, -16, each a required pack flag; then -6, -7, -8, -10, -11
+     (recommendations in runbook §28.14.7).
+  2. Operator: the deployment's own authorisation; then the README §4 sequence (D5 detached, DS, D7, C1, N-k). Nothing is authorised by
+     this entry.
+  *(Superseded by the r1 review below.)*
+- **Deploy pack r1 reviewed before an approval request (2026-10-06; agent, offline; runbook §28.15). r1 NOT READY; deployment NOT
+  AUTHORISED; ISSUE-265 stays open.**
+  - **What the agent did:** local reads; sha256 checks; extraction of the r1 archive into the scratchpad and a comparison with the
+    folder; two stub tests in the scratchpad; one new documentation file; these tracker edits.
+  - **What it did not do:** no host, database or Git contact; no pack script edited. r1 (manifest `d8413f73…7e5a`, archive
+    `d5e61848…12d8`) is unchanged, and every earlier verdict stands.
+  - **HIGH (both confirmed offline):**
+    - RV-1: the build-failure restore item restarts the web even after a refused settle guard or a failed restore.
+    - RV-2: the N-k server-log check grades "0 deadlocks" PASS when the logs were not read.
+  - **MED:**
+    - RV-3: `restore` covers neither a build-check failure nor a restart/health failure.
+    - RV-4: the restore runs under a 300 s default timeout.
+    - RV-5: the health poll can run 120–720 s, not 120 s.
+    - RV-6: `npm ci` is unnecessary (the lock is unchanged) and its failure also breaks the rollback.
+    - RV-12: the marker match is not anchored or tied to the session.
+    - RV-13: there is no rotation or window-start proof.
+  - **Also:** the "within the health poll" recovery assurance is withdrawn (no measurement exists). P-1's request-level effects are
+    possible and not observed.
+  - **Recommendations:** stay in-place for this release with the r2 fixes (a release-directory build becomes a tooling follow-up,
+    DEV-rehearsed first). New decision **D-PROD-17** `--npm-ci verify-only`. D-PROD-16 redesigned with bracketing markers; missing
+    evidence grades INCONCLUSIVE.
+  - **Draft README:** `D:\tmp\issue265\prod-deploy-pack-r2-draft\README-PROD-DEPLOY.md` (sha256 `ce0b1b1f…33c7`), with the findings,
+    the failure-by-step matrix, and the exact flags and commands.
+  *(Superseded by the r2 build below.)*
+- **Deploy pack r2 built and sealed offline (2026-10-06; agent; runbook §28.16). Deployment NOT AUTHORISED; no decision approved;
+  ISSUE-265 stays open.**
+  - **Pack:** `D:\tmp\issue265\prod-deploy-pack-r2\` (44 files + manifest `7c17a16e…9231`); archive `prod-deploy-pack-r2.tar`
+    `3cc7076c…b4da`. Tests: `prod-deploy-pack-r2-offline-tests\` (manifest `94f54f06…32e0`, archive `99f8b8e8…32e4`).
+  - **Fixed:**
+    - RV-1: no restart unless the restore exited 0 with C0's BUILD_IDs, and every guard now blocks.
+    - RV-2: the server log grades INCONCLUSIVE unless it was read completely, and the journal reads are exit-checked.
+    - RV-3…RV-7 and RV-11…RV-16. Recovery covers 40/45/50 (exits 20–23). The rollback restarts the web before the checkout.
+      Each step has an explicit timeout and health a 180 s wall-clock deadline. Bracketing anchored, session-tied markers.
+    - New D-PROD-17 `--npm-ci verify-only` (lock blobs, installed tree vs lock, tools and probes, `npm ls --offline`; refuses on
+      doubt).
+    - The "two full-outage paths" claim is replaced by a non-exhaustive list of seven supported modes.
+  - **Found and fixed while building:** `verify-deps` with `--project .` would have refused every verify-only run. N-k `S3` passed
+    on empty reads.
+  - **Checks:** self-tests 18/18, 19/19 (real C0 journal), 28/28, 43/43. **Stub dry runs of the sealed scripts: 378/378 assertions
+    in 57 cases.** The harness has a locked PATH, node with its network blocked, intercepted `kill`, and fails closed on a missing
+    stub. These prove control flow only; nothing ran on PROD, DEV or a database.
+- **r2 reviewed (2026-10-06; agent; runbook §28.17; read-only, no command run). r2 NOT READY; r2 and its archive unchanged.**
+  - **UC-1 (MED):** `dp_next_untouched` (`lib/bundle.sh:66-80`) checks the two BUILD_IDs, the mtime of `standalone/server.js`
+    and an entry count. A same-count change (an in-place rewrite, or a rename) yields `NEXT-UNTOUCHED`; this was shown by trace
+    over the sealed fixture, not run. Proposed r3 fix: a verified copy is mandatory, plus name-set equality and
+    `tar --compare` outside the names `cleanDistDir` keeps. The item-41 limit becomes 1800 s. Proposed negative cases:
+    D06a–d.
+  - **Completed rollback:** scripts PASS. Leaving main at PREV is rejected: origin/main = T still FAILs the gated modes, it
+    re-arms r2's D5 and `git pull`, and it rewinds a ref. README line 206 is incomplete (LOW, doc only). Recorded: the holding
+    state, a never-list, evidence preservation, Exit A (revert commit R with PREV's tree, then a guarded `update-ref` and an
+    attach; proposed D-PROD-18) and Exit B (roll forward in a new pack).
+- **Deploy pack r3 built and sealed offline (2026-10-07; agent; runbook §28.18). Deployment NOT AUTHORISED; no decision approved;
+  D-PROD-18 documented only; ISSUE-265 stays open.**
+  - **Pack:** `D:\tmp\issue265\prod-deploy-pack-r3\` (44 files + manifest `e2c0d047…ae2c0`); archive `prod-deploy-pack-r3.tar`
+    `35e8f2d8…ba14a`. Tests: `prod-deploy-pack-r3-offline-tests\` (230 files + manifest `09a7ff1d…3a4c`, archive
+    `62e39f03…08b8`). r1, r2, r2's tests and all evidence re-verified unchanged.
+  - **UC-1 fixed** (`lib/bundle.sh` `dp_next_untouched`). UNTOUCHED requires all of: a verified copy (mandatory); exact path sets
+    excluding only Next's kept top-level `^(cache|dev|lock|trace)`; `tar --compare -v` over exactly those members with exit 0,
+    an empty stderr and a complete listing; no ctime change since D5 started; and the copy re-verified. Any error, unreadable
+    entry or timeout restores. Item-41 limit 120 → 1800 s. Live ISR writes count as TOUCHED (restore + restart).
+  - **tar --compare measured, not assumed** (GNU tar 1.35, ext4): it misses extra files, directory mtimes, a truncated archive
+    (exit 0) and trailing bytes; an unreadable entry or a symlink replaced by a file is exit 2. These gaps are covered by the path
+    sets, the sha256 checks and the listing check.
+  - **F-r3-1 (LOW, fixed):** an inherited `TAR_OPTIONS` would have changed the copy, its verification and the restore; every tar
+    call is now `env -u TAR_OPTIONS`.
+  - **Rollback:** the detached holding state is kept, and README §10 documents its restrictions, the never-list, evidence
+    preservation and the proposed Exits A (D-PROD-18) and B. Nothing implemented. New proposal **D-PROD-19**: the same
+    comparison before `--bundle keep`.
+  - **Checks:**
+    - Self-tests 18/18, 14/14, 19/19, 28/28, 43/43 (real tree SUITABLE).
+    - Linux, locked down: tar characterisation 76/76; group U (the actual function through the pack's `cap`) 105/105; r2
+      control K 4/4 (UC-1 reproduced on the sealed r2); a real 33,723-entry Next build tree 5/5 (6 s).
+    - **Stub dry runs of the sealed r3 scripts: 490/490 in 62 cases**, including D06a–e. Stub r2 control: D06a/b/d fail on r2
+      as required.
+    - Run 1 was superseded (Windows MAX_PATH in the harness, not a pack result) and is kept. README §11's "25 cases" is an
+      erratum for 24.
+- **Deploy pack r4 built and sealed offline (2026-10-07; agent; runbook §28.19). Authorised as offline preparation of the
+  `--bundle keep` safeguard only: no rollback, no deployment; every deployment decision stays undecided; ISSUE-265 stays open.**
+  - **Pack:** `D:\tmp\issue265\prod-deploy-pack-r4\` (44 files + manifest `aa183ace…d0b4`); archive `prod-deploy-pack-r4.tar`
+    `6cedef9b…39a5`. Tests: `prod-deploy-pack-r4-offline-tests\` (149 files + manifest `bbda6ffd…6016`, archive `d539639f…9775`).
+    r3 and r3's tests re-verified unchanged.
+  - **Change (`r-rollback.sh` only):** `--bundle keep` verifies the copy in its prelude (exit 3), and item 40 (60 → 1800 s) runs
+    the r3 UC-1 comparison `dp_next_untouched`, byte-identical to r3, with `<since>` = the rollback start. Anything but
+    `NEXT-UNTOUCHED` with exit 0 gives `KEEP REFUSED` (exit 10): no restart, no checkout, no dependency step, no automatic mode
+    change. Items 41/30/31 re-check the proof themselves. D-PROD-19 is thereby implemented (no flag).
+  - **Exclusions:** confirmed equal to Next 16.3.1's `cleanDistDir` (`build/index.js:623-624`, `recursive-delete.js:122-124`): a
+    prefix match on top-level names only (`trace-build`, `lockfile`, `devtools/` kept; nested `server/trace`,
+    `standalone/.next/cache/` deleted; case-sensitive). Running Next's own deletion on a 51-entry fixture kept 19 paths, exactly
+    the 19 each pack expression excludes. Nothing broadened.
+  - **F-r4-1 (MED, operational, fail-closed; not fixed; proposed D-PROD-20):** the restore extracts under `umask 077`, so after a
+    D5 restore the modes differ from the copy and keep always refuses on PROD (Linux UK03/UK04). The r3 route "restore + restart
+    OK → keep" is gone: choose recovery-copy or rebuild explicitly. Possible fix: `tar -x --preserve-permissions`. r3's stub R10
+    withdrawn.
+  - **Checks:** static clean; self-tests as r3; Linux tar 76/76, U 105/105, UK 25/25, K 4/4, real 5/5; **stub 681/681 in 70
+    cases (D 24, R 10, new RK 9: unchanged → continue; same-size/mtime-kept rewrite, same-count rename, copy unverifiable before
+    or during the run, unreadable entry, compare timeout, and a difference with no restart due → refused, each with no kill, no
+    checkout, no npm, no mv/extract, HEAD T)**; r2 control 3/3; **r3 control 7/7** (r3 rolls back through every refusal case).
+    README §11's D count corrected to 24.
+- **Deploy pack r5 built and sealed offline (2026-10-07; agent; runbook §28.20). Authorised as offline preparation of the
+  F-r4-1 fix only: recorded as an implementation fix, not a deployment decision (D-PROD-20 withdrawn); no rollback, no
+  deployment; ISSUE-265 stays open.**
+  - **Pack:** `D:\tmp\issue265\prod-deploy-pack-r5\` (44 files + manifest `7dd2fbb7…8f0f`); archive `prod-deploy-pack-r5.tar`
+    `e59485bb…accf`. Tests: `prod-deploy-pack-r5-offline-tests\` (154 files + manifest `f12453c4…43d0`, archive
+    `9eec4a96…081f`). r4, r4's tests and r3 re-verified unchanged.
+  - **Change (`lib/bundle.sh` `dp_bundle_restore` only):** the restore extracts with `tar --preserve-permissions -xf`, so as
+    `arm` under `umask 077` the restored tree gets the copy's modes (root and directories included); one `MODES …` information
+    line. D5 recovery and rollback `recovery-copy` both use this one function. Verification, guards, refusals and restart
+    prerequisites unchanged. After a D5 restore, `--bundle keep` is again the rollback (README §3/§4).
+  - **Checks:** static clean (only that function changed in code); Linux UK 24/24 (UK03 flipped); **new group RS 101/101** (the
+    actual D5 and rollback restore paths, an independent Python oracle against the archive, keep accepts the restored tree,
+    keep refuses altered contents/modes/symlinks, a real extract failure never restarts, refused restores move nothing);
+    **RS r4 control 18/18** (F-r4-1 reproduced on sealed r4); stub 695/695 in 71 cases (R10 reinstated); r2/r3 controls as r4.
+- **Operator decisions on r5 (2026-10-07; runbook §28.21). Execution NOT authorised.** Approved: **D-PROD-4** (narrow: deploy
+  mode accepted only with the two exact FAIL classes, known manifests and pending 110 before D7); D-PROD-1 A (`cd3cf782` by SHA),
+  -2 accept 26, -9 recovery copy yes, -14 `beta.afldb.com`, -15 restore, -16 log marker yes, -17 verify-only; D-PROD-6 two counted
+  AFL Tables runs within 7 nights; D-PROD-7 decline (no sampler); D-PROD-8 do not run (no controlled PROD promotion). D-PROD-5
+  window (second message): **2026-10-07 10:30–12:30 AEDT (+11:00)**; operator available and pausing uploads, promotions and Match
+  Sheet saves. Not named, to confirm: Data Editor saves, on-demand settles, the B1 player-statistic pause to the morning after the
+  first counted night. Still open: D-PROD-10 (at closure), -11 (outside 265); D-PROD-18 proposed only.
+- **D-PROD-5 confirmed in full (2026-10-07, third message; runbook §28.22). Execution NOT authorised.** Window: 2026-10-07 from
+  10:30 AEDT (+11:00). 12:30 is a progress review point, not an automatic stop. The operator stays available and holds the pauses
+  until deployment, migration and verification finish, or recovery reaches a verified safe state. Paused throughout: uploads,
+  promotions, Match Sheet saves, Data Editor saves and on-demand settles. B1: Match Sheet player-statistic corrections stay paused
+  until the morning after the first counted AFL Tables night. Every §28.21 decision is preserved.
+  - Local read-only pack check:
+    - archive `e59485bb…accf` ✔;
+    - manifest `7dd2fbb7…8f0f` ✔;
+    - 44/44 listed files ✔;
+    - 49 archive entries under one top folder;
+    - no CR byte;
+    - `bash -n` 13/13.
+  - A fail-fast PowerShell transfer block (verify, refuse existing paths, copy, remote hash before extraction, `TAR_OPTIONS` removed,
+    manifest and file-set check, `bash -n`, `R5-PACK-VERIFIED`) and the D5 launch line with `--window-confirmed 2026-10-07` were
+    prepared and returned to the operator. Neither was run, and no host was contacted.
+- **D5 deployment AUTHORISED (2026-10-07; runbook §28.23).** Pack r5, with exactly the approved options and
+  `--window-confirmed 2026-10-07`. The operator confirmed the pauses are in place and runs D5 on PROD as `arm`. **D7 (migration
+  110), any rollback (including `--bundle keep` after a D5 exit 20) and any 110 reversal remain NOT authorised.** The transfer
+  output has not been returned yet.
+- **D5 on r5 refused at the window guard: pack defect F-r5-1; r6 built and sealed offline (2026-10-07; runbook §28.24).**
+  - PROD (operator-run; launch log `/home/arm/issue265-prod/d5-launch-20261007-114955.log`): D5 refused with
+    `WINDOW REFUSED: the AFL Tables timer's next elapse was not read`.
+  - Cause: PROD's `systemctl show … --value` ignores `--timestamp=unix` and printed `Thu 2026-10-08 04:37:30 AEDT`. r5 kept
+    only `@<seconds>`, so the read was always empty. The same pattern was in G-START `S3`, the DS/C1 start guard and `W3`,
+    and N-k's last trigger. r5's stub printed `@<seconds>` on request and hid it.
+  - **A pack defect that failed closed:** the timer window was safe, and D5 refused before any change. Not a deployment
+    failure.
+  - r6 `D:\tmp\issue265\prod-deploy-pack-r6\`: manifest `34680b59…e44b`, archive `e3da234e…706f`; tests manifest
+    `4be1c60b…1f18`, archive `5864616e…4a94`.
+  - The fix, new `lib/timestamp.sh`: no `--timestamp`; systemctl and date exit statuses checked; a strict shape plus a
+    date round trip; refusals on failed, empty, `n/a`, malformed or past values, with diagnostics kept. The 04:15–06:00
+    exclusion and the 60-minute minimum are kept. G-START `S4` now FAILs on an unread local time.
+  - Offline: Linux WG 259/259 (exact PROD output, failures, malformed values, past, 59/60 min, 04:15/06:00, DST); WG r5
+    control 6/6; RS 101/101; stub 802/802 in 82 cases (new group W 11); stub r5 control 13/13.
+  - One wrong static grep was corrected and recorded. The transfer block is prepared, 11/11 offline.
+  - r5 is unchanged. **r6 NOT RUN; not authorised (the D5 authorisation named r5).** D7, rollback and reversal are NOT
+    authorised. The decisions are unchanged.
+- **D5 on r6 AUTHORISED (2026-10-07; runbook §28.25).** The operator authorised an operator-run D5 with pack r6, the approved
+  options and `--window-confirmed 2026-10-07`.
+  - Transfer: run 14:48 AEDT, `R6-PACK-VERIFIED`. The agent read the local record `D:\tmp\issue265\r6-transfer-20261007-144800\`:
+    archive `e3da234e…706f` and manifest `34680b59…e44b` match, 45/45 files verified, no unlisted file, `bash -n` 14/14, nothing executed.
+  - Every earlier decision and all the pauses stand, including B1. 12:30 was a progress review, not an end time.
+  - Launch, monitor, outcome and DS blocks were returned to the operator. The launch writes a new log
+    `~/issue265-prod/d5-launch-r6-<stamp>.log`, and a wrapper records `D5_EXIT=`. The r5 refused log is preserved. There is no
+    automatic retry.
+  - **D7 (110), any rollback (including `--bundle keep`), any 110 reversal and a README §5 sudo restart are NOT authorised.**
+  - A completed deployment is not PROD acceptance.
+- **D5 and DS on r6 reported by the operator; D7 and C1 AUTHORISED (2026-10-07; runbook §28.26).** These are pasted operator
+  results. The agent read neither PROD folder.
+  - D5 `/home/arm/issue265-prod/D5-20261007-153007` (manifest `8d44ba8f…c9ff`): all items exit 0, `OUTCOME D5 COMPLETE`,
+    `CHECKOUT=T`, BUILD_ID `soM_1u3Nf9aIamMtnpfWn`, web active/running MainPID 2131615, `D5_EXIT=0` at 15:34:53 +11:00.
+  - DS `/home/arm/issue265-prod/DS-20261007-154459` (manifest `215ea244…e077`): fresh connection more than 2 min after the
+    restart, all items exit 0, 20/20 checks, `DS PASS`, `DS_EXIT=0`.
+  - **Deployment success on PROD is supported by DS, as the operator reported it. This is not PROD acceptance.** The database stays
+    in State A (ledger 109) until D7.
+  - Authorised: an operator-run D7 with r6 and that exact DS folder (`--window-confirmed 2026-10-07`). After D7 succeeds, C1 from a
+    fresh connection with `--public-host beta.afldb.com --d-prod-4 approved --log-marker yes` (the one opening-marker server-log line).
+  - Three blocks were returned, in `D:\tmp\issue265\r6-d7-c1-blocks-20261007\BLOCKS.md`. They are proofread only; nothing was run.
+    1. A guarded detached D7 launch with a `D7_EXIT=` wrapper and a new log.
+    2. A read-only wait and outcome block that ends `GO-FOR-C1` or `NOT CLEAN: STOP`.
+    3. A guarded C1 launch that refuses if any C1 log or folder exists, because N1 needs exactly one opening marker.
+  - There is no automatic retry. Rollback, 110 reversal, restarts and timer changes are **NOT authorised**. All pauses and B1 stand.
+  - Process deviation: one local read-only Bash listing of the r6 pack (CLAUDE.md §9). Recorded in §28.26.
+- **D5, DS, D7 and C1 on r6 graded from the copied evidence (2026-10-07; runbook §28.27).** The agent read the workstation copies only
+  (no host, database or network contact, no Git command) and re-ran the pack's preflight grader locally.
+  - **Integrity:** the four manifest-file hashes equal the operator's expected values (D5 `8d44ba8f…c9ff`, DS `215ea244…e077`, D7
+    `73540daf…a8db`, C1 `80f807a1…19d5`). All 97 listed files verify, with no unlisted or missing file. Every `exits.tsv` row is 0.
+    The launch logs' printed manifest hashes equal the computed ones. The log hashes were calculated locally and not compared with remote.
+  - **Graded:** D5 COMPLETE; DS PASS 20/20 re-derived; D7 COMPLETE (migration 110 applied exactly once, 16:11, State B); C1 PASS 21/21.
+    **Deployment success on PROD is supported by independently graded evidence.**
+    - HEAD, `main` and `origin/main` = `cd3cf7827da15dc73968bf775c62b975c5f26587`; the 37 untracked paths are all `settle-*.json` manifests
+      (C0's 36 plus the 2026-10-07 04:41 run's).
+    - BUILD_ID `rjrdXKga5b7MBY_LjXA06` → `soM_1u3Nf9aIamMtnpfWn` in both places; web MainPID 1892284 → 2131615, started 15:34:50 AEDT after the
+      bundle, `NRestarts=1`, no restart between DS and C1; local and public (`beta.afldb.com`) health 200.
+    - The three installed units equal C0's hashes (no reinstall, D-PROD-12); AFL API, Brownlow and intake units still absent; source pins 4/4.
+    - Preflight: only the two D-PROD-4 classes before 110 (working tree, pending 110), only the working tree after it. A negative control on the grader blocks.
+    - Migration: ledger 109 → 110; CHECK 13 → 14 literals incl. `player_match_stats` (md5 `8485a110…`, **the pack's predicted value, now confirmed**);
+      comment md5 `37f2fe81…`/590 re-derived from the migration file; rollback guard PERMITTED, 0 `player_match_stats` records.
+    - Database baseline: batches max 46 (the one new batch since C0 is the scheduled 2026-10-07 04:41 run on PREV's code), 36 cap rows byte-identical
+      to C0, `deadlock_fp` none, gate 0, no legacy submission in any state.
+    - C1's opening marker `AFLDB-ISSUE-265-NK-MARKER C1-1791350246852473008` was raised 16:17:31.000980 +11:00 (client side; the server-log line is read by N1).
+  - **Gaps and discrepancies (nothing corrected):** a transfer interruption (the first transfer failed during C1; an outbound SSH IPS block
+    `ET SCAN Potential SSH Scan OUTBOUND` at 16:21:39 was allowed by the operator; a later single SCP copied C1 and the four logs; no partial copy exists;
+    the destination is **not** claimed verified from the screenshot); `DS_EXIT=0` operator-reported and absent from the saved DS log (folder evidence consistent);
+    "fresh SSH connection" unprovable from the folder (timing shown: 10 min after the restart); batch 46 known from the database only;
+    PROD build 1,516 pages vs 1,515 on `afldb_test`. None changes a grade.
+  - **PROD acceptance is NOT achieved:** 0 of 2 counted AFL Tables runs. The period starts at C1 (2026-10-07 16:17 +11:00); the first scheduled run on the new
+    code is due 2026-10-08 04:37:30. At most 7 nights (N7 = 2026-10-14), else INCONCLUSIVE. No overnight sampler and no controlled PROD promotion is approved.
+  - **Pauses:** the deployment-window pauses can be released (operator's act). **The B1 pause stays**: no Match Sheet player-statistic corrections until
+    the morning after the first successfully counted AFL Tables night. Recommended, not decided: avoid on-demand settles during observation, and avoid
+    starting legacy promotions between about 04:15 and 06:00 on 2026-10-08.
+  - **ISSUE-265 stays open.** Rollback, any 110 reversal, any restart, any timer change, any re-run of D5, D7 or C1 stay NOT authorised.
+- **N1 graded from the copied evidence (2026-10-08; runbook §28.28) — NIGHT COUNTED 1; PROD acceptance 1 of 2.** The agent read the workstation
+  copies only (no host, database or network contact, no Git command), re-ran the pack's journal and server-log graders locally and also read the raw
+  journal JSON independently. Saved verdicts were not relied on.
+  - **Integrity:** return archive sha256 `6cabf202cbc6bba8fa0ac9e1c5e810b133b843e93ae6ae661a5eecb9449abac4` and N1 `MANIFEST.sha256` file hash
+    `fea6936a164c28807dbb154abe71fc027ff8ff4b6cafb55144a07c2945430444` equal the operator's values; 25 listed files verify, 26 in the folder (25 + manifest);
+    the archive extracts to a byte-identical folder; all 21 `exits.tsv` rows are 0 and the log carries `N1_EXIT=0` at 14:13:21. The launch log's sha256
+    `74d9225f…dcbe1` is calculated locally and **not compared with a remote hash**. The pack (`34680b59…e44b`) and the C1 baseline (`80f807a1…19d5`) are the
+    ones that ran.
+  - **The counted run:** timer `LastTriggerUSec` 04:37:45 (first journal line 0.53 s later); invocation `db337a7903524876be765ef081485654`; exactly one
+    anchored `AFLDB_SETTLE_SUCCESS label=settle-2026-2026-10-08-0437` and no failure marker; `Result=success`, `ExecMainStatus=0`; `Applied as import batch 47:
+    0 canonical row(s) inserted, 60 updated, 60 ledger row(s), 0 retried after resolution, 0 refused at the write, 0 unit(s) rolled back` (derived recompute, 58
+    players); exactly one completed batch (47) with `started_at` 04:37:58.144 inside the run; `canonicalApplyFailures` 0, `issues_opened` 0, `issues_refreshed`
+    0; no gate-timeout text in the 188 journal entries; 37.6 s from the first to the last line. A negative control (no timer trigger given) grades the same night
+    NOT-COUNTED, so the timer check is live.
+  - **Deadlock checks, all clean:** 0 of 188 settle-journal entries; the web journal read completely with no matching line (its one unfiltered line is not
+    preserved); the server log: 8 files read twice with identical results, C1's opening marker found once (line 23, tied) and N1's closing marker once (line 27,
+    tied), **0 `deadlock detected` lines between them**, 0 in any file at any time; `data_issues` sections D and F empty; `deadlock_fp` `0|none` equals C1's;
+    `gate 0`. Information: 2 `statement_timeout` lines in the rotated `.5.gz` (2026-09-01 to 09-05), before the deployment.
+  - **State:** `cap_fp` and all 36 `cap_row` lines identical to C1 (the 20 `[warning] afl_api|apply|player_match_stats` journal lines are the settle's report of
+    those existing findings, all `first detected 2026-09-28`, all `foreign_source_owner`, none new); HEAD `cd3cf782`, 0 tracked changes, 38 known manifests,
+    BUILD_ID and web MainPID 2131615 unchanged, unit hashes equal C0/C1. No promotion or upload reached the database since the deployment.
+  - **Gaps (no grade changes):** one second between N1's journal-window end (14:13:15) and its capture start (14:13:16), handled by setting N2's `--since` to the
+    window end; N1 was captured at 14:13, not in the morning; the settle's gate hold was not observed at lock level (no sampler approved); N-k does not measure the
+    rollback guard or Match Sheet saves.
+  - **B1:** the approved criterion (the capture that grades the first counted night COUNTED) is met, so **the Match Sheet player-statistic pause may lift**. That
+    is permission, not an observed action: lifting is the operator's act, nothing in N1 shows it either way, and the first such record makes the release
+    roll-forward-only (D-257-7). It does not wait for N2 or the morning of 2026-10-09 (corrected 2026-10-08: an earlier literal-morning suggestion is withdrawn).
+    Recommendation, not a decision: avoid legacy promotions, Match Sheet saves, Data Editor saves and on-demand settles between about 04:15 and 06:00 on the
+    remaining mornings. Legacy promotions take the exclusive gate, so one still running at 04:30 delays the settle (up to 300 s; a stuck one makes the night
+    INCONCLUSIVE); Match Sheet and Data Editor saves are outside the gate and can still contend with the settle, and a deadlock would be graded against
+    acceptance (§28.7, §28.28.6).
+  - **PROD acceptance is NOT achieved:** 1 of 2 counted runs; N7 = 2026-10-14. ISSUE-265 **stays open**; closure is a separate D-PROD-10 decision. Rollback, any
+    110 reversal, any restart, any timer change, any re-run of D5, D7, C1 or N1, an overnight sampler and a controlled PROD promotion stay NOT authorised.
+- **N2 retrospective capture RUN, verified and graded; batch 53 accepted as the second counted run (2026-10-14; runbook §28.29–§28.30).**
+  - Owner approved D-RETRO-265-20261014 (one retrospective capture; the prescribed 2026-10-09 N2 was missed and no N3–N6 exists). Operator-run 2026-10-14
+    10:13:43–10:13:49 +11:00, `CAPTURE_EXIT=0 TEE_EXIT=0`, 21 items exit 0, one server-log marker, capture 5 h 35 min after the run.
+  - Integrity (agent, local): archive `3a311425…cf43` and manifest file `760e3622…d6a2` equal the owner's values; 25 of 25 files verify; the archive extracts to a
+    byte-identical folder; the pack graders re-run locally agree. The launch-log hash (`7daa1e1f…be64b`) is local only; the precheck/capture/packaging transcript is operator-supplied.
+  - Invocation `55a9060a…` (batch 53, 04:37:15–04:38:02) meets all six §28.4 conditions (timer-fired, one success marker, 0 units rolled back, 0 apply failures, no gate-timeout text);
+    a no-change night. Batches 48–52 are `NOT-COUNTED (J1 TRIGGER-UNPROVEN)` and stay uncounted.
+  - Owner accepted batch 53 as the second counted run, retrospectively: **2 of 2** (batch 47; batch 53). Every element of the §28.6 acceptance row is met: 0 deadlock text in
+    the settle, web and server-log intervals; `deadlock_fp` and all 36 `cap_row` lines identical to C1; no promotion since the deployment.
+  - Limitations kept: no contention or refusal path on PROD, missed per-night evidence for 9–13 Oct, the web journal's unpreserved line, `copytruncate` rotation on 11 Oct.
+- **Next action (as at 2026-10-07; superseded by the one below).** N1 on 2026-10-08 after 06:00 with `--c1` and `--prev` = the C1 folder (instructions
+  `D:\tmp\issue265\n1-instructions-20261008\N1-INSTRUCTIONS.md`). **Done: see the N1 grade above.**
+- **D-PROD-10 decided; RESOLVED on the owner's decision (2026-10-14; runbook §28.31). Closure documentation prepared locally; commit, merge and push PENDING.**
+  - **Owner decision D-PROD-10.** Accept the §28.6 passive-acceptance result as satisfied retrospectively: N1 (2026-10-08, batch 47) and the scheduled 2026-10-14
+    invocation `55a9060a041d4092bb62e27ad3828af3` (batch 53, independently COUNTED) are two counted runs within seven nights; the earlier missed nights (9–13 October)
+    remain uncounted. Closure is authorised on that basis, preserving every §28.7 limitation and the additional disclosed evidence gaps. This is **not** contention
+    testing and **not** contemporaneous capture.
+  - **Root cause.** A settle unit takes its match row locks (`lockUnitMatchRows`) in feed order and holds them to the end of the settle transaction, while the ISSUE-264
+    promotion hooks lock their existing matches in ascending id and hold them to commit. A settle that held a later match and waited for an earlier one a promotion held
+    formed a lock cycle and could be the deadlock victim; its unit rolled back to its savepoint with no in-run retry (runbook §10–§14).
+  - **Fix (commit `cd3cf782`; no migration, schema or privilege change).** A transaction-level advisory gate `(717275, 4)`: both settles take it shared as their first
+    call, and the three match-writing legacy hooks (`match_results`, `player_match_stats`, `match_attendance`) take it exclusively before they lock any match. A promotion
+    that meets a running settle waits 5 s and is refused with the existing retryable message, writing nothing; a settle that meets a promotion waits up to 300 s
+    (`lock_timeout`, with a 330 s transaction-local `statement_timeout` for that statement) and then fails before writing, naming the promotion. `match_attendance` now
+    locks in ascending id.
+  - **Validation.** Phase B 11/11 on `afldb_test` (§23); regression window passed (32, 16, 7 and 76 tests, §25) and build passed (§25.8); DEV acceptance PASSED
+    2026-10-06 (§27); PROD deployment checks 20/20, post-migration capture 21/21 and C1 PASS (§28.27); PROD passive acceptance (§28.6): two counted AFL Tables runs, batch 47
+    and batch 53 (retrospective; §28.28, §28.30).
+  - **Residual limits (§28.7, §28.30.6; kept, not cleared).** No contention or refusal path was exercised on PROD; the AFL API settle and the 300 s reverse-direction wait
+    are proved on `afldb_test` only; writers outside the gate (Match Sheet and Data Editor saves, `player_bio`, direct SQL; ISSUE-261 is separate) are not covered; nights
+    9–13 October have no per-night evidence and stay uncounted; the web journal's single line is unpreserved; the `copytruncate` rotation on 11 October; the 36 open
+    `canonical_apply_failed` findings (first detected 2026-09-28) are not attributed to this change.
+  - **PROD hold.** The ISSUE-265-specific PROD deployment hold releases **only after the closure documentation is merged, pushed and verified**. Until then it remains
+    active; it is **not released** by this entry. Other issues' independent PROD prerequisites are unchanged. No deployment is authorised.
+  - **Separate and unchanged.** B1 (D-PROD-3, the Match Sheet player-statistic pause) stays a separate pause. D-PROD-11 (a deploy-mode tooling issue) stays a separate
+    follow-up, not a closure prerequisite and not opened here. Rollback, any 110 reversal, restarts, timer changes and re-runs stay NOT authorised.
+  - **Records moved.** The runbook is now `issues/closed/AFLDB-ISSUE-265.md`, with `issues/closed/AFLDB-ISSUE-265-phase-a/` and
+    `issues/closed/AFLDB-ISSUE-265-prod-settle-timing.sql`; `eslint.config.mjs` names the relocated Phase A preload. Entries above name the original `issues/open/`
+    locations as historical provenance.
+  - **Pending (operator).** Stage, commit, `merge:ready -- --issue 265 --runbook issues/closed/AFLDB-ISSUE-265.md`, merge, push, then verify the closure documentation is
+    on `origin/main`.
 
 ## AFLDB-ISSUE-266 — Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin
 

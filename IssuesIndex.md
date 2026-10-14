@@ -9,86 +9,11 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 46 (ISSUE-229, ISSUE-265–270, and the 39 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13)
+**Open issues:** 45 (ISSUE-229, ISSUE-266–270, and the 39 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265 on 2026-10-14 with its closure documentation prepared locally, commit, merge and push pending)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
 > runbooks and `issues.md` are. Update it whenever a listed blocker or acceptance state changes.
-
-### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
-- **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
-  `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows`, `applyAttendanceEnrichment`),
-  `settle-afltables.ts`, `settle-afl-api.ts`, `settle-core.ts`, `src/lib/ingest/datasets.ts` (the
-  ISSUE-264 hooks, `match_attendance`).
-- **State:** Open (2026-10-04), from ISSUE-264 F-002. The operator accepted it as a temporary ISSUE-264
-  limitation (D-264-11). ISSUE-264 is resolved (2026-10-05, DEV accepted, PROD promotion outstanding;
-  runbook `issues/closed/AFLDB-ISSUE-264.md`); this limitation is **still open and not eliminated**, and the
-  DEV acceptance did not exercise it.
-  - A settle holding a later match can deadlock with a promotion holding an earlier one. If the settle is
-    the victim, one unit rolls back with a `canonical_apply_failed` finding and the run continues. There
-    is no in-run retry.
-  - Recovery comes on the provider's next in-season run: the AFL Tables §9.3 retry, or the AFL API
-    re-diff. This is traced in code (`issues/closed/AFLDB-ISSUE-264.md` §14.5.2). No real settle has been run into the
-    deadlock.
-  - DEV has no AFL Tables timer, so an AFL Tables unit waits for an operator-run settle.
-  - The deadlock is not eliminated.
-- **Runbook:** `issues/open/AFLDB-ISSUE-265.md`.
-  - **2026-10-05 investigation (runbook §10–§15):**
-    - **F-265-1**: an AFL API attendance-enrichment deadlock loses the **whole** run.
-    - `match_attendance` is a third, unordered legacy match writer.
-    - An in-run unit retry is futile in the main shapes.
-    - Recommended: a settle/promotion advisory gate. Independently reviewed.
-  - **2026-10-05 decisions (runbook §14.1):**
-    - D-265-1..12 accepted: Option 3 gate, with settles shared and the promotions (including
-      `match_attendance`) exclusive.
-    - D-265-5 accepted (2026-10-05): a 300 s settle gate wait with a 330 s gate-statement bound. PROD
-      records cannot validate it: promotion durations are not recorded. The D-265-13 query gives
-      settle-duration context only (runbook §16.4).
-    - D-265-14 accepted (Phase B case B11). D-265-15 accepted: the Phase A tooling is archived unchanged in
-      `issues/open/AFLDB-ISSUE-265-phase-a/` (runbook §20.7).
-    - Nothing implemented yet.
-  - Phase A window 1 (2026-10-05 15:23:57): FAILED, census CLEAN (runbook §17.12). It is kept as
-    historical evidence.
-  - **Phase A window 2 (2026-10-05 16:22:35): PASSED 3/3, census CLEAN** (runbook §17.14). C2, C1 and
-    F-265-1 are demonstrated with real settles. Retained: batches 1230, 1233 and 1237. No migration was
-    applied (109).
-  - Phase A is retired, and Phase B replaces it (runbook §17.15). The S0 checkpoint is commit 62f2cd67.
-  - **2026-10-05: mitigation IMPLEMENTED in the working tree, uncommitted** (runbook §21). Shared settle gate
-    (300 s / 330 s), exclusive gate in the three legacy hooks, ascending `match_attendance` hook, database-free
-    pins, Phase B harness B1–B11. Typecheck, lint, unit pins and the network-blocked skip check pass.
-    Pre-window verification (§22): the two failing tests are pre-existing; provenance manifests and a
-    full-`settle-afltables` regression runner are prepared.
-  - **Phase B window (2026-10-05 22:41, operator-run): PASSED 11/11 on `afldb_test`** (runbook §23). No skips,
-    census CLEAN, 14 retained `admin-upload` batches all explained, historical fingerprints unchanged, zero
-    teardown problems, provenance unchanged (58 files), no migration applied (State A). Evidence:
-    `D:\tmp\issue265\run-20261005-224117-Full\`. It does **not** show protection against writers that lack the
-    gate (Match Sheet, Data Editor, `player_bio`, direct SQL), and the regression window and DEV acceptance
-    have not run.
-  - **Regression window FAILED twice (2026-10-05 23:10 and 2026-10-06 05:28), cause confirmed** (runbook §24). Suites
-    32/32, 16/16, 7/7, 76/76 passed; the census after `settle-afltables` was DIRTY both times (3 unexplained
-    `settle-afltables.ts` batches each). Cause: the S6 block commits three batches per run and its teardown never deleted
-    them; the probe shared the blind spot. Operator diagnostic: 18 S6 batches = six from these windows (1339-1341,
-    1477-1479) plus **twelve historical** (66-68, 325-327, 543-545, 639-641). Verdicts and evidence preserved;
-    **regression acceptance outstanding**. Suite teardown and probe corrected (uncommitted).
-  - **S6 cleanup EXECUTED and VERIFIED (operator-run 2026-10-06; runbook §24.9):** six batches deleted (COMMITTED), post-commit
-    Verify PASSED, the twelve historical batches unchanged.
-  - **Historical exception APPROVED (operator, 2026-10-06 08:46) and Static PASS (runbook §24.10):** twelve pins and `rowMd5`
-    values unchanged (0 differences vs the saved Plan); `s6-selftest` 12/12 on the approved file;
-    `run-20261006-084649-Regression-Static` PASS (172 files).
-  - **Regression window PASSED (operator-run 2026-10-06 08:56; runbook §25):** 32/32, 16/16, 7/7, 76/76; all censuses clean;
-    migration 110 restored and verified against the capture; the twelve historical S6 rows unchanged, no new S6 residue; 36
-    retained `admin-upload` batches (15 + 2 + 19), all explained; 172 provenance files unchanged. Both earlier failed verdicts and
-    all evidence preserved (`D:\tmp\issue265\run-20261006-085603-Regression-Full\`). A `-Phase Build` was added to the runner
-    (runbook §25.5).
-  - **Build PASSED (operator-run 2026-10-06, `-Phase Build`, runbook §25.8):** `npm run build` exit 0 as `afldb_app` on `afldb_test`,
-    1,515/1,515 static pages, standalone bundle ready; post-build census CLEAN (no database write); twelve S6 pins unchanged;
-    172 provenance files unchanged; migration 110 not applied (State A). Two build warnings recorded as observed, **not** claimed
-    pre-existing (deprecated `middleware` convention; `process.cwd` Edge Runtime notice from `node_modules/next`). Evidence:
-    `D:\tmp\issue265\run-20261006-092204-Regression-Build\`. No new tracked change from the build. **Commit, `merge:ready`,
-    deployment and DEV acceptance are pending**; ISSUE-265 stays open.
-- **Next action:**
-  1. The operator reviews and commits the eighteen files in runbook §25.7 (explicit paths; not the stray files; nothing under `D:\tmp\`).
-  2. `npm run merge:ready -- --issue 265`, then merge/push, `deploy/sync-dev.ps1` and DEV acceptance (runbook §18.2).
 
 ### AFLDB-ISSUE-229 — AFL API fixture ingestion
 - **Severity:** Medium. **Area:** acquisition / fixtures — `afl_api` season feed → `fixtures`,

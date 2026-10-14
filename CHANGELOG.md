@@ -547,7 +547,7 @@ commit.
   violation; P2 passed. The validation used a Brownlow-only reload, not a full `db:test:rebuild`. DEV and PROD
   were not touched.
 
-### Source settles and legacy file promotions no longer overlap, so a settle cannot lose a match-lock deadlock to a promotion (AFLDB-ISSUE-265; implemented, Phase B, the regression window and the build passed on `afldb_test`; commit, deployment and DEV acceptance pending) - 5 October 2026
+### Source settles and legacy file promotions no longer overlap, so a settle cannot lose a match-lock deadlock to a promotion (AFLDB-ISSUE-265; commit `cd3cf782`; Phase B, the regression window and the build passed on `afldb_test`; DEV accepted 2026-10-06; deployed to PROD 2026-10-07; PROD passive acceptance satisfied 2026-10-14 (retrospective); closed 2026-10-14) - 5 October 2026
 
 - A transaction-level advisory gate `(717275, 4)` now separates the two. The AFL Tables and AFL API settles
   take it **shared** as the first call in their transaction, before any row lock or write. The three
@@ -600,7 +600,39 @@ commit.
     historical S6 pins were unchanged and 172 provenance files were unchanged. Two build warnings are recorded as observed and are
     not claimed to be pre-existing: the deprecated `middleware` file convention and a `process.cwd` Edge Runtime notice from
     `node_modules/next`.
-  - **Not done:** the commit, `merge:ready`, DEV deployment and acceptance, and PROD. The issue stays open.
+  - ~~**Not done:** the commit, `merge:ready`, DEV deployment and acceptance, and PROD.~~ *Superseded 2026-10-06:* the change is
+    commit `cd3cf782` and DEV runs it (deployed 2026-10-06 09:44:40 +11:00).
+  - **DEV acceptance PASSED (operator-run 2026-10-06 13:34–13:47 +11:00; runbook §27).** A real AFL Tables settle (unit
+    `afldb-settle-afltables.service`) held the shared gate. One armed promotion of a one-row `match_results` file that restates
+    historical match 16407 exactly (submission 68) went through the deployed pipeline during that hold. It waited and received the
+    exact retryable refusal after 5,070.650 ms (server-side wait 4,992–5,023 ms), and it wrote nothing: the match row was unchanged,
+    with the same `xmin`. The settle completed as batch 107: 0 canonical changes, 0 apply failures, 0 units rolled back, success marker
+    present. The operator's manual Promote then succeeded as batch 108, rewriting the match with identical values (all values and
+    provenance unchanged, `xmin` moved, no additional match, the batch owns no match). No deadlock finding appeared, and the 60
+    existing `canonical_apply_failed` findings were unchanged. Earlier, a revision 3 candidate selection was refused (no
+    already-manual match before 2025); that refusal is preserved.
+  - **Not shown on DEV:** the AFL API settle, a settle waiting 300 s behind a promotion (the reverse direction), and writers that do not
+    take the gate (Match Sheet and Data Editor saves, `player_bio`, direct SQL). Those are covered on `afldb_test` only, or not at all.
+  - **Deployed to PROD (operator-run 2026-10-07 15:30–16:17 +11:00; graded from the copied evidence, runbook §28.27).** The release
+    carried `cd3cf782` (26 commits from `1111ab19`: this change plus ISSUE-257, -258, -264 and other work) with a rebuilt web (BUILD_ID
+    `soM_1u3Nf9aIamMtnpfWn`, restarted 15:34:50) and then **migration 110** (ISSUE-257: `data_overrides` admits `player_match_stats`;
+    applied once at 16:11, ledger 110). The deployment checks passed 20/20 and the post-migration capture 21/21. Units, timers and
+    database baselines were unchanged. The rollback guard permits a reversal only until the first Match Sheet player-statistic record exists.
+  - **Not yet shown on PROD:** the first scheduled AFL Tables settle on the new code (due 2026-10-08 04:37 +11:00), and any real
+    contention under the gate. **PROD acceptance needs two counted AFL Tables nights within seven; none has counted. The issue stays
+    open.** Match Sheet player-statistic corrections stay paused until the morning after the first counted night.
+  - Notes elsewhere in this file that PROD has not received the ISSUE-257, -258 or -264 changes are superseded by this entry (2026-10-07).
+  - ~~**Not done:** PROD acceptance. The issue stays open.~~ *Superseded 2026-10-07: PROD is deployed; acceptance is still pending (above).*
+  - **First PROD night counted (N1, graded 2026-10-08 from the copied evidence; runbook §28.28).** The first scheduled AFL Tables settle on the new code
+    (2026-10-08 04:37:45–04:38:23 +11:00, import batch 47) is counted: the timer fired it, one success marker, 60 canonical rows updated with a derived
+    recompute, 0 units rolled back, 0 apply failures, no gate-timeout text. No deadlock text appeared in the settle journal, the web journal or the
+    PostgreSQL server log (the opening and closing markers were each read once; no `deadlock detected` line between them), and the open-finding
+    fingerprints are identical to the post-deployment baseline (C1). No promotion or upload reached the database since the deployment, so the gate was not
+    exercised under contention and the refusal path was not exercised on PROD. **PROD acceptance is 1 of 2 counted runs and is not achieved; the issue
+    stays open.** The B1 criterion for the Match Sheet player-statistic pause is met, so that pause may lift (the operator's act; not observed). The
+    launch-log hash is local only.
+  - **Second counted PROD night (batch 53, 2026-10-14; retrospective).** The N2 slot's capture was taken on 2026-10-14, five and a half hours after the scheduled run; the owner accepted invocation `55a9060a…` as the second counted AFL Tables run, so counted runs are 2 of 2 (batch 47, batch 53). No deadlock text appeared in the settle journal, the web journal or the server-log interval, the open-finding fingerprints equal the post-deployment baseline, and no promotion reached the database, so contention and the refusal path are still not shown on PROD. This supersedes the N1 bullet's "1 of 2 ... not achieved".
+  - **Closed (owner decision D-PROD-10, 2026-10-14).** The owner accepted the passive-acceptance result as satisfied retrospectively (batch 47 and batch 53) and authorised closure, keeping every recorded limitation: this is not contention testing and not contemporaneous capture, nights 9–13 October stay uncounted, and the web journal's unpreserved line and the `copytruncate` rotation of 11 October stand. This supersedes the "stays open" wording above. The closure documentation is prepared locally; commit, merge and push are pending.
 
 ### Legacy file intake refuses rows that would revert a Match Sheet decision (AFLDB-ISSUE-264; DEV accepted 2026-10-05, PROD promotion outstanding) - 5 October 2026
 

@@ -13,7 +13,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // AFLDB-ISSUE-265: a byte-preserved historical CommonJS preload, retained with the Phase A
     // reproduction tooling. Its bytes are hash-recorded, so it is ignored rather than edited.
-    "issues/open/AFLDB-ISSUE-265-phase-a/tools/block-network.cjs",
+    "issues/closed/AFLDB-ISSUE-265-phase-a/tools/block-network.cjs",
   ]),
 ]);
 

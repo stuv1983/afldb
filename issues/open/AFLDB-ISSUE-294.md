@@ -38,7 +38,7 @@ Completion time equals start time; the admin panel shows the start as the comple
 
 ## 7. Impact
 
-Reporting and operations only. Run durations cannot be measured from the ledger: `issues/open/AFLDB-ISSUE-265.md:709-712` recorded this as an evidence limitation of the 265 overlap analysis.
+Reporting and operations only. Run durations cannot be measured from the ledger: `issues/closed/AFLDB-ISSUE-265.md:769-772` recorded this as an evidence limitation of the 265 overlap analysis.
 
 ## 8. Reproduction / witness
 
