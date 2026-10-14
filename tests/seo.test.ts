@@ -13,7 +13,19 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/db/client', () => ({ sql: Object.assign(() => [], { unsafe: () => [] }) }));
+// `rows` lets one test hand back rows for a query it names; every other
+// test, and every other query, still gets an empty result.
+const mockedSql = vi.hoisted(() => {
+  const state: { rows: (text: string) => unknown[] } = { rows: () => [] };
+  return state;
+});
+
+vi.mock('@/db/client', () => ({
+  sql: Object.assign(
+    (strings: unknown) => mockedSql.rows(Array.isArray(strings) ? strings.join('?') : ''),
+    { unsafe: () => [] },
+  ),
+}));
 
 const KEYS = ['AFLDB_BASE_URL', 'AFLDB_INDEXING', 'AFLDB_BETA_GATE', 'AFLDB_ENV'] as const;
 let saved: Partial<Record<(typeof KEYS)[number], string | undefined>> = {};
@@ -22,6 +34,7 @@ beforeEach(() => {
   saved = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
   for (const key of KEYS) delete process.env[key];
   process.env.AFLDB_BASE_URL = 'https://afldb.com';
+  mockedSql.rows = () => [];
 });
 
 afterEach(() => {
@@ -225,7 +238,49 @@ describe('sitemap', () => {
     const { generateSitemaps, default: sitemap } = await import('@/app/sitemap');
 
     expect(await generateSitemaps()).toEqual([]);
-    expect(await sitemap({ id: 0 })).toEqual([]);
+    expect(await sitemap({ id: Promise.resolve('0') })).toEqual([]);
+  });
+
+  /**
+   * AFLDB-ISSUE-279. Next 16 hands the sitemap function its segment id as a
+   * Promise of the string from the URL. The function once read it as a number
+   * or string, Number(Promise) is NaN, no segment branch matched, and every
+   * /sitemap/<n>.xml returned an empty urlset while the index still
+   * advertised it. The loader strips ".xml" and passes a Promise<string>;
+   * the earlier contracts (a plain string, a number) must keep working too.
+   */
+  it('renders every segment under the Next 16 Promise<string> id', async () => {
+    process.env.AFLDB_INDEXING = 'on';
+    // One row for each paged table, so segments 100 and 200 have something to
+    // list; the reference tables stay empty, the static URLs are enough.
+    mockedSql.rows = (text) =>
+      /FROM players/.test(text) ? [{ id: 7, slug: 'a-player' }] : /FROM matches/.test(text) ? [{ id: 9 }] : [];
+    vi.resetModules();
+    const { default: sitemap } = await import('@/app/sitemap');
+
+    const players = await sitemap({ id: Promise.resolve('100') });
+    expect(players.map((e) => e.url)).toEqual(['https://afldb.com/players/a-player-7']);
+    const matches = await sitemap({ id: Promise.resolve('200') });
+    expect(matches.map((e) => e.url)).toEqual(['https://afldb.com/matches/9']);
+
+    for (const id of [0, 1, 100, 200, 300]) {
+      const segment = await sitemap({ id: Promise.resolve(String(id)) });
+      expect(segment.length, `segment ${id} is empty`).toBeGreaterThan(0);
+
+      // Same output as the pre-16 contracts: only the shape of the id changed.
+      expect(await sitemap({ id: String(id) })).toEqual(segment);
+      expect(await sitemap({ id })).toEqual(segment);
+    }
+  });
+
+  it('renders nothing for an id that names no segment', async () => {
+    process.env.AFLDB_INDEXING = 'on';
+    vi.resetModules();
+    const { default: sitemap } = await import('@/app/sitemap');
+
+    expect(await sitemap({ id: Promise.resolve('999') })).toEqual([]);
+    expect(await sitemap({ id: Promise.resolve(undefined) })).toEqual([]);
+    expect(await sitemap({ id: Promise.resolve('not-a-number') })).toEqual([]);
   });
 
   /**
@@ -240,7 +295,7 @@ describe('sitemap', () => {
     vi.resetModules();
     const { default: sitemap } = await import('@/app/sitemap');
 
-    const segment = await sitemap({ id: 0 });
+    const segment = await sitemap({ id: Promise.resolve('0') });
     const urls = segment.map((entry) => entry.url);
     expect(urls.filter((url) => url.endsWith('/clubs/compare'))).toEqual([
       'https://afldb.com/clubs/compare',
@@ -248,7 +303,7 @@ describe('sitemap', () => {
 
     // No segment, not just this one, may publish a parameterised comparison.
     const segments = await Promise.all(
-      [0, 1, 100, 200, 300].map((id) => sitemap({ id })),
+      [0, 1, 100, 200, 300].map((id) => sitemap({ id: Promise.resolve(String(id)) })),
     );
     for (const url of segments.flat().map((entry) => entry.url)) {
       expect(url).not.toContain('club1=');

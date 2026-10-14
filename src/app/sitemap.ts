@@ -54,11 +54,14 @@ export async function generateSitemaps() {
 export default async function sitemap({
   id: rawId,
 }: {
-  id: number | string;
+  id: Promise<string | undefined> | string | number | undefined;
 }): Promise<MetadataRoute.Sitemap> {
-  // Next passes the segment id back as the string from the URL, so a strict
-  // comparison against 0 never matched and segment 0 rendered empty.
-  const id = Number(rawId);
+  // Next 16 passes the segment id as a Promise of the string from the URL
+  // (AFLDB-ISSUE-279). Number() of the Promise itself is NaN, which matched no
+  // segment and rendered every one of them empty. The earlier contracts (a
+  // plain string, a number) are still accepted: awaiting a plain value is a
+  // no-op, and the string must still be coerced or `id === 0` never matches.
+  const id = Number(await rawId);
 
   if (!indexingEnabled()) return [];
 
