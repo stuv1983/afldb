@@ -880,6 +880,30 @@ export type ManualPickFields = {
 };
 
 /**
+ * AFLDB-ISSUE-290: a manual selection's pick number, draft age, height and
+ * weight obey the same `EDITABLE_ENTITIES.draft_picks` ranges as a
+ * source-owned correction. The values are copied into the durable `selection`
+ * payload that replay re-creates, so an implausible figure must be refused
+ * BEFORE the transaction opens, never stored.
+ */
+export function validateManualPickMeasures(
+  fields: Pick<ManualPickFields, 'pickNumber' | 'draftAge' | 'heightCm' | 'weightKg'>,
+): { ok: true } | { ok: false; error: string } {
+  const entity = EDITABLE_ENTITIES.draft_picks;
+  const checks: [string, number | null | undefined][] = [
+    ['pick_number', fields.pickNumber],
+    ['draft_age', fields.draftAge],
+    ['height_cm', fields.heightCm],
+    ['weight_kg', fields.weightKg],
+  ];
+  for (const [fieldKey, value] of checks) {
+    const result = validateFieldValue(entity.fields[fieldKey], value == null ? '' : String(value));
+    if (!result.ok) return result;
+  }
+  return { ok: true };
+}
+
+/**
  * The whole-row `selection` payload a manual selection's durable record
  * carries. `player_identity` and `club_slug` are IDENTITIES, not ids: a
  * promotion renumbers `players.id` and `clubs.id`, so storing either would
@@ -947,6 +971,8 @@ export type CreateManualPickInput = ManualPickFields & {
 export async function createManualPick(
   input: CreateManualPickInput,
 ): Promise<DraftMutationResult<{ pickId: number; pickToken: string; playerSlug: string; playerId: number }>> {
+  const measures = validateManualPickMeasures(input);
+  if (!measures.ok) return refuse('validation', measures.error);
   return withImportConnection(async (importSql) => {
     try {
       return await importSql.begin(async (tx) => {
@@ -1032,6 +1058,8 @@ export async function createPlayerAndDraftPick(
   if (!displayName || displayName.length > 100) {
     return refuse('validation', 'Display name is required (up to 100 characters).');
   }
+  const measures = validateManualPickMeasures(input);
+  if (!measures.ok) return refuse('validation', measures.error);
   return withImportConnection(async (importSql) => {
     try {
       return await importSql.begin(async (tx) => {
@@ -1131,6 +1159,8 @@ export type SaveManualPickInput = ManualPickFields & {
 export async function saveManualPick(
   input: SaveManualPickInput,
 ): Promise<DraftMutationResult<{ relinked: boolean }>> {
+  const measures = validateManualPickMeasures(input);
+  if (!measures.ok) return refuse('validation', measures.error);
   return withImportConnection(async (importSql) => {
     try {
       return await importSql.begin(async (tx) => {

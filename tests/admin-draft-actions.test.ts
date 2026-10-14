@@ -41,6 +41,8 @@ import {
   NULL_PICK_KINDS,
   checkNewPlayerDuplicates,
   checkSelectionConflicts,
+  createManualPick,
+  createPlayerAndDraftPick,
   isDraftListState,
   manualEntityKey,
   manualPlayerUrl,
@@ -48,8 +50,10 @@ import {
   playerLinksHref,
   provenanceOf,
   readDraftPickRevision,
+  saveManualPick,
   sourcePickEntityKey,
   trackedProfilePaths,
+  validateManualPickMeasures,
 } from '@/db/queries/admin-draft';
 import { UNRESOLVED_LINK_STATUSES } from '@/db/queries/player-links';
 
@@ -399,6 +403,46 @@ describe('Stage 2: parseNullablePickNumber', () => {
     expect(parseNullablePickNumber('0')).toEqual({ ok: false });
     expect(parseNullablePickNumber('-1')).toEqual({ ok: false });
     expect(parseNullablePickNumber('abc')).toEqual({ ok: false });
+  });
+});
+
+describe('AFLDB-ISSUE-290: manual selections obey the draft_picks ranges', () => {
+  const base = {
+    draftYear: 2025, draftType: 'National', draftKind: 'national', clubSlug: 'x', pickNumber: 50 as number | null,
+  };
+  const create = { ...base, playerId: 1, adminUserId: 1 };
+  const save = { ...base, pickId: 1, playerId: 1, adminUserId: 1 };
+  const createNew = { ...base, player: { displayName: 'Test Draftee' }, adminUserId: 1 };
+
+  it('accepts figures inside the source-owned ranges, and blanks', () => {
+    expect(validateManualPickMeasures({ pickNumber: 1, draftAge: 14, heightCm: 120, weightKg: 40 })).toEqual({ ok: true });
+    expect(validateManualPickMeasures({ pickNumber: 200, draftAge: 50, heightCm: 230, weightKg: 160 })).toEqual({ ok: true });
+    expect(validateManualPickMeasures({ pickNumber: null })).toEqual({ ok: true });
+    expect(validateManualPickMeasures({ pickNumber: null, draftAge: null, heightCm: undefined, weightKg: null })).toEqual({ ok: true });
+  });
+
+  it.each([
+    ['pick number above 200', { pickNumber: 9999 }, 'Pick number must be at most 200.'],
+    ['draft age above 50', { pickNumber: 1, draftAge: 99 }, 'Draft age must be at most 50.'],
+    ['draft age below 14', { pickNumber: 1, draftAge: 5 }, 'Draft age must be at least 14.'],
+    ['height above 230', { pickNumber: 1, heightCm: 999 }, 'Height (cm) must be at most 230.'],
+    ['height below 120', { pickNumber: 1, heightCm: 5 }, 'Height (cm) must be at least 120.'],
+    ['weight above 160', { pickNumber: 1, weightKg: 500 }, 'Weight (kg) must be at most 160.'],
+    ['weight below 40', { pickNumber: 1, weightKg: 3 }, 'Weight (kg) must be at least 40.'],
+  ] as const)('refuses %s with the same message the source-owned path gives', (_label, fields, error) => {
+    expect(validateManualPickMeasures(fields)).toEqual({ ok: false, error });
+  });
+
+  it.each([
+    ['createManualPick', () => createManualPick({ ...create, heightCm: 999 })],
+    ['saveManualPick', () => saveManualPick({ ...save, draftAge: 99 })],
+    ['createPlayerAndDraftPick', () => createPlayerAndDraftPick({ ...createNew, weightKg: 500 })],
+    ['createManualPick (pick number)', () => createManualPick({ ...create, pickNumber: 9999 })],
+  ])('%s refuses an implausible figure before any connection is opened', async (_name, run) => {
+    const result = await run();
+    expect(result).toMatchObject({ ok: false, reason: 'validation' });
+    expect(mocks.postgres).not.toHaveBeenCalled();
+    expect(mocks.sql).not.toHaveBeenCalled();
   });
 });
 
