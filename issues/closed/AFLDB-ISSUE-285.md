@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). **Implemented and DB-free validated 2026-10-14** (§17, §17.1) as `70af9ae3` on `sonnet/issue-285` (base `ea792f43`); not yet merged. Not deployed.
+- **Status:** **Resolved (2026-10-14, merge-scoped)**, on the push of the documentation-only closure commit (§18). Implemented as `70af9ae3` on `sonnet/issue-285` (base `ea792f43`), merged and pushed with its records as `848f13f1`; DB-free validated (§17.1). **Not deployed.**
 - **Severity:** Low. **Area:** admin awards UI.
 - **Key files:** `src/app/admin/awards/ReplacePanel.tsx`, `src/app/admin/awards/actions.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-020; partition note R2a-F04).
@@ -74,7 +74,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Done 2026-10-14 (§17). Next: merge and push, then close.
+~~Implementation.~~ Done 2026-10-14 (§17); merged and closed (§18).
 
 ## 17. Implementation record (2026-10-14)
 
@@ -92,3 +92,11 @@ None.
 - `npx tsc --noEmit` exit 0; `npx eslint` of the two changed files exit 0; `git diff --check` exit 0. `npm run preflight -- --mode implementation --issue 285`: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; `D:\tmp\issue285\preflight-impl.txt`).
 - `tests/awards-admin.test.ts` (the only other suite that names `ReplacePanel.tsx`): 40 of 41 pass; the one failure (`widens data_edits by SELECT alone in 108`, a migration-text regex) fails identically in the primary checkout at the unmodified base, so it is pre-existing and unrelated. The full suite was not run.
 - **Not run / limits:** the integration variant named in §14 item 2 (an `admin-awards` case replacing onto an existing same-player row with `confirmDuplicate`) was not written or run: it needs `afldb_test`, and the query layer it exercises is unchanged. The panel's React state transitions (preview, refusal, tick, resubmit) and the rendered page are not exercised: this suite has no DOM, so the tick-then-resubmit sequence is covered as pieces (helpers, rendered control, real action) plus a source-wiring check, not as one interaction. No browser, deployment, DEV or PROD action.
+
+## 18. Readiness, merge and closure (2026-10-14)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 285`: READY (§17.1). `npm run merge:ready -- --issue 285` (raw output, unchanged: `D:\tmp\issue285\merge-ready-raw-1.txt`): every check PASS except **one blocker, "main worktree is clean"**, the primary checkout's **17** untracked paths (nine `.agents/skills` files, seven zero-byte stray-named files including `void`, and the literal `$null)`). Existing warnings: no `afldb-merge-readiness` block in this runbook; no unexpected-file classification (5 committed files); database parity not checked. The worktree was created with `git worktree add -b sonnet/issue-285 <path> ea792f43` (the tip verified equal to the live remote by `git ls-remote`) and a `node_modules` junction, because `worktree:bootstrap` is blocked by the same strays.
+- **Exception.** The owner authorised a fresh exception for this issue, covering only that clean-tree FAIL and the exact 17-path set, compared by full content hash, **verified immediately before each merge**. `D:\tmp\issue285\exception-check.py` (a copy of the read-only ISSUE-300 script) was run as `precheck-1`, as `premerge-1` immediately before the implementation merge and `postmerge-1` after its push, and again as `premerge-2` immediately before the closure merge and `postmerge-2` after it; every run RESULT OK. `$null)` (143 bytes, mtime 20:00:49) was hashed in full before each merge as `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500` and the check was run with that fresh value. Current equality with the saved 13 Oct snapshots, not continuous preservation. No stray was modified, moved or deleted.
+- **Merge 1.** `70af9ae3` (fix) and `848f13f1` (records) fast-forwarded onto `main` (`ea792f43..848f13f1`) and pushed; local `main`, the fetched `origin/main` and `git ls-remote origin refs/heads/main` all equalled `848f13f1` afterwards. Before the merge a fresh `git fetch` and `ls-remote` showed `main` still at `ea792f43`.
+- **Resolution.** Resolved on the push of the documentation-only closure commit, under §14 item 1 (a DB-free component render asserting the control appears; met, §17.1). The closure scope is **merge-scoped**: code on `main`, DB-free validated, **not deployed**.
+- **Preserved limits.** Not deployed. The §14 item 2 integration variant (an `admin-awards` integration case replacing onto an existing same-player row with `confirmDuplicate`) was not written or run: it needs `afldb_test`, and the query layer it would exercise is unchanged by this issue. The panel's React state transitions and the rendered page were not exercised in a browser; the tick-then-resubmit sequence is covered as pieces (helpers, rendered control, the real action over a mocked query) plus a source-wiring check. The one failure in `tests/awards-admin.test.ts` is pre-existing at the base and unrelated (§17.1).
