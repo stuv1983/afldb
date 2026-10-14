@@ -17,7 +17,13 @@ import { audit, requireCapability } from '@/lib/auth/session';
  * `revokeAflApiLink` (A7, D12).
  */
 
-export type AflApiAdjudicationActionState = { error?: string; message?: string };
+export type AflApiAdjudicationActionState = { error?: string; message?: string; warning?: string };
+
+// Same wording as the sibling actions in ../actions.ts (AFLDB-ISSUE-311). Not shared: a
+// 'use server' module may export only async functions.
+const ACTIVITY_AUDIT_WARNING =
+  'The change succeeded, but its administrative activity audit failed. '
+  + 'Do not submit it again; ask an administrator to reconcile the audit log.';
 
 function stringField(formData: FormData, name: string): string {
   return String(formData.get(name) ?? '').trim();
@@ -45,14 +51,16 @@ export async function linkAflApiPlayer(
   });
   if (!result.ok) return { error: result.error };
 
+  let warning: string | undefined;
   try {
     await audit('player_link.afl_api_linked', { providerId, playerId },
       { userId: admin.id, label: admin.email });
   } catch (error) {
     console.error('Failed to log administrative audit for afl_api link', error);
+    warning = ACTIVITY_AUDIT_WARNING;
   }
 
-  return { message: `Linked ${providerId} — awaiting the next settle.` };
+  return { message: `Linked ${providerId} — awaiting the next settle.`, warning };
 }
 
 export async function revokeAflApiPlayerLink(
@@ -72,11 +80,13 @@ export async function revokeAflApiPlayerLink(
   const result = await revokeAflApiLink({ providerId, adminUserId: admin.id, note, fingerprint });
   if (!result.ok) return { error: result.error };
 
+  let warning: string | undefined;
   try {
     await audit('player_link.afl_api_revoked', { providerId }, { userId: admin.id, label: admin.email });
   } catch (error) {
     console.error('Failed to log administrative audit for afl_api revoke', error);
+    warning = ACTIVITY_AUDIT_WARNING;
   }
 
-  return { message: `Revoked the link for ${providerId}.` };
+  return { message: `Revoked the link for ${providerId}.`, warning };
 }

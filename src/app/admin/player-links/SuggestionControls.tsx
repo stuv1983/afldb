@@ -20,7 +20,13 @@ export function SuggestionControls({ suggestionId }: { suggestionId: number }) {
     if (state.message) router.refresh();
   }, [state.message, router]);
 
-  if (state.message) return <span className="muted" style={{ fontSize: '0.85rem' }}>{state.message}</span>;
+  if (state.message) {
+    return (
+      <span className="muted" style={{ fontSize: '0.85rem' }}>
+        {state.message}{state.warning && ` ${state.warning}`}
+      </span>
+    );
+  }
 
   return (
     <form action={formAction} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>

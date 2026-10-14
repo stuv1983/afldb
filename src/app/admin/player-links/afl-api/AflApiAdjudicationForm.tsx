@@ -70,6 +70,7 @@ export function AflApiAdjudicationForm({
   );
 
   const done = linkState.message ?? revokeState.message;
+  const warning = linkState.warning ?? revokeState.warning;
   useEffect(() => {
     if (done) router.refresh(); // E32: no revalidatePath from the actions themselves.
   }, [done, router]);
@@ -82,6 +83,7 @@ export function AflApiAdjudicationForm({
       {done && (
         <p style={{ margin: 0, fontWeight: 600, color: 'var(--accent)' }}>✓ {done}</p>
       )}
+      {done && warning && <p className="badge badge-warn">{warning}</p>}
 
       {canLink && (
         <form action={linkAction} style={{ display: 'grid', gap: '0.6rem' }}>

@@ -29,6 +29,29 @@ function combineWarnings(...warnings: Array<string | undefined>): string | undef
   return warnings.filter(Boolean).join(' ') || undefined;
 }
 
+// A multi-target action resolves each target in its own transaction, so a later
+// failure cannot undo an earlier commit (AFLDB-ISSUE-309). Failures are collected
+// per target and reported once the loop has finished.
+type TargetFailure = { label: string; error: string };
+
+const MAX_LISTED_FAILURES = 5;
+
+function listFailures(failed: TargetFailure[], describe: (failure: TargetFailure) => string): string {
+  return failed.slice(0, MAX_LISTED_FAILURES).map(describe).join('; ')
+    + (failed.length > MAX_LISTED_FAILURES ? ' …' : '');
+}
+
+/** Nothing committed: the refusal(s), in the single-target wording. */
+function allFailedError(failed: TargetFailure[]): string {
+  return listFailures(failed, f => `Error on ${f.label}: ${f.error}`);
+}
+
+/** Something committed: the targets that were left unchanged. */
+function notChangedWarning(failed: TargetFailure[]): string | undefined {
+  if (failed.length === 0) return undefined;
+  return `${failed.length} record(s) were not changed: ${listFailures(failed, f => `${f.label} — ${f.error}`)}`;
+}
+
 function revalidatePublicLinkPages(): void {
   revalidatePath('/awards/[slug]', 'page');
   revalidatePath('/awards/[slug]/[season]', 'page');
@@ -74,13 +97,19 @@ export async function linkPlayer(
   const note = String(formData.get('note') ?? '').trim();
   if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
+  let linked = 0;
+  const failed: TargetFailure[] = [];
   let warning: string | undefined;
 
   for (const { targetTable, targetId } of targets) {
     const result = await resolveLink({
       targetTable, targetId, playerId, adminUserId: admin.id, note,
     });
-    if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
+    if (!result.ok) {
+      failed.push({ label: `${targetTable}:${targetId}`, error: result.error });
+      continue;
+    }
+    linked += 1;
 
     try {
       await audit('player_link.linked', { targetTable, targetId, playerId },
@@ -91,8 +120,15 @@ export async function linkPlayer(
     }
   }
 
+  if (linked === 0) return { error: allFailedError(failed) };
+
   revalidatePublicLinkPages();
-  return { message: `Player linked to ${targets.length} record(s).`, warning };
+  return {
+    message: failed.length === 0
+      ? `Player linked to ${linked} record(s).`
+      : `Player linked to ${linked} of ${targets.length} record(s).`,
+    warning: combineWarnings(warning, notChangedWarning(failed)),
+  };
 }
 
 export async function confirmUnlinked(
@@ -107,18 +143,38 @@ export async function confirmUnlinked(
   const note = String(formData.get('note') ?? '').trim();
   if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
+  let confirmed = 0;
+  const failed: TargetFailure[] = [];
+  let warning: string | undefined;
+
   for (const { targetTable, targetId } of targets) {
     const result = await confirmUnlinkedQuery({
       targetTable, targetId, adminUserId: admin.id, note,
     });
-    if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
+    if (!result.ok) {
+      failed.push({ label: `${targetTable}:${targetId}`, error: result.error });
+      continue;
+    }
+    confirmed += 1;
 
-    await audit('player_link.confirmed_unlinked', { targetTable, targetId },
-      { userId: admin.id, label: admin.email });
+    try {
+      await audit('player_link.confirmed_unlinked', { targetTable, targetId },
+        { userId: admin.id, label: admin.email });
+    } catch (error) {
+      console.error('Failed to log administrative audit for confirmed-unlinked', error);
+      warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+    }
   }
 
+  if (confirmed === 0) return { error: allFailedError(failed) };
+
   revalidatePublicLinkPages();
-  return { message: `Recorded ${targets.length} record(s) as vetted — genuinely unlinked.` };
+  return {
+    message: failed.length === 0
+      ? `Recorded ${confirmed} record(s) as vetted — genuinely unlinked.`
+      : `Recorded ${confirmed} of ${targets.length} record(s) as vetted — genuinely unlinked.`,
+    warning: combineWarnings(warning, notChangedWarning(failed)),
+  };
 }
 
 export async function reviewSuggestion(
@@ -137,10 +193,16 @@ export async function reviewSuggestion(
 
   await setSuggestionStatus(id, status, admin.id);
 
-  await audit('player_link.suggestion_reviewed', { suggestionId: id, status },
-    { userId: admin.id, label: admin.email });
+  let warning: string | undefined;
+  try {
+    await audit('player_link.suggestion_reviewed', { suggestionId: id, status },
+      { userId: admin.id, label: admin.email });
+  } catch (error) {
+    console.error('Failed to log administrative audit for suggestion review', error);
+    warning = ACTIVITY_AUDIT_WARNING;
+  }
 
-  return { message: `Suggestion ${status}.` };
+  return { message: `Suggestion ${status}.`, warning };
 }
 
 export async function createAndLinkPlayer(
@@ -179,6 +241,8 @@ export async function createAndLinkPlayer(
   let first = true;
   let createdPlayerId = 0;
   let createdPlayerName = '';
+  let linked = 0;
+  const failed: TargetFailure[] = [];
   let warning: string | undefined;
 
   for (const { targetTable, targetId } of targets) {
@@ -190,8 +254,11 @@ export async function createAndLinkPlayer(
         note,
         player: playerFields,
       });
+      // No player exists yet, so nothing has committed and there is nothing
+      // for the remaining targets to link to.
       if (!result.ok) return { error: result.error };
       const { player } = result;
+      linked += 1;
       createdPlayerId = player.id;
       createdPlayerName = player.displayName;
       try {
@@ -210,7 +277,11 @@ export async function createAndLinkPlayer(
       const result = await resolveLink({
         targetTable, targetId, playerId: createdPlayerId, adminUserId: admin.id, note,
       });
-      if (!result.ok) return { error: `Error on ${targetTable}:${targetId}: ${result.error}` };
+      if (!result.ok) {
+        failed.push({ label: `${targetTable}:${targetId}`, error: result.error });
+        continue;
+      }
+      linked += 1;
       try {
         await audit('player_link.linked', { targetTable, targetId, playerId: createdPlayerId },
           { userId: admin.id, label: admin.email });
@@ -225,8 +296,10 @@ export async function createAndLinkPlayer(
   revalidatePath('/players');
   revalidatePath('/admin/data-editor');
   return {
-    message: `Created player ${createdPlayerName} (ID #${createdPlayerId}) and linked successfully to ${targets.length} record(s).`,
-    warning,
+    message: failed.length === 0
+      ? `Created player ${createdPlayerName} (ID #${createdPlayerId}) and linked successfully to ${linked} record(s).`
+      : `Created player ${createdPlayerName} (ID #${createdPlayerId}) and linked to ${linked} of ${targets.length} record(s).`,
+    warning: combineWarnings(warning, notChangedWarning(failed)),
   };
 }
 
