@@ -178,6 +178,30 @@ function optionalCountReader(row: Record<string, string | null>) {
   return { read, reasons };
 }
 
+/**
+ * AFLDB-ISSUE-305: validation must refuse what promotion cannot write. A date cell is later cast with
+ * `::date` (or stored in a `date` column), and PostgreSQL rejects a day that does not exist, so
+ * `2024-02-30` has to be refused here, not at promotion where it rolls the whole submission back to
+ * `failed`. Strict `YYYY-MM-DD` shape plus plain Gregorian arithmetic (not `Date.UTC`, which remaps
+ * years 0-99 to 1900-1999); year 0000 is refused because PostgreSQL's date input rejects it.
+ */
+function isRealIsoDate(text: string): boolean {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!parts) return false;
+  const [year, month, day] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return year >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= monthDays[month - 1];
+}
+
+/**
+ * AFLDB-ISSUE-305: a cell that is later cast with `::smallint` must be plain decimal digits in range.
+ * `Number()` also reads `8e1`, `1.8e2`, `0x50` and `80.0` as whole numbers, none of which the cast accepts.
+ */
+function isWholeNumberCell(text: string, min: number, max: number): boolean {
+  return /^\d+$/.test(text) && Number(text) >= min && Number(text) <= max;
+}
+
 export async function resolveSeason(sql: Sql, value: string | null): Promise<number | null> {
   const year = toIntOrNull(value);
   if (year === null) return null;
@@ -999,8 +1023,8 @@ const matchResults: DatasetSpec = {
     if (!round.ok) return { verdict: 'error', reasons: [round.reason] };
     const { roundCode, roundType, roundNumber } = round;
 
-    if (!row.match_date || !/^\d{4}-\d{2}-\d{2}$/.test(row.match_date)) {
-      return { verdict: 'error', reasons: [`match_date "${row.match_date ?? '(empty)'}" must be YYYY-MM-DD`] };
+    if (!row.match_date || !isRealIsoDate(row.match_date)) {
+      return { verdict: 'error', reasons: [`match_date "${row.match_date ?? '(empty)'}" must be a real date, YYYY-MM-DD`] };
     }
 
     const home = await resolveClub(sql, row.home_club, season);
@@ -1688,15 +1712,15 @@ const playerBio: DatasetSpec = {
     if (!player) return { verdict: 'error', reasons: [`no player with id ${playerId}`] };
 
     const dob = (row.dob ?? '').trim();
-    if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-      reasons.push('dob must be YYYY-MM-DD');
+    if (dob && !isRealIsoDate(dob)) {
+      reasons.push('dob must be a real date, YYYY-MM-DD');
     }
     const height = (row.height_cm ?? '').trim();
-    if (height && !(Number.isInteger(Number(height)) && Number(height) >= 120 && Number(height) <= 230)) {
+    if (height && !isWholeNumberCell(height, 120, 230)) {
       reasons.push('height_cm must be a whole number between 120 and 230');
     }
     const weight = (row.weight_kg ?? '').trim();
-    if (weight && !(Number.isInteger(Number(weight)) && Number(weight) >= 40 && Number(weight) <= 160)) {
+    if (weight && !isWholeNumberCell(weight, 40, 160)) {
       reasons.push('weight_kg must be a whole number between 40 and 160');
     }
     if (!dob && !height && !weight) {
