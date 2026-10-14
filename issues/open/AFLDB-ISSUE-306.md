@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). **Implemented and DB-free validated 2026-10-14** (§17, §17.1, §17.2) as `3372667f` and `e060cb49` on `sonnet/issue-306` (base `18faa58e`); not yet merged. Not deployed.
 - **Severity:** Low. **Area:** legacy CSV intake validation.
 - **Key files:** `src/lib/ingest/datasets.ts` (`fileKey`), `src/lib/ingest/pipeline.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-041; partition note R5a-F09).
@@ -71,4 +71,40 @@ None.
 
 ## 16. Next action
 
-Implementation, alongside AFLDB-ISSUE-272.
+~~Implementation, alongside AFLDB-ISSUE-272.~~ Done 2026-10-14 (§17). Next: merge and push, then close.
+
+## 17. Implementation record (2026-10-14)
+
+- **Commits:** `3372667f` (fix and tests) and `e060cb49` (two further test cases) on `sonnet/issue-306`, base `18faa58e`. Source: `src/lib/ingest/datasets.ts`, `src/lib/ingest/pipeline.ts`. Tests: `tests/ingest-datasets.test.ts`, `tests/submission-review-actions.test.ts` (both existing suites; each already tests the code it extends).
+- **Shape chosen (§13, first option).** `DatasetSpec.resolvedKey?(row, resolved)` is optional and defined only where the database key is built from resolved names or ids. `match_results`: `matchResultsKey(season, canonical round, match_date, resolved home name, resolved away name)`, the same string `preparePromotion` locks on and `promoteRow` writes. `player_match_stats`: `player #<player_id> in match #<match_id>`, the `ON CONFLICT (player_id, match_id)` key. `validateSubmission` keeps a second map of resolved keys; the first row that claims a key keeps its verdict, a later row becomes an `error` with `duplicate of row N: the same record once names are resolved (key "...")` and is counted once in `duplicates`. A row that is already a cell-text duplicate keeps that reason and is not counted twice; a row whose verdict is `error` claims nothing.
+- **Promotion (§13, second option, as defence in depth).** `player_match_stats.preparePromotion` refuses the whole submission before any lock or query when two rows claim one `(player_id, match_id)`, even with identical values, naming up to ten collisions. This covers a submission validated before this fix, whose stored verdicts are `ok`. `match_results` already refused two rows on one canonical key (ISSUE-272), and now also reports it at validation.
+- **Scope kept.** `all_australian`'s file key (`year:player:club` as typed) already matches its database record id (`season:player:club` as typed), so no resolved key is needed there; the other datasets key on ids or a source key. Round-code normalisation is ISSUE-272's and is reused, not changed.
+- **Existing test changed.** `AFLDB-ISSUE-264 ... promotion re-check > admits identical and absent protected values at promotion` used two rows on one player-match only as a shortcut; it now runs its two cases as two submissions and keeps both assertions.
+
+## 17.1 Validation (2026-10-14, assistant-run on the owner's explicit authorisation; Windows, DB-free)
+
+- New cases: dataset-level (`resolvedKey` of both datasets for an alias, a round spelling, another date, round, season and swapped clubs; no key for an unresolved row; defined only on the two datasets), the `player_match_stats` promotion guard (identical values, up to ten collisions named with a count of the rest, distinct players and matches pass the check) and the real `validateSubmission` over a scripted database with the real `fileKey` and `resolvedKey` (alias duplicate, different fixtures untouched, double duplicate counted once, first claimant named for a third spelling, refused row claims nothing, a player-match under two club spellings, a dataset without a resolved key unchanged).
+- Six related files (`ingest-datasets`, `submission-review-actions`, `email-intake-route`, `csv`, `afl-api-ingestion-control`, `afl-api-ingestion-safety`): **503 passed.** `npx tsc --noEmit`, `npx eslint` of the four changed files and `git diff --check`: exit 0. `npm run preflight -- --mode implementation --issue 306`: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; `D:\tmp\issue306\preflight-impl.txt`).
+- **Against the pre-fix source** (`datasets.ts` and `pipeline.ts` restored to `18faa58e`, then back): **17 of the 291 cases in the two changed files fail.** The four pipeline cases fail on assertions (the alias duplicate is not flagged); the key cases fail because `resolvedKey` does not exist, and the guard cases because promotion does not refuse (`D:\tmp\issue306\vs-base-src.txt`).
+- **Not run / limits:** PostgreSQL, the integration files (`tests/integration/{datasets,submission-promotion,match-results-promotion}.test.ts`; their multi-row fixtures use distinct fixtures and dates, so none is expected to meet the new rule, but they were read, not run), the full suite, any browser or DEV/PROD action. The scripted `validateRow` plays the alias resolver; the real resolver against `club_aliases` is the existing integration surface.
+
+## 17.2 Mutation checks of the tests (2026-10-14, assistant-run; Windows, DB-free)
+
+Each mutant changes the real fix, is applied alone to a clean tree and restored from Git (`D:\tmp\issue306\mutate.py`; outputs `mutation-<name>.txt`); the two changed test files are run against it. A kill counts only on an assertion failure.
+
+| Mutant | Result against the final tests |
+|---|---|
+| M1 the pipeline never consults the resolved key | killed (4 cases) |
+| M2 the duplicate is flagged but not counted | killed (4) |
+| M3 a later row takes over the key | **survived the first tests**; killed (1) by the three-spellings case |
+| M4 a refused row that carries a resolved value claims a key | **survived the first tests**; killed (1) by the refused-row case |
+| M5 `match_results` keys on the typed clubs | killed (5) |
+| M6 the canonical round is dropped from the `match_results` key | killed (4) |
+| M7 the `player_match_stats` key ignores the player | killed (3) |
+| M8 the `player_match_stats` key includes the typed club | killed (2) |
+| M9 the promotion guard is removed | killed (2) |
+| M10 the promotion guard keys on the match only | killed (3) |
+| M11 the promotion guard keys on the club too | killed (1) |
+| M12 a resolved key is registered on a dataset that should not have one | killed (1) |
+
+All twelve fail on `AssertionError`. The two survivors were strengthened (a third spelling must name the first claimant; a refused row with a resolved value must claim nothing) and the full set re-run. The 291 cases pass unmutated.

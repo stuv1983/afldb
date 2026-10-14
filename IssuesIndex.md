@@ -537,9 +537,8 @@
 ### AFLDB-ISSUE-306 — Legacy intake duplicate detection compares raw club text
 - **Severity:** Low. **Area:** legacy CSV intake validation — `src/lib/ingest/datasets.ts` (`fileKey`). **State:** Open
   (2026-10-08), F-041; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-306.md`. **Not implemented** — the ISSUE-271/272 batch (2026-10-10) canonicalised
-  only the round code in `match_results` `fileKey`; club text is still compared raw. **Next action:** implementation (the
-  review proposed doing it alongside ISSUE-272; that batch did not).
+- **Runbook:** `issues/open/AFLDB-ISSUE-306.md` (§17, §17.1, §17.2). **Next action:** merge and push (implemented 2026-10-14,
+  DB-free validated), then close.
 
 ### AFLDB-ISSUE-307 — Legacy promotion counts every promoted row as inserted
 - **Severity:** Low. **Area:** legacy CSV intake / batch accounting — `src/lib/ingest/pipeline.ts`. **State:** Open
