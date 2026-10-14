@@ -262,12 +262,13 @@ async function attachAflIdentity(playerId: number, suffix: string): Promise<stri
 /** A source-owned winner of the given award, as the wikipedia loader would leave one. */
 async function seedSourceWinner(awardId: number, recordId: string, over: {
   playerId?: number | null; playerName?: string; votes?: string | null; note?: string | null;
+  season?: number;
 } = {}): Promise<number> {
   const [row] = await admin<{ id: number }[]>`
     INSERT INTO award_winners
       (award_id, season, player_id, player_name_raw, link_status_value,
        club_id, club_name_raw, votes, position, note, source_id, source_record_id)
-    VALUES (${awardId}, ${season}::smallint, ${over.playerId ?? linkedPlayerId},
+    VALUES (${awardId}, ${over.season ?? season}::smallint, ${over.playerId ?? linkedPlayerId},
             ${over.playerName ?? `${MARKER} Linked`},
             ${over.playerId === null ? 'unmatched' : 'resolved'}::link_status,
             NULL, NULL, ${over.votes ?? '12.00'}::numeric, NULL,
@@ -703,6 +704,110 @@ describe('award_winners — correction, void, reinstate, replace', () => {
       expect(value).not.toContain(`"${id}"`);
       expect(value).not.toContain('row_id');
     }
+  });
+
+  it('replacing onto a season the player already holds refuses the duplicate, then honours the confirmation (ISSUE-285)', async () => {
+    // The trigger in the runbook: a row sits in the WRONG season and the player's
+    // other row for the RIGHT season already exists, so moving it is a duplicate
+    // by the rule and legitimate by the 1984 All-Australian shape. Its own award,
+    // so every count below is a statement about this test's rows only.
+    const awardId = await makeAward('replace-duplicate');
+    const [prior] = await admin<{ year: number }[]>`
+      SELECT max(year)::int AS year FROM seasons WHERE year < ${season}`;
+    expect(prior?.year, 'a season earlier than the latest is needed to move a row from').toBeTruthy();
+    const wrongSeason = prior!.year;
+
+    const existingId = await seedSourceWinner(awardId, `${MARKER}:replace-dup-existing`);
+    const targetRecordId = `${MARKER}:replace-dup-target`;
+    const targetId = await seedSourceWinner(awardId, targetRecordId, { season: wrongSeason });
+    const targetKey = awardWinnerEntityKey('wikipedia', targetRecordId);
+
+    const activeFor = async (forSeason: number) => (await admin<{ id: number }[]>`
+      SELECT id::int AS id FROM award_winners
+       WHERE award_id = ${awardId} AND season = ${forSeason}::smallint
+         AND player_id = ${linkedPlayerId} AND status = 'active'
+       ORDER BY id`).map((r) => r.id);
+    const totalRows = async () => (await admin<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM award_winners WHERE award_id = ${awardId}`)[0].n;
+
+    const targetBefore = await winnerRow(targetId);
+    const existingBefore = await winnerRow(existingId);
+    expect(await activeFor(season)).toEqual([existingId]);
+    expect(await totalRows()).toBe(2);
+
+    // 1. WITHOUT the confirmation: refused as a duplicate, and refused whole.
+    const refused = await replaceAwardWinner({
+      rowId: targetId,
+      expectedUpdatedAt: targetBefore!.updatedAt,
+      adminUserId: actorId,
+      reason: 'entered against the wrong season',
+      replacement: { awardId, season, playerId: linkedPlayerId },
+    });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.reason).toBe('duplicate');
+      expect(refused.error).toContain(`#${existingId}`);
+    }
+    // The void happens before the duplicate check inside the transaction, so
+    // this is the proof that the refusal rolled the void back with it.
+    const targetAfterRefusal = await winnerRow(targetId);
+    expect(targetAfterRefusal!.status).toBe('active');
+    expect(targetAfterRefusal!.statusReason).toBeNull();
+    expect(targetAfterRefusal!.updatedAt).toBe(targetBefore!.updatedAt);
+    expect(await winnerRow(existingId)).toEqual(existingBefore);
+    expect(await totalRows()).toBe(2);
+    expect(await activeFor(season)).toEqual([existingId]);
+    expect(await overridesFor('award_winners', targetKey)).toHaveLength(0);
+    expect(await auditRows('award_winners', targetId)).toHaveLength(0);
+
+    // 2. WITH the confirmation: the same replacement now succeeds.
+    const confirmed = await replaceAwardWinner({
+      rowId: targetId,
+      expectedUpdatedAt: targetBefore!.updatedAt,
+      adminUserId: actorId,
+      reason: 'entered against the wrong season',
+      replacement: { awardId, season, playerId: linkedPlayerId, confirmDuplicate: true },
+    });
+    expect(confirmed.ok, JSON.stringify(confirmed)).toBe(true);
+    if (!confirmed.ok) return;
+
+    // Persisted: the wrong-season row is void with its reason, the replacement is
+    // an active manual row in the right season, and the player now legitimately
+    // holds two active rows there. The pre-existing row is untouched.
+    const voided = await winnerRow(targetId);
+    expect(voided!.status).toBe('void');
+    expect(voided!.statusReason).toBe('entered against the wrong season');
+    expect(voided!.season).toBe(wrongSeason);
+    const created = await winnerRow(confirmed.rowId);
+    expect(created!.status).toBe('active');
+    expect(created!.season).toBe(season);
+    expect(created!.playerId).toBe(linkedPlayerId);
+    expect((await readAwardWinner(confirmed.rowId))!.sourceKey).toBe('manual_admin_edit');
+    expect(await activeFor(season)).toEqual([existingId, confirmed.rowId]);
+    expect(await activeFor(wrongSeason)).toEqual([]);
+    expect(await totalRows()).toBe(3);
+    expect(await winnerRow(existingId)).toEqual(existingBefore);
+
+    // Durable record: cross-linked by natural key, never by surrogate id.
+    const [oldOverride] = await overridesFor('award_winners', targetKey);
+    expect(oldOverride.fieldGroup).toBe('lifecycle');
+    expect(oldOverride.values.status).toBe('void');
+    expect(oldOverride.values.replaced_by_key).toBe(confirmed.entityKey);
+    const [newOverride] = await overridesFor('award_winners', confirmed.entityKey);
+    expect(newOverride.fieldGroup).toBe('record');
+    expect(newOverride.values.replaces_key).toBe(targetKey);
+    expect(newOverride.values.season).toBe(season);
+    expect(newOverride.values.player_identity).toBe(linkedPlayerIdentity);
+
+    // Audit: one voided row and one created row, sharing the replacement id.
+    const voidAudit = await auditRows('award_winners', targetId);
+    expect(voidAudit.map((a) => a.fieldGroup)).toEqual(['award_winner_voided']);
+    expect(voidAudit[0].newValues.replacement_id).toBe(confirmed.replacementId);
+    expect(voidAudit[0].newValues.replaced_by_key).toBe(confirmed.entityKey);
+    const createAudit = await auditRows('award_winners', confirmed.rowId);
+    expect(createAudit.map((a) => a.fieldGroup)).toEqual(['award_winner_created']);
+    expect(createAudit[0].newValues.replacement_id).toBe(confirmed.replacementId);
+    expect(createAudit[0].newValues.replaces).toBe(targetKey);
   });
 
   it('surfaces a same-player duplicate for confirmation rather than refusing it (R-5)', async () => {
