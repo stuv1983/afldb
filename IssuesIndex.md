@@ -472,7 +472,8 @@
 
 ### AFLDB-ISSUE-286 — Hall of Fame legend and removal years are not bounded server-side
 - **Severity:** Low. **Area:** admin awards / Hall of Fame validation. **State:** Open (2026-10-08), F-021; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-286.md`. **Next action:** implementation.
+- **Runbook:** `issues/open/AFLDB-ISSUE-286.md` (§17, §17.1). **Next action:** merge and push (implemented 2026-10-14, DB-free
+  validated), then close.
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;
