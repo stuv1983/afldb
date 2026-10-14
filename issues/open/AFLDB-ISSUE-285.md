@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** **Resolved (2026-10-14, merge-scoped)**, on the push of the documentation-only closure commit (§18). Implemented as `70af9ae3` on `sonnet/issue-285` (base `ea792f43`), merged and pushed with its records as `848f13f1`; DB-free validated (§17.1). **Not deployed.**
+- **Status:** **Open (2026-10-08).** Implemented as `70af9ae3` on `sonnet/issue-285` (base `ea792f43`), merged and pushed with its records as `848f13f1`; DB-free validated (§17.1, §17.2). **Not deployed. Not resolved:** §14 item 2 (the integration variant) is outstanding; a closure pushed as `5f440acf` was withdrawn (§18).
 - **Severity:** Low. **Area:** admin awards UI.
 - **Key files:** `src/app/admin/awards/ReplacePanel.tsx`, `src/app/admin/awards/actions.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-020; partition note R2a-F04).
@@ -74,7 +74,7 @@ None.
 
 ## 16. Next action
 
-~~Implementation.~~ Done 2026-10-14 (§17); merged and closed (§18).
+~~Implementation.~~ Done 2026-10-14 (§17); merged (§18). Next: the operator runs the §14 item 2 integration variant on `afldb_test`, then close.
 
 ## 17. Implementation record (2026-10-14)
 
@@ -93,10 +93,24 @@ None.
 - `tests/awards-admin.test.ts` (the only other suite that names `ReplacePanel.tsx`): 40 of 41 pass; the one failure (`widens data_edits by SELECT alone in 108`, a migration-text regex) fails identically in the primary checkout at the unmodified base, so it is pre-existing and unrelated. The full suite was not run.
 - **Not run / limits:** the integration variant named in §14 item 2 (an `admin-awards` case replacing onto an existing same-player row with `confirmDuplicate`) was not written or run: it needs `afldb_test`, and the query layer it exercises is unchanged. The panel's React state transitions (preview, refusal, tick, resubmit) and the rendered page are not exercised: this suite has no DOM, so the tick-then-resubmit sequence is covered as pieces (helpers, rendered control, real action) plus a source-wiring check, not as one interaction. No browser, deployment, DEV or PROD action.
 
-## 18. Readiness, merge and closure (2026-10-14)
+## 17.2 Mutation checks of the tests (2026-10-14, assistant-run; Windows, DB-free)
 
-- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 285`: READY (§17.1). `npm run merge:ready -- --issue 285` (raw output, unchanged: `D:\tmp\issue285\merge-ready-raw-1.txt`): every check PASS except **one blocker, "main worktree is clean"**, the primary checkout's **17** untracked paths (nine `.agents/skills` files, seven zero-byte stray-named files including `void`, and the literal `$null)`). Existing warnings: no `afldb-merge-readiness` block in this runbook; no unexpected-file classification (5 committed files); database parity not checked. The worktree was created with `git worktree add -b sonnet/issue-285 <path> ea792f43` (the tip verified equal to the live remote by `git ls-remote`) and a `node_modules` junction, because `worktree:bootstrap` is blocked by the same strays.
-- **Exception.** The owner authorised a fresh exception for this issue, covering only that clean-tree FAIL and the exact 17-path set, compared by full content hash, **verified immediately before each merge**. `D:\tmp\issue285\exception-check.py` (a copy of the read-only ISSUE-300 script) was run as `precheck-1`, as `premerge-1` immediately before the implementation merge and `postmerge-1` after its push, and again as `premerge-2` immediately before the closure merge and `postmerge-2` after it; every run RESULT OK. `$null)` (143 bytes, mtime 20:00:49) was hashed in full before each merge as `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500` and the check was run with that fresh value. Current equality with the saved 13 Oct snapshots, not continuous preservation. No stray was modified, moved or deleted.
-- **Merge 1.** `70af9ae3` (fix) and `848f13f1` (records) fast-forwarded onto `main` (`ea792f43..848f13f1`) and pushed; local `main`, the fetched `origin/main` and `git ls-remote origin refs/heads/main` all equalled `848f13f1` afterwards. Before the merge a fresh `git fetch` and `ls-remote` showed `main` still at `ea792f43`.
-- **Resolution.** Resolved on the push of the documentation-only closure commit, under §14 item 1 (a DB-free component render asserting the control appears; met, §17.1). The closure scope is **merge-scoped**: code on `main`, DB-free validated, **not deployed**.
-- **Preserved limits.** Not deployed. The §14 item 2 integration variant (an `admin-awards` integration case replacing onto an existing same-player row with `confirmDuplicate`) was not written or run: it needs `afldb_test`, and the query layer it would exercise is unchanged by this issue. The panel's React state transitions and the rendered page were not exercised in a browser; the tick-then-resubmit sequence is covered as pieces (helpers, rendered control, the real action over a mocked query) plus a source-wiring check. The one failure in `tests/awards-admin.test.ts` is pre-existing at the base and unrelated (§17.1).
+Each mutant changes the real confirmation wiring in `ReplacePanel.tsx`, keeps every export, is applied alone to a clean tree, and is restored from Git afterwards (`D:\tmp\issue285\mutate.py`; outputs `mutation-<name>.txt`). A kill counts only if the failure is an assertion about behaviour, not a missing import.
+
+| Mutant | Against the first 15 cases | Against the 20 cases |
+|---|---|---|
+| A1 the helper never sends `confirmDuplicate` when ticked | killed by 2 behavioural cases (`expected null to be '1'`) | killed by 3 |
+| A2 the component never applies the tick | killed **only by a source-text assertion** | killed by the panel flow (`expected null to be '1'`) |
+| B1 the offer is not tied to the refused preview | killed by 1 helper case | killed by 2 (helper and panel flow) |
+| B2 the tick survives a new preview and "Back" | killed **only by a source-text assertion** | killed by the panel flow (the control returns pre-ticked for another player) |
+| B3 the tick is applied once the control is no longer offered | killed **only by a source-text assertion** | killed by the panel flow (`expected true to be false`) |
+| C1 the control is offered for every domain | killed by 2 helper cases | killed by 4 |
+
+The component-level mutants (A2, B2, B3) survived behaviourally in the first 15 cases, so the tests were strengthened: the real `ReplacePanel` function is driven through open, preview, confirm, refusal, tick, resubmit, back and a different player's preview, using a hook harness (slot-based `useState`/`useRef`, inert `useEffect`, a mocked awards submit hook and a `FormData` stand-in). The source-text case was removed. A first attempt at the mutation run was contaminated by an earlier aborted command that had left mutant A in the file; all results above are from clean-tree reruns. The 20 cases pass unmutated; `tsc --noEmit` and ESLint exit 0. Still not exercised: the markup the browser finally paints and real React rendering (no DOM or browser).
+
+## 18. Readiness, merge and the withdrawn closure (2026-10-14)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run merge:ready -- --issue 285` (raw output, unchanged: `D:\tmp\issue285\merge-ready-raw-1.txt`): every check PASS except **one blocker, "main worktree is clean"**, the primary checkout's **17** untracked paths. The exact set and the full content hashes were verified immediately before and after each merge (`D:\tmp\issue285\premerge-1`, `postmerge-1`, `premerge-2`, `postmerge-2`, all RESULT OK).
+- **Merge 1.** `70af9ae3` (fix) and `848f13f1` (records) fast-forwarded onto `main` (`ea792f43..848f13f1`) and pushed.
+- **Closure withdrawn.** `5f440acf` closed the issue "under §14 item 1" and moved this runbook to `issues/closed/`. That over-read §14: it lists a DB-free render **and** an integration variant of the `admin-awards` :670 case and nowhere says the first suffices (the other closed review findings' §14 sections say so explicitly), and an unchanged query layer is not a reason to drop a listed criterion. The closure was reverted; the runbook is back in `issues/open/` and the issue is **Open**.
+- **Remaining.** §14 item 2 on `afldb_test`, run by the operator (it needs the database), then close. Not deployed. The panel's React state transitions are now covered by a DOM-free harness (§17.2); the painted page and a browser are not.

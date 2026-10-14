@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 36 (ISSUE-229, ISSUE-266–270, and the 30 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-285, ISSUE-286, ISSUE-287, ISSUE-288, ISSUE-290, ISSUE-291, ISSUE-297, ISSUE-300, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18), and ISSUE-290 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-290.md` §18), and ISSUE-291 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-291.md` §18), and ISSUE-287 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-287.md` §18), and ISSUE-286 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-286.md` §18), and ISSUE-300 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-300.md` §18), and ISSUE-285 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-285.md` §18); other issues' PROD prerequisites are unchanged)
+**Open issues:** 37 (ISSUE-229, ISSUE-266–270, and the 31 review findings ISSUE-271–314 other than ISSUE-278, ISSUE-281, ISSUE-286, ISSUE-287, ISSUE-288, ISSUE-290, ISSUE-291, ISSUE-297, ISSUE-300, ISSUE-302, ISSUE-312, ISSUE-313 and ISSUE-314, registered on 2026-10-10; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, ISSUE-281 and ISSUE-288 on 2026-10-14 (both DEV-scoped; PROD installation and acceptance pending, runbooks `issues/closed/AFLDB-ISSUE-281.md` §18 and `issues/closed/AFLDB-ISSUE-288.md` §18), and ISSUE-265 on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released, and ISSUE-297 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-297.md` §18), and ISSUE-290 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-290.md` §18), and ISSUE-291 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-291.md` §18), and ISSUE-287 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-287.md` §18), and ISSUE-286 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-286.md` §18), and ISSUE-300 on 2026-10-14 (merge-scoped, not deployed; runbook `issues/closed/AFLDB-ISSUE-300.md` §18); other issues' PROD prerequisites are unchanged)
 
 > **Waiting and blockers:** [`blockers.md`](blockers.md) is a navigation register of everything outstanding (blocked
 > work, actionable work awaiting execution, decisions, acceptance and deployment holds). It is not authoritative; the
@@ -464,6 +464,15 @@
 - **Severity:** Low. **Area:** admin Brownlow — `src/db/queries/admin-brownlow.ts`. **State:** Open (2026-10-08), F-019;
   imported 2026-10-10.
 - **Runbook:** `issues/open/AFLDB-ISSUE-284.md`. **Next action:** implementation.
+
+### AFLDB-ISSUE-285 — Award Replace panel cannot give the duplicate confirmation its action requires
+- **Severity:** Low. **Area:** admin awards UI — `src/app/admin/awards/ReplacePanel.tsx`. **State:** Open (2026-10-08),
+  F-020; imported 2026-10-10. Implemented 2026-10-14 (`70af9ae3`), DB-free validated (20 cases; six mutants of the confirmation
+  wiring all killed by behavioural assertions), **merged and pushed to `main` as `848f13f1`, not deployed. Not resolved:** a first
+  closure was withdrawn the same day because the runbook's §14 lists two validation items and never says the DB-free one alone
+  suffices.
+- **Runbook:** `issues/open/AFLDB-ISSUE-285.md` (§14, §17, §17.1, §18). **Next action:** operator-run integration variant of the
+  `admin-awards` :670 case (replace onto an existing same-player row with `confirmDuplicate`) on `afldb_test`, then close.
 
 ### AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 - **Severity:** Low. **Area:** admin fixtures — `src/db/queries/admin-fixtures.ts`. **State:** Open (2026-10-08), F-024;
