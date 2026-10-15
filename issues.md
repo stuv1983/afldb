@@ -50493,6 +50493,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **PROD split-ownership census DONE (15 Oct 2026, read-only, `afldb_prod` as `afldb_app`; runbook §34).** Guarded, repeatable-read read-only, bounded timeouts; exit statuses all 0, hashes recorded. **PROD:** 17,056 matches, 136,448 period rows;
   1,744 rows (218 matches) carry the parent's source 10; 134,704 rows (16,838 matches) carry a NULL source under a set parent; **0 both-set-and-different, 0 mixed-source matches**. The DEV component (§31) read the same shape. Recorded as two separate components;
   both say no foreign-owner split is present in the current data. A point-in-time state before the fix is installed on PROD; nothing repaired. **State B and the first attributable nightly remain separate, unmet requirements**; the 15 Oct night stays unattributed.
+- **Next DEV deployment prepared (15 Oct 2026; documentation only; runbook §36).** PREV `17514052` re-read read-only; the full delta reviewed (0 migrations/lockfile/package.json/deploy/next.config; 38 src and 9 tools files); gate G-10 run read-only on the real DEV snapshot (0 violations); pinned guards, 18-path hashed exception, installation checks, rollback and a nightly **watcher** (timestamped capture series that can make the next night attributable) prepared and locally tested. **Nothing deployed or authorised.** The next night will also be the first run of the 293-301 nightly-path changes; State B and PROD remain.
 
 ## AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 
@@ -51191,6 +51192,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Complete build on merged `main` (15 Oct 2026; runbook §19).** The earlier "not a completed build" was an environment limitation (no database on `127.0.0.1:5432`), not a code failure. With a child-scoped read-only `afldb_test` connection through the tunnel
   (all other connection settings replaced by an unroutable sentinel; pre-build assertions on database, role, read-only and write privileges), `next build` and `prepare-standalone` both exited 0 (1515/1515 pages; `/admin/upload/stage` registered). It shows the tree builds, not runtime or
   DEV behaviour; acceptance (§17.4, §17.5) is unchanged and the issue stays Open.
+- **DEV acceptance prepared (15 Oct 2026; runbook §20):** the browser checklist C-303-1..5 (1.5 MB staged; over-5 MB refused; audit row; reject the staged submission) and the two CSV generators are in the deployment pack; not deployed, not run. Pass needs three images (`VISUAL: UNVERIFIED` otherwise); the issue stays Open.
 
 ## AFLDB-ISSUE-304 — Email intake parses the whole body before sender and size checks
 
