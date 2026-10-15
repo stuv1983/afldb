@@ -463,7 +463,7 @@
 ### AFLDB-ISSUE-308 — Approving a player-link suggestion does not revalidate public pages
 - **Severity:** Low. **Area:** admin player links / revalidation — `src/app/admin/player-links/actions.ts`. **State:** Open
   (2026-10-08), F-043; imported 2026-10-10.
-- **Update 2026-10-15 (implemented, merge-scoped, not deployed):** a suggestion approval (single or bulk) returns `revalidatePublic: true` when it committed, and the
+- **Update 2026-10-15 (implemented, merge-scoped, not deployed; code `16f31a67`, merged with records as `dfc5c9f2`; readiness accepted under a task-specific cleanliness exception, runbook §20):** a suggestion approval (single or bulk) returns `revalidatePublic: true` when it committed, and the
   browser posts to a new capability-gated `POST /admin/player-links/revalidate` after the action settles (the approval actions still never call `revalidatePath`, so the
   Next 15.5 hang question is avoided, not answered). DB-free: 5 new cases, 9 of 9 mutants killed, `tsc` clean; one pre-existing unrelated failure (I14). No browser, DEV or
   PROD action. **Not resolved:** the §14 item 2 DEV check needs a deployment and a data write; **parked** with the exact steps and a read-only-chosen candidate
