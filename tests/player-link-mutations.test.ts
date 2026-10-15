@@ -1480,6 +1480,13 @@ describe('player-link action contracts', () => {
       expect(controls, file).toContain('postPublicRevalidate');
       expect(controls, file).toMatch(/\.revalidatePublic\)\s*void postPublicRevalidate\(\)/);
     }
+    // The effect is keyed on the whole result object, not on its fields: two
+    // approvals that return an identical message and flag are still two results,
+    // and a field-keyed dependency would post (and refresh) for the first only.
+    expect(read('src', 'app', 'admin', 'player-links', 'ResolveControls.tsx'))
+      .toMatch(/postPublicRevalidate\(\);\s*\}, \[approveState\]\);/);
+    expect(read('src', 'app', 'admin', 'player-links', 'BulkApproveControls.tsx'))
+      .toMatch(/router\.refresh\(\);\s*\}\s*\}, \[state, router\]\);/);
     expect(read('src', 'app', 'admin', 'player-links', 'post-public-revalidate.ts'))
       .toContain("fetch('/admin/player-links/revalidate', { method: 'POST' })");
   });

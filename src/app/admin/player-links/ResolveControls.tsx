@@ -169,9 +169,10 @@ export function ResolveControls({
 
   // The approval committed, whatever its audit warning says: revalidate the
   // public pages in a follow-up request, not inside the action (AFLDB-ISSUE-308).
+  // Keyed on the result object so a second committed approval posts again.
   useEffect(() => {
     if (approveState.revalidatePublic) void postPublicRevalidate();
-  }, [approveState.revalidatePublic]);
+  }, [approveState]);
 
   useEffect(() => {
     if (done && !warning) {

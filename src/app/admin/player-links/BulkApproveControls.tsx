@@ -29,6 +29,8 @@ export function BulkApproveControls({
   const router = useRouter();
   const [state, formAction, pending] = useActionState(bulkApproveSuggestions, INITIAL);
 
+  // Keyed on the result object, not its fields: two approvals with the same
+  // message and flag are still two results, and each must refresh and revalidate.
   useEffect(() => {
     if (state.message) {
       // Public pages first (AFLDB-ISSUE-308): a follow-up request after the
@@ -37,7 +39,7 @@ export function BulkApproveControls({
       document.dispatchEvent(new CustomEvent('player-links-resolved'));
       router.refresh();
     }
-  }, [state.message, state.revalidatePublic, router]);
+  }, [state, router]);
 
   if (targets.length === 0) {
     return (
