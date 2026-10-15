@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### A cancelled fixture whose game was later played can be reinstated (AFLDB-ISSUE-289; `39622149`, merged and pushed to `main`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
+
+- A fixture that had been cancelled and whose game was then played and imported could not be reinstated: the played lock refused every edit and the collision check refused the fixture's own match, so the record stayed `cancelled` and played with no way out. On the owner's decision (D-289-1, option a) Reinstate is now permitted for exactly that case, and for no other: every other edit of a played fixture, an ambiguous result, a duplicate scheduled fixture and a club already playing that round still refuse, and the played match is never touched. The fixture page offers Reinstate (not Cancel or Void) for such a fixture.
+- **Validation (`afldb_test`).** 9 new DB-free cases (7 fail on the unfixed source) and 3 new PostgreSQL cases including create, cancel, play, reinstate; 6 of 6 mutants killed. **Not done:** any deployment or browser check; the page change is `VISUAL: UNVERIFIED`. Detail: `issues/closed/AFLDB-ISSUE-289.md` §17 and §18.
+
 ### The legacy promotion batch counts inserted and updated rows (AFLDB-ISSUE-307; `0d7810d8`, merged and pushed to `main`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
 
 - Promoting an uploaded CSV recorded `records_inserted` as the number of rows read and `records_updated` as 0, so a corrected file that updated existing matches, player statistics or biographies was reported as all inserts, and an update that touched no row (a player or match deleted after validation) was counted as an insert. Each of the six dataset writers now reports whether its row was inserted, updated or matched nothing, and the batch records `records_inserted` and `records_updated` from that; a row that matched nothing is counted only in `records_read`. Earlier batches are not changed. No migration; the data written is unchanged.

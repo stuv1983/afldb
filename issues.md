@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 20 (ISSUE-229, ISSUE-266–270 and 14 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294, ISSUE-295, ISSUE-301, ISSUE-304 and ISSUE-307 on 2026-10-15, merge-scoped and not deployed, see below)
+**Open issues:** 19 (ISSUE-229, ISSUE-266–270 and 13 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294, ISSUE-295, ISSUE-301, ISSUE-304, ISSUE-307 and ISSUE-289 on 2026-10-15, merge-scoped and not deployed, see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -30,7 +30,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-277 | Data Editor edits other than the name to a token-only player are not durable | Medium | Admin authority / Data Editor / override replay — `src/db/queries/data-edits.ts`, `tools/migration/common.py` | Open (2026-10-08); review F-012, code-proven; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-277.md` | Operator decision **D-277-1** (option (a) or (b)), then implementation |
 | AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | Code fix plus test update, before search indexing is enabled |
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
-| AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; fix implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-292.md` §17 | Run the read-only DEV/PROD two-path census (needs DEV/PROD contact); then close |
 | AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; fix implemented and validated locally without the network 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-299.md` §17 | Operator-run §14 double run (networked), then close |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
@@ -50840,13 +50839,22 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-289 — A cancelled fixture that is later played can never be reinstated
 
-- **Status:** Open (2026-10-08). **Severity:** Low. **Area:** admin fixtures (ISSUE-162 lifecycle). Key file:
-  `src/db/queries/admin-fixtures.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-289.md`.
+- **Status:** Resolved (2026-10-15, merge-scoped; opened 2026-10-08). **Severity:** Low. **Area:** admin fixtures (ISSUE-162 lifecycle). Key file:
+  `src/db/queries/admin-fixtures.ts`. **Runbook:** `issues/closed/AFLDB-ISSUE-289.md`.
 - **Origin.** Review F-024 (R2c-F05) at `20a7a4bb`. Code-proven.
 - **Defect.** Once the game is played and settled, the played-lock gate (and `checkMoveTarget`'s `already_played`) refuses
   Reinstate; the fixture stays `cancelled` + played with no diagnostic.
-- **Decisions.** **D-289-1 (operator, undecided):** (a) exempt `fixture_reinstated` for the fixture's own pair and round, or
-  (b) keep the lock, add a `cancelled_but_played` diagnostic and amend the runbook. **Next action.** D-289-1.
+- **Decisions.** **D-289-1 (owner, decided 2026-10-15): option (a), narrowly:** exempt `fixture_reinstated` for the fixture's own played
+  match; preserve every other lock. (Option (b), a `cancelled_but_played` diagnostic, was not chosen.) ~~**Next action.** D-289-1.~~ Superseded below.
+- **Implementation (2026-10-15; commit `39622149`, base `d9cd637a`; not deployed).** `isFixtureEditAllowed` allows `fixture_reinstated` on a cancelled fixture
+  whose resolution is `played` or `played_home_away_differs` and nothing else; `reinstateFixture` skips `already_played` only for that
+  fixture's own single result (an ambiguous resolution, a duplicate scheduled fixture and a club clash still refuse). The fixture page now
+  offers Reinstate (and not Cancel or Void) for such a fixture. Runbook §17.
+- **Validation (15 Oct 2026; runbook §17.3).** DB-free `admin-fixture-actions` 80 passed (9 new; 7 fail on the unfixed source); the whole
+  `admin-fixtures` integration file 39 passed on `afldb_test` (3 new, including the runbook's create, cancel, play, reinstate case); 6 of 6
+  mutants killed; residue 0; `tsc`, ESLint and `git diff --check` clean.
+- **Status: Resolved (2026-10-15)**, merge-scoped, on the push of the documentation-only closure commit. **Preserved limits:** not deployed; no
+  browser, DEV or PROD action; **`VISUAL: UNVERIFIED`** for the page change (structural render test only, nobody has seen the page).
 
 ## AFLDB-ISSUE-290 — Manual draft selections accept out-of-range age, height, weight and pick number
 
