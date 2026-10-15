@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### The beta magic link survives a scanner's GET and signs in exactly once: ISSUE-280 accepted on DEV and closed DEV-scoped - 15 October 2026
+
+- DEV (still `0cb3d20c`, no redeployment) issued one sign-in link for `stuart.villanti@gmail.com` through the journal fallback (D-280-1 amendment; no SMTP change, no email). The reviewed simulated prefetch (3 GET + HEAD) left the token usable and granted no cookie; the owner's single confirmation signed in and wrote exactly one `beta.magic_link_verified` event; a replay from a fresh, cookie-less browser context was redirected to `/beta` with no further verified event. Desktop and mobile confirmation-page captures exist (taken at replay time, disclosed in the record). Actual link-scanning gateway behaviour remains untested (D-280-2). Effects: one `beta_login_tokens` row (hash only, used) and two `auth_audit_log` rows; no settings, schema, allowlist or SMTP change; PROD untouched, installation and acceptance there pending. Record: `issues/closed/AFLDB-ISSUE-280.md` §22 and the `issues.md` ISSUE-280 entry.
+- Record corrections: ISSUE-280's runbook and ledger entry now name the r2 pack rather than the superseded first pack; the `run-20261015-2201` evidence folder was re-verified (33/33 sealed hashes match) and its references stand.
+
 ### DEV now runs `0cb3d20c`: ISSUE-308's approval revalidation is accepted on DEV; ISSUE-280's acceptance is parked (DEV has no SMTP) - 15 October 2026
 
 - **Deployment.** DEV was installed with `0cb3d20c` by one gated run on 2026-10-15 (22:03:13-22:07:15 AEDT; sync-dev exit 0; `f07c2a74..0cb3d20c` fast-forward; `npm ci`; `db:migrate` reported 110 applied and nothing to apply; build; BUILD_ID `jfwHG_Ru35eHV1Q9_O6oy`; MainPID 1800181 -> 2084219; health ready; one restart; no retry, no rollback). Installation checks (`i-checks.sh`) exit 0 / PASS; S0 manifest 56/56; Pin-Check PASS; gate PASS; H4 exit 10 = the authorised EXCEPTED-FAIL (the one clean-tree FAIL, sealed 18 paths equal at P1 and P5, 110/110 migration parity); post-browser journal check PASS (408 lines, 0 matches).
@@ -25,7 +30,7 @@ commit.
 ### The beta magic link no longer burns on a GET: a confirmation page, then a POST (AFLDB-ISSUE-280; DB-free validated; not deployed; still open) - 15 October 2026
 
 - `GET /beta/verify?token=` used to spend the single-use token as its first statement, so a mail provider that pre-fetches links for safety scanning (SafeLinks, URL rewriters) spent it before the reader clicked and the reader was bounced to `/beta` with no explanation. The GET now renders a one-button confirmation page and reads no table (`src/app/beta/verify/page.tsx`, `VerifyForm.tsx`); the form posts the token to the Server Action `confirmMagicLink` (`actions.ts`), which keeps the per-caller rate limit, the single-use `UPDATE`, the allowlist re-check, both audit events and the access cookie. The emailed URL is unchanged, so links already issued still work. `docs/admin-and-beta.md` describes the page.
-- **Validation (DB-free).** `tests/beta-verify.test.ts`, 12 cases including three scanner GETs followed by one click; 11 of 11 mutants killed; `tsc --noEmit`, ESLint (0 errors) and `git diff --check` clean. **Not done:** any live render (the application shell needs a database), browser, DEV or PROD action, deployment or email. The live page is `VISUAL: UNVERIFIED`. The DEV check (a prefetching mailbox) is parked with exact actions: `issues/open/AFLDB-ISSUE-280.md` §18-§19.
+- **Validation (DB-free).** `tests/beta-verify.test.ts`, 12 cases including three scanner GETs followed by one click; 11 of 11 mutants killed; `tsc --noEmit`, ESLint (0 errors) and `git diff --check` clean. **Not done:** any live render (the application shell needs a database), browser, DEV or PROD action, deployment or email. The live page is `VISUAL: UNVERIFIED`. The DEV check (a prefetching mailbox) is parked with exact actions: `issues/closed/AFLDB-ISSUE-280.md` §18-§19.
 
 ### ISSUE-308's approval effects now fire for every approval; its DEV acceptance is corrected for per-worker caches (AFLDB-ISSUE-308 review; DB-free validated; not deployed; still open) - 15 October 2026
 
@@ -44,7 +49,7 @@ commit.
 ### The 15 October DEV installation of `f07c2a74`, reconciled against the merge-scoped entries below (record only; ISSUE-280 assessed and parked) - 15 October 2026
 
 - The DEV installation of `f07c2a74` (previous revision `17514052`; 15 October 16:30 AEDT) carries every fix merged since, so the headings below that said "not deployed" now say DEV-installed. The DEV checkout HEAD and BUILD_ID were re-read read-only afterwards and match. **Installation is not acceptance:** only ISSUE-303 has a DEV acceptance record. Nothing is installed on PROD. The "Not done: any deployment" lines inside those entries record the state at the merge and are left as written. ISSUE-299's entry (a live double run, no code change) is in the same installation. ISSUE-279 stays open: its DEV check needs indexing switched on for DEV, a settings change that was not made.
-- ISSUE-280 (beta magic link burned by a prefetching GET) was assessed and parked: its DEV check needs a deployment of a fix that does not exist yet, a token write and an email to an allowlisted address; incidence evidence was not collectable at the least-privilege role. Detail: `issues/open/AFLDB-ISSUE-280.md` §17.
+- ISSUE-280 (beta magic link burned by a prefetching GET) was assessed and parked: its DEV check needs a deployment of a fix that does not exist yet, a token write and an email to an allowlisted address; incidence evidence was not collectable at the least-privilege role. Detail: `issues/closed/AFLDB-ISSUE-280.md` §17.
 
 ### Complete build on merged main and the ISSUE-275 PROD split-ownership census (validation records; nothing deployed) - 15 October 2026
 
