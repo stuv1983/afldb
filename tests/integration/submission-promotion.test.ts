@@ -868,3 +868,43 @@ describe('AFLDB-ISSUE-273 teardown after an early failure', () => {
     expect(background).toEqual([]);
   });
 });
+
+describe('AFLDB-ISSUE-307 the promotion batch counts what each row did', () => {
+  it('records an update for each biography row written and counts a row whose player is gone as neither', async () => {
+    const kept = await createFixturePlayer('batch-counts-kept');
+    const gone = await createFixturePlayer('batch-counts-gone');
+    const sha = `${MARKER}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    const [submission] = await owner<{ id: number }[]>`
+      INSERT INTO data_submissions
+        (dataset, filename, content, content_sha256, uploaded_by, row_count, status)
+      VALUES ('player_bio', ${`${MARKER}.csv`}, ${Buffer.from('player_id,dob\n')}, ${sha},
+              ${fixtureAdminId}, 2, 'approved'::submission_status)
+      RETURNING id
+    `;
+    submissionIds.add(submission.id);
+    for (const [rowNo, playerId] of [[1, kept], [2, gone]] as const) {
+      await owner`
+        INSERT INTO data_submission_rows (submission_id, row_no, payload, verdict, reasons)
+        VALUES (${submission.id}, ${rowNo},
+                ${owner.json({ player_id: String(playerId), dob: '2001-02-03' })}, 'ok',
+                ${owner.json({ resolved: { player_id: playerId } })})
+      `;
+    }
+    // The second player is deleted after "validation": its UPDATE then matches no row.
+    await owner`DELETE FROM players WHERE id = ${gone}`;
+    playerIds.delete(gone);
+
+    const result = await promoteSubmission(submission.id);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    expect(await readPlayerDob(kept)).toBe('2001-02-03');
+
+    const [batch] = await owner<{ read: number; inserted: number; updated: number }[]>`
+      SELECT records_read::int AS read, records_inserted::int AS inserted,
+             records_updated::int AS updated
+        FROM import_batches WHERE id = ${String(result.batchId)}::bigint
+    `;
+    // Two rows read; one bio row written (an update, never an insert); one that matched no row.
+    expect(batch).toEqual({ read: 2, inserted: 0, updated: 1 });
+  });
+});

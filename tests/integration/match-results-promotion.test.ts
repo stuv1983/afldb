@@ -808,6 +808,46 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     expect(await readStats(player)).toEqual(before);
   });
 
+  it('AFLDB-ISSUE-307: the promotion batch counts a new match as inserted and a re-promoted one as updated', async () => {
+    const counts = async (batchId: string | number) => {
+      const [batch] = await owner<{ read: number; inserted: number; updated: number; rejected: number }[]>`
+        SELECT records_read::int AS read, records_inserted::int AS inserted,
+               records_updated::int AS updated, records_rejected::int AS rejected
+          FROM import_batches WHERE id = ${String(batchId)}::bigint
+      `;
+      return batch;
+    };
+    const promote = async (dataset: string, payloads: Payload[]) => {
+      const staged = await stageAndValidate(dataset, payloads);
+      expect(staged.summary.errors).toBe(0);
+      const result = await approveAndPromote(staged.id);
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+      if (!result.ok) throw new Error('unreachable');
+      return result;
+    };
+
+    // One new match: read 1, inserted 1, updated 0 (it used to say inserted 1 for anything).
+    const first = await promote('match_results', [matchPayload('R307A', '27')]);
+    expect(await counts(first.batchId)).toEqual({ read: 1, inserted: 1, updated: 0, rejected: 0 });
+
+    // The same match again, with one genuinely new one beside it: one of each.
+    const mixed = await promote('match_results', [
+      matchPayload('R307A', '27', { home_score: '90' }), matchPayload('R307B', '28'),
+    ]);
+    expect(await counts(mixed.batchId)).toEqual({ read: 2, inserted: 1, updated: 1, rejected: 0 });
+
+    // player_match_stats: the first row for a player on a match is an insert, the second promotion an update.
+    const player = `${TAG} Fresh Player`;
+    const newStats = await promote('player_match_stats', [
+      statsPayload(player, { round_code: fixtureRound('R307B'), kicks: '5' }),
+    ]);
+    expect(await counts(newStats.batchId)).toEqual({ read: 1, inserted: 1, updated: 0, rejected: 0 });
+    const againStats = await promote('player_match_stats', [
+      statsPayload(player, { round_code: fixtureRound('R307B'), kicks: '6' }),
+    ]);
+    expect(await counts(againStats.batchId)).toEqual({ read: 1, inserted: 0, updated: 1, rejected: 0 });
+  });
+
   it('player_match_stats: a new row with silent optional columns stores them as not recorded', async () => {
     const player = `${TAG} Fresh Player`;
     await promoteFile('player_match_stats', [statsPayload(player)]);

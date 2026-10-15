@@ -477,7 +477,9 @@
 ### AFLDB-ISSUE-307 — Legacy promotion counts every promoted row as inserted
 - **Severity:** Low. **Area:** legacy CSV intake / batch accounting — `src/lib/ingest/pipeline.ts`. **State:** Open
   (2026-10-08), F-042; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-307.md`. **Next action:** implementation (low priority).
+- **State (2026-10-15):** implemented and validated on `afldb_test` (4 end-to-end promotion counts through the real pipeline, 6 DB-free cases;
+  10 of 10 mutants killed; promotion-batch census back at 690); not deployed.
+- **Runbook:** `issues/open/AFLDB-ISSUE-307.md` §17. **Next action:** merge, then close (merge-scoped).
 
 ### AFLDB-ISSUE-308 — Approving a player-link suggestion does not revalidate public pages
 - **Severity:** Low. **Area:** admin player links / revalidation — `src/app/admin/player-links/actions.ts`. **State:** Open

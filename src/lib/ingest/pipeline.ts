@@ -571,19 +571,27 @@ export async function promoteSubmission(submissionId: number): Promise<PromoteRe
             // and reported, never counted.
             const batchId = asImportBatchId(batch.id);
 
+            // AFLDB-ISSUE-307: what each row actually did. A re-promotion over an existing row is an
+            // update, and a statement that matched no row (a match deleted since validation) is
+            // neither, so `read` can exceed `inserted + updated`.
+            let inserted = 0;
+            let updated = 0;
             for (const row of rows) {
-              await spec.promoteRow(row.payload, row.reasons?.resolved ?? {}, {
+              const outcome = await spec.promoteRow(row.payload, row.reasons?.resolved ?? {}, {
                 sql: sp as unknown as typeof importSql,
                 awardId,
                 sourceId: source?.id ?? 0,
                 batchId,
               });
+              if (outcome === 'inserted') inserted += 1;
+              else if (outcome === 'updated') updated += 1;
             }
 
             await sp`
               UPDATE import_batches
                  SET completed_at = now(), status = 'completed',
-                     records_read = ${rows.length}, records_inserted = ${rows.length}
+                     records_read = ${rows.length}, records_inserted = ${inserted},
+                     records_updated = ${updated}
                WHERE id = ${batchId}
             `;
             return batchId;

@@ -88,6 +88,25 @@ export type PromotionRow = {
   resolved: Record<string, number | string | null>;
 };
 
+/** What `promoteRow` did to the database (AFLDB-ISSUE-307). */
+export type PromotedRowOutcome = 'inserted' | 'updated' | 'noop';
+
+/**
+ * The outcome of an `INSERT ... ON CONFLICT DO UPDATE ... RETURNING (xmax = 0) AS inserted`:
+ * `xmax` is 0 on a row this statement inserted and non-zero on one it updated in place. No row
+ * back means the statement wrote nothing.
+ */
+function upsertOutcome(rows: readonly { inserted: boolean }[]): PromotedRowOutcome {
+  const row = rows[0];
+  if (row === undefined) return 'noop';
+  return row.inserted ? 'inserted' : 'updated';
+}
+
+/** The outcome of an `UPDATE ... RETURNING id`: a row written is an update, none is a no-op. */
+function updateOutcome(rows: readonly unknown[]): PromotedRowOutcome {
+  return rows.length === 0 ? 'noop' : 'updated';
+}
+
 export type DatasetSpec = {
   key: string;
   title: string;
@@ -117,12 +136,16 @@ export type DatasetSpec = {
    * Apply one validated row. Runs inside the promotion transaction under
    * the import role. Upserts by a natural/source key, so re-promoting a
    * corrected file updates rather than duplicates.
+   *
+   * Returns what the row did to the database, so the promotion batch can record honest
+   * `records_inserted` / `records_updated` counts (AFLDB-ISSUE-307): `inserted` (a new row),
+   * `updated` (an existing row was written over) or `noop` (a statement that matched no row).
    */
   promoteRow: (
     row: Record<string, string | null>,
     resolved: Record<string, number | string | null>,
     context: { sql: Sql; awardId: number | null; sourceId: number; batchId: ImportBatchId },
-  ) => Promise<void>;
+  ) => Promise<PromotedRowOutcome>;
   /**
    * Optional whole-submission check, run inside the promotion transaction
    * before anything is written and before the first `promoteRow`. Throwing
@@ -414,7 +437,7 @@ const risingStar: DatasetSpec = {
       if (value !== null) stats[key] = value;
     }
 
-    await sql`
+    const written = await sql<{ inserted: boolean }[]>`
       INSERT INTO award_nominations
         (award_id, season, round_number, player_id, player_name_raw,
          link_status_value, club_id, opponent_club_id, is_winner, is_ineligible,
@@ -444,7 +467,9 @@ const risingStar: DatasetSpec = {
          votes = EXCLUDED.votes,
          stat_line = EXCLUDED.stat_line,
          import_batch_id = EXCLUDED.import_batch_id
+      RETURNING (xmax = 0) AS inserted
     `;
+    return upsertOutcome(written);
   },
 };
 
@@ -535,7 +560,7 @@ const allAustralian: DatasetSpec = {
       );
     }
 
-    await sql`
+    const written = await sql<{ inserted: boolean }[]>`
       INSERT INTO award_winners
         (award_id, season, player_id, player_name_raw, link_status_value,
          candidate_count, club_id, club_name_raw, position,
@@ -559,7 +584,9 @@ const allAustralian: DatasetSpec = {
          is_captain = EXCLUDED.is_captain,
          is_vice_captain = EXCLUDED.is_vice_captain,
          import_batch_id = EXCLUDED.import_batch_id
+      RETURNING (xmax = 0) AS inserted
     `;
+    return upsertOutcome(written);
   },
 };
 
@@ -1244,7 +1271,7 @@ const matchResults: DatasetSpec = {
       resolved.home_club_name, resolved.away_club_name,
     );
 
-    await sql`
+    const written = await sql<{ inserted: boolean }[]>`
       INSERT INTO matches
         (match_key, season, round_code, round_number, round_type, is_final,
          match_date, venue_id, venue_raw, home_club_id, away_club_id,
@@ -1283,6 +1310,7 @@ const matchResults: DatasetSpec = {
          attendance_status = CASE WHEN EXCLUDED.attendance IS NULL
                                   THEN matches.attendance_status
                                   ELSE EXCLUDED.attendance_status END
+      RETURNING (xmax = 0) AS inserted
       -- AFLDB-ISSUE-258 (D-258-2/3): a NULL optional figure above means the
       -- file was silent (no column, or a blank cell) and keeps the stored
       -- value; a malformed cell never reaches here, validation refuses it.
@@ -1298,6 +1326,7 @@ const matchResults: DatasetSpec = {
       -- write would move a value active Data Editor authority protects, so
       -- no protected value changes here.
     `;
+    return upsertOutcome(written);
   },
 };
 
@@ -1632,7 +1661,7 @@ const playerMatchStats: DatasetSpec = {
 
   async promoteRow(row, resolved, { sql, sourceId, batchId }) {
     const s = (key: (typeof STAT_COLUMNS)[number]) => resolved[key] ?? null;
-    await sql`
+    const written = await sql<{ inserted: boolean }[]>`
       INSERT INTO player_match_stats
         (player_id, match_id, club_id, career_game_no, jumper_number,
          kicks, marks, handballs, disposals, goals, behinds, hitouts, tackles,
@@ -1682,7 +1711,9 @@ const playerMatchStats: DatasetSpec = {
          goal_assists     = COALESCE(EXCLUDED.goal_assists, player_match_stats.goal_assists),
          brownlow_votes   = COALESCE(EXCLUDED.brownlow_votes, player_match_stats.brownlow_votes),
          import_batch_id  = EXCLUDED.import_batch_id
+      RETURNING (xmax = 0) AS inserted
     `;
+    return upsertOutcome(written);
   },
 };
 
@@ -1739,7 +1770,7 @@ const playerBio: DatasetSpec = {
     const weight = (row.weight_kg ?? '').trim() || null;
     // COALESCE keeps the current value wherever the file is silent, so a
     // partial file can never blank a figure it did not mention.
-    await sql`
+    const written = await sql`
       UPDATE players
          SET dob = COALESCE(${dob}::date, dob),
              dob_confidence = CASE WHEN ${dob}::date IS NOT NULL
@@ -1748,7 +1779,9 @@ const playerBio: DatasetSpec = {
              height_cm = COALESCE(${height}::smallint, height_cm),
              weight_kg = COALESCE(${weight}::smallint, weight_kg)
        WHERE id = ${resolved.player_id}
+      RETURNING id
     `;
+    return updateOutcome(written);
   },
 };
 
@@ -1898,13 +1931,17 @@ const matchAttendance: DatasetSpec = {
   },
 
   async promoteRow(_row, resolved, { sql }) {
-    await sql`
+    // The match can have been deleted since validation; the UPDATE then touches no row, and
+    // that is a no-op for the batch's accounting rather than an update (AFLDB-ISSUE-307).
+    const written = await sql`
       UPDATE matches
          SET attendance = ${resolved.attendance},
              attendance_status = 'complete'::coverage_status,
              attendance_source_id = (SELECT id FROM sources WHERE key = 'manual_admin_edit')
        WHERE id = ${resolved.match_id}
+      RETURNING id
     `;
+    return updateOutcome(written);
   },
 };
 

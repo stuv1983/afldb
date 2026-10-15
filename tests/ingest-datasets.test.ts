@@ -1820,3 +1820,63 @@ describe('AFLDB-ISSUE-305 validation refuses what promotion cannot cast', () => 
     });
   });
 });
+
+// AFLDB-ISSUE-307: promoteRow reports what the row did, so the promotion batch can count inserted and updated rows
+// instead of calling everything inserted. The statements are exercised against a stand-in that answers the way
+// PostgreSQL does for `RETURNING (xmax = 0) AS inserted` (true: inserted, false: updated in place, no row: written
+// nothing) and for `UPDATE ... RETURNING id`; the real xmax semantics are exercised in the integration suites.
+describe('AFLDB-ISSUE-307 promoteRow reports what the row did', () => {
+  type Answer = { inserted: boolean }[] | { id: number }[];
+  const taggedSql = (answer: Answer) => {
+    const statements: string[] = [];
+    const tag = (strings: TemplateStringsArray) => {
+      const text = strings.join('?');
+      statements.push(text);
+      // all_australian looks for a held admin decision first; there is none.
+      if (/FROM data_overrides/.test(text)) return Promise.resolve([]);
+      return Promise.resolve(answer);
+    };
+    (tag as unknown as { json: (value: unknown) => unknown }).json = (value) => value;
+    return { sql: tag as unknown as Sql, statements };
+  };
+  const context = (sql: Sql) => ({ sql, awardId: 4, sourceId: 3, batchId: '9' as never });
+
+  const upserts = [
+    ['rising_star', 'award_nominations', { player: 'P', source_key: 'k1', is_season_winner: '0', ineligible: '0', votes: '3' },
+      { season: 2073, round_number: 1, player_id: 1, link_status: 'unique', club_id: 1, opponent_club_id: 2 }],
+    ['all_australian', 'award_winners', { player: 'P', club: 'C', year: '2073' },
+      { season: 2073, player_id: 1, link_status: 'unique', club_id: 1 }],
+    ['match_results', 'matches', { round_code: '1', match_date: '2073-04-21', venue: 'V' },
+      { season: 2073, round_number: 1, round_type: 'home_and_away', home_club_name: 'Home FC', away_club_name: 'Away FC',
+        home_score: 86, away_score: 70 }],
+    ['player_match_stats', 'player_match_stats', {},
+      { player_id: 1, match_id: 2, club_id: 3 }],
+  ] as const;
+
+  it.each(upserts)('%s: a new row is inserted, an existing one updated, and nothing written is a no-op', async (key, table, row, resolved) => {
+    const spec = DATASETS[key];
+    for (const [answer, expected] of [
+      [[{ inserted: true }], 'inserted'], [[{ inserted: false }], 'updated'], [[], 'noop'],
+    ] as const) {
+      const { sql, statements } = taggedSql([...answer] as unknown as Answer);
+      expect(await spec.promoteRow({ ...row }, { ...resolved }, context(sql))).toBe(expected);
+      const write = statements.find((text) => new RegExp(`INSERT INTO ${table}\\b`).test(text))!;
+      expect(write, `${key} write`).toBeDefined();
+      expect(write).toContain('RETURNING (xmax = 0) AS inserted');
+    }
+  });
+
+  const updates = [
+    ['player_bio', 'players', { dob: '2000-01-01', height_cm: '180', weight_kg: '80' }, { player_id: 1 }],
+    ['match_attendance', 'matches', {}, { attendance: 1000, match_id: 5 }],
+  ] as const;
+
+  it.each(updates)('%s: a row written is an update, and a statement that matched no row is a no-op', async (key, table, row, resolved) => {
+    const spec = DATASETS[key];
+    const hit = taggedSql([{ id: 1 }]);
+    expect(await spec.promoteRow({ ...row }, { ...resolved }, context(hit.sql))).toBe('updated');
+    const miss = taggedSql([]);
+    expect(await spec.promoteRow({ ...row }, { ...resolved }, context(miss.sql))).toBe('noop');
+    expect(miss.statements[0]).toMatch(new RegExp(`UPDATE ${table}\\b[\\s\\S]*RETURNING id\\s*$`));
+  });
+});
