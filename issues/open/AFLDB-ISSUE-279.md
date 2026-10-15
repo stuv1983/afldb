@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented 2026-10-14 (§17), DB-free validated (§17.1), merged to `main` as `cf1d49c3` (§18), not deployed. **Open** until the §14 item 2 DEV check passes.
+- **Status:** Open (2026-10-08). Implemented 2026-10-14 (§17), DB-free validated (§17.1), merged to `main` as `cf1d49c3` (§18); **installed on DEV in `f07c2a74` on 2026-10-15, not on PROD** (§19). **Open** until the §14 item 2 DEV check passes; that check is parked (§19).
 - **Severity:** Medium. **Area:** public site / SEO / framework upgrade.
 - **Key files:** `src/app/sitemap.ts`, `tests/seo.test.ts`, `tests/e2e/seo.spec.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-014; main-session partition R1c-F01).
@@ -90,7 +90,7 @@ None.
 
 ## 16. Next action
 
-~~Code fix plus test update. This must be done before indexing is enabled.~~ Done and merged (§17, §18). **Remaining:** deploy to DEV and run the §14 item 2 check with indexing on; close only when it passes.
+~~Code fix plus test update. This must be done before indexing is enabled.~~ Done and merged (§17, §18). Deployed to DEV on 2026-10-15 (§19). **Remaining:** the operator's DEV settings change (indexing on, beta gate off) and the §14 item 2 check; close only when it passes.
 
 ## 17. Implementation record (2026-10-14)
 
@@ -117,3 +117,10 @@ None.
 - **Hash limitation, corrected.** §18's "the 16 established paths unchanged in length and hash" rests on `exception-precheck.txt` / `-2.txt`, which compared only the first **16 hex characters** of each SHA-256 plus the length. No full 64-character baseline was saved immediately before the merge. A hash taken now cannot prove content from before the merge.
 - **Full-hash comparison actually available.** The 13 Oct 2026 manifests `D:\tmp\issue313\untracked-blockers-manifest.txt` and `D:\tmp\issue314\closeout-20261013T021336Z\untracked-after.json` hold full SHA-256 values for the nine non-empty files (and one zero-byte stray). The current full SHA-256 and length of all nine non-empty files equal them exactly, and their 16-character prefixes equal the pre-merge 14 Oct values. The seven zero-byte files (including `void`) are `e3b0c442…b855` by definition of length 0 (length 0 and the prefix were recorded before the merge). This shows **current equality with the saved 13 Oct snapshots** (re-checked in full on 14 Oct in a later session, `D:\tmp\issue286\precheck-1.txt`: all nine non-empty files equal both manifests by length and full SHA-256, the seven zero-byte files are `e3b0c442…b855`). It does **not** show that the files were preserved continuously since 13 Oct: the snapshots are points in time, not a monitor, and nothing recorded what happened between them. By 16-hex prefix and length only, the files also matched the pre-merge check. **The merge-time evidence is missing** (no full-hash baseline was saved at the merge instant) and that limitation stands.
 - **`$null)` is not stable.** Its current SHA-256 is `D9EDB146…2500` (143 bytes, rewritten 20:00 on 14 Oct), not `82E23AB9…6EFF`: the SessionStart hook rewrites the file in every session with a cmd.exe error quoting that session's `session_id`. Confirmed by content (the new file names this session's id; the saved copy `stray-dollar-null-paren.bak` names the ISSUE-279 session's). The `82E23AB9…` hash identifies the 14 Oct 19:40 content only; a full-content exception for this path must be established freshly each session. No hook or settings change was made here.
+
+## 19. DEV installation and the parked §14 item 2 check (2026-10-15)
+
+- **Installed, observed.** `c206d1d1` is an ancestor of `f07c2a74` and not of the previous DEV revision `17514052` (`git log 17514052..f07c2a74` lists it). `f07c2a74` was installed on DEV on 2026-10-15 at 16:30 AEDT by one gated run (exit 0; `issues/closed/AFLDB-ISSUE-303.md` §21). Read-only on 2026-10-15 afterwards: the DEV checkout HEAD is `f07c2a742f1eecb325df5d1f6514bc14ccfce859`, `.next/BUILD_ID` is `Xr8x1v5iRTaLiR7h0ScFg`, `/api/health` reports `ok`, and the `afldb` unit has been active since 16:30:12 AEDT. **Not on PROD.**
+- **Not the acceptance check.** §14 item 2 needs `/sitemap/0.xml` to contain a `<url>` with indexing on. `src/app/sitemap.ts` (`:35`, `:66`) and `src/app/sitemap.xml/route.ts` (`:23`) return nothing unless `AFLDB_INDEXING=on` (`src/lib/indexing.ts` fails closed), so the check cannot be observed on the installed DEV as configured; this is by design, and it is why the DB-free result never substituted for it.
+- **Why parked.** Turning indexing on for DEV (with the beta gate off) is a settings change and needs a restart or reload and a reversal afterwards. The 15 October authority was read-only DEV diagnostics and browser checks. §14 is not weakened.
+- **Exact remaining action (operator):** (1) record the current DEV `AFLDB_INDEXING` value and beta-gate setting; (2) set `AFLDB_INDEXING=on` and the beta gate off for DEV only, restart, and confirm `/api/health`; (3) request `/sitemap.xml` and `/sitemap/0.xml` anonymously: the index lists the segments and `/sitemap/0.xml` contains at least one `<url>`; keep the raw bodies; (4) restore the recorded values, restart, and confirm `/robots.txt` disallows again and `/sitemap/0.xml` is empty; (5) close with the evidence. Do not enable indexing on PROD as part of this.

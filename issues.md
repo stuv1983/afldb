@@ -50572,6 +50572,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   92 manual players, none token-only.
 - **Status: Resolved (2026-10-15)**, merge-scoped, on the push of the documentation-only closure commit. **Preserved limits:** not deployed; no browser, DEV or PROD
   write; a player with a token but no active record, or with no identity, is still not durable (unchanged); the replay's `afltables_profile_path` arm is not mirrored.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-278 — The destructive `db:test:rebuild` reset never asserts which database it is connected to
 
@@ -50629,6 +50630,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Merge.** `c206d1d1` plus `cf1d49c3` fast-forwarded to `main` and pushed (`a7f7a713..cf1d49c3`); the live remote was verified equal.
 - **Evidence reconciliation (2026-10-14, later session; runbook §18.1).** The pre-merge check of the 16 established untracked paths compared length and a 16-hex SHA-256 prefix only; no full pre-merge baseline was saved. Current full SHA-256 values of the nine non-empty files equal the 13 Oct full manifests (`D:\tmp\issue313`, `D:\tmp\issue314`); the zero-byte files are `e3b0c442…b855` by definition. This shows current equality with the saved 13 Oct snapshots (re-checked in full on 14 Oct, `D:\tmp\issue286\precheck-1.txt`); it does not show continuous preservation since 13 Oct, and the missing full-hash evidence at the merge instant remains a recorded limitation. The `$null)` stray is rewritten each session by the SessionStart hook (now `D9EDB146…2500`), so `82E23AB9…6EFF` identifies only the 14 Oct 19:40 content.
 - **Status: remains OPEN, not closed.** Merged, **not deployed**. The runbook's §14 item 2 is unmet: **on DEV with `AFLDB_INDEXING=on` and the beta gate off, `/sitemap/0.xml` must contain at least one `<url>`.** The DB-free result does not replace it. No deployment, host or database action and no indexing change was made. Open issues stay at 40.
+- **DEV installation (15 Oct 2026; reconciliation; parked).** The fix (`c206d1d1`) is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; HEAD and BUILD_ID re-read read-only the same day and match). The "not deployed" statements above record the merge-time state. **Installation is not the §14 item 2 check, and the check is not run:** `sitemap.ts` and `sitemap.xml` return nothing unless `AFLDB_INDEXING=on` (`src/lib/indexing.ts`, fails closed), so it needs a DEV settings change (indexing on, beta gate off) and its reversal, outside the 15 October authority. The issue stays **Open**; the criterion is unchanged. **Not installed on PROD.** Runbook §19.
 
 ## AFLDB-ISSUE-280 — Beta magic link is consumed by any GET, including a mail scanner's prefetch
 
@@ -50636,7 +50638,8 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `src/app/beta/verify/route.ts`. **Runbook:** `issues/open/AFLDB-ISSUE-280.md`.
 - **Origin.** Review F-015 (R1a-F02) at `20a7a4bb`. Code-proven mechanism; incidence depends on recipients' mail providers.
 - **Defect.** `GET /beta/verify` burns the single-use token first, so a scanner prefetch spends it before the reader clicks.
-- **Next action.** Implementation (low priority).
+- **Assessment (2026-10-15; runbook §17).** **Cannot close within read-only DEV scope; parked, nothing implemented.** Nothing is implemented, so there is nothing for a DEV check to test. The runbook's §14 needs (1) a route test (GET issues no `UPDATE beta_login_tokens`, POST does), which is DB-free, and (2) a manual DEV check with a prefetching mailbox, which needs a deployment, a magic-link issue (a `beta_login_tokens` write) and an email to an allowlisted address (an external message). The fix also adds a user-visible confirmation page (`VISUAL: UNVERIFIED` until captured). Incidence evidence was not collectable: the DEV `afldb_app` role is refused `beta_login_tokens` (`permission denied`), and reading it with the auth role would cross the credential boundary, so no escalation was attempted. §15 lists no open decision. The criteria are unchanged.
+- **Next action.** Implementation (low priority), in its own session: confirmation page on GET, burn on POST, route test, then the §14 item 2 DEV check (runbook §17 lists the exact steps).
 
 ## AFLDB-ISSUE-281 — Two public list pages fail on a sort key that names an inherited object property
 
@@ -50688,6 +50691,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:** no browser, DEV or PROD action; the
   action layer's revalidation of the returned paths was not exercised; the whole integration files (and the awards file's python replay
   tests) were not run; ISSUE-283 is not addressed.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-283 — The administrative note is not recorded on creation audit rows
 
@@ -50724,6 +50728,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `afldb_test`. The closure scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:**
   no browser, DEV or PROD action; no real Server Action was driven with a session and a database together; the whole integration files
   (and the awards file's python replay tests) were not run; earlier audit rows are not repaired.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-284 — Brownlow season "accounted" count excludes a drafted source-complete match and blocks Publish
 
@@ -50751,6 +50756,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   which a draft on an imported match leaves the season complete and publish accepted; it exists and passes on `afldb_test`. The closure
   scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:** no browser, DEV or PROD
   action; the season page and list were not rendered; the whole integration file was not run.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-285 — Award Replace panel cannot give the duplicate confirmation its action requires
 
@@ -50776,6 +50782,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Integration variant (15 Oct 2026; runbook §19).** Commit `39f996c8` adds the `admin-awards` integration case for replacing onto a season where the player already holds an active row: without `confirmDuplicate` the replacement is refused as `duplicate` and refused whole (the void rolled back, no override or audit row written); with it the void, the active replacement, the natural-key cross-linked `lifecycle`/`record` overrides and the `award_winner_voided`/`award_winner_created` audit rows sharing one `replacement_id` are persisted. Run against `afldb_test` only, through a launcher that proved `current_database() = afldb_test` for the owner, importer and auth roles before any write: the new case **1 passed**; the whole file **33/33**; two mutants of the duplicate check (confirmation ignored; check removed) each killed; fixture residue read back as zero. No `afldb_dev`, PROD, migration, rebuild or repair; not deployed; no browser.
 - **Readiness and merge of the integration variant (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 285` (raw `D:\tmp\issue285\merge-ready-raw-int-1.txt`, unchanged) BLOCKED by exactly one blocker, the primary worktree not clean, for this issue only, under a fresh owner authorisation covering the exact 18-path state; every other check PASSed (declared scope 5 changed, 0 unexpected). Paths, no tracked or staged change and full content hashes verified immediately before and after the merge (`D:\tmp\issue285\precheck-int-1`, `premerge-int-1`, `postmerge-int-1`; script `exception-check-int.py`; `$null)` `d9edb146…2500`). `39f996c8` and `fbe9715c` fast-forwarded to `main` and pushed (`cc38c669..fbe9715c`); local `main` and the live remote both equalled `fbe9715c` afterwards.
 - **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit. Runbook §14 lists two items and both are met: the DB-free render of the control (§17.1, §17.2) and the integration variant of the `admin-awards` :670 case (§19). **Preserved limits:** not deployed; no browser, DEV or PROD action; the panel wiring and the query layer are proved by separate suites, not one end-to-end run; the whole integration suite was not run.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-286 — Hall of Fame legend and removal years are not bounded server-side
 
@@ -50803,6 +50810,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Merge.** `3f657ae2`, `f2c6b675` and `c2b1d65e` fast-forwarded to `main` and pushed (`c514b731..c2b1d65e`); local `main`, the fetched `origin/main` and the live remote all equalled `c2b1d65e` afterwards.
 - **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's §14 criterion (DB-free validation unit cases where possible: met, §17.1).
   **Preserved limits:** not deployed; no integration test or PostgreSQL case was run (the real `smallint` columns, the row lock and the atomic write are not exercised); existing rows with an implausible stored year were not looked for and nothing was repaired; no browser check (no markup changed). Open issues: 39 -> 38.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-287 — Source-owned draft pick `null_pick_number` confirmation is unreachable
 
@@ -50828,6 +50836,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Merge.** `dcc6a61c` plus the records commit `8cea1a45` fast-forwarded to `main` and pushed (`b3975136..8cea1a45`); the live remote was verified equal.
 - **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's satisfied DB-free criterion (§14: a render test asserting the control exists).
   **Preserved limits:** not deployed; `VISUAL: UNVERIFIED` (no browser capture); the click path is covered by a helper truth table and a source contract, not a DOM event; no integration test or DEV/PROD check was run. Open issues: 40 -> 39.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-288 — `createCoach` casts an unvalidated `dob` outside its error handling
 
@@ -50875,6 +50884,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   mutants killed; residue 0; `tsc`, ESLint and `git diff --check` clean.
 - **Status: Resolved (2026-10-15)**, merge-scoped, on the push of the documentation-only closure commit. **Preserved limits:** not deployed; no
   browser, DEV or PROD action; **`VISUAL: UNVERIFIED`** for the page change (structural render test only, nobody has seen the page).
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-290 — Manual draft selections accept out-of-range age, height, weight and pick number
 
@@ -50896,6 +50906,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Merge.** `a48646d8` plus the records commit `19969669` fast-forwarded to `main` and pushed (`99fcc4f0..19969669`); the live remote was verified equal.
 - **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's satisfied DB-free criterion (§14: unit tests in `tests/admin-draft-actions.test.ts`).
   **Preserved limits:** not deployed; no integration test, browser or DEV/PROD check was run; an existing manual selection holding an out-of-range figure must be corrected before it can be saved again; no historical data was assessed or repaired. Open issues: 42 -> 41.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-291 — Admin player creation persists unvalidated biographical fields
 
@@ -50919,6 +50930,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Merge.** `fd9443ff` plus the records commit `0bd64fc7` fast-forwarded to `main` and pushed (`4277d017..0bd64fc7`); the live remote was verified equal.
 - **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's satisfied DB-free criterion (§14: a DB-free refusal test).
   **Preserved limits:** not deployed; no integration test, browser or DEV/PROD check was run; the actions still treat a non-integer height or weight as absent rather than refusing it; no existing player data was assessed or repaired. Open issues: 41 -> 40.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-292 — Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths
 
@@ -50944,6 +50956,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   more than one `afltables` key, and 0 rows from the replay's own equal-authority conflict query, on both** (DEV 95 active player overrides over 93 players, PROD 92 over 92; the four
   folded-pair players carry none). No repair is needed. Both hosts run pre-fix code.
 - **Status: Resolved (2026-10-15)**, merge-scoped, on the push of the documentation-only closure commit. **Preserved limits:** the fix (`1d2ec9fb`) is not deployed; the census is current state only.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-293 — Settle runs under-report `dataIssuesResolved`
 
@@ -50971,6 +50984,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `dataIssuesResolved` is 1 after an apply-failure heal; it exists and passes on `afldb_test`, with the AFL API sites asserted too. The
   closure scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:** no browser, DEV or PROD
   action; earlier runs' counters are not repaired; the test files were run by filter, not whole.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-294 — AFL Tables, lineup and fallback import batches record `completed_at = started_at` and no inserted count
 
@@ -51000,6 +51014,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:** no browser, DEV or PROD
   action; the fallback importer's close is proved by source text only; earlier batches are not repaired; the legacy CSV promotion batch
   (ISSUE-307) is unchanged; the test files were run by filter, not whole.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-295 — Settle exception report mixes both sources' apply-failure findings
 
@@ -51026,6 +51041,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   one finding per source and each report listing only its own; it exists and passes on `afldb_test`. The closure scope is
   **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:** no browser, DEV or PROD action; the
   report CLI and its rendered text were not run; the test file was run by filter, not whole.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-296 — Deprecated fallback importer sets `records_rejected` without rejection rows
 
@@ -51041,6 +51057,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Readiness (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 296` (raw `D:\tmp\issue296\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one blocker, the primary worktree not clean, for this issue only, under a fresh owner authorisation covering the exact 18-path state; every other check PASSed (declared scope 4 changed, 0 unexpected). Paths, no tracked or staged change and full content hashes verified immediately before and after the merge (`D:\tmp\issue296\precheck-1`, `premerge-1`, `postmerge-1`; script `exception-check.py`).
 - **Merge.** `03fb5bcd`, `074667eb` and the records commit `10548157` fast-forwarded to `main` and pushed (`981ba5a1..10548157`); local `main`, the fetched `origin/main` and the live remote all equalled it afterwards.
 - **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit, under the runbook's §14 (a unit assertion on the batch's `records_rejected` write: met as a source-contract case, §17.1). **Preserved limits:** not deployed; the assertion is on the SQL text, not a live batch row; no PostgreSQL, integration, browser, DEV or PROD run; historical batch rows not inspected or repaired; one pre-existing unrelated failure in `current-season-import.test.ts` untouched; the retire-or-keep question is open for the operator.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-297 — AFL API provider id is used unvalidated as a file path and URL path segment
 
@@ -51061,6 +51078,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's satisfied DB-free criteria (§14 item 1: the parser and the plan helpers refuse the hostile ids, and `runAcquisition` refuses before writing).
   **Preserved limits:** not deployed; no live-feed observation (the parser is also used by the settle's season-enumeration read, so a real feed with another id shape would make that read throw after deployment; none is known); the `code_test_db`
   rekey rehearsal was not re-run after its synthetic ids changed; no integration test was run; §14 item 2 does not apply to this issue. Open issues: 43 -> 42.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-298 — AFL API snapshot companion files are read without manifest verification
 
@@ -51075,6 +51093,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   The exact 17-path set and the full content hashes were verified **immediately before the merge** (`D:\tmp\issue298\precheck-1`, `premerge-1`, `postmerge-1`; script `exception-check.py`), all RESULT OK. `$null)` (143 bytes, mtime 2026-10-14 20:00:49) hashed in full as `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500`, identical at every check. Current equality with the saved 13 Oct snapshots, not continuous preservation.
 - **Merge.** `fd22d7a9`, `3987afaf` and the records commit fast-forwarded to `main` and pushed (`1149e17a..54697545`); local `main`, the fetched `origin/main` and the live remote all equalled it afterwards.
 - **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit, under the runbook's §14 criterion (a DB-free test in `tests/afl-api-player-evidence.test.ts`: met, §17.1); §15 lists no decision. **Preserved limits:** not deployed; no PostgreSQL, integration, network-acquisition or DEV/PROD run; no real snapshot was read.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-299 — R lineup and roster acquirers overwrite retained evidence in place
 
@@ -51093,6 +51112,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   (468 lineup rows; 812 roster rows) and the **second run of each was refused (exit 1, the guard's message, no fetch) with the first run's bytes unchanged.**
 - **Status: Resolved (2026-10-15)**, merge-scoped, on the push of the documentation-only closure commit. Fix `091e4635`. **Preserved limits:** the networked evidence is one lineup round and one roster season
   from one workstation; nothing is deployed.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-300 — AFL API control-database read failure is reported as "disabled by a super admin"
 
@@ -51117,6 +51137,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Merge.** `47541503` and `597242cd` fast-forwarded to `main` and pushed (`5dff6ea6..597242cd`); local `main`, the fetched `origin/main` and the live remote all equalled `597242cd` afterwards.
 - **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's §14 criterion (DB-free unit tests with an unreachable stub: met, §17.1).
   **Preserved limits:** not deployed; no live CLI, systemd, PostgreSQL-restart, timeout or missing-table observation; the unreachable case is a local refused-port stub; settle CLIs that use `proveAflApiIngestionPreflight` were already correct and untouched.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-301 — AFL API HTTP client has no request timeout and reads the body outside its retry
 
@@ -51142,6 +51163,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   fetch that never resolves makes `requestAflApi` reject within the budget; it exists and passes. The open value was settled as an
   **implementation default of 60 s per attempt** (permitted by the runbook; not an owner decision). The closure scope is **merge-scoped**: code
   on `main`, validated DB-free, **not deployed**. **Preserved limits:** no network, DEV or PROD action; the real upstream is not exercised.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-302 — Lineup bundle records the pinned fitzRoy version as provenance whatever version ran
 
@@ -51222,6 +51244,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   poller cap and a route test with an oversized `Content-Length` expecting 400 without parsing; both exist and pass. The closure scope is
   **merge-scoped**: code on `main`, validated DB-free, **not deployed**. **Preserved limits:** no mail, network, DEV or PROD action; the poller
   is dormant on both hosts; a body with no `Content-Length` is not bounded before parsing; the intake integration file was not run.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-305 — Legacy intake validation accepts values promotion then rejects
 
@@ -51240,6 +51263,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Readiness (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 305` (raw `D:\tmp\issue305\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one blocker, the primary worktree not clean, for this issue only, under a fresh owner authorisation covering the exact 18-path state; every other check PASSed (declared scope 4 changed, 0 unexpected). Paths, no tracked or staged change and full content hashes verified immediately before and after the merge (`D:\tmp\issue305\precheck-1`, `premerge-1`, `postmerge-1`; script `exception-check.py`).
 - **Merge.** `d82e891e`, `5282322b` and the records commit `1ba75b06` fast-forwarded to `main` and pushed (`1185bad3..1ba75b06`); local `main`, the fetched `origin/main` and the live remote all equalled it afterwards.
 - **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit, under the runbook's §14 (DB-free `validateRow` cases: met, §17.1). **Preserved limits:** not deployed; no PostgreSQL, integration, browser, DEV or PROD run; two pre-existing unrelated failures in `honours-lifecycle-public-contract.test.ts` untouched; the H-305-1 follow-up above is open for a decision.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-306 — Legacy intake duplicate detection compares raw club text
 
@@ -51253,6 +51277,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   The exact 17-path set and the full content hashes were verified **immediately before each merge** (`D:\tmp\issue306\precheck-1`, `premerge-1`, `postmerge-1`, `premerge-2`, `postmerge-2`; script `exception-check.py`), all RESULT OK. `$null)` (143 bytes, mtime 20:00:49) hashed in full in this session as `d9edb1467a9ddecc7ca89424e5b5597f3c6fae7e5e41b49bb279aa1f71f62500`, identical at every check. Current equality with the saved 13 Oct snapshots, not continuous preservation.
 - **Merge.** `3372667f`, `e060cb49` and the records commit fast-forwarded to `main` and pushed (`18faa58e..cf58e03d`); local `main`, the fetched `origin/main` and the live remote all equalled it afterwards.
 - **Status: Resolved (2026-10-14)**, on the push of the documentation-only closure commit, under the runbook's §14 criterion (DB-free unit tests with a stub alias resolver: met, §17.1). **Preserved limits:** not deployed; no PostgreSQL or integration run (the real alias resolver against `club_aliases` is the existing integration surface); the scripted resolver in the pipeline cases stands in for it.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-307 — Legacy promotion counts every promoted row as inserted
 
@@ -51280,6 +51305,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   The closure scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**. **Preserved limits:** no browser, DEV or
   PROD action; earlier batches keep their old counts; `xmax` was exercised on PostgreSQL for two of the six writers' tables; `completed_at`
   on the promotion batch is unchanged.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-308 — Approving a player-link suggestion does not revalidate public pages
 
@@ -51287,8 +51313,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `src/app/admin/player-links/actions.ts` (`approveSuggestion`, `bulkApproveSuggestions`). **Runbook:**
   `issues/open/AFLDB-ISSUE-308.md`.
 - **Origin.** Review F-043 (R5b-F01) at `20a7a4bb`. Code-proven; the fix choice is framework-dependent.
-- **Open question.** Whether the ISSUE-087 `revalidatePath`-in-action hang reproduces on Next 16.3.1. **Next action.**
-  Choose the mechanism, then implement (ISSUE-309 and ISSUE-311 are resolved, 2026-10-15; no longer a dependency).
+- **Open question.** Whether the ISSUE-087 `revalidatePath`-in-action hang reproduces on Next 16.3.1: not answered and not needed (the mechanism below does not depend on it).
+- **Implementation (2026-10-15; branch `sonnet/issue-rec1015`, base `032ca17c`; DB-free validated; not deployed; runbook §17-§18).** A suggestion approval (single or bulk) now returns `revalidatePublic: true` when it committed, and the browser posts to a new capability-gated `POST /admin/player-links/revalidate` (`data.playerLinks`, first statement) after the action has settled; the route revalidates the same eight public paths the manual link actions already revalidate, from one shared list. The approval actions still never call `revalidatePath`. 5 new cases, file 160 tests with the one pre-existing unrelated failure (I14, identical on `main`); 9 of 9 mutants killed; `tsc` and `git diff --check` exit 0.
+- **Status: remains OPEN, not resolved.** The runbook's §14 item 2 (approve one suggestion on DEV and request the award page) is unmet: it needs a deployment and a DEV data write. **Parked** with the exact steps and a read-only-chosen candidate target in runbook §19. No browser, PostgreSQL, DEV or PROD action was run. **Next action.** Deploy to DEV (operator decision), approve one suggestion as Super Admin, request the award page, then close DEV-scoped.
 
 ## AFLDB-ISSUE-309 — Multi-target player-link actions stop at the first failure after earlier targets committed
 
@@ -51301,6 +51328,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Merge.** `adbe6329`, `c7e583e0` and `7ebe2763` fast-forwarded to `main` and pushed (`f959e68f..7ebe2763`); local `main`, the fetched `origin/main` and the live remote all equalled it afterwards.
 - **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit, under the runbook's §14 criterion (a DB-free unit test with `resolveLink` failing on the second of two targets: met, §17.1); §15 lists no decision. **Preserved limits:** not deployed; no PostgreSQL, integration, browser or DEV/PROD run; the two components' added text is **VISUAL: UNVERIFIED**; one pre-existing unrelated failure in `tests/player-link-mutations.test.ts` (I14, identical on unchanged `main`) is untouched.
 - **Post-merge reassessment and owner ratification (2026-10-15).** The original 17-path exception was exceeded: the primary held an eighteenth path, zero-byte `2000)`, at both merges (`7ebe2763`, `6a41ce7a`), which proceeded before the owner approved that state. After the fact, a read-only reassessment passed (`2000)` regular, 0 bytes, untracked, unstaged; exactly the 17 plus `2000)`, all earlier hashes equal; the three preserved raw readiness outputs stay **BLOCKED** with the clean-tree check as the only FAIL and declared scope PASS; the merged commits touch only the declared files) and the owner ratified the two merges under that exact 18-path state. Not a standing exception for `2000)` or any other path; the original exception and the raw output are unchanged. `issues/closed/AFLDB-ISSUE-309.md` §18.1.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-310 — AFL API link path derives the stable player identity by a different rule from the forward classifier
 
@@ -51315,6 +51343,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Readiness (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `merge:ready -- --issue 310` (raw `D:\tmp\issue310\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one blocker, the primary worktree not clean, for this issue only, under a new owner authorisation covering the exact 18-path state (the 17 earlier paths plus zero-byte `2000)`); the ISSUE-309/311 ratification was not reused. Every other check PASSed (declared scope 6 changed, 0 unexpected). Paths, no tracked or staged change and full content hashes verified immediately before each merge (`D:\tmp\issue310\precheck-1`, `premerge-1`, `postmerge-1`, `premerge-2`, `postmerge-2`; script `exception-check.py`).
 - **Merge.** `3961d6fd`, `616e383b` and the records commit `cc711d81` fast-forwarded to `main` and pushed (`84e71cd3..cc711d81`); local `main`, the fetched `origin/main` and the live remote all equalled it afterwards.
 - **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit, under the runbook's §14 (DB-free witness and mocked-transaction T7 test: met, §17.1); the §15 collation question decides only how often trigger (a) fires and stays an operator fact. **Preserved limits:** not deployed; no PostgreSQL, integration (I4/T7), browser, DEV or PROD run; the DEV/PROD collation is unknown; existing ledger rows are not audited or corrected; the revoke fallback is pinned by a source contract; one pre-existing unrelated failure (I14) is untouched.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-311 — Activity audit after a committed player-link mutation is unwrapped or silent
 
@@ -51326,6 +51355,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Readiness and merge:** shared with ISSUE-309 (the same `merge:ready` blocker, exception, hash checks and fast-forward to `7ebe2763`; see its entry and `issues/closed/AFLDB-ISSUE-311.md` §18).
 - **Status: Resolved (2026-10-15)**, on the push of the documentation-only closure commit, under the runbook's §14 criterion (a DB-free unit test with `audit` mocked to reject: met, §17 and ISSUE-309 §17.1); §15 lists no decision. **Preserved limits:** as ISSUE-309; additionally no render of the two components, and `auditInTransaction` and the `refreshSuggestions` audit are untouched.
 - **Post-merge reassessment and owner ratification (2026-10-15).** The original 17-path exception was exceeded: the primary held an eighteenth path, zero-byte `2000)`, at both merges (`7ebe2763`, `6a41ce7a`), which proceeded before the owner approved that state. After the fact, a read-only reassessment passed (`2000)` regular, 0 bytes, untracked, unstaged; exactly the 17 plus `2000)`, all earlier hashes equal; the three preserved raw readiness outputs stay **BLOCKED** with the clean-tree check as the only FAIL and declared scope PASS; the merged commits touch only the declared files) and the owner ratified the two merges under that exact 18-path state. Not a standing exception for `2000)` or any other path; the original exception and the raw output are unchanged. `issues/closed/AFLDB-ISSUE-311.md` §18.1.
+- **DEV installation (15 Oct 2026; reconciliation).** The change is in `f07c2a74`, installed on DEV on 2026-10-15 at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; the DEV checkout HEAD and BUILD_ID were re-read read-only the same day and match; `issues/closed/AFLDB-ISSUE-303.md` §21). The "not deployed" statements above record the state at the merge. Installation is not acceptance: no DEV acceptance of this change is recorded unless stated above. **Not installed on PROD.**
 
 ## AFLDB-ISSUE-312 — Migration safety scan fails on a detached HEAD with a misleading error
 
