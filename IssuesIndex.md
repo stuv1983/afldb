@@ -464,7 +464,10 @@
 ### AFLDB-ISSUE-303 — `/admin/upload` promises 5 MB but Server Actions accept 1 MB
 - **Severity:** Low. **Area:** legacy CSV intake UI / framework configuration — `next.config.ts`. **State:** Open
   (2026-10-08), F-038; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-303.md`. **Next action:** operator decision **D-303-1**.
+- **Update 2026-10-15:** D-303-1 decided (owner, option c). Implemented as `50f9345b` and merged and pushed: a dedicated `POST /admin/upload/stage` Route Handler with
+  a same-origin check, the unchanged capability guard and a 5 MiB bounded read; the 1 MB Server Action is removed. `afldb_test` validated (DB-free 25, integration 3,
+  9 of 9 mutants killed). **Not deployed.** Stays open for the DEV acceptance (`VISUAL: UNVERIFIED`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-303.md` §17-§18. **Next action:** deploy to DEV (operator), then stage a 1.5 MB CSV and an over-5 MB file through `/admin/upload` with screenshots (runbook §17.5), then close.
 
 ### AFLDB-ISSUE-308 — Approving a player-link suggestion does not revalidate public pages
 - **Severity:** Low. **Area:** admin player links / revalidation — `src/app/admin/player-links/actions.ts`. **State:** Open

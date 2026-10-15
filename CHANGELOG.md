@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### `/admin/upload` takes the documented 5 MB file through a dedicated route (AFLDB-ISSUE-303; `50f9345b`, merged and pushed to `main`; `afldb_test` validated; not deployed; DEV acceptance pending) - 15 October 2026
+
+- The upload form promised a 5 MB CSV but posted through a Server Action that Next limits to 1 MB, so a 1-5 MB file failed at the framework with a generic error. On the owner's decision (D-303-1, option c) the form now posts to a dedicated `POST /admin/upload/stage` Route Handler: it checks the request is same-origin (a Route Handler gets no Server Action origin check), re-checks the session and the legacy-intake capability as before, refuses a declared or actual body over 5 MiB plus the multipart envelope without buffering it, and then stages the file through the unchanged pipeline with the same audit events. The 1 MB Server Action is removed and the project-wide action limit is not raised.
+- **Validation (`afldb_test`).** A 1.5 MB CSV is staged through the real route and pipeline; 25 DB-free and 3 PostgreSQL cases; 9 of 9 non-equivalent mutants killed. **Not done:** any deployment or browser check (`VISUAL: UNVERIFIED`); the runbook's DEV acceptance is outstanding. Detail: `issues/open/AFLDB-ISSUE-303.md` §17 and §18.
+
 ### Data Editor corrections to a player with no AFL Tables identity survive a rebuild (AFLDB-ISSUE-277; `8450134b`, merged and pushed to `main`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
 
 - A date of birth, birth year, height, weight or note corrected in the Data Editor for a player whose only durable identity is the manual token (a drafted player not yet matched to an AFL Tables profile) wrote no durable record, so a rebuild or promotion brought the old value back while the audit trail still named the change. On the owner's decision (D-277-1, option a) such a save now updates the player's durable creation record in the same transaction, with its own audit row. A save that would leave that record unable to be replayed (a date of birth with no usable confidence) is refused before anything is written. Players who hold an AFL Tables identity are unchanged.

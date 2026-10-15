@@ -51160,8 +51160,17 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `next.config.ts`, `src/app/admin/upload/actions.ts`, `src/app/admin/upload/UploadForm.tsx`, `src/lib/ingest/pipeline.ts`.
   **Runbook:** `issues/open/AFLDB-ISSUE-303.md`.
 - **Origin.** Review F-038 (R5a-F06) at `20a7a4bb`. Code-proven, framework-confirmed by the review.
-- **Decisions.** **D-303-1 (operator, undecided):** raise the global action body limit (widens every action) or lower the
-  upload limit. **Next action.** D-303-1.
+- **Decisions.** **D-303-1 (owner, decided 2026-10-15): option (c):** a dedicated upload Route Handler with a bounded 5 MiB file limit,
+  preserving authentication, authorisation and CSRF protection (neither the global limit nor the 5 MB promise changes).
+  ~~**Next action.** D-303-1.~~ Superseded below.
+- **Implementation (2026-10-15; commit `50f9345b`, base `69dd22e5`; not deployed).** New `POST /admin/upload/stage`: same-origin check (`Origin` and
+  `Sec-Fetch-Site`, mirroring Next's Server Action check), then `requireCapability('acquisition.legacyIntake')`, then a `Content-Length` check and a
+  bounded body read at 5 MiB plus a 16 KiB multipart envelope, then the unchanged `stageSubmission` and audit events. The form posts to it with
+  `fetch`; the 1 MB Server Action is removed. `next.config.ts` is untouched. Runbook §17.
+- **Validation (15 Oct 2026; runbook §17.3).** DB-free route file 25 cases; integration 3 cases on `afldb_test` through the real pipeline (a 1.5 MB CSV staged,
+  a duplicate, an oversize refusal, a pipeline rejection), residue 0; 9 of 9 non-equivalent mutants killed; `tsc`, ESLint and `git diff --check` clean.
+- **Stays open.** The runbook's DEV acceptance (a 1.5 MB CSV through the real proxy and browser) needs a deployment (runbook §17.4, §17.5); the page is
+  `VISUAL: UNVERIFIED`. Merge-scoped only: not deployed.
 
 ## AFLDB-ISSUE-304 — Email intake parses the whole body before sender and size checks
 
