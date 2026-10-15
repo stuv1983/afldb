@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Nothing implemented.
+- **Status:** Open (2026-10-08). Fix implemented and validated locally, without the network, 2026-10-15 (§17); not deployed. **Stays open:** the §14 operator-run, networked double run has not been done (§17.5).
 - **Severity:** Low. **Area:** acquisition tooling / evidence retention.
 - **Key files:** `tools/rebuild/afl_api/acquire_lineups.R`, `tools/rebuild/afl_api/acquire_rosters.R`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-034; partition note R4b-F04).
@@ -73,4 +73,33 @@ None.
 
 ## 16. Next action
 
-Implementation.
+~~Implementation.~~ Superseded by §17.
+
+## 17. Implementation and validation (2026-10-15)
+
+### 17.1 Change
+
+`tools/rebuild/afl_api/acquire_lineups.R` and `acquire_rosters.R` each gain the same guard directly after `out_dir` is computed: an output directory that already exists **and is not empty** (`dir.exists(out_dir) && length(list.files(out_dir, all.files = TRUE, no.. = TRUE)) > 0L`, hidden files included) stops the script with `Output directory '<dir>' already exists and is not empty; a second acquisition would overwrite the retained evidence and its manifest.json. Choose another --label or --out-dir, or move the existing directory aside deliberately.` It runs before the contract is read, before `dir.create` and before any network call, so a refusal costs nothing. This is the runbook's first option (refuse), not the second (timestamp the default label), so a re-acquisition into the same label now needs the existing directory moved aside deliberately. An existing **empty** directory (an operator-prepared scratch directory) is still accepted. No change to the TypeScript acquirers.
+
+### 17.2 Tests
+
+`tests/afl-api-lineup.test.ts` (DB-free; it already reads the lineup adapter's source), a new block `AFLDB-ISSUE-299`, four cases:
+
+- Static, per adapter: the guard's exact condition is present, it follows a `dir.exists(out_dir)` test, and it comes before the contract read, `dir.create(out_dir` and the last `fitzRoy::fetch_` mention (the header comments name `fetch_*`, so the call is the last).
+- Behavioural, per adapter (skipped when `Rscript` or the `fitzRoy` package is absent): the real script is run with a non-empty `--out-dir`. It exits non-zero, its stderr carries `Error: Output directory '...' already exists and is not empty` (the refusal itself, not a warning that lets a later failure stand in), the output never says `Fetching`, the directory still holds exactly its one file with its bytes, and no `manifest.json` appeared.
+- **Safety belt.** Were the guard ever removed, the script would go on to fetch from the AFL API. The behavioural cases therefore run `Rscript` with every `http(s)_proxy` variable pointing at `127.0.0.1:9`, where nothing listens, so any request fails with a connection error instead of acquiring anything. That was checked by hand first, against the unfixed script: it attempted only `127.0.0.1:9` (`Failed to connect to 127.0.0.1 port 9`) and wrote nothing into the scratch directory.
+
+### 17.3 Results
+
+- **Fixed code.** `tests/afl-api-lineup.test.ts`: **46 passed** (4 new, the two behavioural ones executed). No database and no network were used; R 4.6.1 with fitzRoy was present.
+- **Unfixed scripts** (`git checkout HEAD -- tools/rebuild/afl_api/`, the fixed files copied back and byte-restored): all 4 new cases fail (the behavioural ones after about 2.4 s, at the proxy refusal).
+- **Mutants** (`D:\tmp\issue299\mutate.mjs`, each against both adapters, original bytes restored and hash-verified after each): the guard removed (A1), an empty directory refused (A2), `stop` weakened to `warning` (A3), hidden files ignored (A4). **All 8 killed** (A3 only after the behavioural assertion was tightened to require the refusal as the error; the first version would have let it survive).
+- **Static.** `tsc --noEmit` exit 0; `git diff --check` exit 0; ESLint of the test file exits 0 on this branch and on unchanged `main`.
+
+### 17.4 Limits
+
+- Not deployed; no network, DEV or PROD action. The R scripts' successful path (an absent output directory, the real fetch, the manifest) was not run: it needs the AFL API.
+
+### 17.5 Why this issue stays open
+
+§14 specifies the validation as an operator-run, networked procedure: run the acquirer twice with the same scope into a scratch `--out-dir` and expect a refusal on the second run. Provider/network acquisition was outside this work's authority, so that procedure has not been run. What was shown instead is the second-run state itself (an existing, non-empty directory) refused by the real scripts, with no network. The issue closes once an operator has run §14 once (two real runs, the second refused) or accepts the local evidence.

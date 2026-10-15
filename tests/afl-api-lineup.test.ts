@@ -9,7 +9,12 @@
  * DB-free by construction: nothing here imports a driver, opens a connection or
  * reads a DSN, and the module under test cannot.
  */
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -613,4 +618,63 @@ describe('boundaries', () => {
       expect(record.scope_key).toBe('season=2026;round=20');
     }
   });
+});
+
+// AFLDB-ISSUE-299: the two R acquirers used a deterministic default label and created their output
+// directory silently when it existed, so a second run with the same scope rewrote the first run's
+// artefact and manifest.json in place. They now refuse a non-empty existing output directory, before
+// the contract is read and before any network call.
+describe('AFLDB-ISSUE-299 the R acquirers refuse to write into retained evidence', () => {
+  const adapters = [
+    { name: 'acquire_lineups.R', path: 'tools/rebuild/afl_api/acquire_lineups.R', args: ['--season', '2026', '--round', '1'] },
+    { name: 'acquire_rosters.R', path: 'tools/rebuild/afl_api/acquire_rosters.R', args: ['--from', '2012', '--to', '2012'] },
+  ];
+
+  it.each(adapters)('$name: the refusal precedes the contract read, the directory creation and the fetch', ({ path }) => {
+    const source = readFileSync(path, 'utf8');
+    const guard = source.indexOf('length(list.files(out_dir, all.files = TRUE, no.. = TRUE)) > 0L');
+    expect(guard).toBeGreaterThan(-1);
+    expect(source.slice(Math.max(0, guard - 40), guard)).toContain('dir.exists(out_dir)');
+    for (const later of ['jsonlite::fromJSON(CONTRACT_PATH', 'dir.create(out_dir']) {
+      expect(source.indexOf(later), later).toBeGreaterThan(guard);
+    }
+    // The header comments name fetch_*, so the call is the LAST mention.
+    expect(source.lastIndexOf('fitzRoy::fetch_'), 'fetch call').toBeGreaterThan(guard);
+    expect(source).toContain('already exists and is not empty');
+  });
+
+  // The behavioural half needs R and fitzRoy (the scripts load it first); it never reaches the network,
+  // because the refusal is before the contract read.
+  const probe = spawnSync('Rscript', ['-e', 'quit(status = !requireNamespace("fitzRoy", quietly = TRUE))'], { encoding: 'utf8' });
+  const hasR = probe.status === 0;
+
+  // Safety belt: if the refusal were ever removed the script would go on to fetch from the AFL API. Any
+  // HTTP(S) request is therefore routed to a local port nothing listens on, so a regression fails here
+  // with a connection error instead of acquiring anything.
+  const noNetwork = {
+    ...process.env,
+    https_proxy: 'http://127.0.0.1:9', HTTPS_PROXY: 'http://127.0.0.1:9',
+    http_proxy: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9',
+    all_proxy: 'http://127.0.0.1:9', ALL_PROXY: 'http://127.0.0.1:9',
+    no_proxy: '', NO_PROXY: '',
+  };
+
+  it.skipIf(!hasR).each(adapters)('$name: a non-empty existing --out-dir is refused and left exactly as it was', ({ path, args }) => {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-issue-299-'));
+    try {
+      writeFileSync(join(dir, 'raw.json'), 'retained evidence');
+      const run = spawnSync('Rscript', [path, ...args, '--out-dir', dir], {
+        encoding: 'utf8', cwd: process.cwd(), env: noNetwork,
+      });
+      expect(run.status).not.toBe(0);
+      // The refusal itself is the error: not a warning that lets the run go on to fail later.
+      expect(run.stderr).toMatch(/^Error: Output directory '.*' already exists and is not empty/m);
+      expect(`${run.stdout}${run.stderr}`).not.toContain('Fetching');
+      expect(readdirSync(dir)).toEqual(['raw.json']);
+      expect(readFileSync(join(dir, 'raw.json'), 'utf8')).toBe('retained evidence');
+      expect(existsSync(join(dir, 'manifest.json'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

@@ -32,7 +32,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-280 | Beta magic link is consumed by any GET, including a mail scanner's prefetch | Low | Beta gate / authentication UX — `src/app/beta/verify/route.ts` | Open (2026-10-08); review F-015, code-proven mechanism; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-280.md` | Implementation (low priority) |
 | AFLDB-ISSUE-289 | A cancelled fixture that is later played can never be reinstated | Low | Admin fixtures (ISSUE-162 lifecycle) — `src/db/queries/admin-fixtures.ts` | Open (2026-10-08); review F-024, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-289.md` | Operator decision **D-289-1** (option (a) or (b)) |
 | AFLDB-ISSUE-292 | Data Editor override key is chosen nondeterministically for a player with two AFL Tables paths | Low | Data Editor / override replay — `src/db/queries/data-edits.ts` | Open (2026-10-08); review F-027, nondeterminism code-proven, trigger a hypothesis; imported 2026-10-10; fix implemented and validated on `afldb_test` 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-292.md` §17 | Run the read-only DEV/PROD two-path census (needs DEV/PROD contact); then close |
-| AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-299.md` | Implementation |
+| AFLDB-ISSUE-299 | R lineup and roster acquirers overwrite retained evidence in place | Low | Acquisition tooling / evidence retention — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R` | Open (2026-10-08); review F-034, code-proven; imported 2026-10-10; fix implemented and validated locally without the network 2026-10-15, not deployed; runbook `issues/open/AFLDB-ISSUE-299.md` §17 | Operator-run §14 double run (networked), then close |
 | AFLDB-ISSUE-303 | `/admin/upload` promises 5 MB but Server Actions accept 1 MB | Low | Legacy CSV intake UI / framework configuration — `next.config.ts` | Open (2026-10-08); review F-038, code-proven, framework-confirmed; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-303.md` | Operator decision **D-303-1** (raise the global action limit, or lower the upload limit) |
 | AFLDB-ISSUE-308 | Approving a player-link suggestion does not revalidate public pages | Low | Admin player links / revalidation — `src/app/admin/player-links/actions.ts` | Open (2026-10-08); review F-043, code-proven, fix framework-dependent; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-308.md` | Choose the mechanism (does the ISSUE-087 hang reproduce on Next 16.3.1?), then implement (ISSUE-309/311 resolved 2026-10-15, no longer a dependency) |
 
@@ -51050,7 +51050,13 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `tools/rebuild/afl_api/acquire_lineups.R`, `tools/rebuild/afl_api/acquire_rosters.R`. **Runbook:**
   `issues/open/AFLDB-ISSUE-299.md`.
 - **Origin.** Review F-034 (R4b-F04) at `20a7a4bb`. Code-proven. The hazard `src/lib/acquisition/snapshot-dir.ts` prevents
-  for the TypeScript acquirers. **Next action.** Implementation.
+  for the TypeScript acquirers. ~~**Next action.** Implementation.~~ Superseded below.
+- **Implementation (2026-10-15; branch `sonnet/issue-299`, base `a5b17f24`; not deployed).** Both R acquirers refuse a non-empty existing
+  output directory, before the contract is read and before any network call (an empty directory is still accepted). Runbook §17.
+- **Validation (local, no network, 15 Oct 2026; runbook §17.3).** Four DB-free cases (two static ordering checks; the real scripts run
+  against a non-empty directory and refuse it, under a refused-proxy environment that makes any fetch impossible); all fail on the
+  unfixed scripts; 8 of 8 mutants killed. `tsc --noEmit`, ESLint (same as `main`) and `git diff --check` clean.
+- **Stays open.** The runbook's §14 validation is an operator-run networked double run, which was outside this authority (runbook §17.5).
 
 ## AFLDB-ISSUE-300 — AFL API control-database read failure is reported as "disabled by a super admin"
 

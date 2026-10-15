@@ -79,6 +79,20 @@ label <- opt("--label", sprintf("afl-api-lineups-%d-r%d", season, round_number))
 # acquisition cannot be committed by accident.
 out_dir <- opt("--out-dir", file.path(WORKING_ROOT, label))
 
+# AFLDB-ISSUE-299: never write into an output directory that already holds evidence. The default
+# label has no timestamp, so a second run with the same scope would otherwise rewrite the first
+# run's artefact and manifest.json in place (the silent overwrite
+# src/lib/acquisition/snapshot-dir.ts was added to prevent for the TypeScript acquirers). An
+# existing but EMPTY directory (an operator-prepared scratch dir) is allowed. This runs before the
+# contract is read and before any network call, so a refusal costs nothing.
+if (dir.exists(out_dir) &&
+    length(list.files(out_dir, all.files = TRUE, no.. = TRUE)) > 0L) {
+  stop("Output directory '", out_dir, "' already exists and is not empty; a second ",
+       "acquisition would overwrite the retained evidence and its manifest.json. Choose ",
+       "another --label or --out-dir, or move the existing directory aside deliberately.",
+       call. = FALSE)
+}
+
 if (!file.exists(CONTRACT_PATH)) {
   stop("Missing acquisition contract: ", CONTRACT_PATH, call. = FALSE)
 }

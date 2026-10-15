@@ -467,7 +467,9 @@
 ### AFLDB-ISSUE-299 — R lineup and roster acquirers overwrite retained evidence in place
 - **Severity:** Low. **Area:** acquisition tooling — `tools/rebuild/afl_api/acquire_{lineups,rosters}.R`. **State:** Open
   (2026-10-08), F-034; imported 2026-10-10.
-- **Runbook:** `issues/open/AFLDB-ISSUE-299.md`. **Next action:** implementation.
+- **State (2026-10-15):** fix merged and validated locally without the network (4 cases, the real scripts refusing a non-empty directory; 8 of 8 mutants
+  killed); not deployed. **Stays open** for the §14 operator-run, networked double run.
+- **Runbook:** `issues/open/AFLDB-ISSUE-299.md` §17. **Next action:** the operator runs §14 once (two real runs into a scratch directory, the second refused), then close.
 
 ### AFLDB-ISSUE-303 — `/admin/upload` promises 5 MB but Server Actions accept 1 MB
 - **Severity:** Low. **Area:** legacy CSV intake UI / framework configuration — `next.config.ts`. **State:** Open
