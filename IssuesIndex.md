@@ -463,7 +463,8 @@
 - **Update 2026-10-15 (build):** the complete build on merged `main` passed against a child-scoped read-only `afldb_test` connection (`next build` and `prepare-standalone` exit 0; 1515/1515 pages; the route is registered; runbook §19). The earlier
   incomplete build was an environment limitation. Not a DEV acceptance; the issue stays open.
 - **Update 2026-10-15 (acceptance prepared):** the DEV browser checklist (1.5 MB staged, over-5 MB refused, one audit row, reject the staged submission) is in the deployment pack (ISSUE-275 §36, ISSUE-303 §20); not deployed or run; `VISUAL: UNVERIFIED` until three images exist.
-- **Runbook:** `issues/open/AFLDB-ISSUE-303.md` §17-§18. **Next action:** deploy to DEV (operator), then stage a 1.5 MB CSV and an over-5 MB file through `/admin/upload` with screenshots (runbook §17.5), then close.
+- **Update 2026-10-15 (deployed to DEV):** `f07c2a74` installed on DEV at 16:30 AEDT (one gated run, exit 0, BUILD_ID `Xr8x1v5iRTaLiR7h0ScFg`; installation checks and journal check PASS). Browser acceptance **not run**: no authenticated Super Admin session was available, so `VISUAL: UNVERIFIED` and the issue stays open (runbook §21). Not on PROD.
+- **Runbook:** `issues/open/AFLDB-ISSUE-303.md` §17-§18, §21. **Next action:** the operator, signed in as Super Admin on DEV, stages a 1.5 MB CSV and an over-5 MB file through `/admin/upload` with screenshots (runbook §17.5, §21), rejects the staged submission through the UI, then close DEV-scoped.
 
 ### AFLDB-ISSUE-308 — Approving a player-link suggestion does not revalidate public pages
 - **Severity:** Low. **Area:** admin player links / revalidation — `src/app/admin/player-links/actions.ts`. **State:** Open
