@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and validated on `afldb_test` 2026-10-15 (§17); not deployed.
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Implemented and merged as `0d7810d8` (fix, tests and records), validated on `afldb_test` (§17), merged and pushed (§18). **Not deployed.**
 - **Severity:** Low. **Area:** legacy CSV intake / import batch accounting.
 - **Key file:** `src/lib/ingest/pipeline.ts` (`promoteSubmission`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-042; partition note R5a-F10).
@@ -100,3 +100,11 @@ None.
 ### 17.4 Limits
 
 - Not deployed; no browser, DEV or PROD action. Earlier promotion batches keep the old counts (`records_inserted` = rows, `records_updated` 0); nothing is repaired. `rising_star`, `all_australian` and `match_attendance` are proved by the stand-in `sql` and by the statement text; the `xmax` semantics were exercised against PostgreSQL for `matches` and `player_match_stats` (and `UPDATE ... RETURNING id` for `players`), through the same idiom, not for the award tables or `match_attendance` themselves. An upsert statement cannot return no row (a no-op there is a safeguard). The batch's `completed_at` still equals its start (`now()` inside the promotion transaction), the defect class ISSUE-294 fixed for three other writers; it is not part of this issue and was not changed.
+
+## 18. Readiness, merge and closure (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 307` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue307\preflight-1.txt`). `npm run merge:ready -- --issue 307` (raw, unchanged: `D:\tmp\issue307\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The eight committed paths were compared with the declared scope by hand: the two ingest source files, the three test files, this runbook, `issues.md` and `IssuesIndex.md`.
+- **Exception (fresh, this issue only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state (the nine `.agents/skills` files, the seven zero-byte stray-named files, the literal `$null)` and the zero-byte `2000)`). Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
+- **Merge.** `0d7810d8` fast-forwarded onto `main` and was pushed (`631b9c72..0d7810d8`); local `main` and `git ls-remote origin refs/heads/main` both equalled `0d7810d8` afterwards.
+- **Resolution.** Resolved on the push of the documentation-only closure commit. §14 asks for an integration case that promotes a file with one new and one existing row and asserts 1/1; it exists and passes through the real promotion pipeline on the import role (`2/1/1`), with the player-stats and biography cases and six DB-free cases (§17.2, §17.3). The closure scope is **merge-scoped**: code on `main`, validated on `afldb_test`, **not deployed**.
+- **Preserved limits.** Not deployed. No browser, DEV or PROD action. Earlier promotion batches keep their old counts. The `xmax` semantics were exercised on PostgreSQL for `matches` and `player_match_stats`, not for the award tables or `match_attendance` themselves. The batch's `completed_at` still equals its start. The match-results file's ISSUE-264 block does not run on `afldb_test` (pre-110 state), identically on `main`.
