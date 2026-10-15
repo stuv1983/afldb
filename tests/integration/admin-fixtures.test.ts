@@ -657,6 +657,114 @@ describe('cancel, reinstate and void (§16, D-2)', () => {
     await clearFixtureState();
   });
 
+  it('reinstates a cancelled fixture whose game was later played, and keeps every other lock (D-289-1)', async () => {
+    // The chronology of the defect: scheduled -> cancelled -> the game is played and
+    // imported -> the admin reinstates. The fixture is entered on seasonNow because a
+    // played `matches` row can only exist in a season the register holds.
+    const key = await mustCreate({
+      season: seasonNow, roundNumber: MARKER_ROUND, matchDate: `${seasonNow}-08-01`,
+    });
+    expect(await cancelFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+      reason: 'Postponed: wet ground',
+    })).toMatchObject({ ok: true });
+    const matchId = await insertPlayedMatch({
+      suffix: 'reinstate-played', homeClubId: clubA.id, awayClubId: clubB.id,
+    });
+    expect((await readFixture(key))!).toMatchObject({
+      status: 'cancelled', playedState: 'played', playedMatchId: matchId,
+    });
+
+    // Every other group is still locked for the cancelled-and-played fixture.
+    expect(await rescheduleFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+      matchDate: `${seasonNow}-08-02`,
+    })).toMatchObject({ ok: false, reason: 'played_locked' });
+    expect(await voidFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+      reason: 'too late',
+    })).toMatchObject({ ok: false, reason: 'played_locked' });
+    expect(await cancelFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+      reason: 'again',
+    })).toMatchObject({ ok: false, reason: 'played_locked' });
+
+    const matchBefore = await admin`SELECT * FROM matches WHERE id = ${matchId}`;
+    expect(await reinstateFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+    })).toMatchObject({ ok: true });
+
+    // Reinstated, still read as played against the SAME match, durable record and audit
+    // agree, and the played match was not touched.
+    expect(await fixtureRow(key)).toMatchObject({ status: 'scheduled', status_reason: null });
+    expect((await readFixture(key))!).toMatchObject({
+      status: 'scheduled', playedState: 'played', playedMatchId: matchId,
+    });
+    expect((await readFixtureOverrides(key))[0].overrideValues)
+      .toMatchObject({ status: 'scheduled' });
+    expect((await auditRows(key)).map((a) => a.fieldGroup))
+      .toEqual(['fixture_creation', 'fixture_cancelled', 'fixture_reinstated']);
+    expect(await admin`SELECT * FROM matches WHERE id = ${matchId}`).toEqual(matchBefore);
+
+    // And the played lock is back in force for the reinstated fixture.
+    expect(await rescheduleFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+      matchDate: `${seasonNow}-08-02`,
+    })).toMatchObject({ ok: false, reason: 'played_locked' });
+
+    await clearFixtureState();
+    await admin`DELETE FROM matches WHERE id = ${matchId}`;
+  });
+
+  it('still refuses to reinstate a cancelled fixture beside another scheduled fixture for the pair', async () => {
+    const key = await mustCreate({
+      season: seasonNow, roundNumber: MARKER_ROUND, matchDate: `${seasonNow}-08-01`,
+    });
+    expect(await cancelFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+      reason: 'Postponed',
+    })).toMatchObject({ ok: true });
+    // A replacement for the same pair is scheduled while the first is cancelled.
+    const replacement = await mustCreate({
+      season: seasonNow, roundNumber: MARKER_ROUND, matchDate: `${seasonNow}-08-08`,
+    });
+    const matchId = await insertPlayedMatch({
+      suffix: 'reinstate-duplicate', homeClubId: clubA.id, awayClubId: clubB.id,
+    });
+    expect(await reinstateFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+    })).toMatchObject({ ok: false, reason: 'duplicate_fixture' });
+    expect(await fixtureRow(key)).toMatchObject({ status: 'cancelled' });
+    expect(replacement).not.toBe(key);
+    await clearFixtureState();
+    await admin`DELETE FROM matches WHERE id = ${matchId}`;
+  });
+
+  it('still refuses to reinstate when two results make the resolution ambiguous', async () => {
+    const key = await mustCreate({
+      season: seasonNow, roundNumber: MARKER_ROUND, matchDate: `${seasonNow}-08-01`,
+    });
+    expect(await cancelFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+      reason: 'Postponed',
+    })).toMatchObject({ ok: true });
+    const first = await insertPlayedMatch({
+      suffix: 'reinstate-amb-a', homeClubId: clubA.id, awayClubId: clubB.id,
+      matchDate: `${seasonNow}-08-01`,
+    });
+    const second = await insertPlayedMatch({
+      suffix: 'reinstate-amb-b', homeClubId: clubB.id, awayClubId: clubA.id,
+      matchDate: `${seasonNow}-08-08`,
+    });
+    expect((await readFixture(key))!.playedState).toBe('ambiguous');
+    expect(await reinstateFixture({
+      fixtureKey: key, expectedUpdatedAt: await updatedAt(key), adminUserId: actorId,
+    })).toMatchObject({ ok: false, reason: 'already_played' });
+    expect(await fixtureRow(key)).toMatchObject({ status: 'cancelled' });
+    await clearFixtureState();
+    await admin`DELETE FROM matches WHERE id = ANY(${[first, second]}::int[])`;
+  });
+
   it('voids without deleting, and a void row is terminal and excluded', async () => {
     const key = await mustCreate();
     expect(await voidFixture({

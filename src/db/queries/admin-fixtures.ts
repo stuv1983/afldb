@@ -1326,6 +1326,14 @@ type EditContext = {
  *
  * `void` is terminal: a row entered in error is kept for audit and replay, not
  * maintained.
+ *
+ * The one exception to the played lock (AFLDB-ISSUE-289, D-289-1): reinstating a
+ * CANCELLED fixture whose game was later played. A cancelled fixture is
+ * self-contradictory once its game has been played and settled, and the runbook
+ * says a cancelled game may be reinstated; without this the state had no repair
+ * path. The exception is exactly that group on exactly that status. Every other
+ * group stays locked for a played fixture, cancelled or not, and the played
+ * match is never touched.
  */
 export function isFixtureEditAllowed(input: {
   fieldGroup: FixtureFieldGroup;
@@ -1340,6 +1348,13 @@ export function isFixtureEditAllowed(input: {
       error: 'This fixture was voided as a data-entry error. Voided fixtures are kept for the '
         + 'record and are not maintained; enter a new fixture instead.',
     };
+  }
+  if (
+    input.fieldGroup === 'fixture_reinstated'
+    && input.status === 'cancelled'
+    && isPlayedState(input.played)
+  ) {
+    return { allowed: true };
   }
   if (isPlayedState(input.played)) {
     return {
@@ -1665,6 +1680,13 @@ async function checkMoveTarget(tx: Tx, input: {
   awayClubId: number;
   homeClubName: string;
   awayClubName: string;
+  /**
+   * True only when the fixture being checked already resolves to exactly one
+   * played match for this very season, round and club pair (AFLDB-ISSUE-289):
+   * that match is the fixture's own result, not a rival, so the `already_played`
+   * rule does not apply to it. The duplicate and club-clash rules still do.
+   */
+  ownPlayedMatch?: boolean;
 }): Promise<FixtureRefusal | null> {
   const [duplicate] = await tx<{ fixtureKey: string }[]>`
     SELECT fixture_key AS "fixtureKey" FROM fixtures
@@ -1694,6 +1716,8 @@ async function checkMoveTarget(tx: Tx, input: {
     return refuse('club_already_scheduled', `${name} already has a fixture in that round.`,
       [String(clash[0].clubId)]);
   }
+
+  if (input.ownPlayedMatch) return null;
 
   const played = await playedCandidatesFor(tx, {
     season: input.season, roundCode: input.roundCode,
@@ -1751,12 +1775,19 @@ export async function cancelFixture(input: FixtureLifecycleInput) {
   });
 }
 
-/** Put a cancelled fixture back on the schedule, re-running the §13 checks. */
+/**
+ * Put a cancelled fixture back on the schedule, re-running the §13 checks.
+ *
+ * A fixture whose game was later played still reinstates (AFLDB-ISSUE-289,
+ * D-289-1): its single played match is its own result, so `already_played` is
+ * skipped for it. An ambiguous resolution links nothing and so is not "its own"
+ * match; it keeps refusing `already_played`.
+ */
 export async function reinstateFixture(input: FixtureEditBase) {
   return editFixture({
     ...input,
     fieldGroup: 'fixture_reinstated',
-    precheck: async ({ tx, row }) => {
+    precheck: async ({ tx, row, played }) => {
       if (row.status !== 'cancelled') {
         return refuse('invalid_transition',
           `That fixture is ${row.status}, so there is nothing to reinstate.`);
@@ -1773,6 +1804,7 @@ export async function reinstateFixture(input: FixtureEditBase) {
         awayClubId: row.awayClubId,
         homeClubName: row.homeClubName,
         awayClubName: row.awayClubName,
+        ownPlayedMatch: isPlayedState(played.state),
       });
     },
     apply: async ({ row }) => ({

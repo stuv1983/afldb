@@ -22,11 +22,17 @@ import type { FixtureStatus } from '@/lib/fixtures/spec';
  * it lives in its own, more heavily worded block below.
  */
 export function LifecyclePanel({
-  fixtureKey, status, expectedUpdatedAt,
+  fixtureKey, status, expectedUpdatedAt, played = false,
 }: {
   fixtureKey: string;
   status: FixtureStatus;
   expectedUpdatedAt: string;
+  /**
+   * The fixture's game has been played (AFLDB-ISSUE-289). Only a cancelled
+   * fixture is rendered this way, and only Reinstate is offered: the result is
+   * authoritative, so Cancel and Void are not.
+   */
+  played?: boolean;
 }) {
   const cancel = useFixtureActionSubmit(cancelFixtureAction, {});
   const reinstate = useFixtureActionSubmit(reinstateFixtureAction, {});
@@ -116,6 +122,7 @@ export function LifecyclePanel({
               <p className="muted" style={{ fontSize: '0.85rem' }}>
                 Reinstating returns this fixture to the schedule and re-runs the round&rsquo;s
                 collision checks.
+                {played && ' The game has since been played; the result is not changed.'}
               </p>
               {reinstate.state.error && <p className="notice" role="alert">{reinstate.state.error}</p>}
               <div>
@@ -128,7 +135,7 @@ export function LifecyclePanel({
         )}
       </section>
 
-      {!voidAction.state.ok && (
+      {!played && !voidAction.state.ok && (
         <section className="section" style={{ borderColor: 'var(--color-warn, #b91c1c)' }}>
           <h2>Void this fixture record</h2>
           <p className="muted" style={{ fontSize: '0.85rem' }}>
@@ -170,7 +177,7 @@ export function LifecyclePanel({
           )}
         </section>
       )}
-      {voidAction.state.ok && (
+      {!played && voidAction.state.ok && (
         <section className="section">
           <p className="notice" role="status">{voidAction.state.message}</p>
         </section>

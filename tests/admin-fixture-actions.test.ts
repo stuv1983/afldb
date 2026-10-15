@@ -18,12 +18,26 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ postgres: vi.fn(), sql: vi.fn() }));
 vi.mock('postgres', () => ({ default: mocks.postgres }));
 vi.mock('@/db/client', () => ({ sql: mocks.sql }));
+// The panel imports Server Actions, which pull in auth and the database, and a submit hook that
+// needs a mounted app router; the render cases below only need the functions to exist and the
+// hook to report an idle state.
+vi.mock('@/app/admin/fixtures/actions', () => ({
+  cancelFixtureAction: vi.fn(),
+  reinstateFixtureAction: vi.fn(),
+  voidFixtureAction: vi.fn(),
+}));
+vi.mock('@/app/admin/fixtures/submit-helper', () => ({
+  useFixtureActionSubmit: () => ({ state: {}, isPending: false, submit: vi.fn() }),
+}));
 
+import { LifecyclePanel } from '@/app/admin/fixtures/LifecyclePanel';
 import {
   FINALS_ROUND_CODES,
   FIXTURE_ENTITY_TYPE,
@@ -44,9 +58,11 @@ import {
   isFixtureEditAllowed,
   normaliseSchedule,
   parseFixtureEntityKey,
+  reinstateFixture,
   renderRound,
   resolvePlayed,
   voidFixture,
+  type FixtureFieldGroup,
   type FixtureRoundType,
 } from '@/db/queries/admin-fixtures';
 
@@ -537,6 +553,32 @@ describe('the edit lifecycle matrix (§15, §16)', () => {
     })).toEqual({ allowed: true });
   });
 
+  it('lets a cancelled fixture whose game was played be reinstated, and nothing else (D-289-1)', () => {
+    for (const played of ['played', 'played_home_away_differs'] as const) {
+      expect(isFixtureEditAllowed({ fieldGroup: 'fixture_reinstated', status: 'cancelled', played }), played)
+        .toEqual({ allowed: true });
+      // Every other group stays locked for the same cancelled-and-played fixture.
+      const others: FixtureFieldGroup[] = [
+        'fixture_creation', 'fixture_schedule', 'fixture_venue', 'fixture_round',
+        'fixture_clubs', 'fixture_cancelled', 'fixture_void',
+      ];
+      for (const fieldGroup of others) {
+        expect(isFixtureEditAllowed({ fieldGroup, status: 'cancelled', played }), fieldGroup)
+          .toMatchObject({ allowed: false, reason: 'played_locked' });
+      }
+      // The exception is the cancelled status only: a scheduled played fixture stays locked,
+      // and a void one stays terminal.
+      expect(isFixtureEditAllowed({ fieldGroup: 'fixture_reinstated', status: 'scheduled', played }))
+        .toMatchObject({ allowed: false, reason: 'played_locked' });
+      expect(isFixtureEditAllowed({ fieldGroup: 'fixture_reinstated', status: 'void', played }))
+        .toMatchObject({ allowed: false, reason: 'invalid_transition' });
+    }
+    // An ambiguous resolution links nothing, so it never needed the exception.
+    expect(isFixtureEditAllowed({
+      fieldGroup: 'fixture_reinstated', status: 'cancelled', played: 'ambiguous',
+    })).toEqual({ allowed: true });
+  });
+
   it('never deletes a fixture: there is no DELETE FROM fixtures anywhere (D-2)', () => {
     expect(moduleCode).not.toMatch(/DELETE\s+FROM\s+fixtures/i);
     expect(readSource('tools/migration/common.py')).not.toMatch(/DELETE\s+FROM\s+fixtures/i);
@@ -553,6 +595,102 @@ describe('the edit lifecycle matrix (§15, §16)', () => {
     }
     // And the database carries the same rule.
     expect(tableDdl).toContain('fixtures_status_reason_ck');
+  });
+});
+
+describe('reinstating a cancelled fixture whose game was played (AFLDB-ISSUE-289, D-289-1)', () => {
+  const CANCELLED_ROW = {
+    id: 41, fixtureKey: 'manual_admin_edit:k', season: 2026, roundCode: '5', roundNumber: 5,
+    roundType: 'home_and_away', isFinal: false, matchDate: '2026-04-10', matchTime: '19:20',
+    venueId: 55, venueSlug: 'mcg', venueRaw: null,
+    homeClubId: 7, homeClubSlug: 'richmond', homeClubName: 'Richmond',
+    awayClubId: 8, awayClubSlug: 'carlton', awayClubName: 'Carlton',
+    status: 'cancelled', statusReason: 'Wet ground', notes: null,
+    createdAt: '2026-03-01 00:00:00+00', updatedAt: '2026-03-02 00:00:00+00',
+  };
+  const REINSTATE = { fixtureKey: 'manual_admin_edit:k', expectedUpdatedAt: CANCELLED_ROW.updatedAt, adminUserId: 1 };
+  const db = (candidates: { exactCount?: number; exactMatchId?: number | null; swappedCount?: number; swappedMatchId?: number | null }, extra: Record<string, unknown[]> = {}) =>
+    defaultDb({
+      'FOR UPDATE': [{ id: 41 }],
+      'f.id::int AS id': [CANCELLED_ROW],
+      '"exactCount"': [{ exactCount: 0, exactMatchId: null, swappedCount: 0, swappedMatchId: null, ...candidates }],
+      ...extra,
+    });
+
+  it('reinstates when the single played match is its own result', async () => {
+    for (const candidates of [
+      { exactCount: 1, exactMatchId: 900 },
+      { swappedCount: 1, swappedMatchId: 901 },
+    ]) {
+      const seen = fakeImportConnection(db(candidates));
+      expect(await reinstateFixture(REINSTATE)).toMatchObject({ ok: true });
+      const writes = wrote(seen);
+      expect(writes.some((s) => s.includes('UPDATE fixtures'))).toBe(true);
+      // The played match is never written by a fixture mutation.
+      expect(writes.some((s) => /matches/i.test(s) && !/fixtures/i.test(s))).toBe(false);
+    }
+  });
+
+  it('still refuses when the resolution is ambiguous: two results are nobody\'s own', async () => {
+    const seen = fakeImportConnection(db({ exactCount: 1, exactMatchId: 900, swappedCount: 1, swappedMatchId: 901 }));
+    expect(await reinstateFixture(REINSTATE)).toMatchObject({ ok: false, reason: 'already_played' });
+    expect(wrote(seen)).toEqual([]);
+  });
+
+  it('still refuses a duplicate scheduled fixture, played or not', async () => {
+    const seen = fakeImportConnection(db(
+      { exactCount: 1, exactMatchId: 900 },
+      { 'SELECT fixture_key AS "fixtureKey" FROM fixtures': [{ fixtureKey: 'other' }] },
+    ));
+    expect(await reinstateFixture(REINSTATE)).toMatchObject({ ok: false, reason: 'duplicate_fixture' });
+    expect(wrote(seen)).toEqual([]);
+  });
+
+  it('still refuses a club with another fixture in the round, played or not', async () => {
+    const seen = fakeImportConnection(db(
+      { exactCount: 1, exactMatchId: 900 },
+      { 'END AS "clubId"': [{ clubId: 7 }] },
+    ));
+    expect(await reinstateFixture(REINSTATE)).toMatchObject({ ok: false, reason: 'club_already_scheduled' });
+    expect(wrote(seen)).toEqual([]);
+  });
+
+  it('skips already_played only for the fixture\'s own resolution, never as a blanket bypass', () => {
+    expect(moduleCode).toMatch(/ownPlayedMatch:\s*isPlayedState\(played\.state\)/);
+    expect(moduleCode).toMatch(/if \(input\.ownPlayedMatch\) return null;/);
+  });
+});
+
+describe('the lifecycle panel for a played fixture (AFLDB-ISSUE-289, D-289-1)', () => {
+  const render = (status: 'scheduled' | 'cancelled' | 'void', played: boolean) =>
+    renderToStaticMarkup(createElement(LifecyclePanel, {
+      fixtureKey: 'manual_admin_edit:k', status, expectedUpdatedAt: 't', played,
+    }));
+
+  it('offers Reinstate and neither Cancel nor Void for a cancelled, played fixture', () => {
+    const html = render('cancelled', true);
+    expect(html).toContain('Reinstate');
+    expect(html).toContain('The game has since been played; the result is not changed.');
+    expect(html).not.toContain('Cancel this fixture');
+    expect(html).not.toContain('Void this fixture');
+  });
+
+  it('is unchanged for an unplayed fixture: Reinstate plus the Void block when cancelled', () => {
+    const html = render('cancelled', false);
+    expect(html).toContain('Reinstate');
+    expect(html).toContain('Void this fixture');
+    expect(html).not.toContain('The game has since been played');
+    const scheduled = render('scheduled', false);
+    expect(scheduled).toContain('Cancel this fixture');
+    expect(scheduled).toContain('Void this fixture');
+  });
+
+  it('is wired so the page renders the panel for a played fixture only when it is cancelled', () => {
+    const page = readSource('src/app/admin/fixtures/[season]/[fixtureKey]/page.tsx');
+    expect(page).toMatch(/canEdit && \(!played \|\| fixture\.status === 'cancelled'\) && \(/);
+    expect(page).toMatch(/<LifecyclePanel [^>]*played=\{played\}/);
+    // The schedule, venue, round and club panels stay hidden for any played fixture.
+    expect(page).toMatch(/const schedulable = !played && fixture\.status !== 'void';/);
   });
 });
 

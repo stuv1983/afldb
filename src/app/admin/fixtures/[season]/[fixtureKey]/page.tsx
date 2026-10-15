@@ -183,8 +183,11 @@ export default async function FixtureDetailPage(
         </section>
       )}
 
-      {canEdit && !played && (
-        <LifecyclePanel fixtureKey={fixture.fixtureKey} status={fixture.status} expectedUpdatedAt={fixture.updatedAt} />
+      {/* A played fixture still offers Reinstate when it is cancelled (AFLDB-ISSUE-289,
+          D-289-1): its game was played after it was cancelled. Cancel and Void stay hidden
+          for it, and the backend still refuses every other group as `played_locked`. */}
+      {canEdit && (!played || fixture.status === 'cancelled') && (
+        <LifecyclePanel fixtureKey={fixture.fixtureKey} status={fixture.status} expectedUpdatedAt={fixture.updatedAt} played={played} />
       )}
       {/* An editor is told this by LifecyclePanel's own terminal branch; this
           is the same fact for a read-only Admin, who never sees that panel. */}
@@ -203,6 +206,9 @@ export default async function FixtureDetailPage(
             This fixture has been played. The result is authoritative for what happened, so only
             its notes may be changed here — correcting a played match&rsquo;s own identity, round,
             date or clubs is match administration, not fixture administration.
+            {fixture.status === 'cancelled' && (
+              <> A cancelled fixture whose game was played can still be reinstated above.</>
+            )}
           </p>
         </section>
       )}
