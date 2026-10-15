@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Implemented and validated on `afldb_test` 2026-10-15 (§17); not deployed. **Stays open:** the §15 census has not been run (§17.5).
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Fix merged as `1d2ec9fb` and validated on `afldb_test` (§17); the §15 census was run read-only on DEV and PROD on 2026-10-15 and found nothing (§19). **Not deployed.**
 - **Severity:** Low. **Area:** Data Editor / override replay.
 - **Key file:** `src/db/queries/data-edits.ts` (`getEntityNaturalKey`).
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-027; partition note R3-F04).
@@ -109,3 +109,37 @@ A DB-free unit test of the key chooser.
 - **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 292` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue292\preflight-1.txt`). `npm run merge:ready -- --issue 292` (raw, unchanged: `D:\tmp\issue292\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The six committed paths were compared with the declared scope by hand: `data-edits.ts`, the two test files, this runbook, `issues.md` and `IssuesIndex.md`.
 - **Exception (fresh, this issue only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state (the nine `.agents/skills` files, the seven zero-byte stray-named files, the literal `$null)` and the zero-byte `2000)`). Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
 - **Merge.** `1d2ec9fb` (fix, tests and records) fast-forwarded onto `main` and was pushed (`7fbec965..1d2ec9fb`); local `main` and `git ls-remote origin refs/heads/main` both equalled `1d2ec9fb` afterwards. Merge-scoped only; not deployed. The issue is not resolved.
+
+## 19. The §15 census (2026-10-15; read-only, DEV and PROD)
+
+### 19.1 Method
+
+One guarded script, generated twice from `D:\tmp\issue292\census\census-292.tpl.sh` (DEV `census-292-dev.sh` sha-256 `165a771c0d0d8a1093b763ebf39510c908b30bcf53dce5ff720c24705f4bd70b`, PROD `census-292-prod.sh` `27e23ff67476930e1df896a24094bb09f716f8267d52c02e052bd8b6429c3e97`). The connection setting is read from the host's `.env` inside a Python child and never printed, every `PG*` variable is dropped, a guard checks `current_database()`, `current_user`, `session_user` and `transaction_read_only` before every statement, and the session is `default_transaction_read_only=on` with a 60 s statement timeout. **DEV:** `afldb_dev` as `afldb_owner`, over `ssh arm@10.0.40.100` by the reviewed `Invoke-Remote.ps1`. **PROD:** `afldb_prod` as `afldb_backup` (read-only, `pg_read_all_data`; not the owner), over `scp` of the script to the host and `ssh afldb` to run it by path, the remote copy removed in the same command; two SSH connections in all. Nothing was written to either database, either checkout or either host's disk. It resolves an override key to a player with the replay's own join (`tools/migration/common.py`, `replay_admin_overrides('players')`).
+
+### 19.2 Results
+
+| | DEV (13:21:39 AEDT, checkout `17514052`) | PROD (13:21:50 AEDT, checkout `cd3cf782`) |
+|---|---|---|
+| Active `players` overrides | 95 (`afltables`/`name` 2, `afltables`/`notes` 1, `manual_admin_edit`/`identity` 92) | 92 (all `manual_admin_edit`/`identity`) |
+| Resolved to a player by the replay's join | 95, to 93 players; 0 unresolved | 92, to 92 players; 0 unresolved |
+| **C-3: players with active overrides under more than one `afltables` key** | **0 rows** | **0 rows** |
+| C-4: players holding more than one accepted AFL Tables identity | 4 (players 2604, 6292, 6519, 6619; two profile-URL paths each), carrying **0** active overrides under any of those paths | the same four players, **0** overrides |
+| **C-5: the replay's own equal-authority conflict query** | **0 rows** | **0 rows** |
+| C-6 (for ISSUE-277): manual players / token-only / with a creation record | 92 / 0 / 92 | 92 / 0 / 92 |
+
+Evidence: `D:\tmp\issue292\census\run-20261015\dev-census-292.txt` (sha-256 `951c66558968964297094b922d29e4054dca2e3049ce182aa09895a23f5a819f`) and `prod-census-292.txt` (`26f00b58a75f4e2f31229cdfbf871288005b8aac4cb368138c2dd0472b15b5f5`).
+
+### 19.3 What it shows, and does not
+
+- **No player on DEV or PROD carries Data Editor overrides under two AFL Tables keys, and the replay's equal-authority conflict check returns nothing on either**, so no reload or promotion would be refused for this cause today and **no repair is needed**. The four folded-pair players that could trigger the defect have no editor override at all.
+- Both hosts were running code from before the fix (DEV `17514052`, PROD `cd3cf782`); the census therefore describes what the unfixed key choice has produced so far. It says nothing about future edits, which the merged fix keys deterministically.
+- It reads current state only, not history (an override deactivated earlier is not visible), and PROD was read through the backup role's view of the database.
+
+### 19.4 Closure
+
+The runbook's §17.5 condition ("the census has been run and either found nothing or its findings have a repair plan") is met: it found nothing. Resolved, **merge-scoped**: the fix is on `main`, validated on `afldb_test`, **not deployed**; no DEV or PROD write was made.
+
+## 20. Readiness, merge and closure record (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 292` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issuerec1015\preflight-1.txt`). `npm run merge:ready -- --issue 292` (raw, unchanged: `D:\tmp\issuerec1015\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The committed code paths were compared with the declared scope by hand.
+- **Exception.** The owner retained the exact **18**-path primary-state exception for this batch (the nine `.agents/skills` files, the seven zero-byte stray-named files, the literal `$null)` and the zero-byte `2000)`), covering only that clean-tree FAIL. A 19th path, a zero-byte `0` created at 11:47 that day, appeared and made the exact-path check fail; the owner answered a direct question by authorising its deletion, and it was deleted (empty, untracked) before any merge. Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146...2500`, unchanged), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).

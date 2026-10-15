@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). Fix implemented and validated locally, without the network, 2026-10-15 (§17); not deployed. **Stays open:** the §14 operator-run, networked double run has not been done (§17.5).
+- **Status:** **Resolved (2026-10-15, merge-scoped; opened 2026-10-08).** Fix merged as `091e4635` and validated without the network (§17); the §14 networked double run was run on 2026-10-15 for both acquirers and the second run was refused each time (§19). **Not deployed.**
 - **Severity:** Low. **Area:** acquisition tooling / evidence retention.
 - **Key files:** `tools/rebuild/afl_api/acquire_lineups.R`, `tools/rebuild/afl_api/acquire_rosters.R`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-034; partition note R4b-F04).
@@ -109,3 +109,30 @@ None.
 - **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 299` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issue299\preflight-1.txt`). `npm run merge:ready -- --issue 299` (raw, unchanged: `D:\tmp\issue299\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The six committed paths were compared with the declared scope by hand: the two R acquirers, the lineup test, this runbook, `issues.md` and `IssuesIndex.md`.
 - **Exception (fresh, this issue only).** The owner authorised an exception covering only that clean-tree FAIL under the exact **18**-path primary state (the nine `.agents/skills` files, the seven zero-byte stray-named files, the literal `$null)` and the zero-byte `2000)`). Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146…2500`, unchanged since the session start), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).
 - **Merge.** `091e4635` (fix, tests and records) fast-forwarded onto `main` and was pushed (`a5b17f24..091e4635`); local `main` and `git ls-remote origin refs/heads/main` both equalled `091e4635` afterwards. Merge-scoped only; not deployed. The issue is not resolved.
+
+## 19. The §14 networked double run (2026-10-15)
+
+### 19.1 Method
+
+From the primary checkout at `main` (tracked tree clean), with R 4.6.1 and the pinned fitzRoy 1.8.0, each acquirer was run **twice with the same scope into a fresh scratch `--out-dir` that did not exist beforehand**, under `D:\tmp\issue299\double-run-20261015\`. Scope was bounded to one lineup round and one roster season. The default `data/sources/afl_api/...` working root was never used. The first run of each reached the AFL API; the second was run with the same arguments immediately after, with the first run's files hashed before and after.
+
+- `Rscript tools/rebuild/afl_api/acquire_lineups.R --season 2026 --round 20 --out-dir <scratch>\lineups-scratch`
+- `Rscript tools/rebuild/afl_api/acquire_rosters.R --from 2026 --to 2026 --out-dir <scratch>\rosters-scratch`
+
+### 19.2 Results
+
+| | First run | Second run (same arguments, same directory) |
+|---|---|---|
+| Lineups | exit 0; 468 rows, 9 matches, 18 team instances; `lineups_2026_r20.json` (321,299 bytes, sha-256 `c85e1ec7...06d2d4`) and `manifest.json` (`d5be7044...ab9e`) | **exit 1** with `Error: Output directory '...\lineups-scratch' already exists and is not empty; a second acquisition would overwrite the retained evidence and its manifest.json. Choose another --label or --out-dir, or move the existing directory aside deliberately.`; output never says `Fetching`; both files byte-identical (hashes equal before and after) |
+| Rosters | exit 0; 812 rows, 18 teams, 812 with height; `rosters_2026.json` (415,413 bytes, sha-256 `019c1315...7d52e`) and `manifest.json` (`4fa50f4c...369449`) | **exit 1** with the same refusal for `...\rosters-scratch`; output never says `Fetching`; both files byte-identical |
+
+Evidence: the output logs and both scratch directories under `D:\tmp\issue299\double-run-20261015\` (full hashes: `lineups-run2.combined.txt` `7d91e4e2...`, `rosters-run2.combined.txt` `d1886958...`). The network was used by the two first runs only (one lineup fetch for one round, one squad fetch per club for one season); the refusals cost no request.
+
+### 19.3 Closure
+
+The runbook's §14 procedure (two real runs, the second refused) was run for both scripts and behaved as specified, which closes the condition in §17.5. Resolved, **merge-scoped**: the scripts are workstation tooling with nothing to deploy beyond the checkout; nothing was written outside the scratch directories.
+
+## 20. Readiness, merge and closure record (2026-10-15)
+
+- **Readiness: accepted under a scoped cleanliness exception, not a clean pass.** `npm run preflight -- --mode implementation --issue 292` on the committed worktree: READY (0 blockers, 3 warnings: `.env`, `psql`, `pg_restore`; raw `D:\tmp\issuerec1015\preflight-1.txt`). `npm run merge:ready -- --issue 292` (raw, unchanged: `D:\tmp\issuerec1015\merge-ready-raw-1.txt`): BLOCKED by exactly one blocker, the primary worktree not clean; every other check PASSed, with two metadata warnings (no runbook readiness JSON block; no automated unexpected-file classification). The committed code paths were compared with the declared scope by hand.
+- **Exception.** The owner retained the exact **18**-path primary-state exception for this batch (the nine `.agents/skills` files, the seven zero-byte stray-named files, the literal `$null)` and the zero-byte `2000)`), covering only that clean-tree FAIL. A 19th path, a zero-byte `0` created at 11:47 that day, appeared and made the exact-path check fail; the owner answered a direct question by authorising its deletion, and it was deleted (empty, untracked) before any merge. Immediately before the merge a script verified the 18 paths, their full sha-256 hashes (`$null)` `d9edb146...2500`, unchanged), no tracked and no staged primary change, and that fresh `main`, `origin/main` and the live remote agreed (`premerge-1.txt`); it read OK again after the push (`postmerge-1.txt`).

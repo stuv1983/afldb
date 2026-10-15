@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-275 first post-installation DEV nightly captured, clean and unattributed (observation only; ISSUE-275, 274 and 276 stay Open) - 15 October 2026
+
+- The first AFL API nightly after the combined ISSUE-275/281/288 DEV installation (import batch 123, 15 October 05:08-05:09 AEDT) was captured read-only with the reviewed pack: success, the same 64 refusals as the previous night, no failure marker, and the sealed A1/A2 censuses differ only as the pack predicts. No finding is attributable to the ISSUE-275 gate, as expected on DEV. Because independent evidence that the checkout stayed on the installed revision through the run does not exist, the night is recorded as an unattributed observation and accepts nothing. No code changed. Detail: `issues/open/AFLDB-ISSUE-275.md` §32.
+
+### The R acquirers' refusal to overwrite retained evidence is confirmed against the live AFL API (AFLDB-ISSUE-299; fix `091e4635`; bounded networked double run; resolved) - 15 October 2026
+
+- The guard that makes `acquire_lineups.R` and `acquire_rosters.R` refuse a non-empty output directory (`091e4635`, merged earlier the same day and validated without the network) was exercised for real: each script was run twice with the same scope into a fresh scratch directory. The first run acquired (468 lineup rows for 2026 round 20; 812 roster rows for 2026); the second was refused with exit 1 and the guard's message, made no request, and left the first run's files byte-identical. No code changed. Detail: `issues/closed/AFLDB-ISSUE-299.md` §19.
+
+### Census closes the Data Editor override-key issue: no player carries overrides under two AFL Tables paths (AFLDB-ISSUE-292; fix `1d2ec9fb`; read-only DEV and PROD census; not deployed; resolved) - 15 October 2026
+
+- The deterministic override-key fix (`1d2ec9fb`) was merged earlier the same day with the issue left open until a read-only census could show whether any DEV or PROD player already carried overrides under two AFL Tables keys. The census ran on 15 October 2026 and found none, and the replay's own equal-authority conflict check returns nothing, on either database. No repair is needed. No code changed; nothing is deployed. Detail: `issues/closed/AFLDB-ISSUE-292.md` §19.
+
 ### `/admin/upload` takes the documented 5 MB file through a dedicated route (AFLDB-ISSUE-303; `50f9345b`, merged and pushed to `main`; `afldb_test` validated; not deployed; DEV acceptance pending) - 15 October 2026
 
 - The upload form promised a 5 MB CSV but posted through a Server Action that Next limits to 1 MB, so a 1-5 MB file failed at the framework with a generic error. On the owner's decision (D-303-1, option c) the form now posts to a dedicated `POST /admin/upload/stage` Route Handler: it checks the request is same-origin (a Route Handler gets no Server Action origin check), re-checks the session and the legacy-intake capability as before, refuses a declared or actual body over 5 MiB plus the multipart envelope without buffering it, and then stages the file through the unchanged pipeline with the same audit events. The 1 MB Server Action is removed and the project-wide action limit is not raised.
