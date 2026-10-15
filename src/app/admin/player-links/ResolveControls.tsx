@@ -10,6 +10,7 @@ import {
   linkPlayer,
   type PlayerLinkActionState,
 } from '@/app/admin/player-links/actions';
+import { postPublicRevalidate } from '@/app/admin/player-links/post-public-revalidate';
 import { PlayerPicker } from '@/components/PlayerPicker';
 
 const INITIAL: PlayerLinkActionState = {};
@@ -165,6 +166,12 @@ export function ResolveControls({
   const parts = cleanName.split(/\s+/);
   const initialGiven = parts.length > 1 ? parts.slice(0, -1).join(' ') : '';
   const initialSurname = parts.length > 1 ? parts[parts.length - 1] : parts[0] || '';
+
+  // The approval committed, whatever its audit warning says: revalidate the
+  // public pages in a follow-up request, not inside the action (AFLDB-ISSUE-308).
+  useEffect(() => {
+    if (approveState.revalidatePublic) void postPublicRevalidate();
+  }, [approveState.revalidatePublic]);
 
   useEffect(() => {
     if (done && !warning) {

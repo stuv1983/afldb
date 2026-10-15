@@ -7,6 +7,7 @@ import {
   bulkApproveSuggestions,
   type PlayerLinkActionState,
 } from '@/app/admin/player-links/actions';
+import { postPublicRevalidate } from '@/app/admin/player-links/post-public-revalidate';
 
 const INITIAL: PlayerLinkActionState = {};
 
@@ -30,10 +31,13 @@ export function BulkApproveControls({
 
   useEffect(() => {
     if (state.message) {
+      // Public pages first (AFLDB-ISSUE-308): a follow-up request after the
+      // action has settled, never inside it.
+      if (state.revalidatePublic) void postPublicRevalidate();
       document.dispatchEvent(new CustomEvent('player-links-resolved'));
       router.refresh();
     }
-  }, [state.message, router]);
+  }, [state.message, state.revalidatePublic, router]);
 
   if (targets.length === 0) {
     return (

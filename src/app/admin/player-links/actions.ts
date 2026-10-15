@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { revalidatePublicLinkPages } from '@/app/admin/player-links/public-link-pages';
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import {
@@ -19,7 +20,18 @@ import {
 } from '@/db/queries/player-match-candidates';
 import { audit, requireCapability } from '@/lib/auth/session';
 
-export type PlayerLinkActionState = { error?: string; message?: string; warning?: string };
+export type PlayerLinkActionState = {
+  error?: string;
+  message?: string;
+  warning?: string;
+  /**
+   * A suggestion approval committed at least one link. The approval actions
+   * cannot revalidate the public pages themselves (see `public-link-pages.ts`),
+   * so the browser posts to `/admin/player-links/revalidate` when this is set
+   * (AFLDB-ISSUE-308).
+   */
+  revalidatePublic?: true;
+};
 
 const ACTIVITY_AUDIT_WARNING =
   'The change succeeded, but its administrative activity audit failed. '
@@ -50,17 +62,6 @@ function allFailedError(failed: TargetFailure[]): string {
 function notChangedWarning(failed: TargetFailure[]): string | undefined {
   if (failed.length === 0) return undefined;
   return `${failed.length} record(s) were not changed: ${listFailures(failed, f => `${f.label} — ${f.error}`)}`;
-}
-
-function revalidatePublicLinkPages(): void {
-  revalidatePath('/awards/[slug]', 'page');
-  revalidatePath('/awards/[slug]/[season]', 'page');
-  revalidatePath('/clubs/[slug]', 'page');
-  revalidatePath('/honour-teams/[slug]', 'page');
-  revalidatePath('/seasons/[year]', 'page');
-  revalidatePath('/hall-of-fame');
-  revalidatePath('/draft');
-  revalidatePath('/records/first-kick-goal');
 }
 
 function parseTargets(formData: FormData): {
@@ -316,7 +317,9 @@ export async function createAndLinkPlayer(
  * it is.
  *
  * No revalidatePath: the client refreshes once the action settles (see
- * reviewSuggestion and SuggestionControls).
+ * reviewSuggestion and SuggestionControls). The public pages are revalidated
+ * the same way -- the result sets `revalidatePublic` and the browser posts to
+ * `/admin/player-links/revalidate` afterwards (AFLDB-ISSUE-308).
  */
 export async function approveSuggestion(
   _prev: PlayerLinkActionState,
@@ -358,7 +361,7 @@ export async function approveSuggestion(
     warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
   }
 
-  return { message: 'Suggested match approved.', warning };
+  return { message: 'Suggested match approved.', warning, revalidatePublic: true };
 }
 
 /**
@@ -435,6 +438,7 @@ export async function bulkApproveSuggestions(
     ? `${stale.length} row(s) were shown under an older algorithm version and were approved on `
       + `the current one: ${stale.slice(0, 5).join('; ')}${stale.length > 5 ? ' …' : ''}`
     : undefined;
+  const revalidatePublic = approved > 0 ? { revalidatePublic: true as const } : {};
   if (skipped.length > 0) {
     return {
       message: summary,
@@ -444,9 +448,10 @@ export async function bulkApproveSuggestions(
         + (skipped.length > 5 ? ' …' : ''),
         staleWarning,
       ),
+      ...revalidatePublic,
     };
   }
-  return { message: summary, warning: combineWarnings(warning, staleWarning) };
+  return { message: summary, warning: combineWarnings(warning, staleWarning), ...revalidatePublic };
 }
 
 /**

@@ -1040,6 +1040,63 @@ describe('suggested match approval', () => {
       expect(state.warning).toContain('shown as v1 score 79; approved on v2 score 92');
     });
 
+    // AFLDB-ISSUE-308: the approval actions never revalidate in-action; they tell the
+    // browser to, once they have returned.
+    it('flags a committed single approval for public revalidation without calling revalidatePath', async () => {
+      const { tx } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment());
+
+      const state = await approveSuggestion({}, formOf({
+        targets: 'award_winners:412:unmatched',
+        playerId: '1000',
+      }));
+
+      expect(state.message).toBe('Suggested match approved.');
+      expect(state.revalidatePublic).toBe(true);
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it('does not flag a refused single approval', async () => {
+      const { tx } = fakeTransaction(() => []);
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment());
+
+      const state = await approveSuggestion({}, formOf({
+        targets: 'award_winners:412:unmatched',
+        playerId: '1000',
+      }));
+
+      expect(state.error).toBeTruthy();
+      expect(state.revalidatePublic).toBeUndefined();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it('flags a bulk approval that committed a row, and not one that committed none', async () => {
+      const committed = lockedUnmatchedRow();
+      installImportClient(committed.tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment());
+
+      const some = await bulkApproveSuggestions({}, formOf({
+        targets: 'award_winners:412:unmatched',
+        playerIds: '1000',
+      }));
+      expect(some.message).toBe('Approved 1 suggested match(es).');
+      expect(some.revalidatePublic).toBe(true);
+
+      installImportClient(fakeTransaction(() => []).tx);
+      const none = await bulkApproveSuggestions({}, formOf({
+        targets: 'award_winners:412:unmatched',
+        playerIds: '1000',
+      }));
+      expect(none.message).toBe('Approved 0 suggested match(es).');
+      expect(none.revalidatePublic).toBeUndefined();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
     it('reports stale rows per row in the bulk summary', async () => {
       const { tx } = lockedUnmatchedRow();
       installImportClient(tx);
@@ -1391,10 +1448,63 @@ describe('player-link action contracts', () => {
   it('keeps revalidatePath out of the new actions', () => {
     // Next 15.5 can hang the client commit when the submitting form
     // unmounts; the suggestion controls refresh after the action
-    // settles instead (see SuggestionControls).
-    const approval = actions.slice(actions.indexOf('export async function approveSuggestion'));
+    // settles instead (see SuggestionControls). The public pages are
+    // revalidated by a browser follow-up to /admin/player-links/revalidate
+    // (AFLDB-ISSUE-308), never inside these actions.
+    const approval = actions.slice(
+      actions.indexOf('export async function approveSuggestion'),
+      actions.indexOf('export async function refreshSuggestions'),
+    );
     expect(approval).not.toContain('revalidatePath');
     expect(approval).not.toContain('revalidatePublicLinkPages');
+    expect(approval).toContain('revalidatePublic: true');
+  });
+
+  it('revalidates the public pages for an approval through a gated follow-up route (AFLDB-ISSUE-308)', async () => {
+    const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+    const route = read('src', 'app', 'admin', 'player-links', 'revalidate', 'route.ts');
+    expect(route).toMatch(/export async function POST\(\)[^{]*\{\s*await requireCapability\('data\.playerLinks'\);/);
+    expect(route).toContain('revalidatePublicLinkPages()');
+    // Nothing the browser sends reaches revalidatePath.
+    expect(route).not.toMatch(/request\.json|formData|searchParams/);
+
+    // One path list, shared with the in-action link actions.
+    const pages = read('src', 'app', 'admin', 'player-links', 'public-link-pages.ts');
+    expect(pages).toContain("revalidatePath('/awards/[slug]', 'page')");
+    expect(actions).toContain("from '@/app/admin/player-links/public-link-pages'");
+    expect(actions).not.toMatch(/function revalidatePublicLinkPages/);
+
+    // Both approval surfaces post after the action settles, only when it flagged a commit.
+    for (const file of ['ResolveControls.tsx', 'BulkApproveControls.tsx']) {
+      const controls = read('src', 'app', 'admin', 'player-links', file);
+      expect(controls, file).toContain('postPublicRevalidate');
+      expect(controls, file).toMatch(/\.revalidatePublic\)\s*void postPublicRevalidate\(\)/);
+    }
+    expect(read('src', 'app', 'admin', 'player-links', 'post-public-revalidate.ts'))
+      .toContain("fetch('/admin/player-links/revalidate', { method: 'POST' })");
+  });
+
+  it('the revalidate route revalidates the fixed public set after the capability check (AFLDB-ISSUE-308)', async () => {
+    const { POST } = await import('@/app/admin/player-links/revalidate/route');
+    const order: string[] = [];
+    mocks.requireCapability.mockImplementation(async () => { order.push('guard'); return { id: 5, email: 'a@example.test' }; });
+    mocks.revalidatePath.mockImplementation(() => { order.push('revalidate'); });
+
+    const response = await POST();
+
+    expect(response.status).toBe(200);
+    expect(mocks.requireCapability).toHaveBeenCalledWith('data.playerLinks');
+    expect(order[0]).toBe('guard');
+    expect(mocks.revalidatePath.mock.calls.map(([path]) => path)).toEqual([
+      '/awards/[slug]', '/awards/[slug]/[season]', '/clubs/[slug]', '/honour-teams/[slug]',
+      '/seasons/[year]', '/hall-of-fame', '/draft', '/records/first-kick-goal',
+    ]);
+
+    // A refused guard revalidates nothing.
+    mocks.revalidatePath.mockClear();
+    mocks.requireCapability.mockRejectedValueOnce(new Error('forbidden'));
+    await expect(POST()).rejects.toThrow('forbidden');
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it('reports every skipped row instead of abandoning the batch', () => {
