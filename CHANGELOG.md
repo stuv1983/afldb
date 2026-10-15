@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Data Editor corrections to a player with no AFL Tables identity survive a rebuild (AFLDB-ISSUE-277; `8450134b`, merged and pushed to `main`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
+
+- A date of birth, birth year, height, weight or note corrected in the Data Editor for a player whose only durable identity is the manual token (a drafted player not yet matched to an AFL Tables profile) wrote no durable record, so a rebuild or promotion brought the old value back while the audit trail still named the change. On the owner's decision (D-277-1, option a) such a save now updates the player's durable creation record in the same transaction, with its own audit row. A save that would leave that record unable to be replayed (a date of birth with no usable confidence) is refused before anything is written. Players who hold an AFL Tables identity are unchanged.
+- **Validation (`afldb_test`).** The real players replay re-creates a deleted player with every edited value; the refusal guard agrees with that replay on four record shapes; 7 of 7 mutants killed. A read-only census found no token-only player on DEV or PROD today. **Not done:** any deployment. Detail: `issues/closed/AFLDB-ISSUE-277.md` §17 and §18.
+
 ### A cancelled fixture whose game was later played can be reinstated (AFLDB-ISSUE-289; `39622149`, merged and pushed to `main`; `afldb_test` validated; not deployed; resolved) - 15 October 2026
 
 - A fixture that had been cancelled and whose game was then played and imported could not be reinstated: the played lock refused every edit and the collision check refused the fixture's own match, so the record stayed `cancelled` and played with no way out. On the owner's decision (D-289-1, option a) Reinstate is now permitted for exactly that case, and for no other: every other edit of a played fixture, an ambiguous result, a duplicate scheduled fixture and a club already playing that round still refuse, and the played match is never touched. The fixture page offers Reinstate (not Cancel or Void) for such a fixture.
