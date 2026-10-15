@@ -50690,7 +50690,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `admin-special-records` 4, DB-free `awards-replace-panel` 25 (5 new); against the unfixed source the same cases fail 7, 3 and 3
   respectively; 18 of 18 mutants are killed. One residue incident is recorded: the first special-records run left 3 + 1 fixture rows and
   1 audit row because its record text did not match the suite's purge; they were removed by id with a guarded script and the purge was
-  extended; the final census reads 0 on 14 selectors and 0 audit rows naming either marker. `tsc --noEmit`, ESLint and
+  extended; the final census reads 0 on 14 selectors and 0 audit rows naming either marker. *(2026-10-15: the deleted ids were printed at the dry run and the apply; the `after_siren_kicks` row's attribution rests on its fixture text, not on a before-run census; runbook §19.)* `tsc --noEmit`, ESLint and
   `git diff --check` exit 0. The python replay tests and the whole integration files were not run.
 - **Readiness and merge (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `preflight --mode implementation
   --issue 283` READY on the committed worktree (the earlier run, made before the commit, was BLOCKED only by the uncommitted edits; raw
@@ -51215,8 +51215,8 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Validation (`afldb_test`, 15 Oct 2026; runbook §17.3).** Integration through the real promotion pipeline on the import role: a new match
   `1/1/0`, a re-promoted match plus a new one `2/1/1`, player stats `1/1/0` then `1/0/1`, and a bio file with one deleted player `2/0/1`;
   6 DB-free cases for all six writers; all fail on the unfixed source (which reports `inserted 2` for the mixed file); 10 of 10 mutants
-  are killed. The match-results file's ISSUE-264 block is skipped by a pre-existing migration-110 hook failure, identical on `main`. The 147
-  promotion batches the runs left were removed by a guarded script and the census is back at 690. `tsc --noEmit`, ESLint (same problem set
+  are killed. The match-results file's ISSUE-264 block (22 tests) is skipped by a pre-existing migration-110 hook failure, identical on `main`; the 22 did not run and are not counted as passes. The 147
+  promotion batches the runs left were removed by a guarded script and the census is back at 690. *(2026-10-15: each pass selected by predicate and time window, not a recorded ID list, and a first full match-results run failed one existing ISSUE-271 case before a passing rerun on unchanged code; evidence limits in runbook §19.)* `tsc --noEmit`, ESLint (same problem set
   as `main`) and `git diff --check` clean.
 - **Readiness and merge (15 Oct 2026): accepted under a scoped cleanliness exception, not a clean pass.** `preflight --mode implementation
   --issue 307` READY; `merge:ready -- --issue 307` (raw `D:\tmp\issue307\merge-ready-raw-1.txt`, unchanged) BLOCKED by exactly one blocker, the
