@@ -11,7 +11,11 @@ import {
   recomputeSeasonMetadata,
   matchBusyRefusal,
 } from '@/db/queries/player-derived';
-import { syncManualIdentityNameRecord } from '@/db/queries/player-identity';
+import {
+  applyManualIdentityRecordSync,
+  planManualIdentityRecordSync,
+  syncManualIdentityNameRecord,
+} from '@/db/queries/player-identity';
 import {
   EDITABLE_ENTITIES,
   type EditEntity,
@@ -217,7 +221,25 @@ export async function saveEdit(input: {
       const naturalKey = await getEntityNaturalKey(tx, input.entityKey, input.rowId);
 
       if (input.entityKey === 'players') {
+        // AFLDB-ISSUE-277 (D-277-1). A player with no AFL Tables identity has no override
+        // key, so nothing below this block would make a dob, birth-year, height, weight or
+        // notes correction durable: the players replay re-creates them from the creation
+        // record and would put the old value back. Plan the creation-record sync FIRST,
+        // read-only, so a save that would leave that record unreplayable is refused before
+        // the canonical row is touched.
+        const recordPlan = naturalKey === null
+          ? await planManualIdentityRecordSync(tx, {
+            playerId: input.rowId, groupKey: input.groupKey, before, after: values,
+          })
+          : null;
+        if (recordPlan?.kind === 'refused') throw new EditRefusal(recordPlan.error);
+
         await applyPlayerEdit(tx, input.rowId, input.groupKey, values);
+        if (recordPlan?.kind === 'write') {
+          await applyManualIdentityRecordSync(tx, recordPlan, {
+            playerId: input.rowId, adminUserId: input.adminUserId, note: input.note,
+          });
+        }
         if (input.groupKey === 'name') {
           // AFLDB-ISSUE-224 §21.3.2 (A1). An admin-created player also carries a
           // durable CREATION RECORD keyed by their manual token, and nothing else
@@ -287,6 +309,8 @@ export async function saveEdit(input: {
       const busy = matchBusyRefusal(error);
       if (busy) return { ok: false, error: busy };
     }
+    // A refusal this module decided inside the transaction (AFLDB-ISSUE-277): its own message, not the generic wrapper.
+    if (error instanceof EditRefusal) return { ok: false, error: error.message };
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The edit could not be applied: ${message}` };
   } finally {
@@ -302,6 +326,14 @@ export async function saveEdit(input: {
 }
 
 type Tx = postgres.TransactionSql;
+
+/**
+ * A save refused by a precondition this module checks inside the transaction
+ * (AFLDB-ISSUE-277's replay-compatibility guard). Thrown so the transaction rolls
+ * back, and mapped back to a plain `{ ok: false }` with its own message instead of
+ * the generic "could not be applied" wrapper.
+ */
+class EditRefusal extends Error {}
 
 async function readCurrent(
   tx: Tx,

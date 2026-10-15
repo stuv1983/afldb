@@ -4,7 +4,10 @@ import * as path from 'path';
 
 import {
   MANUAL_IDENTITY_NAME_FIELDS,
+  MANUAL_IDENTITY_RECORD_GROUPS,
   manualIdentityNamePatchFor,
+  manualIdentityRecordPatchFor,
+  manualIdentityRecordReplayProblem,
 } from '@/db/queries/player-identity';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
 
@@ -1623,12 +1626,97 @@ describe('AFLDB-ISSUE-224 §21.3.2 — one deterministic winning authority per f
     expect(identity).toMatch(/SET override_values = override_values \|\|/);
   });
 
-  test('the synced fields are exactly the editor name group, and nothing wider', () => {
-    // Widening this to `dob` would hand a legitimate edit a new way to make the
-    // creation record unresolvable: the replay refuses a payload carrying a dob with
-    // dob_confidence 'unknown' (migration 018), which the editor can produce.
+  test('the name sync that runs for every player is exactly the editor name group, and nothing wider', () => {
+    // Widening THIS constant to `dob` would hand a legitimate edit to a player who holds an AFL
+    // Tables identity a new way to make the creation record unresolvable: the replay refuses a
+    // payload carrying a dob with dob_confidence 'unknown' (migration 018), which the editor can
+    // produce. The other groups reach the record only for a player with no AFL Tables identity
+    // (AFLDB-ISSUE-277, D-277-1), behind a guard: see the tests below.
     expect([...MANUAL_IDENTITY_NAME_FIELDS]).toEqual(EDITABLE_ENTITIES.players.groups.name.fields);
     expect([...MANUAL_IDENTITY_NAME_FIELDS]).not.toContain('dob');
+  });
+
+  test('the groups synced for a player with no AFL Tables identity are exactly the other editor groups (AFLDB-ISSUE-277)', () => {
+    const groups = EDITABLE_ENTITIES.players.groups;
+    expect(Object.keys(MANUAL_IDENTITY_RECORD_GROUPS).sort())
+      .toEqual(Object.keys(groups).filter((key) => key !== 'name').sort());
+    for (const [key, fields] of Object.entries(MANUAL_IDENTITY_RECORD_GROUPS)) {
+      expect([...fields], key).toEqual(groups[key].fields);
+    }
+  });
+
+  test('the record patch restates the whole group, mirrors the editor on a cleared dob, and is null when nothing moved', () => {
+    const before = { dob: '2006-03-04', dob_confidence: 'sourced' };
+    expect(manualIdentityRecordPatchFor('dob', before, { ...before })).toBeNull();
+    expect(manualIdentityRecordPatchFor('dob', before, { dob: '2006-03-05', dob_confidence: 'sourced' }))
+      .toEqual({ dob: '2006-03-05', dob_confidence: 'sourced' });
+    // The editor stores a cleared date with confidence 'unknown' whatever the form sent.
+    expect(manualIdentityRecordPatchFor('dob', before, { dob: null, dob_confidence: 'sourced' }))
+      .toEqual({ dob: null, dob_confidence: 'unknown' });
+    // A confidence-only change restates the date beside it.
+    expect(manualIdentityRecordPatchFor('dob', before, { dob: '2006-03-04', dob_confidence: 'estimated' }))
+      .toEqual({ dob: '2006-03-04', dob_confidence: 'estimated' });
+    expect(manualIdentityRecordPatchFor('birth_year',
+      { birth_year: 2006, birth_year_min: null, birth_year_max: null, birth_year_confidence: 'unknown' },
+      { birth_year: 2006, birth_year_min: 2005, birth_year_max: 2006, birth_year_confidence: 'estimated' }))
+      .toEqual({ birth_year: 2006, birth_year_min: 2005, birth_year_max: 2006, birth_year_confidence: 'estimated' });
+    expect(manualIdentityRecordPatchFor('height_cm', { height_cm: 180 }, { height_cm: null }))
+      .toEqual({ height_cm: null });
+    // Numbers stay numbers; the comparison alone is by text.
+    expect(manualIdentityRecordPatchFor('height_cm', { height_cm: 180 }, { height_cm: 180 })).toBeNull();
+    // Not a group this sync owns: the name has its own, and an unknown group has none.
+    expect(manualIdentityRecordPatchFor('name', { display_name: 'a' }, { display_name: 'b' })).toBeNull();
+    expect(manualIdentityRecordPatchFor('constructor', {}, { constructor: 'x' })).toBeNull();
+  });
+
+  test('the replay-compatibility guard mirrors the first arms of the replay pre-check', () => {
+    expect(manualIdentityRecordReplayProblem({ display_name: 'A B', dob: '2006-03-04', dob_confidence: 'sourced' }))
+      .toBeNull();
+    expect(manualIdentityRecordReplayProblem({ display_name: 'A B' })).toBeNull();
+    expect(manualIdentityRecordReplayProblem({ display_name: 'A B', dob: null, dob_confidence: 'unknown' }))
+      .toBeNull();
+    expect(manualIdentityRecordReplayProblem({ given_name: 'A' })).toContain('no display_name');
+    expect(manualIdentityRecordReplayProblem({ display_name: null })).toContain('no display_name');
+    expect(manualIdentityRecordReplayProblem({ display_name: 'A B', dob: '2006-03-04' }))
+      .toContain('dob with no dob_confidence');
+    expect(manualIdentityRecordReplayProblem({ display_name: 'A B', dob: '2006-03-04', dob_confidence: 'unknown' }))
+      .toContain('dob with no dob_confidence');
+    // The SQL it mirrors: if the replay's wording or arms change, this fails and the mirror is re-read.
+    const common = fs.readFileSync(path.join(process.cwd(), 'tools/migration/common.py'), 'utf-8')
+      .replace(/\r\n/g, '\n');
+    // The players branch is the first of the function (`if`, not `elif`).
+    const branch = common.slice(common.indexOf('if table == "players":'), common.indexOf('elif table == "player_match_stats":'));
+    expect(branch.length).toBeGreaterThan(1000);
+    expect(branch).toContain("WHEN o.override_values->>'display_name' IS NULL");
+    expect(branch).toContain("WHEN o.override_values->>'dob' IS NOT NULL");
+    expect(branch).toContain("AND COALESCE(o.override_values->>'dob_confidence', 'unknown') = 'unknown'");
+  });
+
+  test('the editor plans the record sync before the canonical write, only for a player with no source key, and refuses by rollback (AFLDB-ISSUE-277)', () => {
+    const code = executableTypeScript(readSource('src/db/queries/data-edits.ts'));
+    const begin = code.indexOf('await importSql.begin(');
+    const plan = code.indexOf('await planManualIdentityRecordSync(tx, {');
+    const refuse = code.indexOf("if (recordPlan?.kind === 'refused') throw new EditRefusal(recordPlan.error);");
+    const apply = code.indexOf('await applyPlayerEdit(tx, input.rowId, input.groupKey, values);');
+    const write = code.indexOf('await applyManualIdentityRecordSync(tx, recordPlan, {');
+    const commit = code.indexOf('return before;');
+    expect(begin).toBeGreaterThan(-1);
+    // Plan and refusal come BEFORE the canonical UPDATE; the record write comes after it; all in the one transaction.
+    expect(plan).toBeGreaterThan(begin);
+    expect(refuse).toBeGreaterThan(plan);
+    expect(apply).toBeGreaterThan(refuse);
+    expect(write).toBeGreaterThan(apply);
+    expect(write).toBeLessThan(commit);
+    // Only when the editor wrote no override of its own: a player with a source key is unchanged.
+    expect(code).toMatch(/const recordPlan = naturalKey === null\s*\? await planManualIdentityRecordSync\(tx, \{/);
+    // A refusal is mapped back to a plain refusal, not wrapped as "could not be applied".
+    expect(code).toContain('if (error instanceof EditRefusal) return { ok: false, error: error.message };');
+    // The record write is its own audited, merging statement on the ACTIVE creation record.
+    const identity = executableTypeScript(readSource('src/db/queries/player-identity.ts'));
+    const applyFn = identity.slice(identity.indexOf('export async function applyManualIdentityRecordSync('));
+    expect(applyFn).toMatch(/SET override_values = override_values \|\|/);
+    expect(applyFn).toContain("field_group = 'identity'");
+    expect(applyFn).toContain("fieldGroup: 'manual_identity_record'");
   });
 
   test('the patch is all-or-nothing, so the record is never half a name', () => {

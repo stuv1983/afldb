@@ -116,16 +116,23 @@ export async function resolvePlayerIdentity(
  * The three fields the editor's `players` / `name` group and the durable
  * `manual_admin_edit:<token>` / `identity` creation record BOTH claim.
  *
- * They are the only overlap this module keeps in step, deliberately. Every
- * other shared field (`dob`, `height_cm`, …) is already settled deterministically
- * by the replay's authority precedence (`tools/migration/common.py`,
- * `replay_admin_overrides('players')`), and propagating them here would create a
+ * They are the only overlap this module keeps in step for EVERY player,
+ * deliberately. For a player who holds an AFL Tables identity every other shared
+ * field (`dob`, `height_cm`, …) is already settled deterministically by the
+ * replay's authority precedence (`tools/migration/common.py`,
+ * `replay_admin_overrides('players')`), and propagating it here would create a
  * new way for a legitimate edit to make the creation record unresolvable — the
  * replay refuses a payload carrying a `dob` with `dob_confidence = 'unknown'`
  * (migration 018, `players_dob_confidence_ck`), a state the editor can produce.
  * The name family is different in two ways that earn the sync: it is what the
  * replay's INSERT branch re-creates a destroyed row FROM, and it is what the AFL
  * API player bridge's fail-closed surname check reads.
+ *
+ * A player with NO AFL Tables identity is the exception, and
+ * {@link planManualIdentityRecordSync} (AFLDB-ISSUE-277, D-277-1) covers it: the
+ * editor writes no override for them, so the creation record is the only durable
+ * record of every other field too, and it is kept in step behind a save-time
+ * replay-compatibility guard instead of being left stale.
  */
 export const MANUAL_IDENTITY_NAME_FIELDS = ['display_name', 'given_name', 'surname'] as const;
 
@@ -238,4 +245,194 @@ export async function syncManualIdentityNameRecord(
     note: input.note,
   });
   return 'synced';
+}
+
+// ---------------------------------------------------------------------------
+// The creation record's other editor-owned fields (AFLDB-ISSUE-277, D-277-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The editor groups other than `name`, each with exactly the creation-record keys
+ * it owns. They are the groups `getEntityNaturalKey('players')` writes NO override
+ * for when the player has no AFL Tables identity, so a Data Editor save of one of
+ * them was reverted by the next replay (AFLDB-ISSUE-277). Syncing the group into
+ * the creation record makes it durable: the replay's INSERT branch re-creates the
+ * row from `dob`, `dob_confidence`, `birth_year`, `height_cm`, `weight_kg` and
+ * `notes`, and its merge UPDATE applies `birth_year_min`, `birth_year_max` and
+ * `birth_year_confidence` to the re-created row in the same pass.
+ *
+ * The keys of a group are the editor spec's own fields for it; a source contract
+ * test pins that equality.
+ */
+export const MANUAL_IDENTITY_RECORD_GROUPS = {
+  dob: ['dob', 'dob_confidence'],
+  birth_year: ['birth_year', 'birth_year_min', 'birth_year_max', 'birth_year_confidence'],
+  height_cm: ['height_cm'],
+  weight_kg: ['weight_kg'],
+  notes: ['notes'],
+} as const satisfies Record<string, readonly string[]>;
+
+export type ManualIdentityRecordGroup = keyof typeof MANUAL_IDENTITY_RECORD_GROUPS;
+
+export function isManualIdentityRecordGroup(groupKey: string): groupKey is ManualIdentityRecordGroup {
+  return Object.prototype.hasOwnProperty.call(MANUAL_IDENTITY_RECORD_GROUPS, groupKey);
+}
+
+export type ManualIdentityRecordPatch = Record<string, string | number | null>;
+
+/**
+ * The patch to merge into the creation record after a save of `groupKey`, or
+ * `null` when the group is not one this module syncs or the save moved none of its
+ * fields. Every field of the group is restated whenever any one moves, as for the
+ * name: the record is a snapshot, and a half-updated pair (a new `dob` beside a
+ * stale `dob_confidence`) would be a third answer to what the person is.
+ *
+ * The `dob` group mirrors the editor's own write (`applyPlayerEdit`): a cleared
+ * date is stored with the confidence `'unknown'`, whatever the form sent.
+ * Absent and `undefined` read as an explicit `null`, which the replay applies as
+ * "clear this column". Pure, and exercised directly by the source contract test.
+ */
+export function manualIdentityRecordPatchFor(
+  groupKey: string,
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): ManualIdentityRecordPatch | null {
+  if (!isManualIdentityRecordGroup(groupKey)) return null;
+  const patch: ManualIdentityRecordPatch = {};
+  for (const field of MANUAL_IDENTITY_RECORD_GROUPS[groupKey]) {
+    const value = after[field] ?? null;
+    patch[field] = value as string | number | null;
+  }
+  if (groupKey === 'dob') {
+    patch.dob_confidence = patch.dob === null ? 'unknown' : (patch.dob_confidence ?? 'unknown');
+  }
+  const same = (a: unknown, b: unknown) =>
+    (a === null || a === undefined ? null : String(a)) === (b === null || b === undefined ? null : String(b));
+  const moved = MANUAL_IDENTITY_RECORD_GROUPS[groupKey].some((field) => !same(before[field], patch[field]));
+  return moved ? patch : null;
+}
+
+/**
+ * Whether the replay's fail-closed pre-check would refuse this creation record.
+ * Mirrors the first three arms of the `CASE` in `replay_admin_overrides('players')`
+ * (`tools/migration/common.py`): a record with no `display_name` cannot re-create
+ * the row, and a record carrying a `dob` with no usable `dob_confidence` violates
+ * `players_dob_confidence_ck` (migration 018). The fourth arm, an
+ * `afltables_profile_path` that resolves to more than one player, is a property of
+ * the whole database and not of one edit, and is not the editor's to decide.
+ *
+ * The refusal names the replay's own wording so an operator can match the two. An
+ * integration case runs the REAL replay over a record this function accepts and
+ * over one it refuses, so the mirror cannot drift silently.
+ */
+export function manualIdentityRecordReplayProblem(record: Record<string, unknown>): string | null {
+  if (record.display_name === undefined || record.display_name === null) {
+    return 'the record carries no display_name to re-create the row with';
+  }
+  const dobConfidence = record.dob_confidence ?? 'unknown';
+  if (record.dob !== undefined && record.dob !== null && dobConfidence === 'unknown') {
+    return 'the record carries a dob with no dob_confidence (players_dob_confidence_ck, migration 018)';
+  }
+  return null;
+}
+
+export type ManualIdentityRecordPlan =
+  | { kind: 'skip'; outcome: 'no_change' | 'no_durable_record' }
+  | { kind: 'refused'; error: string }
+  | {
+      kind: 'write';
+      token: string;
+      patch: ManualIdentityRecordPatch;
+      existing: Record<string, unknown>;
+    };
+
+/**
+ * Decide, BEFORE the canonical write, how an editor save of `groupKey` reaches the
+ * creation record of a player who has no AFL Tables identity (AFLDB-ISSUE-277,
+ * D-277-1). Nothing is written here; the creation record is read `FOR UPDATE` so
+ * the plan cannot go stale before {@link applyManualIdentityRecordSync} uses it.
+ *
+ * THE GUARD. The merged record is checked against the replay's own pre-check, and
+ * a save that would leave it unreplayable is refused whole, with nothing written.
+ * A record that was ALREADY unreplayable for the same reason is not made worse by
+ * the save, so it is not refused for it: the replay refuses that record on its own.
+ *
+ * `skip` outcomes: the group is not synced or nothing moved (`no_change`), or the
+ * player has no manual token or no active creation record (`no_durable_record`),
+ * in which case there is no durable record anywhere and the save is exactly as
+ * non-durable as it was before this change.
+ */
+export async function planManualIdentityRecordSync(
+  tx: postgres.TransactionSql,
+  input: {
+    playerId: number;
+    groupKey: string;
+    before: Record<string, unknown>;
+    after: Record<string, unknown>;
+  },
+): Promise<ManualIdentityRecordPlan> {
+  const patch = manualIdentityRecordPatchFor(input.groupKey, input.before, input.after);
+  if (patch === null) return { kind: 'skip', outcome: 'no_change' };
+
+  const token = await readManualPlayerToken(tx, input.playerId);
+  if (!token) return { kind: 'skip', outcome: 'no_durable_record' };
+
+  const [existing] = await tx<{ overrideValues: Record<string, unknown> }[]>`
+    SELECT override_values AS "overrideValues"
+      FROM data_overrides
+     WHERE entity_type = 'players'
+       AND entity_key = ${manualEntityKey(token)}
+       AND field_group = 'identity'
+       AND is_active = true
+     FOR UPDATE
+  `;
+  if (!existing) return { kind: 'skip', outcome: 'no_durable_record' };
+
+  const problem = manualIdentityRecordReplayProblem({ ...existing.overrideValues, ...patch });
+  if (problem !== null && problem !== manualIdentityRecordReplayProblem(existing.overrideValues)) {
+    return {
+      kind: 'refused',
+      error: 'This change was not saved. It would leave the player\'s durable creation record '
+        + `unable to be replayed: ${problem}.`,
+    };
+  }
+  return { kind: 'write', token, patch, existing: existing.overrideValues };
+}
+
+/**
+ * Write a `write` plan into the creation record and audit it. Same transaction as
+ * the canonical edit and its own `data_edits` row (`manual_identity_record`), as
+ * for the name sync, so the repair is a distinct decision in the trail and a
+ * failed audit rolls the whole save back (AFLDB-ISSUE-027).
+ */
+export async function applyManualIdentityRecordSync(
+  tx: postgres.TransactionSql,
+  plan: Extract<ManualIdentityRecordPlan, { kind: 'write' }>,
+  input: { playerId: number; adminUserId: number; note?: string | null },
+): Promise<void> {
+  const updated = await tx<{ id: number }[]>`
+    UPDATE data_overrides
+       SET override_values = override_values || ${tx.json(plan.patch as postgres.JSONValue)},
+           admin_user_id = ${input.adminUserId},
+           updated_at = now()
+     WHERE entity_type = 'players'
+       AND entity_key = ${manualEntityKey(plan.token)}
+       AND field_group = 'identity'
+       AND is_active = true
+    RETURNING id
+  `;
+  // The row was locked FOR UPDATE by the plan in this transaction, so it cannot have gone.
+  if (updated.length === 0) throw new Error('The player\'s durable creation record disappeared during the save.');
+
+  const oldValues: Record<string, unknown> = {};
+  for (const field of Object.keys(plan.patch)) oldValues[field] = plan.existing[field] ?? null;
+  await recordDataEdit(tx, {
+    tableName: 'players',
+    rowId: input.playerId,
+    fieldGroup: 'manual_identity_record',
+    oldValues,
+    newValues: plan.patch,
+    adminUserId: input.adminUserId,
+    note: input.note,
+  });
 }

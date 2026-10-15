@@ -806,6 +806,309 @@ describe('AFLDB-ISSUE-224 §21.3.2: a name edit repairs the durable creation rec
   });
 });
 
+describe('AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record', () => {
+  const PREFIX = 'Issue277';
+  const NOTE = 'issue-277 creation record sync';
+  const root = process.cwd();
+  const venvPython = process.platform === 'win32'
+    ? join(root, '.venv', 'Scripts', 'python.exe')
+    : join(root, '.venv', 'bin', 'python');
+  const python = process.env.AFLDB_PYTHON
+    ?? (existsSync(venvPython) ? venvPython : (process.platform === 'win32' ? 'python' : 'python3'));
+  const probe = spawnSync(python, ['-c', 'import psycopg'], { encoding: 'utf8', timeout: 30_000 });
+  const canReplay = !probe.error && probe.status === 0;
+  if (!canReplay) {
+    // A skip must never pass for a run: say why.
+    console.warn(`AFLDB-ISSUE-277 replay cases SKIPPED: \`${python} -c "import psycopg"\` did not succeed`);
+  }
+  const TIMEOUT = 120_000;
+
+  type Fixture = { playerId: number; token: string };
+  const made: Fixture[] = [];
+
+  /** An admin-created player with a creation record and NO AFL Tables identity. */
+  const makePlayer = async (suffix: string, withAflIdentity?: string): Promise<Fixture> => {
+    let fixture: Fixture | null = null;
+    await sql.begin(async (tx) => {
+      const created = await createPlayerInTransaction(tx, {
+        displayName: `${PREFIX} ${suffix}`, givenName: PREFIX, surname: suffix,
+      }, { adminUserId });
+      const [identity] = await tx<{ externalId: string }[]>`
+        SELECT e.external_id AS "externalId"
+          FROM external_identities e JOIN sources s ON s.id = e.source_id
+         WHERE e.player_id = ${created.id} AND s.key = 'manual_admin_edit'
+      `;
+      if (withAflIdentity) {
+        const [source] = await tx<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afltables'`;
+        await tx`
+          INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+          VALUES (${source.id}, ${withAflIdentity}, ${created.id}, 'unique', 'afltables_profile_url')
+        `;
+      }
+      fixture = { playerId: created.id, token: identity.externalId };
+    });
+    made.push(fixture!);
+    return fixture!;
+  };
+
+  const record = async (token: string) => {
+    const [row] = await sql<{ overrideValues: Record<string, unknown> }[]>`
+      SELECT override_values AS "overrideValues" FROM data_overrides
+       WHERE entity_type = 'players' AND entity_key = ${`manual_admin_edit:${token}`}
+         AND field_group = 'identity' AND is_active = true`;
+    return row?.overrideValues;
+  };
+  const setRecord = (token: string, values: Record<string, unknown>) => sql`
+    UPDATE data_overrides SET override_values = ${sql.json(values as never)}
+     WHERE entity_type = 'players' AND entity_key = ${`manual_admin_edit:${token}`}
+       AND field_group = 'identity'`;
+  const auditGroups = async (playerId: number) => (await sql<{ fieldGroup: string }[]>`
+    SELECT field_group AS "fieldGroup" FROM data_edits
+     WHERE table_name = 'players' AND row_id = ${playerId} AND note = ${NOTE} ORDER BY id`)
+    .map((a) => a.fieldGroup);
+  const playerRow = async (playerId: number) => (await sql<Record<string, unknown>[]>`
+    SELECT to_char(dob, 'YYYY-MM-DD') AS dob, dob_confidence::text AS dob_confidence,
+           birth_year, birth_year_min, birth_year_max, birth_year_confidence::text AS birth_year_confidence,
+           height_cm, weight_kg, notes
+      FROM players WHERE id = ${playerId}`)[0];
+  const save = (f: Fixture, groupKey: string, raw: Record<string, string>) => saveEdit({
+    entityKey: 'players', rowId: f.playerId, groupKey, raw, adminUserId, note: NOTE,
+  });
+
+  const SNAPSHOT = `
+    SELECT to_jsonb(x) FROM (
+      SELECT p.display_name, p.given_name, p.surname, to_char(p.dob, 'YYYY-MM-DD') AS dob,
+             p.dob_confidence::text AS dob_confidence, p.birth_year, p.birth_year_min,
+             p.birth_year_max, p.birth_year_confidence::text AS birth_year_confidence,
+             p.height_cm, p.weight_kg, p.notes
+        FROM players p
+        JOIN external_identities e ON e.player_id = p.id
+        JOIN sources s ON s.id = e.source_id
+       WHERE s.key = 'manual_admin_edit' AND e.external_id = %s) x`;
+
+  type Replay277 = { ok?: boolean; refused?: string; player: Record<string, unknown> | null };
+
+  /**
+   * The REAL replay_admin_overrides(conn, 'players'), ROLLED BACK. With `recreate` the player
+   * and its identities are deleted first inside the same transaction, which is exactly the
+   * state a destructive reload or a promotion candidate is in: the replay's INSERT branch then
+   * re-creates the row from the creation record alone.
+   */
+  const replay = (f: Fixture, recreate: boolean): Replay277 => {
+    const r = spawnSync(python, ['-c', [
+      'import sys, os, json',
+      `sys.path.insert(0, ${JSON.stringify(join(root, 'tools', 'migration'))})`,
+      'import psycopg',
+      'from common import replay_admin_overrides',
+      'token = os.environ["AFLDB_ISSUE277_TOKEN"]',
+      'pid = int(os.environ["AFLDB_ISSUE277_PID"])',
+      'recreate = os.environ["AFLDB_ISSUE277_RECREATE"] == "1"',
+      'out = {}',
+      'conn = psycopg.connect(os.environ["AFLDB_REPLAY_DSN"], connect_timeout=10)',
+      'try:',
+      '    with conn.cursor() as cur:',
+      '        cur.execute("SET LOCAL lock_timeout = \'5s\'")',
+      '        cur.execute("SET LOCAL statement_timeout = \'30s\'")',
+      '        if recreate:',
+      '            cur.execute("DELETE FROM external_identities WHERE player_id = %s", (pid,))',
+      '            cur.execute("DELETE FROM player_career_stats WHERE player_id = %s", (pid,))',
+      '            cur.execute("DELETE FROM players WHERE id = %s", (pid,))',
+      '    try:',
+      '        replay_admin_overrides(conn, "players")',
+      '        out["ok"] = True',
+      '    except RuntimeError as exc:',
+      '        out["refused"] = str(exc)',
+      '    with conn.cursor() as cur:',
+      `        cur.execute(${JSON.stringify(SNAPSHOT)}, (token,))`,
+      '        row = cur.fetchone()',
+      '        out["player"] = row[0] if row else None',
+      'finally:',
+      '    conn.rollback()',
+      '    conn.close()',
+      'print("REPLAY277 " + json.dumps(out))',
+    ].join('\n')], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 90_000,
+      killSignal: 'SIGKILL',
+      env: {
+        ...process.env,
+        AFLDB_REPLAY_DSN: process.env.AFLDB_TEST_DATABASE_URL,
+        AFLDB_ISSUE277_TOKEN: f.token,
+        AFLDB_ISSUE277_PID: String(f.playerId),
+        AFLDB_ISSUE277_RECREATE: recreate ? '1' : '0',
+      },
+    });
+    const output = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+    expect(r.error, output).toBeUndefined();
+    expect(r.status, output).toBe(0);
+    const line = r.stdout.split(/\r?\n/).find((l) => l.startsWith('REPLAY277 '));
+    expect(line, output).toBeDefined();
+    return JSON.parse(line!.slice('REPLAY277 '.length)) as Replay277;
+  };
+
+  afterAll(async () => {
+    for (const f of made) {
+      await sql.begin(async (tx) => {
+        await tx`DELETE FROM data_edits WHERE table_name = 'players' AND row_id = ${f.playerId}`;
+        await tx`
+          DELETE FROM data_overrides
+           WHERE entity_type = 'players'
+             AND (entity_key = ${`manual_admin_edit:${f.token}`} OR entity_key LIKE 'afltables:issue277-%')`;
+        await tx`DELETE FROM external_identities WHERE player_id = ${f.playerId}`;
+        await tx`DELETE FROM player_career_stats WHERE player_id = ${f.playerId}`;
+        await tx`DELETE FROM players WHERE id = ${f.playerId}`;
+      });
+    }
+  });
+
+  it('writes dob, birth year, height, weight and notes into the record, audits each, and the replay re-creates them', async () => {
+    const f = await makePlayer('Durable');
+    expect(await record(f.token)).not.toHaveProperty('height_cm');
+
+    expect(await save(f, 'dob', { dob: '2006-03-04', dob_confidence: 'sourced' })).toMatchObject({ ok: true });
+    expect(await save(f, 'birth_year', {
+      birth_year: '2006', birth_year_min: '2005', birth_year_max: '2006', birth_year_confidence: 'estimated',
+    })).toMatchObject({ ok: true });
+    expect(await save(f, 'height_cm', { height_cm: '191' })).toMatchObject({ ok: true });
+    expect(await save(f, 'weight_kg', { weight_kg: '88' })).toMatchObject({ ok: true });
+    expect(await save(f, 'notes', { notes: 'Draftee note' })).toMatchObject({ ok: true });
+
+    expect(await record(f.token)).toMatchObject({
+      display_name: `${PREFIX} Durable`,
+      dob: '2006-03-04', dob_confidence: 'sourced',
+      birth_year: 2006, birth_year_min: 2005, birth_year_max: 2006, birth_year_confidence: 'estimated',
+      height_cm: 191, weight_kg: 88, notes: 'Draftee note',
+    });
+    // No override exists under any source key: the creation record is the only durable record.
+    const overrides = await sql<{ entityKey: string }[]>`
+      SELECT entity_key AS "entityKey" FROM data_overrides
+       WHERE entity_type = 'players' AND is_active AND field_group <> 'identity'
+         AND entity_key = ${`manual_admin_edit:${f.token}`}`;
+    expect(overrides).toEqual([]);
+    // Each save has its own canonical audit row and its own record audit row (written first,
+    // inside the same transaction, as the name sync does).
+    expect(await auditGroups(f.playerId)).toEqual([
+      'manual_identity_record', 'dob', 'manual_identity_record', 'birth_year',
+      'manual_identity_record', 'height_cm', 'manual_identity_record', 'weight_kg',
+      'manual_identity_record', 'notes',
+    ]);
+
+    if (canReplay) {
+      const out = replay(f, true);
+      expect(out.refused, 'the replay refused; a foreign afldb_test override may be the cause').toBeUndefined();
+      expect(out.player).toMatchObject({
+        display_name: `${PREFIX} Durable`,
+        dob: '2006-03-04', dob_confidence: 'sourced',
+        birth_year: 2006, birth_year_min: 2005, birth_year_max: 2006, birth_year_confidence: 'estimated',
+        height_cm: 191, weight_kg: 88, notes: 'Draftee note',
+      });
+    }
+  }, TIMEOUT);
+
+  it('a cleared value is an explicit null in the record, and the replay clears it', async () => {
+    const f = await makePlayer('Cleared');
+    expect(await save(f, 'height_cm', { height_cm: '180' })).toMatchObject({ ok: true });
+    expect(await save(f, 'dob', { dob: '2006-03-04', dob_confidence: 'sourced' })).toMatchObject({ ok: true });
+    expect(await save(f, 'height_cm', { height_cm: '' })).toMatchObject({ ok: true });
+    expect(await save(f, 'dob', { dob: '', dob_confidence: 'sourced' })).toMatchObject({ ok: true });
+
+    // The editor stores a cleared date with confidence 'unknown'; the record says the same.
+    expect(await record(f.token)).toMatchObject({ height_cm: null, dob: null, dob_confidence: 'unknown' });
+    expect(await playerRow(f.playerId)).toMatchObject({ height_cm: null, dob: null, dob_confidence: 'unknown' });
+    if (canReplay) {
+      const out = replay(f, true);
+      expect(out.refused).toBeUndefined();
+      expect(out.player).toMatchObject({ height_cm: null, dob: null, dob_confidence: 'unknown' });
+    }
+  }, TIMEOUT);
+
+  it('an unchanged save writes nothing to the record and adds no record audit row', async () => {
+    const f = await makePlayer('Unchanged');
+    expect(await save(f, 'notes', { notes: 'once' })).toMatchObject({ ok: true });
+    const before = await record(f.token);
+    expect(await save(f, 'notes', { notes: 'once' })).toMatchObject({ ok: true });
+    expect(await record(f.token)).toEqual(before);
+    expect(await auditGroups(f.playerId)).toEqual(['manual_identity_record', 'notes', 'notes']);
+  }, TIMEOUT);
+
+  it('the guard refuses a dob the replay could not re-create, and nothing is written', async () => {
+    const f = await makePlayer('Guarded');
+    const recordBefore = await record(f.token);
+    const rowBefore = await playerRow(f.playerId);
+    const result = await save(f, 'dob', { dob: '2006-03-04', dob_confidence: 'unknown' });
+    expect(result).toMatchObject({ ok: false });
+    expect((result as { error: string }).error).toContain('durable creation record');
+    expect((result as { error: string }).error).toContain('dob_confidence');
+    expect(await record(f.token)).toEqual(recordBefore);
+    expect(await playerRow(f.playerId)).toEqual(rowBefore);
+    expect(await auditGroups(f.playerId)).toEqual([]);
+  }, TIMEOUT);
+
+  it('the guard does not turn a record that was already unreplayable into a block on every edit', async () => {
+    const f = await makePlayer('Legacy');
+    // A legacy payload: a dob with no confidence. The replay already refuses it; an unrelated
+    // height edit does not make it worse and so is saved.
+    await setRecord(f.token, { display_name: `${PREFIX} Legacy`, dob: '2006-03-04' });
+    expect(await save(f, 'height_cm', { height_cm: '185' })).toMatchObject({ ok: true });
+    expect(await record(f.token)).toMatchObject({ dob: '2006-03-04', height_cm: 185 });
+    // ...and a dob save that supplies the missing confidence repairs it.
+    expect(await save(f, 'dob', { dob: '2006-03-04', dob_confidence: 'sourced' })).toMatchObject({ ok: true });
+    expect(await record(f.token)).toMatchObject({ dob: '2006-03-04', dob_confidence: 'sourced' });
+    if (canReplay) {
+      const out = replay(f, true);
+      expect(out.refused).toBeUndefined();
+      expect(out.player).toMatchObject({ dob: '2006-03-04', height_cm: 185 });
+    }
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('the guard agrees with the real replay about which records it refuses', async () => {
+    const f = await makePlayer('Agreement');
+    const variants: Array<[string, Record<string, unknown>, RegExp | null]> = [
+      ['replayable', { display_name: `${PREFIX} Agreement`, dob: '2006-03-04', dob_confidence: 'sourced' }, null],
+      ['no display_name', { given_name: 'x' }, /carries no display_name/],
+      ['dob without confidence', { display_name: `${PREFIX} Agreement`, dob: '2006-03-04' }, /dob with no dob_confidence/],
+      ['dob with unknown confidence', { display_name: `${PREFIX} Agreement`, dob: '2006-03-04', dob_confidence: 'unknown' }, /dob with no dob_confidence/],
+    ];
+    const { manualIdentityRecordReplayProblem } = await import('@/db/queries/player-identity');
+    for (const [label, values, refusal] of variants) {
+      await setRecord(f.token, values);
+      const out = replay(f, false);
+      if (refusal === null) {
+        expect(out.refused, label).toBeUndefined();
+        expect(manualIdentityRecordReplayProblem(values), label).toBeNull();
+      } else {
+        expect(out.refused, label).toMatch(refusal);
+        expect(manualIdentityRecordReplayProblem(values), label).not.toBeNull();
+      }
+    }
+  }, TIMEOUT);
+
+  it('a player who holds an AFL Tables identity is unchanged: the correction is keyed under the source and the record is not touched', async () => {
+    const f = await makePlayer('Sourced', 'issue277-players/S/Sourced_Fixture0.html');
+    const recordBefore = await record(f.token);
+    expect(await save(f, 'height_cm', { height_cm: '192' })).toMatchObject({ ok: true });
+    expect(await record(f.token)).toEqual(recordBefore);
+    const [row] = await sql<{ overrideValues: Record<string, unknown> }[]>`
+      SELECT override_values AS "overrideValues" FROM data_overrides
+       WHERE entity_type = 'players' AND entity_key = 'afltables:issue277-players/S/Sourced_Fixture0.html'
+         AND field_group = 'height_cm' AND is_active`;
+    expect(row.overrideValues).toMatchObject({ height_cm: 192 });
+    expect(await auditGroups(f.playerId)).toEqual(['height_cm']);
+  }, TIMEOUT);
+
+  it('a player with no identity at all keeps the old behaviour: the save succeeds and nothing durable exists', async () => {
+    const f = await makePlayer('Legacyless');
+    await sql.begin(async (tx) => {
+      await tx`DELETE FROM external_identities WHERE player_id = ${f.playerId}`;
+    });
+    expect(await save(f, 'height_cm', { height_cm: '186' })).toMatchObject({ ok: true });
+    expect((await playerRow(f.playerId)).height_cm).toBe(186);
+    expect(await record(f.token)).not.toHaveProperty('height_cm');
+    expect(await auditGroups(f.playerId)).toEqual(['height_cm']);
+  }, TIMEOUT);
+});
+
 describe('AFLDB-ISSUE-292: a player with two accepted AFL Tables paths is always keyed under the same one', () => {
   const ROOT = 'issue292-players/';
   // Inserted first, but sorts last: an unordered `LIMIT 1` answers with this one until its row moves.
