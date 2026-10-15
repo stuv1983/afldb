@@ -412,7 +412,11 @@ serves disallow-all. Two ways in, both managed at `/admin/access`:
   to be ticked deliberately.
 * **Allowlisted emails** — the visitor requests a single-use, 30-minute
   magic link on `/beta`. The response never reveals whether the address
-  was on the list. Configure an SMTP relay (`AFLDB_SMTP_*`, see
+  was on the list. The emailed link opens a one-button confirmation page
+  (`/beta/verify`); **pressing the button** spends the token and admits the
+  reader. A plain GET of the link reads no table and spends nothing, so a
+  mail provider that pre-fetches links for safety scanning (Outlook
+  SafeLinks, corporate URL rewriters) cannot burn it (AFLDB-ISSUE-280). Configure an SMTP relay (`AFLDB_SMTP_*`, see
   [apex-coming-soon.md](apex-coming-soon.md) §6) and the link is
   delivered; without one it is written to the service log instead:
   `journalctl -u afldb | grep magic`. Revoking the email wins even
