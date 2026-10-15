@@ -419,6 +419,9 @@
 - **Update 2026-10-15:** the first nightly after the DEV installation (batch 123, 05:08:05-05:09:41 AEDT) was captured read-only: success, 64 refusals as on 14 Oct, no failure marker, censuses differ
   from the sealed baselines only as predicted; no finding attributable to the gate (expected on DEV). **Recorded as an unattributed observation**: checkout continuity through the run is not
   evidenced and was not invented. State B and the PROD split-ownership census remain unrun; not an acceptance (runbook §32).
+- **Update 2026-10-15 (PROD census):** the PROD component of the section 15 split-ownership census is DONE (read-only, `afldb_prod` as the least-privileged `afldb_app`; runbook §34): 17,056 matches, 136,448 period rows, 1,744 rows (218 matches)
+  with the parent's source, 134,704 rows (16,838 matches) with a NULL source, **0 both-set-and-different, 0 mixed-source matches**; recorded separately from the DEV component (§31), which read the same shape. This supersedes the "PROD component outstanding"
+  wording in Next action below. State B and the first attributable nightly remain separate unmet requirements; the 15 Oct night stays unattributed.
 - **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Next action:** the merge and push are done (`24ca412b` on `origin/main`). The ISSUE-274 + ISSUE-276 observation window is **closed** (D-OBS-274276-20261014), so the hold on a DEV install was released; **installed on DEV 2026-10-14 13:52 AEDT under D-DEV-275-281-288-1** (TARGET `17514052`, BUILD `2mH5otSwPUveE-pcn3LcF`, installation checks PASS; runbook §30). Acceptance is NOT met and stays open: the first attributable nightly (needs independent continuity evidence covering the full run), State B durable Match Sheet behaviour and the PROD component of the §15 split-ownership census (the DEV component was DONE 2026-10-14 14:09 AEDT, runbook §31: 17,056 matches / 136,448 period rows; 1,744 same-source rows (218 matches); 134,704 NULL-source legacy rows (16,838 matches) = unattributed, not proof of authorship; 0 rows with both sources set and different; 0 matches with mixed period sources; read-only, nothing repaired). PROD: the ISSUE-265-specific PROD hold was released by `a862d192`; PROD still needs its own reviewed procedure (`blockers.md` R6). Open: the PROD §15 split-ownership census (not done; the fix is forward-only). D-275-1 is resolved by the owner's instruction; the period-only retry was traced and is not part of this defect (§23.4).
 
 ### AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
@@ -456,6 +459,8 @@
 - **Update 2026-10-15:** D-303-1 decided (owner, option c). Implemented as `50f9345b` and merged and pushed: a dedicated `POST /admin/upload/stage` Route Handler with
   a same-origin check, the unchanged capability guard and a 5 MiB bounded read; the 1 MB Server Action is removed. `afldb_test` validated (DB-free 25, integration 3,
   9 of 9 mutants killed). **Not deployed.** Stays open for the DEV acceptance (`VISUAL: UNVERIFIED`).
+- **Update 2026-10-15 (build):** the complete build on merged `main` passed against a child-scoped read-only `afldb_test` connection (`next build` and `prepare-standalone` exit 0; 1515/1515 pages; the route is registered; runbook §19). The earlier
+  incomplete build was an environment limitation. Not a DEV acceptance; the issue stays open.
 - **Runbook:** `issues/open/AFLDB-ISSUE-303.md` §17-§18. **Next action:** deploy to DEV (operator), then stage a 1.5 MB CSV and an over-5 MB file through `/admin/upload` with screenshots (runbook §17.5), then close.
 
 ### AFLDB-ISSUE-308 — Approving a player-link suggestion does not revalidate public pages

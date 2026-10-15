@@ -50490,6 +50490,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   0 inserted or updated, `corroboratedForeignOwned` 218, `dataIssuesOpened` 0, `dataIssuesRefreshed` 64; every failure marker 0; A1/A2 differ from the sealed baselines only as predicted (batch 123,
   `data_issues_id_seq` +64); no new `match_period_scores` finding, so nothing is attributable to the ISSUE-275 gate (expected on DEV). **Recorded as an unattributed observation: independent
   evidence that the checkout stayed `17514052` through the run is not available and was not invented.** Not an acceptance; State B and the PROD split-ownership census remain unrun.
+- **PROD split-ownership census DONE (15 Oct 2026, read-only, `afldb_prod` as `afldb_app`; runbook §34).** Guarded, repeatable-read read-only, bounded timeouts; exit statuses all 0, hashes recorded. **PROD:** 17,056 matches, 136,448 period rows;
+  1,744 rows (218 matches) carry the parent's source 10; 134,704 rows (16,838 matches) carry a NULL source under a set parent; **0 both-set-and-different, 0 mixed-source matches**. The DEV component (§31) read the same shape. Recorded as two separate components;
+  both say no foreign-owner split is present in the current data. A point-in-time state before the fix is installed on PROD; nothing repaired. **State B and the first attributable nightly remain separate, unmet requirements**; the 15 Oct night stays unattributed.
 
 ## AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 
@@ -51185,6 +51188,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   a duplicate, an oversize refusal, a pipeline rejection), residue 0; 9 of 9 non-equivalent mutants killed; `tsc`, ESLint and `git diff --check` clean.
 - **Stays open.** The runbook's DEV acceptance (a 1.5 MB CSV through the real proxy and browser) needs a deployment (runbook §17.4, §17.5); the page is
   `VISUAL: UNVERIFIED`. Merge-scoped only: not deployed.
+- **Complete build on merged `main` (15 Oct 2026; runbook §19).** The earlier "not a completed build" was an environment limitation (no database on `127.0.0.1:5432`), not a code failure. With a child-scoped read-only `afldb_test` connection through the tunnel
+  (all other connection settings replaced by an unroutable sentinel; pre-build assertions on database, role, read-only and write privileges), `next build` and `prepare-standalone` both exited 0 (1515/1515 pages; `/admin/upload/stage` registered). It shows the tree builds, not runtime or
+  DEV behaviour; acceptance (§17.4, §17.5) is unchanged and the issue stays Open.
 
 ## AFLDB-ISSUE-304 — Email intake parses the whole body before sender and size checks
 

@@ -131,3 +131,7 @@ Option (b) needs care: an equal-rank row would trip the replay's disagreement re
 ## 19. Build evidence (added 2026-10-15, after the merge)
 
 `npm run build` on merged `main` (which contains this change, ISSUE-277, ISSUE-289 and ISSUE-303) reported `Compiled successfully` and `Finished TypeScript`, then stopped at "Collecting page data" with `ECONNREFUSED 127.0.0.1:5432`: this workstation has no database on that port. It is therefore **not a completed build**; it shows only that the change compiles and type-checks under Next 16.3.1. Raw `D:	mpatch1015uild-main.txt`.
+
+## 20. Complete build (added 2026-10-15)
+
+The build caveat in §19 is superseded as to the build: `npm run build`'s two steps completed (exit 0, 1515/1515 pages) on merged `main` `c658360f` against `afldb_test` through a read-only child-scoped connection. It says nothing about runtime or about DEV or PROD data. Detail and evidence: `issues/open/AFLDB-ISSUE-303.md` §19.

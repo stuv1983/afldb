@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Complete build on merged main and the ISSUE-275 PROD split-ownership census (validation records; nothing deployed) - 15 October 2026
+
+- The earlier incomplete production build on merged `main` was an environment limitation (no database on the workstation's default port). With a child-scoped, read-only `afldb_test` connection through the existing tunnel and every other connection setting replaced by an unroutable sentinel, `next build` and the standalone preparation both completed (exit 0, 1515/1515 pages, the new `/admin/upload/stage` route registered). It shows the merged tree builds; it is not a DEV acceptance. Detail: `issues/open/AFLDB-ISSUE-303.md` section 19.
+- The PROD component of ISSUE-275's section 15 split-ownership census ran read-only on `afldb_prod` as the least-privileged `afldb_app`, after an in-session guard proved no write privilege: 17,056 matches and 136,448 period rows, no row with both sources set and different, no match with mixed period sources. It is recorded separately from the DEV component, which read the same shape. State B and the first attributable nightly remain separate, unmet requirements. No repair, marker or setting change. Detail: `issues/open/AFLDB-ISSUE-275.md` section 34.
+
 ### ISSUE-275 first post-installation DEV nightly captured, clean and unattributed (observation only; ISSUE-275, 274 and 276 stay Open) - 15 October 2026
 
 - The first AFL API nightly after the combined ISSUE-275/281/288 DEV installation (import batch 123, 15 October 05:08-05:09 AEDT) was captured read-only with the reviewed pack: success, the same 64 refusals as the previous night, no failure marker, and the sealed A1/A2 censuses differ only as the pack predicts. No finding is attributable to the ISSUE-275 gate, as expected on DEV. Because independent evidence that the checkout stayed on the installed revision through the run does not exist, the night is recorded as an unattributed observation and accepts nothing. No code changed. Detail: `issues/open/AFLDB-ISSUE-275.md` §32.
