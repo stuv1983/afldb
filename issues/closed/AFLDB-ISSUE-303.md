@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **Status:** Open (2026-10-08). D-303-1 decided by the owner (option c, a dedicated Route Handler). Implemented 2026-10-15 as `50f9345b`, validated on `afldb_test` (§17), merged and pushed (§18); not deployed. **Stays open:** the runbook's DEV acceptance (§14: a 1.5 MB CSV staged through the real proxy and browser) cannot be run without a deployment, and the page is `VISUAL: UNVERIFIED`.
+- **Status:** **Resolved 2026-10-15, DEV-scoped** (§22; PROD installation and acceptance pending). Earlier: Open (2026-10-08). D-303-1 decided by the owner (option c, a dedicated Route Handler). Implemented 2026-10-15 as `50f9345b`, validated on `afldb_test` (§17), merged and pushed (§18); not deployed. **Stays open:** the runbook's DEV acceptance (§14: a 1.5 MB CSV staged through the real proxy and browser) cannot be run without a deployment, and the page is `VISUAL: UNVERIFIED`.
 - **Severity:** Low. **Area:** legacy CSV intake UI / framework configuration.
 - **Key files:** `next.config.ts`, `src/app/admin/upload/actions.ts`, `src/app/admin/upload/UploadForm.tsx`, `src/lib/ingest/pipeline.ts`.
 - **Origin:** full code review at `20a7a4bbdea835cdd3fc5520e65ad47d275bd881` (`issues/reviews/2026-10-08-full-code-review.md`, F-038; partition note R5a-F06). The main session confirmed the framework behaviour.
@@ -144,3 +144,20 @@ A deployment pack exists outside the repository (`D:\tmp\dev-deploy-next-2026101
 **Next action.** The operator (signed in as Super Admin on DEV, `http://10.0.40.100:8090/admin/upload`) runs C-303-1..5 from the pack's `PROCEDURE.md` section 8 A with the files from `fixtures\make-upload-csv.py`, rejects the staged submission through the UI and returns the three screenshots; then close DEV-scoped. Nothing was run on PROD.
 
 **Nightly (for ISSUE-275's records).** DEV now runs `f07c2a74`, so the 16 Oct 05:04:17 AFL API nightly is the first run of the ISSUE-293..301 changes. The attribution watcher (`remote\watch-nightly.sh`) was **not scheduled or run**: it was not authorised for this session. Unless the owner (decision D-DEV-NEXT-2) has the operator run it before 04:59, that night is again an unattributed observation, and `nightly-check.sh` can still be run afterwards for its content.
+
+## 22. DEV browser acceptance and resolution (2026-10-15 16:57-17:00 AEDT; resolved, DEV-scoped)
+
+The owner signed in as Super Admin in the shared Playwright browser (no credential typed, logged or captured); viewport 1280x800; fresh `SMOKE_START` `20261015T165723`. Evidence (outside the repository): `D:\tmp\dev-deploy-next-20261015-rev2\run-20261015-1630\post\` (`browser\` screenshots and `URL-RECORD.txt`, `upload\` fixtures, `smoke-journal-postbrowser.txt`, `browser-evidence.sha256` with every hash). Fixtures from `fixtures\make-upload-csv.py` (salt `dev-acc-20261015`): `upload-1p5mb.csv` 1,500,359 bytes, 1,451 rows, sha-256 `4b41ebb92a8f123aef4e365e4b0cbaed789eac8c68a1987600e5875e1ec3b122`; `upload-over5mb.csv` 5,244,473 bytes, sha-256 `e47d9dc99c255921ed7d77f2c69bcdab9e5058dc61a9ab97562bd11e7af71bb1`.
+
+| Check | Result |
+|---|---|
+| C-303-1 | PASS. `http://10.0.40.100:8090/admin/upload` rendered the form (V-303-1). |
+| C-303-2 | PASS. Dataset `match_attendance`, `upload-1p5mb.csv` chosen (V-303-2a); one click on Stage for review; the browser landed on `http://10.0.40.100:8090/admin/submissions/75`, status staged, 1,451 rows, named `upload-1p5mb.csv`, no error and no session message (V-303-2). |
+| C-303-3 | PASS. `upload-over5mb.csv` chosen: the form showed `The file exceeds the 5 MB limit.`, the URL stayed `/admin/upload`, the browser console logged `413 Request Entity Too Large` for `POST /admin/upload/stage`, and the dashboard's newest submission was still 75 (V-303-3). |
+| C-303-4 | PASS. `/admin/audit`: one `upload.staged` row at 05:57:58 UTC (submissionId 75, rows 1451, `match_attendance`) and none for the refused file (V-303-4). |
+| C-303-5 | PASS. Reject pressed once on `/admin/submissions/75`: status rejected, reviewed by the admin; audit `submission.rejected` at 05:59:12 UTC (V-303-5). The submission was never validated, approved or promoted. |
+| Journal | PASS. `smoke-journal.sh` since 16:57:23 (427 web journal lines, read completely): no syntax error, invalid input syntax, unhandled, audit-failure or ERROR line. The earlier installation journal check (since 16:30:15, §21) does not substitute for this one. |
+
+**Findings.** (1) The real `Origin` / `Sec-Fetch-Site` values behind Caddy were accepted by the route's same-origin check (the staged request succeeded) and the proxied 1.5 MB body and the `fetch` redirect worked; the over-limit path returns 413 with the documented sentence. (2) The procedure's `/admin/submissions` list URL does not exist (404); submissions are listed on the `/admin` dashboard, which was used for the before/after comparison. (3) Optional C-303-6 (session-ended path) was not run; it was not required.
+
+**Resolution.** Every required criterion (C-303-1..5, images V-303-1..3, journal check exit 0) passed on DEV, so the issue is resolved **DEV-scoped**, like ISSUE-281 and ISSUE-288. **Not done:** PROD installation and acceptance (the PROD Caddy has no body cap on this path; the same browser checks apply there). The rejected submission 75 and its audit rows stay as history. Moved from `issues/open/` to `issues/closed/`.
