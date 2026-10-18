@@ -1272,8 +1272,10 @@ AFL API current-season ingestion switch too, so the Brownlow chain needs that
 switch enabled as well as its own two gates; with it off the unit fails visibly
 at step 1. Automatic `revalidateSeason()` is not wired (D-232-3).
 
-**Brownlow timer policy and the count window.** The timer is permanently
-enabled once installed (AFLDB-ISSUE-232 E1). The wrapper's first check, and its
+**Brownlow timer policy and the count window.** On DEV the timer is permanently
+enabled once installed (AFLDB-ISSUE-232 E1). **On PROD, AFLDB-ISSUE-316 supersedes
+that: the Brownlow timer stays disabled and inactive until step C8 (count week),
+and installing the units (C3) never enables it.** The wrapper's first check, and its
 only early no-op, is the environment gate: when `AFLDB_AFL_API_BROWNLOW_ENABLED`
 is not `true` it exits 0 before reading `seasons.json`, the network or the
 database. Outside the count window it is left unset. The database switch is

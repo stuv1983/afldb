@@ -16,6 +16,41 @@
 # href, a duplicate profile path on one page, a club with no rows.
 # ---------------------------------------------------------------------------
 
+# AFL API cutover: every request below goes to afltables.com, so the one
+# switch, data/reference/afltables-network.json, is checked before anything is
+# loaded. A missing or unreadable file, any status other than "active", or no
+# integer last_season refuses (fail closed); so does an in-progress season in
+# data/reference/seasons.json later than last_season. See the file's $comment.
+if (!requireNamespace("jsonlite", quietly = TRUE)) {
+  stop("Package 'jsonlite' is required: install.packages('jsonlite')", call. = FALSE)
+}
+AFLTABLES_NETWORK_PATH <- "data/reference/afltables-network.json"
+afltables_network <- local({
+  read <- function(path) tryCatch(jsonlite::fromJSON(path, simplifyVector = FALSE),
+                                  error = function(e) NULL)
+  is_year <- function(x) is.numeric(x) && length(x) == 1L && is.finite(x) && x == round(x)
+  control <- read(AFLTABLES_NETWORK_PATH)
+  if (!is.list(control) || !identical(control[["status"]], "active") ||
+      !is_year(control[["last_season"]])) return("retired")
+  seasons <- read("data/reference/seasons.json")
+  years <- if (is.list(seasons)) seasons[["in_progress_seasons"]] else NULL
+  bounded <- is.list(years) && all(vapply(
+    years, function(y) is_year(y) && y <= control[["last_season"]], logical(1)))
+  if (bounded) "active" else "out_of_bounds"
+})
+if (afltables_network == "out_of_bounds") {
+  stop("AFLDB_AFLTABLES_OUT_OF_BOUNDS: data/reference/seasons.json has an in-progress season ",
+       "later than last_season in ", AFLTABLES_NETWORK_PATH, " (or is unreadable); ",
+       "AFL Tables network acquisition is refused.", call. = FALSE)
+}
+if (afltables_network != "active") {
+  stop("AFLDB_AFLTABLES_RETIRED: ", AFLTABLES_NETWORK_PATH,
+       if (file.exists(AFLTABLES_NETWORK_PATH)) " does not say status \"active\" with an integer last_season"
+       else paste0(" not found under ", getwd(), " (run from the repository root)"),
+       "; AFL Tables network acquisition is refused.",
+       call. = FALSE)
+}
+
 suppressWarnings(suppressMessages({
   library(httr)
   library(xml2)

@@ -43,6 +43,65 @@ MANIFEST_ROOT=docs/rebuild-manifests/afltables_fitzroy_core
 
 cd "$PROJECT_ROOT"
 
+# --- AFL API cutover: is AFL Tables network fetching retired? --------------
+# data/reference/afltables-network.json is the one switch (see its $comment).
+# Checked first, before the R runtime or the season, so a retired source never
+# reaches acquisition. Retired is a deliberate state, not a failure: the unit
+# succeeds and does nothing, so a timer or a Super Admin start that outlived
+# the cutover cannot fetch. A missing or unreadable file, any status other
+# than "active", or no integer last_season counts as retired (fail closed). An
+# integer here is any finite integer-valued JSON number, so 2026 and 2026.0 both
+# qualify, exactly as in the R, Python and TypeScript gates; a bool, string,
+# fraction, null or non-finite value does not.
+# An ACTIVE switch that meets an in-progress season later than its last_season
+# (or an unreadable register) is out of bounds: the state a season rollover
+# would create if the switch were left active, which would fetch, and could
+# claim, the next season's matches. That is a misconfiguration, so the unit
+# FAILS rather than succeeding quietly. An interpreter that cannot run at all
+# is NOT read as retired either: that would let a broken host report a
+# successful no-op every night, so it fails the unit instead, as the season
+# step below always has.
+afltables_network=$("$PYTHON" - <<'PY'
+import json
+def load(path):
+    try:
+        with open(path, encoding='utf-8') as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+control = load('data/reference/afltables-network.json')
+control = control if isinstance(control, dict) else {}
+def is_year(value):
+    return type(value) is int or (type(value) is float and value.is_integer())
+last = control.get('last_season')
+if control.get('status') != 'active' or not is_year(last):
+    print('retired')
+else:
+    seasons = load('data/reference/seasons.json')
+    years = seasons.get('in_progress_seasons') if isinstance(seasons, dict) else None
+    bounded = isinstance(years, list) and all(is_year(y) and y <= last for y in years)
+    print('active' if bounded else 'out_of_bounds')
+PY
+) || {
+  echo "could not run $PYTHON to read data/reference/afltables-network.json. Refusing." >&2
+  exit 1
+}
+case "$afltables_network" in
+  active) ;;
+  out_of_bounds)
+    echo "AFLDB_AFLTABLES_OUT_OF_BOUNDS: data/reference/afltables-network.json is active, but" \
+         "data/reference/seasons.json has an in-progress season later than its last_season (or is" \
+         "unreadable). AFL Tables must not fetch or own a later season. Refusing; nothing acquired." >&2
+    exit 1
+    ;;
+  *)
+    echo "AFLDB_AFLTABLES_RETIRED: data/reference/afltables-network.json does not say" \
+         "status \"active\" with an integer last_season; AFL Tables is not fetched." \
+         "Nothing acquired or settled."
+    exit 0
+    ;;
+esac
+
 # --- AFLDB-ISSUE-244 I244-F029: keep the stripped credentials stripped -----
 # systemd has already applied this unit's EnvironmentFile= and then its
 # UnsetEnvironment= by the time we run, so the environment here is the narrowed

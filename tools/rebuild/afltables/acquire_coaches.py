@@ -54,6 +54,43 @@ WORKING_ROOT = Path("data/sources/afltables/coaches")
 COACHES_DIR = "https://afltables.com/afl/stats/coaches/"
 
 
+AFLTABLES_NETWORK_PATH = Path("data/reference/afltables-network.json")
+SEASONS_PATH = Path("data/reference/seasons.json")
+
+
+def _is_json_year(value: object) -> bool:
+    """A finite, integer-valued JSON number: 2026 or 2026.0, never a bool, string, null or fraction."""
+    return type(value) is int or (type(value) is float and value.is_integer())
+
+
+def afltables_network_status(root: Path) -> str:
+    """AFL API cutover: the one switch for AFL Tables network fetching.
+
+    "active" only when the file says status "active" with an integer-valued
+    JSON number as last_season (2026 and 2026.0 both qualify; the R and
+    TypeScript gates read it the same way) AND no in-progress season is later
+    than it; a missing or unreadable file, any other status or no such
+    last_season is "retired" (fail closed); an active switch beyond its
+    last_season, or an unreadable register, is "out_of_bounds". See the file's
+    $comment.
+    """
+    def load(rel: Path) -> object:
+        try:
+            return json.loads((root / rel).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    control = load(AFLTABLES_NETWORK_PATH)
+    control = control if isinstance(control, dict) else {}
+    last = control.get("last_season")
+    if control.get("status") != "active" or not _is_json_year(last):
+        return "retired"
+    seasons = load(SEASONS_PATH)
+    years = seasons.get("in_progress_seasons") if isinstance(seasons, dict) else None
+    bounded = isinstance(years, list) and all(_is_json_year(y) and y <= last for y in years)
+    return "active" if bounded else "out_of_bounds"
+
+
 class Terminal(SystemExit):
     def __init__(self, message: str) -> None:
         super().__init__(f"ERROR: {message}")
@@ -279,6 +316,19 @@ def main() -> int:
     parser.add_argument("--label", default=f"coaches-{date.today():%Y%m%d}")
     parser.add_argument("--out-dir", default=None)
     args = parser.parse_args()
+
+    network = afltables_network_status(REPO_ROOT)
+    if network == "out_of_bounds":
+        raise Terminal(
+            f"AFLDB_AFLTABLES_OUT_OF_BOUNDS: {SEASONS_PATH} has an in-progress season later "
+            f"than last_season in {AFLTABLES_NETWORK_PATH} (or is unreadable); AFL Tables "
+            "network acquisition is refused."
+        )
+    if network != "active":
+        raise Terminal(
+            f"AFLDB_AFLTABLES_RETIRED: {AFLTABLES_NETWORK_PATH} does not say status "
+            '"active" with an integer last_season; AFL Tables network acquisition is refused.'
+        )
 
     contract_path = REPO_ROOT / CONTRACT_PATH
     if not contract_path.is_file():

@@ -76,6 +76,7 @@
  *     --stat-availability artifacts/rollover/stat-availability.json \
  *     --accepted-corrections artifacts/rollover/accepted-corrections.json \
  *     --afl-api-ownership-census artifacts/rollover/afl-api-ownership-census-afldb_test.json \
+ *     --afltables-retirement-decision D-316-1 \
  *     --expected-club-season-rows <n>
  *
  * `--afl-api-ownership-census` (AFLDB-ISSUE-233 D-233-3, required, repeatable: one per
@@ -83,6 +84,13 @@
  * <season>` wrote. The planner refuses, before any gate runs or anything is written, when a
  * season of the successor rebuild scope holds an `afl_api`-owned canonical match, because the
  * post-rollover rebuild would re-own it. This tool still opens no database connection.
+ *
+ * `--afltables-retirement-decision` (AFLDB-ISSUE-316 C2, required) names the owner decision
+ * that retires AFL Tables network fetching, and must be exactly the one registered for
+ * `--season` (`D-316-1` for 2026). The rollover writes `in_progress_seasons: [Y + 1]`,
+ * so it also writes `data/reference/afltables-network.json` to `retired` in the same apply,
+ * before any other file, and refuses before any gate runs unless that switch is `active` with
+ * `last_season` equal to `--season` (see `src/lib/rollover/afltables-network-retirement.ts`).
  *
  * `--retire-status` must name a value the acceptance register declares in
  * `selection_policy.retired_statuses` (today: `retired`). `--accepted-corrections`
@@ -113,6 +121,11 @@ import {
   type ValidatorOverride,
   type ValidatorRun,
 } from '../../src/lib/rollover/season-rollover';
+import {
+  AFLTABLES_NETWORK_PATH,
+  parseAfltablesRetirementDecision,
+  planAfltablesNetworkRetirement,
+} from '../../src/lib/rollover/afltables-network-retirement';
 import { resolvePython } from './rebuild-test';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -242,6 +255,7 @@ function writeAtomicish(relativePath: string, content: string): void {
 
 function main(argv: string[]): number {
   const args = parseRolloverArgv(argv);
+  const retirementDecision = parseAfltablesRetirementDecision(argv);
   const { apply } = args;
 
   const core = parseJsonFile(args.coreManifest,
@@ -310,6 +324,21 @@ function main(argv: string[]): number {
   // Nothing has been spawned and nothing has been written.
   const successor = planSuccessorContract({
     request, current, currentSources: sources, evidence: successorEvidence,
+  });
+
+  // AFLDB-ISSUE-316 C2: the next in-progress season and the AFL Tables
+  // retirement land in one write. Refuses here, before any gate is spawned,
+  // unless the switch is active and bounded to exactly this season.
+  if (!existsSync(join(REPO_ROOT, AFLTABLES_NETWORK_PATH))) {
+    throw new RolloverRefused(`${AFLTABLES_NETWORK_PATH} does not exist, so the rollover cannot `
+      + 'retire AFL Tables network fetching in the same write as the next in-progress season.');
+  }
+  const networkRetirement = planAfltablesNetworkRetirement({
+    completedSeason: successor.completedSeason,
+    rolloverDate: args.rolloverDate,
+    decision: retirementDecision,
+    currentSource: readRepoFile(AFLTABLES_NETWORK_PATH),
+    currentSeasons: current.seasons,
   });
 
   const temporary = mkdtempSync(join(tmpdir(), 'afldb-rollover-'));
@@ -396,6 +425,9 @@ function main(argv: string[]): number {
     console.log('\nAll three pre-apply gates PASSED against the computed successor state.');
 
     printPlan(plan, apply);
+    console.log(`  ${networkRetirement.file.path}${networkRetirement.file.reformatted ? '  (JSON reformatted)' : ''}`
+      + '  (AFLDB-ISSUE-316: written first)');
+    console.log(`  - ${networkRetirement.note}`);
 
     if (!apply) {
       console.log('\nDRY RUN — nothing was written. Every gate above still ran. '
@@ -404,9 +436,12 @@ function main(argv: string[]): number {
     }
 
     // Every check has passed. Only now does anything reach the filesystem.
+    // The AFL Tables switch goes first: if the sequence is interrupted, AFL
+    // Tables is already retired and nothing can fetch the next season.
+    writeAtomicish(networkRetirement.file.path, networkRetirement.file.content);
     for (const file of plan.files) writeAtomicish(file.path, file.content);
 
-    console.log(`\nWROTE ${plan.files.length} files.`);
+    console.log(`\nWROTE ${plan.files.length + 1} files.`);
     console.log('Review the diff before anything else — Git is the recovery boundary if a '
       + 'filesystem failure interrupted the sequence.');
     console.log('\nRemaining proof, which genuinely needs the rebuilt database:');
