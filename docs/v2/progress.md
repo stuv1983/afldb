@@ -23,7 +23,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | Plan review (Launch A) | done; resolutions in `plan.md` §7 | `58ec8626` |
 | 0 Evidence | done: `docs/v2/baseline.md` (primary session), `docs/v2/inventory.md` | `58ec8626` |
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
-| 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`; closure fix in the `fix(v2-baseline): …` commit that follows it |
+| 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3-6 | not started (Launches B-E) | — |
 
 ## Stage 0 — evidence
