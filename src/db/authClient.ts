@@ -24,6 +24,8 @@ import 'server-only';
 
 import postgres from 'postgres';
 
+import { assertTestProcessDsn } from './test-process-guard';
+
 declare global {
   // eslint-disable-next-line no-var
   var __afldbAuthSql: ReturnType<typeof postgres> | undefined;
@@ -37,6 +39,8 @@ function createClient() {
       + 'Run tools/maintenance/02_add_auth_role.sh on the server.',
     );
   }
+  // AFLDB V2 plan D5: a no-op outside a test process; inside one, only a _test database.
+  assertTestProcessDsn('AFLDB_AUTH_DATABASE_URL', connectionString);
 
   return postgres(connectionString, {
     // Auth traffic is a trickle next to page traffic.

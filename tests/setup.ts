@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { applyTestDsnPolicy } from '@afldb/testing';
 import { validateImportRoleParityDsnTargets } from './integration/import-role-parity';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -33,36 +34,14 @@ try {
   // .env is absent in CI; variables are expected to be set already.
 }
 
+// AFLDB V2 plan D5 (packages/testing/src/dsn-policy.ts): with a _test DSN, DATABASE_URL is redirected to it
+// and any other non-_test DSN variable is removed; with none, every DSN variable and the libpq
+// connection variables are removed (never a throw), so no test, imported module or spawned
+// child can reach a non-test database. The pre-V2 refusals throw exactly as before.
+applyTestDsnPolicy(process.env);
+
 const testUrl = process.env.AFLDB_TEST_DATABASE_URL;
-
-if (testUrl) {
-  let database: string;
-  try {
-    database = new URL(testUrl).pathname.replace(/^\//, '');
-  } catch {
-    throw new Error('AFLDB_TEST_DATABASE_URL is not a valid connection URL.');
-  }
-
-  // The suite creates and deletes rows. Only a database whose name says it
-  // exists to be thrown away may be pointed at.
-  if (!/_test$/.test(database)) {
-    throw new Error(
-      `AFLDB_TEST_DATABASE_URL points at '${database}', which is not a _test `
-      + 'database. Refusing to run: these tests mutate the database they '
-      + 'connect to.',
-    );
-  }
-
-  // Everything imported from src/db/client.ts now targets afldb_test.
-  process.env.DATABASE_URL = testUrl;
-}
-
 const restrictedImportTestUrl = process.env.AFLDB_TEST_IMPORT_DATABASE_URL;
-if (restrictedImportTestUrl) {
-  if (!testUrl) {
-    throw new Error(
-      'AFLDB_TEST_DATABASE_URL must be set when AFLDB_TEST_IMPORT_DATABASE_URL is configured.',
-    );
-  }
+if (testUrl && restrictedImportTestUrl) {
   validateImportRoleParityDsnTargets(testUrl, restrictedImportTestUrl);
 }

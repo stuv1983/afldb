@@ -68,12 +68,26 @@ export function loadEnv(projectRoot: string): void {
   } catch {
     return;
   }
+  // VITEST is set in vitest workers and inherited by every child a test spawns.
+  const testProcess = typeof process.env.VITEST === 'string' && process.env.VITEST !== '';
   for (const line of contents.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
     const eq = trimmed.indexOf('=');
     if (eq === -1) continue;
     const name = trimmed.slice(0, eq).trim();
+    // AFLDB V2 plan D5: inside a test process, a `.env` never rehydrates a connection variable
+    // that tests/setup.ts stripped or redirected. Outside one this line never fires.
+    if (testProcess && isConnectionVariableName(name)) continue;
     if (!process.env[name]) process.env[name] = trimmed.slice(eq + 1).trim();
   }
+}
+
+/**
+ * AFLDB V2 plan D5. True for a variable a `.env` must not supply to a test process: any
+ * `*DATABASE_URL*` name and the libpq connection defaults (`PGHOST`, `PGPASSWORD`, ...).
+ */
+export function isConnectionVariableName(name: string): boolean {
+  return /DATABASE_URL/.test(name)
+    || /^PG(HOST|HOSTADDR|PORT|DATABASE|USER|PASSWORD|PASSFILE|SERVICE|SERVICEFILE)$/.test(name);
 }

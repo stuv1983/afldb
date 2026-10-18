@@ -8,6 +8,8 @@ import 'server-only';
 
 import postgres from 'postgres';
 
+import { assertTestProcessDsn } from './test-process-guard';
+
 declare global {
   // eslint-disable-next-line no-var
   var __afldbSql: ReturnType<typeof postgres> | undefined;
@@ -18,6 +20,8 @@ function createClient() {
   if (!connectionString) {
     throw new Error('DATABASE_URL is not set');
   }
+  // AFLDB V2 plan D5: a no-op outside a test process; inside one, only a _test database.
+  assertTestProcessDsn('DATABASE_URL', connectionString);
 
   const statementTimeout = Number(process.env.AFLDB_STATEMENT_TIMEOUT_MS ?? 5000);
 

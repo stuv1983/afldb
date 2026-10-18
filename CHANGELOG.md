@@ -15,6 +15,27 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2
+
+Local controlled-fork rebuild in `D:\dev\afldbV2` (no remote, nothing deployed). V2 records its
+gaps as `V2-GAP-NNN` in `docs/v2/known-gaps.md` instead of allocating `AFLDB-ISSUE-NNN` IDs, a
+deliberate departure from CLAUDE.md §5 so the fork cannot collide with the mainline ledger
+(ADR 0003). `issues.md` and `IssuesIndex.md` are left as inherited.
+
+#### Stage 1 — foundation: test-process connection safety and module boundaries - 19 October 2026
+
+- Tests can no longer reach a non-test database. With no `AFLDB_TEST_DATABASE_URL`,
+  `tests/setup.ts` now strips every `*DATABASE_URL*` variable and the libpq connection variables
+  (it never throws); with one, it still redirects `DATABASE_URL` and now also removes any other
+  DSN variable that does not name a `_test` database. Inside a test process `src/db/client.ts`
+  and `src/db/authClient.ts` refuse a non-`_test` database and `loadEnv()` no longer rehydrates
+  connection variables from `.env`; outside one, behaviour is unchanged (ADR 0005;
+  `tests/dsn-policy.test.ts`).
+- New `packages/{domain,db,acquisition,derived,admin,testing}` modules reached only as
+  `@afldb/<module>` (tsconfig `paths`, vitest alias), with ESLint `no-restricted-imports`
+  boundary rules and `tests/v2-module-boundaries.test.ts` (ADR 0001).
+- ADRs 0001-0011, `docs/v2/inventory.md`, `docs/v2/architecture.md`, a README V2 section.
+
 ### One switch retires AFL Tables network acquisition on every path (AFLDB-ISSUE-316; local, uncommitted; shipped `active`, so no behaviour change) - 18 October 2026
 
 - New `data/reference/afltables-network.json`. With `status` `active` and `last_season` at or after every in-progress season (each a finite, integer-valued JSON number: `2026` and `2026.0` read the same in the shell, R, Python and TypeScript gates, and a boolean, string, fraction or non-finite value is not a season), everything behaves as before. With `retired` (or a missing, malformed or unbounded file) the nightly and on-demand AFL Tables settle unit exits 0 with `AFLDB_AFLTABLES_RETIRED` before acquiring anything, `acquire_core.R`, `acquire_club_lists.R` and `acquire_coaches.py` refuse before any request, and the Super Admin "start now" returns unavailable without calling `systemctl`. An active switch behind the in-progress register refuses on every path and fails the unit (`AFLDB_AFLTABLES_OUT_OF_BOUNDS`). Reading AFL Tables data already stored is not affected.
