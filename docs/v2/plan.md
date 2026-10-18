@@ -159,7 +159,7 @@ These resolutions amend §3 and §4 and bind Launches A-E.
   --no-cache` diffed against `docs/v2/evidence/baseline-failures.txt` (same failing-file set,
   same failing-case set, unchanged load-failure messages), not the seven-suite set.
 - **R-002 (HIGH) D5 proof tests must be non-vacuous.** The policy is a pure function
-  (`tests/dsn-policy.ts`, `applyTestDsnPolicy(env)`), called by `tests/setup.ts` after the `.env`
+  (`applyTestDsnPolicy(env)`; implemented at `packages/testing/src/dsn-policy.ts`, exported by `@afldb/testing`), called by `tests/setup.ts` after the `.env`
   load, and unit-tested on env objects: absent DSN strips without throwing; a `_test` DSN plus a
   stray `DATABASE_URL` redirects `DATABASE_URL` to the test DSN (never deletes it); `afldb_dev`
   throws the existing message; `afldb_prod` throws by the same `_test$` allowlist suffix (the rule

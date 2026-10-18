@@ -1,6 +1,6 @@
 # AFLDB V2 — architecture overview (implemented state)
 
-Status: describes what exists in `D:\dev\afldbV2` at the close of Stage 1 (2026-10-19). Planned
+Status: describes what exists in `D:\dev\afldbV2` at the close of Stage 2 (2026-10-19). Planned
 work is labelled as such and points at its plan decision; nothing here is aspirational.
 
 ## 1. Shape
@@ -36,8 +36,8 @@ Counts are from `docs/v2/inventory.md`, where each has its re-derivation command
 
 | Package | Exports (Stage 1) | Source of each export |
 |---|---|---|
-| `@afldb/domain` | fixture status and round vocabulary, finals round codes, `isFixtureRoundType`, `isFixtureStatus`; `ImportBatchId`, `asImportBatchId` | re-exports of `src/lib/fixtures/spec.ts`, `src/lib/import-batch-id.ts` (both pure leaf modules) |
-| `@afldb/db` | `assertTestProcessDsn`, `testProcessDsnRefusal`, `isTestProcess` | re-export of `src/db/test-process-guard.ts` (new in V2, ADR 0005) |
+| `@afldb/domain` | fixture status and round vocabulary, finals round codes, `isFixtureRoundType`, `isFixtureStatus`; `ImportBatchId`, `asImportBatchId`; the historical baseline manifest spec, sealed-season rule, validation and comparator (Stage 2) | re-exports of `src/lib/fixtures/spec.ts`, `src/lib/import-batch-id.ts` (both pure leaf modules); `packages/domain/src/historical-manifest.ts` (new in V2) |
+| `@afldb/db` | `assertTestProcessDsn`, `testProcessDsnRefusal`, `isTestProcess`; the read-only manifest producer (`produceManifest`, `resolveProducerTarget`; never run) | re-export of `src/db/test-process-guard.ts` (new in V2, ADR 0005); `packages/db/src/historical-manifest-producer.ts` (new in V2) |
 | `@afldb/acquisition` | the source-family registry contract (`parseSourceFamilyRegistry`, `getSourceFamily`, `isPromotable`, ...) | re-export of `src/lib/acquisition/source-families.ts` |
 | `@afldb/derived` | nothing | deliberately empty until Stage 4 (ADR 0006) |
 | `@afldb/admin` | `hasCapability`, `Capability`, `CapabilityRole`, `CapabilityViewer` | re-export of `src/lib/auth/capabilities.ts` |
@@ -76,7 +76,15 @@ No test can reach a non-test database: `tests/setup.ts` applies `applyTestDsnPol
 clients refuse a non-`_test` database inside a test process, and `loadEnv()` does not rehydrate
 connection variables from `.env` inside a test process. Outside a test process nothing changes.
 
-## 7. Decisions
+## 7. Historical baseline (Stage 2)
+
+The sealed historical baseline (seasons 1897-2025 today) is defined in
+`docs/v2/historical-baseline.md`, its provenance model in `docs/v2/provenance.md`, and its
+content-free verification manifest in `docs/v2/historical-manifest-spec.md`. The CLI is
+`tools/v2/historical-manifest.ts` (`compare` offline; `produce` read-only and never run in Launch
+A). Table ownership is drafted in `docs/v2/db-ownership-matrix.md`.
+
+## 8. Decisions
 
 ADRs 0001-0011 in `docs/v2/adr/` record plan decisions D1-D11; ADRs 0006-0011 are accepted but
 not implemented yet, and say so.

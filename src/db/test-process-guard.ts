@@ -11,7 +11,8 @@
  *     port 1 (the repository's existing convention, e.g. tests/catalogue-lookups.test.ts).
  *
  * The refusal names the variable and the database name only, never the DSN (which may carry a
- * password). It complements tests/setup.ts (tests/dsn-policy.ts), which strips or redirects the
+ * password). It complements tests/setup.ts (applyTestDsnPolicy from @afldb/testing,
+ * packages/testing/src/dsn-policy.ts), which strips or redirects the
  * variables before any test module loads; this catches a value a test or tool sets afterwards.
  */
 

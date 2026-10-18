@@ -22,6 +22,21 @@ gaps as `V2-GAP-NNN` in `docs/v2/known-gaps.md` instead of allocating `AFLDB-ISS
 deliberate departure from CLAUDE.md §5 so the fork cannot collide with the mainline ledger
 (ADR 0003). `issues.md` and `IssuesIndex.md` are left as inherited.
 
+#### Stage 2 — sealed historical baseline definition and read-only verification tooling - 19 October 2026
+
+- `docs/v2/historical-baseline.md` defines the sealed baseline (every season not in progress in
+  `data/reference/seasons.json`, today 1897-2025), the audited workflows that alone may change it,
+  and verification, reconciliation and restoration (documented, not executed);
+  `docs/v2/provenance.md` maps the provenance model to its migrations;
+  `docs/v2/db-ownership-matrix.md` drafts table ownership.
+- New content-free manifest (`docs/v2/historical-manifest-spec.md`): per table and season, a row
+  count and sha256 digests of the ordered keys, the facts and the provenance metadata.
+  `tools/v2/historical-manifest.ts compare` compares two manifests offline; `produce` reads a
+  database in a server-enforced read-only, rolled-back transaction, takes its DSN only from
+  `--dsn-env`, and refuses a non-`_test` database without `--read-only-source` and
+  `--i-understand-this-reads-a-non-test-database`. Unit-tested with synthetic fixtures and a fake
+  query function only; never run against any database.
+
 #### Stage 1 — foundation: test-process connection safety and module boundaries - 19 October 2026
 
 - Tests can no longer reach a non-test database. With no `AFLDB_TEST_DATABASE_URL`,

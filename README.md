@@ -24,6 +24,12 @@ lives in `packages/{domain,db,acquisition,derived,admin,testing}/src/index.ts`, 
 `@afldb/<module>`. Module boundaries are enforced by ESLint (`eslint.config.mjs`) and
 `tests/v2-module-boundaries.test.ts`. See `docs/v2/architecture.md` and `docs/v2/inventory.md`.
 
+**Historical baseline (Stage 2).** Seasons not in progress (today 1897-2025) are a sealed
+baseline that only audited correction workflows may change (`docs/v2/historical-baseline.md`,
+`docs/v2/provenance.md`). `tools/v2/historical-manifest.ts compare` checks two content-free
+manifests offline; its `produce` mode is read-only and has never been run
+(`docs/v2/historical-manifest-spec.md`).
+
 **Local setup with no database.** V2 is developed without any DSN: do not create a `.env` and do
 not copy one from another checkout.
 

@@ -9,6 +9,9 @@ close it. An entry is removed only when the closing evidence exists.
 | V2-GAP-002 | Medium | frontend build | open: needs a database |
 | V2-GAP-003 | Medium | environment | open: inherited, environmental |
 | V2-GAP-004 | Low | source worktree hygiene | open: owner action |
+| V2-GAP-005 | Low | historical baseline scope | open: AFLW not covered by the manifest |
+| V2-GAP-006 | Medium | historical baseline | open: seal detected, not enforced |
+| V2-GAP-007 | Medium | historical baseline | open: manifest producer never run |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -56,3 +59,30 @@ close it. An entry is removed only when the closing evidence exists.
   an empty file). It appeared during the Launch A plan review. V2 work never writes to the source.
 - **Close.** Owner removes the file (V2 agents are forbidden to modify the source) and, ideally,
   fixes or disables the hook.
+
+## V2-GAP-005 — AFLW is outside the historical baseline manifest
+
+- **What.** `HISTORICAL_TABLES` covers the AFL/VFL canonical tables only; `staging_aflw.*` and the
+  `aflw.*` views are not fingerprinted (`docs/v2/historical-baseline.md` §3).
+- **Why.** AFLW has its own loader (`tools/aflw/`) and modelling rules (`docs/aflw.md`) and is not
+  part of the V2 AFL API scope.
+- **Close.** An owner decision to cover AFLW, then a spec-version bump adding its tables.
+
+## V2-GAP-006 — The seal on historical seasons is detected, not enforced
+
+- **What.** No constraint, trigger or code path refuses a write to a sealed season. A change made
+  outside the audited workflows is caught only by comparing manifests.
+- **Why.** Stage 2 is documentation and read-only tooling; enforcement belongs with the writers.
+- **Close.** Stage 3: the V2 AFL API promotion refuses sealed seasons unless invoked as an audited
+  correction, with a test. Database-level enforcement, if wanted, is an additive `111_`+ migration
+  under plan D4 and needs an owner decision.
+
+## V2-GAP-007 — No manifest of the real baseline exists yet
+
+- **What.** The producer (`tools/v2/historical-manifest.ts produce`) is tested only through a fake
+  query function; its SQL has never executed on PostgreSQL, so a server-side error (for example a
+  column privilege, or the memory cost of `string_agg` on the largest season) is possible.
+- **Why.** Plan §7 R-007: never run in Launch A; V2 has no database access.
+- **Close.** An authorised run against an isolated `afldb_test`, twice, with identical results,
+  then (owner decision) a read-only run against the live source. Record timings and both manifests'
+  locations, outside the repository.

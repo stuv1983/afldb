@@ -21,3 +21,35 @@ export {
 
 // The branded import-batch identifier every acquisition and promotion record carries.
 export { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
+
+// The sealed historical baseline manifest: table spec, sealed seasons, validation, comparator
+// (docs/v2/historical-manifest-spec.md). Pure; the producer lives in @afldb/db.
+export {
+  COMPARISON_FORMAT,
+  HISTORICAL_TABLES,
+  MANIFEST_FORMAT,
+  MANIFEST_FORMAT_VERSION,
+  MANIFEST_SPEC_VERSION,
+  METADATA_COLUMNS,
+  ManifestFormatError,
+  compareManifests,
+  comparisonExitCode,
+  describeColumnRef,
+  isSealedSeason,
+  parseManifest,
+  renderComparison,
+  sealedSeasonsFrom,
+  validateManifest,
+  type ColumnRef,
+  type ComparisonFinding,
+  type FindingCode,
+  type FindingSeverity,
+  type HistoricalManifest,
+  type HistoricalTableKind,
+  type HistoricalTableSpec,
+  type ManifestBucket,
+  type ManifestComparison,
+  type ManifestTable,
+  type SealedSeasons,
+  type SeasonRegistry,
+} from './historical-manifest';
