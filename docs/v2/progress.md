@@ -23,7 +23,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | Plan review (Launch A) | done; resolutions in `plan.md` §7 | `58ec8626` |
 | 0 Evidence | done: `docs/v2/baseline.md` (primary session), `docs/v2/inventory.md` | `58ec8626` |
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
-| 2 Historical baseline | done, pending closure verification | the Stage 2 commit (`feat(v2-baseline): …`) |
+| 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`; closure fix in the `fix(v2-baseline): …` commit that follows it |
 | 3-6 | not started (Launches B-E) | — |
 
 ## Stage 0 — evidence
@@ -87,7 +87,7 @@ Delivered:
   validation, comparator; pure), `packages/db/src/historical-manifest-producer.ts` (read-only
   producer and target refusals), `tools/v2/historical-manifest.ts` (CLI: `compare` offline,
   `produce` never run).
-- Tests: `tests/v2-historical-manifest.test.ts` (34 tests) with the synthetic fixture
+- Tests: `tests/v2-historical-manifest.test.ts` (34 tests at `80e110d6`, 37 after the closure fix) with the synthetic fixture
   `tests/fixtures/v2/historical-manifest/before.synthetic.json`. Negative control: corrupting a
   spec table name and a key column made 2 spec tests fail; restored, all pass.
 - V2-GAP-005 (AFLW not covered), V2-GAP-006 (seal detected, not enforced), V2-GAP-007 (producer
@@ -103,6 +103,26 @@ Results read from runs (2026-10-19):
 | `eslint --no-cache .` | 253 errors, 132 warnings: unchanged |
 | Full `vitest run --no-cache` | **Test Files 96 failed, 170 passed, 2 skipped (268); Tests 15 failed, 9018 passed, 48 skipped (9081)**, 320 s. Failing set identical to `baseline-failures.txt` (102 lines; none new, none missing); load-failure messages unchanged (83 + 4). Delta from Stage 1: +1 file, +34 passing tests (the new suite). |
 | source worktree status vs launch snapshot | differs only by `?? supplies` (V2-GAP-004) |
+
+Stage 2 closure (afldb-closure, return `.phaneslight/returns/launchA-20261019/07-closure-stage2.md`):
+no CRIT/HIGH; disclosure exact; tsc, eslint, focused (3 files, 68 tests) and full vitest reproduced
+the figures above; two negative controls of its own (read-only check removed: 1 failure;
+ROLLBACK removed: 5 failures); 15+ migration citations checked, no false statement.
+
+- **MED C2-001, fixed.** A fact bucket with a NULL season (possible in `award_winners`) was
+  treated as open, so its changes were info only. Now `isSealedBucket` makes it sealed in both the
+  producer and the comparator; two regression tests, which fail with the old rule (negative
+  control: 2 failures) and pass with the fix.
+- LOW C2-002 (the `seasons` digest includes measured/status columns, so a re-measurement reports
+  `FACTS_CHANGED`): documented in the spec §3. LOW C2-003 (the static column map ignores DROP/RENAME
+  COLUMN; no current defect): recorded, no work. INFO C2-006 (a failing ROLLBACK could mask the
+  original error): fixed, ROLLBACK attempted exactly once, with a test. INFO C2-007 wording fixed.
+  INFO C2-005: the curated `baseline-failures.txt` has 102 ' FAIL ' lines; a raw run also prints one
+  stdout line beginning "FAIL  9.6 that run passed every offline guard" from a baseline-failing
+  draftguru test, so a raw count can read 103 — compare against the curated list, as here.
+
+After the fix (2026-10-19): `tests/v2-historical-manifest.test.ts` 37 tests; focused 3 files, 71
+passed; tsc exit 0; eslint clean on the changed files; full suite: **Test Files 96 failed, 170 passed, 2 skipped (268); Tests 15 failed, 9021 passed, 48 skipped (9084)**, 378 s; failing set identical to `baseline-failures.txt` (102 lines, none new, none missing); load-failure messages unchanged (83 + 4).
 
 ## Resumption point
 

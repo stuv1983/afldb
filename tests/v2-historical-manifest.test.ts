@@ -28,6 +28,7 @@ import {
   compareManifests,
   comparisonExitCode,
   parseManifest,
+  isSealedBucket,
   sealedSeasonsFrom,
   validateManifest,
   type HistoricalManifest,
@@ -224,6 +225,23 @@ describe('compareManifests (offline)', () => {
     ]);
   });
 
+  it('a NULL-season fact bucket is sealed: its change is a violation, not info (closure C2-001)', () => {
+    const withNull = mutable(before());
+    withNull.tables[1].buckets.push({ season: null, sealed: true, rows: 10, keyDigest: hex('1'), factDigest: hex('2'), metadataDigest: null });
+    const changed = clone(withNull);
+    changed.tables[1].buckets[1].rows = 7;
+    changed.tables[1].buckets[1].factDigest = hex('3');
+    const c = compareManifests(withNull as unknown as HistoricalManifest, changed as unknown as HistoricalManifest);
+    expect(c.findings.map((f) => [f.severity, f.code, f.season])).toEqual([
+      ['violation', 'ROWS_CHANGED', null],
+      ['violation', 'FACTS_CHANGED', null],
+    ]);
+    expect(c.verdict).toBe('reconciliation-required');
+    expect(isSealedBucket('fact', SEALED, null)).toBe(true);
+    expect(isSealedBucket('reference', SEALED, null)).toBe(false);
+    expect(isSealedBucket('fact', SEALED, 2026)).toBe(false);
+  });
+
   it('a later manifest that seals 2026 compares only the seasons sealed in both', () => {
     const after = mutable(before());
     after.sealed.through = 2026;
@@ -320,6 +338,33 @@ describe('produceManifest (fake query function only)', () => {
     await expect(produceManifest(db.query, { sealed: SEALED, readOnlySource: false, tables: SPEC, clock: CLOCK })).rejects.toThrow(message);
     expect(db.statements.at(-1)).toBe(PRODUCER_END_SQL);
     expect(db.statements.filter((s) => s === PRODUCER_END_SQL)).toHaveLength(1);
+  });
+
+  it('a failing ROLLBACK never masks the error that caused it, and is attempted once', async () => {
+    const statements: string[] = [];
+    const db = fakeDatabase({ failOn: /FROM ONLY public\."matches"/ });
+    const query = async (statement: string) => {
+      statements.push(statement);
+      if (statement === PRODUCER_END_SQL) throw new Error('rollback failed');
+      return db.query(statement);
+    };
+    await expect(produceManifest(query, { sealed: SEALED, readOnlySource: false, tables: SPEC, clock: CLOCK })).rejects.toThrow('synthetic failure');
+    expect(statements.filter((x) => x === PRODUCER_END_SQL)).toHaveLength(1);
+  });
+
+  it('marks a NULL-season fact bucket sealed when producing', async () => {
+    const db = fakeDatabase();
+    const query = async (statement: string) => (statement.includes('FROM ONLY public."award_winners"')
+      ? [{ season: null, row_count: '4', key_digest: hex('1'), fact_digest: hex('2'), metadata_digest: hex('3') }]
+      : db.query(statement));
+    const awards = HISTORICAL_TABLES.filter((t) => t.table === 'award_winners');
+    LIVE.award_winners = ['id', 'award_id', 'season', 'player_id', 'source_id'];
+    try {
+      const manifest = await produceManifest(query, { sealed: SEALED, readOnlySource: false, tables: awards, clock: CLOCK });
+      expect(manifest.tables[0].buckets[0]).toMatchObject({ season: null, sealed: true, rows: 4 });
+    } finally {
+      delete LIVE.award_winners;
+    }
   });
 
   it('pins fact columns to an earlier manifest and refuses when a pinned column is gone', async () => {

@@ -35,6 +35,7 @@ export {
   compareManifests,
   comparisonExitCode,
   describeColumnRef,
+  isSealedBucket,
   isSealedSeason,
   parseManifest,
   renderComparison,

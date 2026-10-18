@@ -21,7 +21,7 @@ import {
   MANIFEST_SPEC_VERSION,
   METADATA_COLUMNS,
   describeColumnRef,
-  isSealedSeason,
+  isSealedBucket,
   type ColumnRef,
   type HistoricalManifest,
   type HistoricalTableSpec,
@@ -179,6 +179,7 @@ export async function produceManifest(query: ManifestQuery, options: ProduceOpti
 
   await query(PRODUCER_SESSION_SQL);
   await query(PRODUCER_BEGIN_SQL);
+  let ending = false;
   try {
     for (const statement of PRODUCER_LOCAL_SETTINGS) await query(statement);
     const [state] = await query(PRODUCER_STATE_SQL);
@@ -208,7 +209,7 @@ export async function produceManifest(query: ManifestQuery, options: ProduceOpti
         const seasonValue = r.season === null || r.season === undefined ? null : toInt(r.season, 'season');
         return {
           season: seasonValue,
-          sealed: spec.kind === 'fact' && isSealedSeason(options.sealed, seasonValue),
+          sealed: isSealedBucket(spec.kind, options.sealed, seasonValue),
           rows: toInt(r.row_count, 'row count'),
           keyDigest: String(r.key_digest),
           factDigest: String(r.fact_digest),
@@ -226,7 +227,7 @@ export async function produceManifest(query: ManifestQuery, options: ProduceOpti
         buckets,
       });
     }
-    return {
+    const manifest: HistoricalManifest = {
       format: MANIFEST_FORMAT,
       formatVersion: MANIFEST_FORMAT_VERSION,
       specVersion: MANIFEST_SPEC_VERSION,
@@ -242,8 +243,13 @@ export async function produceManifest(query: ManifestQuery, options: ProduceOpti
       pinnedTo: options.pinned ? { producedAt: options.pinned.producedAt, database: options.pinned.source.database } : null,
       tables: out,
     };
-  } finally {
+    ending = true;
     await query(PRODUCER_END_SQL);
+    return manifest;
+  } catch (error) {
+    // Roll back once, and never let a failing ROLLBACK mask the error that caused it.
+    if (!ending) await query(PRODUCER_END_SQL).catch(() => undefined);
+    throw error;
   }
 }
 

@@ -20,8 +20,8 @@ authorised run produces one, a content-free manifest of it.
   [Y + 1]`.
 - **Covered tables**: the fact and reference tables listed in
   `docs/v2/historical-manifest-spec.md` §2 (`HISTORICAL_TABLES`).
-- **The AFL API does not redefine it.** API coverage is 2012-2026 by season registry and
-  detailed verified contracts only for about 2022-2026 (owner instruction, "Treat API coverage
+- **The AFL API does not redefine it.** API coverage is approximately 2012-2026 by season
+  registry and detailed verified contracts only for about 2022-2026 (owner instruction, "Treat API coverage
   honestly"). A sealed season's rows stay authoritative whether or not the API can reproduce
   them; Stage 4's coverage registry (plan D11) will label each season and family
   (`api_verified`, `api_partial`, `historical_baseline`, `manual_curated`, `unsupported`), and

@@ -130,6 +130,16 @@ export function isSealedSeason(sealed: SealedSeasons, season: number | null): bo
   return season !== null && season >= sealed.from && season <= sealed.through && !sealed.open.includes(season);
 }
 
+/**
+ * Whether a manifest bucket is inside the seal. A fact row whose season is NULL (for example an
+ * `award_winners` row with no season) is undated history, so it is sealed rather than open:
+ * treating it as open would let its changes pass as information only. Reference tables are
+ * never sealed; they have their own comparison rules.
+ */
+export function isSealedBucket(kind: HistoricalTableKind, sealed: SealedSeasons, season: number | null): boolean {
+  return kind === 'fact' && (season === null || isSealedSeason(sealed, season));
+}
+
 // ---------------------------------------------------------------------------------------------
 // The manifest
 // ---------------------------------------------------------------------------------------------
@@ -352,7 +362,7 @@ export function compareManifests(before: HistoricalManifest, after: HistoricalMa
     add(scope ? 'info' : 'unverified', 'SEALED_RANGE_DIFFERS', null, null,
       `sealed ${describe(before.sealed)} -> ${describe(after.sealed)}; ${scope ? `comparing ${describe(scope)}` : 'no season is sealed in both'}`);
   }
-  const inScope = (season: number | null) => scope !== null && isSealedSeason(scope, season);
+  const inScope = (season: number | null) => scope !== null && isSealedBucket('fact', scope, season);
 
   const afterTables = new Map(after.tables.map((t) => [t.table, t]));
   const beforeNames = new Set(before.tables.map((t) => t.table));

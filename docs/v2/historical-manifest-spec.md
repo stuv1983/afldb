@@ -56,8 +56,14 @@ checks every table, key column and season column against the migrations.
 `sealed = { from: first_season, through: the last season not in progress, open: [] }`, read
 from `data/reference/seasons.json` (today 1897-2025; 2026 is in progress). A season is sealed
 once the rollover removes it from `in_progress_seasons`. A season inside the range that is still
-in progress is listed in `open`. Reference tables have no season and are never "sealed"; they
-are compared under their own rules (section 6).
+in progress is listed in `open`. A fact row whose season is NULL (possible in `award_winners`)
+is undated history and its bucket is **sealed**. Reference tables have no season and are never
+"sealed"; they are compared under their own rules (section 6).
+
+The `seasons` table is digested whole, including its measured and status columns (match and
+club counts, first/last match dates, `status`, `data_through_date`, `completed_at`, ...). A
+re-measurement of a sealed season therefore reports `FACTS_CHANGED`: deliberately conservative,
+and reconciled like any other change.
 
 ## 4. Digest recipe (per table, per season bucket)
 
