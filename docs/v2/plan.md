@@ -141,3 +141,75 @@ UI rendering, Linux behaviour, live API) is labelled unexecuted with the reason.
 read from runs, never predicted. Do not weaken, skip or delete tests to obtain a pass; explain
 environmental skips exactly. Production go/no-go stays **no-go** while any ISSUE-316 gate or
 D-316-13 remains unsatisfied.
+
+## 7. Review resolutions (Launch A plan review, 2026-10-19)
+
+Review: `docs/v2/reviews/plan-review-launchA-2026-10-19.md` (afldb-reviewer). Verdict
+proceed-with-resolutions; no owner stop condition reached. The owner's working mode (do not
+return for routine clarification or design choices; stop only for the listed conditions)
+overrides the agent protocol's "CRIT/HIGH at plan review goes to the user", so the orchestrator
+resolved every finding below with the most conservative option consistent with the instruction.
+These resolutions amend §3 and §4 and bind Launches A-E.
+
+- **R-001 (HIGH) D5 means strip, never throw.** `tests/setup.ts` is the global setup file for
+  every test file. With `AFLDB_TEST_DATABASE_URL` absent it removes every `*DATABASE_URL*`
+  variable and the libpq `PG*` connection variables from the test process and does not throw.
+  The existing throw for `AFLDB_TEST_IMPORT_DATABASE_URL` without a test DSN is evaluated
+  **before** the strip, so it still fires. Stage 1 acceptance is the **full** `vitest run
+  --no-cache` diffed against `docs/v2/evidence/baseline-failures.txt` (same failing-file set,
+  same failing-case set, unchanged load-failure messages), not the seven-suite set.
+- **R-002 (HIGH) D5 proof tests must be non-vacuous.** The policy is a pure function
+  (`tests/dsn-policy.ts`, `applyTestDsnPolicy(env)`), called by `tests/setup.ts` after the `.env`
+  load, and unit-tested on env objects: absent DSN strips without throwing; a `_test` DSN plus a
+  stray `DATABASE_URL` redirects `DATABASE_URL` to the test DSN (never deletes it); `afldb_dev`
+  throws the existing message; `afldb_prod` throws by the same `_test$` allowlist suffix (the rule
+  is the suffix, not a host heuristic); a non-URL throws. The present-DSN branch is labelled
+  **unverified on a live database** (no database exists on this workstation).
+- **R-003 (MED) runtime files keep accepting production DSNs.** `src/db/client.ts`,
+  `src/db/authClient.ts` and `tools/current-season/load-env.ts` change only inside a test process
+  (`process.env.VITEST` set, which vitest also hands to children it spawns): the clients refuse a
+  DSN whose database name does not end in `_test` unless it is a never-connectable unit
+  placeholder (an RFC 6761 `.invalid` host, or a loopback host on port 1, the repository's
+  existing placeholder convention); `loadEnv()` does not populate `*DATABASE_URL*`/`PG*` names
+  from a `.env` file. Outside a test process their behaviour is byte-for-byte unchanged in effect.
+- **R-004 (MED) other DSNs in the present-DSN branch.** Resolved by **strip**, not throw: when a
+  test DSN is present, any other set `*DATABASE_URL*` variable whose database name does not end in
+  `_test` is removed (`DATABASE_URL` is redirected as before). The reviewer suggested a throw for
+  `AFLDB_AUTH_DATABASE_URL`; strip was chosen because it is equally fail-closed (the variable can
+  no longer reach a non-test database) without failing every suite on a host whose `.env` holds a
+  DEV auth DSN that the integration files already overwrite with the test DSN. Unverifiable
+  locally; recorded in `docs/v2/known-gaps.md`.
+- **R-005 (MED) no `next build` in V2.** Ten `generateStaticParams` routes and the eager pool in
+  `src/db/client.ts` make the production build require a database. It is not attempted; the gate
+  is `next typegen` + `tsc`. Every `next` command runs with `NEXT_TELEMETRY_DISABLED=1`. Recorded
+  as a V2-GAP.
+- **R-006 (MED) omitted owner deliverables are assigned:** Stage 1 `docs/v2/architecture.md`
+  (implemented state, including the `apps/web`/`apps/worker` mapping table); Stage 2 the database
+  compatibility and ownership matrix (`docs/v2/db-ownership-matrix.md`, draft), completed in
+  Stage 4; Stage 4 the "runtime independent of CSV/AFL Tables/Squiggle/Kali" and "no scheduler or
+  admin path invokes offline legacy tools" tests; Stage 5 the admin-centre operating guide and a
+  frontend contract test; Stage 6 the migration plan and a backup **and** rollback plan.
+- **R-007 (MED) Stage 2 tooling semantics.** The comparator is DSN-free (two manifest files in, a
+  diff out). The producer takes a DSN only through an explicit `--dsn-env <VAR>` flag (never
+  implicitly from `DATABASE_URL`); a database whose name does not end in `_test` additionally
+  requires both `--read-only-source` and `--i-understand-this-reads-a-non-test-database`; read-only
+  is enforced server-side (`BEGIN READ ONLY` plus `SET TRANSACTION READ ONLY`/
+  `default_transaction_read_only`) and asserted through a fake client in unit tests; the manifest
+  holds counts and checksums only, never row content; it is never run against any database in
+  Launch A. Restoration and reconciliation are documented in `docs/v2/historical-baseline.md`.
+- **R-008 (MED, Stage 4)** A `111_`+ migration that grants through `afldb_meta` functions names the
+  `tools/db/privileges.ts` change and carries a 097-style deploy-order comment (migration, then
+  privileges, then code; ISSUE-027). In pglite, grant statements are either run against labelled
+  stubs or marked "statically reviewed, unexecuted". `-- ROLLBACK:` blocks are comment lines only.
+- **R-009 (LOW)** `@afldb/*` maps to `./packages/*/src/index.ts` only; subpath imports are
+  forbidden by the boundary test; package tests live under `tests/` (vitest collects `tests/**`).
+- **R-010 (LOW)** The boundary test resolves relative specifiers to files (so `../../src/...`
+  escapes are caught), not only bare specifiers. `packages/testing` may import any package; only
+  `tests/**` may import `@afldb/testing`.
+- **R-011 (LOW)** Lint gate: no new ESLint findings in files V2 creates or edits; the 253 errors /
+  132 warnings recorded in `baseline.md` are not fixed opportunistically.
+- **R-012 (INFO)** Commit attribution uses the model that commits; the D3 departure from CLAUDE.md
+  §5 is stated in the CHANGELOG V2 section. The reviewer's hazard check is answered: at
+  2026-10-19 09:18:47 +11:00 an empty stray file `supplies` appeared at the source worktree root
+  (`git status` shows `?? supplies`), consistent with the documented Read/Grep hook defect. It was
+  **not** deleted (the source is read-only to V2); it is reported to the owner.
