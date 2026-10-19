@@ -17,7 +17,11 @@ commit.
 
 ### AFLDB V2
 
-#### Local release-readiness follow-up — 19 October 2026
+#### Local release-readiness follow-up — 19–20 October 2026
+
+- Corrected the ungated deadlock fixture's unsupported assumption about which transaction
+  PostgreSQL aborts. Both documented outcomes now require exact failure/commit behaviour,
+  atomic rollback, bounded waits and successful retry; no runtime guard or privilege changed.
 
 - Added guarded six-role credential rotation for the dedicated isolated PostgreSQL cluster;
   all new logins succeeded and all old passwords were rejected. No secrets committed.
