@@ -113,3 +113,30 @@ export {
   type RetiredAdminSurface,
   type RetiredAdminSurfaceKind,
 } from './legacy-retirement';
+// @v2-stage6:table-row-counts
+// The table row-count inventory format (shadow parity input; docs/v2/shadow-rehearsal.md). Pure.
+export {
+  TABLE_ROW_COUNTS_FORMAT,
+  TABLE_ROW_COUNTS_FORMAT_VERSION,
+  TableRowCountsFormatError,
+  V2_ADDED_TABLES,
+  isV2AddedTable,
+  parseTableRowCounts,
+  validateTableRowCounts,
+  type TableRowCount,
+  type TableRowCounts,
+} from './table-row-counts';
+// @v2-stage6:shadow-target
+// The shadow-rehearsal target policy: only an afldb_v2_shadow[_<tag>]_test copy is a target. Pure.
+export {
+  REDIRECTING_LIBPQ_VARIABLES,
+  RESERVED_DATABASE_NAMES,
+  SHADOW_DATABASE_NAME_PATTERN,
+  databaseNameFromDsn,
+  evaluateShadowDatabaseName,
+  evaluateShadowDsn,
+  scanShadowEnvironment,
+  type ShadowDsnVerdict,
+  type ShadowEnvironmentFinding,
+  type ShadowEnvironmentResult,
+} from './shadow-target';

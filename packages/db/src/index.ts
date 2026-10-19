@@ -42,3 +42,24 @@ export {
   type SqlExecutor,
   type TransactionalSqlExecutor,
 } from './sql-executor';
+
+// @v2-stage6:table-row-counts-producer
+// The read-only table row-count census (shadow parity input; docs/v2/shadow-rehearsal.md).
+export {
+  DEFAULT_ROW_COUNT_SCHEMAS,
+  ROW_COUNTS_BEGIN_SQL,
+  ROW_COUNTS_END_SQL,
+  ROW_COUNTS_LOCAL_SETTINGS,
+  ROW_COUNTS_SESSION_SQL,
+  ROW_COUNTS_STATE_SQL,
+  ROW_COUNTS_STATEMENT_ALLOWLIST,
+  ROW_COUNTS_TRANSACTION,
+  RowCountsProducerRefusal,
+  produceTableRowCounts,
+  rowCountCatalogSql,
+  rowCountSql,
+  schemaExistsSql,
+  type RowCountsOptions,
+  type RowCountsQuery,
+  type RowCountsRow,
+} from './table-row-counts-producer';

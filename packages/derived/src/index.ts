@@ -69,3 +69,39 @@ export {
 // @v2-stage4:brownlow-reconciliation
 export * from './brownlow-reconciliation';
 export * from './brownlow-reconciliation-report';
+// @v2-stage6:shadow-parity
+// The shadow PARITY comparison of a rehearsal's before/after artefacts (docs/v2/shadow-rehearsal.md).
+// Pure: no database, file system or clock; the thin CLI is tools/v2/shadow-parity.ts.
+export {
+  COVERAGE_EXPORT_FORMAT,
+  COVERAGE_EXPORT_FORMAT_VERSION,
+  SHADOW_PARITY_CHECK_IDS,
+  SHADOW_PARITY_POLICY_VERSION,
+  SHADOW_PARITY_REPORT_FORMAT,
+  SHADOW_PARITY_REPORT_VERSION,
+  SHADOW_PARITY_STATUSES,
+  SHADOW_PARITY_THRESHOLDS,
+  SHADOW_PARITY_VERDICTS,
+  buildCoverageRegistryExport,
+  buildShadowParityReport,
+  parseCoverageRegistryExport,
+  renderShadowParitySummary,
+  serialiseCoverageRegistryExport,
+  serialiseShadowParityReport,
+  shadowParityExitCode,
+  shadowParityVerdict,
+  validateCoverageRegistryExport,
+  validateShadowParityReport,
+  type CoverageExportCell,
+  type CoverageRegistryExport,
+  type ShadowParityCheck,
+  type ShadowParityCheckId,
+  type ShadowParityFinding,
+  type ShadowParityFindingSeverity,
+  type ShadowParityInput,
+  type ShadowParityInputFile,
+  type ShadowParityInputs,
+  type ShadowParityReport,
+  type ShadowParityStatus,
+  type ShadowParityVerdict,
+} from './shadow-parity';
