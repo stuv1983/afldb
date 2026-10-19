@@ -26,8 +26,14 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CuratedAwardError, createProposal, validateProposal, type ProposalInput } from '@afldb/admin';
-import type { AwardPromotionPort, CuratedAwardsViewer } from '@afldb/admin';
+import type { ApprovedWinnerRevisionPort, AwardPromotionPort, CuratedAwardsViewer } from '@afldb/admin';
 import type { SqlExecutor, TransactionalSqlExecutor } from '@afldb/db';
+import {
+  ColemanProjectionRefusal,
+  type ColemanDerivation,
+  type ColemanProjectionRequest,
+  type ColemanProjectionResult,
+} from '@afldb/derived';
 import { sealedSeasonsFrom } from '@afldb/domain';
 import { createInMemoryPglite, pgliteExecutor, type InMemoryPglite } from '@afldb/testing';
 
@@ -57,6 +63,7 @@ import {
   readCuratedHistory,
   reconcileBrownlowSeasonForAdmin,
   rejectCurated,
+  reviseApprovedCurated,
   validateCurated,
   type OperationsDeps,
 } from '@/lib/admin/operations-centre';
@@ -88,6 +95,12 @@ const session = vi.hoisted(() => ({
 const bridge = vi.hoisted(() => ({
   withExecutor: null as null | (<T>(work: (executor: unknown) => Promise<T>) => Promise<T>),
   promote: null as null | ((tx: unknown, request: unknown) => Promise<{ entityKey: string }>),
+  // The PRODUCTION Coleman projection port is mocked here (it needs the real award_winners table and a
+  // postgres.js transaction, which PGlite stubs cannot host): its SQL is proven on PostgreSQL in
+  // tests/integration/v2-coleman-publication.test.ts. These spies record that the operations centre
+  // calls it on every publication and previews through it.
+  project: vi.fn<(tx: unknown, request: ColemanProjectionRequest) => Promise<ColemanProjectionResult>>(),
+  preview: vi.fn<(executor: unknown, derivation: ColemanDerivation) => Promise<unknown>>(),
 }));
 
 vi.mock('@/lib/auth/session', async () => {
@@ -113,7 +126,30 @@ vi.mock('@/db/queries/award-proposals', () => ({
       return bridge.promote(tx, request);
     },
   },
+  // V2-GAP-018: the real revision port is not used here; revisions inject `deps.revision` (see makeDeps).
+  awardWinnerRevisionPort: {
+    revise: async () => { throw new Error('the real revision port is not used in this suite'); },
+  },
 }));
+
+vi.mock('@/db/queries/coleman-award-winners', () => ({
+  colemanAwardWinnerProjection: {
+    project: (tx: unknown, request: ColemanProjectionRequest) => bridge.project(tx, request),
+    preview: (executor: unknown, derivation: ColemanDerivation) => bridge.preview(executor, derivation),
+  },
+}));
+
+/** A STUB projection: reports every derived winner as inserted and writes nothing. */
+function stubProjection(request: ColemanProjectionRequest): ColemanProjectionResult {
+  const winners = request.derivation.winners;
+  return {
+    projectionId: null,
+    actions: winners.map((winner) => ({ entityKey: `afltables:${winner.key}`, action: 'inserted' as const, awardWinnerId: null })),
+    counts: { inserted: winners.length, updated: 0, voided: 0, retained: 0 },
+    changedCount: winners.length,
+    revalidatePaths: ['/awards', '/awards/coleman', `/awards/coleman/${request.derivation.season}`],
+  };
+}
 
 const auditMock = vi.mocked(audit);
 const guardMock = vi.mocked(requireCapability);
@@ -125,8 +161,6 @@ const guardMock = vi.mocked(requireCapability);
 const SUPER_USER: AdminUser = { id: 1, email: 'super@example.invalid', role: 'super_admin', canManageAdmins: true, mustChangePassword: false };
 const PLAIN_ADMIN: AdminUser = { id: 2, email: 'admin@example.invalid', role: 'admin', canManageAdmins: false, mustChangePassword: false };
 const CONTRIBUTOR_USER: AdminUser = { id: 3, email: 'contributor@example.invalid', role: 'contributor', canManageAdmins: false, mustChangePassword: false };
-
-const SUPER_VIEWER: CuratedAwardsViewer = { role: 'super_admin', canManageAdmins: true, userId: 1 };
 
 const NOW = () => new Date('2026-10-19T12:00:00Z');
 const OPTIONS = { now: NOW };
@@ -226,6 +260,8 @@ const ID_TWO = 'afltables:players/s/synthetic_two.html';
 
 const MIGRATION_111 = join(process.cwd(), 'src', 'db', 'migrations', '111_curated_award_proposals.sql');
 const MIGRATION_112 = join(process.cwd(), 'src', 'db', 'migrations', '112_derived_award_results.sql');
+const MIGRATION_113 = join(process.cwd(), 'src', 'db', 'migrations', '113_brownlow_eligibility_decisions.sql');
+const MIGRATION_114 = join(process.cwd(), 'src', 'db', 'migrations', '114_award_projections_and_curated_revisions.sql');
 
 let db: InMemoryPglite;
 
@@ -247,6 +283,8 @@ async function asImportExecutor<T>(work: (executor: TransactionalSqlExecutor) =>
   }
 }
 
+const STUB_REVALIDATE_PATHS = ['/awards', '/awards/synthetic-medal', '/awards/synthetic-medal/1990'];
+
 /** A STUB promotion port: writes a stub award_winners row. It is NOT insertAwardWinner. */
 function stubPromotion(options: { fail?: 'after_write_refusal' | 'after_write_error' } = {}): AwardPromotionPort {
   return {
@@ -262,7 +300,8 @@ function stubPromotion(options: { fail?: 'after_write_refusal' | 'after_write_er
       );
       if (options.fail === 'after_write_refusal') throw new CuratedAwardError('promotion_refused', 'STUB promotion refused after writing');
       if (options.fail === 'after_write_error') throw new Error('STUB boom: connection reset by peer');
-      return { entityKey: `manual_admin_edit:stub-award-winner-${row.id}` };
+      // V2-GAP-024: the production port returns the paths of the row it wrote; the stub returns fixed ones.
+      return { entityKey: `manual_admin_edit:stub-award-winner-${row.id}`, revalidatePaths: STUB_REVALIDATE_PATHS };
     },
   };
 }
@@ -301,11 +340,16 @@ function proposal(overrides: Partial<ProposalInput> = {}): ProposalInput {
   };
 }
 
-/** Seed a proposal straight through the services (no audit row), optionally validated. */
+/**
+ * Seed a proposal straight through the services (no audit row), optionally validated. Created by a
+ * DIFFERENT super admin (stub user 2) than the one the tests approve as (user 1), so the four-eyes
+ * rule (V2-GAP-019) is satisfied without an attestation; the self-approval paths have their own tests.
+ */
+const SEEDING_SUPER_VIEWER: CuratedAwardsViewer = { role: 'super_admin', canManageAdmins: true, userId: 2 };
 async function seedProposal(overrides: Partial<ProposalInput> = {}, validated = true): Promise<number> {
   return asImportExecutor(async (executor) => {
-    const created = await createProposal(SUPER_VIEWER, executor, proposal(overrides), OPTIONS);
-    if (validated) await validateProposal(SUPER_VIEWER, executor, { proposalId: created.id }, OPTIONS);
+    const created = await createProposal(SEEDING_SUPER_VIEWER, executor, proposal(overrides), OPTIONS);
+    if (validated) await validateProposal(SEEDING_SUPER_VIEWER, executor, { proposalId: created.id }, OPTIONS);
     return created.id;
   });
 }
@@ -334,6 +378,7 @@ function auditActions(): string[] {
 }
 
 const LONG_NOTE = 'SYNTHETIC reviewer note: checked against the annual report.';
+const SELF_ATTESTATION = 'SYNTHETIC attestation: no second reviewer is available this week.';
 
 beforeAll(async () => {
   db = await createInMemoryPglite();
@@ -341,6 +386,8 @@ beforeAll(async () => {
   // The migrations under test, applied VERBATIM from disk (not edited to suit PGlite).
   await db.exec(readFileSync(MIGRATION_111, 'utf8'));
   await db.exec(readFileSync(MIGRATION_112, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_113, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_114, 'utf8'));
   bridge.withExecutor = asImportExecutor as unknown as typeof bridge.withExecutor;
   bridge.promote = (tx, request) => stubPromotion().promote(tx as SqlExecutor, request as Parameters<AwardPromotionPort['promote']>[1]);
 }, 60_000);
@@ -351,13 +398,21 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.query('RESET ROLE');
-  await db.exec(`TRUNCATE award_proposal_decisions, award_proposals, award_winners, derived_award_results,
+  await db.exec(`TRUNCATE award_proposal_decisions, award_proposals, award_winners, derived_award_projections,
+                          derived_award_results, brownlow_eligibility_decisions,
                           player_match_stats, matches, brownlow_season_votes, staging.afl_api_brownlow_vote RESTART IDENTITY CASCADE`);
   await db.exec('DELETE FROM external_identities WHERE player_id >= 11');
   session.actor = null;
   auditMock.mockReset();
   auditMock.mockResolvedValue(undefined);
   guardMock.mockClear();
+  bridge.project.mockReset();
+  bridge.project.mockImplementation(async (_tx, request) => stubProjection(request));
+  bridge.preview.mockReset();
+  bridge.preview.mockResolvedValue({
+    ok: true, counts: { inserted: 1, updated: 0, voided: 0, retained: 0 }, changedCount: 1,
+    actions: [{ entityKey: `afltables:${WINNER_A_KEY}`, action: 'inserted', awardWinnerId: null }],
+  });
 });
 
 afterEach(() => {
@@ -822,6 +877,86 @@ describe('curated awards: server callers on PGlite', () => {
     expect(refused).toMatchObject({ ok: false, code: 'forbidden', auditWarning: expect.any(String) });
     expect(errorLog).toHaveBeenCalledTimes(2);
   });
+
+  // V2-GAP-018: reviseApprovedCurated over PGlite with a STUB revision port (not the production one).
+  describe('reviseApprovedCurated', () => {
+    const REVISE_PATHS = ['/awards', '/awards/synthetic-medal'];
+
+    /** Approve a seeded proposal and give its stub winner row the durable key the approval recorded. */
+    async function approvedProposal(): Promise<number> {
+      const proposalId = await seedProposal();
+      const { deps } = makeDeps({ loadSealed: () => SYNTHETIC_OPEN });
+      const approved = await approveCurated(SUPER_USER, { proposalId, decisionNote: LONG_NOTE }, deps);
+      expect(approved).toMatchObject({ ok: true, selfApproval: false, revalidatePaths: STUB_REVALIDATE_PATHS });
+      await db.query(`UPDATE award_winners SET source_id = 2, source_record_id = 'stub-award-winner-1'`);
+      // The stub revision port updates the stub winner row; the real one writes through the lifecycle.
+      await db.query('GRANT UPDATE ON award_winners TO afldb_import');
+      auditMock.mockClear();
+      return proposalId;
+    }
+
+    function stubRevision(fail = false): ApprovedWinnerRevisionPort {
+      return {
+        async revise(tx, request) {
+          await tx.query(
+            `UPDATE award_winners SET votes = $1::numeric WHERE source_record_id = $2`,
+            [request.correction.votes ?? null, request.previousEntityKey.replace(/^manual_admin_edit:/, '')],
+          );
+          if (fail) throw new CuratedAwardError('promotion_refused', 'STUB revision refused after writing');
+          return { entityKey: request.previousEntityKey, mode: request.mode, voidedEntityKey: null, revalidatePaths: REVISE_PATHS };
+        },
+      };
+    }
+
+    it('revises: the winner, the superseded and the new revision, two ledger rows and ONE audit row; the paths are returned', async () => {
+      const proposalId = await approvedProposal();
+      const revision = vi.fn(stubRevision().revise);
+      const { deps } = makeDeps({ loadSealed: () => SYNTHETIC_OPEN, revision: { revise: revision } });
+      const result = await reviseApprovedCurated(
+        SUPER_USER, { proposalId, changes: { votes: '13' }, decisionNote: LONG_NOTE }, deps,
+      );
+
+      expect(result).toMatchObject({
+        ok: true, mode: 'correct', sealedSeason: false, revalidatePaths: REVISE_PATHS,
+        entityKey: 'manual_admin_edit:stub-award-winner-1', proposal: { revision: 2, status: 'approved' },
+      });
+      expect(revision).toHaveBeenCalledTimes(1);
+      expect(revision.mock.calls[0][1]).toMatchObject({ mode: 'correct', correction: { votes: '13' }, adminNote: LONG_NOTE });
+      expect((await one<{ votes: string }>('SELECT votes::text AS votes FROM award_winners')).votes).toBe('13.00');
+      expect((await one<{ status: string }>('SELECT status FROM award_proposals WHERE id = $1', [proposalId])).status).toBe('superseded');
+      const actions = await db.query<{ action: string }>('SELECT action FROM award_proposal_decisions ORDER BY id');
+      expect(actions.rows.map((row) => row.action).slice(-2)).toEqual(['supersede_approved', 'revise_approved']);
+      expect(auditActions()).toEqual([OPERATIONS_AUDIT_ACTIONS.curatedRevised]);
+      expect(auditMock.mock.calls[0][1]).toMatchObject({ operation: 'revise_approved', mode: 'correct', outcome: 'revised' });
+    });
+
+    it('a port failure rolls everything back and is audited once as a refusal', async () => {
+      const proposalId = await approvedProposal();
+      const { deps } = makeDeps({ loadSealed: () => SYNTHETIC_OPEN, revision: stubRevision(true) });
+      const result = await reviseApprovedCurated(
+        SUPER_USER, { proposalId, changes: { votes: '13' }, decisionNote: LONG_NOTE }, deps,
+      );
+
+      expect(result).toMatchObject({ ok: false, code: 'promotion_refused' });
+      expect((await one<{ votes: string }>('SELECT votes::text AS votes FROM award_winners')).votes).toBe('12.50');
+      expect((await one<{ status: string }>('SELECT status FROM award_proposals WHERE id = $1', [proposalId])).status).toBe('approved');
+      expect(await count('award_proposals')).toBe(1);
+      expect(auditActions()).toEqual([OPERATIONS_AUDIT_ACTIONS.curatedRefused]);
+    });
+
+    it('a plain admin is refused by the caller itself: no connection, no registry read, one refusal audit row', async () => {
+      const proposalId = await approvedProposal();
+      const { deps, spies } = makeDeps();
+      const result = await reviseApprovedCurated(
+        PLAIN_ADMIN, { proposalId, changes: { votes: '13' }, decisionNote: LONG_NOTE }, deps,
+      );
+
+      expect(result).toMatchObject({ ok: false, code: 'forbidden' });
+      expect(spies.withExecutor).not.toHaveBeenCalled();
+      expect(spies.loadSealed).not.toHaveBeenCalled();
+      expect(auditActions()).toEqual([OPERATIONS_AUDIT_ACTIONS.curatedRefused]);
+    });
+  });
 });
 
 /* =============================================================================================
@@ -914,7 +1049,7 @@ describe('Coleman: server callers on PGlite', () => {
       'SELECT published_by, basis, correction, supersedes_id FROM derived_award_results');
     expect(row).toMatchObject({ published_by: 1, basis: 'audited_correction', supersedes_id: null });
     expect(row.correction).toMatchObject({ workflow: 'derived_award_publication', actorUserId: 1, note: NOTE, evidenceRef: first.evidenceRef });
-    expect(await count('award_winners')).toBe(0); // V2-GAP-021: never projected into award_winners
+    expect(await count('award_winners')).toBe(0); // the STUB projection port writes nothing; the real one is proven on PostgreSQL
 
     const again = await publishColemanSeason(SUPER_USER, { season: 2024, settled: true, note: NOTE }, deps);
     expect(again).toMatchObject({ ok: true, outcome: 'unchanged', id: 1, supersededId: null });
@@ -963,6 +1098,91 @@ describe('Coleman: server callers on PGlite', () => {
     spies.withExecutor.mockClear();
     expect(await listColemanPublicationsForAdmin(CONTRIBUTOR_USER, {}, deps)).toMatchObject({ ok: false, code: 'forbidden' });
     expect(spies.withExecutor, 'a refused viewer never opens a connection').not.toHaveBeenCalled();
+  });
+
+  it('publish ALWAYS passes the production projection port, after the ledger step, on every outcome including unchanged', async () => {
+    const { deps } = makeDeps(); // no colemanProjection override: the default (mocked production) port is used
+    const first = await publishColemanSeason(SUPER_USER, { season: 2024, settled: true, note: NOTE }, deps);
+    expect(first).toMatchObject({ ok: true, outcome: 'published', id: 1 });
+    expect(bridge.project).toHaveBeenCalledTimes(1);
+    const [, firstRequest] = bridge.project.mock.calls[0];
+    expect(firstRequest).toMatchObject({
+      derivedAwardResultId: 1, ledgerOutcome: 'published', publishedBy: 1,
+      audit: { workflow: 'derived_award_publication', actorUserId: 1, note: NOTE },
+    });
+    expect(firstRequest.derivation.winners.map((w) => w.key)).toEqual([WINNER_A_KEY]);
+
+    // A rerun leaves the ledger alone ('unchanged') and still goes through the port.
+    const again = await publishColemanSeason(SUPER_USER, { season: 2024, settled: true, note: NOTE }, deps);
+    expect(again).toMatchObject({ ok: true, outcome: 'unchanged', id: 1 });
+    expect(bridge.project).toHaveBeenCalledTimes(2);
+    expect(bridge.project.mock.calls[1][1]).toMatchObject({ derivedAwardResultId: 1, ledgerOutcome: 'unchanged' });
+
+    // An injected port replaces it (and only then); nothing else ever bypasses the port.
+    const injected = vi.fn(async (_tx: unknown, request: ColemanProjectionRequest) => stubProjection(request));
+    await publishColemanSeason(SUPER_USER, { season: 2024, settled: true, note: NOTE }, { ...deps, colemanProjection: { project: injected, preview: vi.fn() } });
+    expect(injected).toHaveBeenCalledTimes(1);
+    expect(bridge.project).toHaveBeenCalledTimes(2);
+  });
+
+  it('publish returns the projection summary and the server-computed revalidation paths; the audit row carries the counts', async () => {
+    const { deps } = makeDeps();
+    const result = await publishColemanSeason(SUPER_USER, { season: 2024, settled: true, note: NOTE }, deps);
+    expect(result).toMatchObject({
+      ok: true,
+      projection: { projectionId: null, changedCount: 1, provenanceOnly: false, alreadyProjected: false, counts: { inserted: 1, retained: 0 } },
+      revalidatePaths: ['/awards', '/awards/coleman', '/awards/coleman/2024'],
+    });
+    expect(auditMock.mock.calls[0][1]).toMatchObject({ projected: { inserted: 1, updated: 0, voided: 0, retained: 0 }, provenanceOnly: false });
+
+    // Provenance only: the port reports no change but recorded a projection row.
+    bridge.project.mockImplementation(async (_tx, request) => ({
+      ...stubProjection(request), projectionId: 7, changedCount: 0, revalidatePaths: [],
+      counts: { inserted: 0, updated: 0, voided: 0, retained: 1 },
+    }));
+    const provenance = await publishColemanSeason(SUPER_USER, { season: 2024, settled: true, note: NOTE }, deps);
+    expect(provenance).toMatchObject({
+      ok: true, projection: { projectionId: 7, changedCount: 0, provenanceOnly: true, alreadyProjected: false }, revalidatePaths: [],
+    });
+  });
+
+  it('a projection refusal rolls the LEDGER row back, is returned with its typed code and rows, and is audited as a refusal', async () => {
+    bridge.project.mockImplementation(async () => {
+      throw new ColemanProjectionRefusal('foreign_winner_rows', 'Refused: SYNTHETIC foreign row.', ['#7 manual_admin_edit:award_winner:SYNTHETIC']);
+    });
+    const { deps } = makeDeps();
+    const result = await publishColemanSeason(SUPER_USER, { season: 2024, settled: true, note: NOTE }, deps);
+    expect(result).toMatchObject({ ok: false, code: 'foreign_winner_rows' });
+    if (!result.ok) expect(result.error).toContain('#7 manual_admin_edit:award_winner:SYNTHETIC');
+    expect(bridge.project).toHaveBeenCalledTimes(1);
+    expect(await count('derived_award_results')).toBe(0); // the ledger insert ran, then rolled back
+    expect(auditActions()).toEqual([OPERATIONS_AUDIT_ACTIONS.colemanRefused]);
+    expect(auditMock.mock.calls[0][1]).toMatchObject({ code: 'foreign_winner_rows', outcome: 'refused' });
+  });
+
+  it('compare previews the award_winners effect through the same port, read-only, and only for a derivable sealed season', async () => {
+    const { deps } = makeDeps();
+    const result = await compareColemanSeason(PLAIN_ADMIN, { season: 2024, settled: true }, deps);
+    expect(result).toMatchObject({
+      ok: true,
+      comparison: { projection: { ok: true, counts: { inserted: 1 }, changedCount: 1 } },
+    });
+    expect(bridge.preview).toHaveBeenCalledTimes(1);
+    expect(bridge.project).not.toHaveBeenCalled();
+    expect(await count('derived_award_results')).toBe(0);
+
+    // A refusal the write would hit is shown, not thrown.
+    bridge.preview.mockResolvedValue({ ok: false, refusal: { code: 'admin_override_present', message: 'SYNTHETIC', subjects: ['#1 afltables:x'] } });
+    expect(await compareColemanSeason(PLAIN_ADMIN, { season: 2024, settled: true }, deps))
+      .toMatchObject({ ok: true, comparison: { projection: { ok: false, refusal: { code: 'admin_override_present' } } } });
+
+    // Not derivable (no settled attestation) and not sealed: no preview is computed at all.
+    bridge.preview.mockClear();
+    expect(await compareColemanSeason(PLAIN_ADMIN, { season: 2024, settled: false }, deps))
+      .toMatchObject({ ok: true, comparison: { projection: null } });
+    expect(await compareColemanSeason(PLAIN_ADMIN, { season: 2026, settled: true }, deps))
+      .toMatchObject({ ok: true, comparison: { projection: null } });
+    expect(bridge.preview).not.toHaveBeenCalled();
   });
 
   it('a Coleman contract that cannot be read refuses with its own code', async () => {
@@ -1090,21 +1310,35 @@ describe('Server Actions: the curated workflow end to end', () => {
     const validated = await validateCuratedProposalAction({}, form({ proposalId: '1' }));
     expect(validated).toMatchObject({ ok: true, validation: 'validated', proposal: { status: 'validated' } });
 
+    // Four eyes (V2-GAP-019): this super admin CREATED the revision, so approving it needs an attestation.
+    const noAttestation = await approveCuratedProposalAction({}, form({ proposalId: '1', decisionNote: LONG_NOTE }));
+    expect(noAttestation).toMatchObject({ code: 'self_approval_forbidden', fieldErrors: { selfApprovalAttestation: expect.any(String) } });
+    const shortAttestation = await approveCuratedProposalAction({}, form({ proposalId: '1', decisionNote: LONG_NOTE, selfApprovalAttestation: 'too short' }));
+    expect(shortAttestation).toMatchObject({ code: 'self_approval_attestation_required', fieldErrors: { selfApprovalAttestation: expect.any(String) } });
+    expect(await count('award_winners')).toBe(0);
+
     // Season 1990 is sealed in the REAL registry (the default dependency): no note -> field error.
-    const noNote = await approveCuratedProposalAction({}, form({ proposalId: '1' }));
+    const noNote = await approveCuratedProposalAction({}, form({ proposalId: '1', selfApprovalAttestation: SELF_ATTESTATION }));
     expect(noNote).toMatchObject({ code: 'season_sealed_correction_invalid', fieldErrors: { decisionNote: expect.any(String) } });
     expect(await count('award_winners')).toBe(0);
 
-    const approved = await approveCuratedProposalAction({}, form({ proposalId: '1', decisionNote: LONG_NOTE }));
-    expect(approved).toMatchObject({ ok: true, sealedSeason: true, proposal: { status: 'approved' } });
+    const approved = await approveCuratedProposalAction({}, form({ proposalId: '1', decisionNote: LONG_NOTE, selfApprovalAttestation: SELF_ATTESTATION }));
+    expect(approved).toMatchObject({
+      ok: true, sealedSeason: true, selfApproval: true, proposal: { status: 'approved' }, revalidatePaths: STUB_REVALIDATE_PATHS,
+    });
     expect(await count('award_winners')).toBe(1);
+    const ledger = await one<{ new_values: Record<string, unknown> }>(
+      `SELECT new_values FROM award_proposal_decisions WHERE action = 'approve'`);
+    expect(ledger.new_values).toMatchObject({ selfApproval: true, selfApprovalAttestation: SELF_ATTESTATION });
 
-    const again = await approveCuratedProposalAction({}, form({ proposalId: '1', decisionNote: LONG_NOTE }));
+    const again = await approveCuratedProposalAction({}, form({ proposalId: '1', decisionNote: LONG_NOTE, selfApprovalAttestation: SELF_ATTESTATION }));
     expect(again).toMatchObject({ code: 'illegal_transition' });
 
     expect(auditActions()).toEqual([
       OPERATIONS_AUDIT_ACTIONS.curatedCreated,
       OPERATIONS_AUDIT_ACTIONS.curatedValidated,
+      OPERATIONS_AUDIT_ACTIONS.curatedRefused,
+      OPERATIONS_AUDIT_ACTIONS.curatedRefused,
       OPERATIONS_AUDIT_ACTIONS.curatedRefused,
       OPERATIONS_AUDIT_ACTIONS.curatedApproved,
       OPERATIONS_AUDIT_ACTIONS.curatedRefused,
@@ -1135,6 +1369,9 @@ describe('Server Actions: the Coleman workflow end to end', () => {
 
     const published = await publishColemanSeasonAction({}, form({ season: '2024', settled: 'on', note: LONG_NOTE }));
     expect(published).toMatchObject({ ok: true, publication: { outcome: 'published', id: 1, season: 2024, winnerKeys: [WINNER_A_KEY] } });
+    // The action NEVER revalidates; it returns the server-computed paths for the client to post.
+    expect(published).toMatchObject({ revalidatePaths: ['/awards', '/awards/coleman', '/awards/coleman/2024'] });
+    expect(published.message).toContain('award_winners: 1 inserted, 0 updated, 0 voided, 0 retained.');
     const repeat = await publishColemanSeasonAction({}, form({ season: '2024', settled: 'on', note: LONG_NOTE }));
     expect(repeat).toMatchObject({ ok: true, publication: { outcome: 'unchanged', id: 1 } });
     expect(await count('derived_award_results')).toBe(1);
@@ -1175,5 +1412,191 @@ describe('action modules (static)', () => {
     expect(hasCapability(CONTRIBUTOR_USER, 'data.awards.read')).toBe(false);
     expect(hasCapability(PLAIN_ADMIN, 'data.brownlow.read')).toBe(true);
     expect(hasCapability(CONTRIBUTOR_USER, 'data.brownlow.read')).toBe(false);
+  });
+});
+
+
+/* =============================================================================================
+ * Launch F F-D stream A: Brownlow eligibility callers, action and form (docs/v2/adr/0014)
+ *
+ * What runs here: the capability refusals, the pre-SQL gate, the audit rows, the Server Action's
+ * guard and parsing, the action-card wording and its drift test. What does NOT run here: the
+ * decision SQL itself - it needs the postgres.js adapter (player identity is resolved through
+ * `resolvePlayerIdentity`), so over PGlite the service refuses with `unexpected`; the real thing is
+ * proved against PostgreSQL by tests/integration/v2-brownlow-eligibility.test.ts.
+ * =========================================================================================== */
+describe('Brownlow eligibility: callers, Server Action and form (Launch F F-D stream A)', () => {
+  const DECISION = (over: Record<string, unknown> = {}) => ({
+    season: 2024, playerId: 11, verdict: 'ineligible' as const, citation: 'https://example.invalid/ruling',
+    note: LONG_NOTE, expectedCurrentDecisionId: null, ...over,
+  });
+  const decisionForm = (over: Record<string, string | undefined> = {}) => form({
+    season: '2024', playerId: '11', verdict: 'ineligible', citation: 'https://example.invalid/ruling',
+    note: LONG_NOTE, expectedCurrentDecisionId: '', ...over,
+  });
+
+  it('the action card mirrors the audit actions of OPERATIONS_AUDIT_ACTIONS exactly', async () => {
+    const { BROWNLOW_ELIGIBILITY_AUDIT_ACTIONS } = await import('@/app/admin/operations/brownlow/eligibility-consequences');
+    expect(BROWNLOW_ELIGIBILITY_AUDIT_ACTIONS).toEqual({
+      brownlowEligibilityDecided: OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityDecided,
+      brownlowEligibilityRefused: OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityRefused,
+    });
+    expect(OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityDecided).toBe('admin.brownlow_eligibility_decided');
+    expect(OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityRefused).toBe('admin.brownlow_eligibility_refused');
+  });
+
+  it('the form constants mirror the service rules (citation 1..2000, note 20..2000)', async () => {
+    const form_ = await import('@/app/admin/operations/brownlow/eligibility-form');
+    const service = await import('@/db/queries/brownlow-eligibility');
+    expect(form_.CITATION_MAX_LENGTH).toBe(service.BROWNLOW_CITATION_MAX_LENGTH);
+    expect(form_.DECISION_NOTE_MIN_LENGTH).toBe(service.BROWNLOW_DECISION_NOTE_MIN_LENGTH);
+    expect(form_.DECISION_NOTE_MAX_LENGTH).toBe(service.BROWNLOW_DECISION_NOTE_MAX_LENGTH);
+  });
+
+  it('determine: a contributor is refused before any SQL; a bad season is refused as invalid_input; nothing is audited', async () => {
+    const { determineBrownlowSeasonForAdmin } = await import('@/lib/admin/operations-centre');
+    const { deps, spies } = makeDeps();
+    expect(await determineBrownlowSeasonForAdmin(CONTRIBUTOR_USER, { season: 2024 }, deps)).toMatchObject({ ok: false, code: 'forbidden' });
+    expect(await determineBrownlowSeasonForAdmin(PLAIN_ADMIN, { season: 24 }, deps)).toMatchObject({ ok: false, code: 'invalid_input' });
+    expect(spies.withExecutor).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it('record: a plain admin and a contributor are refused (forbidden) BEFORE the registry or any connection; one refused audit row each', async () => {
+    const { recordBrownlowEligibilityForAdmin } = await import('@/lib/admin/operations-centre');
+    const loadRegistry = vi.fn(() => REGISTRY);
+    const { deps, spies } = makeDeps({ loadRegistry });
+    for (const actor of [PLAIN_ADMIN, CONTRIBUTOR_USER]) {
+      expect(await recordBrownlowEligibilityForAdmin(actor, DECISION(), deps)).toMatchObject({ ok: false, code: 'forbidden' });
+    }
+    expect(loadRegistry).not.toHaveBeenCalled();
+    expect(spies.withExecutor).not.toHaveBeenCalled();
+    expect(await count('brownlow_eligibility_decisions')).toBe(0);
+    expect(auditActions()).toEqual([OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityRefused, OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityRefused]);
+    // The audit detail carries ids and codes, never the note or the citation.
+    const detail = JSON.stringify(auditMock.mock.calls[0][1]);
+    expect(detail).toContain('"code":"forbidden"');
+    expect(detail).not.toContain(LONG_NOTE);
+    expect(detail).not.toContain('example.invalid');
+  });
+
+  it('record: the service gate refuses a blank citation, a short note and a bad verdict with typed codes and writes nothing', async () => {
+    const { recordBrownlowEligibilityForAdmin } = await import('@/lib/admin/operations-centre');
+    const { deps } = makeDeps();
+    expect(await recordBrownlowEligibilityForAdmin(SUPER_USER, DECISION({ citation: '   ' }), deps)).toMatchObject({ ok: false, code: 'citation_required' });
+    expect(await recordBrownlowEligibilityForAdmin(SUPER_USER, DECISION({ note: 'too short' }), deps)).toMatchObject({ ok: false, code: 'note_invalid' });
+    expect(await recordBrownlowEligibilityForAdmin(SUPER_USER, DECISION({ verdict: 'maybe' }), deps)).toMatchObject({ ok: false, code: 'invalid_input' });
+    expect(await recordBrownlowEligibilityForAdmin(SUPER_USER, DECISION({ season: 1800 }), deps)).toMatchObject({ ok: false, code: 'invalid_input' });
+    expect(await count('brownlow_eligibility_decisions')).toBe(0);
+    expect(auditActions()).toEqual(Array(4).fill(OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityRefused));
+  });
+
+  it('record: over a non-postgres.js executor the service refuses to guess an identity (unexpected) and writes nothing', async () => {
+    const { recordBrownlowEligibilityForAdmin } = await import('@/lib/admin/operations-centre');
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { deps } = makeDeps();
+    const result = await recordBrownlowEligibilityForAdmin(SUPER_USER, DECISION(), deps);
+    expect(result).toMatchObject({ ok: false, code: 'unexpected' });
+    expect(await count('brownlow_eligibility_decisions')).toBe(0);
+    expect(auditActions()).toEqual([OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityRefused]);
+  });
+
+  it('the Server Action redirects anonymous callers, contributors and a plain admin (guard: data.brownlow.finalise); nothing is written or audited', async () => {
+    const { recordBrownlowEligibilityAction } = await import('@/app/admin/operations/brownlow/actions');
+    for (const actor of [null, CONTRIBUTOR_USER, PLAIN_ADMIN]) {
+      session.actor = actor;
+      await expect(recordBrownlowEligibilityAction({}, decisionForm()), actor?.role ?? 'anonymous').rejects.toThrow('NEXT_REDIRECT');
+    }
+    expect(guardMock.mock.calls.every((call) => call[0] === 'data.brownlow.finalise')).toBe(true);
+    expect(await count('brownlow_eligibility_decisions')).toBe(0);
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it('the Server Action refuses a bad form with field errors, after the guard and before any service; the player is echoed', async () => {
+    const { recordBrownlowEligibilityAction } = await import('@/app/admin/operations/brownlow/actions');
+    session.actor = SUPER_USER;
+    const state = await recordBrownlowEligibilityAction({}, decisionForm({ season: '24', verdict: 'maybe', citation: ' ', note: 'short', expectedCurrentDecisionId: 'x' }));
+    expect(state).toMatchObject({
+      code: 'invalid_input',
+      playerId: 11,
+      fieldErrors: {
+        season: expect.any(String), verdict: expect.any(String), citation: expect.any(String),
+        note: expect.any(String), expectedCurrentDecisionId: expect.any(String),
+      },
+    });
+    expect(await recordBrownlowEligibilityAction({}, decisionForm({ playerId: 'abc' }))).toMatchObject({ code: 'invalid_input', fieldErrors: { playerId: expect.any(String) } });
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it('a refusal from the service maps onto the right field and the state is plain data', async () => {
+    const { recordBrownlowEligibilityAction } = await import('@/app/admin/operations/brownlow/actions');
+    session.actor = SUPER_USER;
+    // 20+ characters pass the form's shape check; the service then refuses the (non-postgres.js) executor.
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const state = await recordBrownlowEligibilityAction({}, decisionForm());
+    expect(state).toMatchObject({ code: 'unexpected', playerId: 11 });
+    expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+    const { brownlowFailureState } = await import('@/app/admin/operations/brownlow/eligibility-form');
+    expect(brownlowFailureState({ ok: false, code: 'citation_required', error: 'cite it' }, 7)).toMatchObject({ playerId: 7, fieldErrors: { citation: 'cite it' } });
+    expect(brownlowFailureState({ ok: false, code: 'note_invalid', error: 'longer' }, 7)).toMatchObject({ fieldErrors: { note: 'longer' } });
+    expect(brownlowFailureState({ ok: false, code: 'stale_decision', error: 'reload' }, 7)).toMatchObject({ code: 'stale_decision', playerId: 7 });
+  });
+
+  it('form parsing: shape checks only, with the boundaries', async () => {
+    const f = await import('@/app/admin/operations/brownlow/eligibility-form');
+    expect(f.parseBrownlowPlayerId('12')).toEqual({ ok: true, value: 12 });
+    expect(f.parseBrownlowPlayerId('0').ok).toBe(false);
+    expect(f.parseBrownlowPlayerId('1e3').ok).toBe(false);
+    expect(f.parseBrownlowVerdict('eligible')).toEqual({ ok: true, value: 'eligible' });
+    expect(f.parseBrownlowVerdict('Eligible').ok).toBe(false);
+    expect(f.parseBrownlowCitation('  ref  ')).toEqual({ ok: true, value: 'ref' });
+    expect(f.parseBrownlowCitation('').ok).toBe(false);
+    expect(f.parseBrownlowCitation('x'.repeat(2001)).ok).toBe(false);
+    expect(f.parseBrownlowCitation('x'.repeat(2000)).ok).toBe(true);
+    expect(f.parseBrownlowDecisionNote('n'.repeat(19)).ok).toBe(false);
+    expect(f.parseBrownlowDecisionNote('n'.repeat(20)).ok).toBe(true);
+    expect(f.parseBrownlowDecisionNote(`  ${'n'.repeat(19)}  `).ok).toBe(false); // trimmed before the floor
+    expect(f.parseBrownlowDecisionNote('n'.repeat(2001)).ok).toBe(false);
+    expect(f.parseExpectedDecisionId('')).toEqual({ ok: true, value: null });
+    expect(f.parseExpectedDecisionId('5')).toEqual({ ok: true, value: 5 });
+    expect(f.parseExpectedDecisionId('-1').ok).toBe(false);
+  });
+
+  it('the action card states what changes, the irreversibility, the actor and the audit entries', async () => {
+    const { describeBrownlowEligibilityConsequences } = await import('@/app/admin/operations/brownlow/eligibility-consequences');
+    const sealed = describeBrownlowEligibilityConsequences({ actingEmail: 'super@example.invalid', season: 1990, playerId: 7, identity: 'afltables:players/s/x.html', sealedSeason: true, supersedesId: 4 });
+    expect(sealed.changes.join(' ')).toMatch(/append-only/);
+    expect(sealed.changes.join(' ')).toMatch(/NOT change any raw vote/);
+    expect(sealed.affected).toContain('afltables:players/s/x.html');
+    expect(sealed.validationState).toMatch(/SEALED/);
+    expect(sealed.validationState).toMatch(/supersede decision #4/);
+    expect(sealed.reversible).toBe(false);
+    expect(sealed.reversibility).toMatch(/supersedes/);
+    expect(sealed.actingUser).toContain('super@example.invalid');
+    expect(sealed.audit.activityActions).toEqual(['admin.brownlow_eligibility_decided', 'admin.brownlow_eligibility_refused']);
+    const open = describeBrownlowEligibilityConsequences({ season: 2026, playerId: 7, sealedSeason: false });
+    expect(open.validationState).toMatch(/open/);
+    expect(open.validationState).toMatch(/No earlier decision/);
+    expect(describeBrownlowEligibilityConsequences({ season: 2026, playerId: 7, sealedSeason: null }).validationState).toMatch(/fails closed/);
+  });
+
+  it('the Brownlow action module exports only async functions, never revalidates, and guards first', () => {
+    const source = readFileSync(join(process.cwd(), 'src', 'app', 'admin', 'operations', 'brownlow', 'actions.ts'), 'utf8').replace(/\r\n/g, '\n');
+    expect(source.startsWith("'use server';")).toBe(true);
+    const exports = [...source.matchAll(/^export\s+(.*)$/gm)].map((m) => m[1]);
+    expect(exports.length).toBeGreaterThan(0);
+    for (const declaration of exports) expect(declaration).toMatch(/^async function \w+\(/);
+    expect(source).not.toMatch(/\brevalidatePath\s*\(|from 'next\/cache'/);
+    const actionCount = [...source.matchAll(/^export async function \w+Action\(/gm)].length;
+    const guarded = [...source.matchAll(/^export async function \w+Action\([^{]*\{\n  const admin = await requireCapability\('data\.brownlow\.finalise'\);/gm)].length;
+    expect(guarded).toBe(actionCount);
+    expect(actionCount).toBe(1);
+  });
+
+  it('hasCapability: the decision is Super Admin only, the read is Admin and up', () => {
+    expect(hasCapability(SUPER_USER, 'data.brownlow.finalise')).toBe(true);
+    expect(hasCapability(PLAIN_ADMIN, 'data.brownlow.finalise')).toBe(false);
+    expect(hasCapability(CONTRIBUTOR_USER, 'data.brownlow.finalise')).toBe(false);
+    expect(hasCapability(PLAIN_ADMIN, 'data.brownlow.read')).toBe(true);
   });
 });

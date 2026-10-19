@@ -418,6 +418,31 @@ BEGIN
     GRANT USAGE ON SEQUENCE derived_award_results_id_seq TO afldb_import;
   END IF;
 
+  -- Migration 113 (AFLDB V2 Launch F, Brownlow eligibility): the append-only
+  -- ledger of administrator eligibility decisions. A decision is one INSERT
+  -- as afldb_import, in a single transaction; a reversal is a NEW row that
+  -- supersedes the old, never an UPDATE, and no role gets DELETE or TRUNCATE.
+  -- SELECT, INSERT and sequence USAGE only. Not registered in
+  -- import_writable_tables, whose loop above would grant UPDATE, DELETE and
+  -- TRUNCATE. Not app-readable. The revoke loop strips these each run;
+  -- re-grant them here.
+  IF to_regclass('public.brownlow_eligibility_decisions') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON brownlow_eligibility_decisions TO afldb_import;
+    GRANT USAGE ON SEQUENCE brownlow_eligibility_decisions_id_seq TO afldb_import;
+  END IF;
+
+  -- Migration 114 (AFLDB V2 Launch F, derived awards): the append-only
+  -- provenance ledger of projecting a published derivation into award_winners
+  -- (keys and actions only, not a winner store). SELECT, INSERT and sequence
+  -- USAGE only; one INSERT per projection as afldb_import, in the projection's
+  -- single transaction. Not registered in import_writable_tables (the loop
+  -- above would grant UPDATE, DELETE and TRUNCATE). Not app-readable. The
+  -- revoke loop strips these each run; re-grant them here.
+  IF to_regclass('public.derived_award_projections') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON derived_award_projections TO afldb_import;
+    GRANT USAGE ON SEQUENCE derived_award_projections_id_seq TO afldb_import;
+  END IF;
+
   -- Migration 094 (AFLDB-ISSUE-155 Phase C1): the Brownlow administration
   -- workflow. These two tables record administrative decisions -- who
   -- drafted, who finalised, who published a season and from which
@@ -557,6 +582,14 @@ DECLARE
     -- alone (see migration 112, AFLDB V2 Stage 4). The admin history view may
     -- only read it.
     ['derived_award_results',  'SELECT'],                            -- 112
+    -- Read-only: the Brownlow eligibility decision ledger is written by
+    -- afldb_import alone (see migration 113, AFLDB V2 Launch F). The admin
+    -- history view may only read it.
+    ['brownlow_eligibility_decisions', 'SELECT'],                    -- 113
+    -- Read-only: the derived-award projection provenance ledger is written by
+    -- afldb_import alone (see migration 114, AFLDB V2 Launch F). The admin
+    -- history view may only read it.
+    ['derived_award_projections', 'SELECT'],                         -- 114
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023

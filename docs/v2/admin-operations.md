@@ -14,7 +14,7 @@ PGlite over labelled stubs (V2-GAP-017). Roles and capabilities are the existing
 | Award proposals (queue) | `/admin/operations/awards` | `data.awards.read` (Admin, Super Admin) | create from a local file: `data.awards.edit` (Super Admin) |
 | Award proposal (one) | `/admin/operations/awards/[id]` | `data.awards.read` | validate / approve / reject: `data.awards.edit` |
 | Coleman Medal derivation | `/admin/operations/coleman` | `data.awards.read` (includes the read-only compare) | publish: `data.awards.edit` |
-| Brownlow reconciliation | `/admin/operations/brownlow` | `data.brownlow.read` (Admin, Super Admin) | none (read-only) |
+| Brownlow reconciliation and medal determination | `/admin/operations/brownlow` | `data.brownlow.read` (Admin, Super Admin) | record an eligibility decision: `data.brownlow.finalise` (Super Admin) |
 
 Every page calls its capability guard as its first awaited statement; every server action does the
 same, and the server caller (`src/lib/admin/operations-centre.ts`) checks the capability again, so a
@@ -57,15 +57,26 @@ issues and any audit warning. **An audit warning means the change WAS made: do n
 |---|---|---|---|---|
 | Create proposals from a local file (JSON or CSV, pasted or uploaded; nothing is fetched) | N `award_proposals` (status `proposed`) and N ledger rows, all or none; validates and approves nothing | in effect: a proposal can be rejected or left alone | `award_proposal_decisions` ledger | `admin.curated_award_created` / `admin.curated_award_refused` |
 | Validate | status to `validated` or `validation_failed`; one ledger row | yes (re-validate, or reject) | ledger | `admin.curated_award_validated` / `admin.curated_award_refused` |
-| Approve | one transaction: re-validate, pass the season seal, write `award_winners` with `data_overrides` and `data_edits` through `insertAwardWinner`, set `approved`, write the ledger; any failure rolls all of it back | **no**: approved is terminal; correct the winner through `/admin/awards` | ledger and `data_edits` | `admin.curated_award_approved` / `admin.curated_award_refused` |
+| Approve | one transaction: re-validate, pass the season seal, write `award_winners` with `data_overrides` and `data_edits` through `insertAwardWinner`, set `approved`, write the ledger; any failure rolls all of it back | **no**; an approved winner is corrected by an audited approved revision (below) or through `/admin/awards` | ledger and `data_edits` | `admin.curated_award_approved` / `admin.curated_award_refused` |
 | Reject | status to `rejected`; the reason (at least 10 characters) kept in the ledger | **no**: terminal; a corrected entry is a new proposal | ledger | `admin.curated_award_rejected` / `admin.curated_award_refused` |
-| Coleman publish | one append-only `derived_award_results` row, or none when the recompute is unchanged; never touches `award_winners` | not undone; a later recompute supersedes | `derived_award_results.correction` (workflow `derived_award_publication`) | `admin.coleman_published` / `admin.coleman_publication_refused` |
+| Coleman publish | one transaction: one append-only `derived_award_results` row (none when unchanged), then the projection into `award_winners` with the loader's key and row tuple (insert / update / void / retain; refuses foreign rows, administrator overrides and voided derived rows), `data_edits` per changed row and one `derived_award_projections` provenance row (none on an idempotent rerun); the form posts the returned public paths to `/admin/awards/revalidate` (ADR 0015) | not undone; a later republish supersedes and is itself audited | `derived_award_results.correction` (workflow `derived_award_publication`), `derived_award_projections`, `data_edits` | `admin.coleman_published` / `admin.coleman_publication_refused` |
 
 Notes:
 
 - Approving into a **sealed** season is an audited correction (workflow `curated_award_approval`)
   and needs a decision note of 20 to 2000 characters; approving Wikipedia-derived input needs a
-  note of at least 20 characters. There is no four-eyes rule (V2-GAP-019).
+  note of at least 20 characters. **Four eyes (Launch F):** the creator of the revision being approved may not
+  approve it, except a Super Admin who supplies a self-approval attestation of at least 20 characters; the
+  approval ledger row records `selfApproval` and the attestation (ADR 0008).
+- **Revise approved winner (Launch F, V2-GAP-018):** one transaction that validates the new values, passes the
+  seal (`curated_award_approval`), corrects the canonical row in place (non-identity fields) or voids it and
+  records the replacement (identity fields), supersedes the approved revision (`supersede_approved`) and inserts
+  the new approved revision (`revise_approved`); a note of 20-2000 characters is required. Any failure rolls all
+  of it back. Audit: two ledger rows plus the replace/correct `data_edits` and `data_overrides` rows;
+  activity row `admin.curated_award_revised`.
+- **Identity first (V2-GAP-020):** a winner without a durable player identity cannot be approved (re-validation
+  refuses with `player_unresolved`). Link the player through the existing identity tools (player links), then
+  propose again.
 - Coleman **publish** needs the operator's "settled" attestation (every promotion and settle for
   the season has concluded; plan §7 R-022) and a note of 20 to 2000 characters. The evidence
   reference stored with it is `coleman_derivation:<season>:<inputChecksum>`. A season with a goal
@@ -74,13 +85,13 @@ Notes:
   compares it with the stored winners and the current publication; it writes and audits nothing.
 - Activity-trail rows are written after the transaction settles and can never change its outcome
   (the awards-admin pattern); reads write no audit row.
-- An approval does not refresh the cached public award pages; they can show the old record for up
-  to a day (V2-GAP-024).
+- Approval, approved revision and Coleman publication return the server-computed public paths and the form
+  posts them to `/admin/awards/revalidate` after success, as `/admin/awards` does (V2-GAP-024).
 - Every database call of the operations centre uses the import-role connection
   (`AFLDB_IMPORT_DATABASE_URL`, as the other audited editors do); the activity trail uses the auth
   connection.
 
-## 4. Brownlow reconciliation (`/admin/operations/brownlow`, read-only)
+## 4. Brownlow reconciliation and eligibility-aware medal determination (`/admin/operations/brownlow`)
 
 Pick a season and an eligibility rule. The page runs `reconcileBrownlowSeason` (ADR 0007) over the
 staged AFL API round votes (`staging.afl_api_brownlow_vote`), the stored totals
@@ -89,6 +100,19 @@ severity, comparisons, raw totals, and a leader only when the determination is `
 Caveats stated on the page: no eligibility rule is recorded for API-era seasons (V2-GAP-016; the
 default rule `unrecorded` refuses a leader when an ineligible player polled votes), the API
 leaderboard is not staged, and provider team ids are not mapped to clubs (V2-GAP-023).
+
+**Medal determination (Launch F, ADR 0014).** The page also shows the owner's eligibility-aware determination: the
+raw leaderboard for every vote-getter with each player's eligibility status (eligible, ineligible, missing,
+ambiguous) and its source. Authoritative evidence is the current administrator decision
+(`brownlow_eligibility_decisions`), else a RECORDED statement in `brownlow_season_votes` (`is_ineligible = true`; or
+`false` on an admin-published season or with a recorded `eligible_rank`); the AFL API flag is never authoritative.
+A known-ineligible player is excluded; if a player in the deciding group is missing or ambiguous the result is
+`requires_review` and no winner is named; tied eligible leaders are joint winners. A Super Admin
+(`data.brownlow.finalise`) records an eligibility decision with a required citation and a 20-2000 character note;
+it is one append-only row (a later decision supersedes it), sealed seasons carry the
+`brownlow_eligibility_decision` audited correction, and the determination is recomputed at once. Raw votes and
+`brownlow_season_votes` are never written: projecting a decision into the published table remains the existing
+`/admin/brownlow` publish workflow, and the page says when the stored `is_winner` flags disagree.
 
 ## 5. Retired controls (V2-GAP-013, `docs/v2/legacy-disposition.md` L1-L3, L5, L6)
 
@@ -113,6 +137,9 @@ one wrapping fix; no agent or person has inspected the images, and no real page 
 3. `/admin/operations/awards/[id]`: a validated proposal with the decision panel (Super Admin) and read-only (Admin); a sealed-season approval refusal.
 4. `/admin/operations/coleman`: before compare, a derivable comparison, a refusal, the publish form.
 5. `/admin/operations/brownlow`: a reconciled season and a refused one.
+   Launch F additions: the medal determination (determined, tie, requires_review) and the eligibility decision form
+   (Super Admin) with its success and error states; the Coleman award_winners preview and publish outcome; the curated
+   self-approval attestation field and the "Revise approved winner" panel.
 6. `/admin/current-season`: only the AFL API switches and the AFL API settle units remain.
 7. `/admin/upload` (retirement notice), `/admin/submissions/[id]` (read-only history), `/admin` (no review notice, read-only submissions log).
 8. The admin sidebar for Admin and Super Admin.

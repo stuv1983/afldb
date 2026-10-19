@@ -3,6 +3,10 @@
 - Status: Accepted (2026-10-19); implemented in Stage 4 as services, migration 111 and tests — no UI,
   no server action, nothing applied to any real database
 - Plan decision: `docs/v2/plan.md` §3 D8; review resolutions R-008 and R-017 (§7)
+- Launch F (stream F-D) amendments, in the sections marked **Launch F** below: four-eyes approval
+  (V2-GAP-019), audited revision of an approved proposal (V2-GAP-018), public-page revalidation after
+  approval or revision (V2-GAP-024) and the identity-first workflow (V2-GAP-020). Migration 114 section 2
+  is the only schema change.
 
 ## Context
 
@@ -73,8 +77,11 @@ table and requires the accepted set to equal the TypeScript set.
 | `reject` | `proposed`, `validated`, `validation_failed` | `rejected` | 1, reason mandatory (≥ 10 chars) |
 | `supersede` | `proposed`, `validated`, `validation_failed` | `superseded` | 1 on the old revision |
 | `revise` | (none) | `proposed` | 1 on the new revision |
+| `supersede_approved` (Launch F) | `approved` | `superseded` | 1 on the old revision |
+| `revise_approved` (Launch F) | (none) | `approved` | 1 on the new revision |
 
-`approved`, `rejected` and `superseded` are terminal. A revision of a pending proposal is two
+`rejected` and `superseded` are terminal. `approved` has exactly one outgoing edge, `supersede_approved`,
+which only `reviseApprovedProposal` writes (see **Launch F: revising an approved proposal**). A revision of a pending proposal is two
 transitions on two rows (`supersede` the old, then `revise` the new, in that order because of the
 live-revision index), so two ledger rows; each transition still writes exactly one.
 
@@ -121,15 +128,79 @@ Wikipedia proposal into a sealed season is bound by both.
 
 Approving `wikipedia_offline_file` input additionally needs a decision note of at least 20 characters
 recording the independent verification: Wikipedia is never self-certifying and nothing approves it
-automatically. **No four-eyes rule is enforced**: a `data.awards.edit` holder may approve a proposal
-they created. That is a recorded gap, not an assumption.
+automatically.
+
+**Launch F: four eyes (V2-GAP-019, now enforced).** The Stage 4 text here said no four-eyes rule was
+enforced; that is no longer true. `approveProposal` calls `decideFourEyes` before any lookup or write:
+
+- "Creator" is `created_by` of the **revision being approved**. A reviser is the creator of their
+  revision (`insertProposalWithLedger` records them), so revising a pending proposal hands the approval
+  to someone else.
+- Another administrator approves with no further input.
+- The creator is refused with `self_approval_forbidden` unless the viewer's `role` is **explicitly**
+  `super_admin` (tested on the role, never inferred from the `data.awards.edit` capability, which is
+  super-admin-only today but may widen) **and** they supply a self-approval attestation of at least 20
+  trimmed characters. A blank attestation is `self_approval_forbidden`; a present but short one is
+  `self_approval_attestation_required`; over 2000 characters is `invalid_input`.
+- The approve ledger row records `new_values.selfApproval` (`false` for a normal approval) and, when
+  `true`, `new_values.selfApprovalAttestation`. The attestation is kept in the ledger, not in a new column.
+- The rule composes with the season seal and the Wikipedia note: all three are independent refusals, each
+  raised before the promotion port is called, each leaving nothing written.
+
+On the approval form the attestation field is shown only to the creator of a validated revision, with the
+rule explained above the field.
 
 ### Revisions
 
 `reviseProposal` creates revision n+1 (`revision_of_id`), supersedes the earlier one and never edits
-it again. Revising an **approved** proposal is refused with `approved_revision_unsupported`: the
-winner already exists, and correcting it is the existing `replaceAwardWinner` / `correctAwardWinner`
-lifecycle, which this step does not wrap (follow-up proposed as a gap).
+it again. Revising an **approved** proposal through it is still refused with
+`approved_revision_unsupported`: the winner already exists, so it needs the action below.
+
+**Launch F: revising an approved proposal (V2-GAP-018).** `reviseApprovedProposal(viewer, executor, input,
+deps)` is a wrapper over the existing replace / correct lifecycle, recording the new revision and its two
+ledger rows in the **same transaction** as the canonical change. Capability `data.awards.edit`; the
+decision note (trimmed 20..2000 characters) is always required. In one transaction:
+
+1. lock the approved proposal row (`supersede_approved` must be a legal edge from its status);
+2. validate the new values against the database exactly as approval does; errors refuse with
+   `invalid_input`. The approved canonical row itself is excluded from the duplicate check (it is not a
+   duplicate of its own revision), a different active winner is still one;
+3. consult the season seal (`curated_award_approval`, the note) for the old **and** the new season,
+   before any canonical write: `season_sealed_correction_invalid`; then require the note itself
+   (`note_required`);
+4. through the injected `ApprovedWinnerRevisionPort`, **locate and lock the canonical row by the proposal's
+   `approved_entity_key`** (source key + `source_record_id`) and take the compare-and-swap value from that
+   locked row's own `updated_at`, so no `expectedUpdatedAt` crosses the service boundary. A missing or
+   void row is `approved_winner_not_active`. The port then calls a tx-level variant extracted from the
+   existing function: `replaceAwardWinnerInTx` when an identity-bearing value changed (award, season,
+   player identity, player name; the old row is voided and a replacement created) or
+   `correctAwardWinnerInTx` when only non-identity values changed (votes, position, captain flags, note,
+   club). `replaceAwardWinner`, `correctAwardWinner` and `runHonourEdit` call the same code inside their
+   own `begin`, so their behaviour is unchanged; `admin-awards.test.ts` passes unchanged against them.
+   Refusals the lifecycle returns are **thrown** inside the wrapper, so the whole transaction rolls back;
+5. the old revision `approved -> superseded` (ledger `supersede_approved`; migration 114 lets a superseded
+   former approval keep its key and time), then the new revision is inserted directly as `approved` with
+   the resulting entity key (the new key after a replacement, the same key after a correction) and
+   `approved_at` (ledger `revise_approved`, from no state), in that order because of the live-revision
+   unique index. `revision_of_id` chains them. `revise_approved` records `selfApproval: true`: the reviser
+   applies the revision themselves, and the mandatory note is the audit of that.
+
+Any failure rolls all of it back: no ledger row, the proposal still approved, `award_winners` unchanged.
+Limits, stated plainly: a revision that would not change the canonical row (an evidence-only edit) is refused
+`no_change` — the canonical correction is relative to the proposal's own recorded values, so a winner
+edited out of band in `/admin/awards` after approval is overwritten only in the fields the revision names;
+and only the newest revision of a proposal can be revised.
+
+**Launch F: public-page revalidation (V2-GAP-024).** The promotion port now returns
+`revalidatePaths`, computed server-side with `awardWinnerPaths` from the row it just created
+(`readAwardWinnerInTx`); the revision port returns the union of the paths of the row before and after the
+change (a replacement, a season move or a club change moves two sets of pages). `approveCurated` and
+`reviseApprovedCurated` return them, the server actions pass them through, and the **client** posts them to
+`/admin/awards/revalidate` after success, exactly as `src/app/admin/awards/submit-helper.ts` does. No server
+action calls `revalidatePath` (it hangs the client). The route's allowlist
+(`src/app/admin/awards/revalidate-paths.ts`) admits every shape `awardWinnerPaths` produces
+(`tests/v2-curated-awards.test.ts` and `tests/integration/v2-curated-awards.test.ts` assert this on the paths
+the real port returns).
 
 ### Audit tiers
 
@@ -137,6 +208,20 @@ lifecycle, which this step does not wrap (follow-up proposed as a gap).
    `afl_api_identity_adjudications` (104) audit their decisions.
 2. **Canonical row** — the existing `insertAwardWinner` path writes `award_winners`, `data_overrides`
    and `data_edits`. `data_edits_table_name_check` is deliberately **not** widened.
+
+### Link the player first, then propose (V2-GAP-020)
+
+The identity-less refusal is a **safety property and is kept**. `insertAwardWinner` itself would accept a
+legacy identity-less player (the award row is meaningful unlinked), so the line is held by
+`validateAwardProposal` (`player_unresolved`), which `approveProposal` runs again inside its own
+transaction. The PostgreSQL suite proves it on the **approval path**, not just in validation: a proposal
+with no identity validates to `validation_failed` and cannot be approved (`illegal_transition`); and a row
+forced to `validated` anyway is refused by the approval's own re-validation as `stale_validation` carrying
+`player_unresolved`, with no winner, no `data_overrides`, no `data_edits` and no approve ledger row written.
+
+The workflow for a player who is not yet linked is therefore: **link the identity first through the existing
+identity tools (`/admin/player-links`), then propose** (or revise the pending proposal with the resolved
+identity). Nothing in the curated path links players.
 
 ### Offline files
 
@@ -206,7 +291,9 @@ the server-described type and would double-encode it).
 > the acting user's `auth_users.id` as `CuratedAwardsViewer.userId`; no `revalidatePath`. Not
 > wired: manual single-entry with `resolvePlayerIdentity` (proposals come from a file only),
 > revising (V2-GAP-018) and public-page revalidation after approval (V2-GAP-024). The list below
-> is the Stage 4 instruction, kept as written.
+> is the Stage 4 instruction, kept as written. **Launch F** wired the rest: four eyes, revising an
+> approved winner (`/admin/operations/awards/[id]`, the "Revise approved winner" panel) and revalidation
+> after approval and revision.
 
 - Pages under `/admin/awards` (or the data editor) that call the services through
   `withAwardProposalExecutor` and `awardWinnerPromotionPort`; guard each with
@@ -231,7 +318,11 @@ the server-described type and would double-encode it).
 
 ## Consequences
 
-Requires an additive migration (ADR 0004) and the matching privileges change. Known follow-ups
-(proposed `V2-GAP` text is in the Stage 4 return): approved-proposal revisions via the existing
-replace/correct path; no enforced four-eyes rule; PostgreSQL-side verification of migration 111, the
-grants and the production port.
+Requires an additive migration (ADR 0004) and the matching privileges change. Stage 4 follow-ups, now
+closed by Launch F: approved-proposal revisions (V2-GAP-018), the four-eyes rule (V2-GAP-019), the
+PostgreSQL-side verification of the production port (`tests/integration/v2-curated-awards.test.ts`, run on
+the isolated cluster) and public revalidation (V2-GAP-024). Migration 114 section 2 widens three migration 111
+constraints by DROP/ADD superset replacement (the migration 094 precedent): no row is rewritten and nothing
+accepted before is refused after; its `-- ROLLBACK:` block restores the 111 texts verbatim. Deploy order:
+apply 114, then `npm run db:privileges`, then the code. Still open: evidence-only edits of an approved
+proposal are not applied (they are refused `no_change`); V2-GAP-023 is not part of this ADR.

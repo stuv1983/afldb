@@ -36,6 +36,11 @@ import {
 } from './v2-coleman-publication-fixtures';
 
 const MIGRATION = join(process.cwd(), 'src', 'db', 'migrations', '112_derived_award_results.sql');
+// Migration 114 adds derived_award_projections (references 112) and, in its section 2, widens three
+// migration-111 constraints, so it only applies on top of 111 (which depends only on auth_users).
+// Order: 111, 112, 114.
+const MIGRATION_111 = join(process.cwd(), 'src', 'db', 'migrations', '111_curated_award_proposals.sql');
+const MIGRATION_114 = join(process.cwd(), 'src', 'db', 'migrations', '114_award_projections_and_curated_revisions.sql');
 
 /* STUB prerequisites: minimal stand-ins, NOT the real schema. */
 const STUB_PREREQUISITES = `
@@ -77,7 +82,9 @@ beforeAll(async () => {
   db = await createInMemoryPglite();
   await db.exec(STUB_PREREQUISITES);
   // The migration under test, applied VERBATIM from disk (not edited to suit PGlite).
+  await db.exec(readFileSync(MIGRATION_111, 'utf8'));
   await db.exec(readFileSync(MIGRATION, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_114, 'utf8'));
 }, 60_000);
 
 afterAll(async () => {
@@ -86,7 +93,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.query('RESET ROLE');
-  await db.exec('TRUNCATE derived_award_results RESTART IDENTITY');
+  await db.exec('TRUNCATE derived_award_projections, derived_award_results RESTART IDENTITY');
 });
 
 async function asImport<T>(fn: () => Promise<T>): Promise<T> {
@@ -289,7 +296,7 @@ describe('migration 112 applied verbatim to PGlite: structure and constraints', 
     });
     await expectRejected(insertRaw({ supersedes_id: otherSeason }), /uq_derived_award_results_supersedes|derived_award_results_supersedes_fk/);
     // and a row cannot supersede a later id (no cycles).
-    await db.exec('TRUNCATE derived_award_results RESTART IDENTITY');
+    await db.exec('TRUNCATE derived_award_projections, derived_award_results RESTART IDENTITY');
     await insertRaw({ id: 5 });
     await expectRejected(insertRaw({ id: 3, season: 2024, supersedes_id: 5 }), /derived_award_results_supersedes_ck/);
   });
@@ -430,7 +437,7 @@ describe('publishColemanResult on PGlite (real publisher SQL, stub role afldb_im
     expect((await rows())[0].winners.map((w) => [w.key, w.goals])).toEqual([
       [`coleman:${SEASON}:${synthPath('A')}`, 5], [`coleman:${SEASON}:${synthPath('B')}`, 5],
     ]);
-    await db.exec('TRUNCATE derived_award_results RESTART IDENTITY');
+    await db.exec('TRUNCATE derived_award_projections, derived_award_results RESTART IDENTITY');
     const finals = await publish({ derivation: makeInput({ playerMatchGoals: synthFacts({ '14:5': 9 }) }) });
     if (!finals.ok) throw new Error(finals.refusal.message);
     expect((await rows())[0].winners.map((w) => w.key)).toEqual([`coleman:${SEASON}:${synthPath('A')}`]);

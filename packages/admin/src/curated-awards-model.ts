@@ -22,6 +22,9 @@ export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 
 export const PROPOSAL_ACTIONS = [
   'create', 'validate', 'approve', 'reject', 'revise', 'supersede',
+  // V2-GAP-018 (migration 114): the audited revision of an APPROVED proposal. Both are written by
+  // `reviseApprovedProposal`, in the same transaction as the canonical award_winners change.
+  'supersede_approved', 'revise_approved',
 ] as const;
 export type ProposalAction = (typeof PROPOSAL_ACTIONS)[number];
 
@@ -43,6 +46,10 @@ export const MAX_VOTES = 999_999.99;
 export const MAX_NOTE_LENGTH = 2000;
 export const REJECT_NOTE_MIN_LENGTH = 10;
 export const WIKIPEDIA_APPROVAL_NOTE_MIN_LENGTH = 20;
+/** V2-GAP-019: a super admin approving their own revision must attest to why (trimmed length). */
+export const SELF_APPROVAL_ATTESTATION_MIN_LENGTH = 20;
+/** V2-GAP-018: revising an approved winner always needs a recorded reason (trimmed length). */
+export const APPROVED_REVISION_NOTE_MIN_LENGTH = 20;
 
 // ---------------------------------------------------------------------------
 // Typed errors
@@ -60,7 +67,13 @@ export type CuratedAwardErrorCode =
   | 'concurrent_modification'
   | 'approved_revision_unsupported'
   | 'season_sealed_correction_invalid'
-  | 'promotion_refused';
+  | 'promotion_refused'
+  /** V2-GAP-019: the approver created the revision and may not approve it (no valid attestation). */
+  | 'self_approval_forbidden'
+  /** V2-GAP-019: a super admin's self-approval needs an attestation of at least 20 characters. */
+  | 'self_approval_attestation_required'
+  /** V2-GAP-018: the canonical winner an approved proposal produced is missing or void. */
+  | 'approved_winner_not_active';
 
 /** Every refusal the services raise. `code` is the contract; `message` is for people. */
 export class CuratedAwardError extends Error {
@@ -93,9 +106,11 @@ function edges(from: readonly TransitionFrom[], to: readonly ProposalStatus[]): 
  * bring a NEW row into existence in `proposed`. `revise` is always accompanied by a `supersede`
  * of the revision it replaces, so one revision is two ledger rows on two proposal rows.
  *
- * `approved`, `rejected` and `superseded` have no outgoing edge. Revising an APPROVED proposal is
- * not in the machine at all: it must go through the existing replace/correct path for
- * award_winners (see `reviseProposal`, which refuses it with `approved_revision_unsupported`).
+ * `rejected` and `superseded` have no outgoing edge, and `approved` has exactly one: V2-GAP-018's
+ * `supersede_approved` (approved -> superseded). Only `reviseApprovedProposal` writes it, in the
+ * same transaction as the canonical award_winners correction/replacement and the paired
+ * `revise_approved` (no state -> approved) that records the replacement revision. The pending-proposal
+ * `reviseProposal` still refuses an approved proposal with `approved_revision_unsupported`.
  */
 export const CURATED_AWARD_TRANSITIONS: Readonly<Record<ProposalAction, readonly TransitionEdge[]>> = {
   create: edges([null], ['proposed']),
@@ -104,6 +119,8 @@ export const CURATED_AWARD_TRANSITIONS: Readonly<Record<ProposalAction, readonly
   approve: edges(['validated'], ['approved']),
   reject: edges(PENDING_STATUSES, ['rejected']),
   supersede: edges(PENDING_STATUSES, ['superseded']),
+  supersede_approved: edges(['approved'], ['superseded']),
+  revise_approved: edges([null], ['approved']),
 };
 
 export function isLegalTransition(action: ProposalAction, from: TransitionFrom, to: ProposalStatus): boolean {
@@ -133,7 +150,11 @@ function assertViewerIdentity(viewer: CuratedAwardsViewer): void {
   }
 }
 
-/** Mutations need `data.awards.edit` (super_admin). Not a four-eyes rule: see ADR 0008. */
+/**
+ * Mutations need `data.awards.edit` (super_admin). The four-eyes rule (the creator of a revision may
+ * not approve it, except a super admin with an attestation) is `decideFourEyes`, enforced by
+ * `approveProposal` (V2-GAP-019, ADR 0008).
+ */
 export function assertCanEditAwards(viewer: CuratedAwardsViewer): void {
   assertViewerIdentity(viewer);
   if (!hasCapability(viewer, 'data.awards.edit')) {
@@ -477,6 +498,12 @@ export function checkDecisionNote(
     throw new CuratedAwardError('note_required',
       `A rejection needs a reason of at least ${REJECT_NOTE_MIN_LENGTH} characters.`);
   }
+  if ((action === 'revise_approved' || action === 'supersede_approved')
+    && (trimmed === null || trimmed.length < APPROVED_REVISION_NOTE_MIN_LENGTH)) {
+    throw new CuratedAwardError('note_required',
+      `Revising an approved winner needs a decision note of at least ${APPROVED_REVISION_NOTE_MIN_LENGTH} characters `
+      + 'recording why the approved record is being changed.');
+  }
   if (action === 'approve' && sourceKind === 'wikipedia_offline_file'
     && (trimmed === null || trimmed.length < WIKIPEDIA_APPROVAL_NOTE_MIN_LENGTH)) {
     throw new CuratedAwardError('note_required',
@@ -484,6 +511,51 @@ export function checkDecisionNote(
       + 'recording the independent source that verified it.');
   }
   return trimmed;
+}
+
+// ---------------------------------------------------------------------------
+// Four eyes (V2-GAP-019)
+// ---------------------------------------------------------------------------
+
+export type FourEyesDecision =
+  | { selfApproval: false }
+  | { selfApproval: true; attestation: string };
+
+/**
+ * The four-eyes rule for approving a revision. "Creator" is `created_by` of the revision being
+ * approved (a reviser is the creator of their revision). Anyone else approves freely. The creator is
+ * refused (`self_approval_forbidden`) unless they are a `super_admin` — tested EXPLICITLY on the role,
+ * not inferred from the `data.awards.edit` capability, so widening that capability later cannot
+ * silently widen self-approval — AND supply an attestation of at least
+ * {@link SELF_APPROVAL_ATTESTATION_MIN_LENGTH} trimmed characters. A blank attestation is refused as
+ * `self_approval_forbidden` (the creator may not approve at all without one); a present but short
+ * one is `self_approval_attestation_required`.
+ */
+export function decideFourEyes(
+  viewer: CuratedAwardsViewer,
+  createdBy: number,
+  attestation: string | null | undefined,
+): FourEyesDecision {
+  if (viewer.userId !== createdBy) return { selfApproval: false };
+  if (viewer.role !== 'super_admin') {
+    throw new CuratedAwardError('self_approval_forbidden',
+      'You created this revision, so you cannot approve it: another administrator must. '
+      + 'Only a super admin may approve their own revision, with a recorded attestation.');
+  }
+  const trimmed = trimmedOrNull(attestation);
+  if (trimmed === null) {
+    throw new CuratedAwardError('self_approval_forbidden',
+      'You created this revision, so you cannot approve it unless you attest to why a second '
+      + `reviewer is not used (at least ${SELF_APPROVAL_ATTESTATION_MIN_LENGTH} characters).`);
+  }
+  if (trimmed.length < SELF_APPROVAL_ATTESTATION_MIN_LENGTH) {
+    throw new CuratedAwardError('self_approval_attestation_required',
+      `A self-approval attestation needs at least ${SELF_APPROVAL_ATTESTATION_MIN_LENGTH} characters.`);
+  }
+  if (trimmed.length > MAX_NOTE_LENGTH) {
+    throw new CuratedAwardError('invalid_input', `The attestation is longer than ${MAX_NOTE_LENGTH} characters.`);
+  }
+  return { selfApproval: true, attestation: trimmed };
 }
 
 /** The UTC calendar date (YYYY-MM-DD) of an instant. */

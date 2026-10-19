@@ -297,7 +297,7 @@ describe('the baseline: identical rehearsal artefacts', () => {
     expect(report.summary).toEqual({ pass: 5, fail: 0, incomplete: 0 });
     expect(report.checks.map((c) => c.id)).toEqual([...SHADOW_PARITY_CHECK_IDS]);
     expect(report.checks.every((c) => c.required === true && c.status === 'pass')).toBe(true);
-    expect(codes(checkOf(report, 'table_row_counts'))).toEqual(['V2_TABLE_ADDED', 'V2_TABLE_ADDED', 'V2_TABLE_ADDED']);
+    expect(codes(checkOf(report, 'table_row_counts'))).toEqual(V2_TABLES.map(() => 'V2_TABLE_ADDED'));
     for (const id of ['historical_manifest', 'coleman', 'brownlow', 'coverage'] as const) {
       expect(checkOf(report, id).findings).toEqual([]);
     }
@@ -414,11 +414,11 @@ describe('historical_manifest: zero tolerance on sealed history', () => {
  * ------------------------------------------------------------------ */
 
 describe('table_row_counts', () => {
-  it('passes a before without and an after with the three V2 tables (info), nothing else changed', () => {
+  it('passes a before without and an after with every V2-added table (info), nothing else changed', () => {
     const c = rowsRun(ROWS_BEFORE, ROWS_AFTER);
     expect(c.status).toBe('pass');
-    expect(codes(c)).toEqual(['V2_TABLE_ADDED', 'V2_TABLE_ADDED', 'V2_TABLE_ADDED']);
-    expect(c.counts).toMatchObject({ fail: 0, info: 3, tablesBefore: 3, tablesAfter: 6 });
+    expect(codes(c)).toEqual(V2_TABLES.map(() => 'V2_TABLE_ADDED'));
+    expect(c.counts).toMatchObject({ fail: 0, info: V2_TABLES.length, tablesBefore: 3, tablesAfter: 3 + V2_TABLES.length });
   });
 
   it('SCHEMAS_DIFFER fails', () => {
@@ -436,11 +436,11 @@ describe('table_row_counts', () => {
   it('UNEXPECTED_TABLE_ADDED fails; a V2-added table is V2_TABLE_ADDED instead', () => {
     const c = rowsRun(ROWS_BEFORE, rowCounts([...BASE_TABLES, ...V2_TABLES, { table: 'mystery', rows: 1 }]));
     expect(codes(c, 'fail')).toEqual(['UNEXPECTED_TABLE_ADDED']);
-    expect(codes(c, 'info')).toEqual(['V2_TABLE_ADDED', 'V2_TABLE_ADDED', 'V2_TABLE_ADDED']);
+    expect(codes(c, 'info')).toEqual(V2_TABLES.map(() => 'V2_TABLE_ADDED'));
   });
 
   it('V2_TABLE_ABSENT fails when a V2-added table is missing from the after state', () => {
-    const c = rowsRun(ROWS_BEFORE, rowCounts([...BASE_TABLES, ...V2_TABLES.slice(0, 2)]));
+    const c = rowsRun(ROWS_BEFORE, rowCounts([...BASE_TABLES, ...V2_TABLES.filter((t) => t.table !== 'derived_award_results')]));
     expect(codes(c, 'fail')).toEqual(['V2_TABLE_ABSENT']);
     expect(c.findings.find((f) => f.code === 'V2_TABLE_ABSENT')?.subject).toBe('public.derived_award_results');
     // Before == after with no V2 tables is also a failure: the after state is always post migration 112.
@@ -449,7 +449,7 @@ describe('table_row_counts', () => {
 
   it('a V2 table dropped after existing before reports both TABLE_DROPPED and V2_TABLE_ABSENT', () => {
     const c = rowsRun(ROWS_AFTER, ROWS_BEFORE);
-    expect(codes(c, 'fail')).toEqual(['TABLE_DROPPED', 'TABLE_DROPPED', 'TABLE_DROPPED', 'V2_TABLE_ABSENT', 'V2_TABLE_ABSENT', 'V2_TABLE_ABSENT']);
+    expect(codes(c, 'fail')).toEqual([...V2_TABLES.map(() => 'TABLE_DROPPED'), ...V2_TABLES.map(() => 'V2_TABLE_ABSENT')]);
   });
 
   it('ROWS_DECREASED fails in a non-V2 table; ROWS_INCREASED is info', () => {
@@ -922,8 +922,8 @@ describe('validateTableRowCounts / parseTableRowCounts', () => {
     refused((d) => { d.tables[0].table = 'Bad-Name'; }, /valid schema and table name/);
   });
 
-  it('knows exactly the three V2-added tables', () => {
-    expect(V2_ADDED_TABLES.map((t) => t.table)).toEqual(['award_proposals', 'award_proposal_decisions', 'derived_award_results']);
+  it('knows exactly the five V2-added tables', () => {
+    expect(V2_ADDED_TABLES.map((t) => t.table)).toEqual(['award_proposals', 'award_proposal_decisions', 'derived_award_results', 'brownlow_eligibility_decisions', 'derived_award_projections']);
     expect(isV2AddedTable('public', 'award_proposals')).toBe(true);
     expect(isV2AddedTable('other', 'award_proposals')).toBe(false);
     expect(isV2AddedTable('public', 'matches')).toBe(false);

@@ -1,5 +1,6 @@
 import type {
   ColemanComparisonView,
+  ColemanProjectionSummary,
   ColemanPublicationView,
 } from '@/lib/admin/operations-centre';
 
@@ -19,6 +20,61 @@ const PLAN_WORDS: Record<NonNullable<ColemanComparisonView['plan']>, string> = {
 };
 
 const CATEGORY_LABELS = { agree: 'Agrees', disagree: 'Disagrees', not_derivable: 'Not derivable' } as const;
+
+type ProjectionCounts = { inserted: number; updated: number; voided: number; retained: number };
+
+function countsWords(counts: ProjectionCounts): string {
+  return `${counts.inserted} inserted, ${counts.updated} updated, ${counts.voided} voided, ${counts.retained} unchanged`;
+}
+
+/**
+ * What publishing would do to the public Coleman rows (award_winners), from the read-only preview:
+ * the counts, or the refusal publishing would hit with the rows that cause it. Words, not colour
+ * alone: the refusal carries its own badge and code.
+ */
+function ProjectionPreview({ projection }: { projection: ColemanComparisonView['projection'] }) {
+  if (projection === null) {
+    return <>Not previewed: the season is not derivable or not sealed, so publishing would be refused before anything is written.</>;
+  }
+  if (!projection.ok) {
+    return (
+      <div data-coleman-projection="refused">
+        <span className="badge badge-warn">Publishing would be refused</span>{' '}
+        <span className="mono">{projection.refusal.code}</span>: {projection.refusal.message}
+        {projection.refusal.subjects.length > 0 && (
+          <ul className="ruled-list">
+            {projection.refusal.subjects.map((subject) => <li key={subject} className="mono" style={{ overflowWrap: 'anywhere' }}>{subject}</li>)}
+          </ul>
+        )}
+      </div>
+    );
+  }
+  return (
+    <span data-coleman-projection="ok">
+      {countsWords(projection.counts)}.
+      {projection.changedCount === 0
+        ? ' No award_winners row would change; publishing would record provenance only.'
+        : ` ${projection.changedCount} row${projection.changedCount === 1 ? '' : 's'} would change, each with its own audit entry.`}
+    </span>
+  );
+}
+
+/** The outcome of a publication on the public winners, shown after submit. */
+export function ColemanProjectionOutcome({ projection }: { projection: ColemanProjectionSummary }) {
+  return (
+    <>
+      <dt>award_winners</dt>
+      <dd data-projection-outcome={projection.alreadyProjected ? 'already_projected' : projection.provenanceOnly ? 'provenance_only' : 'changed'}>
+        {countsWords(projection.counts)}.{' '}
+        {projection.alreadyProjected && 'Nothing was written: this derivation was already projected.'}
+        {projection.provenanceOnly && 'Provenance only: the stored winners already matched, so no row changed.'}
+        {!projection.alreadyProjected && !projection.provenanceOnly && `${projection.changedCount} row${projection.changedCount === 1 ? '' : 's'} changed and audited.`}
+      </dd>
+      <dt>Provenance record</dt>
+      <dd>{projection.projectionId === null ? 'none written' : `derived_award_projections #${projection.projectionId}`}</dd>
+    </>
+  );
+}
 
 export function ColemanPublicationsTable({ publications }: { publications: readonly ColemanPublicationView[] }) {
   if (publications.length === 0) {
@@ -89,6 +145,8 @@ export function ColemanComparisonResult({ comparison }: { comparison: ColemanCom
         </dd>
         <dt>Publication plan</dt>
         <dd>{comparison.plan === null ? 'Publishing is not possible for this season (not derivable, or not sealed).' : PLAN_WORDS[comparison.plan]}</dd>
+        <dt>Effect on the public winners</dt>
+        <dd><ProjectionPreview projection={comparison.projection} /></dd>
         <dt>Current publication</dt>
         <dd>
           {comparison.current === null

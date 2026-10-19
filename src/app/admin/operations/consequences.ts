@@ -24,6 +24,7 @@ export const CONSEQUENCE_KINDS = [
   'validate_proposal',
   'approve_proposal',
   'reject_proposal',
+  'revise_approved_winner',
   'publish_coleman',
 ] as const;
 export type ConsequenceKind = (typeof CONSEQUENCE_KINDS)[number];
@@ -34,9 +35,12 @@ export const CONSEQUENCE_AUDIT_ACTIONS = {
   curatedValidated: 'admin.curated_award_validated',
   curatedApproved: 'admin.curated_award_approved',
   curatedRejected: 'admin.curated_award_rejected',
+  curatedRevised: 'admin.curated_award_revised',
   curatedRefused: 'admin.curated_award_refused',
   colemanPublished: 'admin.coleman_published',
   colemanRefused: 'admin.coleman_publication_refused',
+  brownlowEligibilityDecided: 'admin.brownlow_eligibility_decided',
+  brownlowEligibilityRefused: 'admin.brownlow_eligibility_refused',
 } as const;
 
 /**
@@ -68,6 +72,17 @@ export type ConsequenceContext = {
     category: 'agree' | 'disagree' | 'not_derivable';
     plan: 'published' | 'unchanged' | 'superseded' | null;
     sealed: boolean;
+    /**
+     * What publishing would do to the canonical `award_winners` rows (ADR 0015), as counts, or the
+     * refusal code it would hit. Absent/null when the comparison did not preview it.
+     */
+    projection?: {
+      ok: true;
+      inserted: number;
+      updated: number;
+      voided: number;
+      retained: number;
+    } | { ok: false; code: string } | null;
   } | null;
 };
 
@@ -142,6 +157,18 @@ function comparisonWords(context: ConsequenceContext): string {
   return `Last comparison this session (season ${c.season}): the derived winners ${c.category === 'agree' ? 'agree with' : 'differ from'} the stored Coleman rows; ${plan}${c.sealed ? '' : '; the season is not sealed'}.`;
 }
 
+/** The comparison's preview of the `award_winners` effect, in words (or the fact that none was run). */
+function projectionWords(context: ConsequenceContext): string {
+  const p = context.comparison?.projection;
+  if (p === null || p === undefined) {
+    return 'Run the read-only comparison first to see how many award_winners rows publishing would insert, update, void or leave unchanged.';
+  }
+  if (!p.ok) {
+    return `Preview: publishing would be REFUSED (${p.code}) and nothing would be written; the comparison lists the rows.`;
+  }
+  return `Preview: ${p.inserted} to insert, ${p.updated} to update, ${p.voided} to void, ${p.retained} unchanged.`;
+}
+
 /** The six D9 fields for one mutation. Pure and deterministic. */
 export function describeConsequences(kind: ConsequenceKind, context: ConsequenceContext = {}): Consequences {
   const actingUser = actor(context);
@@ -195,11 +222,12 @@ export function describeConsequences(kind: ConsequenceKind, context: Consequence
         changes: [
           'In ONE transaction: re-validates the proposal, passes the season seal, writes the award_winners row (with its data_overrides and data_edits rows, and recomputes the span) through the production promotion port, sets the proposal to "approved" and writes the ledger row.',
           'Any failure rolls all of it back.',
+          'Four eyes: the person who created this revision cannot approve it. A Super Admin may approve their own revision only with a written attestation (at least 20 characters), recorded in the ledger as a self-approval.',
         ],
         affected: `${proposalLabel(context)}. This writes the public award record for that season. ${sealWords(context)}`,
         validationState: `Requires status "validated" (current: ${statusWords(context)}). The approval re-validates inside its transaction, so a stale validation is refused.`,
         reversible: false,
-        reversibility: 'Not reversible: "approved" is terminal. The winner can be corrected only through the existing replace or correct flow in /admin/awards.',
+        reversibility: 'Not reversible: "approved" is terminal. The winner can afterwards be changed only by revising the approved winner (a separate, audited action) or through the existing replace or correct flow in /admin/awards.',
         actingUser,
         audit: {
           durable: 'award_proposal_decisions: one "approve" ledger row, plus the data_edits audit row of the award_winners write (same transaction).',
@@ -228,24 +256,46 @@ export function describeConsequences(kind: ConsequenceKind, context: Consequence
         },
       };
 
+    case 'revise_approved_winner':
+      return {
+        kind,
+        title: 'Revise this approved winner',
+        changes: [
+          'In ONE transaction: validates the new values against the database, passes the season seal for the old and the new season, then changes the award_winners row. Only votes, position, captain flags, note or club changed: the row is corrected in place. The award, season, player or player name changed: the row is voided and a replacement is created.',
+          'Supersedes this approved revision and records one new revision, already approved, that names the resulting winner. Writes two ledger rows (supersede_approved, revise_approved) with the data_overrides and data_edits rows of the canonical change.',
+          'Any failure rolls all of it back: the proposal stays approved and award_winners is unchanged.',
+        ],
+        affected: `${proposalLabel(context)}. This changes the public award record. ${context.sealedSeason === true ? `The season is SEALED: the revision is an audited correction under the season seal (decision note of ${SEAL_NOTE_MIN_LENGTH} to ${SEAL_NOTE_MAX_LENGTH} characters).` : context.sealedSeason === false ? 'The season is open (in progress). If you move the winner to a sealed season, the seal applies to that season too.' : 'Whether the season is sealed could not be read here; the revision is refused if the season registry cannot be read (it fails closed).'}`,
+        validationState: `Requires status "approved" (current: ${context.proposalStatus ?? 'not shown here'}) and an active winner row. A decision note of ${SEAL_NOTE_MIN_LENGTH} to ${SEAL_NOTE_MAX_LENGTH} characters is ALWAYS required. A revision that changes nothing in the winner row is refused.`,
+        reversible: false,
+        reversibility: 'Not reversible except by another revision: the superseded revision and, for a replacement, the voided winner stay on record as history.',
+        actingUser,
+        audit: {
+          durable: 'award_proposal_decisions: one "supersede_approved" and one "revise_approved" ledger row (the latter records selfApproval: true), plus the data_edits and data_overrides rows of the canonical change, all in one transaction.',
+          activity: `One auth_audit_log row: ${A.curatedRevised} on success, ${A.curatedRefused} if refused.`,
+          activityActions: [A.curatedRevised, A.curatedRefused],
+        },
+      };
+
     case 'publish_coleman':
       return {
         kind,
         title: 'Publish the derived Coleman result',
         changes: [
-          'Appends ONE row to derived_award_results for the season, derived from the database at the moment you submit: a first publication, or a superseding one that points at the previous row.',
-          'If the inputs, derivation version and winners are unchanged since the current publication, nothing is written (reported as "unchanged").',
-          'Append-only: nothing is updated or deleted, and award_winners (the public Coleman rows) is never touched.',
+          'Writes the derivation ledger: appends ONE row to derived_award_results for the season, derived from the database at the moment you submit (a first publication, or a superseding one that points at the previous row). If nothing changed since the current ledger row, no ledger row is added.',
+          `Then projects the derived winners into the public Coleman rows in award_winners, in the same transaction: inserts new winners, updates a row whose values moved, voids a winner the facts no longer support, and leaves a row that already matches untouched. Joint winners are separate rows. ${projectionWords(context)}`,
+          'If the stored winners already match, only a provenance row (derived_award_projections) is recorded and no award_winners row changes. Re-publishing never duplicates a winner.',
+          'It is refused whole, and nothing is written, when a manual or legacy Coleman row, a voided derived row or an administrator override stands in the way.',
         ],
         affected: context.season === null || context.season === undefined
-          ? 'The season you enter below. It must be a sealed season.'
-          : `Season ${context.season}. It must be a sealed season.`,
-        validationState: `Derived fresh inside the publisher and refused if the season is not sealed, not attested as settled, or not derivable (for example goals not recorded). A note of ${SEAL_NOTE_MIN_LENGTH} to ${SEAL_NOTE_MAX_LENGTH} characters is required. ${comparisonWords(context)}`,
+          ? 'The season you enter below. It must be a sealed season. Public pages for the Coleman award, that season, and the winners and clubs involved are refreshed after success.'
+          : `Season ${context.season}. It must be a sealed season. Public pages for the Coleman award, that season, and the winners and clubs involved are refreshed after success.`,
+        validationState: `Derived fresh inside the publisher from home-and-away goals only (finals are excluded) and refused if the season is not sealed, not attested as settled, or not derivable (for example goals not recorded). Publishing is a correction of sealed history: it needs the settled attestation and a note of ${SEAL_NOTE_MIN_LENGTH} to ${SEAL_NOTE_MAX_LENGTH} characters. ${comparisonWords(context)}`,
         reversible: false,
-        reversibility: 'Not reversible in place: the ledger is append-only, so a publication is never undone; a later recompute supersedes it.',
+        reversibility: 'Not reversible in place: the derivation ledger is append-only and every award_winners change is audited, so a publication is never rewritten. A correction is a later publish; a void is recorded with its reason and is never a delete.',
         actingUser,
         audit: {
-          durable: 'derived_award_results.correction: workflow derived_award_publication, you as the actor, your note, and the evidence reference coleman_derivation:<season>:<input checksum>.',
+          durable: 'derived_award_results.correction (workflow derived_award_publication, you as the actor, your note, the evidence reference coleman_derivation:<season>:<input checksum>); derived_award_projections (what was inserted, updated, voided or retained); and one data_edits row per award_winners row changed.',
           activity: `One auth_audit_log row: ${A.colemanPublished} on success (including "unchanged"), ${A.colemanRefused} if refused.`,
           activityActions: [A.colemanPublished, A.colemanRefused],
         },

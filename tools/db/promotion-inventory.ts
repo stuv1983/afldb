@@ -809,6 +809,43 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       + 'identity is the AFL Tables profile path in winners[].key (coleman:<season>:<path>). '
       + 'References auth_users and itself.',
   },
+  // --- Brownlow eligibility decisions (migration 113, AFLDB V2 Launch F) ---------------
+  // Decided exactly like derived_award_results (reinstate, no football reference): an
+  // administrator's eligibility ruling is an audited HUMAN act (citation, note, decided_by and,
+  // for a sealed season, the season seal's correction record) that no rebuild can recompute,
+  // so it must survive. It names its player by the durable identity string, with NO foreign key
+  // into players or seasons, only auth_users and itself.
+  {
+    schema: 'public', name: 'brownlow_eligibility_decisions', subsystem: 'Brownlow eligibility', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
+    note: 'Append-only ledger of administrator Brownlow eligibility decisions (AFLDB V2 Launch F). '
+      + 'Production-only audited human state: new authoritative eligibility evidence that takes '
+      + 'precedence over the brownlow_season_votes stored flags and never alters a raw vote. A '
+      + 'reversal is a NEW row whose supersedes_id names the old (no UPDATE for any role). '
+      + 'Reinstated with ids preserved (supersedes_id is an intra-table reference). It names its '
+      + 'player by the durable identity string (afltables:<profile path> or manual_admin_edit:'
+      + '<token>) with no foreign key into players or seasons; player_id_at_decision is a '
+      + "snapshot of the replaced database's id, not a durable reference. References auth_users "
+      + 'and itself.',
+  },
+  // --- Derived award projections (migration 114, AFLDB V2 Launch F) --------------------
+  // Decided like derived_award_results, which it references: the audited provenance of a
+  // projection into award_winners (keys and actions only, not a winner store) is a human act
+  // that no rebuild can recompute. Its only foreign keys are auth_users and derived_award_results
+  // (reinstated first, ids preserved); none into awards, players, clubs or award_winners.
+  {
+    schema: 'public', name: 'derived_award_projections', subsystem: 'derived awards', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 30,
+    restoreAfter: ['derived_award_results', 'auth_users'],
+    note: 'Append-only provenance ledger of projecting a published award derivation into '
+      + 'award_winners (AFLDB V2 Launch F). Production-only audited state: each row names the '
+      + 'derived_award_results row projected, the actor, the season seal correction record and '
+      + 'the entity keys and actions (inserted, updated, voided, retained) only; it is NOT a '
+      + 'winner store. actions[].awardWinnerId is a snapshot a rebuild renumbers, the durable '
+      + 'identity is actions[].entityKey. Reinstated after derived_award_results and auth_users, '
+      + 'ids preserved; no foreign key into awards, players, clubs or award_winners.',
+  },
   // --- NL search telemetry and review (migrations 046–051, 055, 079, 081) -------------
   {
     schema: 'public', name: 'nl_search_log', subsystem: 'NL search telemetry', category: 'operations',

@@ -2,7 +2,7 @@
 
 import type { ProposalRecord } from '@afldb/admin';
 import { useRouter } from 'next/navigation';
-import { startTransition, useActionState, type FormEvent } from 'react';
+import { startTransition, useActionState, useEffect, type FormEvent } from 'react';
 
 import {
   IDLE_OPERATIONS_STATE,
@@ -14,6 +14,7 @@ import {
   approveCuratedProposalAction,
   createCuratedProposalsAction,
   rejectCuratedProposalAction,
+  reviseApprovedProposalAction,
   validateCuratedProposalAction,
 } from '../awards/actions';
 import { compareColemanSeasonAction, publishColemanSeasonAction } from '../coleman/actions';
@@ -24,6 +25,7 @@ import {
   DecisionPanelView,
   type FormBinding,
 } from './OperationForms';
+import { ReviseApprovedPanelView } from './ReviseApprovedViews';
 
 /**
  * The Client Component wrappers of the operations-centre forms (AFLDB V2 Stage 5, plan D9).
@@ -44,11 +46,30 @@ import {
 
 type ServerAction<S> = (previous: S, formData: FormData) => Promise<S>;
 
+/**
+ * Post the server-computed public paths to a capability-gated, allowlisted revalidate route, AFTER
+ * the action resolved (the awards pattern, `src/components/admin/action-submit.ts`). Best-effort: the
+ * write has already committed, so a missed invalidation only leaves a public page stale until its
+ * ISR window expires.
+ */
+async function postRevalidatePaths(endpoint: string, paths: readonly string[]): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ paths }),
+    });
+  } catch {
+    // Best-effort, see above.
+  }
+}
+
 /** `useActionState` + the submit interception shared by every form here. */
 function useOperationsAction<S extends OperationsActionState>(
   action: ServerAction<S>,
   initial: S,
-  options: { refreshOnSuccess: boolean },
+  options: { refreshOnSuccess: boolean; revalidateEndpoint?: string },
 ): FormBinding<S> {
   const router = useRouter();
   // `useActionState`'s own generic resolves `Awaited<State>`, which does not simplify back to `S`
@@ -57,6 +78,9 @@ function useOperationsAction<S extends OperationsActionState>(
   // already typed against `S`, so the values React carries are never anything else.
   const wrapped = async (previous: OperationsActionState, formData: FormData): Promise<OperationsActionState> => {
     const result = await action(previous as S, formData);
+    if (result.ok === true && options.revalidateEndpoint !== undefined) {
+      await postRevalidatePaths(options.revalidateEndpoint, (result as { revalidatePaths?: string[] }).revalidatePaths ?? []);
+    }
     if (result.ok === true && options.refreshOnSuccess) router.refresh();
     return result;
   };
@@ -98,15 +122,54 @@ async function decide(previous: CuratedActionState, formData: FormData): Promise
   return DECISION_ACTIONS[intent](previous, formData);
 }
 
+/** An approval changes public award pages: its server-computed paths go to the awards revalidate route. */
+const AWARDS_REVALIDATE_ENDPOINT = '/admin/awards/revalidate';
+
 export function DecisionPanel({
+  proposal, actingEmail, sealedSeason, viewerCreatedRevision = false,
+}: {
+  proposal: ProposalRecord;
+  actingEmail: string;
+  sealedSeason: boolean | null;
+  /** V2-GAP-019: the signed-in administrator created this revision (the attestation field is shown). */
+  viewerCreatedRevision?: boolean;
+}) {
+  const binding = useOperationsAction<CuratedActionState>(
+    decide, IDLE_OPERATIONS_STATE, { refreshOnSuccess: true, revalidateEndpoint: AWARDS_REVALIDATE_ENDPOINT },
+  );
+  return (
+    <DecisionPanelView
+      proposal={proposal}
+      actingEmail={actingEmail}
+      sealedSeason={sealedSeason}
+      binding={binding}
+      viewerCreatedRevision={viewerCreatedRevision}
+    />
+  );
+}
+
+/**
+ * The revise-approved panel (V2-GAP-018). After a successful revision the superseded revision's page
+ * is stale (the newest revision has a new id), so it moves to the new revision instead of refreshing in
+ * place; this wrapper stays mounted across that navigation and keeps the outcome on screen.
+ */
+export function ReviseApprovedPanel({
   proposal, actingEmail, sealedSeason,
 }: {
   proposal: ProposalRecord;
   actingEmail: string;
   sealedSeason: boolean | null;
 }) {
-  const binding = useOperationsAction<CuratedActionState>(decide, IDLE_OPERATIONS_STATE, { refreshOnSuccess: true });
-  return <DecisionPanelView proposal={proposal} actingEmail={actingEmail} sealedSeason={sealedSeason} binding={binding} />;
+  const router = useRouter();
+  const binding = useOperationsAction<CuratedActionState>(
+    reviseApprovedProposalAction, IDLE_OPERATIONS_STATE,
+    { refreshOnSuccess: false, revalidateEndpoint: AWARDS_REVALIDATE_ENDPOINT },
+  );
+  const revisedId = binding.state.ok === true ? binding.state.proposal?.id : undefined;
+  useEffect(() => {
+    if (revisedId !== undefined && revisedId !== proposal.id) router.replace(`/admin/operations/awards/${revisedId}`);
+  }, [revisedId, proposal.id, router]);
+  return <ReviseApprovedPanelView proposal={proposal} actingEmail={actingEmail} sealedSeason={sealedSeason} binding={binding} />;
 }
 
 export function ColemanWorkbench({
@@ -120,8 +183,9 @@ export function ColemanWorkbench({
   const compare = useOperationsAction<ColemanActionState>(
     compareColemanSeasonAction, IDLE_OPERATIONS_STATE, { refreshOnSuccess: false },
   );
+  // The projection changes public award pages: post the server-computed paths to the awards route.
   const publish = useOperationsAction<ColemanActionState>(
-    publishColemanSeasonAction, IDLE_OPERATIONS_STATE, { refreshOnSuccess: true },
+    publishColemanSeasonAction, IDLE_OPERATIONS_STATE, { refreshOnSuccess: true, revalidateEndpoint: '/admin/awards/revalidate' },
   );
   return (
     <ColemanWorkbenchView

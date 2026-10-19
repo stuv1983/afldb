@@ -442,6 +442,14 @@ describe('load_reference_data.py', () => {
         // registry loop would restore UPDATE/DELETE/TRUNCATE on every reconcile.
         'award_proposal_decisions',
         'award_proposals',
+        // 113 (AFLDB V2 Launch F, Brownlow eligibility). The append-only ledger of
+        // administrator eligibility decisions. It names its player by the durable identity
+        // string and carries NO foreign key into players or seasons (only auth_users and
+        // itself), so it sits outside the reference loader's FK cascade closure. Not
+        // registered import-writable: it is append-only by grant (SELECT, INSERT and the
+        // sequence, re-granted in privileges.sql); the registry loop would restore
+        // UPDATE/DELETE/TRUNCATE on every reconcile.
+        'brownlow_eligibility_decisions',
         // 094 (AFLDB-ISSUE-155 Phase C1). The Brownlow administration
         // workflow: a record of who drafted, finalised, voided and
         // published. Deliberately outside afldb_meta.import_writable_tables
@@ -473,6 +481,12 @@ describe('load_reference_data.py', () => {
         // import-writable: it is append-only by grant (SELECT, INSERT and the sequence,
         // re-granted in privileges.sql); the registry loop would restore
         // UPDATE/DELETE/TRUNCATE on every reconcile.
+        // 114 (AFLDB V2 Launch F, derived awards). The append-only provenance ledger of
+        // projecting a published derivation into award_winners (keys and actions only).
+        // Its only foreign keys are auth_users and derived_award_results, so it sits
+        // outside the reference loader's FK cascade closure. Not registered
+        // import-writable: append-only by grant, re-granted in privileges.sql.
+        'derived_award_projections',
         'derived_award_results',
         // 080 (AFLDB-ISSUE-118). The external grid corpus: immutable
         // captured evidence, append-only by grant (SELECT/INSERT plus the

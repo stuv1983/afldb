@@ -31,8 +31,10 @@ import {
   listProposals,
   readProposalHistory,
   rejectProposal,
+  reviseApprovedProposal,
   reviseProposal,
   validateProposal,
+  type ApprovedWinnerRevisionPort,
   type AwardPromotionPort,
   type CuratedAwardsViewer,
   type ProposalInput,
@@ -41,6 +43,10 @@ import { sealedSeasonsFrom } from '@afldb/domain';
 import { createInMemoryPglite, pgliteExecutor, type InMemoryPglite } from '@afldb/testing';
 
 const MIGRATION = join(process.cwd(), 'src', 'db', 'migrations', '111_curated_award_proposals.sql');
+// Migration 114 section 2 widens three 111 constraints (V2-GAP-018) and section 1 references
+// derived_award_results, so 112 is applied too (it depends only on auth_users). Order: 111, 112, 114.
+const MIGRATION_112 = join(process.cwd(), 'src', 'db', 'migrations', '112_derived_award_results.sql');
+const MIGRATION_114 = join(process.cwd(), 'src', 'db', 'migrations', '114_award_projections_and_curated_revisions.sql');
 const NOW = () => new Date('2026-10-19T12:00:00Z');
 const OPTIONS = { now: NOW };
 // SYNTHETIC sealed range 1897-1899: the fixtures' seasons (1990+) are OPEN under it, so the existing
@@ -49,6 +55,10 @@ const SYNTHETIC_OPEN = { from: 1897, through: 1899, open: [] as number[] };
 const REAL_SEALED = sealedSeasonsFrom(JSON.parse(readFileSync(join(process.cwd(), 'data', 'reference', 'seasons.json'), 'utf8')));
 
 const SUPER: CuratedAwardsViewer = { role: 'super_admin', canManageAdmins: true, userId: 1 };
+// A DIFFERENT super admin (stub user 2): the four-eyes rule (V2-GAP-019) forbids SUPER (the creator in
+// these fixtures) from approving without an attestation, so approvals run as APPROVER. The ADMIN below
+// shares the user id only because the stub seed has three users; it never approves.
+const APPROVER: CuratedAwardsViewer = { role: 'super_admin', canManageAdmins: true, userId: 2 };
 const ADMIN: CuratedAwardsViewer = { role: 'admin', canManageAdmins: false, userId: 2 };
 const CONTRIBUTOR: CuratedAwardsViewer = { role: 'contributor', canManageAdmins: false, userId: 3 };
 
@@ -84,11 +94,13 @@ const STUB_PREREQUISITES = `
     player_id integer REFERENCES players(id), player_name_raw text NOT NULL,
     club_id integer REFERENCES clubs(id), votes numeric(8,2), position text,
     is_captain boolean NOT NULL DEFAULT false, is_vice_captain boolean NOT NULL DEFAULT false,
-    note text, status text NOT NULL DEFAULT 'active', source_record_id text);
+    note text, status text NOT NULL DEFAULT 'active',
+    source_id smallint REFERENCES sources(id), source_record_id text);
 
   -- STUB reads/writes the real import-writable registry would give afldb_import on these tables.
   GRANT SELECT ON seasons, awards, players, clubs, sources, external_identities, award_winners TO afldb_import;
-  GRANT INSERT ON award_winners TO afldb_import;
+  -- UPDATE: only the STUB promotion/revision ports use it (the real ones write through the lifecycle).
+  GRANT INSERT, UPDATE ON award_winners TO afldb_import;
   GRANT USAGE ON SEQUENCE award_winners_id_seq TO afldb_import;
 
   -- STUB seed (SYNTHETIC; no real people, results or identities).
@@ -140,8 +152,11 @@ function stubPromotion(options: { throwAfterWrite?: boolean } = {}): AwardPromot
           request.votes, request.position, request.isCaptain, request.isViceCaptain, request.note,
           `stub:${request.proposalKey}:${request.revision}`],
       );
+      // Give the stub row the durable key the port returns (source 2 = manual_admin_edit), so a later
+      // revision can locate it the way the production one does.
+      await tx.query(`UPDATE award_winners SET source_id = 2, source_record_id = 'stub-award-winner-' || id WHERE id = $1`, [row.id]);
       if (options.throwAfterWrite) throw new Error('STUB promotion failed after writing award_winners');
-      return { entityKey: `manual_admin_edit:stub-award-winner-${row.id}` };
+      return { entityKey: `manual_admin_edit:stub-award-winner-${row.id}`, revalidatePaths: ['/awards'] };
     },
   };
 }
@@ -161,6 +176,8 @@ beforeAll(async () => {
   await db.exec(STUB_PREREQUISITES);
   // The migration under test, applied VERBATIM from disk (not edited to suit PGlite).
   await db.exec(readFileSync(MIGRATION, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_112, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_114, 'utf8'));
 }, 60_000);
 
 afterAll(async () => {
@@ -327,6 +344,60 @@ describe('migration 111 applied verbatim to PGlite: constraints', () => {
     expect(expected.length).toBe(Object.values(CURATED_AWARD_TRANSITIONS).reduce((n, e) => n + e.length, 0));
     expect(expected.length).toBeGreaterThan(10);
   });
+
+  // Migration 114 section 2 (V2-GAP-018): the three widened constraints are SUPERSETS. The triple test
+  // above covers the new actions too (PROPOSAL_ACTIONS now includes supersede_approved and revise_approved);
+  // this adds the finer probes: which from/to each new action admits, the NULL from_status trap, and the
+  // superseded-approval combination on award_proposals.
+  it('migration 114 admits the approved-revision actions and a superseded former approval, and nothing else new', async () => {
+    await db.query(`${INSERT_BASE}) VALUES ('s', 1990, 'X', 'manual_entry', NULL, 'c', '2026-10-19', 1)`);
+    const decide = (action: string, from: string | null, to: string) => db.query(
+      `INSERT INTO award_proposal_decisions (proposal_id, action, from_status, to_status, admin_user_id, note)
+       VALUES (1, $1, $2, $3, 1, 'a reason that is long enough')`, [action, from, to]);
+    await db.transaction(async (tx) => {
+      const attempt = async (action: string, from: string | null, to: string): Promise<boolean> => {
+        await tx.query('SAVEPOINT attempt');
+        try {
+          await tx.query(
+            `INSERT INTO award_proposal_decisions (proposal_id, action, from_status, to_status, admin_user_id, note)
+             VALUES (1, $1, $2, $3, 1, 'a reason that is long enough')`, [action, from, to]);
+          return true;
+        } catch {
+          return false;
+        } finally {
+          await tx.query('ROLLBACK TO SAVEPOINT attempt');
+        }
+      };
+      expect(await attempt('supersede_approved', 'approved', 'superseded')).toBe(true);
+      expect(await attempt('revise_approved', null, 'approved')).toBe(true);
+      // Nothing else is admitted for the new actions (including the NULL from_status trap).
+      for (const from of [null, 'proposed', 'validated', 'validation_failed', 'rejected', 'superseded']) {
+        expect(await attempt('supersede_approved', from, 'superseded'), `supersede_approved ${from}`).toBe(false);
+      }
+      for (const to of ['proposed', 'validated', 'approved', 'rejected']) {
+        expect(await attempt('supersede_approved', 'approved', to), `supersede_approved -> ${to}`).toBe(false);
+      }
+      expect(await attempt('revise_approved', null, 'proposed')).toBe(false);
+      expect(await attempt('revise_approved', 'approved', 'approved')).toBe(false);
+      expect(await attempt('revise_approved', 'proposed', 'approved')).toBe(false);
+      // An unlisted action is still refused, and the old approve transition is unchanged.
+      expect(await attempt('approve_approved', 'approved', 'superseded')).toBe(false);
+      expect(await attempt('approve', 'validated', 'approved')).toBe(true);
+      expect(await attempt('approve', 'approved', 'superseded')).toBe(false);
+    });
+    await expectRejected(decide('supersede_approved', null, 'superseded'), /award_proposal_decisions_transition_ck/);
+
+    // award_proposals_approval_ck: a superseded former approval may keep its key and time (both or neither).
+    await db.query(`UPDATE award_proposals SET status = 'approved', approved_entity_key = 'k', approved_at = now()`);
+    await db.query(`UPDATE award_proposals SET status = 'superseded'`);   // keeps key and time
+    await db.query(`UPDATE award_proposals SET approved_entity_key = NULL, approved_at = NULL`);   // superseded, never approved
+    await expectRejected(db.query(`UPDATE award_proposals SET approved_entity_key = 'k'`), /award_proposals_approval_ck/);
+    await expectRejected(db.query(`UPDATE award_proposals SET approved_at = now()`), /award_proposals_approval_ck/);
+    // The key is allowed only for approved | superseded, and an approved row still needs both.
+    await expectRejected(db.query(`UPDATE award_proposals SET status = 'rejected', approved_entity_key = 'k', approved_at = now()`), /award_proposals_approval_ck/);
+    await expectRejected(db.query(`UPDATE award_proposals SET status = 'approved'`), /award_proposals_approval_ck/);
+    await expectRejected(db.query(`UPDATE award_proposals SET status = 'approved', approved_entity_key = 'k'`), /award_proposals_approval_ck/);
+  });
 });
 
 /* =============================================================================================
@@ -400,7 +471,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
       expect(validated.status).toBe('validated');
       expect(validated.validationResult).toMatchObject({ ok: true, issues: [], checkedAt: '2026-10-19T12:00:00.000Z' });
 
-      const approved = await approveProposal(SUPER, exec, { proposalId: created.id, decisionNote: 'checked against the club annual report' },
+      const approved = await approveProposal(APPROVER, exec, { proposalId: created.id, decisionNote: 'checked against the club annual report' },
         { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS);
       expect(approved.proposal.status).toBe('approved');
       expect(approved.proposal.approvedEntityKey).toMatch(/^manual_admin_edit:stub-award-winner-\d+$/);
@@ -417,7 +488,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
     expect(ledger).toEqual([
       { action: 'create', from_status: null, to_status: 'proposed', admin_user_id: 1 },
       { action: 'validate', from_status: 'proposed', to_status: 'validated', admin_user_id: 1 },
-      { action: 'approve', from_status: 'validated', to_status: 'approved', admin_user_id: 1 },
+      { action: 'approve', from_status: 'validated', to_status: 'approved', admin_user_id: 2 },
     ]);
     // jsonb is stored single-encoded (an object, never a JSON string inside jsonb).
     const types = (await db.query<{ a: string | null; b: string | null; c: string | null }>(
@@ -436,7 +507,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
       expect(validated.status).toBe('validation_failed');
       expect(validated.validationResult?.issues.map((i) => i.code).sort()).toEqual([
         'award_not_found', 'club_not_found', 'player_identity_ambiguous', 'season_not_in_register']);
-      await expect(approveProposal(SUPER, exec, { proposalId: created.id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS))
+      await expect(approveProposal(APPROVER, exec, { proposalId: created.id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS))
         .rejects.toMatchObject({ code: 'illegal_transition' });
     });
     expect(await count('award_winners')).toBe(0);
@@ -485,7 +556,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
     expect(ledgerBefore).toBe(2);
 
     await asImport(async () => {
-      await expect(approveProposal(SUPER, exec, { proposalId, decisionNote: 'note' },
+      await expect(approveProposal(APPROVER, exec, { proposalId, decisionNote: 'note' },
         { promotion: stubPromotion({ throwAfterWrite: true }), sealed: SYNTHETIC_OPEN }, OPTIONS))
         .rejects.toThrow('STUB promotion failed after writing award_winners');
     });
@@ -509,7 +580,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
     await db.query(`INSERT INTO award_winners (award_id, season, player_id, player_name_raw, status) VALUES (1, 1990, 1, 'Synthetic Player One', 'active')`);
     const ledgerBefore = await count('award_proposal_decisions');
     await asImport(async () => {
-      const error = await approveProposal(SUPER, exec, { proposalId }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS).catch((e: unknown) => e);
+      const error = await approveProposal(APPROVER, exec, { proposalId }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(CuratedAwardError);
       expect(error).toMatchObject({ code: 'stale_validation' });
       expect((error as CuratedAwardError).issues.map((i) => i.code)).toEqual(['duplicate_active_winner']);
@@ -531,7 +602,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
 
     await asImport(async () => {
       for (const decisionNote of [undefined, 'checked']) {
-        const error = await approveProposal(SUPER, exec, { proposalId, decisionNote },
+        const error = await approveProposal(APPROVER, exec, { proposalId, decisionNote },
           { promotion: stubPromotion(), sealed: REAL_SEALED }, OPTIONS).catch((e: unknown) => e);
         expect(error).toBeInstanceOf(CuratedAwardError);
         expect(error).toMatchObject({ code: 'season_sealed_correction_invalid' });
@@ -551,14 +622,14 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
     await asImport(async () => {
       const created = await createProposal(SUPER, exec, proposal(), OPTIONS);
       await validateProposal(SUPER, exec, { proposalId: created.id }, OPTIONS);
-      const approved = await approveProposal(SUPER, exec, { proposalId: created.id, decisionNote: note },
+      const approved = await approveProposal(APPROVER, exec, { proposalId: created.id, decisionNote: note },
         { promotion: stubPromotion(), sealed: REAL_SEALED }, OPTIONS);
       expect(approved.proposal.status).toBe('approved');
     });
     expect(await count('award_winners')).toBe(1);
     const ledger = await one<{ action: string; admin_user_id: number; note: string | null }>(
       `SELECT action, admin_user_id, note FROM award_proposal_decisions ORDER BY id DESC LIMIT 1`);
-    expect(ledger).toEqual({ action: 'approve', admin_user_id: 1, note });
+    expect(ledger).toEqual({ action: 'approve', admin_user_id: 2, note });
   });
 
   it('SEAL: an open season is approved with no note, exactly as before the seal', async () => {
@@ -566,7 +637,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
     await asImport(async () => {
       const created = await createProposal(SUPER, exec, proposal(), OPTIONS);
       await validateProposal(SUPER, exec, { proposalId: created.id }, OPTIONS);
-      await approveProposal(SUPER, exec, { proposalId: created.id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS);
+      await approveProposal(APPROVER, exec, { proposalId: created.id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS);
     });
     expect(await count('award_winners')).toBe(1);
     expect((await one<{ note: string | null }>(`SELECT note FROM award_proposal_decisions ORDER BY id DESC LIMIT 1`)).note).toBeNull();
@@ -582,7 +653,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
       expect(rejected.status).toBe('rejected');
       for (const attempt of [
         () => validateProposal(SUPER, exec, { proposalId: created.id }, OPTIONS),
-        () => approveProposal(SUPER, exec, { proposalId: created.id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS),
+        () => approveProposal(APPROVER, exec, { proposalId: created.id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS),
         () => rejectProposal(SUPER, exec, { proposalId: created.id, decisionNote: 'a second rejection reason' }),
         () => reviseProposal(SUPER, exec, { proposalId: created.id, changes: { season: 1991 } }, OPTIONS),
       ]) {
@@ -643,7 +714,7 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
     await asImport(async () => {
       const created = await createProposal(SUPER, exec, proposal(), OPTIONS);
       await validateProposal(SUPER, exec, { proposalId: created.id }, OPTIONS);
-      await approveProposal(SUPER, exec, { proposalId: created.id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS);
+      await approveProposal(APPROVER, exec, { proposalId: created.id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS);
       await expect(reviseProposal(SUPER, exec, { proposalId: created.id, changes: { votes: '14' } }, OPTIONS))
         .rejects.toMatchObject({ code: 'approved_revision_unsupported' });
     });
@@ -687,8 +758,8 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
 
       // Wikipedia input is never self-certifying: approving it needs a verification note.
       await validateProposal(SUPER, exec, { proposalId: 1 }, OPTIONS);
-      await expect(approveProposal(SUPER, exec, { proposalId: 1 }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS)).rejects.toMatchObject({ code: 'note_required' });
-      await expect(approveProposal(SUPER, exec, { proposalId: 1, decisionNote: 'looks right' }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS)).rejects.toMatchObject({ code: 'note_required' });
+      await expect(approveProposal(APPROVER, exec, { proposalId: 1 }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS)).rejects.toMatchObject({ code: 'note_required' });
+      await expect(approveProposal(APPROVER, exec, { proposalId: 1, decisionNote: 'looks right' }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS)).rejects.toMatchObject({ code: 'note_required' });
 
       // Whole-file refusal: one bad row, nothing written.
       const before = await count('award_proposals');
@@ -714,5 +785,260 @@ describe('services on PGlite: the full workflow with ledger rows', () => {
       await expect(createProposal(SUPER, exec, proposal({ awardSlug: 'brownlow-medal' }), OPTIONS)).rejects.toMatchObject({ code: 'invalid_input' });
     });
     expect(await count('award_proposals')).toBe(0);
+  });
+});
+
+/* =============================================================================================
+ * 4. V2-GAP-018: revising an APPROVED proposal — the service SQL with a STUB revision port
+ * =========================================================================================== */
+describe('reviseApprovedProposal on PGlite (stub revision port)', () => {
+  const NOTE = 'Corrected against the club annual report (page 14).';
+
+  /**
+   * A STUB revision port. It is NOT the production lifecycle (that is covered on PostgreSQL by
+   * tests/integration/v2-curated-awards.test.ts): `correct` updates the stub winner row located by its
+   * durable key; `replace` voids it and inserts a new stub row. Both can be told to throw AFTER writing,
+   * so the rollback of the canonical write itself is observable.
+   */
+  function stubRevision(options: { throwAfterWrite?: boolean } = {}): ApprovedWinnerRevisionPort {
+    return {
+      async revise(tx, request) {
+        const recordId = request.previousEntityKey.replace(/^manual_admin_edit:/, '');
+        let entityKey = request.previousEntityKey;
+        let voidedEntityKey: string | null = null;
+        if (request.mode === 'correct') {
+          await tx.query('UPDATE award_winners SET votes = $1::numeric WHERE source_record_id = $2', [request.target.votes, recordId]);
+        } else {
+          await tx.query(`UPDATE award_winners SET status = 'void' WHERE source_record_id = $1`, [recordId]);
+          const [row] = await tx.query<{ id: number }>(
+            `INSERT INTO award_winners (award_id, season, player_id, player_name_raw, votes, status, source_id)
+             VALUES ($1::int, $2::smallint, $3::int, $4, $5::numeric, 'active', 2) RETURNING id::int AS id`,
+            [request.target.awardId, request.target.season, request.target.playerId, request.target.playerNameRaw, request.target.votes],
+          );
+          await tx.query(`UPDATE award_winners SET source_record_id = 'stub-award-winner-' || id WHERE id = $1`, [row.id]);
+          entityKey = `manual_admin_edit:stub-award-winner-${row.id}`;
+          voidedEntityKey = request.previousEntityKey;
+        }
+        if (options.throwAfterWrite) throw new Error('STUB revision failed after writing award_winners');
+        return { entityKey, mode: request.mode, voidedEntityKey, revalidatePaths: ['/awards', '/awards/synthetic-medal'] };
+      },
+    };
+  }
+
+  /** Create (SUPER), validate and approve (APPROVER) one proposal; returns its id. */
+  async function approvedProposal(overrides: Partial<ProposalInput> = {}): Promise<number> {
+    const exec = pgliteExecutor(db);
+    return asImport(async () => {
+      const created = await createProposal(SUPER, exec, proposal(overrides), OPTIONS);
+      await validateProposal(SUPER, exec, { proposalId: created.id }, OPTIONS);
+      await approveProposal(APPROVER, exec, { proposalId: created.id, decisionNote: NOTE }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS);
+      return created.id;
+    });
+  }
+
+  const ledgerActions = async (): Promise<string[]> =>
+    (await db.query<{ action: string }>('SELECT action FROM award_proposal_decisions ORDER BY id')).rows.map((r) => r.action);
+
+  it('correct: the old revision is superseded (keeping its approval key), the new one is approved, both ledger rows are written', async () => {
+    const proposalId = await approvedProposal();
+    const exec = pgliteExecutor(db);
+    const before = await one<{ approved_entity_key: string; approved_at: string }>(
+      'SELECT approved_entity_key, approved_at::text AS approved_at FROM award_proposals WHERE id = $1', [proposalId]);
+
+    const result = await asImport(() => reviseApprovedProposal(
+      SUPER, exec, { proposalId, changes: { votes: '13', position: 'Forward' }, decisionNote: NOTE },
+      { revision: stubRevision(), sealed: SYNTHETIC_OPEN }, OPTIONS));
+
+    expect(result.superseded).toMatchObject({ id: proposalId, status: 'superseded', approvedEntityKey: before.approved_entity_key });
+    expect(result.revision).toMatchObject({
+      revision: 2, revisionOfId: proposalId, status: 'approved', proposalKey: result.superseded.proposalKey,
+      votes: '13.00', position: 'Forward', approvedEntityKey: before.approved_entity_key, createdBy: 1,
+    });
+    expect(result.revision.approvedAt).not.toBeNull();
+    expect(result.revision.validationResult).toMatchObject({ ok: true });
+    expect(result.revised).toMatchObject({ mode: 'correct', entityKey: before.approved_entity_key });
+
+    // The earlier revision's values are untouched; the canonical row carries the new value.
+    expect((await one<{ votes: string }>('SELECT votes::text AS votes FROM award_proposals WHERE id = $1', [proposalId])).votes).toBe('12.50');
+    expect((await one<{ votes: string }>('SELECT votes::text AS votes FROM award_winners')).votes).toBe('13.00');
+    expect((await one<{ approved_entity_key: string }>('SELECT approved_entity_key FROM award_proposals WHERE id = $1', [proposalId])).approved_entity_key)
+      .toBe(before.approved_entity_key);
+
+    expect(await ledgerActions()).toEqual(['create', 'validate', 'approve', 'supersede_approved', 'revise_approved']);
+    const [supersedeRow, reviseRow] = (await db.query<{
+      proposal_id: number; action: string; from_status: string | null; to_status: string; admin_user_id: number; note: string; new_values: Record<string, unknown>;
+    }>(`SELECT proposal_id::int AS proposal_id, action, from_status, to_status, admin_user_id::int AS admin_user_id, note, new_values
+          FROM award_proposal_decisions WHERE action IN ('supersede_approved', 'revise_approved') ORDER BY id`)).rows;
+    expect(supersedeRow).toMatchObject({ proposal_id: proposalId, from_status: 'approved', to_status: 'superseded', admin_user_id: 1, note: NOTE });
+    expect(reviseRow).toMatchObject({ proposal_id: result.revision.id, from_status: null, to_status: 'approved', admin_user_id: 1, note: NOTE });
+    expect(reviseRow.new_values).toMatchObject({ selfApproval: true, mode: 'correct', revision: 2, revision_of_id: proposalId });
+
+    // Exactly one live revision (the unique index), and the history reads in order.
+    expect((await one<{ n: number }>(`SELECT count(*)::int AS n FROM award_proposals WHERE status IN ('proposed','validated','validation_failed','approved')`)).n).toBe(1);
+    const history = await readProposalHistory(SUPER, exec, { proposalId });
+    expect(history.revisions.map((r) => [r.revision, r.status])).toEqual([[1, 'superseded'], [2, 'approved']]);
+  });
+
+  it('replace: an identity-bearing change takes the replace mode; the new revision records the NEW key and can be revised again', async () => {
+    const proposalId = await approvedProposal();
+    const exec = pgliteExecutor(db);
+    const oldKey = (await one<{ approved_entity_key: string }>('SELECT approved_entity_key FROM award_proposals WHERE id = 1')).approved_entity_key;
+
+    const first = await asImport(() => reviseApprovedProposal(
+      SUPER, exec, { proposalId, changes: { season: 1991 }, decisionNote: NOTE },
+      { revision: stubRevision(), sealed: SYNTHETIC_OPEN }, OPTIONS));
+    expect(first.revised).toMatchObject({ mode: 'replace', voidedEntityKey: oldKey });
+    expect(first.revision.approvedEntityKey).not.toBe(oldKey);
+    expect(first.revision).toMatchObject({ revision: 2, season: 1991, status: 'approved' });
+    expect((await db.query<{ status: string; season: number }>('SELECT status, season::int AS season FROM award_winners ORDER BY id')).rows)
+      .toEqual([{ status: 'void', season: 1990 }, { status: 'active', season: 1991 }]);
+
+    // A second revision locates the NEW canonical row by the new key.
+    const second = await asImport(() => reviseApprovedProposal(
+      SUPER, exec, { proposalId: first.revision.id, changes: { votes: '20' }, decisionNote: NOTE },
+      { revision: stubRevision(), sealed: SYNTHETIC_OPEN }, OPTIONS));
+    expect(second.revision).toMatchObject({ revision: 3, revisionOfId: first.revision.id, status: 'approved', approvedEntityKey: first.revision.approvedEntityKey });
+    expect((await db.query<{ votes: string }>(`SELECT votes::text AS votes FROM award_winners WHERE status = 'active'`)).rows).toEqual([{ votes: '20.00' }]);
+    expect(await ledgerActions()).toEqual([
+      'create', 'validate', 'approve', 'supersede_approved', 'revise_approved', 'supersede_approved', 'revise_approved']);
+  });
+
+  it('ROLLBACK: a port that fails AFTER writing leaves the proposal approved, no ledger row, no new revision, the winner unchanged', async () => {
+    const proposalId = await approvedProposal();
+    const exec = pgliteExecutor(db);
+    const ledgerBefore = await count('award_proposal_decisions');
+    const winnerBefore = await one<{ votes: string }>('SELECT votes::text AS votes FROM award_winners');
+
+    await asImport(async () => {
+      await expect(reviseApprovedProposal(
+        SUPER, exec, { proposalId, changes: { votes: '99' }, decisionNote: NOTE },
+        { revision: stubRevision({ throwAfterWrite: true }), sealed: SYNTHETIC_OPEN }, OPTIONS))
+        .rejects.toThrow('STUB revision failed after writing award_winners');
+      await expect(reviseApprovedProposal(
+        SUPER, exec, { proposalId, changes: { season: 1991 }, decisionNote: NOTE },
+        { revision: stubRevision({ throwAfterWrite: true }), sealed: SYNTHETIC_OPEN }, OPTIONS))
+        .rejects.toThrow('STUB revision failed after writing award_winners');
+    });
+
+    expect(await count('award_proposal_decisions')).toBe(ledgerBefore);
+    expect(await count('award_proposals')).toBe(1);
+    expect((await one<{ status: string }>('SELECT status FROM award_proposals WHERE id = $1', [proposalId])).status).toBe('approved');
+    expect(await one<{ votes: string }>('SELECT votes::text AS votes FROM award_winners')).toEqual(winnerBefore);
+    expect(await count('award_winners')).toBe(1);
+  });
+
+  it('a typed refusal from the port (approved_winner_not_active) also rolls everything back', async () => {
+    const proposalId = await approvedProposal();
+    const exec = pgliteExecutor(db);
+    const ledgerBefore = await count('award_proposal_decisions');
+    const refusing: ApprovedWinnerRevisionPort = {
+      revise: async () => { throw new CuratedAwardError('approved_winner_not_active', 'The approved winner is void.'); },
+    };
+    await asImport(async () => {
+      await expect(reviseApprovedProposal(
+        SUPER, exec, { proposalId, changes: { votes: '99' }, decisionNote: NOTE }, { revision: refusing, sealed: SYNTHETIC_OPEN }, OPTIONS))
+        .rejects.toMatchObject({ code: 'approved_winner_not_active' });
+    });
+    expect(await count('award_proposal_decisions')).toBe(ledgerBefore);
+    expect((await one<{ status: string }>('SELECT status FROM award_proposals WHERE id = $1', [proposalId])).status).toBe('approved');
+  });
+
+  it('the approved winner is not a duplicate of its own revision, but a different active winner still is', async () => {
+    const proposalId = await approvedProposal();
+    const exec = pgliteExecutor(db);
+    // Another active row for the same player, award and season (a real duplicate).
+    await db.query(`INSERT INTO award_winners (award_id, season, player_id, player_name_raw, status, source_id, source_record_id)
+                    VALUES (1, 1990, 1, 'Synthetic Player One', 'active', 2, 'someone-else')`);
+    await asImport(async () => {
+      const error = await reviseApprovedProposal(
+        SUPER, exec, { proposalId, changes: { votes: '99' }, decisionNote: NOTE }, { revision: stubRevision(), sealed: SYNTHETIC_OPEN }, OPTIONS)
+        .catch((e: unknown) => e);
+      expect(error).toMatchObject({ code: 'invalid_input' });
+      expect((error as CuratedAwardError).issues.map((i) => i.code)).toEqual(['duplicate_active_winner']);
+    });
+    // Confirming the repeat lets the revision through.
+    await asImport(async () => {
+      const result = await reviseApprovedProposal(
+        SUPER, exec, { proposalId, changes: { votes: '99', duplicateConfirmed: true }, decisionNote: NOTE }, { revision: stubRevision(), sealed: SYNTHETIC_OPEN }, OPTIONS);
+      expect(result.revision.status).toBe('approved');
+    });
+  });
+
+  it('the season seal: a sealed season needs the 20..2000 note; the refusal writes nothing', async () => {
+    const proposalId = await approvedProposal();
+    const exec = pgliteExecutor(db);
+    const ledgerBefore = await count('award_proposal_decisions');
+    await asImport(async () => {
+      for (const decisionNote of [undefined, 'too short']) {
+        await expect(reviseApprovedProposal(
+          SUPER, exec, { proposalId, changes: { votes: '99' }, decisionNote }, { revision: stubRevision(), sealed: REAL_SEALED }, OPTIONS))
+          .rejects.toMatchObject({ code: 'season_sealed_correction_invalid' });
+      }
+    });
+    expect(await count('award_proposal_decisions')).toBe(ledgerBefore);
+    await asImport(async () => {
+      const result = await reviseApprovedProposal(
+        SUPER, exec, { proposalId, changes: { votes: '99' }, decisionNote: NOTE }, { revision: stubRevision(), sealed: REAL_SEALED }, OPTIONS);
+      expect(result.revision.status).toBe('approved');
+    });
+  });
+
+  it('only an approved proposal, only by a super admin, and a no-op or invalid change is refused with no write', async () => {
+    const exec = pgliteExecutor(db);
+    const pendingId = await asImport(async () => (await createProposal(SUPER, exec, proposal({ playerIdentity: ID_TWO, playerNameRaw: 'Synthetic Player Two' }), OPTIONS)).id);
+    const approvedId = await approvedProposal();
+    const ledgerBefore = await count('award_proposal_decisions');
+    const deps = { revision: stubRevision(), sealed: SYNTHETIC_OPEN };
+    await asImport(async () => {
+      await expect(reviseApprovedProposal(SUPER, exec, { proposalId: pendingId, changes: { votes: '1' }, decisionNote: NOTE }, deps, OPTIONS))
+        .rejects.toMatchObject({ code: 'illegal_transition' });
+      await expect(reviseApprovedProposal(SUPER, exec, { proposalId: approvedId, changes: {}, decisionNote: NOTE }, deps, OPTIONS))
+        .rejects.toMatchObject({ code: 'no_change' });
+      await expect(reviseApprovedProposal(SUPER, exec, { proposalId: approvedId, changes: { citation: 'A different SYNTHETIC citation' }, decisionNote: NOTE }, deps, OPTIONS))
+        .rejects.toMatchObject({ code: 'no_change' });
+      await expect(reviseApprovedProposal(SUPER, exec, { proposalId: approvedId, changes: { awardSlug: 'no-such-award' }, decisionNote: NOTE }, deps, OPTIONS))
+        .rejects.toMatchObject({ code: 'invalid_input' });
+      await expect(reviseApprovedProposal(SUPER, exec, { proposalId: approvedId, changes: { playerIdentity: null }, decisionNote: NOTE }, deps, OPTIONS))
+        .rejects.toMatchObject({ code: 'invalid_input' });
+      await expect(reviseApprovedProposal(SUPER, exec, { proposalId: approvedId, changes: { votes: '1' }, decisionNote: '' }, deps, OPTIONS))
+        .rejects.toMatchObject({ code: 'note_required' });
+      for (const viewer of [ADMIN, CONTRIBUTOR]) {
+        await expect(reviseApprovedProposal(viewer, exec, { proposalId: approvedId, changes: { votes: '1' }, decisionNote: NOTE }, deps, OPTIONS))
+          .rejects.toMatchObject({ code: 'forbidden' });
+      }
+    });
+    expect(await count('award_proposal_decisions')).toBe(ledgerBefore);
+    expect((await one<{ status: string }>('SELECT status FROM award_proposals WHERE id = $1', [approvedId])).status).toBe('approved');
+  });
+
+  it('four eyes on PostgreSQL semantics: the creator needs an attestation, the ledger row records it; another approver does not', async () => {
+    const exec = pgliteExecutor(db);
+    const ATTESTATION = 'No second reviewer is available before the printing deadline.';
+    const make = async () => asImport(async () => {
+      const created = await createProposal(SUPER, exec, proposal(), OPTIONS);
+      await validateProposal(SUPER, exec, { proposalId: created.id }, OPTIONS);
+      return created.id;
+    });
+    const id = await make();
+    await asImport(async () => {
+      await expect(approveProposal(SUPER, exec, { proposalId: id }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS))
+        .rejects.toMatchObject({ code: 'self_approval_forbidden' });
+      await expect(approveProposal(SUPER, exec, { proposalId: id, selfApprovalAttestation: 'x'.repeat(19) }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS))
+        .rejects.toMatchObject({ code: 'self_approval_attestation_required' });
+    });
+    expect(await count('award_winners')).toBe(0);
+    expect(await count('award_proposal_decisions')).toBe(2);
+    await asImport(async () => {
+      await approveProposal(SUPER, exec, { proposalId: id, selfApprovalAttestation: ATTESTATION }, { promotion: stubPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS);
+    });
+    const ledger = await one<{ new_values: Record<string, unknown> }>(`SELECT new_values FROM award_proposal_decisions WHERE action = 'approve'`);
+    expect(ledger.new_values).toMatchObject({ selfApproval: true, selfApprovalAttestation: ATTESTATION });
+  });
+
+  it('a non-creator approval records selfApproval false with no attestation kept', async () => {
+    await approvedProposal();
+    const ledger = await one<{ new_values: Record<string, unknown> }>(`SELECT new_values FROM award_proposal_decisions WHERE action = 'approve'`);
+    expect(ledger.new_values.selfApproval).toBe(false);
+    expect('selfApprovalAttestation' in ledger.new_values).toBe(false);
   });
 });

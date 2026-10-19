@@ -243,6 +243,22 @@ export function syntheticColemanComparison(kind: ColemanKind): ColemanComparison
     report,
     current: kind === 'agree' ? SYNTHETIC_PUBLICATION : null,
     plan: outcome.ok ? (kind === 'agree' ? 'unchanged' : 'published') : null,
+    // What publishing would do to award_winners (ADR 0015): agree = the one stored row is retained,
+    // disagree = the one derived winner has no stored row yet, not derivable = no preview.
+    projection: kind === 'not_derivable'
+      ? null
+      : {
+        ok: true,
+        counts: kind === 'agree'
+          ? { inserted: 0, updated: 0, voided: 0, retained: 1 }
+          : { inserted: 1, updated: 0, voided: 0, retained: 0 },
+        changedCount: kind === 'agree' ? 0 : 1,
+        actions: [{
+          entityKey: `afltables:${WINNER_A_KEY}`,
+          action: kind === 'agree' ? 'retained' : 'inserted',
+          awardWinnerId: kind === 'agree' ? 1 : null,
+        }],
+      },
   };
 }
 

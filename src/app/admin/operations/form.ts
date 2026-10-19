@@ -1,4 +1,9 @@
-import type { AwardProposalFileDefaults, AwardProposalFileFormat, ProposalSourceKind } from '@afldb/admin';
+import type {
+  AwardProposalFileDefaults,
+  AwardProposalFileFormat,
+  ProposalInput,
+  ProposalSourceKind,
+} from '@afldb/admin';
 
 import type { OperationFailure } from '@/lib/admin/operations-centre';
 
@@ -161,11 +166,101 @@ export async function parseCreateForm(
   return { ok: true, value: { text: body, format: format.value, defaults, decisionNote: decisionNote.value } };
 }
 
+export type ReviseApprovedFormInput = {
+  proposalId: number;
+  changes: ProposalInput;
+  decisionNote: string;
+};
+
+const SOURCE_KINDS: readonly ProposalSourceKind[] = ['manual_entry', 'offline_file', 'wikipedia_offline_file'];
+
+/**
+ * The revise-approved form (V2-GAP-018): the proposal id, the full set of editable values (the service
+ * diffs them against the approved revision) and a REQUIRED decision note. Shape checks only; the
+ * 20-character floor, the season seal and the database validation are the service's, inside its
+ * transaction. Field errors are keyed by the form field name.
+ */
+export function parseReviseApprovedForm(
+  formData: FormData,
+): { ok: true; value: ReviseApprovedFormInput } | { ok: false; fieldErrors: Record<string, string> } {
+  const fieldErrors: Record<string, string> = {};
+
+  const proposalId = parseProposalId(formData.get('proposalId'));
+  if (!proposalId.ok) fieldErrors.proposalId = proposalId.error;
+  const decisionNote = parseRequiredNote(formData.get('decisionNote'));
+  if (!decisionNote.ok) fieldErrors.decisionNote = decisionNote.error;
+  const season = parseSeason(formData.get('season'));
+  if (!season.ok) fieldErrors.season = season.error;
+  const acquiredOn = parseOptionalDate(formData.get('acquiredOn'));
+  if (!acquiredOn.ok) fieldErrors.acquiredOn = acquiredOn.error;
+  else if (acquiredOn.value === null) fieldErrors.acquiredOn = 'Enter the date the evidence was acquired (YYYY-MM-DD).';
+
+  const awardSlug = optionalShort(formData.get('awardSlug'), 200, 'The award');
+  if (!awardSlug.ok) fieldErrors.awardSlug = awardSlug.error;
+  else if (awardSlug.value === null) fieldErrors.awardSlug = 'An award is required.';
+  const playerNameRaw = optionalShort(formData.get('playerNameRaw'), 200, 'The player name');
+  if (!playerNameRaw.ok) fieldErrors.playerNameRaw = playerNameRaw.error;
+  else if (playerNameRaw.value === null) fieldErrors.playerNameRaw = 'The source name of the player is required.';
+  const playerIdentity = optionalShort(formData.get('playerIdentity'), 500, 'The player identity');
+  if (!playerIdentity.ok) fieldErrors.playerIdentity = playerIdentity.error;
+  const clubSlug = optionalShort(formData.get('clubSlug'), 200, 'The club');
+  if (!clubSlug.ok) fieldErrors.clubSlug = clubSlug.error;
+  const votes = optionalShort(formData.get('votes'), 20, 'The votes or value');
+  if (!votes.ok) fieldErrors.votes = votes.error;
+  const position = optionalShort(formData.get('position'), 200, 'The position');
+  if (!position.ok) fieldErrors.position = position.error;
+  const note = parseOptionalNote(formData.get('note'));
+  if (!note.ok) fieldErrors.note = note.error;
+  const sourceUrl = optionalShort(formData.get('sourceUrl'), MAX_URL, 'The source URL');
+  if (!sourceUrl.ok) fieldErrors.sourceUrl = sourceUrl.error;
+  const citation = optionalShort(formData.get('citation'), MAX_NOTE, 'The citation');
+  if (!citation.ok) fieldErrors.citation = citation.error;
+
+  const rawKind = text(formData.get('sourceKind'));
+  const sourceKind = SOURCE_KINDS.find((kind) => kind === rawKind);
+  if (sourceKind === undefined) fieldErrors.sourceKind = 'Choose the source kind.';
+
+  if (Object.keys(fieldErrors).length > 0
+    || !proposalId.ok || !decisionNote.ok || !season.ok || !acquiredOn.ok || acquiredOn.value === null
+    || !awardSlug.ok || awardSlug.value === null || !playerNameRaw.ok || playerNameRaw.value === null
+    || !playerIdentity.ok || !clubSlug.ok || !votes.ok || !position.ok || !note.ok
+    || !sourceUrl.ok || !citation.ok || sourceKind === undefined) {
+    return { ok: false, fieldErrors };
+  }
+  return {
+    ok: true,
+    value: {
+      proposalId: proposalId.value,
+      decisionNote: decisionNote.value,
+      changes: {
+        awardSlug: awardSlug.value,
+        season: season.value,
+        playerIdentity: playerIdentity.value,
+        playerNameRaw: playerNameRaw.value,
+        clubSlug: clubSlug.value,
+        votes: votes.value,
+        position: position.value,
+        isCaptain: parseChecked(formData.get('isCaptain')),
+        isViceCaptain: parseChecked(formData.get('isViceCaptain')),
+        note: note.value,
+        duplicateConfirmed: parseChecked(formData.get('duplicateConfirmed')),
+        sourceKind,
+        sourceUrl: sourceUrl.value,
+        citation: citation.value,
+        acquiredOn: acquiredOn.value,
+      },
+    },
+  };
+}
+
 /** A typed refusal, as the state `useActionState` renders. Field errors are keyed by form field name. */
 export function failureState(failure: OperationFailure): OperationsActionState {
   const fieldErrors: Record<string, string> = {};
   if (failure.code === 'note_required' || failure.code === 'season_sealed_correction_invalid') {
     fieldErrors.decisionNote = failure.error;
+  }
+  if (failure.code === 'self_approval_forbidden' || failure.code === 'self_approval_attestation_required') {
+    fieldErrors.selfApprovalAttestation = failure.error;
   }
   if (failure.code === 'correction_invalid') fieldErrors.note = failure.error;
   if (failure.code === 'settled_required') fieldErrors.settled = failure.error;

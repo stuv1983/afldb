@@ -11,6 +11,7 @@ import {
 } from '@afldb/domain';
 
 import type {
+  BrownlowDeterminationView,
   ColemanPublicationView,
   OperationResult,
 } from '@/lib/admin/operations-centre';
@@ -71,6 +72,7 @@ export type PageDeps = {
     | 'readCuratedHistory'
     | 'listColemanPublicationsForAdmin'
     | 'reconcileBrownlowSeasonForAdmin'
+    | 'determineBrownlowSeasonForAdmin'
   >>;
 };
 
@@ -284,5 +286,24 @@ export async function loadBrownlowReport(
   return viaOperations(deps, 'Brownlow reconciliation', async (api) => fromResult(
     await api.reconcileBrownlowSeasonForAdmin(admin, { season, eligibilityRule: query.rule }),
     (value) => value.report,
+  ));
+}
+
+/**
+ * The eligibility-aware medal determination of the chosen season (Launch F F-D; ADR 0014), or null
+ * while no season is chosen. READ-ONLY (`data.brownlow.read`). The raw leaderboard, the status and
+ * the evidence behind it come back as one JSON-safe view.
+ */
+export async function loadBrownlowDetermination(
+  admin: AdminUser,
+  query: BrownlowQuery,
+  overrides?: Partial<PageDeps>,
+): Promise<Loaded<BrownlowDeterminationView> | null> {
+  if (query.season === null) return null;
+  const deps = resolve(overrides);
+  const season = query.season;
+  return viaOperations(deps, 'Brownlow determination', async (api) => fromResult(
+    await api.determineBrownlowSeasonForAdmin(admin, { season }),
+    (value) => value.view,
   ));
 }
