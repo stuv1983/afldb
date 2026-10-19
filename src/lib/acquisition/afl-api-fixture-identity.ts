@@ -103,16 +103,10 @@ type Tx = postgres.TransactionSql;
 
 const MATCH_FAMILY = 'match';
 
-/**
- * Distinguishes a `--fixtures-only` acquisition's manifest from a normal
- * `afl_api_match_snapshot` one — used by both `acquire-afl-api.ts` (to write
- * it) and `settle-afl-api-fixtures.ts` (to refuse a manifest that is not
- * this kind, and so that `settle-afl-api.ts` — which this constant does not
- * touch — can never mistake a fixtures-only snapshot for a complete one by
- * silently accepting it; that tool's own manifest check pins the OTHER
- * value, `afl_api_match_snapshot`).
- */
-export const AFL_API_FIXTURE_ACQUISITION_KIND = 'afl_api_fixture_snapshot';
+// The fixtures-only acquisition kind is defined (with its full rationale) in the writer-free leaf
+// module so acquire-afl-api.ts need not import this module (AFLDB V2 Stage 3); re-exported here
+// unchanged for every existing importer.
+export { AFL_API_FIXTURE_ACQUISITION_KIND } from './afl-api-acquisition-constants';
 
 // ---------------------------------------------------------------------------
 // Build: DB-free, exactly `emitAflApiMatch()` per already-selected raw

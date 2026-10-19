@@ -16,7 +16,7 @@
  */
 import { createHash } from 'node:crypto';
 import {
-  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -25,7 +25,11 @@ import {
   afterEach, describe, expect, it,
 } from 'vitest';
 
-import type { FetchLike } from '@/lib/acquisition/afl-api-client';
+import {
+  AFL_API_MIN_REQUEST_INTERVAL_MS,
+  AflApiRequestError,
+  type FetchLike,
+} from '@/lib/acquisition/afl-api-client';
 import { readAflApiIngestionControls } from '@/lib/acquisition/afl-api-ingestion-control';
 import {
   buildAflApiBrownlowLabel,
@@ -277,5 +281,99 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
     // The failed run's own (suffixed) directory is gone; the first, complete snapshot is untouched.
     if (claimedSnapshotDir) expect(existsSync(claimedSnapshotDir)).toBe(false);
     expect(existsSync(first.manifestPath)).toBe(true);
+  });
+
+  it('W4 (Launch B): the manifest records each raw file\'s request, the tool, the start time and the request parameters, and never the token', async () => {
+    const projectRoot = makeProjectRoot();
+    const secret = 'tok-SECRET-w4-brownlow-0123';
+    const seen: { url: string; method: string; headers: string }[] = [];
+    const { fetchImpl: inner } = stubFetch(brownlowHandlers({ matches: [] }, { players: [] }, secret));
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      seen.push({ url: String(url), method: init?.method ?? 'GET', headers: JSON.stringify(init?.headers ?? {}) });
+      return inner(url, init);
+    }) as FetchLike;
+
+    const result = await runBrownlowAcquisition(
+      { season: 2025 },
+      {
+        fetchImpl, projectRoot, now: new Date('2026-09-20T10:08:00Z'), env: BROWNLOW_ENV,
+        ingestionControls: BROWNLOW_ENABLED_CONTROLS, retryOpts: { sleep: noSleep },
+      },
+    );
+    const manifestText = readFileSync(result.manifestPath, 'utf8');
+    const manifest = JSON.parse(manifestText);
+
+    const seasonUrl = seen.find((c) => c.url.includes('/afl/bfawards/season/'))?.url;
+    const leaderboardUrl = seen.find((c) => c.url.includes('/afl/bfawards/leaderboard/season/'))?.url;
+    expect(seasonUrl).toBeDefined();
+    expect(leaderboardUrl).toBeDefined();
+    expect(manifest.files.map((f: { file: string; request: unknown }) => [f.file, f.request])).toEqual([
+      ['01-brownlow-season.raw.json', { method: 'GET', url: seasonUrl }],
+      ['02-brownlow-leaderboard.raw.json', { method: 'GET', url: leaderboardUrl }],
+    ]);
+    expect(manifest.acquisition_tool).toBe('acquire-afl-api-brownlow.ts');
+    expect(manifest.request_parameters).toEqual({ season_provider_id: 'CD_S2025014' });
+    expect(Date.parse(manifest.acquisition_started_at)).toBeLessThanOrEqual(Date.parse(manifest.acquired_at));
+    // acquired_at keeps its meaning (completion time) and the pre-existing keys are all still present.
+    for (const key of ['contract_version', 'source_key', 'acquisition_kind', 'label', 'season', 'season_provider_id', 'files']) {
+      expect(manifest).toHaveProperty(key);
+    }
+
+    // The token travelled in a header on the CFS requests, and is recorded nowhere in the manifest.
+    expect(seen.some((c) => c.headers.includes(secret))).toBe(true);
+    expect(manifestText).not.toContain(secret);
+  });
+
+  it('W4 (Launch B): a 2xx Brownlow body that is not JSON fails with the URL and status, before any file is written', async () => {
+    const projectRoot = makeProjectRoot();
+    const now = new Date('2026-09-20T10:08:00Z');
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'brownlow', buildAflApiBrownlowLabel(2025, now));
+    const { fetchImpl } = stubFetch([
+      { test: (u: string) => u.endsWith('/afl/WMCTok'), respond: () => jsonResponse({ token: 'tok-1' }) },
+      { test: (u: string) => u.includes('/afl/bfawards/leaderboard/season/'), respond: () => jsonResponse({ players: [] }) },
+      { test: (u: string) => u.includes('/afl/bfawards/season/'), respond: () => new Response('<html>maintenance</html>', { status: 200 }) },
+    ]);
+    const error = await runBrownlowAcquisition(
+      { season: 2025 },
+      {
+        fetchImpl, projectRoot, now, env: BROWNLOW_ENV,
+        ingestionControls: BROWNLOW_ENABLED_CONTROLS, retryOpts: { sleep: noSleep },
+      },
+    ).catch((e) => e);
+    expect(error).toBeInstanceOf(AflApiRequestError);
+    expect((error as AflApiRequestError).message).toMatch(/Brownlow season response from GET \S+\/afl\/bfawards\/season\/CD_S2025014 \(HTTP 200\) was not valid JSON/);
+    expect(readdirSync(snapshotDir)).toEqual([]);
+  });
+
+  it('W4 (Launch B): a 404 is requested once, and the tool spaces its requests by the default interval on the injected clock', async () => {
+    const projectRoot = makeProjectRoot();
+    const clock = { t: 9_000 };
+    const starts: number[] = [];
+    const seasonCalls: string[] = [];
+    const { fetchImpl: inner } = stubFetch([
+      { test: (u: string) => u.endsWith('/afl/WMCTok'), respond: () => jsonResponse({ token: 'tok-1' }) },
+      { test: (u: string) => u.includes('/afl/bfawards/leaderboard/season/'), respond: () => new Response('missing', { status: 404 }) },
+      { test: (u: string) => u.includes('/afl/bfawards/season/'), respond: () => jsonResponse({ matches: [] }) },
+    ]);
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      starts.push(clock.t);
+      if (String(url).includes('leaderboard')) seasonCalls.push(String(url));
+      return inner(url, init);
+    }) as FetchLike;
+
+    await expect(runBrownlowAcquisition(
+      { season: 2025 },
+      {
+        fetchImpl, projectRoot, now: new Date('2026-09-20T10:08:00Z'), env: BROWNLOW_ENV,
+        ingestionControls: BROWNLOW_ENABLED_CONTROLS,
+        retryOpts: { now: () => clock.t, sleep: async (ms) => { clock.t += ms; } },
+      },
+    )).rejects.toThrow(/failed with 404 \(not retried: the resource does not exist/);
+
+    expect(seasonCalls).toHaveLength(1); // the 404 was not retried
+    expect(starts).toHaveLength(3); // token, season votes, leaderboard
+    for (let i = 1; i < starts.length; i += 1) {
+      expect(starts[i] - starts[i - 1]).toBeGreaterThanOrEqual(AFL_API_MIN_REQUEST_INTERVAL_MS);
+    }
   });
 });

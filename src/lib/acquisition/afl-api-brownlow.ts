@@ -154,12 +154,9 @@ const BROWNLOW_ROUND_VOTES_FIELDS = ['played', 'votes', 'match_id'] as const;
  * match-family settle's own timer/flag.
  * ------------------------------------------------------------------ */
 
-export const BROWNLOW_ENABLE_ENV = 'AFLDB_AFL_API_BROWNLOW_ENABLED';
-
-/** Anything other than the literal string `'true'` is disabled — never a truthy-string guess. */
-export function isAflApiBrownlowEnabled(env: Partial<Record<string, string | undefined>> = process.env): boolean {
-  return env[BROWNLOW_ENABLE_ENV] === 'true';
-}
+// Defined in the writer-free leaf module so the acquire CLIs need not import this settle writer
+// (AFLDB V2 Stage 3); re-exported here unchanged for every existing importer.
+export { BROWNLOW_ENABLE_ENV, isAflApiBrownlowEnabled } from './afl-api-acquisition-constants';
 
 /* ------------------------------------------------------------------ *
  * §10 follow-up (2026-09-20) — the completed-season Brownlow backtest

@@ -28,8 +28,11 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  AFL_API_MIN_REQUEST_INTERVAL_MS,
   AflApiRequestError,
+  createAflApiRateLimiter,
   fetchAflApiToken,
+  parseAflApiJsonBody,
   planAflApiBrownlowLeaderboardRequest,
   planAflApiBrownlowSeasonRequest,
   requestAflApi,
@@ -39,7 +42,7 @@ import {
   type FetchLike,
   type RetryOptions,
 } from '../../src/lib/acquisition/afl-api-client';
-import { BROWNLOW_ENABLE_ENV, isAflApiBrownlowEnabled } from '../../src/lib/acquisition/afl-api-brownlow';
+import { BROWNLOW_ENABLE_ENV, isAflApiBrownlowEnabled } from '../../src/lib/acquisition/afl-api-acquisition-constants';
 import {
   combineAflApiBrownlowGates,
   describeAflApiIngestionReadFailure,
@@ -88,19 +91,24 @@ export function buildAflApiBrownlowLabel(season: number, now: Date = new Date())
 type ManifestFileEntry = {
   file: string; sha256: string; http_status: number; etag: string | null;
   cache_control: string | null; retrieved_at: string;
+  /** W4 (Launch B): the request that produced this raw file. The URL only: the token travels in a header and is never recorded. */
+  request: { method: string; url: string };
 };
 
 function sha256Of(text: string): string {
   return createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex');
 }
 
-function writeRawFile(snapshotDir: string, relPath: string, response: AflApiResponse): ManifestFileEntry {
+function writeRawFile(
+  snapshotDir: string, relPath: string, response: AflApiResponse, plan: { method: string; url: string },
+): ManifestFileEntry {
   const path = join(snapshotDir, relPath);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, response.bodyText, 'utf8');
   return {
     file: relPath, sha256: sha256Of(response.bodyText), http_status: response.status,
     etag: response.etag, cache_control: response.cacheControl, retrieved_at: response.retrievedAt,
+    request: { method: plan.method, url: plan.url },
   };
 }
 
@@ -165,7 +173,14 @@ export async function runBrownlowAcquisition(
     );
   }
   const bases = deps.bases ?? resolveAflApiEndpointBases(env);
-  const retryOpts = deps.retryOpts ?? {};
+  // W4 (Launch B): every request, retries included, waits its turn. The limiter shares the injected
+  // sleep, so a test that injects one never waits on a real timer.
+  const retryOpts: RetryOptions = {
+    ...deps.retryOpts,
+    rateLimiter: deps.retryOpts?.rateLimiter ?? createAflApiRateLimiter({
+      minIntervalMs: AFL_API_MIN_REQUEST_INTERVAL_MS, sleep: deps.retryOpts?.sleep, now: deps.retryOpts?.now,
+    }),
+  };
   const log = deps.log ?? ((line: string) => { process.stdout.write(`${line}\n`); });
   const { fetchImpl } = deps;
 
@@ -188,6 +203,7 @@ export async function runBrownlowAcquisition(
 
   log(`AFLDB-ISSUE-228 S7 Brownlow acquire — season ${args.season} (${seasonProviderId}), label ${label}`);
 
+  const acquisitionStartedAt = new Date().toISOString();
   let token = await fetchAflApiToken(fetchImpl, bases, env, retryOpts);
   let reissuedThisRun = false;
   const reissueToken = async (): Promise<string> => {
@@ -209,18 +225,18 @@ export async function runBrownlowAcquisition(
     }
   }
 
-  const seasonResponse = await fetchCfs((tok) => planAflApiBrownlowSeasonRequest(bases, seasonProviderId, tok, env));
-  const leaderboardResponse = await fetchCfs(
-    (tok) => planAflApiBrownlowLeaderboardRequest(bases, seasonProviderId, tok, env),
-  );
+  const seasonPlanFor = (tok: string) => planAflApiBrownlowSeasonRequest(bases, seasonProviderId, tok, env);
+  const leaderboardPlanFor = (tok: string) => planAflApiBrownlowLeaderboardRequest(bases, seasonProviderId, tok, env);
+  const seasonResponse = await fetchCfs(seasonPlanFor);
+  const leaderboardResponse = await fetchCfs(leaderboardPlanFor);
 
   // Confirm the transaction succeeded and produced JSON; no adjudication (§7.1).
-  JSON.parse(seasonResponse.bodyText);
-  JSON.parse(leaderboardResponse.bodyText);
+  parseAflApiJsonBody('Brownlow season response', seasonPlanFor(token), seasonResponse);
+  parseAflApiJsonBody('Brownlow leaderboard response', leaderboardPlanFor(token), leaderboardResponse);
 
   const files: ManifestFileEntry[] = [
-    writeRawFile(snapshotDir, '01-brownlow-season.raw.json', seasonResponse),
-    writeRawFile(snapshotDir, '02-brownlow-leaderboard.raw.json', leaderboardResponse),
+    writeRawFile(snapshotDir, '01-brownlow-season.raw.json', seasonResponse, seasonPlanFor(token)),
+    writeRawFile(snapshotDir, '02-brownlow-leaderboard.raw.json', leaderboardResponse, leaderboardPlanFor(token)),
   ];
 
   const manifestPath = join(snapshotDir, 'manifest.json');
@@ -231,6 +247,10 @@ export async function runBrownlowAcquisition(
     label,
     season: args.season,
     season_provider_id: seasonProviderId,
+    // W4 (Launch B): provenance. `acquired_at` below stays the completion time; this is when the run began.
+    acquisition_tool: 'acquire-afl-api-brownlow.ts',
+    acquisition_started_at: acquisitionStartedAt,
+    request_parameters: { season_provider_id: seasonProviderId },
     acquired_at: new Date().toISOString(),
     files,
   };

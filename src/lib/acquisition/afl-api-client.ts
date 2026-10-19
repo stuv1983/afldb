@@ -207,6 +207,11 @@ export class AflApiRequestError extends Error {
     public readonly url: string,
     public readonly status: number | null,
     public readonly attempts: number,
+    /**
+     * W4 (Launch B): whether repeating the same request could help. `false` for a status the client
+     * refuses to retry; `true` for a transient class; omitted where the caller did not classify it.
+     */
+    public readonly retryable?: boolean,
   ) {
     super(message);
     this.name = 'AflApiRequestError';
@@ -234,10 +239,48 @@ export type RetryOptions = {
   timeoutMs?: number;
   /** Injected so tests never wait on real timers. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * The longest a `Retry-After` header on a 429/503 may make the client wait before the next
+   * attempt; a larger value is capped to this (default 30 000 ms). The wait is still bounded by
+   * `attempts`.
+   */
+  maxRetryAfterMs?: number;
+  /** Clock for an HTTP-date `Retry-After`. Injected by tests; defaults to `Date.now`. */
+  now?: () => number;
+  /**
+   * Awaited before EVERY attempt, retries included, so request starts are spaced
+   * (`createAflApiRateLimiter`). Unset means no spacing.
+   */
+  rateLimiter?: AflApiRateLimiter;
 };
 
+/** W4 (Launch B): spaces request starts. See `createAflApiRateLimiter`. */
+export type AflApiRateLimiter = { acquire(): Promise<void> };
+
+export type AflApiRateLimiterOptions = {
+  /** The minimum time between the starts of two consecutive requests; `0` disables spacing. */
+  minIntervalMs: number;
+  /** Clock in milliseconds. Injected by tests; defaults to `Date.now`. */
+  now?: () => number;
+  /** Injected so tests never wait on real timers. */
+  sleep?: (ms: number) => Promise<void>;
+};
+
+/**
+ * W4 (Launch B): the default spacing between request STARTS used by both acquire tools. An
+ * implementation default, not a provider limit: docs/acquisition/AFLDB-2026-API-ACQUISITION.md states no
+ * AFL API rate limit or throttle (searched for "rate" and "throttle"; the only hits are unrelated), so
+ * this is a courtesy figure of four requests a second, small against a nightly run of a few hundred
+ * requests.
+ */
+export const AFL_API_MIN_REQUEST_INTERVAL_MS = 250;
+
 const DEFAULT_RETRY_ATTEMPTS = 3;
+const MAX_RETRY_ATTEMPTS = 10;
 const DEFAULT_RETRY_BASE_DELAY_MS = 500;
+const DEFAULT_MAX_RETRY_AFTER_MS = 30_000;
+/** Statuses other than 5xx that are transient by definition: request timeout, too early, too many requests. */
+const RETRYABLE_CLIENT_STATUSES: ReadonlySet<number> = new Set([408, 425, 429]);
 /**
  * An implementation default, not a measured or owner-decided figure (AFLDB-ISSUE-301 left the
  * value open): the feeds are small JSON documents, so a healthy attempt finishes in seconds, and
@@ -245,6 +288,73 @@ const DEFAULT_RETRY_BASE_DELAY_MS = 500;
  */
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/**
+ * W4 (Launch B): a rate limiter that spaces request STARTS by at least `minIntervalMs`. Each call
+ * to `acquire()` reserves the next free start slot synchronously, so concurrent callers queue
+ * rather than race; it then waits (via the injected `sleep`) until its slot.
+ */
+export function createAflApiRateLimiter(options: AflApiRateLimiterOptions): AflApiRateLimiter {
+  const { minIntervalMs } = options;
+  if (!Number.isFinite(minIntervalMs) || minIntervalMs < 0) {
+    throw new RangeError(`minIntervalMs must be a finite number of milliseconds >= 0, got ${String(minIntervalMs)}.`);
+  }
+  const clock = options.now ?? Date.now;
+  const sleep = options.sleep ?? defaultSleep;
+  let nextFreeSlot = Number.NEGATIVE_INFINITY;
+  return {
+    async acquire(): Promise<void> {
+      const now = clock();
+      const slot = Math.max(now, nextFreeSlot);
+      nextFreeSlot = slot + minIntervalMs;
+      const wait = slot - now;
+      if (wait > 0) await sleep(wait);
+    },
+  };
+}
+
+/**
+ * Seconds-or-HTTP-date `Retry-After` (RFC 9110 §10.2.3) as a delay in ms, or `null` when absent or
+ * unparseable. A date in the past is a zero delay.
+ */
+function parseRetryAfterMs(value: string | null, nowMs: number): number | null {
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000;
+  const at = Date.parse(trimmed);
+  if (Number.isNaN(at)) return null;
+  return Math.max(0, at - nowMs);
+}
+
+/** Releases a discarded non-2xx body so the connection is not held open across the retry. Never throws. */
+function discardBody(response: Response): void {
+  try {
+    const cancelled = response.body?.cancel();
+    if (cancelled) cancelled.catch(() => {});
+  } catch {
+    // A body that cannot be cancelled is not worth failing the request over.
+  }
+}
+
+const REMEDY_UNAVAILABLE = 'the AFL API is unavailable or slow; retry later. Nothing was written by this request.';
+
+function describeHttpFailure(plan: AflApiRequestPlan, status: number, attempt: number, attempts: number): string {
+  const base = `${plan.method} ${plan.url} failed with ${status}`;
+  if (status === 404) {
+    return `${base} (not retried: the resource does not exist. Check the season's compSeasonId in `
+      + 'data/reference/afl-api-identities.json or the match providerId.)';
+  }
+  if (status === 401 || status === 403) return base;
+  if (status >= 400 && status < 500 && !RETRYABLE_CLIENT_STATUSES.has(status)) {
+    return `${base} (not retried: the request is wrong, so repeating it cannot help. Check the request URL and parameters.)`;
+  }
+  if (attempt < attempts) return base;
+  if (status === 429) {
+    return `${base} after ${attempt} attempt(s) (the AFL API is rate limiting this client; retry later or raise `
+      + 'the minimum request interval. Nothing was written by this request.)';
+  }
+  return `${base} after ${attempt} attempt(s) (${REMEDY_UNAVAILABLE})`;
+}
 
 /**
  * Runs one attempt under a deadline. The `AbortSignal` is handed to the transport so a real
@@ -260,7 +370,8 @@ async function attemptWithDeadline<T>(
   const deadline = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
       const error = new AflApiRequestError(
-        `${plan.method} ${plan.url} timed out after ${timeoutMs} ms`, plan.url, null, attempt,
+        `${plan.method} ${plan.url} timed out after ${timeoutMs} ms (${REMEDY_UNAVAILABLE})`,
+        plan.url, null, attempt, true,
       );
       controller.abort(error);
       reject(error);
@@ -294,11 +405,24 @@ export async function requestAflApi(
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new RangeError(`timeoutMs must be a positive finite number of milliseconds, got ${String(timeoutMs)}.`);
   }
+  if (!Number.isInteger(attempts) || attempts < 1 || attempts > MAX_RETRY_ATTEMPTS) {
+    throw new RangeError(`attempts must be an integer from 1 to ${MAX_RETRY_ATTEMPTS}, got ${String(attempts)}.`);
+  }
+  if (!Number.isFinite(baseDelayMs) || baseDelayMs < 0) {
+    throw new RangeError(`baseDelayMs must be a finite number of milliseconds >= 0, got ${String(baseDelayMs)}.`);
+  }
+  const maxRetryAfterMs = opts.maxRetryAfterMs ?? DEFAULT_MAX_RETRY_AFTER_MS;
+  if (!Number.isFinite(maxRetryAfterMs) || maxRetryAfterMs < 0) {
+    throw new RangeError(`maxRetryAfterMs must be a finite number of milliseconds >= 0, got ${String(maxRetryAfterMs)}.`);
+  }
+  const clock = opts.now ?? Date.now;
 
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     let response: Response;
     let bodyText: string | null;
+    // Spacing applies to every attempt, a retry included (a retry is a request to the same host).
+    if (opts.rateLimiter) await opts.rateLimiter.acquire();
     try {
       // The body of a 2xx response is read inside the same attempt and the same deadline, so a
       // stream that fails or stalls part-way is retried like any other transport failure.
@@ -323,20 +447,43 @@ export async function requestAflApi(
         retrievedAt: new Date().toISOString(),
       };
     }
+    // The body of a non-2xx response is never read; release it before deciding what happens next.
+    discardBody(response);
+    const status = response.status;
+    const tokenRejected = status === 401 || status === 403;
+    const retryable = !tokenRejected
+      && (status >= 500 || RETRYABLE_CLIENT_STATUSES.has(status) || status < 400);
     const httpError = new AflApiRequestError(
-      `${plan.method} ${plan.url} failed with ${response.status}`, plan.url, response.status, attempt,
+      describeHttpFailure(plan, status, attempt, attempts), plan.url, status, attempt, retryable,
     );
-    if (response.status === 401 || response.status === 403) throw httpError;
+    // 401/403: the caller's reissue-once policy decides. Other 4xx (404, 400, ...): the request
+    // itself is wrong, so repeating it only burns the attempt budget and hammers the API.
+    if (!retryable) throw httpError;
     lastError = httpError;
     if (attempt < attempts) {
-      await sleep(baseDelayMs * 2 ** (attempt - 1));
+      let delay = baseDelayMs * 2 ** (attempt - 1);
+      if (status === 429 || status === 503) {
+        const retryAfter = parseRetryAfterMs(response.headers?.get('retry-after') ?? null, clock());
+        if (retryAfter !== null) delay = Math.max(delay, Math.min(retryAfter, maxRetryAfterMs));
+      }
+      await sleep(delay);
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new AflApiRequestError(
-      `${plan.method} ${plan.url} failed after ${attempts} attempt(s).`, plan.url, null, attempts,
+  if (lastError instanceof AflApiRequestError) throw lastError;
+  if (lastError instanceof Error) {
+    // A transport failure (connection refused, DNS, reset, a failed body read): keep the original
+    // message and add the class of remedy, and keep the cause for anyone who needs the stack.
+    const wrapped = new AflApiRequestError(
+      `${plan.method} ${plan.url} failed after ${attempts} attempt(s): ${lastError.message} `
+      + `(transport error; ${REMEDY_UNAVAILABLE})`,
+      plan.url, null, attempts, true,
     );
+    wrapped.cause = lastError;
+    throw wrapped;
+  }
+  throw new AflApiRequestError(
+    `${plan.method} ${plan.url} failed after ${attempts} attempt(s).`, plan.url, null, attempts,
+  );
 }
 
 /**
@@ -400,6 +547,24 @@ export async function fetchAflApiCfsResource(
     const freshToken = await reissueToken();
     const response = await requestAflApi(fetchImpl, buildPlan(freshToken), opts);
     return { response, tokenReissued: true };
+  }
+}
+
+/**
+ * W4 (Launch B): parses a 2xx body as JSON, or throws an `AflApiRequestError` that names the URL and
+ * status and says what to do, instead of a bare `SyntaxError` that names neither. `what` is a short
+ * label such as "Season matches response".
+ */
+export function parseAflApiJsonBody(what: string, plan: Pick<AflApiRequestPlan, 'url' | 'method'>, response: Pick<AflApiResponse, 'status' | 'bodyText'>): unknown {
+  try {
+    return JSON.parse(response.bodyText);
+  } catch {
+    throw new AflApiRequestError(
+      `${what} from ${plan.method} ${plan.url} (HTTP ${response.status}) was not valid JSON `
+      + `(${response.bodyText.length} character(s)). Not retried: the AFL API answered with something other than its JSON feed; `
+      + 'check the configured AFLDB_AFL_API_* base URLs and retry later. Nothing was written by this request.',
+      plan.url, response.status, 1, false,
+    );
   }
 }
 

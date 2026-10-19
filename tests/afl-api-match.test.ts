@@ -20,13 +20,15 @@ import {
 import type postgres from 'postgres';
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  AFL_API_MIN_REQUEST_INTERVAL_MS,
   AflApiRequestError,
   type AflApiRequestPlan,
+  createAflApiRateLimiter,
   DEFAULT_AFL_API_BASES,
   fetchAflApiCfsResource,
   fetchAflApiToken,
@@ -361,6 +363,227 @@ describe('afl-api-client (AFLDB-ISSUE-228 §7.1)', () => {
       expect(error).toBeInstanceOf(AflApiRequestError);
       expect((error as AflApiRequestError).status).toBe(401);
       expect(calls).toHaveLength(1);
+    });
+
+    describe('W4 (Launch B): retryable classes, Retry-After, option validation, rate limiting', () => {
+      const tooMany = (retryAfter?: string): Response => new Response('slow down', {
+        status: 429, headers: retryAfter === undefined ? {} : { 'retry-after': retryAfter },
+      });
+
+      it('404 is thrown after exactly one attempt, with a remedy and no sleep', async () => {
+        const sleeps: number[] = [];
+        const { fetchImpl, calls } = stubFetch([{ test: () => true, respond: () => new Response('gone', { status: 404 }) }]);
+        const error = await requestAflApi(fetchImpl, plan, { sleep: async (ms) => { sleeps.push(ms); } }).catch((e) => e);
+        expect(error).toBeInstanceOf(AflApiRequestError);
+        expect((error as AflApiRequestError).status).toBe(404);
+        expect((error as AflApiRequestError).attempts).toBe(1);
+        expect((error as AflApiRequestError).retryable).toBe(false);
+        expect((error as AflApiRequestError).message).toContain('failed with 404');
+        expect((error as AflApiRequestError).message).toContain('not retried: the resource does not exist');
+        expect((error as AflApiRequestError).message).toContain('data/reference/afl-api-identities.json');
+        expect(calls).toHaveLength(1);
+        expect(sleeps).toEqual([]);
+      });
+
+      it('400 is thrown after exactly one attempt, saying the request is wrong', async () => {
+        const { fetchImpl, calls } = stubFetch([{ test: () => true, respond: () => new Response('bad', { status: 400 }) }]);
+        const error = await requestAflApi(fetchImpl, plan, { sleep: noSleep }).catch((e) => e);
+        expect((error as AflApiRequestError).status).toBe(400);
+        expect((error as AflApiRequestError).retryable).toBe(false);
+        expect((error as AflApiRequestError).message).toContain('not retried: the request is wrong');
+        expect(calls).toHaveLength(1);
+      });
+
+      it.each([408, 425, 500, 502])('%i is transient and still retried to success', async (status) => {
+        let n = 0;
+        const { fetchImpl, calls } = stubFetch([
+          { test: () => true, respond: () => { n += 1; return n < 2 ? new Response('x', { status }) : jsonResponse({ ok: true }); } },
+        ]);
+        const response = await requestAflApi(fetchImpl, plan, { sleep: noSleep });
+        expect(response.status).toBe(200);
+        expect(calls).toHaveLength(2);
+      });
+
+      it('an exhausted 503 names the remedy and counts the attempts', async () => {
+        const { fetchImpl, calls } = stubFetch([{ test: () => true, respond: () => new Response('nope', { status: 503 }) }]);
+        const error = await requestAflApi(fetchImpl, plan, { sleep: noSleep }).catch((e) => e);
+        expect((error as AflApiRequestError).attempts).toBe(3);
+        expect((error as AflApiRequestError).retryable).toBe(true);
+        expect((error as AflApiRequestError).message).toContain('failed with 503 after 3 attempt(s)');
+        expect((error as AflApiRequestError).message).toContain('unavailable or slow; retry later');
+        expect(calls).toHaveLength(3);
+      });
+
+      it('a transport failure on every attempt is wrapped with its original message, the remedy and the cause', async () => {
+        const cause = new TypeError('fetch failed');
+        const fetchImpl = (async () => { throw cause; }) as unknown as FetchLike;
+        const error = await requestAflApi(fetchImpl, plan, { attempts: 2, sleep: noSleep }).catch((e) => e);
+        expect(error).toBeInstanceOf(AflApiRequestError);
+        expect((error as AflApiRequestError).message).toContain('fetch failed');
+        expect((error as AflApiRequestError).message).toContain('unavailable or slow; retry later');
+        expect((error as AflApiRequestError).attempts).toBe(2);
+        expect((error as Error).cause).toBe(cause);
+      });
+
+      it('429 with Retry-After: 2 sleeps 2000 ms (not the 500 ms backoff) and then succeeds', async () => {
+        let n = 0;
+        const sleeps: number[] = [];
+        const { fetchImpl, calls } = stubFetch([
+          { test: () => true, respond: () => { n += 1; return n === 1 ? tooMany('2') : jsonResponse({ ok: true }); } },
+        ]);
+        const response = await requestAflApi(fetchImpl, plan, { sleep: async (ms) => { sleeps.push(ms); } });
+        expect(response.status).toBe(200);
+        expect(sleeps).toEqual([2000]);
+        expect(calls).toHaveLength(2);
+      });
+
+      it('a Retry-After above the cap is capped (default 30000 ms, and a custom maxRetryAfterMs)', async () => {
+        for (const [opts, expected] of [[{}, 30_000], [{ maxRetryAfterMs: 1000 }, 1000]] as const) {
+          let n = 0;
+          const sleeps: number[] = [];
+          const { fetchImpl } = stubFetch([
+            { test: () => true, respond: () => { n += 1; return n === 1 ? tooMany('120') : jsonResponse({ ok: true }); } },
+          ]);
+          await requestAflApi(fetchImpl, plan, { ...opts, sleep: async (ms) => { sleeps.push(ms); } });
+          expect(sleeps).toEqual([expected]);
+        }
+      });
+
+      it('honours an HTTP-date Retry-After against the injected clock, and a past date falls back to the backoff', async () => {
+        const fixedNow = Date.parse('2026-10-19T00:00:00Z');
+        for (const [header, expected] of [
+          ['Mon, 19 Oct 2026 00:00:05 GMT', 5000],
+          ['Mon, 19 Oct 2026 00:00:00 GMT', 500], // already due: the exponential backoff stands
+          ['not a date', 500], // unparseable: ignored
+        ] as const) {
+          let n = 0;
+          const sleeps: number[] = [];
+          const { fetchImpl } = stubFetch([
+            {
+              test: () => true,
+              respond: () => {
+                n += 1;
+                return n === 1
+                  ? new Response('busy', { status: 503, headers: { 'retry-after': header } })
+                  : jsonResponse({ ok: true });
+              },
+            },
+          ]);
+          await requestAflApi(fetchImpl, plan, { now: () => fixedNow, sleep: async (ms) => { sleeps.push(ms); } });
+          expect(sleeps).toEqual([expected]);
+        }
+      });
+
+      it('Retry-After never adds a sleep after the last attempt, and is ignored on a 500', async () => {
+        const sleeps: number[] = [];
+        const { fetchImpl, calls } = stubFetch([{ test: () => true, respond: () => tooMany('5') }]);
+        await expect(requestAflApi(fetchImpl, plan, { attempts: 2, sleep: async (ms) => { sleeps.push(ms); } }))
+          .rejects.toBeInstanceOf(AflApiRequestError);
+        expect(calls).toHaveLength(2);
+        expect(sleeps).toEqual([5000]); // one wait between two attempts, none after the last
+
+        const sleeps500: number[] = [];
+        let n = 0;
+        const { fetchImpl: fetch500 } = stubFetch([
+          {
+            test: () => true,
+            respond: () => { n += 1; return n === 1 ? new Response('x', { status: 500, headers: { 'retry-after': '9' } }) : jsonResponse({}); },
+          },
+        ]);
+        await requestAflApi(fetch500, plan, { sleep: async (ms) => { sleeps500.push(ms); } });
+        expect(sleeps500).toEqual([500]);
+      });
+
+      it('releases the body of a discarded non-2xx response', async () => {
+        const cancel = vi.fn(async () => {});
+        const { fetchImpl } = stubFetch([
+          { test: () => true, respond: () => ({ ok: false, status: 404, headers: new Headers(), body: { cancel } }) as unknown as Response },
+        ]);
+        await expect(requestAflApi(fetchImpl, plan, { sleep: noSleep })).rejects.toBeInstanceOf(AflApiRequestError);
+        expect(cancel).toHaveBeenCalledTimes(1);
+      });
+
+      it('validates attempts, baseDelayMs and maxRetryAfterMs before any request', async () => {
+        const { fetchImpl, calls } = stubFetch([{ test: () => true, respond: () => jsonResponse({}) }]);
+        for (const attempts of [0, -1, 11, 1.5, Number.NaN]) {
+          await expect(requestAflApi(fetchImpl, plan, { attempts, sleep: noSleep })).rejects.toBeInstanceOf(RangeError);
+        }
+        for (const baseDelayMs of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+          await expect(requestAflApi(fetchImpl, plan, { baseDelayMs, sleep: noSleep })).rejects.toBeInstanceOf(RangeError);
+        }
+        for (const maxRetryAfterMs of [-1, Number.NaN]) {
+          await expect(requestAflApi(fetchImpl, plan, { maxRetryAfterMs, sleep: noSleep })).rejects.toBeInstanceOf(RangeError);
+        }
+        expect(calls).toHaveLength(0);
+        // The boundaries themselves are accepted.
+        await expect(requestAflApi(fetchImpl, plan, { attempts: 1, baseDelayMs: 0, sleep: noSleep })).resolves.toBeDefined();
+        await expect(requestAflApi(fetchImpl, plan, { attempts: 10, sleep: noSleep })).resolves.toBeDefined();
+      });
+
+      describe('createAflApiRateLimiter', () => {
+        /** A fake clock whose sleep advances it, so spacing is observable without any real wait. */
+        function fakeClock(start = 1000) {
+          const clock = { t: start, sleeps: [] as number[] };
+          return {
+            clock,
+            now: () => clock.t,
+            sleep: async (ms: number) => { clock.sleeps.push(ms); clock.t += ms; },
+          };
+        }
+
+        it('spaces three request starts by at least minIntervalMs', async () => {
+          const { clock, now, sleep } = fakeClock();
+          const limiter = createAflApiRateLimiter({ minIntervalMs: 250, now, sleep });
+          const starts: number[] = [];
+          const fetchImpl = (async () => { starts.push(clock.t); return jsonResponse({ ok: true }); }) as unknown as FetchLike;
+          for (let i = 0; i < 3; i += 1) await requestAflApi(fetchImpl, plan, { rateLimiter: limiter, sleep });
+          expect(starts).toEqual([1000, 1250, 1500]);
+          expect(clock.sleeps).toEqual([250, 250]);
+        });
+
+        it('does not wait when the interval has already passed, and reserves slots for concurrent callers', async () => {
+          const waits: number[] = [];
+          let t = 1000;
+          // This sleep records but does not advance the clock, so the queued waits are visible.
+          const limiter = createAflApiRateLimiter({ minIntervalMs: 100, now: () => t, sleep: async (ms) => { waits.push(ms); } });
+          await limiter.acquire();
+          t = 1500; // the gap is already longer than the interval
+          await limiter.acquire();
+          expect(waits).toEqual([]);
+          // Three callers released together queue behind each other rather than racing.
+          await Promise.all([limiter.acquire(), limiter.acquire(), limiter.acquire()]);
+          expect(waits).toEqual([100, 200, 300]);
+        });
+
+        it('is awaited before EVERY attempt, retries included', async () => {
+          const { clock, now, sleep } = fakeClock();
+          const inner = createAflApiRateLimiter({ minIntervalMs: 250, now, sleep });
+          let acquires = 0;
+          const limiter = { acquire: async () => { acquires += 1; await inner.acquire(); } };
+          const starts: number[] = [];
+          let n = 0;
+          const fetchImpl = (async () => {
+            starts.push(clock.t);
+            n += 1;
+            return n < 3 ? new Response('x', { status: 500 }) : jsonResponse({ ok: true });
+          }) as unknown as FetchLike;
+          // baseDelayMs 0 isolates the limiter: without it the three starts would share one instant.
+          await requestAflApi(fetchImpl, plan, { rateLimiter: limiter, baseDelayMs: 0, sleep });
+          expect(acquires).toBe(3);
+          expect(starts).toEqual([1000, 1250, 1500]);
+        });
+
+        it('refuses a negative or non-finite interval, and 0 disables spacing', async () => {
+          for (const minIntervalMs of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+            expect(() => createAflApiRateLimiter({ minIntervalMs })).toThrow(RangeError);
+          }
+          const { clock, now, sleep } = fakeClock();
+          const limiter = createAflApiRateLimiter({ minIntervalMs: 0, now, sleep });
+          await limiter.acquire();
+          await limiter.acquire();
+          expect(clock.sleeps).toEqual([]);
+        });
+      });
     });
 
     describe('per-attempt timeout and the body read (AFLDB-ISSUE-301)', () => {
@@ -704,6 +927,119 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
       expect(existsSync(join(snapshotDir, 'CD_M1'))).toBe(false);
       expect(existsSync(join(matchesRoot, 'escape'))).toBe(false);
       expect(existsSync(join(projectRoot, 'data', 'sources', 'escape'))).toBe(false);
+    });
+
+    it('W4 (Launch B): a season feed listing a providerId twice refuses before any per-match request or file write', async () => {
+      const projectRoot = makeProjectRoot();
+      const duplicated = {
+        matches: [
+          { providerId: 'CD_M1', status: 'CONCLUDED', utcStartTime: '2026-03-05T04:40:00Z' },
+          { providerId: 'CD_M2', status: 'CONCLUDED', utcStartTime: '2026-03-06T04:40:00Z' },
+          { providerId: 'CD_M1', status: 'CONCLUDED', utcStartTime: '2026-03-07T04:40:00Z' },
+        ],
+      };
+      const { fetchImpl, calls } = stubFetch([
+        { test: (u: string) => u.endsWith('/afl/WMCTok'), respond: () => jsonResponse({ token: 'tok-1' }) },
+        { test: (u: string) => u.includes('/afl/v2/matches'), respond: () => jsonResponse(duplicated) },
+      ]);
+      const now = new Date('2026-09-19T14:30:00Z');
+      const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'matches', buildAflApiLabel(2026, now));
+
+      await expect(runAcquisition(
+        { season: 2026, status: null, since: null, match: [] },
+        { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
+      )).rejects.toThrow(/lists providerId more than once: CD_M1 \(x2\)\. Refusing before any per-match request or file write/);
+
+      expect(calls.map((c) => c.url).some((u) => u.includes('/playerStats/') || u.includes('/matchRoster/'))).toBe(false);
+      // The run's own directory was claimed, but not one file was written into it.
+      expect(readdirSync(snapshotDir)).toEqual([]);
+    });
+
+    it('W4 (Launch B): a 2xx season body that is not JSON fails with the URL, the status and a remedy, not a bare SyntaxError', async () => {
+      const projectRoot = makeProjectRoot();
+      const { fetchImpl } = stubFetch([
+        { test: (u: string) => u.endsWith('/afl/WMCTok'), respond: () => jsonResponse({ token: 'tok-1' }) },
+        { test: (u: string) => u.includes('/afl/v2/matches'), respond: () => new Response('<html>maintenance</html>', { status: 200 }) },
+      ]);
+      const error = await runAcquisition(
+        { season: 2026, status: null, since: null, match: [] },
+        { fetchImpl, projectRoot, now: new Date('2026-09-19T14:30:00Z'), retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
+      ).catch((e) => e);
+      expect(error).toBeInstanceOf(AflApiRequestError);
+      expect(error).not.toBeInstanceOf(SyntaxError);
+      expect((error as AflApiRequestError).message).toMatch(/Season matches response from GET \S+\/afl\/v2\/matches\S* \(HTTP 200\) was not valid JSON/);
+      expect((error as AflApiRequestError).message).toContain('retry later');
+      expect((error as AflApiRequestError).status).toBe(200);
+    });
+
+    it('W4 (Launch B): a persistent 404 on a per-match resource is requested once and the failure says what to check', async () => {
+      const projectRoot = makeProjectRoot();
+      const { fetchImpl, calls } = stubFetch([
+        { test: (u: string) => u.endsWith('/afl/WMCTok'), respond: () => jsonResponse({ token: 'tok-1' }) },
+        { test: (u: string) => u.includes('/afl/v2/matches'), respond: () => jsonResponse(seasonFeed) },
+        { test: (u: string) => u.includes('/playerStats/match/CD_M1'), respond: () => new Response('missing', { status: 404 }) },
+      ]);
+      await expect(runAcquisition(
+        { season: 2026, status: null, since: null, match: [] },
+        { fetchImpl, projectRoot, now: new Date('2026-09-19T14:30:00Z'), retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
+      )).rejects.toThrow(/failed with 404 \(not retried: the resource does not exist/);
+      expect(calls.filter((c) => c.url.includes('/playerStats/match/CD_M1'))).toHaveLength(1);
+    });
+
+    it('W4 (Launch B): the manifest records each raw file\'s request, the tool, the start time and the request parameters, and never the token', async () => {
+      const projectRoot = makeProjectRoot();
+      const secret = 'tok-SECRET-w4-0123456789';
+      const { fetchImpl, calls } = stubFetch(happyPathHandlers(secret));
+      const result = await runAcquisition(
+        { season: 2026, status: null, since: null, match: [] },
+        { fetchImpl, projectRoot, now: new Date('2026-09-19T14:30:00Z'), retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
+      );
+      const manifestText = readFileSync(result.manifestPath, 'utf8');
+      const manifest = JSON.parse(manifestText);
+
+      type Entry = { file: string; request?: { method: string; url: string }; derived_from?: string };
+      const byFile = new Map((manifest.files as Entry[]).map((f) => [f.file, f]));
+      const requested = (needle: string) => calls.find((c) => c.url.includes(needle))?.url;
+      expect(byFile.get('00-season-matches.json')?.request).toEqual({ method: 'GET', url: requested('/afl/v2/matches') });
+      expect(byFile.get('CD_M1/player-stats.json')?.request).toEqual({ method: 'GET', url: requested('/playerStats/match/CD_M1') });
+      expect(byFile.get('CD_M1/match-roster.json')?.request).toEqual({ method: 'GET', url: requested('/matchRoster/full/CD_M1') });
+      // The derived fixture is not a request and does not pretend to be one.
+      expect(byFile.get('CD_M1/fixture.json')?.request).toBeUndefined();
+      expect(byFile.get('CD_M1/fixture.json')?.derived_from).toBe('00-season-matches.json');
+
+      expect(manifest.acquisition_tool).toBe('acquire-afl-api.ts');
+      expect(manifest.request_parameters).toEqual({ competition_id: 1, comp_season_id: 85, page_size: 1000 });
+      expect(typeof manifest.acquisition_started_at).toBe('string');
+      expect(Date.parse(manifest.acquisition_started_at)).toBeLessThanOrEqual(Date.parse(manifest.acquired_at));
+      expect(requested('/afl/v2/matches')).toContain('compSeasonId=85');
+
+      // The token travelled (in a header, on the CFS requests) but is recorded nowhere in the manifest.
+      expect(calls.some((c) => JSON.stringify(c.init?.headers ?? {}).includes(secret))).toBe(true);
+      expect(manifestText).not.toContain(secret);
+    });
+
+    it('W4 (Launch B): the tool spaces its requests by the default minimum interval, on the injected clock', async () => {
+      const projectRoot = makeProjectRoot();
+      const clock = { t: 5_000 };
+      const sleeps: number[] = [];
+      const starts: number[] = [];
+      const { fetchImpl: inner } = stubFetch(happyPathHandlers());
+      const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+        starts.push(clock.t);
+        return inner(url, init);
+      }) as FetchLike;
+      await runAcquisition(
+        { season: 2026, status: null, since: null, match: [] },
+        {
+          fetchImpl, projectRoot, now: new Date('2026-09-19T14:30:00Z'), ingestionControls: ENABLED_INGESTION_CONTROLS,
+          retryOpts: { now: () => clock.t, sleep: async (ms) => { sleeps.push(ms); clock.t += ms; } },
+        },
+      );
+      expect(starts).toHaveLength(4); // token, season feed, player stats, match roster
+      for (let i = 1; i < starts.length; i += 1) {
+        expect(starts[i] - starts[i - 1]).toBeGreaterThanOrEqual(AFL_API_MIN_REQUEST_INTERVAL_MS);
+      }
+      expect(AFL_API_MIN_REQUEST_INTERVAL_MS).toBe(250);
     });
 
     it('an explicit --match selects regardless of status', async () => {

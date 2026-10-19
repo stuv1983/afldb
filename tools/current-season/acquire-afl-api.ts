@@ -30,12 +30,17 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  AFL_API_MIN_REQUEST_INTERVAL_MS,
+  AFL_API_SEASON_PAGE_SIZE,
+  AFL_MENS_COMPETITION_ID,
   type AflApiEndpointBases,
   type AflApiRequestPlan,
   type AflApiResponse,
+  createAflApiRateLimiter,
   fetchAflApiCfsResource,
   fetchAflApiToken,
   type FetchLike,
+  parseAflApiJsonBody,
   parseAflApiSeasonMatchesEnvelope,
   planAflApiMatchRosterRequest,
   planAflApiPlayerStatsRequest,
@@ -45,7 +50,7 @@ import {
   type RetryOptions,
   selectAflApiMatches,
 } from '../../src/lib/acquisition/afl-api-client';
-import { AFL_API_FIXTURE_ACQUISITION_KIND } from '../../src/lib/acquisition/afl-api-fixture-identity';
+import { AFL_API_FIXTURE_ACQUISITION_KIND } from '../../src/lib/acquisition/afl-api-acquisition-constants';
 import {
   describeAflApiIngestionReadFailure,
   readAflApiIngestionControls,
@@ -144,6 +149,8 @@ type ManifestFileEntry = {
   etag?: string | null;
   cache_control?: string | null;
   retrieved_at?: string;
+  /** W4 (Launch B): the request that produced this raw file. The URL only: the token travels in a header and is never recorded. */
+  request?: { method: string; url: string };
   derived_from?: string;
 };
 
@@ -151,7 +158,9 @@ function sha256Of(text: string): string {
   return createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex');
 }
 
-function writeRawFile(snapshotDir: string, relPath: string, response: AflApiResponse): ManifestFileEntry {
+function writeRawFile(
+  snapshotDir: string, relPath: string, response: AflApiResponse, plan: Pick<AflApiRequestPlan, 'method' | 'url'>,
+): ManifestFileEntry {
   const path = join(snapshotDir, relPath);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, response.bodyText, 'utf8');
@@ -162,7 +171,15 @@ function writeRawFile(snapshotDir: string, relPath: string, response: AflApiResp
     etag: response.etag,
     cache_control: response.cacheControl,
     retrieved_at: response.retrievedAt,
+    request: { method: plan.method, url: plan.url },
   };
+}
+
+/** W4 (Launch B): provider ids that appear more than once in the season feed, with their counts. */
+function duplicatedProviderIds(summaries: readonly { providerId: string }[]): string[] {
+  const counts = new Map<string, number>();
+  for (const { providerId } of summaries) counts.set(providerId, (counts.get(providerId) ?? 0) + 1);
+  return [...counts].filter(([, n]) => n > 1).map(([id, n]) => `${id} (x${n})`);
 }
 
 export type RunAcquisitionDeps = {
@@ -227,7 +244,14 @@ export async function runAcquisition(
 
   const projectRoot = deps.projectRoot ?? DEFAULT_PROJECT_ROOT;
   const bases = deps.bases ?? resolveAflApiEndpointBases(process.env);
-  const retryOpts = deps.retryOpts ?? {};
+  // W4 (Launch B): every request, retries included, waits its turn. The limiter shares the injected
+  // sleep, so a test that injects one never waits on a real timer.
+  const retryOpts: RetryOptions = {
+    ...deps.retryOpts,
+    rateLimiter: deps.retryOpts?.rateLimiter ?? createAflApiRateLimiter({
+      minIntervalMs: AFL_API_MIN_REQUEST_INTERVAL_MS, sleep: deps.retryOpts?.sleep, now: deps.retryOpts?.now,
+    }),
+  };
   const log = deps.log ?? ((line: string) => { process.stdout.write(`${line}\n`); });
   const { fetchImpl } = deps;
 
@@ -259,6 +283,7 @@ export async function runAcquisition(
   // §7.1 step 1. Memory only; never written to disk. Skipped ENTIRELY in
   // --fixtures-only mode: the season matches feed is on the PUBLIC base and
   // carries no token, and this mode never reaches a CFS endpoint at all.
+  const acquisitionStartedAt = new Date().toISOString();
   const tokenIssuedAt = new Date().toISOString();
   const tokenState: { token: string; reissuedThisRun: boolean } | null = fixturesOnly
     ? null
@@ -283,9 +308,20 @@ export async function runAcquisition(
   // §7.1 step 2. The season matches feed is on the PUBLIC base and carries no token.
   const seasonPlan = planAflApiSeasonMatchesRequest(bases, compSeasonId, process.env);
   const seasonResponse = await requestAflApi(fetchImpl, seasonPlan, retryOpts);
-  const seasonRaw = JSON.parse(seasonResponse.bodyText) as { matches?: unknown[] };
-  const rawMatches = Array.isArray(seasonRaw.matches) ? seasonRaw.matches : [];
+  const seasonRaw = parseAflApiJsonBody('Season matches response', seasonPlan, seasonResponse) as
+    { matches?: unknown[] } | null;
+  const rawMatches = Array.isArray(seasonRaw?.matches) ? seasonRaw.matches : [];
   const summaries = parseAflApiSeasonMatchesEnvelope(seasonResponse.bodyText);
+  // W4 (Launch B): a feed that lists one match twice would have its second entry overwrite the
+  // first's per-match files. Refuse it here, before any per-match request or file write.
+  const duplicates = duplicatedProviderIds(summaries);
+  if (duplicates.length > 0) {
+    throw new Error(
+      `Season feed for season ${args.season} (compSeasonId ${compSeasonId}) lists providerId more than once: `
+      + `${duplicates.join(', ')}. Refusing before any per-match request or file write. The feed is inconsistent: `
+      + 'retry later, and if it persists report it rather than editing the snapshot.',
+    );
+  }
   const rawByProviderId = new Map<string, unknown>(
     rawMatches
       .map((m) => [(m as { providerId?: unknown } | null)?.providerId, m] as const)
@@ -298,7 +334,7 @@ export async function runAcquisition(
   log(`  season feed: ${summaries.length} match(es); selected: ${selected.length}`);
 
   const files: ManifestFileEntry[] = [
-    writeRawFile(snapshotDir, '00-season-matches.json', seasonResponse),
+    writeRawFile(snapshotDir, '00-season-matches.json', seasonResponse, seasonPlan),
   ];
 
   for (const match of selected) {
@@ -326,19 +362,17 @@ export async function runAcquisition(
       continue;
     }
 
-    const statsResult = await fetchAflApiCfsResource(
-      fetchImpl,
-      (tok: string): AflApiRequestPlan => planAflApiPlayerStatsRequest(bases, match.providerId, tok, process.env),
-      currentToken(), reissueToken, retryOpts,
-    );
-    files.push(writeRawFile(snapshotDir, join(match.providerId, 'player-stats.json'), statsResult.response));
+    const statsPlanFor = (tok: string): AflApiRequestPlan => planAflApiPlayerStatsRequest(bases, match.providerId, tok, process.env);
+    const statsResult = await fetchAflApiCfsResource(fetchImpl, statsPlanFor, currentToken(), reissueToken, retryOpts);
+    files.push(writeRawFile(
+      snapshotDir, join(match.providerId, 'player-stats.json'), statsResult.response, statsPlanFor(currentToken()),
+    ));
 
-    const rosterResult = await fetchAflApiCfsResource(
-      fetchImpl,
-      (tok: string): AflApiRequestPlan => planAflApiMatchRosterRequest(bases, match.providerId, tok, process.env),
-      currentToken(), reissueToken, retryOpts,
-    );
-    files.push(writeRawFile(snapshotDir, join(match.providerId, 'match-roster.json'), rosterResult.response));
+    const rosterPlanFor = (tok: string): AflApiRequestPlan => planAflApiMatchRosterRequest(bases, match.providerId, tok, process.env);
+    const rosterResult = await fetchAflApiCfsResource(fetchImpl, rosterPlanFor, currentToken(), reissueToken, retryOpts);
+    files.push(writeRawFile(
+      snapshotDir, join(match.providerId, 'match-roster.json'), rosterResult.response, rosterPlanFor(currentToken()),
+    ));
 
     log(`  ${match.providerId}: player-stats + match-roster acquired`);
   }
@@ -369,6 +403,14 @@ export async function runAcquisition(
     selection: args.match.length > 0
       ? { status: null, since: null, match: args.match }
       : { status: args.status ?? 'CONCLUDED', since: args.since, match: null },
+    // W4 (Launch B): provenance. `acquired_at` below stays the completion time; this is when the run began.
+    acquisition_tool: 'acquire-afl-api.ts',
+    acquisition_started_at: acquisitionStartedAt,
+    request_parameters: {
+      competition_id: AFL_MENS_COMPETITION_ID,
+      comp_season_id: compSeasonId,
+      page_size: AFL_API_SEASON_PAGE_SIZE,
+    },
     acquired_at: new Date().toISOString(),
     counts: { matches_in_feed: summaries.length, matches_selected: selected.length },
     files,
