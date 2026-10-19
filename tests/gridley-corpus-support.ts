@@ -18,6 +18,7 @@
 import { resolveDraftKind, type GridAxisState } from '@/search/grid-solver-spec';
 import { normalisePlayerName, type GridleyPlayerRef } from '@/search/gridley-compat';
 import { KNOWN_ANSWER_EVIDENCE_KIND, type GridleyKnownAnswerAdjudication } from './gridley-known-answer-adjudications';
+import board541Trade from '../data/reference/gridley-board-541-trade.json';
 
 export type PlayerRow = {
   id: number; displayName: string; givenName: string | null; surname: string | null;
@@ -179,27 +180,19 @@ export type DraftTriageCause =
   /** a builder this triage does not read */
   | 'unassessed';
 
-/**
- * V2-GAP-029. A `traded_min_times` cell where AFLDB lists a player Gridley omits, because a trade
- * AFLDB holds happened AFTER the board's frozen date. Gridley's key is frozen at the board date; a
- * trade completed later cannot be in it, so the omission is correct for that date and AFLDB answers
- * for today (the `time of board` shape). Derived only from AFLDB's own trusted-linked trade rows
- * (DraftGuru's trade year is the trade period's year, held in October): the trades completed by the
- * board date -- any earlier year, or this year once the board date is on or after 1 November --
- * must be fewer than the threshold while all of the player's trades reach it. No player is named,
- * no id is read, and the reverse direction (Gridley lists) is never touched.
- */
+/** GAP-029: the tracked board-541 discrepancy only. A trade year does not prove a universal completion date. */
 export function tradesAfterBoard(input: {
+  board: number; cell: string; row: string; col: string; profile: string; gridleyPlayerId: number;
   boardDate: string; rows: readonly LinkedDraftRow[]; threshold: number; inGridley: boolean; inAfldb: boolean;
 }): string | null {
-  if (input.inGridley || !input.inAfldb) return null;
+  const record = board541Trade;
+  if (input.inGridley || !input.inAfldb || input.threshold !== 1
+    || input.board !== record.board || input.cell !== record.cell || input.boardDate !== record.boardDate
+    || input.row !== record.row || input.col !== record.col || input.profile !== record.afltablesProfile
+    || input.gridleyPlayerId !== record.gridleyPlayerId) return null;
   const trades = input.rows.filter((r) => r.draftKind === 'trade');
-  const completed = (year: number) => input.boardDate >= `${year}-11-01`;
-  const atBoard = trades.filter((r) => completed(r.draftYear)).length;
-  if (atBoard >= input.threshold || trades.length < input.threshold) return null;
-  const later = trades.filter((r) => !completed(r.draftYear));
-  return `trade-dated: Gridley's key is frozen at ${input.boardDate}, when ${atBoard} of the ${trades.length} linked trade(s) `
-    + `were complete (needs ${input.threshold}); the rest were later: ${later.map((r) => `${r.draftYear} trade period${r.club ? ` (${r.club})` : ''}`).join(', ')}`;
+  if (trades.length !== 1 || trades[0].draftYear !== record.draftYear || trades[0].club !== record.destination) return null;
+  return `V2-GAP-029 board 541 adjudication: the verified 2025 Gold Coast trade post-dates the frozen 2025-01-07 key; ${record.evidence.join('; ')}`;
 }
 
 export function describeDraftRows(rows: readonly LinkedDraftRow[]): string {

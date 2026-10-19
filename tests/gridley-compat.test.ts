@@ -31,9 +31,54 @@ import {
 } from './gridley-corpus-support';
 import { GRIDLEY_KNOWN_ANSWER_COLUMNS, loadGridleyKnownAnswerAdjudications } from './gridley-known-answer-adjudications';
 import { CAPTAIN_CENSUS, classifyIssue225Cell, ISSUE225_GIDS, issue225Population, TEAMMATE_CENSUS } from './issue225-acceptance';
+import { gridleyPolicyResults, loadGridleyDeferrals, type PolicyFinding } from './gridley-release-policy';
 import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from './rookie-relisting-outcomes';
 
 const FIXTURES = join(__dirname, 'fixtures', 'gridley');
+
+describe('GAP-029 release policy', () => {
+  it('bounds the seven retained deferrals to their original 78 cells and keeps strict results', () => {
+    const policy = loadGridleyDeferrals();
+    expect(policy.criteria).toEqual(['intrulesplayer', 'irish', 'nfl', 'recruitedByDodoro', 'season2024player', 'spoils5season', 'tasmanian']);
+    expect(policy.cells).toHaveLength(78);
+    const boards = loadCorpus();
+    for (const cell of policy.cells) {
+      const board = boards.find((b) => b.board === cell.board)!;
+      const [r, c] = cell.cell.split('-').map(Number);
+      expect([board.rows[r].id, board.cols[c].id]).toEqual([cell.row, cell.col]);
+      const unsupported = [board.rows[r], board.cols[c]]
+        .filter((item) => mapGridleyCriterion(item, STUB_LOOKUPS).status === 'unsupported');
+      expect(unsupported.length).toBeGreaterThan(0);
+      expect(unsupported.every((item) => policy.criteria.includes(item.id))).toBe(true);
+    }
+    const findings = policy.cells.map((cell) => ({ ...cell, category: 'unsupported' }));
+    const original = JSON.stringify(findings);
+    const result = gridleyPolicyResults(findings, policy);
+    expect(result.strictCorpusParity).toEqual({ passed: false, findings: 78 });
+    expect(result.approvedDeferrals).toEqual({ findings: 78, dataMatches: 0 });
+    expect(result.approvedPolicyConformance).toEqual({ passed: true, unapprovedDifferences: [] });
+    expect(JSON.stringify(findings)).toBe(original);
+  });
+
+  it('fails strict parity and policy for unexpected categories, cells and criterion pairs', () => {
+    const policy = loadGridleyDeferrals();
+    const cell = policy.cells[0];
+    const unexpected: PolicyFinding[] = [
+      { ...cell, category: 'incorrect known answer' },
+      { ...cell, category: 'dataset gap' },
+      { ...cell, category: 'source coverage gap' },
+      { ...cell, category: 'unsupported', board: -1 },
+      { ...cell, category: 'unsupported', row: 'new-unsupported-criterion' },
+      { ...cell, category: 'unsupported', cell: 'new-cell' },
+    ];
+    for (const finding of unexpected) {
+      const result = gridleyPolicyResults([finding], policy);
+      expect(result.strictCorpusParity.passed).toBe(false);
+      expect(result.approvedDeferrals.findings).toBe(0);
+      expect(result.approvedPolicyConformance).toEqual({ passed: false, unapprovedDifferences: [finding] });
+    }
+  });
+});
 
 export type CorpusBoard = {
   board: number;
@@ -430,17 +475,21 @@ describe('Gridley corpus support (AFLDB-ISSUE-222)', () => {
     expect(triageDraftFinding(gwsSamReid, { builder: 'national_draft_pick_between', params: { from: '30', to: '40' } }).cause).toBe('satisfied');
   });
 
-  it('V2-GAP-029: a trade after the board date explains a traded cell only in the AFLDB-lists direction, and only when the trades completed by the board are too few', () => {
+  it('V2-GAP-029: the sourced board-541 adjudication cannot hide another trade discrepancy', () => {
     // Board 541 (2025-01-07), Western Bulldogs 2020 national pick 1 traded to Gold Coast in the 2025
-    // trade period (confirmed 2025-10-15, westernbulldogs.com.au / goldcoastfc.com.au).
+    // trade period (official club pages read; see data/reference/gridley-board-541-trade.json).
     const rows: LinkedDraftRow[] = [
       { draftYear: 2020, draftKind: 'national', pickNumber: 1, club: 'Western Bulldogs' },
       { draftYear: 2025, draftKind: 'trade', pickNumber: null, club: 'Gold Coast' },
     ];
-    const base = { rows, threshold: 1, inGridley: false, inAfldb: true };
-    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07' })).toBe(
-      "trade-dated: Gridley's key is frozen at 2025-01-07, when 0 of the 1 linked trade(s) were complete (needs 1); the rest were later: 2025 trade period (Gold Coast)",
-    );
+    const base = { rows, threshold: 1, inGridley: false, inAfldb: true,
+      board: 541, cell: '2-1', row: 'traded1', col: 'WB',
+      profile: 'players/J/Jamarra_Ugle-Hagan.html', gridleyPlayerId: 3663 };
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07' })).toContain('V2-GAP-029 board 541 adjudication');
+    for (const changed of [{ board: 542 }, { cell: '2-0' }, { profile: 'players/X/Someone_Else.html' },
+      { gridleyPlayerId: 1 }, { row: 'traded2' }, { col: 'GC' }, { boardDate: '2025-10-16' }]) {
+      expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', ...changed })).toBeNull();
+    }
     // Once the 2025 trade period is over the key must contain him: a real disagreement again.
     expect(tradesAfterBoard({ ...base, boardDate: '2025-11-01' })).toBeNull();
     expect(tradesAfterBoard({ ...base, boardDate: '2026-08-28' })).toBeNull();

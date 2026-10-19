@@ -260,9 +260,9 @@ describe('gate: Advanced Search regression cases', () => {
    * The keys are read in C (byte) order and hashed twice:
    *  - `canonical`: sha256 of the C-ordered keys. Independent of the database collation, so it is the
    *    pin for the 2026-10 rebuild that holds 1897-2025.
-   *  - `legacy`: the same keys ordered the way the original pins were taken
-   *    (`string_agg(... ORDER BY external_id)` on the Linux en_US.UTF-8 `afldb_test`, whose collation
-   *    ignores punctuation: `_`, `/` and `.` carry no weight at first level, case is folded). The
+   *  - `legacy`: the same keys ordered to reproduce the original pins
+   *    (inferred to be a punctuation-ignoring Linux locale order: `_`, `/` and `.` carry no weight
+   *    at first level, case is folded; the original host collation is not directly evidenced). The
    *    original pins were reproduced exactly from the locally rebuilt membership under this order, and
    *    under no other tried ordering; that equality is the proof the cohorts' membership is unchanged,
    *    and it holds on any database collation because the ordering is applied here, not in SQL.
