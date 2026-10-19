@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import postgres from 'postgres';
 
 import {
   ISOLATED_CLUSTER_NAME,
@@ -8,7 +12,12 @@ import {
   isolatedDatabaseOf,
 } from '@afldb/domain';
 
-import { assertCreatableName, environmentFor, resolveConfig } from '../tools/v2/isolated-pg';
+import { assertCreatableName, checkListenerOwnership, environmentFor, resolveConfig, verifyTarget } from '../tools/v2/isolated-pg';
+
+vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
+vi.mock('node:fs', async (original) => ({ ...await original<typeof import('node:fs')>(), readFileSync: vi.fn() }));
+vi.mock('postgres', () => ({ default: vi.fn(() => { throw new Error('Unexpected database connection'); }) }));
+afterEach(() => vi.clearAllMocks());
 
 const PORT = 55432;
 const dsn = (host: string, port: number | '', db: string, query = '') =>
@@ -93,5 +102,44 @@ describe('tools/v2/isolated-pg.ts pure helpers', () => {
     expect(env.AFLDB_V2_ISOLATED_PG).toBe('1');
     expect(new URL(env.DATABASE_URL).username).toBe('afldb_app');
     expect(new URL(env.AFLDB_TEST_DATABASE_URL).username).toBe('afldb_owner');
+  });
+});
+
+describe('isolated launcher: local process ownership before authentication', () => {
+  const cfg = resolveConfig({ AFLDB_V2_PG_ROOT: '../afldb-v2-listener-test', AFLDB_V2_PG_PORT: '55433' });
+  const data = join(cfg.root, 'data');
+  const executablePath = join(cfg.bin, process.platform === 'win32' ? 'postgres.exe' : 'postgres');
+  const postmaster = `123\n${data}\n1792444854\n55433\n\n127.0.0.1\n`;
+  const owner = { pid: 123, address: '127.0.0.1', executablePath, commandLine: `"${executablePath}" -D "${data}" -p 55433` };
+
+  it('accepts only the matching postmaster, executable, data directory and loopback listener', () => {
+    expect(() => checkListenerOwnership(cfg, postmaster, [owner])).not.toThrow();
+    for (const changed of [{ pid: 456 }, { executablePath: join(cfg.bin, 'ssh.exe') },
+      { commandLine: `postgres -D "${join(cfg.root, 'other')}"` }, { address: '0.0.0.0' }]) {
+      expect(() => checkListenerOwnership(cfg, postmaster, [{ ...owner, ...changed }])).toThrow(/no database credentials sent/);
+    }
+    expect(() => checkListenerOwnership(cfg, postmaster, [])).toThrow();
+    expect(() => checkListenerOwnership(cfg, postmaster.replace('\n55433\n', '\n55432\n'), [owner])).toThrow();
+    expect(() => checkListenerOwnership(cfg, postmaster, [owner, { ...owner, pid: 456 }])).toThrow();
+  });
+
+  it('refuses an SSH listener before reading credentials or constructing a PostgreSQL client', async () => {
+    vi.mocked(readFileSync).mockImplementation((path) => {
+      if (String(path).endsWith('postmaster.pid')) return postmaster;
+      throw new Error('Unexpected secret read');
+    });
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: JSON.stringify([
+      { ...owner, pid: 456, executablePath: 'ssh.exe', commandLine: 'ssh -L sensitive-forwarding-arguments' },
+    ]), stderr: '', pid: 1, output: [], signal: null });
+    await expect(verifyTarget(cfg, 'afldb_v2_listener_test')).rejects.toThrow(/no database credentials sent/);
+    expect(postgres).not.toHaveBeenCalled();
+    expect(vi.mocked(readFileSync).mock.calls.every(([path]) => String(path).endsWith('postmaster.pid'))).toBe(true);
+  });
+
+  it('refuses unavailable process inspection without attempting authentication', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: 'private process details', pid: 1, output: [], signal: null });
+    await expect(verifyTarget(cfg, 'afldb_v2_listener_test')).rejects.toThrow(/cannot prove ownership/);
+    expect(postgres).not.toHaveBeenCalled();
+    expect(readFileSync).not.toHaveBeenCalled();
   });
 });

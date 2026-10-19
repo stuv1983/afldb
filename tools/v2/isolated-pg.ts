@@ -32,7 +32,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readlinkSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,6 +79,61 @@ const exe = (cfg: IsolatedConfig, name: string) => join(cfg.bin, process.platfor
 const dataDir = (cfg: IsolatedConfig) => join(cfg.root, 'data');
 const secretsDir = (cfg: IsolatedConfig) => join(cfg.root, 'secrets');
 
+export interface ListenerOwner {
+  address: string;
+  pid: number;
+  executablePath: string;
+  commandLine: string;
+}
+
+/** No network access: bind the listener to this data directory's live postmaster. */
+export function checkListenerOwnership(cfg: IsolatedConfig, postmaster: string, owners: readonly ListenerOwner[]): void {
+  const lines = postmaster.trim().split(/\r?\n/);
+  const samePath = (a: string, b: string) => process.platform === 'win32'
+    ? resolve(a).toLowerCase() === resolve(b).toLowerCase() : resolve(a) === resolve(b);
+  const pid = Number(lines[0]);
+  const valid = Number.isInteger(pid) && pid > 0 && lines[1] && samePath(lines[1], dataDir(cfg))
+    && Number(lines[3]) === cfg.port && owners.length > 0 && owners.every((owner) => {
+      const args = (owner.commandLine.match(/"[^"]*"|\S+/g) ?? []).map((arg) => arg.replace(/^"|"$/g, ''));
+      const dataIndex = args.indexOf('-D');
+      const data = dataIndex >= 0 ? args[dataIndex + 1] : args.find((arg) => arg.startsWith('--pgdata='))?.slice(9);
+      return owner.address === '127.0.0.1' && owner.pid === pid
+        && samePath(owner.executablePath, exe(cfg, 'postgres')) && data && samePath(data, dataDir(cfg));
+    });
+  if (!valid) throw new Error(`refused: local listener on port ${cfg.port} is not this isolated postmaster; no database credentials sent`);
+}
+
+export function assertLocalListener(cfg: IsolatedConfig): void {
+  if (!Number.isInteger(cfg.port) || cfg.port < 1024 || cfg.port > 65535) throw new Error('refused: invalid isolated listener port');
+  let owners: ListenerOwner[];
+  try {
+    if (process.platform === 'win32') {
+      const script = `$ErrorActionPreference='Stop'; $owners=@(Get-NetTCPConnection -LocalPort ${cfg.port} -State Listen | ForEach-Object { `
+        + `$p=Get-CimInstance Win32_Process -Filter ("ProcessId="+$_.OwningProcess); `
+        + `[pscustomobject]@{address=$_.LocalAddress;pid=[int]$p.ProcessId;executablePath=$p.ExecutablePath;commandLine=$p.CommandLine} }); `
+        + `ConvertTo-Json -InputObject $owners -Compress`;
+      const result = spawnSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+        ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 10_000 });
+      if (result.status !== 0) throw new Error('listener inspection failed');
+      owners = JSON.parse(result.stdout.trim()) as ListenerOwner[];
+    } else if (process.platform === 'linux') {
+      const result = spawnSync('ss', ['-H', '-ltnp', `sport = :${cfg.port}`], { encoding: 'utf8', timeout: 10_000 });
+      if (result.status !== 0) throw new Error('listener inspection failed');
+      owners = result.stdout.trim().split('\n').filter(Boolean).flatMap((line) => {
+        const address = line.trim().split(/\s+/)[3]?.replace(/:\d+$/, '');
+        const pids = [...line.matchAll(/pid=(\d+)/g)].map((match) => Number(match[1]));
+        if (!address || pids.length === 0) throw new Error('listener owner unavailable');
+        return pids.map((pid) => ({ address, pid, executablePath: readlinkSync(`/proc/${pid}/exe`),
+          commandLine: readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean).map((arg) => `"${arg}"`).join(' ') }));
+      });
+    } else throw new Error('unsupported OS');
+    checkListenerOwnership(cfg, readFileSync(join(dataDir(cfg), 'postmaster.pid'), 'utf8'), owners);
+  } catch {
+    // Never include captured process arguments: an unexpected process may hold secrets.
+    throw new Error(`refused: cannot prove ownership of local port ${cfg.port} by this isolated postmaster; no database credentials sent`);
+  }
+}
+
 function readSecret(cfg: IsolatedConfig, file: string): string {
   return readFileSync(join(secretsDir(cfg), file), 'utf8').trim();
 }
@@ -96,6 +151,7 @@ export function dsnFor(cfg: IsolatedConfig, user: string, password: string, data
 }
 
 function superSql(cfg: IsolatedConfig, database = 'postgres') {
+  assertLocalListener(cfg);
   return postgres(dsnFor(cfg, SUPERUSER, readSecret(cfg, 'superuser.pw'), database), { max: 1, onnotice: () => {}, connect_timeout: 5 });
 }
 
@@ -308,6 +364,7 @@ export function environmentFor(cfg: IsolatedConfig, name: string, pw: Record<Rol
 }
 
 export async function verifyTarget(cfg: IsolatedConfig, name: string): Promise<IsolatedTargetFinding[]> {
+  assertLocalListener(cfg);
   const pw = rolePasswords(cfg);
   const dsn = dsnFor(cfg, 'afldb_owner', pw.afldb_owner, name);
   const findings = checkIsolatedTestDsn(dsn, cfg.port);
@@ -356,6 +413,7 @@ async function runCommand(cfg: IsolatedConfig, name: string, command: readonly s
 export async function main(argv: readonly string[]): Promise<number> {
   const cfg = resolveConfig(process.env);
   const [mode, ...rest] = argv;
+  if (['roles', 'rotate-credentials', 'create-db', 'drop-db', 'list', 'verify', 'run'].includes(mode)) assertLocalListener(cfg);
   const opt = (flag: string): string | null => {
     const i = rest.indexOf(flag);
     return i >= 0 && rest[i + 1] !== undefined ? rest[i + 1] : null;
