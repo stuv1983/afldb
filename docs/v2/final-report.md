@@ -13,10 +13,12 @@ The dedicated local cluster's six exposed credentials were rotated and old login
 The complete workflow is reported by assertion identity, NOT failure-output line counts.
 Final complete run: **13,740 passed / 9 failed / 31 skipped**; separate Coleman **27/27**.
 The original four gap-028 files pass **200/200**. Nine strict reference/source disagreements
-were gap 029; follow-up 2026-10-20 repaired seven with evidence (focused six-file strict run:
-1,374 passed / 2 failed / 7 skipped; the full workflow was not rerun) and two Gridley strict
-assertions remain, so the full workflow is **not green**. Typecheck passes; repository lint debt
-is **234 errors / 131 warnings**, with **0 new changed-file findings**.
+were gap 029. Latest follow-up: rookie 23 findings / 7 cells repaired through eight audited
+manual selections; strict Gridley has 149 findings (78 approved deferrals, 71 unapproved).
+Latest six-file focused result: **1,378 passed / 3 failed / 7 skipped**; two original strict
+checks and the independent policy check fail. Approved deferrals are 0 data matches.
+The full workflow was not rerun and remains **not green**. Typecheck and changed-file lint pass.
+Detailed evidence and remaining source/owner decisions: [Gridley closeout](gap-029-gridley-resolution.md).
 Production remains **NO-GO**: no production-dump/Linux-host rehearsal, deployment or owner
 acceptance is implied. No subagent/worktree was created, no remote added, and nothing pushed.
 All unmodified sections below are retained Launch F history, not current verification claims.

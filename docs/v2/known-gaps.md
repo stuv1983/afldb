@@ -52,7 +52,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 local standalone rehearsal passes; raw votes and non-empty proposal/audit history preserved, including after 115 | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
-| V2-GAP-029 | Medium | strict historical baseline verification | rehearsal | partly resolved 2026-10-20: 7 of 9 failed assertions repaired with evidence (snapshot scope, ordering-only digests, board-dated trade); 2 Gridley strict-mode assertions remain open (absent `match_event` labels, 2026 register, accepted deferrals, source-coverage rows) | supply those inputs or decide the accepted-deferral treatment; no blind repins |
+| V2-GAP-029 | Medium | strict historical baseline verification | rehearsal | partly resolved 2026-10-20: rookie 23 findings / 7 cells repaired through audited manual selections; 149 strict findings remain (78 approved deferrals, 71 unapproved); focused 1378 passed / 3 failed / 7 skipped | recover 42 event + 8 board-dated 2026 sources; establish senior-game evidence or owner decision for 21 Jarryd/Corey sibling cells; preserve strict parity |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -576,10 +576,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-029 — Strict baseline/reference evidence differs from locally reproduced history
 
-- **Status:** Partly resolved 2026-10-20 (focused run at `642011c3`). Medium; rehearsal/release
-  verification, not a waiver. **7 of the 9** failed assertions are repaired with evidence; **2**
-  Gridley strict-mode assertions remain open (below). No assertion was skipped, widened or given a
-  tolerance, and no baseline waiver or diagnostic mode was used.
+- **Status:** Partly resolved 2026-10-20. Latest six-file focused run: **1,378 passed / 3 failed / 7 skipped** on the preserved isolated clone `afldb_v2_gap029_test`. Two original strict Gridley assertions and the new policy-conformance assertion remain failed. Strict: **149 findings**; approved deferrals: **78 (0 data matches)**; unapproved: **71**. Rookie coverage repaired: **23 findings / 7 distinct cells**. No new deferral or production waiver. Detailed evidence: [Gridley closeout](gap-029-gridley-resolution.md), `evidence/gap-029-gridley-verification.json`.
 - **Previous full-workflow result (unchanged until rerun):** 13,740 passed / 9 failed / 31 skipped;
   Coleman 27/27; original gap-028 files 200/200. **Focused result after the repairs** (the six GAP-029
   files together on `afldb_v2_rb_final_test`, strict, `evidence/gap-029-focused-tests.json`): 1,374 passed /
@@ -612,8 +609,8 @@ award results must be shown reconcilable before production; **no** — not a pro
    matches are 2026+.
 4. **release-gates exact 261 / 110 digests (2 assertions): membership UNCHANGED; ordering-only
    disagreement.** The pinned digests are reproduced exactly from the local membership when the AFL Tables
-   profile keys are ordered ignoring punctuation (`_`, `/`, `.`) and case — the order a punctuation-ignoring
-   Linux en_US.UTF-8 `afldb_test` gives `string_agg(... ORDER BY external_id)` — and under none of the
+   profile keys are ordered ignoring punctuation (`_`, `/`, `.`) and case — an order inferred to match a punctuation-ignoring
+   Linux locale; the original host collation is not directly evidenced, for `string_agg(... ORDER BY external_id)` — and under none of the
    other orderings tried (C, case-folded, ICU `en`/`en-US`/`sv`/`und` at four strengths, numeric on/off;
    only the punctuation-ignoring variants match). The earlier note that locale ordering is not the cause had
    tried only punctuation-significant orders. Membership difference against the reference: **none** (261 =
@@ -621,42 +618,16 @@ award results must be shown reconcilable before production; **no** — not a pro
    observable here. Fix: the test reads keys in C order, asserts the original pins from the legacy ordering
    applied in code (so it holds on any collation) and pins the canonical C-order digests
    `79d3e6eea83a4620` / `258396e0512a2212`. Key lists retained: `evidence/gap-029-identity-cohorts.json`.
-5. **Gridley board 541, cell 2-1 (`traded1 × WB`, Gridley 3663 / AFLDB 6700, Jamarra Ugle-Hagan): Gridley's
-   key is correct for its date.** The board is dated **2025-01-07**; AFLDB lists him on the 2025 trade
-   (DraftGuru `years/2025#32`, Western Bulldogs to Gold Coast), confirmed by both clubs on **2025-10-15**
-   (westernbulldogs.com.au "Ugle-Hagan departs the Bulldogs"; goldcoastfc.com.au "Ugle-Hagan to play for the
-   Gold Coast SUNS in 2026"; he played no 2025 game). His 2020 national pick 1 is not the trade criterion.
-   The harness had compared him as a finished career because his last game season (2024) precedes the board
-   year. `tradesAfterBoard` (tests/gridley-corpus-support.ts) now classifies a Gridley-omits traded cell as
-   `time of board` only when AFLDB's linked trade rows show fewer trades complete at the board date than the
-   threshold (trade period held in October; a year-Y trade counts complete from 1 November). It never reaches
-   the Gridley-lists direction. Unit regression in `tests/gridley-compat.test.ts`. `incorrect known answer`
-   is now 0 (was 1). This refines an informational category; the owner may prefer a tracked adjudication
-   row instead.
+5. **Gridley board 541, cell 2-1:** both official club pages were read directly. The 2025 Gold Coast trade follows the 2025-01-07 board. Extracted pages do not expose publication timestamps, so the previous exact completion-day claim is not independently verified here. The general 1-November cutoff was replaced by the narrowly tracked, evidence-checked board/cell/profile/direction record in `data/reference/gridley-board-541-trade.json`; unrelated discrepancies stay strict.
 
-### Still open (2 assertions, both in `gridley-corpus.test.ts`, strict mode)
+### Latest Gridley closeout
 
-`has no probed dataset gap` and `has no failing cells` fail on **172 cells** (50 dataset gap, 78
-unsupported, 44 source coverage gap) that need data or decisions this repository does not hold:
+The prior 172 “cells” are **172 findings in 156 distinct cells**. The single machine-readable inventory, `evidence/gap-029-gridley-residual-inventory.json`, retains board dates, criteria, expected-membership references, evaluated actual memberships, observed identity differences, adjudications and exact required evidence; unavailable memberships remain UNKNOWN. No existing raw strict finding was overwritten.
 
-- **42 `dataset gap` cells: `matches.match_event` is empty.** Anzac Day (`anzac-playedin-1` 15,
-  `anzac-won-1` 3), Dreamtime at the 'G (6) and King's Birthday / Big Freeze (18). The labels came from the
-  legacy `games.match_event` column (`import_legacy_afl.py`); that dataset is not in the repository and no
-  derivation rule has been approved. Needed: the legacy labels or an owner-approved rule. None invented.
-- **8 `dataset gap` cells: 2026.** Teammate references to players absent from the through-2025 register
-  (Willem Duursma, Jagga Smith, Malcolm Rosas, Finnbar Maley) and two cells of a 2026 board (43 answers).
-  Needed: the 2026 register/season (current-season import).
-- **78 `unsupported` cells: the seven formally accepted ISSUE-118 §23.36 deferrals** (`tasmanian`,
-  `intrulesplayer`, `irish`, `nfl`, `recruitedByDodoro`, `season2024player`, `spoils5season`). The sibling
-  assertion passes because the unsupported set equals that list exactly; strict mode nevertheless fails the
-  cells, so strict mode cannot be green while the deferrals stand. The V1 acceptance proof was the diagnostic
-  run (`AFLDB_GRIDLEY_DIAGNOSTIC=1`). Owner decision: accept diagnostic as the acceptance mode, treat
-  accepted deferrals as non-failing in strict, or acquire the data.
-- **44 `source coverage gap` cells:** `pickrookie` (Rookie Draft selections DraftGuru pages omit,
-  independently sourced) and `has_brother` (no sibling row). Needed: evidenced rows in
-  `data/players/rookie-relisting-outcomes.csv` / `sibling-supplements.csv` and the DraftGuru supplement.
-- For reference only, **not** acceptance: the same corpus in diagnostic mode passes 1,206/1,206 after the
-  board-541 repair.
+- **Rookie draft:** eight retained independently sourced selections repaired through the established audited manual writer, on an isolated clone. Eight audits, eight durable replay records; second apply is idempotent. **23 findings / 7 cells resolved.** Phil Davis now has directly-read primary evidence. The draft release pin is 6,810 **DraftGuru** rows plus independently accounted durable manual selections, with unexpected sources rejected.
+- **Existing deferrals:** §23.36 W.2/W.3 and §23.38 record acceptance of seven still-unsupported criteria, 26 occurrences / 78 cells. The bounded manifest enumerates all 78 and pins the corpus. No calendar expiry was recorded; changed support/scope/evidence requires review. Approved decisions count as **0 data matches** and still fail strict parity. Policy reporting fails on every unapproved difference, independently of diagnostic mode. No new owner approval is needed to represent the existing decisions.
+- **42 event cells remain:** no recoverable exact labelled match source was found in the scoped tracked/documented artifacts. Canonical matches have no labels. Need a sourced exact-match export or event evidence; no date/clubs/venue inference.
+- **8 registration/2026 cells remain:** the authentic September roster was hash-verified but post-dates the April/May boards. Malcolm Rosas and Finnbar Maley already have canonical identities; Willem Duursma and Jagga Smith do not. Need board-dated registrations and participation, not current memberships.
+- **21 sibling cells remain:** all Jarryd Lyons. Official Lions pages confirm Corey is his brother, but canonical Corey identity and qualifying senior appearance evidence are absent. Existing `has_brother` requires the brother to have `player_career_stats.games > 0`. A proposed exact 21-cell semantic adjudication needs owner approval if no qualifying appearance is established; none is approved here.
 
-**Close:** the two Gridley assertions need the items above. No production access or external baseline was
-used; the public web was consulted only for the 2025-10-15 trade date.
+Final strict result: **149 findings / 149 cells = 50 dataset gaps + 78 unsupported + 21 sibling coverage gaps**. Policy result: **FAIL, 71 unapproved**. Known-answer errors and solver timeouts: **0**. Full workflow remains the historical result above, not rerun. Typecheck and changed-file lint pass. Original database, SSH listener, credentials and authentication are preserved; the dedicated cluster is verified on loopback **55433** because 55432 belongs to ssh.exe. See [closeout](gap-029-gridley-resolution.md) for exact evidence, commands and owner decision wording.

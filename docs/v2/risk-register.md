@@ -39,10 +39,11 @@ This amendment supersedes stale claims in the historical rows below:
 
 Exact results and remaining source-input limitations: `local-release-review.md`.
 Final complete run: **13,740 passed / 9 failed / 31 skipped**, plus separate Coleman **27/27**.
-Strict baseline/count/membership residuals are **V2-GAP-029**. 2026-10-20: seven of the nine were
-repaired with evidence (snapshot scope, ordering-only digests, a board-dated trade); two Gridley
-strict assertions remain. They still block a green verification claim and require the named inputs,
-not blind assertion changes. The historical risk
+Strict baseline/count/membership residuals remain **V2-GAP-029**: latest focused result
+1,378 passed / 3 failed / 7 skipped; 149 strict findings, including 78 approved deferrals
+(0 data matches) and 71 unapproved. Eight audited rookie selections resolve 23 findings / 7 cells.
+Event labels, board-dated 2026 participation and the sibling scope/evidence remain open.
+See `gap-029-gridley-resolution.md`; no full-workflow or production waiver. The historical risk
 rows below retain Launch F wording; the reassessment above is the current state.
 
 | # | Risk | Likelihood | Impact | Mitigation | Owner | Gap |

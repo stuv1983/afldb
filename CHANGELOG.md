@@ -17,6 +17,17 @@ commit.
 
 ### AFLDB V2
 
+- V2-GAP-029 Gridley follow-up: eight sourced rookie selections now use the audited, replayable
+  manual-selection pathway on an isolated clone (23 findings / 7 cells repaired, idempotent).
+  Added a corpus-pinned 78-cell representation of existing §23.36 approvals, with separate
+  strict and policy results; approved deferrals remain 0 data matches. Removed the general
+  1-November trade exception in favour of the directly sourced board-541 record. Qualified
+  Linux collation as inference and retained strict source-scoped DraftGuru counts alongside
+  independently accounted manual selections. Exact residual inventory: 172 findings / 156 cells
+  before, 149 / 149 after (78 approved, 71 unapproved). Focused verification: 1,378 passed /
+  3 expected failing Gridley checks / 7 skipped; typecheck and changed-file lint pass.
+  GAP-029 stays open; full workflow and production gates are unchanged.
+
 #### Local release-readiness follow-up — 19–20 October 2026
 
 - Retained the final assertion-level release package, reproducible local-input commands,

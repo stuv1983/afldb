@@ -111,17 +111,24 @@ the delivery summary):
 | `home-records.test.ts` | preserves venue counts and NULL attendance semantics | **Resolved.** 3200 / 485 were 3151 / 484 through 2025 plus 49 / 1 MCG matches played in 2026. |
 | `nl-answers-cross-domain.test.ts` | X1 T1; X1 T12 | **Resolved.** 367 was 365 through 2025 plus two 2026-only coaches (Carr, Fraser); Adamson stays matchless in the source. |
 | `release-gates.test.ts` | exact 261 players; exact 110 players | **Resolved.** Membership unchanged: both original digests reproduce exactly under the punctuation-ignoring key order; the gate is now collation-independent. |
-| `gridley-corpus.test.ts` | no probed dataset gap; no failing cells | Board 541 cell 2-1 **resolved** (Gridley's key predates the 2025-10-15 trade). **Still open:** 172 cells need `match_event` labels, the 2026 register, owner treatment of the §23.36 accepted deferrals, and source-coverage rows. |
+| `gridley-corpus.test.ts` | no probed dataset gap; no failing cells; bounded policy conformance | **Open:** 149 strict findings (78 approved deferrals, 71 unapproved); rookie 23 findings / 7 cells repaired. Exact inventory and raw strict results: `gap-029-gridley-resolution.md`. |
 
-Seven of the nine assertions are repaired (commits `0faf8607`, `2ee29ade`, `642011c3`); two remain.
-Focused run of the six GAP-029 files together, strict, on `afldb_v2_rb_final_test`:
-**1,374 passed / 2 failed / 7 skipped (1,383)**, typecheck clean, changed-file lint 0 new findings
-(`evidence/gap-029-focused-tests.json`). That is a focused result, not a new complete workflow:
-the last complete result remains 13,740 passed / 9 failed / 31 skipped, and a full rerun would
-be expected to show 2 failures. Cause, evidence and correction for each: **V2-GAP-029**.
-Assertions remain strict; no tolerance, skip or diagnostic mode was used. Missing approved
-reference evidence is not permission to relabel a disagreement as a proven data-only defect, to
-repin digests, or to waive the release gate.
+The earlier six-file baseline was 1,374 passed / 2 failed / 7 skipped. The latest GAP-029
+run on the preserved isolated clone is **1,378 passed / 3 failed / 7 skipped (1,388)**:
+the two original Gridley strict checks and the new independent approved-policy check fail.
+**23 rookie findings across 7 cells are repaired**, using eight audited, replayable manual
+selections. A newly exposed all-source draft-count assertion was corrected to retain exactly
+6,810 DraftGuru rows plus independently accounted durable manual selections, rejecting
+unexplained source rows. Typecheck and changed-file lint pass.
+
+Strict parity remains **FAIL: 149 findings / 149 cells**. Existing §23.36 approvals account for
+**78 deferrals, 0 data matches**; policy conformance remains **FAIL: 71 unapproved** (42 event,
+8 board-dated 2026, 21 Jarryd/Corey sibling findings). No new deferral or diagnostic waiver.
+The raw strict failures, inventory, citations and exact commands are retained in
+[Gridley closeout](gap-029-gridley-resolution.md) and `evidence/gap-029-gridley-verification.json`.
+The broad workflow was **not rerun**; its historical result remains 13,740 / 9 / 31.
+The documented cluster was stopped and port 55432 belongs to ssh.exe; its preserved data now
+runs and verifies on loopback **55433**, with existing credentials and authentication unchanged.
 
 The 31 default-workflow skips are not passes: seven POSIX-only checks; one unavailable rescued
 legacy archive; one synthetic continuity fixture with no collision-free source identity; two

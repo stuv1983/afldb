@@ -544,13 +544,23 @@ describe('gate: draft links', () => {
   beforeAll(() => lockDraftTables(integrationDsn), 300_000);
   afterAll(unlockDraftTables);
 
-  it('retains all 6,810 rows, including unresolved ones', async () => {
-    const [row] = await sql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM draft_picks
+  it('retains all 6,810 DraftGuru rows, including unresolved ones, plus durable manual selections', async () => {
+    const [row] = await sql<{ sourceRows: number; manualRows: number; unexpectedRows: number }[]>`
+      SELECT count(*) FILTER (WHERE s.key = 'draftguru')::int AS "sourceRows",
+             count(*) FILTER (WHERE s.key = 'manual_admin_edit')::int AS "manualRows",
+             count(*) FILTER (WHERE s.key IS NULL OR s.key NOT IN ('draftguru', 'manual_admin_edit'))::int AS "unexpectedRows"
+        FROM draft_picks dp LEFT JOIN sources s ON s.id = dp.source_id
+    `;
+    const [durable] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_overrides
+       WHERE entity_type = 'draft_picks' AND field_group = 'selection' AND is_active
     `;
     // An unmatched row is still a fact about the draft. Dropping it
-    // would silently shrink the historical record.
-    expect(row.n).toBe(6_810);
+    // would silently shrink the historical record. GAP-029's eight independently
+    // reviewed additions are manual facts; they cannot change the source denominator.
+    expect(row.sourceRows).toBe(6_810);
+    expect(row.manualRows).toBe(durable.n);
+    expect(row.unexpectedRows).toBe(0);
   });
 
   it('keeps the raw name on every row whether linked or not', async () => {

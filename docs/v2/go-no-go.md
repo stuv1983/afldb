@@ -8,10 +8,14 @@ previous/V2 application rollback have now been demonstrated. Linux/production-du
 host rollback/backup/service operations, owner visual acceptance and first authentic 2027 B2
 operational acceptance remain. No production authority is granted by these local results.
 Final complete workflow: **13,740 passed / 9 failed / 31 skipped**; Coleman separately **27/27**.
-The nine reference/source assertions were V2-GAP-029, not an approved baseline waiver. As of
-2026-10-20 seven are repaired with evidence (focused strict run, not a new complete workflow);
-two Gridley strict assertions remain open (absent `match_event` labels, 2026 register, accepted
-deferrals, source-coverage rows). The full workflow is still not green; production stays NO-GO.
+GAP-029 remains **open**. Latest six-file focused run: **1,378 passed / 3 failed / 7 skipped**;
+strict parity **FAIL, 149 findings**, including **78 approved deferrals (0 data matches)** and
+**71 unapproved**. Rookie coverage repaired: **23 findings / 7 cells**, through eight audited
+manual selections on an isolated clone. Missing evidence: 42 exact event labels, 8 board-dated
+2026 cells, and senior-game identity/evidence or an explicit decision for 21 sibling cells.
+The independent policy gate rejects the unapproved differences even in diagnostic mode.
+Typecheck and changed-file lint pass. The full workflow was not rerun. Broader production gates
+are unchanged. See [Gridley closeout](gap-029-gridley-resolution.md).
 
 Status: updated at the close of Launch F (2026-10-19); first recorded at Stage 6 (Launch E). The
 criteria are the owner's (`docs/v2/owner-instruction-2026-10-19.md`, "Go/no-go criteria"), and
