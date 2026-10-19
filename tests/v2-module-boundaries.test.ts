@@ -164,9 +164,10 @@ describe('@afldb/* aliases resolve to the package index', () => {
     expect(typeof admin.hasCapability).toBe('function');
     const testing = await import('@afldb/testing');
     expect(typeof testing.applyTestDsnPolicy).toBe('function');
-    // Deliberately empty until Stage 4 (plan D6): no aspirational API.
+    // Stage 4 (plan D6/D7): the Coleman derivation and the Brownlow reconciliation.
     const derived = await import('@afldb/derived');
-    expect(Object.keys(derived)).toEqual([]);
+    expect(typeof derived.deriveColeman).toBe('function');
+    expect(typeof derived.reconcileBrownlowSeason).toBe('function');
   });
 });
 
