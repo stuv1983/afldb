@@ -54,3 +54,40 @@ export {
   type SealedSeasons,
   type SeasonRegistry,
 } from './historical-manifest';
+
+// Stage 3 (AFL API pipeline) export blocks. Each workstream inserts its exports directly
+// below its own anchor line; keep the anchors.
+// @v2-stage3:coverage-registry
+// The evidence-backed coverage registry (plan D11, ADR 0011). Pure; the matrix document is
+// generated from it by tools/v2/coverage-matrix.ts.
+export {
+  COVERAGE_EVIDENCE_KINDS,
+  COVERAGE_FAMILIES,
+  COVERAGE_FAMILY_LABELS,
+  COVERAGE_REGISTRY,
+  COVERAGE_STATUSES,
+  COVERAGE_STATUS_DEFINITIONS,
+  checkCoverageEvidence,
+  coverageFor,
+  renderCoverageMatrix,
+  validateCoverageRegistry,
+  type CoverageEntry,
+  type CoverageEvidence,
+  type CoverageEvidenceKind,
+  type CoverageFamily,
+  type CoverageStatus,
+} from './coverage-registry';
+// @v2-stage3:season-seal
+// The pure write decision for sealed historical seasons (V2-GAP-006; docs/v2/historical-baseline.md §2).
+export {
+  AUDITED_CORRECTION_WORKFLOWS,
+  CORRECTION_NOTE_MAX_LENGTH,
+  CORRECTION_NOTE_MIN_LENGTH,
+  SealedSeasonRefusal,
+  assertSeasonWritable,
+  evaluateSeasonWrite,
+  type AuditedCorrection,
+  type AuditedCorrectionWorkflow,
+  type SeasonWriteDecision,
+  type SeasonWriteInput,
+} from './season-seal';

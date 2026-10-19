@@ -67,6 +67,8 @@ import { SETTING_KEYS } from '../../src/lib/site-settings';
 // I244-F029: the shared loader, which honours AFLDB_SKIP_DOTENV so a variable
 // this unit's `UnsetEnvironment=` stripped is not read straight back in.
 import { loadEnv } from './load-env';
+// V2-GAP-006: the seal on historical seasons (docs/v2/historical-baseline.md §2).
+import { refuseSealedSeasonForSettle } from './settle-season-seal';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -244,6 +246,12 @@ export async function runAflApiSettleCli(
     log('--validate-only: manifest, registry and bundle contract verified. No connection opened.');
     return { args, result: null, report: null, sourceCompleteness: null };
   }
+
+  // V2-GAP-006 (docs/v2/historical-baseline.md §1-§2): the seal on historical seasons. The season is
+  // the snapshot manifest's; this runs AFTER the offline verification above and BEFORE any database
+  // client is created. A settle is not an audited correction, so none is ever passed.
+  // --report is read-only diagnostics and stays allowed for a sealed season.
+  if (!args.report) refuseSealedSeasonForSettle(projectRoot, bundle.season);
 
   // Test-only gate overrides retain the pre-connection refusal contract. The
   // production path proves the live control/writer database identity below.

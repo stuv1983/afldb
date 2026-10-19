@@ -31,6 +31,7 @@ import {
   afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
+import { SealedSeasonRefusal } from '@afldb/domain';
 import { AflApiBrownlowFixtureIdentityRequiredError, BROWNLOW_ENABLE_ENV } from '@/lib/acquisition/afl-api-brownlow';
 import {
   AFL_API_FIXTURE_ACQUISITION_KIND,
@@ -621,5 +622,259 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-ident
 
     expect(error).toBeInstanceOf(AflApiBrownlowFixtureIdentityRequiredError);
     expect(state.writeBoundaryReached).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// V2-GAP-006 (docs/v2/historical-baseline.md §1-§2, docs/v2/known-gaps.md) — the seal on
+// historical seasons. The season of a settle comes from its snapshot manifest. These tests use
+// the copied REAL data/reference/seasons.json (2025 sealed, 2026 open) and run with the ingestion
+// gates ENABLED, so the seal — not a switch — is what refuses. A sealed-season refusal must come
+// BEFORE any database client is touched. `--validate-only` (offline) and `--report` (read-only)
+// stay allowed. A season outside first..last (SYNTHETIC 2071 here) is not sealed.
+// ---------------------------------------------------------------------------
+
+describe('V2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs', () => {
+  const SEALED_SEASON = 2025;
+  const SYNTHETIC_OPEN_SEASON = 2071;
+  const SEAL_REFUSAL = /season 2025 is sealed historical data .*never rewrite sealed history/;
+  const originalDeploymentEnv = process.env[BROWNLOW_ENABLE_ENV];
+  const BROWNLOW_CONTROLS: AflApiIngestionControls = { currentSeasonEnabled: false, brownlowAdminEnabled: true };
+
+  beforeEach(() => {
+    process.env[BROWNLOW_ENABLE_ENV] = 'true';
+  });
+  afterEach(() => {
+    if (originalDeploymentEnv === undefined) delete process.env[BROWNLOW_ENABLE_ENV];
+    else process.env[BROWNLOW_ENABLE_ENV] = originalDeploymentEnv;
+  });
+
+  function setupMatchSnapshot(season: number): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-match-');
+    const label = 'seal-match-snapshot';
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'matches', label);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({
+      source_key: 'afl_api', acquisition_kind: 'afl_api_match_snapshot', season, files: [],
+    }));
+    return { projectRoot, label };
+  }
+
+  function setupFixturesSnapshot(season: number): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-fixtures-');
+    const label = 'seal-fixtures-snapshot';
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'fixtures', label);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({
+      source_key: 'afl_api', acquisition_kind: AFL_API_FIXTURE_ACQUISITION_KIND, season, files: [],
+    }));
+    return { projectRoot, label };
+  }
+
+  /** A zero-vote Brownlow snapshot (the "nothing published yet" state), as the earlier blocks use. */
+  function setupBrownlowSnapshot(season: number): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-brownlow-');
+    const label = 'seal-brownlow-snapshot';
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'brownlow', label);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({ source_key: 'afl_api', season, files: [] }));
+    writeFileSync(
+      join(snapshotDir, '01-brownlow-season.raw.json'),
+      JSON.stringify({ seasonId: 'CD_S2025014', status: 'COMPLETE', matchVotes: [] }),
+    );
+    writeFileSync(
+      join(snapshotDir, '02-brownlow-leaderboard.raw.json'),
+      JSON.stringify({
+        seasonId: 'CD_S2025014', status: 'COMPLETE', teamFilter: null, leaderboard: [],
+      }),
+    );
+    return { projectRoot, label };
+  }
+
+  it.each(['--dry-run', '--apply', '--apply --auto-apply'])(
+    'settle-afl-api %s refuses a sealed season before the DB path opens, with the ingestion gate ENABLED',
+    async (flags) => {
+      const { projectRoot, label } = setupMatchSnapshot(SEALED_SEASON);
+      const { sql, touched } = makeSqlStub();
+
+      const error = await runAflApiSettleCli(
+        ['--label', label, ...flags.split(' ')],
+        { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(SealedSeasonRefusal);
+      expect(error).toMatchObject({ code: 'season_sealed', season: SEALED_SEASON });
+      expect((error as Error).message).toMatch(SEAL_REFUSAL);
+      expect(touched.value).toBe(false);
+    },
+  );
+
+  it('settle-afl-api without the test-only controls refuses a sealed season before the real control preflight', async () => {
+    const { projectRoot, label } = setupMatchSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+    delete process.env.DATABASE_URL;
+
+    // Without the seal this reaches 'DATABASE_URL is not configured for the control database'.
+    await expect(runAflApiSettleCli(['--label', label, '--dry-run'], { projectRoot, sql }))
+      .rejects.toThrow(SEAL_REFUSAL);
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api --validate-only on a sealed season still succeeds offline', async () => {
+    const { projectRoot, label } = setupMatchSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    );
+
+    expect(outcome.result).toBeNull();
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api --report stays allowed for a sealed season (read-only diagnostics reach the DB path)', async () => {
+    const { projectRoot, label } = setupMatchSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', label, '--report'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  it('settle-afl-api does not seal a season outside first..last (SYNTHETIC 2071): the existing path continues', async () => {
+    const { projectRoot, label } = setupMatchSnapshot(SYNTHETIC_OPEN_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  it.each(['--dry-run', '--apply'])(
+    'settle-afl-api-fixtures %s refuses a sealed season before the DB path opens, with the ingestion gate ENABLED',
+    async (flag) => {
+      const { projectRoot, label } = setupFixturesSnapshot(SEALED_SEASON);
+      const { sql, touched } = makeSqlStub();
+
+      const error = await runAflApiFixturesSettleCli(
+        ['--label', label, flag], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(SealedSeasonRefusal);
+      expect(error).toMatchObject({ code: 'season_sealed', season: SEALED_SEASON });
+      expect((error as Error).message).toMatch(SEAL_REFUSAL);
+      expect(touched.value).toBe(false);
+    },
+  );
+
+  it('settle-afl-api-fixtures --validate-only on a sealed season still succeeds offline', async () => {
+    const { projectRoot, label } = setupFixturesSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    const outcome = await runAflApiFixturesSettleCli(
+      ['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    );
+
+    expect(outcome.counters).toBeNull();
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api-fixtures does not seal a season outside first..last (SYNTHETIC 2071)', async () => {
+    const { projectRoot, label } = setupFixturesSnapshot(SYNTHETIC_OPEN_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiFixturesSettleCli(
+      ['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  it.each(['--dry-run', '--apply', '--observe-only'])(
+    'settle-afl-api-brownlow %s refuses a sealed season before the DB path opens, with BOTH gates ENABLED',
+    async (flag) => {
+      const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
+      const { sql, touched } = makeSqlStub();
+
+      const error = await runAflApiBrownlowSettleCli(
+        ['--label', label, flag], { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS },
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(SealedSeasonRefusal);
+      expect(error).toMatchObject({ code: 'season_sealed', season: SEALED_SEASON });
+      expect((error as Error).message).toMatch(SEAL_REFUSAL);
+      expect(touched.value).toBe(false);
+    },
+  );
+
+  it('settle-afl-api-brownlow --validate-only on a sealed season still succeeds offline', async () => {
+    const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    const outcome = await runAflApiBrownlowSettleCli(
+      ['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS },
+    );
+
+    expect(outcome.result).toBeNull();
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api-brownlow does not seal a season outside first..last (SYNTHETIC 2071)', async () => {
+    const { projectRoot, label } = setupBrownlowSnapshot(SYNTHETIC_OPEN_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  /** Answers only `current_database()`; any other statement or `begin` is the write boundary. */
+  class BacktestWriteBoundary extends Error {}
+  function makeBacktestSql(databaseName: string): { sql: postgres.Sql; boundary: { reached: boolean } } {
+    const boundary = { reached: false };
+    const fn = async (strings: TemplateStringsArray): Promise<unknown[]> => {
+      const text = strings.join('?');
+      if (/current_database\(\)/.test(text)) return [{ name: databaseName }];
+      boundary.reached = true;
+      throw new BacktestWriteBoundary('past the backtest proof');
+    };
+    const begin = async (): Promise<never> => {
+      boundary.reached = true;
+      throw new BacktestWriteBoundary('past the backtest proof');
+    };
+    return { sql: Object.assign(fn, { begin }) as unknown as postgres.Sql, boundary };
+  }
+
+  it('settle-afl-api-brownlow --allow-completed-season-backtest keeps the afldb_test refusal reason for a sealed season', async () => {
+    const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
+    const { sql, boundary } = makeBacktestSql('afldb_prod');
+
+    const error = await runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply', '--allow-completed-season-backtest'],
+      { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS },
+    ).catch((e: unknown) => e);
+
+    expect(error).not.toBeInstanceOf(SealedSeasonRefusal);
+    expect((error as Error).message).toMatch(/--allow-completed-season-backtest refused: connected database is 'afldb_prod'/);
+    expect(boundary.reached).toBe(false);
+  });
+
+  it('settle-afl-api-brownlow --allow-completed-season-backtest admits a sealed season ONLY after the afldb_test proof, on a logged basis', async () => {
+    const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
+    const { sql, boundary } = makeBacktestSql('afldb_test');
+    const lines: string[] = [];
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply', '--allow-completed-season-backtest'],
+      { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS, log: (line) => lines.push(line) },
+    )).rejects.toThrow(BacktestWriteBoundary);
+
+    const output = lines.join('\n');
+    expect(output).toContain('database: afldb_test');
+    expect(output).toContain("SEALED SEASON 2025 admitted on basis 'test_database_backtest'");
+    expect(output).toContain('not an audited correction');
+    expect(boundary.reached).toBe(true);
   });
 });

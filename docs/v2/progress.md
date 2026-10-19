@@ -24,7 +24,8 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 0 Evidence | done: `docs/v2/baseline.md` (primary session), `docs/v2/inventory.md` | `58ec8626` |
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
-| 3-6 | not started (Launches B-E) | — |
+| 3 AFL API pipeline | in progress (Launch B) | see Stage 3 below |
+| 4-6 | not started (Launches C-E) | — |
 
 ## Stage 0 — evidence
 
@@ -123,6 +124,17 @@ ROLLBACK removed: 5 failures); 15+ migration citations checked, no false stateme
 
 After the fix (2026-10-19): `tests/v2-historical-manifest.test.ts` 37 tests; focused 3 files, 71
 passed; tsc exit 0; eslint clean on the changed files; full suite: **Test Files 96 failed, 170 passed, 2 skipped (268); Tests 15 failed, 9021 passed, 48 skipped (9084)**, 378 s; failing set identical to `baseline-failures.txt` (102 lines, none new, none missing); load-failure messages unchanged (83 + 4).
+
+## Stage 3 — AFL API pipeline (Launch B, in progress)
+
+Sub-agent returns: `.phaneslight/returns/launchB-20261019/` (01-05 mechanic digests, 06-10 worker
+returns). Commits so far are listed in the stage table when made; this section is rewritten at the
+Stage 3 close with the exact results.
+
+- Done, uncommitted at the time of writing: coverage registry (D11), sealed-season refusal at the
+  three AFL API settle CLIs (V2-GAP-006), fixture contract and player-resolution refusal tests,
+  client resilience and manifest metadata, writer-free acquisition constants.
+- In flight: `@afldb/acquisition` stage contract and façade, replay, reconciliation report.
 
 ## Resumption point
 
