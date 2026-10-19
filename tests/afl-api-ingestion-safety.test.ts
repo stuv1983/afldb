@@ -1,5 +1,5 @@
 import {
-  mkdtempSync, readFileSync, rmSync, writeFileSync,
+  mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1861,5 +1861,78 @@ describe('AFLDB-ISSUE-232 D-232-1 = B + O1 — the scheduled Brownlow wrapper re
     const timeout = Number(/^TimeoutStartSec=(\d+)$/m.exec(unit)?.[1]);
     expect(timeout).toBeGreaterThan(0);
     expect(timeout).toBeLessThan(300);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB V2 Launch B — AFL API ingestion never creates a player
+// (docs/v2/owner-instruction-2026-10-19.md "Fixtures and player identity": player identity is
+// fail-closed; an unresolved provider id is refused and queued for a human, never turned into a
+// players row.) A static scan, because the guarantee is "no code path exists", not "a path was
+// not taken". The resolver's own read-only SQL is asserted in tests/afl-api-settle-plan.test.ts.
+// ---------------------------------------------------------------------------
+
+/** `INSERT INTO players`, any case and whitespace (newlines included), optionally `ONLY`, schema-
+ * qualified and/or double-quoted. `players_x` and `player_name_aliases` do not match. */
+const INSERT_INTO_PLAYERS = /insert\s+into\s+(?:only\s+)?(?:"?public"?\s*\.\s*)?"?players"?(?![\w$])/i;
+
+function filesUnder(relativeDir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(join(ROOT, relativeDir))) {
+    const relative = `${relativeDir}/${name}`;
+    if (statSync(join(ROOT, relative)).isDirectory()) out.push(...filesUnder(relative));
+    else out.push(relative);
+  }
+  return out;
+}
+
+describe('AFLDB V2 Launch B — AFL API ingestion never creates a player', () => {
+  const scanned = [
+    ...filesUnder('src/lib/acquisition'),
+    ...filesUnder('tools/current-season'),
+    'src/db/queries/afl-api-player-links.ts',
+  ];
+
+  it('scans the acquisition library, the current-season tools and the player-link queries', () => {
+    expect(scanned).toEqual(expect.arrayContaining([
+      'src/lib/acquisition/afl-api-player-resolver.ts',
+      'src/lib/acquisition/settle-afl-api.ts',
+      'tools/current-season/settle-afl-api.ts',
+      'tools/current-season/settle-afl-api-brownlow.ts',
+      'src/db/queries/afl-api-player-links.ts',
+    ]));
+  });
+
+  it('no file in that set contains an INSERT INTO players statement', () => {
+    const offenders = scanned.filter((path) => INSERT_INTO_PLAYERS.test(readSource(path)));
+    expect(offenders).toEqual([]);
+  });
+
+  it('NEGATIVE CONTROL: the pattern flags every spelling of the forbidden statement on an in-memory string', () => {
+    for (const forbidden of [
+      'INSERT INTO players (name) VALUES ($1)',
+      'insert into players(name) values ($1)',
+      'INSERT   INTO\n   players',
+      'insert\tinto "players" (name)',
+      'INSERT INTO public.players (name)',
+      'INSERT INTO "public"."players" (name)',
+      'INSERT INTO ONLY players (name)',
+      'INSERT INTO players\nSELECT 1',
+    ]) {
+      expect(INSERT_INTO_PLAYERS.test(forbidden), forbidden).toBe(true);
+    }
+  });
+
+  it('NEGATIVE CONTROL: the pattern leaves other player tables and ordinary text alone', () => {
+    for (const allowed of [
+      'INSERT INTO player_name_aliases (alias) VALUES ($1)',
+      'INSERT INTO players_staging (name) VALUES ($1)',
+      'INSERT INTO external_identities (player_id) VALUES ($1)',
+      'SELECT id FROM players WHERE id = $1',
+      'UPDATE players SET name = $1',
+      'insert into the players table',
+    ]) {
+      expect(INSERT_INTO_PLAYERS.test(allowed), allowed).toBe(false);
+    }
   });
 });
