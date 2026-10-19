@@ -379,6 +379,30 @@ BEGIN
     GRANT USAGE ON SEQUENCE afl_api_identity_adjudications_id_seq TO afldb_import;
   END IF;
 
+  -- Migration 111 (AFLDB V2 Stage 4, curated awards): the proposal table and
+  -- its decision ledger. A status transition writes its ledger row in the
+  -- same afldb_import transaction as the status change, and an approval
+  -- writes award_winners through insertAwardWinner() in that transaction too.
+  -- award_proposals: SELECT, INSERT and a COLUMN-scoped UPDATE of the
+  -- workflow columns only, so the proposed value and its evidence are
+  -- immutable at the grant level (a correction is a new revision).
+  -- award_proposal_decisions: SELECT, INSERT and sequence USAGE only --
+  -- append-only. Neither table is registered in import_writable_tables,
+  -- whose loop above would grant UPDATE, DELETE and TRUNCATE. Neither is
+  -- app-readable: proposals hold unvetted data and must never reach the
+  -- public site. The revoke loop strips these each run; re-grant them here.
+  IF to_regclass('public.award_proposals') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON award_proposals TO afldb_import;
+    GRANT UPDATE (status, validation_result, validated_at,
+                  approved_entity_key, approved_at, updated_at)
+      ON award_proposals TO afldb_import;
+    GRANT USAGE ON SEQUENCE award_proposals_id_seq TO afldb_import;
+  END IF;
+  IF to_regclass('public.award_proposal_decisions') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON award_proposal_decisions TO afldb_import;
+    GRANT USAGE ON SEQUENCE award_proposal_decisions_id_seq TO afldb_import;
+  END IF;
+
   -- Migration 094 (AFLDB-ISSUE-155 Phase C1): the Brownlow administration
   -- workflow. These two tables record administrative decisions -- who
   -- drafted, who finalised, who published a season and from which
@@ -508,6 +532,12 @@ DECLARE
     -- external_identities row it audits (see migration 104,
     -- AFLDB-ISSUE-235 D8). The admin history view may only read it.
     ['afl_api_identity_adjudications', 'SELECT'],                    -- 104
+    -- Read-only: the curated-award proposals and their decision ledger are
+    -- written by afldb_import alone, in the same transaction as the canonical
+    -- award_winners row an approval creates (see migration 111, AFLDB V2
+    -- Stage 4). The admin history view may only read them.
+    ['award_proposals',        'SELECT'],                            -- 111
+    ['award_proposal_decisions', 'SELECT'],                          -- 111
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023

@@ -1,6 +1,7 @@
 # ADR 0002 — No new runtime dependency; one optional exact-pinned devDependency
 
-- Status: Accepted (2026-10-19). The optional devDependency is not installed as of Stage 2.
+- Status: Accepted (2026-10-19). The optional devDependency was installed in Stage 4 (Launch C):
+  `@electric-sql/pglite` 0.2.17, exact-pinned, test-only; see ADR 0012.
 - Plan decision: `docs/v2/plan.md` §3 D2; review resolution R-008 (§7)
 
 ## Context

@@ -757,6 +757,37 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       + 'id — AFLDB-ISSUE-142 (B) — remapped through the same afltables_profile_url lineage '
       + 'ref as player_link_resolutions, plus the D15 stored-identity assertion.',
   },
+  // --- Curated award proposals (migration 111, AFLDB V2 Stage 4, docs/v2/adr/0008) -----
+  // Decided by analogy with data_submission_rows / player_link_suggestions (reinstate, no
+  // football reference) and NOT with afl_api_identity_adjudications (staged remap). The
+  // migration deliberately gives these two tables NO foreign key into awards, players,
+  // clubs or award_winners: a proposal names its award by awards.slug, its player by the
+  // durable resolvePlayerIdentity() string and its club by clubs.slug, exactly so that a
+  // rebuild (TRUNCATE ... CASCADE) cannot empty them and a promotion needs no lineage
+  // remap. Their only foreign keys are auth_users (restored first), the ledger -> its
+  // proposal, and a revision -> its predecessor (both inside the reinstated family, ids
+  // preserved). So there is nothing to put in footballRefs or lineageRefs, and declaring a
+  // historicalOnly gap would be wrong: every row IS evidenced and must survive.
+  {
+    schema: 'public', name: 'award_proposals', subsystem: 'curated awards', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
+    note: 'Curated award proposals, one row per revision (AFLDB V2 Stage 4). Production-only '
+      + 'human workflow state; the rebuilt copy holds none. Named by natural identity (award '
+      + 'slug, durable player identity string, club slug), never by id, so it reinstates '
+      + 'without a remap. An approved row points at its canonical award_winners row through '
+      + 'approved_entity_key (a data_overrides key), not an id. References auth_users and '
+      + 'itself (revision_of_id, ids preserved).',
+  },
+  {
+    schema: 'public', name: 'award_proposal_decisions', subsystem: 'curated awards', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 30,
+    restoreAfter: ['award_proposals', 'auth_users'],
+    note: 'Append-only ledger of every award_proposals status transition (AFLDB V2 Stage 4), '
+      + 'written in the same afldb_import transaction as the change. Deliberately NOT '
+      + 'import-writable (no UPDATE, DELETE or TRUNCATE for any role). Reinstated after '
+      + 'award_proposals, which it references; both keep their ids.',
+  },
   // --- NL search telemetry and review (migrations 046–051, 055, 079, 081) -------------
   {
     schema: 'public', name: 'nl_search_log', subsystem: 'NL search telemetry', category: 'operations',

@@ -432,6 +432,16 @@ describe('load_reference_data.py', () => {
         // populated-roots guard counts it rather than being blocked by it.
         'afl_api_identity_adjudications',
         'app_health_events',
+        // 111 (AFLDB V2 Stage 4, curated awards). The proposal table and its
+        // decision ledger name their award, player and club by natural identity
+        // (slug / durable player identity string), so they carry NO foreign key
+        // into awards, players, clubs or award_winners and sit outside the
+        // reference loader's FK cascade closure. Not registered import-writable:
+        // the ledger is append-only by grant and the proposal's value columns are
+        // immutable by column-scoped grant (re-granted in privileges.sql); the
+        // registry loop would restore UPDATE/DELETE/TRUNCATE on every reconcile.
+        'award_proposal_decisions',
+        'award_proposals',
         // 094 (AFLDB-ISSUE-155 Phase C1). The Brownlow administration
         // workflow: a record of who drafted, finalised, voided and
         // published. Deliberately outside afldb_meta.import_writable_tables

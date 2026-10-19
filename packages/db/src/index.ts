@@ -32,3 +32,13 @@ export {
   type ProducerTarget,
   type ProducerTargetArgs,
 } from './historical-manifest-producer';
+
+// The minimal SQL port shared by @afldb/admin services, the postgres.js adapter and the PGlite
+// test adapter (AFLDB V2 Stage 4, docs/v2/adr/0008-curated-awards.md).
+export {
+  nativeTransactionOf,
+  postgresExecutor,
+  postgresTransactionExecutor,
+  type SqlExecutor,
+  type TransactionalSqlExecutor,
+} from './sql-executor';

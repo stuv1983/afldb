@@ -30,3 +30,8 @@ export {
   type ResolvedImport,
   type SourceFile,
 } from './module-boundaries';
+export {
+  createInMemoryPglite,
+  pgliteExecutor,
+  type InMemoryPglite,
+} from './pglite';

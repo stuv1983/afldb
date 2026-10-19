@@ -25,7 +25,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
-| 4 Derived + curated | in progress (Launch C) | `fad164cd` (derived) |
+| 4 Derived + curated | in progress (Launch C) | `fad164cd` (derived), `4c34be93` (progress), curated-awards commit (this one) |
 | 5-6 | not started (Launches D-E) | — |
 
 ## Stage 0 — evidence
@@ -193,9 +193,21 @@ Gaps created or changed: V2-GAP-006 (narrowed), V2-GAP-008 (High, **cutover bloc
 
 Sub-agent returns: `.phaneslight/returns/launchC-20261019/`. Committed so far: `fad164cd`
 (Coleman derivation + comparison report, Brownlow reconciliation + report; 5 focused files, 289
-tests passed; v2-module-boundaries 14 passed). Curated awards (D8), the Coleman publisher, the
-legacy disposition (D10) and the ownership matrix are in progress; this section is rewritten at
-the stage close.
+tests passed; v2-module-boundaries 14 passed).
+
+Curated awards (D8) commit `(v2-curated)`: migration 111 (`award_proposals`, append-only
+`award_proposal_decisions`; natural-identity keyed, no FK into football tables; comment-only
+ROLLBACK block), `@afldb/db` `SqlExecutor` port, `@afldb/admin` proposal services and offline
+file parser, server-only promotion port `src/db/queries/award-proposals.ts`, `@afldb/testing`
+in-memory PGlite helper, `@electric-sql/pglite` 0.2.17 installed exact-pinned as a devDependency
+(ADR 0012). Verification on the working tree (curated and legacy workstreams both present):
+focused vitest over 10 files 6 failed | 1175 passed | 1 skipped (1182), all 6 failures are
+lines of `baseline-failures.txt`; the two new curated suites 114 passed (92 unit, 22 PGlite);
+tsc exit 0; ESLint on every touched file 0 errors except `tests/reference-data.test.ts`
+(29 errors, all pre-existing and equal at `HEAD`, R-011). Migration 111 and its grants were
+executed only on in-memory PGlite over labelled stub prerequisites; **unexecuted on
+PostgreSQL** (no database is reachable from V2). The Coleman publisher, the legacy disposition
+(D10) and the ownership matrix are in progress; this section is rewritten at the stage close.
 
 ## Resumption point
 

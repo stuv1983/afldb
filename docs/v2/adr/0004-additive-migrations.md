@@ -1,6 +1,7 @@
 # ADR 0004 — Additive, reversible migrations from `111_`
 
-- Status: Accepted (2026-10-19). No V2 migration exists yet; the first is expected in Stage 4.
+- Status: Accepted (2026-10-19). First V2 migration: `111_curated_award_proposals.sql` (Stage 4,
+  ADR 0008), executed on in-memory PGlite over stub prerequisites only; unexecuted on PostgreSQL.
 - Plan decision: `docs/v2/plan.md` §3 D4; review resolution R-008 (§7)
 
 ## Context
@@ -18,6 +19,12 @@ runner (`tools/db/migrate.ts`, `tools/db/migration-safety.ts`) hashes and execut
   migration 039) and, where the importer writes, the fail-closed import-write pattern (migration
   045). Any such migration names the matching `tools/db/privileges.ts` change and carries a
   097-style deploy-order comment (migration, then privileges, then code; AFLDB-ISSUE-027).
+- Qualification (Stage 4): a table that must never be public, or whose writer must be narrower
+  than the registry grants (for example an append-only ledger, or UPDATE on workflow columns
+  only), registers with neither `grant_app_read` nor `grant_import_write`. It carries explicit
+  column-scoped grants in the migration and the matching re-grant block in
+  `tools/maintenance/privileges.sql`, following migrations 074 and 104. Migration 111 is the first
+  V2 instance (ADR 0008).
 - No migration is applied to any real database from V2.
 
 ## Consequences

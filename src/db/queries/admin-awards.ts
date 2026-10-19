@@ -1411,7 +1411,9 @@ export type CreateAwardWinnerInput = {
 
 type CreatedWinner = { rowId: number; entityKey: string; sourceRecordId: string };
 
-async function insertAwardWinner(tx: Tx, input: CreateAwardWinnerInput & {
+// Exported, behaviour unchanged, for the AFLDB V2 curated-award approval: src/db/queries/award-proposals.ts
+// promotes an approved proposal through this function on the same transaction (ADR 0008).
+export async function insertAwardWinner(tx: Tx, input: CreateAwardWinnerInput & {
   replacesKey?: string | null;
   auditExtra?: Record<string, unknown>;
 }): Promise<CreatedWinner> {
