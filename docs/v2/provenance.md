@@ -55,6 +55,16 @@ On disk, AFL API acquisitions are immutable snapshot directories under
 never overwrite one (`src/lib/acquisition/snapshot-dir.ts`), verified by a sha256 manifest before
 any use (`src/lib/acquisition/afl-api-snapshot.ts`, fail closed).
 
+Acquisition metadata in the manifest (Stage 3 additions marked *): per raw file `sha256`,
+`http_status`, `etag`, `cache_control`, `retrieved_at` and *`request` (`method`, `url`; the
+token travels in a header and is never recorded); per manifest `contract_version`, `source_key`,
+`acquisition_kind`, `label`, `season`, the season provider ids, `acquired_at` (completion
+time), *`acquisition_tool`, *`acquisition_started_at` and *`request_parameters`
+(`tools/current-season/acquire-afl-api.ts`, `acquire-afl-api-brownlow.ts`). A stored snapshot
+replays to an identical settle plan (`replayAflApiSnapshot` in `@afldb/acquisition`,
+`tests/v2-acquisition-replay.test.ts`); a settle can be summarised as a machine-readable
+reconciliation report (`afldb.v2.afl-api-reconciliation-report`, `@afldb/acquisition`).
+
 ## 4. Promotion and canonical-mutation audit
 
 | Table | Records | Defined in |
@@ -93,5 +103,6 @@ apply either target if one ever appears (110's constraint comment).
   `external_identities` rather than per-row provenance. V2 does not add columns to them in Stage
   2; Stage 3/4 decide whether the AFL API path needs per-row provenance there (plan D4: additive
   only, from `111_`).
-- The seal is detected, not enforced: no constraint or trigger stops a writer from changing a
+- The seal is enforced only at the AFL API settle CLIs (Stage 3); no constraint or trigger stops
+  another writer from changing a
   sealed season's rows. See V2-GAP-006 in `docs/v2/known-gaps.md`.

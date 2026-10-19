@@ -213,3 +213,41 @@ These resolutions amend §3 and §4 and bind Launches A-E.
   2026-10-19 09:18:47 +11:00 an empty stray file `supplies` appeared at the source worktree root
   (`git status` shows `?? supplies`), consistent with the documented Read/Grep hook defect. It was
   **not** deleted (the source is read-only to V2); it is reported to the owner.
+
+### Launch B decisions (Stage 3, 2026-10-19)
+
+Recorded by the orchestrator under the owner's working mode (conservative choices, no routine
+return). Sub-agent returns: `.phaneslight/returns/launchB-20261019/`. No new plan review: Launch B
+continues the reviewed plan.
+
+- **R-013 Seal choke point.** The seal (V2-GAP-006) is enforced in the three AFL API settle CLIs,
+  after the manifest season is known and before any database client exists, through one helper
+  (`tools/current-season/settle-season-seal.ts`) over a pure domain rule
+  (`packages/domain/src/season-seal.ts`). The library functions (`runSettleAflApi`,
+  `runSettleAflApiBrownlow`, `canonical-apply.ts`) are unchanged so integration suites that drive
+  them with synthetic seasons keep their semantics; their per-target `season_not_in_progress` gate
+  remains the backstop. Settle is never an audited correction (`correction: null`); the Brownlow
+  completed-season backtest keeps its live `afldb_test` proof first and is logged as a separate,
+  non-correction basis. A null or non-integer season is treated as sealed (fail-closed).
+- **R-014 Coverage grading.** `api_verified` needs a committed stored fixture AND a committed test;
+  2026 player statistics rest on one stored sample and are graded `api_partial` (worker W1 had
+  proposed `api_verified`; downgraded for honesty). 2026 results stay `api_verified` because the
+  whole stored season feed carries every concluded score and a test proves it complete.
+- **R-015 Writer-free acquire constants.** Worker W5 found (MED) that the acquire CLIs reached the
+  Brownlow settle and the observation store through three constant imports. The constants moved
+  unchanged to `src/lib/acquisition/afl-api-acquisition-constants.ts` and are re-exported from
+  their original modules; a static test now proves the acquire closure reaches no writer.
+- **R-016 Façade scope.** `@afldb/acquisition` re-exports only modules whose runtime import closure
+  reaches no `src/db/**`, `server-only` or writer module; the settle writers, `settle-core` and the
+  derived recompute are cited by path in the stage contract (`AFL_API_PIPELINE`) instead, and
+  replay takes the bundle builder by dependency injection.
+- **R-017 No PGlite in Stage 3.** The AFL API settle needs the full 110-migration schema with its
+  roles and grants, which plan D2 forbids extending PGlite to; transactional preservation is proved
+  at the plan level and recorded as unexecuted (V2-GAP-009).
+- **R-018 Fixture contract interpretation.** `LIVE`/`POSTGAME` are refused as `status_deferred`
+  (non-projecting; the runbook's "fail closed"); swapped home/away on the same date is a refusal in
+  the V2 fixture contract, stricter than the existing match path, which treats it as a different
+  fixture. No fixtures writer is wired (AFLDB-ISSUE-229 B2 open: V2-GAP-008, cutover blocker).
+- **R-019 Client defaults.** 4xx other than 408/425/429 are not retried; `Retry-After` is capped at
+  30 s; the acquire tools space request starts by 250 ms, an implementation default because no
+  provider limit is documented.

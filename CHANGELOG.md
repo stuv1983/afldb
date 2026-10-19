@@ -22,6 +22,31 @@ gaps as `V2-GAP-NNN` in `docs/v2/known-gaps.md` instead of allocating `AFLDB-ISS
 deliberate departure from CLAUDE.md §5 so the fork cannot collide with the mainline ledger
 (ADR 0003). `issues.md` and `IssuesIndex.md` are left as inherited.
 
+#### Stage 3 — AFL API pipeline boundary, coverage registry, seal enforcement, fixture and identity contracts - 19 October 2026
+
+- `@afldb/acquisition` is the canonical boundary for `AFL API → immutable snapshot → validated
+  staging → identity resolution → reconciliation → transactional promotion → derived
+  calculations`: a typed stage contract (`AFL_API_PIPELINE`) over the existing implementations,
+  whose generated stage map in `docs/v2/architecture.md` §9 a test keeps exact. A static test
+  proves the AFL API client and acquire tools import no writer and contain no SQL mutation.
+- Coverage is explicit: `docs/v2/coverage-matrix.md` (generated from
+  `packages/domain/src/coverage-registry.ts`) labels every season and family; only 2026 results
+  is `api_verified`; nothing before 2026 is labelled API-rebuildable (V2-GAP-010).
+- The AFL API settle CLIs refuse sealed historical seasons (1897-2025 today) before opening a
+  database client; corrections go through the audited workflows only (V2-GAP-006, narrowed).
+- AFL API fixture identity contract (pure refusals for unsupported statuses, unproven start times,
+  unmapped venues, duplicate or colliding provider ids and swapped orientation). The fixtures
+  writer itself stays unbuilt: AFLDB-ISSUE-229 B2 is a recorded cutover blocker (V2-GAP-008).
+- Player resolution is proved fail-closed by test: provider-id lookups only, no player row is ever
+  created by the pipeline, one unresolved Brownlow vote refuses its whole match set.
+- The AFL API client no longer retries 4xx (other than 408/425/429), honours `Retry-After` up to a
+  cap, validates its retry options, rate-limits request starts (250 ms default in the acquire
+  tools) and names a remedy in every failure; the acquire tool refuses a feed listing a match twice.
+- Snapshot manifests also record each request's method and URL, the acquisition tool, the start
+  time and the request parameters. Stored snapshots replay to an identical settle plan, and a
+  settle can be summarised as a versioned, schema-validated JSON reconciliation report.
+- Not executed: any database path (V2-GAP-009 for transactional preservation on PostgreSQL).
+
 #### Stage 2 — sealed historical baseline definition and read-only verification tooling - 19 October 2026
 
 - `docs/v2/historical-baseline.md` defines the sealed baseline (every season not in progress in

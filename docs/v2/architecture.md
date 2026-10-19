@@ -1,6 +1,6 @@
 # AFLDB V2 — architecture overview (implemented state)
 
-Status: describes what exists in `D:\dev\afldbV2` at the close of Stage 2 (2026-10-19). Planned
+Status: describes what exists in `D:\dev\afldbV2` at the close of Stage 3 (2026-10-19). Planned
 work is labelled as such and points at its plan decision; nothing here is aspirational.
 
 ## 1. Shape
@@ -36,9 +36,9 @@ Counts are from `docs/v2/inventory.md`, where each has its re-derivation command
 
 | Package | Exports (Stage 1) | Source of each export |
 |---|---|---|
-| `@afldb/domain` | fixture status and round vocabulary, finals round codes, `isFixtureRoundType`, `isFixtureStatus`; `ImportBatchId`, `asImportBatchId`; the historical baseline manifest spec, sealed-season rule, validation and comparator (Stage 2) | re-exports of `src/lib/fixtures/spec.ts`, `src/lib/import-batch-id.ts` (both pure leaf modules); `packages/domain/src/historical-manifest.ts` (new in V2) |
+| `@afldb/domain` | fixture status and round vocabulary, finals round codes, `isFixtureRoundType`, `isFixtureStatus`; `ImportBatchId`, `asImportBatchId`; the historical baseline manifest spec, sealed-season rule, validation and comparator (Stage 2); the coverage registry (`COVERAGE_REGISTRY`, `validateCoverageRegistry`, `checkCoverageEvidence`, `renderCoverageMatrix`) and the seal decision (`evaluateSeasonWrite`, `assertSeasonWritable`, `AUDITED_CORRECTION_WORKFLOWS`) (Stage 3) | re-exports of `src/lib/fixtures/spec.ts`, `src/lib/import-batch-id.ts` (both pure leaf modules); `packages/domain/src/historical-manifest.ts`, `coverage-registry.ts`, `season-seal.ts` (new in V2) |
 | `@afldb/db` | `assertTestProcessDsn`, `testProcessDsnRefusal`, `isTestProcess`; the read-only manifest producer (`produceManifest`, `resolveProducerTarget`; never run) | re-export of `src/db/test-process-guard.ts` (new in V2, ADR 0005); `packages/db/src/historical-manifest-producer.ts` (new in V2) |
-| `@afldb/acquisition` | the source-family registry contract (`parseSourceFamilyRegistry`, `getSourceFamily`, `isPromotable`, ...) | re-export of `src/lib/acquisition/source-families.ts` |
+| `@afldb/acquisition` | the source-family registry contract; (Stage 3) the pipeline stage contract `AFL_API_PIPELINE` and stage map (§9), `replayAflApiSnapshot`/`aflApiPlanDigest`, the reconciliation report (`buildAflApiReconciliationReport`, validator, JSON Schema), the fixture contract (`classifyAflApiFixtureStatus`, `evaluateAflApiFixtureProjection`, `detectAflApiFixtureCollisions`), and re-exports of the pure/read-only stage code (client, rate limiter, season discovery and enumeration, snapshot readers, `claimSnapshotDir`, bundle emitters, `reconcile`) | re-exports of `src/lib/acquisition/*` modules whose runtime import closure reaches no `src/db/**`, `server-only`, `postgres` or writer module (`tests/v2-acquisition-pipeline.test.ts`); writers (settle, canonical apply, observation store, derived recompute) are cited by path in the stage contract, never re-exported (plan §7 R-016); `packages/acquisition/src/{pipeline,stage-map,replay,reconciliation-report,fixture-contract}.ts` (new in V2) |
 | `@afldb/derived` | nothing | deliberately empty until Stage 4 (ADR 0006) |
 | `@afldb/admin` | `hasCapability`, `Capability`, `CapabilityRole`, `CapabilityViewer` | re-export of `src/lib/auth/capabilities.ts` |
 | `@afldb/testing` | `applyTestDsnPolicy` and DSN helpers; the module-boundary checker | `packages/testing/src/dsn-policy.ts`, `packages/testing/src/module-boundaries.ts` (new in V2) |
@@ -68,7 +68,12 @@ The connection pools (`src/db/client.ts`, `src/db/authClient.ts`) are not re-exp
 - The AFL API pipeline: snapshot (`src/lib/acquisition/afl-api-snapshot.ts`), staging projections
   (migration 103), identity adjudication (migration 104), settle/promotion
   (`src/lib/acquisition/settle-afl-api.ts`, `settle-core.ts`), and the ingestion switches
-  (`src/lib/acquisition/afl-api-ingestion-control.ts`). Stage 3 wraps these in `@afldb/acquisition`.
+  (`src/lib/acquisition/afl-api-ingestion-control.ts`). Stage 3 maps them as the stages of
+  `@afldb/acquisition` (§9), enforces the historical seal at the three settle CLIs before any
+  database client opens (`tools/current-season/settle-season-seal.ts`, V2-GAP-006 narrowed), and
+  proves that the acquire side imports no writer. Coverage per season and family:
+  `docs/v2/coverage-matrix.md`. The AFL API fixtures writer is not built (V2-GAP-008, cutover
+  blocker).
 
 ## 6. Test-process safety (ADR 0005)
 
@@ -88,3 +93,82 @@ A). Table ownership is drafted in `docs/v2/db-ownership-matrix.md`.
 
 ADRs 0001-0011 in `docs/v2/adr/` record plan decisions D1-D11; ADRs 0006-0011 are accepted but
 not implemented yet, and say so.
+
+## 9. AFL API pipeline stage map (Stage 3)
+
+Generated from the `@afldb/acquisition` stage contract by `tools/v2/acquisition-stage-map.ts`;
+a test fails if this table and the code disagree (every cited `path:line` must hold the export).
+
+<!-- stage-map:begin -->
+| Stage | Location | Symbol | Writes |
+| --- | --- | --- | --- |
+| acquire | `src/lib/acquisition/afl-api-client.ts:90` | `planAflApiTokenRequest` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:116` | `planAflApiSeasonMatchesRequest` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:131` | `planAflApiCompSeasonsRequest` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:166` | `planAflApiPlayerStatsRequest` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:174` | `planAflApiMatchRosterRequest` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:182` | `planAflApiBrownlowSeasonRequest` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:398` | `requestAflApi` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:494` | `fetchAflApiToken` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:535` | `fetchAflApiCfsResource` | nothing |
+| acquire | `src/lib/acquisition/afl-api-client.ts:632` | `selectAflApiMatches` | nothing |
+| acquire | `src/lib/acquisition/afl-api-season-discovery.ts:118` | `parseAflApiCompSeasons` | nothing |
+| acquire | `src/lib/acquisition/afl-api-season-discovery.ts:182` | `proposeAflApiSeasons` | nothing |
+| acquire | `src/lib/acquisition/afl-api-acquisition-constants.ts:28` | `AFL_API_FIXTURE_ACQUISITION_KIND` | nothing |
+| acquire | `src/lib/acquisition/afl-api-acquisition-constants.ts:38` | `isAflApiBrownlowEnabled` | nothing |
+| acquire | `tools/current-season/acquire-afl-api.ts:96` | `parseAcquireArgs` | nothing |
+| acquire | `tools/current-season/acquire-afl-api.ts:225` | `runAcquisition` | nothing |
+| acquire | `tools/current-season/acquire-afl-api-brownlow.ts:67` | `parseAcquireBrownlowArgs` | nothing |
+| acquire | `tools/current-season/acquire-afl-api-brownlow.ts:144` | `runBrownlowAcquisition` | nothing |
+| snapshot | `src/lib/acquisition/snapshot-dir.ts:23` | `claimSnapshotDir` | snapshot_files |
+| snapshot | `tools/current-season/acquire-afl-api.ts:138` | `buildAflApiLabel` | snapshot_files |
+| snapshot | `tools/current-season/acquire-afl-api.ts:435` | `cleanupPartialSnapshot` | snapshot_files |
+| snapshot | `tools/current-season/acquire-afl-api-brownlow.ts:84` | `buildAflApiBrownlowLabel` | snapshot_files |
+| snapshot | `tools/current-season/acquire-afl-api-brownlow.ts:265` | `cleanupPartialBrownlowSnapshot` | snapshot_files |
+| snapshot | `src/lib/acquisition/afl-api-snapshot.ts:40` | `aflApiSnapshotRoot` | snapshot_files |
+| snapshot | `src/lib/acquisition/afl-api-snapshot.ts:55` | `verifyAflApiSnapshotManifest` | snapshot_files |
+| snapshot | `src/lib/acquisition/afl-api-snapshot.ts:99` | `aflApiUnitSourcesFrom` | snapshot_files |
+| snapshot | `src/lib/acquisition/afl-api-snapshot.ts:134` | `aflApiSeasonFeedTextFrom` | snapshot_files |
+| snapshot | `src/lib/acquisition/afl-api-snapshot.ts:152` | `aflApiSnapshotManifestSha256` | snapshot_files |
+| snapshot | `packages/acquisition/src/replay.ts:79` | `replayAflApiSnapshot` | snapshot_files |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:329` | `emitAflApiMatch` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:533` | `emitAflApiPlayerMatchStats` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:726` | `emitAflApiMatchRoster` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:834` | `emitAflApiBrownlowMatchVotes` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:928` | `emitAflApiBrownlowLeaderboard` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:1180` | `buildAflApiMatchBundle` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:1296` | `buildAflApiSettleRecords` | staging |
+| validate_stage | `src/lib/acquisition/settle-afl-api.ts:241` | `buildAflApiSettleBundle` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-season-enumeration.ts:156` | `assessAflApiSeasonEnumeration` | staging |
+| validate_stage | `src/lib/acquisition/observations.ts:128` | `canonicalJson` | staging |
+| validate_stage | `src/lib/acquisition/observation-store.ts:60` | `persistSourceObservation` | staging |
+| resolve_identity | `src/lib/acquisition/afl-api-bundle.ts:215` | `parseAflApiIdentities` | nothing |
+| resolve_identity | `src/lib/acquisition/afl-api-rounds.ts:135` | `translateAflRound` | nothing |
+| resolve_identity | `src/lib/acquisition/afl-api-match-resolver.ts:142` | `resolveAflApiMatch` | nothing |
+| resolve_identity | `src/lib/acquisition/afl-api-player-resolver.ts:59` | `resolveAflApiPlayer` | nothing |
+| resolve_identity | `src/lib/acquisition/afl-api-fixture-identity.ts:294` | `resolveAflApiMatchViaFixtureObservation` | nothing |
+| resolve_identity | `packages/acquisition/src/fixture-contract.ts:112` | `classifyAflApiFixtureStatus` | nothing |
+| resolve_identity | `packages/acquisition/src/fixture-contract.ts:230` | `evaluateAflApiFixtureProjection` | nothing |
+| resolve_identity | `packages/acquisition/src/fixture-contract.ts:479` | `detectAflApiFixtureCollisions` | nothing |
+| reconcile | `src/lib/acquisition/reconciliation.ts:467` | `reconcile` | nothing |
+| reconcile | `src/lib/acquisition/afl-api-settle-plan.ts:520` | `planAflApiMatchUnit` | nothing |
+| reconcile | `src/lib/acquisition/afl-api-brownlow.ts:1360` | `reconcileAflApiBrownlowSeason` | nothing |
+| reconcile | `packages/acquisition/src/reconciliation-report.ts:136` | `buildAflApiReconciliationReport` | nothing |
+| reconcile | `packages/acquisition/src/reconciliation-report.ts:248` | `validateAflApiReconciliationReport` | nothing |
+| promote | `tools/current-season/settle-afl-api.ts:123` | `loadAflApiSettleBundle` | canonical |
+| promote | `tools/current-season/settle-afl-api.ts:225` | `runAflApiSettleCli` | canonical |
+| promote | `tools/current-season/settle-season-seal.ts:30` | `refuseSealedSeasonForSettle` | canonical |
+| promote | `packages/domain/src/season-seal.ts:122` | `evaluateSeasonWrite` | canonical |
+| promote | `packages/domain/src/season-seal.ts:168` | `assertSeasonWritable` | canonical |
+| promote | `src/lib/acquisition/settle-core.ts:392` | `acquireSettlePromotionGate` | canonical |
+| promote | `src/lib/acquisition/settle-afl-api.ts:1973` | `runSettleAflApi` | canonical |
+| promote | `src/lib/acquisition/settle-afl-api.ts:1969` | `normaliseAflApiCountersAfterFullRollback` | canonical |
+| promote | `src/lib/acquisition/afl-api-brownlow.ts:1415` | `runSettleAflApiBrownlow` | canonical |
+| promote | `src/lib/acquisition/canonical-apply.ts:1041` | `applyCanonicalUnit` | canonical |
+| derive | `src/lib/acquisition/settle-core.ts:297` | `runDerivedRecomputeWithDeadlockRetry` | derived |
+| derive | `src/db/queries/player-derived.ts:46` | `recomputePlayerDerivedStats` | derived |
+| derive | `src/db/queries/player-derived.ts:435` | `recomputeClubSeasons` | derived |
+| derive | `src/db/queries/player-derived.ts:537` | `recomputeSeasonMetadata` | derived |
+| derive | `src/db/queries/player-derived.ts:383` | `recomputeSeasonBrownlowStatus` | derived |
+| derive | `src/db/queries/player-derived.ts:678` | `recomputeBrownlowCoverage` | derived |
+<!-- stage-map:end -->

@@ -23,7 +23,8 @@ authorised run produces one, a content-free manifest of it.
 - **The AFL API does not redefine it.** API coverage is approximately 2012-2026 by season
   registry and detailed verified contracts only for about 2022-2026 (owner instruction, "Treat API coverage
   honestly"). A sealed season's rows stay authoritative whether or not the API can reproduce
-  them; Stage 4's coverage registry (plan D11) will label each season and family
+  them; the coverage registry (plan D11, delivered in Stage 3: `docs/v2/coverage-matrix.md`,
+  generated from `packages/domain/src/coverage-registry.ts`) labels each season and family
   (`api_verified`, `api_partial`, `historical_baseline`, `manual_curated`, `unsupported`), and
   no season is labelled rebuildable without evidence.
 
@@ -45,10 +46,12 @@ Anything else that changes a sealed row (a bulk reload, an ad hoc SQL fix, a res
 wrong dump) is a **violation**, even if the new value is right: it must be reconciled (section
 5) and re-applied through a workflow above.
 
-The seal is currently **detected, not enforced** (V2-GAP-006): no constraint or trigger stops a
-writer from touching a sealed season. Stage 3 must make the V2 AFL API promotion refuse a
-sealed season unless it is invoked as a correction; until then, the manifest comparison is the
-control.
+Stage 3 enforces the seal at the AFL API settle entry points: the three settle CLIs refuse a
+sealed season in every writing mode before opening a database client
+(`packages/domain/src/season-seal.ts`, `tools/current-season/settle-season-seal.ts`). No
+constraint or trigger stops other writers (V2-GAP-006, narrowed); for them the manifest
+comparison remains the control. Settle is never a correction workflow: the refusal points at the
+audited workflows in the table above.
 
 ## 3. Out of scope, and why
 

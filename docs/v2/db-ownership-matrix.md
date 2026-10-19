@@ -41,7 +41,7 @@ writers are re-derived in Stage 4 from `docs/v2/inventory.md` and the code.
 | Player links | `player_link_suggestions`, `player_link_resolutions`, `player_link_match_candidates` | `@afldb/admin` | 056, 067 |
 | Lists, drafts, leadership, coaching | `draft_picks`, `father_son_selections`, `season_list_members`, `captaincies`, `club_leadership`, `coaches`, `match_coaches` | `@afldb/admin` (curated) | historical rows from offline loaders (legacy) |
 | Special records | `player_achievements`, `after_siren_kicks` | `@afldb/admin` | 053, 089, 102 |
-| Fixtures | `fixtures` | `@afldb/acquisition` (AFL API fixture); `@afldb/admin` (corrections) | 097 |
+| Fixtures | `fixtures` | `@afldb/acquisition` (AFL API fixture, **not built**: V2-GAP-008); `@afldb/admin` (corrections) | 097; the only writers today are the admin fixture editor and offline loaders; the V2 fixture contract (`packages/acquisition/src/fixture-contract.ts`) refuses but writes nothing |
 | Admin audit and overrides | `data_edits`, `data_overrides`, `data_submissions`, `data_submission_rows` | `@afldb/admin` | 057, 073, 023 |
 | Derived | `player_club_season_stats`, `player_career_stats`, `player_clubs`, `derived_rebuilds`, `stat_availability`, `stat_definitions` | `@afldb/derived` (`stat_*` reference: `@afldb/db`) | 007, 015 |
 | External grids | `external_grids`, `external_grid_axes`, `external_grid_sources` | apps/web (Grid Solver) | 080 |
@@ -49,6 +49,23 @@ writers are re-derived in Stage 4 from `docs/v2/inventory.md` and the code.
 | NL search telemetry | `nl_search_log`, `nl_search_feedback`, `nl_search_review` | apps/web | operational |
 | Privilege registries | `afldb_meta.app_readable_tables`, `afldb_meta.import_writable_tables` | `@afldb/db` (migrations only) | 039, 045; never written by hand |
 | AFLW | `staging_aflw.*` (8 tables), `aflw.*` (12 views) | unchanged, outside V2 scope | `tools/aflw/`, `docs/aflw.md`; V2-GAP-005 |
+
+## Acquisition-owned tables as implemented (Stage 3)
+
+Re-derived from the code in Stage 3 (`.phaneslight/returns/launchB-20261019/04-mechanic-settle-promotion.md`,
+re-verified for the cited lines). Every AFL API write happens inside a settle transaction opened by
+one of three entry points; each opens with an `import_batches` row.
+
+| Entry point (CLI → library) | Tables written | Season gate |
+|---|---|---|
+| `tools/current-season/settle-afl-api.ts` → `runSettleAflApi` (`src/lib/acquisition/settle-afl-api.ts`) | `import_batches`, `staging.source_payloads/_record_versions/_records`, `staging.afl_api_match`, `staging.afl_api_player_match`, `promotion_candidates`, `import_rejections`, `data_issues`; with `--auto-apply`: `matches`, `match_period_scores`, `player_match_stats`, `canonical_applications` (via `applyCanonicalUnit`) and the attendance enrichment; derived recompute (`runDerivedRecomputeWithDeadlockRetry`) | sealed season refused by the CLI before any client (Stage 3); canonical targets also need `season_not_in_progress` to pass (`canonical-apply.ts`) |
+| `tools/current-season/settle-afl-api-fixtures.ts` → `persistAflApiFixtureObservations` | `import_batches`, observation spine only | sealed season refused by the CLI (Stage 3) |
+| `tools/current-season/settle-afl-api-brownlow.ts` → `runSettleAflApiBrownlow` (`afl-api-brownlow.ts`) | `import_batches`, observation spine, `staging.afl_api_brownlow_vote`, `brownlow_round_votes` + `canonical_applications` (via `applyCanonicalUnit`), Brownlow coverage recompute | sealed season refused by the CLI unless the live `afldb_test` backtest proof passes (Stage 3); canonical gate as above |
+
+The acquire tools (`tools/current-season/acquire-afl-api*.ts`) write snapshot files only and
+import no writer module (`tests/v2-acquisition-pipeline.test.ts`). Identity rows in
+`external_identities` for `afl_api` are written only by the bridge importer, the admin
+adjudication path and the audited correction/replay CLIs (`tools/migration/`), never by a settle.
 
 ## Open for Stage 4
 
