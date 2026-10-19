@@ -37,21 +37,47 @@ import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from './rook
 const FIXTURES = join(__dirname, 'fixtures', 'gridley');
 
 describe('GAP-029 release policy', () => {
-  it('keeps sourced sibling semantics strict and unapproved, without widening the played-sibling rule', () => {
+  it('accepts only the 21 owner-approved sibling disagreements while retaining every strict finding', () => {
     const evidence = JSON.parse(readFileSync(join(__dirname, '../data/reference/gridley-sibling-eligibility-evidence.json'), 'utf8'));
     expect(evidence.ownerApproved).toBe(false);
     expect(evidence.cells).toHaveLength(21);
     const base = { ...evidence.cells[0], profile: evidence.profile, gridleyPlayerId: 3746,
       inGridley: true, inAfldb: false, lackingBuilders: ['has_brother'] };
-    expect(siblingCriterionDisagreement(base)).toContain('unapproved criterion disagreement');
+    expect(siblingCriterionDisagreement(base)).toContain('criterion disagreement');
     for (const changed of [{ board: -1 }, { profile: 'players/X/Other.html' }, { gridleyPlayerId: 1 },
       { inGridley: false }, { inAfldb: true }, { lackingBuilders: ['has_brother', 'played_for_club'] }]) {
       expect(siblingCriterionDisagreement({ ...base, ...changed })).toBeNull();
     }
-    const result = gridleyPolicyResults([{ ...base, category: 'criterion disagreement' }], loadGridleyDeferrals());
+    const policy = loadGridleyDeferrals();
+    const findings = evidence.cells.map((cell: { board: number; cell: string; row: string; col: string }) => ({
+      ...cell, category: 'criterion disagreement', siblingEvidence: { ...base, ...cell },
+    }));
+    const original = JSON.stringify(findings);
+    const result = gridleyPolicyResults(findings, policy);
     expect(result.strictCorpusParity.passed).toBe(false);
-    expect(result.approvedPolicyConformance.passed).toBe(false);
+    expect(result.strictCorpusParity.findings).toBe(21);
+    expect(result.approvedPolicyConformance.passed).toBe(true);
     expect(result.approvedDeferrals).toEqual({ findings: 0, dataMatches: 0 });
+    expect(result.approvedDisagreements).toEqual({ findings: 21, dataMatches: 0 });
+    expect(result.approvedTotal).toEqual({ findings: 21, dataMatches: 0 });
+    expect(JSON.stringify(findings)).toBe(original);
+    for (const changed of [{ board: -1 }, { cell: '0-0' }, { row: 'other' }, { col: 'other' },
+      { profile: 'players/X/Other.html' }, { gridleyPlayerId: 1 }, { inGridley: false },
+      { inAfldb: true }, { lackingBuilders: ['has_brother', 'played_for_club'] }]) {
+      const finding = { ...findings[0], siblingEvidence: { ...base, ...changed } };
+      expect(gridleyPolicyResults([finding], policy).approvedPolicyConformance.unapprovedDifferences).toEqual([finding]);
+    }
+    for (const finding of [{ ...findings[0], category: 'dataset gap' },
+      { ...findings[0], siblingEvidence: undefined }, { ...findings[0], board: -1 }]) {
+      expect(gridleyPolicyResults([finding], policy).approvedPolicyConformance.passed).toBe(false);
+    }
+    expect(gridleyPolicyResults([...findings, findings[0]], policy).approvedPolicyConformance.unapprovedDifferences).toEqual([findings[0]]);
+    const remaining = JSON.parse(readFileSync(join(__dirname, '../docs/v2/evidence/gap-029-evidence-strict-final.json'), 'utf8'))
+      .rawStrictFindings.filter((finding: PolicyFinding) => finding.category !== 'criterion disagreement');
+    const all = gridleyPolicyResults([...remaining, ...findings], policy);
+    expect(all.strictCorpusParity).toEqual({ passed: false, findings: 149 });
+    expect(all.approvedTotal).toEqual({ findings: 99, dataMatches: 0 });
+    expect(all.approvedPolicyConformance.unapprovedDifferences).toHaveLength(50);
   });
   it('bounds the seven retained deferrals to their original 78 cells and keeps strict results', () => {
     const policy = loadGridleyDeferrals();

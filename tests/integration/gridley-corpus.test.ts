@@ -117,6 +117,7 @@ type CellFinding = {
   rowAxis: string;
   colAxis: string;
   detail: string;
+  siblingEvidence?: Parameters<typeof siblingCriterionDisagreement>[0];
 };
 
 const boards: CorpusBoard[] = loadCorpus();
@@ -692,9 +693,11 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         else if (category === 'incorrect known answer' && axisBuilders.includes('has_brother')
                  && ((!inAfldb && lackingIdx.includes(axisBuilders.indexOf('has_brother'))) || (inAfldb && !inGridley && brotherEvidence.has(afldbId)))) {
           if (!inAfldb) {
-            const disagreement = siblingCriterionDisagreement({ ...base, profile: afltablesProfiles.get(afldbId) ?? '',
-              gridleyPlayerId: gid, inGridley, inAfldb, lackingBuilders: lackingIdx.map((i) => axisBuilders[i]) });
+            const siblingEvidence = { ...base, profile: afltablesProfiles.get(afldbId) ?? '',
+              gridleyPlayerId: gid, inGridley, inAfldb, lackingBuilders: lackingIdx.map((i) => axisBuilders[i]) };
+            const disagreement = siblingCriterionDisagreement(siblingEvidence);
             findings.push({ ...base, category: disagreement ? 'criterion disagreement' : 'source coverage gap',
+              ...(disagreement ? { siblingEvidence } : {}),
               detail: `${detail}; ${disagreement ?? 'no canonical brothers row links him to a VFL/AFL player'}` });
           } else {
             findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; canonical brothers row: ${brotherEvidence.get(afldbId)}` });
