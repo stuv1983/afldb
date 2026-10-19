@@ -179,6 +179,29 @@ export type DraftTriageCause =
   /** a builder this triage does not read */
   | 'unassessed';
 
+/**
+ * V2-GAP-029. A `traded_min_times` cell where AFLDB lists a player Gridley omits, because a trade
+ * AFLDB holds happened AFTER the board's frozen date. Gridley's key is frozen at the board date; a
+ * trade completed later cannot be in it, so the omission is correct for that date and AFLDB answers
+ * for today (the `time of board` shape). Derived only from AFLDB's own trusted-linked trade rows
+ * (DraftGuru's trade year is the trade period's year, held in October): the trades completed by the
+ * board date -- any earlier year, or this year once the board date is on or after 1 November --
+ * must be fewer than the threshold while all of the player's trades reach it. No player is named,
+ * no id is read, and the reverse direction (Gridley lists) is never touched.
+ */
+export function tradesAfterBoard(input: {
+  boardDate: string; rows: readonly LinkedDraftRow[]; threshold: number; inGridley: boolean; inAfldb: boolean;
+}): string | null {
+  if (input.inGridley || !input.inAfldb) return null;
+  const trades = input.rows.filter((r) => r.draftKind === 'trade');
+  const completed = (year: number) => input.boardDate >= `${year}-11-01`;
+  const atBoard = trades.filter((r) => completed(r.draftYear)).length;
+  if (atBoard >= input.threshold || trades.length < input.threshold) return null;
+  const later = trades.filter((r) => !completed(r.draftYear));
+  return `trade-dated: Gridley's key is frozen at ${input.boardDate}, when ${atBoard} of the ${trades.length} linked trade(s) `
+    + `were complete (needs ${input.threshold}); the rest were later: ${later.map((r) => `${r.draftYear} trade period${r.club ? ` (${r.club})` : ''}`).join(', ')}`;
+}
+
 export function describeDraftRows(rows: readonly LinkedDraftRow[]): string {
   if (rows.length === 0) return 'no trusted-linked draft row';
   return [...rows]

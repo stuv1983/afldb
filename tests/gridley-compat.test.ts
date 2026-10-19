@@ -27,7 +27,7 @@ import {
 } from '@/search/gridley-compat';
 import {
   buildCriterionListingIndex, buildResolver, criterionListedElsewhere, knownAnswerAdjudication, knownAnswerEvidence, knownAnswerEvidenceStaleness, nationalPickKeyDisagreement,
-  rookieSourceCoverageGap, teammateListMembership, triageDraftFinding, type KnownAnswerFacts, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
+  rookieSourceCoverageGap, teammateListMembership, tradesAfterBoard, triageDraftFinding, type KnownAnswerFacts, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
 } from './gridley-corpus-support';
 import { GRIDLEY_KNOWN_ANSWER_COLUMNS, loadGridleyKnownAnswerAdjudications } from './gridley-known-answer-adjudications';
 import { CAPTAIN_CENSUS, classifyIssue225Cell, ISSUE225_GIDS, issue225Population, TEAMMATE_CENSUS } from './issue225-acceptance';
@@ -428,6 +428,30 @@ describe('Gridley corpus support (AFLDB-ISSUE-222)', () => {
     // His only pick inside 1-10 is that rookie pick 8: not a national pick.
     expect(triageDraftFinding(gwsSamReid, top10).cause).toBe('non_national_pick_in_range');
     expect(triageDraftFinding(gwsSamReid, { builder: 'national_draft_pick_between', params: { from: '30', to: '40' } }).cause).toBe('satisfied');
+  });
+
+  it('V2-GAP-029: a trade after the board date explains a traded cell only in the AFLDB-lists direction, and only when the trades completed by the board are too few', () => {
+    // Board 541 (2025-01-07), Western Bulldogs 2020 national pick 1 traded to Gold Coast in the 2025
+    // trade period (confirmed 2025-10-15, westernbulldogs.com.au / goldcoastfc.com.au).
+    const rows: LinkedDraftRow[] = [
+      { draftYear: 2020, draftKind: 'national', pickNumber: 1, club: 'Western Bulldogs' },
+      { draftYear: 2025, draftKind: 'trade', pickNumber: null, club: 'Gold Coast' },
+    ];
+    const base = { rows, threshold: 1, inGridley: false, inAfldb: true };
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07' })).toBe(
+      "trade-dated: Gridley's key is frozen at 2025-01-07, when 0 of the 1 linked trade(s) were complete (needs 1); the rest were later: 2025 trade period (Gold Coast)",
+    );
+    // Once the 2025 trade period is over the key must contain him: a real disagreement again.
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-11-01' })).toBeNull();
+    expect(tradesAfterBoard({ ...base, boardDate: '2026-08-28' })).toBeNull();
+    // Never the reverse direction, and never a player who is not in AFLDB's set.
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', inGridley: true, inAfldb: false })).toBeNull();
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', inGridley: false, inAfldb: false })).toBeNull();
+    // A prior trade already satisfies the threshold at the board date: Gridley's omission is not explained by timing.
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', rows: [{ draftYear: 2019, draftKind: 'trade', pickNumber: null, club: 'Essendon' }, ...rows] })).toBeNull();
+    // A threshold the player's trades never reach is not a timing matter either, and a draft pick is not a trade.
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', threshold: 2 })).toBeNull();
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', rows: rows.slice(0, 1) })).toBeNull();
   });
 
   it('D1 (§11.19.12): the national-pick key disagreement fires only for a non-national pick inside a national range', () => {

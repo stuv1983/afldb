@@ -56,7 +56,7 @@ import { type GridAxisState } from '@/search/grid-solver-spec';
 import { loadAnswers, loadCorpus, type CorpusBoard } from '../gridley-compat.test';
 import {
   buildCoachResolver, buildCriterionListingIndex, buildResolver, CLUB_COUNT_BUILDER, criterionListedElsewhere, knownAnswerAdjudication,
-  knownAnswerEvidenceStaleness, LIST_MEMBERSHIP_LACKING_BUILDER, nationalPickKeyDisagreement, playerRegisterHorizon, type CoachRow, rookieSourceCoverageGap, teammateListMembership, triageDraftFinding, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
+  knownAnswerEvidenceStaleness, LIST_MEMBERSHIP_LACKING_BUILDER, nationalPickKeyDisagreement, playerRegisterHorizon, type CoachRow, rookieSourceCoverageGap, teammateListMembership, tradesAfterBoard, triageDraftFinding, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
 } from '../gridley-corpus-support';
 import { loadGridleyKnownAnswerAdjudications } from '../gridley-known-answer-adjudications';
 import { adjudicationStaleness, loadHeightAdjudications, type HeightAdjudication } from '../height-adjudications';
@@ -630,8 +630,20 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
             inGridley, inAfldb, gridleyListsElsewhere: (criterion) => criterionListedElsewhere(criterionListing, gid, criterion, board.board, cell),
           })
           : null;
+        // V2-GAP-029: a traded cell whose qualifying trade post-dates the board (tests/gridley-corpus-support.ts).
+        const tradedIdx = axisBuilders.indexOf('traded_min_times');
+        const tradedMapping = tradedIdx >= 0 ? [rowRec, colRec][tradedIdx].mapping : null;
+        const tradeDated = tradedMapping?.status === 'mapped'
+          ? tradesAfterBoard({
+            boardDate: board.date, rows: linkedDraftRows.get(afldbId) ?? [], threshold: Number(tradedMapping.axis.params.times), inGridley, inAfldb,
+          })
+          : null;
         let category: CellFinding['category'] = 'incorrect known answer';
         if (partial) category = 'partial dataset';
+        else if (tradeDated !== null && !(finalSeason === null || finalSeason >= boardYear || boardYear > gaps.maxSeason || inductedAfterBoard)) {
+          findings.push({ ...base, category: 'time of board', detail: `${detail}; ${tradeDated}` });
+          continue;
+        }
         else if (finalSeason === null || finalSeason >= boardYear || boardYear > gaps.maxSeason || inductedAfterBoard) category = 'time of board';
         // ISSUE-118 Stage E2: coached_by is the same shape. Gridley's "has played on a
         // team coached by X" counts a player listed by the club in a season X coached a
