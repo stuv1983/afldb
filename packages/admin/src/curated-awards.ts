@@ -12,6 +12,10 @@
  *     through an INJECTED port (production: the existing `insertAwardWinner`, see
  *     src/db/queries/award-proposals.ts) and records the canonical row's durable key; any failure
  *     rolls the whole thing back, so a partial promotion is impossible;
+ *   - `approveProposal` writes award_winners, a historical table, so it consults the season seal
+ *     (`evaluateSeasonWrite`, workflow `curated_award_approval`) before promoting: a sealed season
+ *     needs a decision note of 20..2000 characters (the ledger row is the audit), else it is refused
+ *     with `season_sealed_correction_invalid` and nothing is written;
  *   - a correction is a new revision (`reviseProposal`); the earlier revision becomes
  *     `superseded` and is never otherwise edited.
  *
@@ -23,6 +27,7 @@
  * positional parameter.
  */
 import type { SqlExecutor, TransactionalSqlExecutor } from '@afldb/db';
+import { evaluateSeasonWrite, type SealedSeasons } from '@afldb/domain';
 
 import {
   CuratedAwardError,
@@ -514,12 +519,27 @@ export async function validateProposal(
 // approve
 // ---------------------------------------------------------------------------
 
-export type ApproveDependencies = { promotion: AwardPromotionPort };
+export type ApproveDependencies = {
+  promotion: AwardPromotionPort;
+  /**
+   * REQUIRED: the sealed-season range, built by the caller from data/reference/seasons.json
+   * (`sealedSeasonsFrom`). The package does no file I/O. An approval into a sealed season is an
+   * audited correction (workflow `curated_award_approval`) and needs a valid decision note.
+   */
+  sealed: SealedSeasons;
+};
 
 /**
  * Approve a `validated` proposal: ONE transaction that re-validates, promotes through the injected
  * port, records the canonical row's durable key and writes the ledger row. Any failure — a stale
  * validation, a refusal by the port, a concurrent change — rolls all of it back.
+ *
+ * `deps.sealed` is the season seal (V2 historical-baseline.md §2): after the re-validation and BEFORE
+ * the port is called, `evaluateSeasonWrite` decides whether the proposal's season may be written.
+ * An open season proceeds as before; a sealed season proceeds only as an audited correction
+ * (workflow `curated_award_approval`, the approver as actor, the decision note as the reason, the
+ * proposal as evidence), which needs a note of 20..2000 characters. Otherwise it is refused with
+ * `season_sealed_correction_invalid`, and nothing is written.
  */
 export async function approveProposal(
   viewer: CuratedAwardsViewer,
@@ -553,6 +573,22 @@ export async function approveProposal(
     const playerId = facts.playerIds?.[0];
     if (awardId === undefined || playerId === undefined) {
       throw new CuratedAwardError('stale_validation', 'The proposal no longer resolves to an award and a player.');
+    }
+
+    // The seal: award_winners is historical. Decided before the port is called, inside the
+    // transaction, so a refusal rolls back with no status change, no ledger row and no winner.
+    const sealDecision = evaluateSeasonWrite({
+      season: proposal.season,
+      sealed: deps.sealed,
+      correction: {
+        workflow: 'curated_award_approval',
+        actorUserId: viewer.userId,
+        note: note ?? '',
+        evidenceRef: `award_proposals:${proposalId}`,
+      },
+    });
+    if (!sealDecision.allowed) {
+      throw new CuratedAwardError('season_sealed_correction_invalid', sealDecision.message);
     }
 
     const promotion = await deps.promotion.promote(tx, {

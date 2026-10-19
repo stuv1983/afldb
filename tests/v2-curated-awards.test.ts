@@ -55,6 +55,7 @@ import {
   type SqlExecutor,
   type TransactionalSqlExecutor,
 } from '@afldb/db';
+import { sealedSeasonsFrom } from '@afldb/domain';
 
 import { awardWinnerPromotionPort } from '@/db/queries/award-proposals';
 import { insertAwardWinner } from '@/db/queries/admin-awards';
@@ -67,6 +68,10 @@ const TODAY = '2026-10-19';
 const NOW = () => new Date('2026-10-19T12:00:00Z');
 const OPTIONS = { now: NOW };
 const ID_ONE = 'afltables:players/s/synthetic_one.html';
+// SYNTHETIC sealed range 1897-1899: the fixtures' seasons (1990, 1991) are OPEN under it, so the
+// existing approve tests keep exercising the pre-seal behaviour. The seal tests use the real registry.
+const SYNTHETIC_OPEN = { from: 1897, through: 1899, open: [] as number[] };
+const REAL_SEALED = sealedSeasonsFrom(JSON.parse(readFileSync(join(process.cwd(), 'data', 'reference', 'seasons.json'), 'utf8')));
 
 const SUPER: CuratedAwardsViewer = { role: 'super_admin', canManageAdmins: true, userId: 1 };
 const ADMIN: CuratedAwardsViewer = { role: 'admin', canManageAdmins: false, userId: 2 };
@@ -313,7 +318,7 @@ describe('services: role refusal happens before any SQL', () => {
     ['createProposal', (v, f) => createProposal(v, f.executor, input(), OPTIONS)],
     ['createProposalsFromFile', (v, f) => createProposalsFromFile(v, f.executor, { text: '{}', format: 'json' }, OPTIONS)],
     ['validateProposal', (v, f) => validateProposal(v, f.executor, { proposalId: 10 }, OPTIONS)],
-    ['approveProposal', (v, f) => approveProposal(v, f.executor, { proposalId: 10 }, { promotion: okPromotion() }, OPTIONS)],
+    ['approveProposal', (v, f) => approveProposal(v, f.executor, { proposalId: 10 }, { promotion: okPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS)],
     ['rejectProposal', (v, f) => rejectProposal(v, f.executor, { proposalId: 10, decisionNote: 'a sufficient reason' })],
     ['reviseProposal', (v, f) => reviseProposal(v, f.executor, { proposalId: 10, changes: { season: 1991 } }, OPTIONS)],
   ];
@@ -389,7 +394,7 @@ describe('services: exactly one ledger row per transition, inside its transactio
   it('approve: re-validates, promotes once, one status update, one ledger row, committed', async () => {
     const fake = makeFake();
     const promotion = okPromotion();
-    const result = await approveProposal(SUPER, fake.executor, { proposalId: 10, decisionNote: 'checked' }, { promotion }, OPTIONS);
+    const result = await approveProposal(SUPER, fake.executor, { proposalId: 10, decisionNote: 'checked' }, { promotion, sealed: SYNTHETIC_OPEN }, OPTIONS);
     expect(result.promotion.entityKey).toBe('manual_admin_edit:synthetic-key');
     expect(fake.events).toEqual(['begin', 'commit']);
     expect(promotion.promote).toHaveBeenCalledTimes(1);
@@ -409,7 +414,7 @@ describe('services: exactly one ledger row per transition, inside its transactio
   it('APPROVE ROLLBACK: a throwing promotion port rolls back; no status update, no ledger row, no commit', async () => {
     const fake = makeFake();
     const promotion: AwardPromotionPort = { promote: vi.fn(async () => { throw new Error('promotion exploded'); }) };
-    await expect(approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion }, OPTIONS)).rejects.toThrow('promotion exploded');
+    await expect(approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion, sealed: SYNTHETIC_OPEN }, OPTIONS)).rejects.toThrow('promotion exploded');
     expect(fake.events).toEqual(['begin', 'rollback']);
     expect(fake.events).not.toContain('commit');
     expect(fake.statusUpdates()).toEqual([]);
@@ -421,7 +426,7 @@ describe('services: exactly one ledger row per transition, inside its transactio
     const promotion: AwardPromotionPort = {
       promote: vi.fn(async () => { throw new CuratedAwardError('promotion_refused', 'validation: refused'); }),
     };
-    await expect(approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion }, OPTIONS)).rejects.toMatchObject({ code: 'promotion_refused' });
+    await expect(approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion, sealed: SYNTHETIC_OPEN }, OPTIONS)).rejects.toMatchObject({ code: 'promotion_refused' });
     expect(fake.events).toEqual(['begin', 'rollback']);
     expect(fake.ledgerInserts()).toEqual([]);
   });
@@ -429,7 +434,7 @@ describe('services: exactly one ledger row per transition, inside its transactio
   it('approve refuses a stale validation without promoting or writing', async () => {
     const fake = makeFake({ activeWinners: [5] });
     const promotion = okPromotion();
-    await expect(approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion }, OPTIONS)).rejects.toMatchObject({ code: 'stale_validation' });
+    await expect(approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion, sealed: SYNTHETIC_OPEN }, OPTIONS)).rejects.toMatchObject({ code: 'stale_validation' });
     expect(promotion.promote).not.toHaveBeenCalled();
     expect(fake.events).toEqual(['begin', 'rollback']);
     expect(fake.statusUpdates()).toEqual([]);
@@ -439,14 +444,91 @@ describe('services: exactly one ledger row per transition, inside its transactio
   it('approve refuses a proposal that is not validated, and an unnoted Wikipedia approval', async () => {
     for (const status of ['proposed', 'validation_failed', 'approved', 'rejected', 'superseded']) {
       const fake = makeFake({ row: { status } });
-      await expect(approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion: okPromotion() }, OPTIONS))
+      await expect(approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion: okPromotion(), sealed: SYNTHETIC_OPEN }, OPTIONS))
         .rejects.toMatchObject({ code: 'illegal_transition' });
       expect(fake.ledgerInserts()).toEqual([]);
     }
     const wiki = makeFake({ row: { sourceKind: 'wikipedia_offline_file', sourceUrl: 'https://en.wikipedia.org/wiki/X' } });
     const promotion = okPromotion();
-    await expect(approveProposal(SUPER, wiki.executor, { proposalId: 10 }, { promotion }, OPTIONS)).rejects.toMatchObject({ code: 'note_required' });
+    await expect(approveProposal(SUPER, wiki.executor, { proposalId: 10 }, { promotion, sealed: SYNTHETIC_OPEN }, OPTIONS)).rejects.toMatchObject({ code: 'note_required' });
     expect(promotion.promote).not.toHaveBeenCalled();
+  });
+
+  // The season seal (docs/v2/historical-baseline.md §2, workflow `curated_award_approval`). The fixture
+  // proposal is for season 1990: SEALED under the real registry, OPEN under SYNTHETIC_OPEN.
+  describe('approve: the season seal', () => {
+    const LONG_NOTE = 'Checked against the club annual report and the AFL Record.';
+
+    it('the real registry seals the fixture season (so these cases really are sealed)', () => {
+      expect(REAL_SEALED.from).toBeLessThanOrEqual(1990);
+      expect(REAL_SEALED.through).toBeGreaterThanOrEqual(1990);
+      expect(REAL_SEALED.open).not.toContain(1990);
+    });
+
+    it.each([
+      ['no note', undefined],
+      ['a null note', null],
+      ['a short note', 'checked'],
+      ['a note that is short after trimming', `   ${'x'.repeat(10)}   `],
+    ])('a sealed season with %s is refused before the port is called, with zero writes', async (_name, decisionNote) => {
+      const fake = makeFake();
+      const promotion = okPromotion();
+      const error = await approveProposal(
+        SUPER, fake.executor, { proposalId: 10, decisionNote }, { promotion, sealed: REAL_SEALED }, OPTIONS,
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CuratedAwardError);
+      expect(error).toMatchObject({ code: 'season_sealed_correction_invalid' });
+      expect((error as CuratedAwardError).message).toContain('season 1990 is sealed');
+      expect((error as CuratedAwardError).message).toContain('note must be 20-2000 characters');
+      expect(promotion.promote).not.toHaveBeenCalled();
+      expect(fake.events).toEqual(['begin', 'rollback']);
+      expect(fake.statusUpdates()).toEqual([]);
+      expect(fake.ledgerInserts()).toEqual([]);
+    });
+
+    it('a sealed season with a valid note is approved: promoted once, one status update, one ledger row carrying the note', async () => {
+      const fake = makeFake();
+      const promotion = okPromotion();
+      const result = await approveProposal(
+        SUPER, fake.executor, { proposalId: 10, decisionNote: LONG_NOTE }, { promotion, sealed: REAL_SEALED }, OPTIONS,
+      );
+      expect(result.proposal.id).toBe(10);
+      expect(fake.events).toEqual(['begin', 'commit']);
+      expect(promotion.promote).toHaveBeenCalledTimes(1);
+      expect(promotion.promote.mock.calls[0][1]).toMatchObject({ season: 1990, adminUserId: 1, adminNote: LONG_NOTE });
+      expect(fake.statusUpdates()).toHaveLength(1);
+      expect(fake.ledgerInserts()).toHaveLength(1);
+      expect(fake.ledgerInserts()[0].params.slice(1, 5)).toEqual(['approve', 'validated', 'approved', 1]);
+      expect(fake.ledgerInserts()[0].params[7]).toBe(LONG_NOTE);
+    });
+
+    it('an open season needs no note: approved exactly as before the seal existed', async () => {
+      const fake = makeFake();
+      const promotion = okPromotion();
+      await approveProposal(SUPER, fake.executor, { proposalId: 10 }, { promotion, sealed: SYNTHETIC_OPEN }, OPTIONS);
+      expect(fake.events).toEqual(['begin', 'commit']);
+      expect(promotion.promote).toHaveBeenCalledTimes(1);
+      expect(fake.ledgerInserts()).toHaveLength(1);
+      expect(fake.ledgerInserts()[0].params[7]).toBeNull();
+    });
+
+    it('the rules compose: a Wikipedia proposal in a sealed season needs the verification note, and a long one passes both', async () => {
+      const overrides = { sourceKind: 'wikipedia_offline_file', sourceUrl: 'https://en.wikipedia.org/wiki/X' };
+      const refused = makeFake({ row: overrides });
+      const refusedPromotion = okPromotion();
+      await expect(approveProposal(
+        SUPER, refused.executor, { proposalId: 10, decisionNote: 'looks right' }, { promotion: refusedPromotion, sealed: REAL_SEALED }, OPTIONS,
+      )).rejects.toMatchObject({ code: 'note_required' });
+      expect(refusedPromotion.promote).not.toHaveBeenCalled();
+
+      const approved = makeFake({ row: overrides });
+      const promotion = okPromotion();
+      await approveProposal(
+        SUPER, approved.executor, { proposalId: 10, decisionNote: LONG_NOTE }, { promotion, sealed: REAL_SEALED }, OPTIONS,
+      );
+      expect(promotion.promote).toHaveBeenCalledTimes(1);
+      expect(approved.ledgerInserts()).toHaveLength(1);
+    });
   });
 
   it('reject: one status update and one ledger row carrying the reason', async () => {
@@ -739,7 +821,8 @@ describe('static proofs', () => {
   const MODULES: [string, readonly string[]][] = [
     ['packages/admin/src/curated-awards-model.ts', ['@/lib/auth/capabilities']],
     ['packages/admin/src/curated-awards-file.ts', ['./curated-awards-model']],
-    ['packages/admin/src/curated-awards.ts', ['@afldb/db', './curated-awards-model', './curated-awards-file']],
+    // '@afldb/domain' is the pure season-seal decision (no I/O, no network); added with the seal check.
+    ['packages/admin/src/curated-awards.ts', ['@afldb/db', '@afldb/domain', './curated-awards-model', './curated-awards-file']],
     ['packages/db/src/sql-executor.ts', ['postgres']],
     ['packages/testing/src/pglite.ts', ['@afldb/db', '@electric-sql/pglite']],
   ];

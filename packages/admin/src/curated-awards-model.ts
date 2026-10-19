@@ -59,6 +59,7 @@ export type CuratedAwardErrorCode =
   | 'stale_validation'
   | 'concurrent_modification'
   | 'approved_revision_unsupported'
+  | 'season_sealed_correction_invalid'
   | 'promotion_refused';
 
 /** Every refusal the services raise. `code` is the contract; `message` is for people. */

@@ -103,6 +103,22 @@ with the proposal's status and ledger row. The proposal id, key, revision and ev
 the `data_edits` row (`auditExtra`). `@afldb/admin` never imports that module (it is server-only and
 reaches `src/db/client.ts`).
 
+**The season seal.** `award_winners` is a historical table (`HISTORICAL_TABLES`) and almost every
+curated award targets a sealed season, so the approval consults the V2 season seal
+(`evaluateSeasonWrite`, `packages/domain/src/season-seal.ts`) inside its transaction, after the row
+lock and re-validation and **before** the promotion port is called. The caller supplies the sealed
+range as the required `ApproveDependencies.sealed` (`SealedSeasons`); the package does no file I/O.
+The correction passed to the seal is workflow `curated_award_approval` (a new member of
+`AUDITED_CORRECTION_WORKFLOWS`, with its own row in `docs/v2/historical-baseline.md` §2), actor = the
+approving user, note = the decision note, evidence = `award_proposals:<id>`. An open season proceeds
+as before. A sealed season proceeds only with a decision note of 20..2000 characters after trimming;
+otherwise the approval is refused with the typed code `season_sealed_correction_invalid` (carrying the
+seal's message), the transaction rolls back, and there is no status change, no ledger row and no
+winner. The audit record is the append-only `award_proposal_decisions` row the same transaction writes
+(it already records the actor, the note and the proposal id); migration 111 and every table are
+unchanged. The seal rule composes with the Wikipedia rule below: both notes are the same field, so a
+Wikipedia proposal into a sealed season is bound by both.
+
 Approving `wikipedia_offline_file` input additionally needs a decision note of at least 20 characters
 recording the independent verification: Wikipedia is never self-certifying and nothing approves it
 automatically. **No four-eyes rule is enforced**: a `data.awards.edit` holder may approve a proposal
@@ -188,6 +204,12 @@ the server-described type and would double-encode it).
   `withAwardProposalExecutor` and `awardWinnerPromotionPort`; guard each with
   `requireCapability('data.awards.edit' | 'data.awards.read')`, and pass the acting user's
   `auth_users.id` as `CuratedAwardsViewer.userId`.
+- Supply `ApproveDependencies.sealed` on every `approveProposal` call: build it with
+  `sealedSeasonsFrom` (`@afldb/domain`) from `data/reference/seasons.json` (the settle CLIs already do
+  this with `loadSealedSeasonsFor` in `tools/current-season/settle-season-seal.ts`). The approval
+  form must ask for the decision note whenever the proposal's season is sealed (20..2000 characters)
+  and surface `season_sealed_correction_invalid` as a field error. No production caller of
+  `approveProposal` exists yet, so nothing is wired in this stage.
 - Server actions must export functions only (a `'use server'` module exporting a const array 500s) and
   must **not** call `revalidatePath` (it hangs the client): revalidate from the route.
 - Manual entry resolves the picked player to the durable identity string server-side with

@@ -42,6 +42,7 @@ append-only audit row in the same transaction (`docs/v2/provenance.md` §4-5):
 | Brownlow authority and vote entry | `brownlow_season_authority`, `brownlow_vote_entry_state` (094), audited in `data_edits` |
 | user-submitted CSV correction, promoted by an admin | `data_submissions`, `data_submission_rows` (023) |
 | publication of a derived award result (Coleman Medal), by the V2 Coleman publisher (super admin, `data.awards.edit`) | `derived_award_results` (112): append-only, the season seal's audit record in `correction` (workflow `derived_award_publication`), a recompute after a corrected fact is a NEW row whose `supersedes_id` names the old |
+| approval of a curated award proposal into `award_winners`, by `@afldb/admin` `approveProposal` through `insertAwardWinner` (super admin, `data.awards.edit`) | `award_proposal_decisions` (111): append-only ledger row (actor, note, proposal id) written in the same transaction; the season seal's correction names workflow `curated_award_approval`; a sealed season needs a decision note of 20..2000 characters, an open season does not (the Wikipedia 20-character note rule still applies on top); the canonical row also leaves its `data_overrides` and `data_edits` rows |
 
 Anything else that changes a sealed row (a bulk reload, an ad hoc SQL fix, a restore from the
 wrong dump) is a **violation**, even if the new value is right: it must be reconciled (section
