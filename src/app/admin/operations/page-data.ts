@@ -86,6 +86,21 @@ const defaultDeps: PageDeps = {
 
 const resolve = (deps?: Partial<PageDeps>): PageDeps => ({ ...defaultDeps, ...deps });
 
+/**
+ * Launch F: the AFL Tables settle is retired in V2, so the trigger library's "install the polkit
+ * rule" sentence is the wrong advice here; an unconfigured trigger (`configured: false` from
+ * readSettleRunStatus) is the retired state.
+ */
+export const AFL_TABLES_UNIT_NOT_READ =
+  'Not read here: the on-demand trigger is retired. On the host, '
+  + 'tools/v2/cutover-preflight.ts legacy-writers reports whether the timer can still run.';
+
+export function retiredAflTablesStatus(status: UnitStatusLike & { configured?: boolean }): UnitStatusLike {
+  return status.configured === false && status.unit === null
+    ? { ...status, unitError: AFL_TABLES_UNIT_NOT_READ }
+    : status;
+}
+
 export const COVERAGE_UNAVAILABLE = 'The coverage registry could not be summarised.';
 export const SEASON_REGISTRY_UNAVAILABLE =
   'The season registry (data/reference/seasons.json) could not be read or is not valid. '
@@ -155,7 +170,7 @@ export async function loadOperationsOverview(
       return AFL_API_UNIT_ROWS.map((row) => unitRowView(row.key, row.label, table[row.key]));
     }),
     guarded('AFL Tables run status', RUN_STATUS_UNAVAILABLE, async () => (
-      unitRowView('afltables', 'AFL Tables nightly settle (host timer)', await deps.readAflTablesRun())
+      unitRowView('afltables', 'AFL Tables nightly settle (host timer)', retiredAflTablesStatus(await deps.readAflTablesRun()))
     )),
     canReadAwards
       ? guarded('pending proposal count', READ_UNAVAILABLE, async () => {

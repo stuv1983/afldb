@@ -154,9 +154,9 @@ export const RETIRED_ADMIN_SURFACES: readonly RetiredAdminSurface[] = [
     paths: ['src/app/admin/current-season/actions.ts'],
     exports: ['startSettleRunAction'],
     was: 'started the AFL Tables settle systemd unit on demand',
-    why: 'the AFL Tables settle is retired from the admin surface; the nightly timer on the host stays behind '
-      + 'AFLDB-ISSUE-316 until the owner\'s ISSUE-316 decisions retire it (D-316-1 at C2; the timer is '
-      + 'disabled by C5 under D-316-4); V2 neither starts nor stops it.',
+    why: 'the AFL Tables settle is retired in V2: a V2 checkout refuses it, and the release is refused while '
+      + 'the nightly timer can still run (cutover runbook step 4a; AFLDB-ISSUE-316 C5). V2 itself never '
+      + 'starts or stops the timer.',
     replacedBy: 'the AFL API settle units, shown read-only on /admin/current-season',
     governedBy: ADMIN_GOVERNED_BY,
   },

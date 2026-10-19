@@ -70,13 +70,13 @@ only the variable named by `--dsn-env`.
 
 Use the current production release procedure with the previously deployed commit (`PREV`, recorded
 at the start of the window) as the target: check out `PREV`, `npm ci`, `npm run build`, restart,
-then the health and build-identity checks that procedure requires. Migrations 111/112 can stay in
-place: `PREV` never reads or writes the three tables, and the tables hold no row that `PREV` needs.
+then the health and build-identity checks that procedure requires. Migrations 111-114 can stay in
+place: `PREV` never reads or writes the five tables, and the tables hold no row that `PREV` needs.
 
 ### 4.2 Expected preflight finding with the migrations left in place
 
-With 111/112 applied and `PREV` checked out, a migration-parity comparison reports
-`unknown-applied-migration` for both files (`tools/db/migration-safety.ts:165-169`), which the
+With 111-114 applied and `PREV` checked out, a migration-parity comparison reports
+`unknown-applied-migration` for each of the four files (`tools/db/migration-safety.ts:165-169`), which the
 preflight grades `FAIL` outside inspection mode (`tools/dev/preflight-core.ts:202-205`). Decide in
 advance which applies: record it as the expected exception for this rollback, or run §5 so the
 ledger and the checkout agree again. Do not edit the ledger by hand for any other reason.
@@ -97,7 +97,7 @@ automatically.
 prints what the owner decided; the AFL Tables and AFL API timers are in the state they had before
 the window (V2 never changes them; ISSUE-316 owns them).
 
-## 5. Database reversal of migrations 111 and 112 (data-loss step)
+## 5. Database reversal of migrations 111-114 (data-loss step)
 
 **Consequence, stated plainly: this DISCARDS every curated-award proposal and decision and every
 published derivation record (Coleman), including their audit history.** Approved curated winners
@@ -114,19 +114,11 @@ owner role, from a shell whose DSN comes from the operator's environment file:
 \copy (SELECT * FROM award_proposals ORDER BY id) TO 'v2-award_proposals-<STAMP>.csv' WITH (FORMAT csv, HEADER)
 \copy (SELECT * FROM award_proposal_decisions ORDER BY id) TO 'v2-award_proposal_decisions-<STAMP>.csv' WITH (FORMAT csv, HEADER)
 \copy (SELECT * FROM derived_award_results ORDER BY id) TO 'v2-derived_award_results-<STAMP>.csv' WITH (FORMAT csv, HEADER)
+copy (SELECT * FROM brownlow_eligibility_decisions ORDER BY id) TO 'v2-brownlow_eligibility_decisions-<STAMP>.csv' WITH (FORMAT csv, HEADER)
+copy (SELECT * FROM derived_award_projections ORDER BY id) TO 'v2-derived_award_projections-<STAMP>.csv' WITH (FORMAT csv, HEADER)
 
--- 2. Reverse, in one transaction, in the order the ROLLBACK blocks state.
-BEGIN;
-DROP TABLE IF EXISTS derived_award_results;      -- 112 ROLLBACK block, line 86
-DROP TABLE IF EXISTS award_proposal_decisions;   -- 111 ROLLBACK block, line 95
-DROP TABLE IF EXISTS award_proposals;            -- 111 ROLLBACK block, line 96
--- 3. Remove the two ledger rows so the runner and the preflight agree with the PREV checkout.
---    (Stage 6 addition, plan section 7 R-043: the migrations' own ROLLBACK comments do not
---    mention the ledger; without this step a later V2 deploy would skip 111/112 as "applied"
---    while their tables are gone.)
-DELETE FROM afldb_meta.schema_migrations
- WHERE name IN ('111_curated_award_proposals.sql', '112_derived_award_results.sql');
-COMMIT;
+-- 2. Reverse 111-114 and remove their four ledger rows, in one transaction:
+i docs/v2/rollback-111-114.sql
 ```
 
 Then re-run the PREVIOUS release's `tools/maintenance/privileges.sql` (its revoke loop removes
@@ -141,9 +133,10 @@ Verification gate R5 (read-only):
 ```sql
 SELECT to_regclass('public.award_proposals') AS p,
        to_regclass('public.award_proposal_decisions') AS d,
-       to_regclass('public.derived_award_results') AS r;           -- all three NULL
-SELECT count(*) FROM afldb_meta.schema_migrations
- WHERE name IN ('111_curated_award_proposals.sql', '112_derived_award_results.sql');  -- 0
+       to_regclass('public.derived_award_results') AS r,
+       to_regclass('public.brownlow_eligibility_decisions') AS b,
+       to_regclass('public.derived_award_projections') AS j;       -- all five NULL
+SELECT count(*) FROM afldb_meta.schema_migrations WHERE name ~ '^11[1-4]_';  -- 0
 ```
 
 and the historical manifest of production taken after the reversal compares
@@ -160,6 +153,19 @@ re-run after any restore.
 
 ## 7. Rehearsal status
 
-Every step of §2, §4 and §5 is a step of `docs/v2/shadow-rehearsal.md` on an isolated copy. None
-has been run. The rollback is therefore **untested**, and the production go/no-go treats
-"rollback untested" as a no-go condition until the rehearsal records it (`docs/v2/go-no-go.md`).
+Every step of §2, §4 and §5 is a step of `docs/v2/shadow-rehearsal.md` on an isolated copy.
+
+**Launch F (2026-10-19), isolated PostgreSQL 16 only. These are rehearsal mechanics, not
+production.** §5 was rehearsed with `docs/v2/evidence/launchF/rollback-rehearsal.sh` on two empty
+`afldb_v2_*_test` databases:
+- the runner applied 001-114 and privileges;
+- the five exports and `docs/v2/rollback-111-114.sql` ran (gate R5: all five tables NULL, 0 ledger
+  rows);
+- `pg_dump -s --no-privileges` of the reversed schema is **identical** to 001-110 applied alone;
+- the runner then reported 111-114 pending and re-applied them, and the schema-and-grants dump is
+  **identical** to the first forward (hashes in `docs/v2/evidence/launchF/rollback-dumps.sha256`).
+
+The V2 ledgers were empty when reversed, so data-loss exports were exercised only as commands.
+§2 (the production backup), §4 (redeploying `PREV`) and §6 were **not** rehearsed: §4 needs a
+second checkout and a host, and §2 needs production. The production go/no-go therefore still
+treats the application rollback as untested (`docs/v2/go-no-go.md`).
