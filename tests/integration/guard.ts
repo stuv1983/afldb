@@ -13,6 +13,8 @@
  */
 import postgres from 'postgres';
 
+import { ISOLATED_SERVER_FACTS_SQL, checkIsolatedTestDsn, checkIsolatedTestServer } from '@afldb/domain';
+
 import { validateImportRoleParityDsnTargets } from './import-role-parity';
 
 const testUrl = process.env.AFLDB_TEST_DATABASE_URL;
@@ -59,6 +61,33 @@ if (preflightFailed) {
     + `(host=${host}, port=${port}, database=${database}). `
     + 'Check AFLDB_TEST_DATABASE_URL and any required SSH tunnel.',
   );
+}
+
+// AFLDB V2 Launch F: under tools/v2/isolated-pg.ts (AFLDB_V2_ISOLATED_PG=1) every integration file
+// re-verifies, inside the test process, that the DSN is loopback on the isolated port and that the
+// server is the marked isolated cluster and database. Independent of the runner's own check.
+if (process.env.AFLDB_V2_ISOLATED_PG === '1') {
+  const expectedPort = Number(process.env.AFLDB_V2_ISOLATED_PORT);
+  const findings = checkIsolatedTestDsn(testUrl, expectedPort);
+  if (findings.length === 0) {
+    const factsSql = postgres(testUrl, { connect_timeout: 5, max: 1, onnotice: () => {} });
+    try {
+      const [row] = await factsSql.unsafe(ISOLATED_SERVER_FACTS_SQL);
+      findings.push(...checkIsolatedTestServer(database, {
+        clusterName: row?.cluster_name ?? null,
+        databaseComment: row?.database_comment ?? null,
+        currentDatabase: row?.current_database ?? null,
+      }));
+    } finally {
+      await factsSql.end({ timeout: 5 });
+    }
+  }
+  if (findings.length > 0) {
+    throw new Error(
+      'Isolated test target refused: '
+      + findings.map((f) => `${f.check} (${f.detail})`).join('; '),
+    );
+  }
 }
 
 export {};

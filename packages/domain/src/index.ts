@@ -140,3 +140,17 @@ export {
   type ShadowEnvironmentFinding,
   type ShadowEnvironmentResult,
 } from './shadow-target';
+// @v2-launchF:isolated-test-target
+// The isolated local PostgreSQL target policy: loopback, marked cluster and database only. Pure.
+export {
+  ISOLATED_CLUSTER_NAME,
+  ISOLATED_DATABASE_MARKER,
+  ISOLATED_DATABASE_NAME_PATTERN,
+  ISOLATED_SERVER_FACTS_SQL,
+  LOOPBACK_HOSTS,
+  checkIsolatedTestDsn,
+  checkIsolatedTestServer,
+  isolatedDatabaseOf,
+  type IsolatedServerFacts,
+  type IsolatedTargetFinding,
+} from './isolated-test-target';
