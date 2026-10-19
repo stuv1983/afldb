@@ -40,11 +40,26 @@ describe('AFL home record catalogue against afldb_test', () => {
   });
 
   it('preserves venue counts and NULL attendance semantics', async () => {
+    // Through-2025 MCG totals (AFL Tables full-history-20260902, rebuilt locally).
+    // The earlier pins 3200 / 485 were that history plus the 49 MCG matches (one
+    // finals-series: the 2026-09-04 qualifying/elimination final) played in season
+    // 2026 by the 2026-09-14 snapshot (retained 2026 AFL API feed; V2-GAP-029).
+    // Season-2026-and-later MCG matches are therefore counted independently, so the
+    // same assertion holds for the through-2025 rebuild and for a database that
+    // also holds the live season.
+    const [later] = await sql<{ matches: number; finals: number; grandFinals: number; attendance: number | null }[]>`
+      SELECT count(m.id)::int AS matches,
+             count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
+             count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals",
+             max(m.attendance) AS attendance
+        FROM matches m JOIN venues v ON v.id = m.venue_id
+       WHERE v.canonical_name = 'Melbourne Cricket Ground' AND m.season >= 2026
+    `;
     const cases = [
-      ['venue-most-matches', 3200],
-      ['venue-most-finals', 485],
-      ['venue-most-grand-finals', 119],
-      ['venue-highest-recorded-attendance', 121696],
+      ['venue-most-matches', 3151 + later.matches],
+      ['venue-most-finals', 484 + later.finals],
+      ['venue-most-grand-finals', 119 + later.grandFinals],
+      ['venue-highest-recorded-attendance', Math.max(121696, later.attendance ?? 0)],
     ] as const;
 
     for (const [value, expected] of cases) {

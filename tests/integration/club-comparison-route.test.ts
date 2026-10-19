@@ -10,10 +10,18 @@
  *
  * Nothing here re-proves Stage 1-6 query semantics; those live in
  * tests/integration/club-comparison.test.ts and are untouched. The one
- * statistical value asserted (Adelaide/Brisbane Lions 42 meetings, updated
- * from 41 as `afldb_test` gained one more recorded meeting -- AFLDB-ISSUE-172
- * integration validation) is the runbook witness, used only to show the
- * route loaded real data.
+ * statistical value asserted (Adelaide/Brisbane Lions meetings) is the
+ * runbook witness, used only to show the route loaded real data.
+ *
+ * The witness is scoped, not a bare total. Through season 2025 the pair has
+ * exactly 41 meetings (AFL Tables full-history results.csv, 1997-2025; the
+ * 1991-96 rows are Brisbane Bears, a distinct organisation). Any meeting
+ * from season 2026 on belongs to the live season and is counted from the
+ * database independently of the route. The 2026-09-15 `afldb_test` pin of
+ * 42 was those 41 plus one 2026 meeting (the retained 2026 AFL API feed holds
+ * two: Round 7, 2026-04-26, and a 2026-09-12 Semi Final; which of them that
+ * snapshot held is not recorded -- V2-GAP-029). The through-2025 rebuild
+ * therefore holds 41, and a database with 2026 results holds more.
  */
 import './guard';
 
@@ -30,6 +38,28 @@ import { MEETINGS_PAGE_SIZE } from '@/db/queries/club-comparison';
 afterAll(async () => {
   await sql.end();
 });
+
+/** Adelaide v Brisbane Lions meetings, 1997-2025 (AFL Tables full-history-20260902). */
+const ADELAIDE_BRISBANE_THROUGH_2025 = 41;
+
+/**
+ * Independent of the comparison queries: the pair's matches by organisation
+ * slug, split at the season-2025 boundary.
+ */
+async function adelaideBrisbaneMeetingCounts() {
+  const [row] = await sql<{ through2025: number; from2026: number }[]>`
+    SELECT count(*) FILTER (WHERE m.season <= 2025)::int AS "through2025",
+           count(*) FILTER (WHERE m.season >= 2026)::int AS "from2026"
+      FROM matches m
+      JOIN clubs hc ON hc.id = m.home_club_id
+      JOIN club_organizations ho ON ho.id = hc.organization_id
+      JOIN clubs ac ON ac.id = m.away_club_id
+      JOIN club_organizations ao ON ao.id = ac.organization_id
+     WHERE (ho.slug = 'adelaide' AND ao.slug = 'brisbane-lions')
+        OR (ho.slug = 'brisbane-lions' AND ao.slug = 'adelaide')
+  `;
+  return row;
+}
 
 describe('Stage 7 route state: unselected landing', () => {
   it('renders a landing state and chooses nobody', async () => {
@@ -89,7 +119,9 @@ describe('Stage 7 route state: valid pair', () => {
     expect(state.notices).toEqual([]);
 
     // Real data, not an empty shell.
-    expect(state.data.summary.meetings).toBe(42);
+    const counts = await adelaideBrisbaneMeetingCounts();
+    expect(counts.through2025).toBe(ADELAIDE_BRISBANE_THROUGH_2025);
+    expect(state.data.summary.meetings).toBe(counts.through2025 + counts.from2026);
     expect(state.data.meetings.pageSize).toBe(MEETINGS_PAGE_SIZE);
     expect(state.data.brownlowA).toBeTruthy();
     expect(state.data.decades.length).toBeGreaterThan(0);
@@ -223,7 +255,9 @@ describe('Stage FR-2 route state: era filtering (Club Rivalry Explorer follow-up
     if (state.kind !== 'comparison') throw new Error('pair must resolve');
     expect(state.params.era).toBeNull();
     expect(state.notices.some((n) => n.field === 'era')).toBe(true);
-    expect(state.data.meetings.totalMeetings).toBe(42);
+    const counts = await adelaideBrisbaneMeetingCounts();
+    expect(counts.through2025).toBe(ADELAIDE_BRISBANE_THROUGH_2025);
+    expect(state.data.meetings.totalMeetings).toBe(counts.through2025 + counts.from2026);
   });
 
   it('falls back to all time on an unparsable era, with a notice', async () => {
