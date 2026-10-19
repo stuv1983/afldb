@@ -295,6 +295,25 @@ import {
   REGISTRATION_CREATED_AFLTABLES_IDENTITY_SQL,
 } from '../tools/db/rebuild-test';
 import {
+  ISOLATED_REBUILD_DATABASE,
+  ISOLATED_REBUILD_SPEC,
+  ISOLATED_REBUILD_TARGET,
+  ISOLATED_SERVER_FACTS_COPY_SQL,
+  assertIsolatedTargetLive,
+  assertRebuildTargetName,
+  isIsolatedRebuildName,
+  isolatedRunPort,
+  parseIsolatedServerFacts,
+  rebuildSpecFor,
+  resolveIsolatedTarget,
+  restingDatabaseComment,
+} from '../tools/db/rebuild-test';
+import {
+  clearRebuildMarker as clearIsolatedAwareMarker,
+  setRebuildMarker as setIsolatedAwareMarker,
+} from '../tools/migration/rebuild_afl_api_adjudications';
+import { ISOLATED_CLUSTER_NAME, ISOLATED_DATABASE_MARKER, ISOLATED_SERVER_FACTS_SQL } from '@afldb/domain';
+import {
   CORRECTED_REBUILD_REPLAY,
   reinstateRegistrationsStage,
   verifyBijectionStage,
@@ -11805,5 +11824,118 @@ describe('AFLDB-ISSUE-233 D-233-2 — season-scoped AFL API Brownlow artefacts i
     const preflight = runnerSource.slice(runnerSource.indexOf('export function runPreflight('));
     expect(preflight).toContain('for (const path of brownlowSeasonPreflightFiles())');
     expect(brownlowSeasonValidateArgv()).toEqual([resolvePython(), BROWNLOW_SEASON_LOADER, '--validate-only']);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// V2 Launch F — the isolated-cluster rebuild target (`--target isolated`, tools/v2/isolated-pg.ts)
+// ---------------------------------------------------------------------------------------------
+
+describe('V2 Launch F — the isolated rebuild target', () => {
+  const PORT = '55432';
+  const RUN = { AFLDB_V2_ISOLATED_PG: '1', AFLDB_V2_ISOLATED_PORT: PORT };
+  const dsn = (db: string, host = '127.0.0.1', port = PORT, user = 'afldb_owner') => `postgresql://${user}:pw@${host}:${port}/${db}`;
+  const env = (db = ISOLATED_REBUILD_DATABASE, over: Record<string, string | undefined> = {}) => ({
+    ...RUN, AFLDB_TEST_DATABASE_URL: dsn(db), AFLDB_TEST_IMPORT_DATABASE_URL: dsn(db, '127.0.0.1', PORT, 'afldb_import'), ...over,
+  });
+  const resolveIsolated = (e: Record<string, string | undefined>, ack: string = ISOLATED_REBUILD_DATABASE, extra = {}) =>
+    resolveTarget(e, { target: ISOLATED_REBUILD_TARGET, acknowledgeDestroy: ack, ...extra });
+
+  it('resolves only the acknowledged isolated database, inside an isolated run, over loopback DSNs', () => {
+    const target = resolveIsolated(env());
+    expect(target).toMatchObject({ database: ISOLATED_REBUILD_DATABASE, importIsOwnerSubstitution: false, isolated: { port: 55432 } });
+    expect(rebuildSpecFor(target)).toBe(ISOLATED_REBUILD_SPEC);
+    expect(resolveIsolatedTarget(env(), { acknowledgeDestroy: ISOLATED_REBUILD_DATABASE })).toEqual(target);
+    expect(resolveIsolated(env('afldb_v2_rb_shadow_test'), 'afldb_v2_rb_shadow_test').database).toBe('afldb_v2_rb_shadow_test');
+  });
+
+  it('refuses outside an isolated run, without an acknowledgement, with an owner import DSN or a foreign name', () => {
+    expect(() => resolveIsolated(env(ISOLATED_REBUILD_DATABASE, { AFLDB_V2_ISOLATED_PG: undefined }))).toThrow(/only inside an isolated run/);
+    expect(() => resolveIsolated(env(ISOLATED_REBUILD_DATABASE, { AFLDB_V2_ISOLATED_PORT: '5432' }))).toThrow(/only inside an isolated run/);
+    expect(() => resolveTarget(env(), { target: ISOLATED_REBUILD_TARGET })).toThrow(/needs --acknowledge-destroy/);
+    expect(() => resolveIsolated(env(), ISOLATED_REBUILD_DATABASE, { allowOwnerImportDsn: true })).toThrow(/--allow-owner-import-dsn is refused/);
+    expect(() => resolveIsolated(env('afldb_v2_int_test'), 'afldb_v2_int_test')).toThrow(RebuildRefused);
+    expect(() => resolveIsolated(env('afldb_test'), 'afldb_test')).toThrow(/as an isolated target/);
+    expect(() => resolveIsolated(env('afldb_v2_rb_prod_test'), 'afldb_v2_rb_prod_test')).toThrow(RebuildRefused);
+  });
+
+  it('refuses DSNs that do not name the acknowledged database on the isolated loopback port', () => {
+    const db = ISOLATED_REBUILD_DATABASE;
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_DATABASE_URL: dsn('afldb_v2_rb_other_test') }))).toThrow(/not the acknowledged isolated database/);
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_DATABASE_URL: dsn(db, '10.0.0.5') }))).toThrow(/not an isolated-cluster DSN/);
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_DATABASE_URL: dsn(db, '127.0.0.1', '55433') }))).toThrow(/not an isolated-cluster DSN/);
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_IMPORT_DATABASE_URL: undefined }))).toThrow(/no restricted import credential/);
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_IMPORT_DATABASE_URL: dsn(db, 'localhost', PORT, 'afldb_import') }))).toThrow(/different servers/);
+  });
+
+  it('admits an isolated name only inside an isolated run, and never changes the allowlisted targets', () => {
+    expect(isIsolatedRebuildName(ISOLATED_REBUILD_DATABASE)).toBe(true);
+    expect(isIsolatedRebuildName('afldb_v2_int_test')).toBe(false);
+    expect(isolatedRunPort(RUN)).toBe(55432);
+    expect(isolatedRunPort({ AFLDB_V2_ISOLATED_PG: '1', AFLDB_V2_ISOLATED_PORT: '80' })).toBeNull();
+    expect(() => assertRebuildTargetName(ISOLATED_REBUILD_DATABASE, {})).toThrow(/only explicit rebuild targets/);
+    expect(() => assertRebuildTargetName(ISOLATED_REBUILD_DATABASE, RUN)).not.toThrow();
+    expect(() => assertRebuildTargetName('afldb_test', {})).not.toThrow();
+    expect(restingDatabaseComment(ISOLATED_REBUILD_DATABASE)).toBe(ISOLATED_DATABASE_MARKER);
+    expect(restingDatabaseComment('afldb_test')).toBeNull();
+  });
+
+  it('parses the live server facts strictly', () => {
+    expect(ISOLATED_SERVER_FACTS_COPY_SQL).toBe(`COPY (${ISOLATED_SERVER_FACTS_SQL}) TO STDOUT;\n`);
+    expect(parseIsolatedServerFacts(`${ISOLATED_CLUSTER_NAME}\t${ISOLATED_DATABASE_MARKER}\t${ISOLATED_REBUILD_DATABASE}\n`))
+      .toEqual({ clusterName: ISOLATED_CLUSTER_NAME, databaseComment: ISOLATED_DATABASE_MARKER, currentDatabase: ISOLATED_REBUILD_DATABASE });
+    expect(parseIsolatedServerFacts('main\t\\N\tx\n')).toEqual({ clusterName: 'main', databaseComment: null, currentDatabase: 'x' });
+    expect(() => parseIsolatedServerFacts('')).toThrow(/0 line/);
+    expect(() => parseIsolatedServerFacts('a\tb\n')).toThrow(RebuildRefused);
+  });
+
+  it('proves the live server before ANY stage: a foreign cluster, a missing marker or no check runs nothing', () => {
+    const target = resolveIsolated(env());
+    const facts = { clusterName: ISOLATED_CLUSTER_NAME, databaseComment: ISOLATED_DATABASE_MARKER, currentDatabase: ISOLATED_REBUILD_DATABASE };
+    expect(() => assertIsolatedTargetLive(target, { ...fakeDeps().deps, isolatedServerFacts: () => facts })).not.toThrow();
+    const cases: [string, Deps['isolatedServerFacts']][] = [
+      ['no live check wired', undefined],
+      ['foreign cluster', () => ({ ...facts, clusterName: 'main' })],
+      ['no marker', () => ({ ...facts, databaseComment: null })],
+      ['psql failure', () => { throw new Error('psql exited 2'); }],
+    ];
+    for (const [label, isolatedServerFacts] of cases) {
+      const run = fakeDeps();
+      const stages = planStages(target, fitzroy(), OPTS);
+      expect(() => executeRebuild(stages, target, { ...run.deps, isolatedServerFacts }), label).toThrow(RebuildRefused);
+      expect(run.commands, label).toEqual([]);
+      expect(run.sqlRuns, label).toEqual([]);
+      expect(run.validationRuns, label).toEqual([]);
+    }
+    // A hand-built target carrying an isolated name but not resolved by --target isolated.
+    const handBuilt = { ...target, isolated: undefined };
+    expect(() => assertIsolatedTargetLive(handBuilt, { ...fakeDeps().deps, isolatedServerFacts: () => facts }))
+      .toThrow(/not resolved by --target isolated/);
+  });
+
+  it('the adjudication marker treats the isolated-pg comment as the resting state and restores it', async () => {
+    const saved = { pg: process.env.AFLDB_V2_ISOLATED_PG, port: process.env.AFLDB_V2_ISOLATED_PORT };
+    Object.assign(process.env, RUN);
+    try {
+      let comment: string | null = ISOLATED_DATABASE_MARKER;
+      const statements: string[] = [];
+      const tx = Object.assign(
+        (strings: TemplateStringsArray) => {
+          const text = strings.join('?');
+          if (text.includes('current_database() AS actual')) return Promise.resolve([{ actual: ISOLATED_REBUILD_DATABASE }]);
+          if (text.includes('shobj_description')) return Promise.resolve([{ comment }]);
+          return Promise.resolve([]);
+        },
+        { unsafe: (sql: string) => { statements.push(sql); comment = sql; return Promise.resolve([]); } },
+      ) as never;
+      await setIsolatedAwareMarker(tx, ISOLATED_REBUILD_DATABASE,
+        { capturedAt: '2026-10-19T00:00:00.000Z', payloadSha256: 'a'.repeat(64), fileSha256: 'b'.repeat(64) });
+      expect(statements[0]).toMatch(/^COMMENT ON DATABASE "afldb_v2_hist_test" IS /);
+      await clearIsolatedAwareMarker(tx, ISOLATED_REBUILD_DATABASE);
+      expect(statements.at(-1)).toBe(`COMMENT ON DATABASE "${ISOLATED_REBUILD_DATABASE}" IS '${ISOLATED_DATABASE_MARKER}'`);
+    } finally {
+      if (saved.pg === undefined) delete process.env.AFLDB_V2_ISOLATED_PG; else process.env.AFLDB_V2_ISOLATED_PG = saved.pg;
+      if (saved.port === undefined) delete process.env.AFLDB_V2_ISOLATED_PORT; else process.env.AFLDB_V2_ISOLATED_PORT = saved.port;
+    }
   });
 });

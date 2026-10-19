@@ -76,6 +76,11 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
 import {
+  ISOLATED_DATABASE_MARKER, ISOLATED_SERVER_FACTS_SQL, checkIsolatedTestDsn, checkIsolatedTestServer,
+  type IsolatedServerFacts, type IsolatedTargetFinding,
+} from '@afldb/domain';
+
+import {
   AflApiOwnershipCensusError, CENSUS_MARKER as AFL_API_OWNERSHIP_CENSUS_MARKER,
   buildAflApiOwnershipCensusSql, describeScope, rebuildCensusScope, type CensusScope,
 } from './afl-api-ownership-census';
@@ -138,6 +143,12 @@ export type ResolvedTarget = {
   importDsn: string;
   /** True when importDsn is the owner DSN under an explicit acknowledgement. */
   importIsOwnerSubstitution: boolean;
+  /**
+   * V2 Launch F: set ONLY by resolveIsolatedTarget(), for a database on the isolated local
+   * cluster (tools/v2/isolated-pg.ts). executeRebuild() re-proves the DSNs and the live server
+   * against this before any stage runs.
+   */
+  isolated?: { port: number };
 };
 
 export type FitzroySource = {
@@ -242,6 +253,99 @@ function describeRebuildTargets(): string {
 
 /** Refused by name, whatever the DSN claims. */
 const FORBIDDEN_DATABASES = ['afldb_dev', 'afldb_prod'];
+
+/**
+ * AFLDB V2 Launch F — the ISOLATED rebuild target (docs/v2/isolated-rebuild.md).
+ *
+ *     npx tsx tools/v2/isolated-pg.ts run afldb_v2_hist_test -- \
+ *       node node_modules/tsx/dist/cli.mjs tools/db/rebuild-test.ts \
+ *       --target isolated --acknowledge-destroy afldb_v2_hist_test
+ *
+ * Not an entry in REBUILD_TARGETS: it is a FAMILY of databases on the loopback-only cluster that
+ * tools/v2/isolated-pg.ts provisions, and it is admissible only when every one of these holds:
+ *
+ *   1. `--target isolated` AND `--acknowledge-destroy <name>` — the operator names the database;
+ *      it is never inferred from a DSN;
+ *   2. `AFLDB_V2_ISOLATED_PG=1` and a valid `AFLDB_V2_ISOLATED_PORT` (what `isolated-pg run` sets);
+ *   3. the name is exactly ISOLATED_REBUILD_DATABASE or matches ISOLATED_REBUILD_NAME_PATTERN;
+ *   4. AFLDB_TEST_DATABASE_URL and AFLDB_TEST_IMPORT_DATABASE_URL both name that database on the
+ *      same host and port, and each passes `checkIsolatedTestDsn` (loopback, the isolated port,
+ *      an `afldb_v2_*_test` name, no libpq redirection) as well as every existing DSN refusal;
+ *   5. before ANY stage (so before the census, the capture and the reset), the live server
+ *      passes `checkIsolatedTestServer`: cluster_name `afldb_v2_isolated`, the isolated-pg
+ *      marker comment on the database, and current_database() equal to the name.
+ *
+ * The schema and privilege stages reuse the `test` package scripts, because `isolated-pg run`
+ * points AFLDB_TEST_DATABASE_URL at the verified isolated database and resolveIsolatedTarget()
+ * has proven that variable names the acknowledged one.
+ */
+export const ISOLATED_REBUILD_TARGET = 'isolated';
+export const ISOLATED_REBUILD_DATABASE = 'afldb_v2_hist_test';
+export const ISOLATED_REBUILD_NAME_PATTERN = /^afldb_v2_rb_[a-z0-9_]+_test$/;
+export const ISOLATED_REBUILD_SPEC = {
+  role: 'V2 isolated local rebuild (tools/v2/isolated-pg.ts cluster)',
+  adminEnv: 'AFLDB_TEST_DATABASE_URL',
+  importEnv: 'AFLDB_TEST_IMPORT_DATABASE_URL',
+  migrateScript: 'db:migrate:test',
+  migrateTarget: 'test',
+  privilegesScript: 'db:privileges:test',
+} as const;
+
+type RebuildSpec = (typeof REBUILD_TARGETS)[RebuildTargetName] | typeof ISOLATED_REBUILD_SPEC;
+
+export function isIsolatedRebuildName(name: string): boolean {
+  return name === ISOLATED_REBUILD_DATABASE || ISOLATED_REBUILD_NAME_PATTERN.test(name);
+}
+
+/**
+ * The isolated cluster's port when the environment declares an isolated run
+ * (`AFLDB_V2_ISOLATED_PG=1` and a valid unprivileged `AFLDB_V2_ISOLATED_PORT` other than 5432),
+ * otherwise null. Mirrors tools/v2/isolated-pg.ts resolveConfig().
+ */
+export function isolatedRunPort(env: Readonly<Record<string, string | undefined>>): number | null {
+  if (env.AFLDB_V2_ISOLATED_PG !== '1') return null;
+  const raw = env.AFLDB_V2_ISOLATED_PORT ?? '';
+  if (!/^\d+$/.test(raw)) return null;
+  const port = Number(raw);
+  return port >= 1024 && port <= 65535 && port !== 5432 ? port : null;
+}
+
+/**
+ * V2 Launch F: the database comment a rebuild target holds when NO rebuild is in flight. The
+ * AFLDB-ISSUE-235/237 rebuild marker is the database comment, and so is the isolated-pg marker
+ * (`afldb-v2-isolated-test`) that tools/v2/isolated-pg.ts verifies before every run and drop.
+ * For an isolated-family name the adjudication tool therefore reads the resting marker as "no
+ * rebuild marker", may replace it with the rebuild marker, and restores it (not NULL) when Stage
+ * 18 clears the rebuild marker. Every other target rests at NULL, exactly as before.
+ */
+export function restingDatabaseComment(database: string): string | null {
+  return isIsolatedRebuildName(database) ? ISOLATED_DATABASE_MARKER : null;
+}
+
+/** Findings as one refusal line; names the checks only, never a DSN. */
+function describeFindings(findings: readonly IsolatedTargetFinding[]): string {
+  return findings.map((f) => `${f.check} (${f.detail})`).join('; ');
+}
+
+/**
+ * V2 Launch F: refuse a DSN that is not an isolated-cluster DSN for `port`. Also used by the
+ * adjudication stage tool, so a child stage handed an isolated name proves its own DSN too.
+ */
+export function assertIsolatedRebuildDsn(dsn: string, port: number, name: string): void {
+  const findings = checkIsolatedTestDsn(dsn, port);
+  if (findings.length) {
+    throw new RebuildRefused(
+      `${name} is not an isolated-cluster DSN: ${describeFindings(findings)}. Nothing has been destroyed.`);
+  }
+}
+
+/** The stage-graph spec for a resolved target: an allowlisted one, or the isolated family. */
+export function rebuildSpecFor(target: ResolvedTarget): RebuildSpec {
+  if (target.isolated && isIsolatedRebuildName(target.database)) return ISOLATED_REBUILD_SPEC;
+  if (!target.isolated && isRebuildTarget(target.database)) return REBUILD_TARGETS[target.database];
+  throw new RebuildRefused(
+    `No stage graph for '${target.database}': it is not an explicit rebuild target.`);
+}
 
 /** Labels known NOT to be full-history acquisitions. */
 const KNOWN_TRIAL_LABELS = ['trial-2024'];
@@ -607,8 +711,10 @@ export const REBUILD_IDENTITY_MARKER = 'AFLDB-REBUILD-IDENTITY';
  * `database` must be an allowlisted rebuild target, so it is a plain identifier that is safe to
  * inline. `RESET_SQL` itself is not altered: the proof embeds it verbatim.
  */
-export function rebuildIdentityGuardSql(database: string): string {
-  assertRebuildTargetName(database);
+export function rebuildIdentityGuardSql(
+  database: string, env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  assertRebuildTargetName(database, env);
   if (!/^[a-z][a-z0-9_]*$/.test(database)) {
     throw new RebuildRefused(`Refusing to assert identity for '${database}': not a plain identifier.`);
   }
@@ -639,7 +745,9 @@ END $afldb_identity$;
  * call this, so the proof cannot drift into a weaker duplicate of the rebuild's own
  * refusals. Never includes a DSN or password in any message.
  */
-export function assertRebuildTargetName(database: string): void {
+export function assertRebuildTargetName(
+  database: string, env: Readonly<Record<string, string | undefined>> = process.env,
+): void {
   if (FORBIDDEN_DATABASES.includes(database)) {
     throw new RebuildRefused(
       `Refusing to rebuild '${database}': this database is rejected by name.`);
@@ -654,7 +762,11 @@ export function assertRebuildTargetName(database: string): void {
   }
   // An allowlist, not a suffix rule: `random_test` is refused exactly as `afldb_scratch`
   // is. The former `_test` suffix check is subsumed — every allowed name is listed.
-  if (!isRebuildTarget(database)) {
+  // V2 Launch F: the isolated family is admitted by NAME only inside an isolated run
+  // (isolatedRunPort); resolveIsolatedTarget() and executeRebuild() add the DSN and live-server
+  // proofs, and a child stage handed an isolated name proves its own DSN (assertIsolatedRebuildDsn).
+  const isolatedName = isIsolatedRebuildName(database) && isolatedRunPort(env) !== null;
+  if (!isRebuildTarget(database) && !isolatedName) {
     throw new RebuildRefused(
       `Refusing to rebuild '${database}': the only explicit rebuild targets are `
       + `${describeRebuildTargets()}. A target is never inferred from a DSN.`);
@@ -672,8 +784,11 @@ export function assertRebuildTargetName(database: string): void {
  */
 export function resolveTarget(
   env: Record<string, string | undefined>,
-  opts: { target?: string; allowOwnerImportDsn?: boolean } = {},
+  opts: { target?: string; allowOwnerImportDsn?: boolean; acknowledgeDestroy?: string } = {},
 ): ResolvedTarget {
+  // V2 Launch F: the isolated family has its own, stricter resolution. Only the literal
+  // `--target isolated` reaches it; every other value takes the unchanged path below.
+  if (opts.target === ISOLATED_REBUILD_TARGET) return resolveIsolatedTarget(env, opts);
   const requested = opts.target ?? DEFAULT_TARGET;
   assertRebuildTargetName(requested);
   if (!isRebuildTarget(requested)) {
@@ -748,6 +863,173 @@ export function resolveTarget(
   }
 
   return { database, adminDsn, importDsn, importIsOwnerSubstitution };
+}
+
+/** host:port of a DSN as postgres.js and the isolated guard read it (already proven to parse). */
+function serverOf(dsn: string): string {
+  const url = new URL(dsn);
+  return `${url.hostname}:${url.port}`;
+}
+
+/**
+ * V2 Launch F: resolve `--target isolated`. Every condition in the ISOLATED_REBUILD_TARGET
+ * comment is checked here except the live-server one, which executeRebuild() runs before any
+ * stage. Order: the environment declares an isolated run, then the operator's NAMED database,
+ * then each DSN. Messages never contain a DSN.
+ */
+export function resolveIsolatedTarget(
+  env: Record<string, string | undefined>,
+  opts: { allowOwnerImportDsn?: boolean; acknowledgeDestroy?: string } = {},
+): ResolvedTarget {
+  const port = isolatedRunPort(env);
+  if (port === null) {
+    throw new RebuildRefused(
+      `--target ${ISOLATED_REBUILD_TARGET} runs only inside an isolated run: AFLDB_V2_ISOLATED_PG=1 and a `
+      + 'valid AFLDB_V2_ISOLATED_PORT must be set, as `npx tsx tools/v2/isolated-pg.ts run <name> -- ...` '
+      + 'sets them. Nothing has been destroyed.');
+  }
+  if (opts.allowOwnerImportDsn) {
+    throw new RebuildRefused(
+      `--allow-owner-import-dsn is refused with --target ${ISOLATED_REBUILD_TARGET}: the isolated cluster `
+      + 'always has the restricted afldb_import credential. Nothing has been destroyed.');
+  }
+  const named = opts.acknowledgeDestroy;
+  if (!named) {
+    throw new RebuildRefused(
+      `--target ${ISOLATED_REBUILD_TARGET} needs --acknowledge-destroy <database>: the operator names the `
+      + 'isolated database; it is never inferred from a DSN. Nothing has been destroyed.');
+  }
+  assertRebuildTargetName(named, env);
+  if (!isIsolatedRebuildName(named)) {
+    throw new RebuildRefused(
+      `Refusing to rebuild '${named}' as an isolated target: the only isolated rebuild databases are `
+      + `'${ISOLATED_REBUILD_DATABASE}' and names matching ${String(ISOLATED_REBUILD_NAME_PATTERN)}. `
+      + 'Nothing has been destroyed.');
+  }
+
+  const spec = ISOLATED_REBUILD_SPEC;
+  const adminDsn = env[spec.adminEnv];
+  if (!adminDsn) {
+    throw new RebuildRefused(`${spec.adminEnv} is not set (target ${ISOLATED_REBUILD_TARGET} '${named}').`);
+  }
+  let database: string;
+  try {
+    database = databaseOf(adminDsn);
+  } catch {
+    throw new RebuildRefused(`${spec.adminEnv} is not a valid connection URL.`);
+  }
+  if (database !== named) {
+    throw new RebuildRefused(
+      `${spec.adminEnv} names database '${database}', not the acknowledged isolated database '${named}'. `
+      + 'Nothing has been destroyed.');
+  }
+  assertIsolatedRebuildDsn(adminDsn, port, spec.adminEnv);
+  assertPsqlCanCarry(adminDsn, spec.adminEnv);
+  assertDsnPinsTarget(adminDsn, spec.adminEnv);
+
+  const importDsn = env[spec.importEnv];
+  if (!importDsn) {
+    throw new RebuildRefused(
+      `${spec.importEnv} is not set, so there is no restricted import credential for the data stages `
+      + `of '${named}'. Nothing has been destroyed.`);
+  }
+  let importDatabase: string;
+  try {
+    importDatabase = databaseOf(importDsn);
+  } catch {
+    throw new RebuildRefused(`${spec.importEnv} is not a valid connection URL.`);
+  }
+  if (importDatabase !== database) {
+    throw new RebuildRefused(
+      `${spec.importEnv} names a different database from ${spec.adminEnv}. Both must point at '${named}'.`);
+  }
+  assertIsolatedRebuildDsn(importDsn, port, spec.importEnv);
+  assertDsnPinsTarget(importDsn, spec.importEnv);
+  if (serverOf(importDsn) !== serverOf(adminDsn)) {
+    throw new RebuildRefused(
+      `${spec.importEnv} and ${spec.adminEnv} name different servers. Both must name the isolated `
+      + 'cluster the same way. Nothing has been destroyed.');
+  }
+
+  return { database, adminDsn, importDsn, importIsOwnerSubstitution: false, isolated: { port } };
+}
+
+/**
+ * V2 Launch F: the read-only stream behind Deps.isolatedServerFacts — the one row of
+ * ISOLATED_SERVER_FACTS_SQL as COPY text, so nothing but data reaches stdout.
+ */
+export const ISOLATED_SERVER_FACTS_COPY_SQL =
+  `COPY (${ISOLATED_SERVER_FACTS_SQL}) TO STDOUT;\n`;
+
+/** Parse the COPY text row (tab-separated, `\N` for NULL). Throws on anything but one row of three. */
+export function parseIsolatedServerFacts(stdout: string): IsolatedServerFacts {
+  const lines = stdout.split(/\r?\n/).filter((line) => line !== '');
+  const fields = lines.length === 1 ? lines[0].split('\t') : [];
+  if (fields.length !== 3) {
+    throw new RebuildRefused(
+      `The isolated server facts query returned ${lines.length} line(s), not one row of three fields. `
+      + 'Nothing has been destroyed.');
+  }
+  const value = (field: string) => (field === '\\N' ? null : field);
+  return {
+    clusterName: value(fields[0]),
+    databaseComment: value(fields[1]),
+    currentDatabase: value(fields[2]),
+  };
+}
+
+/** Name-check environment for an isolated target, derived from the resolved target only. */
+function isolatedNameEnv(target: ResolvedTarget): Record<string, string | undefined> {
+  return target.isolated
+    ? { AFLDB_V2_ISOLATED_PG: '1', AFLDB_V2_ISOLATED_PORT: String(target.isolated.port) }
+    : process.env;
+}
+
+/**
+ * V2 Launch F: the isolated target's last gate, run by executeRebuild() before ANY stage. It
+ * re-proves both DSNs (a ResolvedTarget can be built by hand) and asks the live server who it
+ * is. Any doubt is a refusal; nothing has run when it throws.
+ */
+export function assertIsolatedTargetLive(target: ResolvedTarget, deps: Deps): void {
+  if (!target.isolated) {
+    throw new RebuildRefused(
+      `'${target.database}' is an isolated-cluster name but the target was not resolved by `
+      + `--target ${ISOLATED_REBUILD_TARGET}. Nothing has been run.`);
+  }
+  if (!isIsolatedRebuildName(target.database)) {
+    throw new RebuildRefused(
+      `'${target.database}' is not an isolated rebuild database. Nothing has been run.`);
+  }
+  const { port } = target.isolated;
+  for (const [dsn, name] of [[target.adminDsn, 'The admin DSN'], [target.importDsn, 'The import DSN']] as const) {
+    assertIsolatedRebuildDsn(dsn, port, name);
+    if (databaseOf(dsn) !== target.database) {
+      throw new RebuildRefused(`${name} does not name '${target.database}'. Nothing has been run.`);
+    }
+  }
+  if (serverOf(target.importDsn) !== serverOf(target.adminDsn)) {
+    throw new RebuildRefused('The admin and import DSNs name different servers. Nothing has been run.');
+  }
+  if (!deps.isolatedServerFacts) {
+    throw new RebuildRefused(
+      'An isolated rebuild needs the live server check (Deps.isolatedServerFacts) and none is wired. '
+      + 'Nothing has been run.');
+  }
+  let facts: IsolatedServerFacts;
+  try {
+    facts = deps.isolatedServerFacts(target.adminDsn);
+  } catch (error) {
+    throw new RebuildRefused(
+      `Could not read the isolated server facts: ${(error as Error).message}. Nothing has been run.`);
+  }
+  const findings = checkIsolatedTestServer(target.database, facts);
+  if (findings.length) {
+    throw new RebuildRefused(
+      `The server behind '${target.database}' is not the isolated cluster: ${describeFindings(findings)}. `
+      + 'Nothing has been run.');
+  }
+  deps.log(`    isolated server verified: cluster ${facts.clusterName}, marker present, `
+    + `current_database ${facts.currentDatabase}`);
 }
 
 /**
@@ -961,12 +1243,9 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
 
   // The schema and privilege stages run through package scripts, and each target has its
   // own pair bound to its own DSN variable. A ResolvedTarget only ever carries an
-  // allowlisted name, but the graph refuses rather than guesses if it does not.
-  if (!isRebuildTarget(target.database)) {
-    throw new RebuildRefused(
-      `No stage graph for '${target.database}': it is not an explicit rebuild target.`);
-  }
-  const spec = REBUILD_TARGETS[target.database];
+  // allowlisted name, but the graph refuses rather than guesses if it does not. V2 Launch F:
+  // an isolated target (resolved only by resolveIsolatedTarget) uses ISOLATED_REBUILD_SPEC.
+  const spec = rebuildSpecFor(target);
   const censusScope = aflApiOwnershipCensusScope();
 
   return [
@@ -2316,6 +2595,12 @@ export type Deps = {
   runValidation: (dsn: string, sql: string) => void;
   fileExists: (path: string) => boolean;
   log: (line: string) => void;
+  /**
+   * V2 Launch F, isolated targets only: what the live server says about itself
+   * (ISOLATED_SERVER_FACTS_SQL), read-only. Absent on a non-isolated run; an isolated run
+   * without it is refused before any stage.
+   */
+  isolatedServerFacts?: (dsn: string) => IsolatedServerFacts;
 };
 
 export type ExecutionReport = {
@@ -2358,7 +2643,12 @@ export function executeRebuild(
   // `target.database` is the acknowledged, allowlisted name; the guard is built (and refuses a
   // name outside the allowlist) before any stage, then leads EVERY stream psql is given.
   assertDsnPinsTarget(target.adminDsn, 'The admin DSN');
-  const identityGuard = rebuildIdentityGuardSql(target.database);
+
+  // V2 Launch F: an isolated target proves its DSNs and the LIVE server before any stage — so
+  // before the census, the capture and the destructive reset. An isolated-family name that did
+  // not come through resolveIsolatedTarget() is refused here too.
+  if (target.isolated || isIsolatedRebuildName(target.database)) assertIsolatedTargetLive(target, deps);
+  const identityGuard = rebuildIdentityGuardSql(target.database, isolatedNameEnv(target));
 
   if (control.rehearsalStopAfter !== undefined) {
     assertRehearsalStop({ target: target.database, rehearsalStopAfter: control.rehearsalStopAfter }, target.database);
@@ -3532,6 +3822,13 @@ export function createCliDeps(spawnSync: typeof import('node:child_process').spa
     // the repo root unconditionally would have rejected every valid override.
     fileExists: (path) => existsSync(isAbsolute(path) ? path : join(REPO_ROOT, path)),
     log: (line) => console.log(line),
+    // V2 Launch F: read-only, through the same pinned psql path; only used for isolated targets.
+    isolatedServerFacts: (dsn) => {
+      const result = runPsql(dsn, ISOLATED_SERVER_FACTS_COPY_SQL,
+        { spawn: spawnSync as SpawnSyncLike, cwd: REPO_ROOT, pinned: true });
+      if (result.status !== 0) throw new Error(`psql exited ${result.status}: ${result.stderr.trim()}`);
+      return parseIsolatedServerFacts(result.stdout);
+    },
   };
 }
 
@@ -3566,7 +3863,7 @@ async function main(): Promise<number> {
 
   console.log('AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)');
   // Names only — never a DSN, host or credential.
-  const spec = REBUILD_TARGETS[target.database as RebuildTargetName];
+  const spec = rebuildSpecFor(target);
   console.log(`  target        : ${target.database} (${spec.role}; `
     + `${opts.target ? '--target' : 'default'})`);
   console.log(`  credentials   : ${spec.adminEnv}`

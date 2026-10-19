@@ -123,9 +123,13 @@ import {
   AFL_API_ADJUDICATION_DSN_ENV,
   AFL_API_ADJUDICATION_TARGET_ENV,
   CAPTURE_ROOT_ENV,
+  assertIsolatedRebuildDsn,
   assertRebuildTargetName,
   databaseOf,
+  isIsolatedRebuildName,
+  isolatedRunPort,
   resolveCaptureRoot,
+  restingDatabaseComment,
 } from '../db/rebuild-test';
 import { redact } from '../db/psql';
 import {
@@ -1026,7 +1030,7 @@ export function resolveAdjudicationTarget(
     throw new AdjudicationRebuildRefused(
       `${AFL_API_ADJUDICATION_TARGET_ENV} is not set. This tool runs only as a db:test:rebuild stage.`);
   }
-  assertRebuildTargetName(database);
+  assertRebuildTargetName(database, env);
   const dsn = env[AFL_API_ADJUDICATION_DSN_ENV];
   if (!dsn) throw new AdjudicationRebuildRefused(`${AFL_API_ADJUDICATION_DSN_ENV} is not set.`);
   let named: string;
@@ -1035,10 +1039,19 @@ export function resolveAdjudicationTarget(
   } catch {
     throw new AdjudicationRebuildRefused(`${AFL_API_ADJUDICATION_DSN_ENV} is not a valid connection URL.`);
   }
-  assertRebuildTargetName(named);
+  assertRebuildTargetName(named, env);
   if (named !== database) {
     throw new AdjudicationRebuildRefused(
       `${AFL_API_ADJUDICATION_DSN_ENV} names database '${named}', not the rebuild target '${database}'.`);
+  }
+  // V2 Launch F: an isolated-cluster target (admitted by name only inside an isolated run) also
+  // proves its DSN is a loopback DSN on the isolated cluster's port.
+  if (isIsolatedRebuildName(database)) {
+    const port = isolatedRunPort(env);
+    if (port === null) {
+      throw new AdjudicationRebuildRefused(`'${database}' is an isolated-cluster target outside an isolated run.`);
+    }
+    assertIsolatedRebuildDsn(dsn, port, AFL_API_ADJUDICATION_DSN_ENV);
   }
   return { database, dsn };
 }
@@ -1155,7 +1168,9 @@ export async function readRebuildMarker(tx: TransactionSql, database: string): P
     SELECT shobj_description(oid, 'pg_database') AS comment FROM pg_database WHERE datname = current_database()
   `;
   const comment = row?.comment ?? null;
-  return comment === null ? null : parseRebuildMarker(comment);
+  // V2 Launch F: an isolated-cluster database RESTS with the isolated-pg marker comment, which is
+  // not a rebuild marker (restingDatabaseComment; null, so unchanged, for every other target).
+  return comment === null || comment === restingDatabaseComment(database) ? null : parseRebuildMarker(comment);
 }
 
 /** Never overwrites an unrelated/pre-existing database comment silently — it refuses instead
@@ -1173,7 +1188,7 @@ export async function setRebuildMarker(
   const [row] = await tx<{ comment: string | null }[]>`
     SELECT shobj_description(oid, 'pg_database') AS comment FROM pg_database WHERE datname = current_database()
   `;
-  if (row?.comment != null) {
+  if (row?.comment != null && row.comment !== restingDatabaseComment(database)) {
     throw new AdjudicationRebuildRefused(
       `${database} already carries a database comment; refusing to overwrite it silently (D11b). `
       + 'Resolve the existing comment by hand before capturing.');
@@ -1193,7 +1208,12 @@ export async function setRebuildMarker(
 export async function clearRebuildMarker(tx: TransactionSql, database: string): Promise<void> {
   assertRebuildTargetName(database);
   await assertConnectedToTarget(tx, database);
-  await tx.unsafe(`COMMENT ON DATABASE "${database}" IS NULL`);
+  // V2 Launch F: an isolated-cluster database returns to its resting isolated-pg marker, not to
+  // NULL, so tools/v2/isolated-pg.ts can still verify, run against and drop it after the rebuild.
+  const resting = restingDatabaseComment(database);
+  await tx.unsafe(resting === null
+    ? `COMMENT ON DATABASE "${database}" IS NULL`
+    : `COMMENT ON DATABASE "${database}" IS '${resting}'`);
 }
 
 // ---------------------------------------------------------------------------
