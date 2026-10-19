@@ -189,8 +189,9 @@ Gaps created or changed: V2-GAP-006 (narrowed), V2-GAP-008 (High, **cutover bloc
 ## Resumption point
 
 Stage 3 is implemented and committed; `afldb-closure` verification of Stage 3 is the last Launch B
-step (its result is recorded below this line when it returns). **Launch C starts Stage 4** (legacy
-quarantine, plan D10): read `docs/v2/plan.md` (stage 4 row, D10, §7), this file,
+step (its result is recorded below this line when it returns). **Launch C starts Stage 4** (derived and
+curated: Coleman D6, Brownlow reconciliation D7, curated awards D8, legacy imports quarantined
+D10): read `docs/v2/plan.md` (stage 4 row, D6-D8, D10, §7), this file,
 `docs/v2/known-gaps.md` (V2-GAP-006 remainder and V2-GAP-008 stay open),
 `docs/v2/db-ownership-matrix.md` ("Open for Stage 4") and `docs/v2/architecture.md` §9. Stages 4-6
 have not been started.
