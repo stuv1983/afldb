@@ -1,5 +1,14 @@
 # AFLDB V2 — known gaps, blockers and deferred work
 
+**Current bounded acceptance (2026-10-20, D-GAP029-21):** 149 strict findings;
+99 approved (78 deferrals + 21 exact sibling disagreements), **0 data matches**;
+50 unapproved (42 event + eight board-date membership). Both gates remain failed.
+All six dedicated local credentials rotated on ownership-verified 55433; new logins
+pass and old logins reject. Backend functionality, shared-data coverage limits,
+unchanged release blockers and the next separate owner decision are distinguished in
+[the current readiness record](gap-029-readiness.md). [Source requests](gap-029-source-requests.md).
+Earlier run counts and unapproved-sibling proposals below are historical where superseded.
+
 Current local-release follow-up: see `local-release-review.md` for final verification. Gap 014
 and 021 and 028 are closed locally; 016 has its publication and 98-season evidence complete but remains
 open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
@@ -52,7 +61,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 local standalone rehearsal passes; raw votes and non-empty proposal/audit history preserved, including after 115 | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
-| V2-GAP-029 | Medium | strict historical baseline verification | rehearsal | open: 149 strict (78 existing deferrals, 71 unapproved = 50 missing-source + 21 criterion disagreements); relevant suites 1397 passed / 3 failed / 7 skipped; launcher listener guard and real rookie replay proven | exact event/2026 artifacts needed; owner decision package for 21 sibling differences; shared-development authentication incident documented |
+| V2-GAP-029 | Medium | strict historical baseline verification | rehearsal | open: 149 strict; 99 approved (78 deferrals + 21 exact sibling disagreements), 0 data matches; 50 unapproved source findings; both gates fail; dedicated credentials rotated after ownership guard | source requests: gap-029-source-requests.md; separate owner release-policy decision required; shared-development incident uncertainty preserved |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -575,6 +584,8 @@ award results must be shown reconcilable before production; **no** — not a pro
   cause, and never weaken an assertion.
 
 ## V2-GAP-029 — Strict baseline/reference evidence differs from locally reproduced history
+
+- **Current acceptance:** D-GAP029-21 implemented; 149 strict, 99 approved, 50 unapproved. No data match or release waiver. [Readiness](gap-029-readiness.md), [verification](evidence/gap-029-acceptance-verification.json). The seven-file run below predates this bounded follow-up.
 
 - **Status:** Partly resolved 2026-10-20. Latest seven-file relevant run: **1,397 passed / 3 failed / 7 skipped** on the preserved isolated clone `afldb_v2_gap029_test`. Two original strict Gridley assertions and the new policy-conformance assertion remain failed. Strict: **149 findings**; approved deferrals: **78 (0 data matches)**; unapproved: **71**. Rookie coverage repaired: **23 findings / 7 distinct cells**. No new deferral or production waiver. Detailed evidence: [Gridley closeout](gap-029-gridley-resolution.md), `evidence/gap-029-evidence-verification.json`.
 - **Previous full-workflow result (unchanged until rerun):** 13,740 passed / 9 failed / 31 skipped;

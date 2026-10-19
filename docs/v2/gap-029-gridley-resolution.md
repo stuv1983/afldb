@@ -1,6 +1,15 @@
 # V2-GAP-029 — Gridley residual closeout, 20 October 2026
 
-## Evidence follow-up — current state (20 October 2026)
+**Current bounded acceptance (2026-10-20, D-GAP029-21):** 149 strict findings;
+99 approved (78 deferrals + 21 exact sibling disagreements), **0 data matches**;
+50 unapproved (42 event + eight board-date membership). Both gates remain failed.
+All six dedicated local credentials rotated on ownership-verified 55433; new logins
+pass and old logins reject. Backend functionality, shared-data coverage limits,
+unchanged release blockers and the next separate owner decision are distinguished in
+[the current readiness record](gap-029-readiness.md). [Source requests](gap-029-source-requests.md).
+Earlier run counts and unapproved-sibling proposals below are historical where superseded.
+
+## Previous evidence follow-up — before D-GAP029-21 (20 October 2026)
 
 GAP-029 remains **open**. Relevant seven-file run: **1,397 passed / 3 failed / 7 skipped** (1,407); focused unit regressions 76/76 and final launcher retest 17/17. Typecheck and changed-file lint pass. No full repository workflow was run.
 
@@ -31,7 +40,7 @@ node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts run afldb_v2_gap029_r
 
 The retained clone already exists: reuse it for the verifier; do not drop/reset it to rerun create-db.
 
-### Exact owner decision package — not approved
+### Previous decision proposal — now approved as D-GAP029-21 above
 
 Proposed wording: **“Accept only the 21 enumerated Jarryd Lyons/brother frozen-key differences as an external eligibility-population disagreement. Preserve the existing has_brother requirement player_career_stats.games > 0 and every raw strict mismatch. This approval does not establish that Gridley intended listed players, include modern state-league games in AFL career totals, or apply to any other player/cell.”**
 

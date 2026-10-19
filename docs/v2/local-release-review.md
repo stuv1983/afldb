@@ -1,5 +1,14 @@
 # Local release package — owner review
 
+**Current bounded acceptance (2026-10-20, D-GAP029-21):** 149 strict findings;
+99 approved (78 deferrals + 21 exact sibling disagreements), **0 data matches**;
+50 unapproved (42 event + eight board-date membership). Both gates remain failed.
+All six dedicated local credentials rotated on ownership-verified 55433; new logins
+pass and old logins reject. Backend functionality, shared-data coverage limits,
+unchanged release blockers and the next separate owner decision are distinguished in
+[the current readiness record](gap-029-readiness.md). [Source requests](gap-029-source-requests.md).
+Earlier run counts and unapproved-sibling proposals below are historical where superseded.
+
 Scope: single-agent continuation of `36679a1e` on `v2/rebuild`, 2026-10-19–20.
 No additional worktree, deployment, live service change or push in this follow-up.
 **Incident correction:** earlier launcher authentication reached the documented shared development

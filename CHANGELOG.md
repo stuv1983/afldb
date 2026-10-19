@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — bounded Gridley acceptance and credential containment (2026-10-20)
+
+- Apply owner decision D-GAP029-21 only to the 21 hash-bound Jarryd/Corey Lyons sibling
+  eligibility-population disagreements committed at `ed4c429c`. Retain `games > 0`, strict
+  mismatches and all unexpected/duplicate findings. Strict 149; approved 99 (78 existing
+  deferrals + 21 disagreements), zero data matches; unapproved 50. Both gates still fail.
+- Verify dedicated postmaster ownership on 55433 before authentication and rotate all six
+  local credentials; new logins pass and old logins reject. Preserve uncertainty about prior
+  shared-development contact; no tunnel/shared credential/SSH changes.
+- Retain focused acceptance evidence and exact source requests for 42 event and eight
+  board-date membership findings. Distinguish backend demonstrations, shared-data coverage
+  gaps and production/host acceptance in `docs/v2/gap-029-readiness.md`. GAP-029 remains open;
+  any separation of Gridley parity from backend migration needs a separate owner decision.
+
 ### AFLDB V2
 
 - GAP-029 evidence follow-up: local process ownership is now checked before isolated-launcher

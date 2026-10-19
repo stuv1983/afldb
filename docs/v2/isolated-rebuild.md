@@ -117,3 +117,11 @@ Credentials were rotated for this dedicated cluster only. `isolated-pg.ts rotate
 checks identity, stores a local recovery file before the transaction, rotates all six roles,
 replaces the local secret files and verifies new login success and old password rejection.
 Neither passwords nor DSNs belong in evidence or version control. All retained databases survive.
+
+2026-10-20 containment follow-up at starting HEAD `ed4c429c`: the process-ownership guard
+verified `afldb_v2_gap029_test` on **55433 before authentication**, then all six credentials
+were rotated again. New logins passed 6/6; old credentials were rejected 6/6 (`28P01`).
+Local secret storage was replaced; no secret was displayed or committed. No connection through
+55432 or shared-credential/SSH change occurred. Earlier endpoint contact remains supported;
+successful login, SQL execution and remote cluster identity remain unestablished. See
+`evidence/gap-029-acceptance-verification.json`.
