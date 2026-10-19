@@ -764,8 +764,7 @@ const canRunLoader = (() => {
 })();
 
 describe('the offline loader (tools/migration/import_awards.py --groups coleman) agrees with the projection (SYNTHETIC, PostgreSQL)', () => {
-  // The loader needs Python with psycopg. Where it is missing this block is skipped and the gap is
-  // reported by the suite's runner; it is never counted as passing evidence.
+  // Python with psycopg is required evidence: absence fails explicitly, never skips.
   const loaderTest = it;
 
   function runLoader() {
@@ -776,6 +775,38 @@ describe('the offline loader (tools/migration/import_awards.py --groups coleman)
       env: { ...process.env, AFLDB_IMPORT_DATABASE_URL: process.env.AFLDB_TEST_IMPORT_DATABASE_URL ?? process.env.AFLDB_TEST_DATABASE_URL },
     });
   }
+
+  loaderTest('the offline guard holds canonical season locks across import-batch commits and releases them on close', () => {
+    if (!canRunLoader) throw new Error('Offline Coleman verification requires AFLDB_TEST_PYTHON with psycopg');
+    const script = `
+import os, sys
+from types import SimpleNamespace
+sys.path.insert(0, 'tools/migration')
+import psycopg
+from import_awards import require_offline_coleman_target
+loader = psycopg.connect(os.environ['AFLDB_TEST_IMPORT_DATABASE_URL'])
+probe = psycopg.connect(os.environ['AFLDB_TEST_DATABASE_URL'])
+try:
+    require_offline_coleman_target(loader, SimpleNamespace(offline_historical=True))
+    loader.commit()  # ImportBatch.__post_init__ commits before the award write.
+    with probe.cursor() as cur:
+        cur.execute("SELECT pg_try_advisory_xact_lock(hashtext('derived_award_results:coleman'), 2001)")
+        assert cur.fetchone()[0] is False, 'canonical publisher lock escaped at batch commit'
+    probe.rollback()
+    loader.close()
+    with probe.cursor() as cur:
+        cur.execute("SELECT pg_try_advisory_xact_lock(hashtext('derived_award_results:coleman'), 2001)")
+        assert cur.fetchone()[0] is True, 'offline session did not release its lock on close'
+    probe.rollback()
+    print('SESSION_LOCK_BOUNDARY_PASS')
+finally:
+    loader.close()
+    probe.close()
+`;
+    const result = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8' });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stdout).toContain('SESSION_LOCK_BOUNDARY_PASS');
+  });
 
   /** The loader's own column tuple of every Coleman row, keyed by its source key (import_batch_id aside). */
   async function tuples() {

@@ -2607,8 +2607,11 @@ def require_offline_coleman_target(pg, args) -> None:
         name, cluster, marker = cur.fetchone()
         if not name.startswith("afldb_v2_") or not name.endswith("_test") or cluster != "afldb_v2_isolated" or marker != "afldb-v2-isolated-test":
             raise RuntimeError("Offline Coleman requires a marked isolated V2 test database")
-        # Same locks as the canonical publisher, held until this bootstrap transaction ends.
-        cur.execute("SELECT pg_advisory_xact_lock(hashtext('derived_award_results:coleman'), year::int) FROM seasons ORDER BY year")
+        # Same keys as the canonical publisher, but SESSION-scoped: ImportBatch
+        # and individual historical groups commit before the Coleman write.
+        # Transaction locks here would silently expire at that boundary. The
+        # CLI owns this connection and always closes it in its finalizer.
+        cur.execute("SELECT pg_advisory_lock(hashtext('derived_award_results:coleman'), year::int) FROM seasons ORDER BY year")
         cur.execute("SELECT count(*) FROM derived_award_results WHERE award_slug='coleman'")
         if cur.fetchone()[0]:
             raise RuntimeError("Coleman bootstrap refused: canonical publications exist; use the V2 publisher")

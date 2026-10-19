@@ -26,6 +26,8 @@ commit.
   available historical seasons reconcile with the canonical medal interpretation.
 - Physically quarantined retained acquisition implementations, refused their former entry
   points, and prevented the offline Coleman bootstrap from overwriting canonical publications.
+  Connection-scoped season locks survive historical import-batch commits; the real PostgreSQL
+  regression proves a canonical competitor remains blocked until the loader connection closes.
 - Repaired historical integration fixtures, live isolated-target proofs and checkout-portable
   frozen DraftGuru verification. Added migration 115 for the missing adjudication FK index.
 - Retained the authentic release bridge across importer tests, corrected the independent draft
