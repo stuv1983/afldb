@@ -100,7 +100,8 @@ a write failure); verdict precedence FAIL > INCOMPLETE > PASS; five required che
 26. `2cfc3a0b` docs(v2-admin): record the Stage 5 afldb-closure result (PASS_WITH_FINDINGS, LOW/INFO only)
 27. `d70389a8` feat(v2-parity): offline shadow parity tool with explicit thresholds, shadow-only capture tools and target ...
 28. `0a3254cf` fix(v2-ops): name the ISSUE-316 decisions that actually retire AFL Tables in the admin text
-29. the Stage 6 documents commit (`docs(v2-docs)`), and the closure-record commit that follows it (see `docs/v2/progress.md`)
+29. `7d012257` docs(v2-docs): Stage 6 shadow rehearsal plan, cutover and rollback runbooks, go/no-go record, risk register and final report
+30. the Stage 6 closure-record commit (`docs(v2-docs)`: afldb-closure PASS_WITH_FINDINGS, LOW/INFO only)
 
 ## 5. Gaps (27 open; none closed by V2)
 

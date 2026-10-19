@@ -55,7 +55,10 @@ Runs it: an **operator** with shell and PostgreSQL access to the rehearsal host.
    when `PGSERVICE`/`PGSERVICEFILE` are set or `PGDATABASE` is not a shadow name, and when the
    checkout holds a `.env*` file other than `.env.example`. It makes no connection and prints no
    DSN. Limitation: a DSN with an empty host lets libpq/postgres.js fall back to `PGHOST`; the
-   guard checks names, not hosts, so keep `PGHOST` unset or pointing at the rehearsal host.
+   guard checks names, not hosts, so keep `PGHOST` unset or pointing at the rehearsal host. The
+   guard also judges only the URL path, not DSN query parameters (postgres.js passes unknown ones as
+   connection settings): write the shadow DSNs without query parameters. The capture tools still
+   force `BEGIN ... READ ONLY`, read the state back and check `current_database()`.
 5. **Evidence directory.** `~/afldb-v2-shadow-evidence/<STAMP>/`, outside the checkout. Every
    capture tool creates its output exclusively (`wx`) and refuses an existing file.
 
@@ -85,8 +88,12 @@ newest applied migration (111 and 112 are not in production).
 
 ## 4. BEFORE captures (read-only)
 
-Every capture opens one read-only, repeatable-read transaction and rolls it back; none has an
-override flag; each refuses a non-shadow target with exit 2 and writes nothing.
+Every capture opens one read-only, repeatable-read transaction and rolls it back. The Stage 6
+tools (`shadow-capture.ts`, `shadow-award-reports.ts`) have no override flag and refuse every
+non-shadow target with exit 2, writing nothing. The Stage 2 manifest producer (item 1) is
+different: it accepts any `*_test` database (including `afldb_test`) and, with its two non-test
+flags, any database. **Never pass those flags here**; the `shadow-guard` run immediately before it
+is what restricts it to the shadow copy.
 
 ```bash
 E=~/afldb-v2-shadow-evidence/<STAMP>; mkdir -p "$E"

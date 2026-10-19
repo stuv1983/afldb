@@ -295,7 +295,7 @@ const KNOWN_LEGACY_RUNTIME_EDGES: readonly { from: string; to: string; dispositi
   { from: 'src/lib/acquisition/settle-afl-api.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: AFL API settle shares the AFL Tables settle helpers' },
   { from: 'src/lib/acquisition/settle-report.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: settle report reads the AFL Tables settle types' },
   { from: 'src/lib/acquisition/settle-status.ts', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'ISSUE-316 C4b cutover: settle status reads the trigger contract' },
-  { from: 'tools/current-season/settle-afltables.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: AFL Tables settle CLI (retirement is the owner decision D-316-2)' },
+  { from: 'tools/current-season/settle-afltables.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: AFL Tables settle CLI (retired through ISSUE-316: D-316-1 at C2, the timer by C5 under D-316-4; plan R-042)' },
   { from: 'tools/db/afl-api-identity-correction-rehearsal.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'offline rehearsal tooling (tools/db)' },
   { from: 'tools/db/prepare-promotion-source.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'offline promotion tooling (tools/db)' },
   { from: 'tools/db/promotion-source-dependency-rehearsal.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'offline rehearsal tooling (tools/db)' },

@@ -27,7 +27,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
 | 4 Derived + curated | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9`, `1374fc13` + this closure commit |
 | 5 Admin | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch D) | `68a026e2`, `458abe68`, `74d4b007` + this closure commit |
-| 6 Shadow-ready tooling, runbooks, go/no-go | done; afldb-closure CLOSURE_VERDICT (Launch E) | `d70389a8`, `0a3254cf`, DOCS_COMMIT + this closure commit |
+| 6 Shadow-ready tooling, runbooks, go/no-go | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch E) | `d70389a8`, `0a3254cf`, `7d012257` + this closure commit |
 
 ## Stage 0 — evidence
 
@@ -390,6 +390,18 @@ Stage-close results (orchestrator, committed tree, DSN variables unset):
 | `tools/v2/coverage-matrix.ts --check`, `tools/v2/acquisition-stage-map.ts --check` | both exit 0 |
 | frozen ISSUE-316 files | source 19/19 sha256 match the snapshot; V2 18/19 equal, `CHANGELOG.md` differs by design |
 | source worktree status | differs from the snapshot only by `?? supplies` |
+
+`afldb-closure` (`.phaneslight/returns/launchE-20261019/04-closure-stage6.md`) re-derived every
+check independently, ran no network, database, deploy or build command, and returned
+**PASS_WITH_FINDINGS**: full suite identical to the above (96/188/2 files; 15/9971/48 tests; the
+102 `FAIL` lines identical to the baseline); tsc 0; typegen 0; ESLint 253/132, 0/0 on the 22 changed
+code files; both generators 0; source status only `?? supplies`; frozen hashes 19/19 (V2 18/19,
+CHANGELOG by design); 37 changed files, all disclosed, no drift; parity and capture contracts
+fail-closed from code and by offline refusal probes; visual **VISUAL: UNVERIFIED**. Findings:
+C6-001 (LOW, a test disposition string still named D-316-2) and C6-002 (LOW, the rehearsal §4
+preamble over-claimed for the Stage 2 manifest producer) fixed in the closure commit; C6-003 (INFO,
+placeholders in this table) filled; C6-004 (INFO, the guard ignores DSN query parameters) documented
+in `shadow-rehearsal.md` §2; C6-005 and C6-006 (INFO) need nothing.
 
 ## Next action for the owner
 
