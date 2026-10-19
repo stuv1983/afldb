@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
@@ -53,6 +53,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string; season: string }>;
 }): Promise<Metadata> {
   const { slug, season } = await params;
+  if (slug === 'brownlow-medal' && parseSeason(season) !== null) permanentRedirect(`/brownlow/${Number(season)}`);
   const award = await getAward(slug);
   const year = parseSeason(season);
   if (!award || year === null) return notFoundMetadata('Award season');
@@ -72,6 +73,7 @@ export default async function AwardSeasonPage({
   const { slug, season } = await params;
   const year = parseSeason(season);
   if (year === null) notFound();
+  if (slug === 'brownlow-medal') permanentRedirect(`/brownlow/${year}`);
 
   const award = await getAward(slug);
   if (!award) notFound();

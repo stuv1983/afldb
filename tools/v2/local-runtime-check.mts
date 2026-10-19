@@ -59,14 +59,21 @@ try {
     const [match] = await sql`SELECT id FROM matches ORDER BY season DESC, id DESC LIMIT 1`;
     if (!player || !match) throw new Error('Historical public-route inputs are required');
     const routes = role === 'anonymous' ? ['/', '/brownlow', '/brownlow/2025', '/awards/coleman', '/seasons/2025', '/search?q=Tony+Lockett',
-      `/players/${player.slug}-${player.id}`, `/matches/${match.id}`, '/clubs/adelaide', '/admin']
+      `/players/${player.slug}-${player.id}`, `/matches/${match.id}`, '/clubs/adelaide', '/admin',
+      ...(version === 'v2' ? ['/awards/brownlow-medal', '/awards/brownlow-medal/2025'] : [])]
       : ['/admin', '/admin/current-season', '/admin/admins', '/admin/settings', ...(version === 'v2' ? ['/admin/operations', '/admin/operations/brownlow?season=2025'] : [])];
     for (const path of routes) {
+      const canonicalRedirect = path === '/awards/brownlow-medal' ? '/brownlow'
+        : path === '/awards/brownlow-medal/2025' ? '/brownlow/2025' : null;
+      if (canonicalRedirect) {
+        const direct = await context.request.get(`${baseURL}${path}`, { maxRedirects: 0 });
+        if (direct.status() !== 308 || direct.headers().location !== canonicalRedirect) throw new Error('Legacy Brownlow URL did not permanently redirect');
+      }
       const response = await page.goto(`${baseURL}${path}`, { waitUntil: 'domcontentloaded' });
       const finalPath = new URL(page.url()).pathname;
       const expectedDenial = role === 'anonymous' && path === '/admin'
         || role === 'admin' && ['/admin/settings', '/admin/current-season'].includes(path);
-      if (expectedDenial ? finalPath === path : response?.status() !== 200 || finalPath !== path.split('?')[0]) {
+      if (expectedDenial ? finalPath === path : response?.status() !== 200 || finalPath !== (canonicalRedirect ?? path.split('?')[0])) {
         throw new Error(`Unexpected runtime result: ${role} ${path}: ${response?.status()} ${finalPath}`);
       }
       checks.push({ role, path, status: response?.status(), finalPath, h1: await page.locator('h1').first().textContent().catch(() => null) });

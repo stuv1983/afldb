@@ -67,6 +67,7 @@ export async function listAwards(): Promise<AwardSummary[]> {
     SELECT ${AWARD_SUMMARY_COLUMNS}
       FROM awards a
       LEFT JOIN clubs c ON c.id = a.club_id
+     WHERE a.slug <> 'brownlow-medal'
      ORDER BY a.category, a.name
   `;
 }
@@ -90,6 +91,7 @@ async function fetchAward(slug: string): Promise<AwardSummary | null> {
       FROM awards a
       LEFT JOIN clubs c ON c.id = a.club_id
      WHERE a.slug = ${slug}
+       AND a.slug <> 'brownlow-medal'
   `;
   return row ?? null;
 }
@@ -124,6 +126,12 @@ const WINNER_COLUMNS = sql`
   w.note
 `;
 
+// Retained named-medal rows are source evidence, not Brownlow publication.
+// Brownlow has its canonical brownlow_season_votes read model and routes.
+const CURATED_AWARD_ONLY = sql`NOT EXISTS (
+  SELECT 1 FROM awards a WHERE a.id = w.award_id AND a.slug = 'brownlow-medal'
+)`;
+
 /** Every winner of one award, most recent first. */
 export async function getAwardWinners(awardId: number): Promise<AwardWinnerRow[]> {
   return sql<AwardWinnerRow[]>`
@@ -132,6 +140,7 @@ export async function getAwardWinners(awardId: number): Promise<AwardWinnerRow[]
       LEFT JOIN players p ON p.id = w.player_id
       LEFT JOIN clubs c   ON c.id = w.club_id
      WHERE w.award_id = ${awardId} AND w.status = 'active'
+       AND ${CURATED_AWARD_ONLY}
      ORDER BY w.season DESC NULLS LAST, w.position NULLS LAST, "playerName"
   `;
 }
@@ -147,6 +156,7 @@ export async function getAwardSeason(
       LEFT JOIN players p ON p.id = w.player_id
       LEFT JOIN clubs c   ON c.id = w.club_id
      WHERE w.award_id = ${awardId} AND w.season = ${season} AND w.status = 'active'
+       AND ${CURATED_AWARD_ONLY}
      ORDER BY w.sort_order NULLS LAST,
               w.is_captain DESC, w.position NULLS LAST, "playerName"
   `;
@@ -154,9 +164,10 @@ export async function getAwardSeason(
 
 export async function getAwardSeasons(awardId: number): Promise<number[]> {
   const rows = await sql<{ season: number }[]>`
-    SELECT DISTINCT season FROM award_winners
-     WHERE award_id = ${awardId} AND season IS NOT NULL AND status = 'active'
-     ORDER BY season DESC
+    SELECT DISTINCT w.season FROM award_winners w
+     WHERE w.award_id = ${awardId} AND w.season IS NOT NULL AND w.status = 'active'
+       AND ${CURATED_AWARD_ONLY}
+     ORDER BY w.season DESC
   `;
   return rows.map((r) => r.season);
 }
@@ -192,6 +203,7 @@ export async function getAwardLeaders(awardId: number, limit = 50) {
         ON p.id = w.player_id
        AND w.link_status_value IN ('unique','resolved')
      WHERE w.award_id = ${awardId} AND w.status = 'active'
+       AND ${CURATED_AWARD_ONLY}
      GROUP BY CASE WHEN p.id IS NOT NULL
                    THEN 'player:' || p.id
                    ELSE 'name:' || lower(w.player_name_raw) END

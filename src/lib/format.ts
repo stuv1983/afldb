@@ -205,6 +205,7 @@ export function seasonPath(year: number): string {
 }
 
 export function awardPath(slug: string): string {
+  if (slug === 'brownlow-medal') return '/brownlow';
   return `/awards/${slug}`;
 }
 
@@ -234,6 +235,7 @@ export function coachProfilePath(coach: { slug: string; coachId: number }): stri
 }
 
 export function awardSeasonPath(slug: string, season: number): string {
+  if (slug === 'brownlow-medal') return `/brownlow/${season}`;
   return `/awards/${slug}/${season}`;
 }
 

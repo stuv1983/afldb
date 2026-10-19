@@ -278,6 +278,24 @@ function notAListMove(alias: string): SqlFragment {
   return sql`(${kind} IS DISTINCT FROM 'trade' AND ${kind} IS DISTINCT FROM 'free_agency')`;
 }
 
+/** Generic award criteria must use the same published Brownlow medal as its pages,
+ * never the retained DraftGuru medal scrape. Other award facts keep their semantics. */
+function linkedAwardWinnerFacts(awardId: number): SqlFragment {
+  return sql`(SELECT w.player_id, w.season FROM award_winners w
+    JOIN awards a ON a.id = w.award_id
+    WHERE a.id = ${awardId} AND a.slug <> 'brownlow-medal' AND w.status = 'active'
+      AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+    UNION ALL
+    SELECT b.player_id, b.season FROM brownlow_season_votes b WHERE b.is_winner
+      AND EXISTS (SELECT 1 FROM awards a WHERE a.id = ${awardId} AND a.slug = 'brownlow-medal'))`;
+}
+
+function brownlowFinish(place: number, exact = false): SqlFragment {
+  // Rank one alone is not publication when a tied leader still requires review.
+  if (place === 1) return sql`is_winner`;
+  return exact ? sql`eligible_rank = ${place}` : sql`eligible_rank <= ${place}`;
+}
+
 // One dispatch per builder is the clearest shape here; splitting it up
 // would scatter the catalogue across files for no real benefit.
 //
@@ -1118,27 +1136,19 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // bound value, never an identifier. ------------------------------
     case 'award_winner': {
       const awardId = requireId(axis, 'award', 'Award');
-      return sql`p.id IN (SELECT player_id FROM award_winners
-                            WHERE player_id IS NOT NULL AND status = 'active'
-                              AND link_status_value IN ('unique', 'resolved')
-                              AND award_id = ${awardId})`;
+      return sql`p.id IN (SELECT player_id FROM ${linkedAwardWinnerFacts(awardId)} f)`;
     }
     case 'award_winner_min_times': {
       const awardId = requireId(axis, 'award', 'Award');
       const n = requireInt(axis, 'times', 'Times');
-      return sql`p.id IN (SELECT player_id FROM award_winners
-                            WHERE player_id IS NOT NULL AND status = 'active'
-                              AND link_status_value IN ('unique', 'resolved')
-                              AND award_id = ${awardId}
+      return sql`p.id IN (SELECT player_id FROM ${linkedAwardWinnerFacts(awardId)} f
                            GROUP BY player_id HAVING count(*) >= ${n})`;
     }
     case 'award_winner_between_seasons': {
       const awardId = requireId(axis, 'award', 'Award');
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
-      return sql`p.id IN (SELECT player_id FROM award_winners
-                            WHERE player_id IS NOT NULL AND status = 'active'
-                              AND link_status_value IN ('unique', 'resolved')
-                              AND award_id = ${awardId} AND season BETWEEN ${lo} AND ${hi})`;
+      return sql`p.id IN (SELECT player_id FROM ${linkedAwardWinnerFacts(awardId)} f
+                            WHERE season BETWEEN ${lo} AND ${hi})`;
     }
     case 'under_22_selection':
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
@@ -1185,14 +1195,14 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     }
     case 'brownlow_finish_exact':
       return sql`p.id IN (SELECT player_id FROM brownlow_season_votes
-                            WHERE eligible_rank = ${requireInt(axis, 'place', 'Finishing place')})`;
+                            WHERE ${brownlowFinish(requireInt(axis, 'place', 'Finishing place'), true)})`;
     case 'brownlow_top_finish':
       return sql`p.id IN (SELECT player_id FROM brownlow_season_votes
-                            WHERE eligible_rank <= ${requireInt(axis, 'place', 'Top place')})`;
+                            WHERE ${brownlowFinish(requireInt(axis, 'place', 'Top place'))})`;
     case 'brownlow_top_finish_min_times': {
       const place = requireInt(axis, 'place', 'Top place');
       const n = requireInt(axis, 'times', 'Times');
-      return sql`p.id IN (SELECT player_id FROM brownlow_season_votes WHERE eligible_rank <= ${place}
+      return sql`p.id IN (SELECT player_id FROM brownlow_season_votes WHERE ${brownlowFinish(place)}
                            GROUP BY player_id HAVING count(*) >= ${n})`;
     }
     case 'brownlow_winner_votes_min': {

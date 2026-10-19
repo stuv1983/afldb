@@ -45,6 +45,9 @@ import {
   type BrownlowEligibilityDecisionRequest,
 } from '@/db/queries/brownlow-eligibility';
 import { getBrownlowWinners } from '@/db/queries/brownlow';
+import { getAward, getAwardWinners, getAwardSeason, getAwardSeasons, getAwardLeaders, listAwards } from '@/db/queries/awards';
+import { compileAxis } from '@/db/queries/grid-solver';
+import type { GridAxisState } from '@/search/grid-solver-spec';
 import { audit, type AdminUser } from '@/lib/auth/session';
 
 vi.mock('@/lib/auth/session', () => ({
@@ -418,6 +421,26 @@ describe('sealed season 2089: a missing leader, a decision, a superseding decisi
     expect(after!.storedFlagCheck).toEqual({ state: 'agrees', storedWinners: [playerIds.a2], determinedWinners: [playerIds.a2] });
     const publicWinners = await getBrownlowWinners();
     expect(publicWinners.filter((r) => r.season === SEASONS.sealed).map((r) => r.playerId)).toEqual([playerIds.a2]);
+    const [award] = await owner`SELECT id FROM awards WHERE slug='brownlow-medal'`;
+    expect(award, 'historical Brownlow definition is required').toBeDefined();
+    expect(await getAward('brownlow-medal')).toBeNull();
+    expect((await listAwards()).some((a) => a.slug === 'brownlow-medal')).toBe(false);
+    expect(await getAwardWinners(award.id)).toEqual([]);
+    expect(await getAwardSeason(award.id, SEASONS.sealed)).toEqual([]);
+    expect(await getAwardSeasons(award.id)).toEqual([]);
+    expect(await getAwardLeaders(award.id)).toEqual([]);
+    // These deliberately minimal fixtures have NULL playing-career facts. Test
+    // the award criterion itself, not an unrelated games>=0 intersection.
+    const genericAxes: GridAxisState[] = [
+      { builder: 'award_winner', params: { award: String(award.id) } },
+      { builder: 'award_winner_min_times', params: { award: String(award.id), times: '1' } },
+      { builder: 'award_winner_between_seasons', params: { award: String(award.id), from: String(SEASONS.sealed), to: String(SEASONS.sealed) } },
+    ];
+    for (const axis of genericAxes) {
+      const generic = await owner`SELECT p.id FROM players p
+        WHERE p.id IN (${playerIds.a1}, ${playerIds.a2}) AND ${compileAxis(axis)} ORDER BY p.id`;
+      expect(generic.map((r) => r.id)).toEqual([playerIds.a2]);
+    }
     expect(after!.determination.inputChecksum).not.toBe(reviewChecksum);
 
     // Audited once, as done, with ids and codes only.
@@ -550,6 +573,32 @@ describe('ties among eligible leaders (season 2086)', () => {
     ].sort((a, b) => a.playerId - b.playerId));
     expect(view.determination.rawLeaderboard.map((e) => e.rank)).toEqual([1, 1, 3]);
     expect(view.storedFlagCheck.state).toBe('agrees');
+  });
+
+  it('an unresolved tied leader blocks every winner criterion until a decision publishes both joint winners', async () => {
+    const before = await rawVoteFingerprint();
+    await owner`UPDATE brownlow_season_votes SET eligible_rank=NULL
+      WHERE season=${SEASONS.tie} AND player_id=${playerIds.c1}`;
+    const result = await importSql.begin((tx) => publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
+      season: SEASONS.tie, registry: REGISTRY, actorId: superAdmin.id, note: NOTE,
+    }));
+    expect(result.determination.status).toBe('requires_review');
+    const winnerAxes: GridAxisState[] = [
+      { builder: 'brownlow_finish_exact', params: { place: '1' } },
+      { builder: 'brownlow_top_finish', params: { place: '1' } },
+      { builder: 'brownlow_top_finish_min_times', params: { place: '1', times: '1' } },
+    ];
+    for (const axis of winnerAxes) {
+      const rows = await owner`SELECT p.id FROM players p WHERE p.id IN (${playerIds.c1},${playerIds.c2}) AND ${compileAxis(axis)}`;
+      expect(rows).toEqual([]);
+    }
+    const resolved = await recordBrownlowEligibilityForAdmin(superAdmin, {
+      season: SEASONS.tie, playerId: playerIds.c1, verdict: 'eligible', citation: CITATION, note: NOTE, expectedCurrentDecisionId: null,
+    }, deps());
+    expect(resolved.ok).toBe(true);
+    expect((await getBrownlowWinners()).filter((r) => r.season === SEASONS.tie).map((r) => r.playerId).sort((a,b) => a-b))
+      .toEqual([playerIds.c1,playerIds.c2].sort((a,b) => a-b));
+    expect(await rawVoteFingerprint()).toBe(before);
   });
 
   it('a ruling that one of the tied players is ineligible leaves the other as the sole winner', async () => {

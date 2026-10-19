@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  awardPath,
+  awardSeasonPath,
   NOT_RECORDED,
   coachProfilePath,
   formatHallOfFameClub,
@@ -16,6 +18,12 @@ import {
   playerPath,
   shouldShowUnmatched,
 } from '@/lib/format';
+
+it('Brownlow award links use its canonical publication, not retained named-medal rows', () => {
+  expect(awardPath('brownlow-medal')).toBe('/brownlow');
+  expect(awardSeasonPath('brownlow-medal', 2025)).toBe('/brownlow/2025');
+  expect(awardPath('coleman')).toBe('/awards/coleman');
+});
 
 describe('formatStat', () => {
   // The central data-correctness rule of the whole site.

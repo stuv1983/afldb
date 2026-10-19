@@ -24,6 +24,9 @@ commit.
 - Completed atomic, audited Brownlow eligibility publication without changing raw votes,
   including public-query updates, unresolved-leader refusal and joint winners. All 98 locally
   available historical seasons reconcile with the canonical medal interpretation.
+  Legacy generic Brownlow award URLs now redirect to its canonical pages; retained named-medal
+  rows cannot be published by generic award reads. Generic award criteria and rank-one Brownlow
+  criteria share the canonical winner flags, including refusal while a tied leader is unresolved.
 - Physically quarantined retained acquisition implementations, refused their former entry
   points, and prevented the offline Coleman bootstrap from overwriting canonical publications.
   Connection-scoped season locks survive historical import-batch commits; the real PostgreSQL

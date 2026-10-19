@@ -895,7 +895,7 @@ describe('grid solver correctness', () => {
       'games_asc',
     );
     const [expected] = await sql<{ count: string }[]>`
-      SELECT count(DISTINCT player_id) FROM brownlow_season_votes WHERE eligible_rank <= 1
+      SELECT count(DISTINCT player_id) FROM brownlow_season_votes WHERE is_winner
     `;
     expect(summary.eligible).toBe(Number(expected.count));
   });
