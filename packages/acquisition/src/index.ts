@@ -192,16 +192,6 @@ export {
   type AflApiFixtureTransition,
   type AflApiFixtureTransitionKind,
 } from './fixture-lifecycle';
-export {
-  AFL_API_FIXTURE_SOURCE_KEY,
-  settleAflApiFixtureStage,
-  type AflApiFixtureAction,
-  type AflApiFixtureActionKind,
-  type AflApiFixtureProvenance,
-  type AflApiFixtureSettleOutcome,
-  type AflApiFixtureWriterRefusal,
-  type AflApiFixtureWriterRefusalCode,
-} from './fixture-writer';
 // @v2-stage3:reconciliation-report
 // The machine-readable reconciliation report (pure; types only from the writer modules).
 export {

@@ -1,10 +1,75 @@
-# AFLDB V2 — final report (close of Stage 6, 2026-10-19)
+# AFLDB V2 — final report (close of Launch F, 2026-10-19; first written at Stage 6)
 
 Everything the owner's final response needs, from committed evidence. Detail lives in the
-documents linked from each section. **Nothing was pushed, tagged or deployed; no production, DEV
-or test database, host, service or network endpoint was contacted or changed by any V2 launch.**
-The production migration is **not** complete: the code is implemented locally, not shadow-tested
-and not cut over.
+documents linked from each section. **Nothing was pushed, tagged or deployed, and no production,
+DEV or shared database, host or service was contacted or changed by any V2 launch.**
+- Launch F used only a loopback-only PostgreSQL 16 cluster it created on this workstation
+  (`tools/v2/isolated-pg.ts`).
+- Its only network call was one read-only GET of the public AFL API compSeasons list.
+
+The production migration is **not** complete. The code is implemented and verified locally on
+isolated PostgreSQL. It is not shadow-tested on production data and not cut over.
+
+## 0. Launch F (2026-10-19): what changed since Stage 6
+
+**Commits** (`0f46c3ae..v2/rebuild`, oldest first):
+
+| Commit | What |
+|---|---|
+| `7762df6e` | merge(v2-awards): migrations 113/114, Brownlow eligibility, Coleman projection, curated revisions |
+| `d760280e` | AFL API pre-match fixture writer (ISSUE-229 writer, V2-GAP-008) |
+| `aeea63d1` | retire every legacy writer entry point in V2; refuse the release while one can run |
+| `d31cd2d7` | isolated-cluster historical rebuild target (`--target isolated`) |
+| `9fc07c07` | rehearse the 111-114 reversal and the shadow mechanics on isolated PG16; retire the AFL Tables copy |
+| the final-verification commit (`docs(v2-final)`) | final verification: fixture writer moved out of the pure package index, docs, evidence |
+
+**Verification**:
+
+| Check | Result |
+|---|---|
+| full `vitest run --no-cache` (once, no DSN) | Test Files 93 failed / 198 passed / 2 skipped (293); Tests 9 failed / 10353 passed / 39 skipped (10401); 349.9 s |
+| ⤷ against the 102-line baseline | 98 ` FAIL ` lines. 92 are on the baseline list, and 10 baseline lines no longer fail (local data and environment). 6 are new: 4 V2 integration files that need a DSN (environmental); 1 DraftGuru frozen sample (environmental, see below); and 1 real regression, `v2-acquisition-pipeline` (f), fixed below. No test was weakened, removed or skipped |
+| `tsc --noEmit --incremental false` | exit 0 (also after the final fix) |
+| `eslint .` (once) | 235 errors / 131 warnings (ceiling 253/132). Every finding is pre-existing: per-file counts for the touched files are unchanged from `0f46c3ae`. The one Launch F finding (`pgtool.cjs` `require`) was fixed by converting the file to `pgtool.mjs`; the moved and edited files lint with 0 findings |
+| `npm run build` (webpack) against isolated `afldb_v2_visual_test`, telemetry off | exit 0; 1,516/1,516 static pages; `prepare-standalone` exit 0 (no `.env*` in the standalone bundle). Run once, after the last code change (V2-GAP-002 closed) |
+| historical rebuild `rebuild-test.ts --target isolated` | 30/30 stages; migrations 001-114; FINAL VALIDATION PASSED (89 checks). Sources: tracked fitzRoy `full-history-20260902` and DraftGuru `annual-html-20260826` |
+| integration on isolated PG16 | `afldb_v2_main_test` (schema-only, 001-114): V2 suites plus `privileges`, 134/134. Rebuilt history: 26 files, 670 passed, 14 failed, 52 skipped. The 14 are pinned to `afldb_test` by design (3 files), `v2-coleman-publication` refusing real Coleman rows (it passes schema-only), and the pre-existing drift in V2-GAP-028 |
+| PostgreSQL forward and rollback (`rollback-runbook.md` §7) | empty database → 001-114 → reversal R5 (0 tables, 0 ledger rows) → schema identical to 001-110 → re-forward, with schema and grants identical. **Application rollback (§4) not rehearsed** |
+| shadow mechanics (`docs/v2/evidence/launchF/`) | synthetic copy of the local rebuild reversed to pre-V2, guard, captures, 111-114 with privileges, captures: parity **VERDICT PASS (5/5)**; manifest identical; Coleman agrees 46/46 (1980-2025). **Not production parity**: no approved production backup was used |
+| fixture writer | 17/17 integration, 67/67 contract; dry run of the tracked 2026 feed on the rebuild: 217 CONCLUDED, 1 SCHEDULED (`CD_M20260142901` would be created), 0 refused, 0 rows left |
+| admin visual check | the production build served from 127.0.0.1:3901 with synthetic staff and proposals. 13 screens were captured as Super Admin and Admin at 1280x800 and 390x844 (26 images plus `capture-log.txt`), all HTTP 200, 0 horizontal overflow, 0 console errors and 0 non-loopback requests. The agent inspected them; one stale AFL Tables copy was found and fixed before this capture. The owner's verdict is pending (V2-GAP-022) |
+
+**One regression found by the final suite and fixed.**
+- **What failed:** `tests/v2-acquisition-pipeline.test.ts` (f) found SQL in the
+  `@afldb/acquisition` index closure.
+- **Cause:** the fixture writer had been placed in the package.
+- **Fix:** it now lives at `src/lib/acquisition/afl-api-fixture-writer.ts`, as the index comment
+  always said.
+- **Re-verified:** focused suites 144/144, the integration suite 17/17, and tsc 0.
+
+**Two environmental failure classes:**
+- Four new V2 integration files refuse without a `_test` DSN, the same class as the 85 baseline
+  integration files.
+- `draftguru-acquisition` "frozen Stage B1 sample" fails because the git-ignored sample records
+  the absolute path of the checkout that built it (`D:/dev/afldb/...`). It became active only
+  because Launch F copied that ignored local data into this checkout for the rebuild; the tool and
+  its inputs are byte-identical to the source.
+
+**Gaps:**
+- **Closed:** V2-GAP-002, 012, 017, 018, 019 and 024.
+- **Narrowed:** 001, 003, 007, 008, 009, 011, 013, 015, 016, 021, 022 and 026.
+- **New:** 028.
+- **Remaining production-only cutover blockers:** 008 (ISSUE-229 B2: no 2027 season exists
+  yet), 011 and 013 (disabling the timers in the release window, which the cutover preflight
+  enforces).
+
+**Verdicts:**
+- Local development: **GO**.
+- Isolated shadow rehearsal on production data: **GO, conditional** on S-A1..S-A5. Its mechanics
+  are already proven locally.
+- Production cutover: **NO-GO** (`go-no-go.md` §1).
+
+
 
 ## 1. Outcome
 
@@ -51,7 +116,7 @@ outside V2's authority: the AFL Tables nightly settle (ISSUE-316: D-316-1, then 
 email-intake timer (cutover-runbook step 4). Python/R tools stay in place (V2-GAP-014).
 Matrix: `docs/v2/legacy-disposition.md`.
 
-## 3. Verification at the close of Stage 6
+## 3. Verification at the close of Stage 6 (historical; Launch F results are in §0)
 
 | Check | Result |
 |---|---|
@@ -103,7 +168,7 @@ a write failure); verdict precedence FAIL > INCOMPLETE > PASS; five required che
 29. `7d012257` docs(v2-docs): Stage 6 shadow rehearsal plan, cutover and rollback runbooks, go/no-go record, risk register and final report
 30. the Stage 6 closure-record commit (`docs(v2-docs)`: afldb-closure PASS_WITH_FINDINGS, LOW/INFO only)
 
-## 5. Gaps (27 open; none closed by V2)
+## 5. Gaps at the close of Stage 6 (historical: 27 open; Launch F state in §0 and `known-gaps.md`)
 
 Full table with the owner action per gap: `docs/v2/known-gaps.md`. Production blockers:
 
@@ -114,7 +179,7 @@ Full table with the owner action per gap: `docs/v2/known-gaps.md`. Production bl
 | reconciliation | 015 (Coleman on real seasons), 016 (Brownlow eligibility rule, owner decision) |
 | not blockers | 004, 005, 014, 018, 020, 023, 025, 027 (Low); 006, 010, 012, 019, 021, 024 (Medium) |
 
-## 6. Top risks (`docs/v2/risk-register.md`)
+## 6. Top risks at the close of Stage 6 (historical; current ranking in `docs/v2/risk-register.md`)
 
 1. RISK-01 AFL API fixtures cannot be ingested (V2-GAP-008).
 2. RISK-02 the AFL Tables nightly settle remains a production writer (V2-GAP-011).
@@ -144,6 +209,9 @@ deployed C4 and before D-316-4) and AFLDB-ISSUE-229 B2. Exact list: `docs/v2/go-
 1. Review this branch (`git log ff100dc2..v2/rebuild`) and the documents above.
 2. Decide the rehearsal approvals S-A1..S-A5; when granted, an operator runs
    `docs/v2/shadow-rehearsal.md` and fills in its §10 record.
-3. Decide V2-GAP-016 and V2-GAP-024 (they gate award approvals in production) and fix or disable
-   the user-level hook (V2-GAP-004).
-4. Keep the ISSUE-316 sequence on its own track; V2 neither executes nor shortens it.
+3. Give eyeball verdicts on `docs/v2/evidence/launchF-visual/` (V2-GAP-022). Confirm the Brownlow
+   projection path (V2-GAP-016). Choose the AFL Tables release ordering (A-AFLT vs ISSUE-316 C5,
+   RISK-27). Fix or disable the user-level hook (V2-GAP-004).
+4. Capture ISSUE-229 B2 once the 2027 season is published, then dry-run and approve the first
+   fixture apply.
+5. Keep the ISSUE-316 sequence on its own track; V2 neither executes nor shortens it.

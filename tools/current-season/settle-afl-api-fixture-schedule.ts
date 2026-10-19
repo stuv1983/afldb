@@ -34,14 +34,16 @@ import postgres from 'postgres';
 import {
   parseAcknowledgedUnobservedStatuses,
   parseSourceFamilyRegistry,
-  settleAflApiFixtureStage,
   stageAflApiFixtureFeed,
-  type AflApiFixtureSettleOutcome,
   type AflApiFixtureStage,
 } from '@afldb/acquisition';
 import { postgresExecutor } from '@afldb/db';
 
 import { parseAflApiIdentities } from '../../src/lib/acquisition/afl-api-bundle';
+import {
+  settleAflApiFixtureStage,
+  type AflApiFixtureSettleOutcome,
+} from '../../src/lib/acquisition/afl-api-fixture-writer';
 import {
   describeAflApiIngestionReadFailure,
   readAflApiIngestionControls,

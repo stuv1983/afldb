@@ -12,7 +12,7 @@ DB=afldb_v2_shadow_test
 ISO="npx tsx tools/v2/isolated-pg.ts"
 TSX="node node_modules/tsx/dist/cli.mjs"
 in_db() { $ISO run $DB -- "$@"; }
-psqlq() { in_db node "$S/pgtool.cjs" "$BIN/psql.exe" "$@"; }
+psqlq() { in_db node "$S/pgtool.mjs" "$BIN/psql.exe" "$@"; }
 SEASONS=$(psqlq -At -c "SELECT string_agg(DISTINCT season::text, ' ') FROM staging.afl_api_brownlow_vote WHERE family = 'brownlow_match_votes'" 2>/dev/null || true)
 
 captures() { # $1 = before|after

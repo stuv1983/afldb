@@ -24,7 +24,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   parseAcknowledgedUnobservedStatuses,
   parseSourceFamilyRegistry,
-  settleAflApiFixtureStage,
   stageAflApiFixtureFeed,
   type AflApiFixtureContractContext,
   type AflApiFixtureStage,
@@ -32,6 +31,7 @@ import {
 import { postgresExecutor } from '@afldb/db';
 
 import { parseAflApiIdentities, type AflApiIdentities } from '@/lib/acquisition/afl-api-bundle';
+import { settleAflApiFixtureStage } from '@/lib/acquisition/afl-api-fixture-writer';
 
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_IMPORT_DATABASE_URL ?? process.env.AFLDB_TEST_DATABASE_URL;
 

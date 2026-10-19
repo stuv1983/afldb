@@ -22,6 +22,48 @@ gaps as `V2-GAP-NNN` in `docs/v2/known-gaps.md` instead of allocating `AFLDB-ISS
 deliberate departure from CLAUDE.md §5 so the fork cannot collide with the mainline ledger
 (ADR 0003). `issues.md` and `IssuesIndex.md` are left as inherited.
 
+#### Launch F — awards integration, fixture writer, legacy retirement, isolated rebuild and verification - 19 October 2026
+
+- **Awards (merged `7762df6e`).**
+  - Migrations 113 (`brownlow_eligibility_decisions`) and 114 (`derived_award_projections`,
+    curated four-eyes and approved revisions). Both are append-only, with no UPDATE, DELETE or
+    TRUNCATE grants.
+  - Brownlow eligibility decisions and the Coleman projection into `award_winners` (ADR 0014,
+    0015).
+- **AFL API pre-match fixture writer (`d760280e`, AFLDB-ISSUE-229, V2-GAP-008).**
+  - New: `npm run settle:afl-api-fixture-schedule -- --label <snapshot>
+    (--validate-only|--dry-run|--apply)`.
+  - Pipeline: snapshot, validation, staging, explicit club and venue resolution, I-1/I-2/I-3
+    reconciliation, then one idempotent transaction. Any refusal writes nothing.
+  - `POSTPONED`, `CANCELLED` and `ABANDONED` need a per-run operator acknowledgement and never
+    create a row.
+  - Admin `editFixture` refuses provider-owned rows (`provider_owned`).
+  - Not applied outside isolation; B2 (the first 2027 pre-match feed) is still required.
+  - The SQL writer lives in `src/lib/acquisition/afl-api-fixture-writer.ts`. Only the pure
+    lifecycle and staging are in `@afldb/acquisition`, whose index stays free of SQL; the final
+    full suite caught the misplaced first version, and it was moved before release.
+- **Legacy writers retired in V2 (`aeea63d1`; V2-GAP-011, 012, 013).**
+  - `npm run settle:afltables`, `deploy/afldb-settle-afltables.sh` (after its out-of-season
+    exit) and the email-intake poller each refuse with `AFLDB_LEGACY_RETIRED_V2`.
+  - The AFL API settle and the settle report no longer import `settle-afltables.ts`; shared
+    helpers moved to `settle-shared.ts`.
+  - Contributors no longer see the retired "Upload a file" link.
+  - The new `tools/v2/cutover-preflight.ts legacy-writers` is read-only. It refuses the release
+    while either legacy timer, a running legacy unit or the on-demand AFL Tables polkit rule
+    remains.
+  - Cutover runbook step 4a lists the reversible window commands; none was executed.
+- **Isolated historical rebuild (`d31cd2d7`).** `tools/db/rebuild-test.ts --target isolated
+  --acknowledge-destroy afldb_v2_hist_test` runs only inside `tools/v2/isolated-pg.ts run` and
+  proves the live server before any stage. It completed all 30 stages; FINAL VALIDATION PASSED
+  (89 checks).
+- **Verification (`9fc07c07`).**
+  - `docs/v2/rollback-111-114.sql` and runbook §5 cover 111-114. The reversal leaves a schema
+    identical to 001-110, and re-forward is identical to the first forward.
+  - Shadow mechanics on a synthetic copy: parity PASS (5/5); Coleman 46/46 seasons agree on local
+    data.
+  - The operations centre no longer advises installing the retired AFL Tables trigger.
+  - None of this is production parity.
+
 #### Stage 6 — shadow rehearsal tooling, runbooks and the go/no-go record - 19 October 2026
 
 - New offline shadow parity tool `tools/v2/shadow-parity.ts` (policy `v2.parity.1`, pure core in

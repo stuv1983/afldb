@@ -1,63 +1,75 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
-Status: recorded at the close of Stage 6 (Launch E, 2026-10-19), the last V2 stage. The criteria
-are the owner's (`docs/v2/owner-instruction-2026-10-19.md`, "Go/no-go criteria"); each is judged
-against committed evidence only. "Unverified" means the evidence would need a database, a build,
-a browser or a host that V2 may not use, not that the property is believed false. **No production
-system has been contacted or changed, and nothing has been pushed or deployed.**
+Status: updated at the close of Launch F (2026-10-19); first recorded at Stage 6 (Launch E). The
+criteria are the owner's (`docs/v2/owner-instruction-2026-10-19.md`, "Go/no-go criteria"), and
+each is judged against committed evidence only.
+
+Launch F added real PostgreSQL 16 evidence from an **isolated**, loopback-only local cluster of
+`afldb_v2_*_test` databases (`docs/v2/isolated-rebuild.md`):
+- a historical rebuild from the tracked local sources;
+- the integration suites;
+- the production build;
+- rendered admin pages;
+- the shadow mechanics;
+- the 111-114 database reversal.
+
+That evidence is **local rehearsal mechanics, not production parity**: no production dump or
+approved backup was used. "Unverified" still means the evidence needs production data, Linux or a
+host. **No production system has been contacted or changed, and nothing has been pushed or
+deployed.**
 
 ## 1. Verdicts
 
 | Decision | Verdict | Why |
 |---|---|---|
-| Continue local development | **GO** | Every stage is committed with closure records; the local gates hold (tsc 0, full-suite failures equal the 102-line baseline, repo-wide ESLint at the 253/132 ceiling, generator checks 0); no `.env`, no DSN, no network is needed |
-| Run the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`) | **GO, conditional** on the owner's approvals S-A1..S-A5 (§4.1). It touches no production system: it restores a dump into `afldb_v2_shadow_test` on a rehearsal host | The tooling, isolation guard, thresholds and procedure exist and are unit-tested; none has met real data, which is exactly what the rehearsal is for (V2-GAP-026) |
-| Production cutover (V2 release and the AFL API cutover) | **NO-GO** | Open cutover blockers V2-GAP-008, 011 and 013; the rehearsal (and so both rollback paths) has never run; award results are not shown reconcilable (V2-GAP-015/016); ISSUE-316's production gates are unsatisfied and D-316-13 has not been approved after a deployed C4 (§3) |
+| Continue local development | **GO** | Launch F is committed, and the local gates hold at its close. tsc is 0. The full suite (run once, no DSN) has 98 failing lines, none of them a code regression: 92 are baseline lines; 4 are new integration files that need a DSN, like the other integration files; 1 is a frozen DraftGuru sample that is environmental (`final-report.md` §3); 1 was a real regression, fixed and re-verified. Repo-wide ESLint is 235 errors / 131 warnings, under the 253/132 ceiling, with no new finding. The isolated PG16 cluster gives every developer-run integration suite a real database without touching a shared one |
+| Run the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`) | **GO, conditional** on the owner's approvals S-A1..S-A5 (§4.1). It touches no production system: it restores a dump into `afldb_v2_shadow_test` on a rehearsal host | Launch F ran the mechanics end to end on isolated PG16 with locally rebuilt data, and both passed: the guard, the captures, 111-114 with privileges, and parity (PASS 5/5) for one; the database reversal and re-forward (schemas identical) for the other. What remains is exactly what needs real data or a host: the production-dump parity, the backup and the application rollback (V2-GAP-026) |
+| Production cutover (V2 release and the AFL API cutover) | **NO-GO** | Production-only blockers remain: V2-GAP-008: ISSUE-229 B2 is uncaptured, because no 2027 season exists yet; V2-GAP-011 and V2-GAP-013: the legacy timers are still enabled on the host. The preflight refuses the release until they are disabled under A-AFLT/A-REL; The real-data rehearsal and the application rollback have not run; Award results are not shown reconcilable on production data (V2-GAP-015/016); The ISSUE-316 production gates are unsatisfied, and D-316-13 has not been approved after a deployed C4 (§3) |
 
-V2 is **implemented locally and not shadow-ready in the owner's full sense**: the label
-`shadow-ready` is not claimed, because several criteria in §2 are unverified until the rehearsal
-runs. Shadow-ready would still not mean cut over.
+V2 is **implemented and verified locally on isolated PostgreSQL 16, and not shadow-ready in the
+owner's full sense**. The label `shadow-ready` is not claimed: criteria 3, 7 and 8 still need
+production data, and criterion 10 needs host action. Shadow-ready would still not mean cut over.
 
 ## 2. The `shadow-ready` criteria, one by one
 
 | # | Criterion | State | Evidence |
 |---|---|---|---|
-| 1 | The existing frontend builds and its critical contracts are preserved | **unverified** (contracts met) | `npm run build` prerenders from a database and has never run in V2 (V2-GAP-002); `npx next typegen` and `tsc` pass; public routes and their tests unchanged; the Stage 5 admin pages never rendered with data (V2-GAP-022) |
-| 2 | Existing PostgreSQL data retained without destructive migration | **met by design**, unexecuted on PostgreSQL | migrations 111/112 only create tables (ADR 0004; `docs/v2/cutover-runbook.md` §2); applied only on PGlite (V2-GAP-017) |
+| 1 | The existing frontend builds and its critical contracts are preserved | **met locally** | `npm run build` exit 0 against the isolated database, 1,516 static pages (V2-GAP-002 closed); the operations pages were rendered from that build and captured at 1280x800 and 390x844 (`docs/v2/evidence/launchF-visual/`). The owner's eyeball verdict is pending (V2-GAP-022) |
+| 2 | Existing PostgreSQL data retained without destructive migration | **met**, executed on isolated PG16 | migrations 111-114 only create tables or widen constraints (ADR 0004). On a copy of the local rebuild, the manifest before and after 111-114 compared identical. The reversal leaves a schema identical to 001-110 (`rollback-runbook.md` §7) |
 | 3 | Stable identifiers and relationships preserved or explicitly mapped | **met** (no id is changed); proof on real data pending | no migration alters an existing table; the manifest digests stable id columns as facts and the parity check fails on any change (plan §7 R-045); never run on real data (V2-GAP-007) |
-| 4 | AFL API ingestion snapshot-based, validated, replayable and idempotent | **met in code and unit tests**; PostgreSQL idempotence unverified | Stage 3 (`replayAflApiSnapshot`, `aflApiPlanDigest`, the settle CLI seal); settle integration suites unexecuted (V2-GAP-009); the rehearsal replays one snapshot twice (§7) |
-| 5 | Promotion transactional and fails closed | **met in code**; unverified on PostgreSQL | Stage 3 promotion and the Stage 4 publishers use one transaction and refuse on any check; V2-GAP-009, V2-GAP-017 |
-| 6 | Fixtures and players cannot be silently fabricated | **met** for players (refusal, never a placeholder: Stage 3 resolution tests); fixtures are **not written at all** by the AFL API path (V2-GAP-008, a cutover blocker) | `tests/v2-*` resolution suites; known-gaps 008 |
-| 7 | Brownlow reconciliation passes | **unverified** (synthetic only); one owner decision open | `tests/v2-brownlow-reconciliation.test.ts`; no eligibility rule for API-era seasons (V2-GAP-016); no staged leaderboard (V2-GAP-023) |
-| 8 | Coleman derivation passes for winners, ties and incomplete seasons | **met on synthetic inputs** | `tests/v2-coleman.test.ts`; no real season compared (V2-GAP-015) |
-| 9 | Curated awards require review and retain citations and audit history | **met in code and PGlite tests**; PostgreSQL unverified | Stage 4 workflow, Stage 5 actions with the D9 action card; four-eyes is an open owner decision (V2-GAP-019); V2-GAP-017 |
-| 10 | Runtime code has no dependency on CSV, AFL Tables, Squiggle or Kali | **not met** | every admin path to CSV/Squiggle/Kali refuses (Stage 5); the AFL Tables nightly settle still runs on the host behind ISSUE-316 (V2-GAP-011), the email-intake timer still runs until cutover-runbook step 4 (V2-GAP-013), and the AFL API settle imports helpers from `settle-afltables.ts` (V2-GAP-012) |
+| 4 | AFL API ingestion snapshot-based, validated, replayable and idempotent | **met**, isolated PG16 | settle suites 5 of 7 pass on the isolated rebuild; 2 are pinned to `afldb_test` by design (V2-GAP-009); the fixture writer replays idempotently (17/17) |
+| 5 | Promotion transactional and fails closed | **met**, isolated PG16 | settle and fixture refusals write nothing (integration suites); publishers are tested in the awards suites (V2-GAP-017 closed) |
+| 6 | Fixtures and players cannot be silently fabricated | **met in code and on isolated PG16**; first real 2027 feed pending | player refusal (Stage 3). The fixture writer (Launch F) resolves clubs and venues explicitly, refuses an unresolved or ambiguous identity, never creates a club or venue, and refuses unobserved statuses unless acknowledged. B2 is uncaptured (V2-GAP-008) |
+| 7 | Brownlow reconciliation passes | **unverified on API-era data**; rule decided | eligibility rule implemented (ADR 0014, migration 113; V2-GAP-016 narrowed); no committed API-era inputs or staged leaderboard (V2-GAP-010, 023) |
+| 8 | Coleman derivation passes for winners, ties and incomplete seasons | **met on synthetic inputs and on locally rebuilt history** | 46/46 seasons (1980-2025) agree on the local rebuild; production data not compared (V2-GAP-015) |
+| 9 | Curated awards require review and retain citations and audit history | **met**, isolated PG16 | four-eyes with a recorded attestation, audited revision and revalidation (V2-GAP-018, 019, 024 closed); `v2-curated-awards` passes on PG16 |
+| 10 | Runtime code has no dependency on CSV, AFL Tables, Squiggle or Kali | **met in code; not met on the host** | a V2 checkout refuses the AFL Tables settle and the email poller; no runtime import remains (V2-GAP-012 closed). The AFL Tables and email-intake timers are still enabled on the production host until the release window (V2-GAP-011, 013), and the cutover preflight refuses the release until they are disabled |
 | 11 | Valuable historical tools are safely quarantined | **partly met** | TypeScript entry points refuse through the retired-entry registry; Python/R tools stay in place (V2-GAP-014) |
-| 12 | Admin operations are narrow, permissioned and audited | **met in code and tests** | capability guards, one audit row per mutation and per refusal (Stage 5 closure); not exercised against PostgreSQL (V2-GAP-017) |
-| 13 | Tests, type checking and linting pass | **not met in full** (no regression) | tsc 0; the full suite's 102 failing lines are the pre-existing, environmental baseline (`docs/v2/evidence/baseline-failures.txt`, V2-GAP-003); repo-wide ESLint 253 errors / 132 warnings, all pre-existing; every file V2 created or edited lints with 0 errors |
+| 12 | Admin operations are narrow, permissioned and audited | **met**, isolated PG16 | capability guards and audit rows (Stage 5); `privileges.test.ts` and the awards suites pass on PG16; pages rendered for Admin and Super Admin |
+| 13 | Tests, type checking and linting pass | **met, with no regression** (environmental failures documented) | tsc 0. The full suite has 98 failing lines against the 102-line baseline (`final-report.md` §3); the one real regression it found was fixed and its suites re-run (144/144 unit, 17/17 integration). The integration suites ran on isolated PG16, with the residue classified in V2-GAP-028. Repo-wide ESLint is 235 / 131, all pre-existing, and every file created or edited in Launch F lints with 0 findings |
 | 14 | Production access is not needed to run the test suite | **met** | ADR 0005: the test setup strips DSNs and refuses any non-`_test` database |
-| 15 | Migration, comparison, rollback and cutover instructions are complete | **met as written**; rollback untested | `cutover-runbook.md`, `rollback-runbook.md`, `shadow-rehearsal.md`, parity policy `v2.parity.1`; V2-GAP-026 |
+| 15 | Migration, comparison, rollback and cutover instructions are complete | **met**; DB rollback rehearsed locally, application rollback untested | `cutover-runbook.md` (now with step 4a and 111-114), `rollback-runbook.md` §5 (111-114) and §7 record; V2-GAP-026 |
 | 16 | No secrets are committed | **met** | no `.env*` beyond `.env.example`; DSNs in tests are synthetic placeholders; closure scans at every stage |
-| 17 | No production action has occurred | **met** | V2 has no remote; no database, ssh, deploy or network command was run in any launch (progress records) |
+| 17 | No production action has occurred | **met** | V2 has no remote; no production or shared database, ssh, deploy or service command was run in any launch. Launch F's only network use was one read-only GET of the public AFL API compSeasons list |
 
 ## 3. Production no-go conditions
 
 | Condition (owner's list) | Holds today? | Evidence |
 |---|---|---|
-| Fixture identity can duplicate or misassign matches | **yes, blocks**: the AFL API fixtures writer is unbuilt and ISSUE-229 B2 is uncaptured | V2-GAP-008 |
+| Fixture identity can duplicate or misassign matches | **yes, blocks until B2**: the writer is built and refuses ambiguity, but it has never seen a 2027 pre-match feed | V2-GAP-008 |
 | Player resolution creates placeholders or silently guesses | no | Stage 3 refusal tests |
 | API coverage is assumed rather than verified | no: 2012-2025 API coverage is not claimed | V2-GAP-010, `docs/v2/coverage-matrix.md` |
 | Historical data would be deleted or rewritten destructively | no | additive migrations; seal checks (V2-GAP-006 for other writers) |
-| Brownlow or Coleman results cannot be reconciled | **not yet shown reconcilable: blocks** | V2-GAP-015, 016 |
+| Brownlow or Coleman results cannot be reconciled | **not yet shown on production data: blocks** (Coleman 46/46 on local data) | V2-GAP-015, 016 |
 | The frontend requires unplanned breaking schema changes | no | no existing table changed |
-| Admin actions can bypass validation, permissions or auditing | no (code and tests); unexecuted on PostgreSQL | Stage 5 closure; V2-GAP-017 |
-| Runtime still depends on legacy ingestion | **yes, blocks** | V2-GAP-011, 013 |
+| Admin actions can bypass validation, permissions or auditing | no (code, tests, isolated PG16) | Stage 5 closure; V2-GAP-017 closed |
+| Runtime still depends on legacy ingestion | **yes on the host, blocks**: the code refuses, but the timers remain enabled until the release window | V2-GAP-011, 013; cutover runbook step 4a |
 | Shadow comparison thresholds are undefined | no: policy `v2.parity.1` | `shadow-rehearsal.md` §8 |
-| Rollback is untested or unclear | **untested: blocks** | `rollback-runbook.md` §7, V2-GAP-026 |
+| Rollback is untested or unclear | **application rollback untested: blocks** (the DB reversal was rehearsed locally) | `rollback-runbook.md` §7, V2-GAP-026 |
 | ISSUE-316 production gates remain unsatisfied | **yes, blocks** | `issues/open/AFLDB-ISSUE-316.md` §7-§8 |
 | D-316-13 not separately approved after the required C4 result | **yes, blocks** | ISSUE-316 §7 C4b |
 
-## 4. Every approval still required (none exists today)
+## 4. Every approval still required (none exists today; the Launch F owner decisions are recorded in ADR 0014, 0015 and 0008)
 
 ### 4.1 To run the isolated shadow rehearsal
 
@@ -77,12 +89,12 @@ runs. Shadow-ready would still not mean cut over.
 | V2-GAP-004 | fix or disable the user-level Read/Grep/Glob hook that runs in the source worktree; decide on the stray `supplies` |
 | V2-GAP-005 | whether AFLW joins the historical manifest |
 | V2-GAP-006 | database-level seal enforcement |
-| V2-GAP-016 | the Brownlow eligibility rule for API-era seasons |
-| V2-GAP-019 | four-eyes approval for curated awards |
-| V2-GAP-021 | the correction workflow for projecting Coleman results into `award_winners` |
-| V2-GAP-024 | fix the curated-approval page revalidation first, or accept up to a day of lag (no production approvals until decided) |
-| contributor role | whether the contributor "Upload data" navigation (now a retired page) stays (RISK-21) |
-| V2-GAP-022 | eyeball verdicts for every Stage 5 page (`admin-operations.md` §6), images or VISUAL: UNVERIFIED |
+| V2-GAP-016 | decided (ADR 0014); remaining: confirm the projection path and run the blast-radius count |
+| V2-GAP-019 | decided and built (ADR 0008, four-eyes with attestation); nothing remaining |
+| V2-GAP-021 | decided and built (ADR 0015); remaining: retire the offline loader's coleman group for covered seasons |
+| V2-GAP-024 | built (Launch F); nothing remaining |
+| contributor role | whether the contributor role keeps a purpose; Launch F removed its retired Upload link (RISK-21) |
+| V2-GAP-022 | eyeball verdicts for every Stage 5 page (`admin-operations.md` §6) against `docs/v2/evidence/launchF-visual/` |
 | V2-GAP-015 | review every Coleman `disagree` found by the rehearsal |
 
 ### 4.3 Production release approvals (V2 release track, `cutover-runbook.md`)
@@ -92,8 +104,9 @@ runs. Shadow-ready would still not mean cut over.
 | A-REHEARSAL | accept the rehearsal record (`shadow-rehearsal.md` §10): parity PASS or every FAIL reconciled, rollbacks rehearsed |
 | A-BACKUP | the production backup and the read-only before-manifest (`rollback-runbook.md` §2 gate B; reading production with the manifest producer's non-test flags) |
 | A-GO | the owner's signed GO on this document's production row (cutover precondition P1) |
-| A-REL | the release window: writers paused per the production release procedure, the email-intake timer disabled (step 4), migrations 111-112, privileges, code (precondition P5) |
+| A-REL | the release window: writers paused per the production release procedure, the email-intake timer disabled (step 4), the AFL Tables timer disabled and its polkit rule moved (step 4a, under A-AFLT), `tools/v2/cutover-preflight.ts legacy-writers` PASS, migrations 111-114, privileges, code (precondition P5) |
 | A-ROLLBACK | standing authority to run `rollback-runbook.md` §4/§5 inside the window if a gate fails |
+| A-AFLT | disable the AFL Tables nightly timer in the V2 release window (step 4a). Either ISSUE-316 C5 has already done it, or the owner accepts ending AFL Tables acquisition at that point (after D-316-1's final acquisition; RISK-27) |
 
 ### 4.4 AFL API cutover approvals (ISSUE-316 track; V2 executes, grants or shortens none)
 

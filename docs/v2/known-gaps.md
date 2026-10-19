@@ -1,9 +1,13 @@
 # AFLDB V2 — known gaps, blockers and deferred work
 
 `V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
-close it. An entry is removed only when the closing evidence exists. **Final state at the close of
-Stage 6 (Launch E, 2026-10-19): 27 gaps, none closed by V2 itself; every closing action below needs
-the owner or an operator acting under the owner's approval.**
+close it. A gap is marked CLOSED only when its closing evidence exists; closed entries are kept
+with that evidence. **State at the close of Launch F (2026-10-19): 28 gaps.**
+- **Closed (6), each on the isolated PostgreSQL 16 cluster:** 002, 012, 017, 018, 019 and 024.
+- **Open (22).** The remaining **production-only** cutover blockers are 008 (B2), 011 and 013.
+  Their reversible steps are documented; none was executed.
+- Each closure below names its evidence. "Isolated" means the loopback-only cluster of
+  `tools/v2/isolated-pg.ts` (`docs/v2/isolated-rebuild.md`), never production.
 
 Production-blocker classes (`docs/v2/go-no-go.md` §3): **cutover** — structural, must be resolved
 before an AFL API-only production pipeline; **rehearsal** — closed only by executing the isolated
@@ -12,36 +16,38 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 | ID | Severity | Area | Production blocker | State | Owner action |
 |---|---|---|---|---|---|
-| V2-GAP-001 | Medium | test safety | rehearsal | open: unverifiable locally | approve the shadow integration run (`shadow-rehearsal.md` §7) |
-| V2-GAP-002 | Medium | frontend build | rehearsal | open: needs a database | approve the shadow build (§6) |
-| V2-GAP-003 | Medium | environment | rehearsal | open: inherited, environmental | approve the Linux suite run (§7) |
+| V2-GAP-001 | Medium | test safety | rehearsal | open, narrowed (Launch F): the strip held for 26 integration files run on isolated PG16; not yet run on a Linux `afldb_test` | approve the Linux integration run (S-A5) |
+| V2-GAP-002 | Medium | frontend build | no | **CLOSED (Launch F)**: `npm run build` exit 0 against the isolated `afldb_v2_visual_test`, telemetry disabled | none |
+| V2-GAP-003 | Medium | environment | rehearsal | open, narrowed (Launch F): integration suites ran on Windows against isolated PG16; Linux/POSIX still unexercised | approve the Linux suite run (§7) |
 | V2-GAP-004 | Low | source worktree hygiene | no | open: owner action | fix or disable the user-level Read/Grep/Glob hook; decide whether to delete the stray `supplies` |
 | V2-GAP-005 | Low | historical baseline scope | no | open: AFLW not covered by the manifest | decide whether AFLW joins the manifest |
 | V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open | decide on database-level seal enforcement |
-| V2-GAP-007 | Medium | historical baseline | rehearsal | open: manifest producer never run | approve the shadow captures (§4), then a read-only production run (cutover runbook step 3) |
-| V2-GAP-008 | High | AFL API fixtures | **cutover** | **open** (AFLDB-ISSUE-229 B2 and the unbuilt fixtures writer) | capture B2 and decide the ISSUE-229 items; fund the writer |
-| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open: transactional preservation unexecuted on PostgreSQL | approve the settle integration suites (§7) |
+| V2-GAP-007 | Medium | historical baseline | rehearsal | open, narrowed (Launch F): the producer ran repeatedly on the isolated rebuild with identical results; no real-baseline manifest | approve the shadow captures (§4), then a read-only production run (cutover runbook step 3) |
+| V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
+| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed (Launch F): 5 of 7 `settle-afl-api*` files pass on the isolated rebuild; the 2 `afldb_test`-pinned files need Linux `afldb_test` | approve the settle integration suites on `afldb_test` (§7) |
 | V2-GAP-010 | Medium | AFL API coverage | no (coverage is not claimed) | open: 2012-2025 API coverage has no committed evidence | decide which seasons to evidence |
-| V2-GAP-011 | High | legacy runtime | **cutover** | **open**, narrowed (Stage 5): the admin trigger refuses; the nightly settle, `npm run settle:afltables` and the trigger library stay until the ISSUE-316 sequence retires them (D-316-1 at C2; the timer disabled by C5 under D-316-4) | the ISSUE-316 decisions; V2 executes none |
-| V2-GAP-012 | Medium | legacy runtime | no (code dependency only) | open: AFL API settle imports shared helpers from `settle-afltables.ts` | none (V2 follow-up) |
-| V2-GAP-013 | High | legacy runtime | **cutover** | **open**, narrowed (Stages 5-6): every admin path refuses; disabling the email-intake timer is now cutover-runbook step 4, not executed; the converted integration suites are unexecuted | approve the release window that disables the timer; approve the integration run |
+| V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains | approve A-AFLT (disable the timer in the window) or complete ISSUE-316 C5 |
+| V2-GAP-012 | Medium | legacy runtime | no | **CLOSED (Launch F)**: helpers moved to `settle-shared.ts`, both edges removed from the ratchet, settle integration suites pass on isolated PG16 | none |
+| V2-GAP-013 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): the poller refuses in V2; the preflight refuses the release while the email-intake timer runs | approve the release window (step 4, 4a) |
 | V2-GAP-014 | Low | legacy quarantine | no | open: Python/R tools not physically quarantined | none (V2 follow-up) |
-| V2-GAP-015 | Medium | Coleman | reconciliation | open: derived on synthetic inputs only; no real season compared | approve the shadow Coleman capture (§4/§8) and review every `disagree` |
-| V2-GAP-016 | Medium | Brownlow | reconciliation | open: owner decision: no eligibility rule for API-era seasons | state the rule |
-| V2-GAP-017 | Medium | Stage 4-5 SQL | rehearsal | open: migrations 111+, their grants and the Stage 5 operations-centre SQL unexecuted on PostgreSQL | approve the shadow migration and privileges steps (§5) |
-| V2-GAP-018 | Low | curated awards | no | open: revising an approved proposal is refused | none (V2 follow-up) |
-| V2-GAP-019 | Medium | curated awards | no | open: no four-eyes rule on approval | decide whether to require it |
+| V2-GAP-015 | Medium | Coleman | reconciliation | open, narrowed (Launch F): 46/46 seasons (1980-2025) agree on the locally rebuilt history; production data not compared | approve the shadow Coleman capture on the production dump (§4/§8) |
+| V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed (Launch F): rule decided and implemented (ADR 0014); the projection path and blast-radius count remain | confirm the projection path (ADR 0014) |
+| V2-GAP-017 | Medium | Stage 4-5 SQL | no | **CLOSED (Launch F)**: 111-114 applied, privileges run, `privileges` and awards integration suites pass, operations pages rendered (isolated PG16) | none |
+| V2-GAP-018 | Low | curated awards | no | **CLOSED (Launch F)**: `reviseApprovedProposal` (ADR 0008), PostgreSQL-tested | none |
+| V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
 | V2-GAP-020 | Low | curated awards | no | open: winners without a resolved player identity cannot be approved | none |
-| V2-GAP-021 | Medium | Coleman | no | open, narrowed (Stage 5): the operations centre calls the publisher; published results are still not projected into `award_winners` | choose the projection's correction workflow |
-| V2-GAP-022 | Medium | admin UI | rehearsal | open: Stage 5 admin pages never rendered (VISUAL: UNVERIFIED) | eyeball the pages on the shadow app (§6) |
+| V2-GAP-021 | Medium | Coleman | no | open, narrowed (Launch F): projection into `award_winners` built (ADR 0015); the offline loader's coleman group is not retired | retire the loader group for publisher-covered seasons |
+| V2-GAP-022 | Medium | admin UI | rehearsal | open, narrowed (Launch F): real pages captured from the production build at 1280x800 and 390x844 (`docs/v2/evidence/launchF-visual/`); the owner's eyeball verdict is pending | record a verdict per screen |
 | V2-GAP-023 | Low | Brownlow | no | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping | none (V2 follow-up) |
-| V2-GAP-024 | Medium | curated awards | no (workaround: no production approvals until fixed) | open: approving a curated award does not refresh the cached public award pages | decide: fix first, or accept up to a day of lag |
+| V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | open: no operations-centre view of AFL API settle refusals | none (V2 follow-up) |
-| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | **open (Stage 6)**: the rehearsal, the parity and capture tools on real data, and both rollback paths have never run | approve and schedule the rehearsal (approvals S-A1..S-A5 in `go-no-go.md` §4) |
+| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed (Launch F): the mechanics (parity PASS 5/5) and the 111-114 DB reversal are rehearsed on isolated PG16 with local data; the production-dump rehearsal and the application rollback have not run | approve S-A1..S-A5 |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
+| V2-GAP-028 | Low | integration tests | no | open (Launch F): admin-draft, awards-reload-links, admin-season-lists and a match-admin-delete teardown fail on the isolated rebuild; files untouched by V2 | run on Linux `afldb_test` (S-A5), fix at the cause |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
+- **Launch F (2026-10-19).** 26 integration files ran on isolated PG16 databases with `AFLDB_TEST_DATABASE_URL` present and the strip active. No suite reached a non-`_test` database. A Linux `afldb_test` run is still needed.
 - **What.** When `AFLDB_TEST_DATABASE_URL` names a `_test` database, `applyTestDsnPolicy`
   (`packages/testing/src/dsn-policy.ts`) now also removes every other `*DATABASE_URL*` variable
   that does not name a `_test` database (for example an operator `.env`'s
@@ -58,6 +64,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-002 — The production frontend build is unexecuted in V2
 
+- **CLOSED, Launch F (2026-10-19).** `npm run build` (`next build --webpack`, then `prepare-standalone`) exited 0 against the isolated, disposable `afldb_v2_visual_test`, with `NEXT_TELEMETRY_DISABLED=1`. It prerendered all 1,516 static pages. The captures in `docs/v2/evidence/launchF-visual/` were served from that build.
 - **What.** `npm run build` (`next build --webpack`) was not run.
 - **Why.** It needs a database: ten routes export `generateStaticParams` that query PostgreSQL
   (for example `src/app/seasons/[year]/page.tsx:54`, `src/app/venues/[slug]/page.tsx:35`), and
@@ -69,6 +76,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-003 — Integration, Linux and POSIX behaviour is not exercised on the V2 workstation
 
+- **Launch F (2026-10-19).** The integration suites ran on Windows against isolated PG16; results are in `docs/v2/final-report.md` §3. Linux and POSIX are still unexercised.
 - **What.** 85 integration suites refuse to load without a `_test` database; 15 unit cases fail
   for Windows-checkout or POSIX-execution reasons or because git-ignored evidence is absent from a
   fresh clone (exact list: `docs/v2/evidence/baseline-failures.txt`).
@@ -133,6 +141,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-007 — No manifest of the real baseline exists yet
 
+- **Launch F (2026-10-19).** `historical-manifest.ts produce` ran on isolated copies of the locally rebuilt history (32 tables, 1,376 buckets). The before and after manifests around migrations 111-114 compared identical. No manifest of the real baseline exists.
 - **What.** The producer (`tools/v2/historical-manifest.ts produce`) is tested only through a fake
   query function; its SQL has never executed on PostgreSQL, so a server-side error (for example a
   column privilege, or the memory cost of `string_agg` on the largest season) is possible.
@@ -143,6 +152,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-008 — CUTOVER BLOCKER: AFL API pre-match fixtures are not ingestible (AFLDB-ISSUE-229)
 
+- **Launch F (2026-10-19, `d760280e`).** The writer is built and tested (AFLDB-ISSUE-229 runbook §7). Only B2, the first authentic 2027 pre-match feed, and the owner's first-apply approval remain. A read-only check of the public compSeasons list shows no 2027 season yet.
 - **What.** The AFL API cannot yet create or update AFLDB `fixtures` rows. AFLDB-ISSUE-229 is open
   (`issues.md` ~:41898; runbook `issues/open/AFLDB-ISSUE-229.md`). Genuinely unresolved, so V2
   did not invent the answer:
@@ -176,6 +186,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-009 — Transactional preservation of promoted data is not executed on PostgreSQL
 
+- **Launch F (2026-10-19).** On the isolated rebuild, `settle-afl-api.test.ts` (73 tests), `-brownlow`, `-brownlow-reschedule`, `-fixtures` and `-issue276` pass. `-brownlow-backtest` and `-state-b` refuse any database not named `afldb_test`, by design.
 - **What.** "Preserve previous promoted data when validation fails" is proved at the plan level
   only (`tests/v2-acquisition-replay.test.ts`: a unit that fails validation is a build failure and
   is never planned; the full-rollback counter normalisation zeroes every durable counter). The
@@ -203,6 +214,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-011 — CUTOVER BLOCKER: the AFL Tables runtime remains until the ISSUE-316 retirement
 
+- **Launch F (2026-10-19).** A V2 checkout refuses the AFL Tables settle: `npm run settle:afltables`, and the deploy script after its out-of-season exit. `tools/v2/cutover-preflight.ts legacy-writers` refuses the release while the timer is enabled, a unit is running or the on-demand polkit rule remains. The reversible window commands are cutover-runbook step 4a; none was executed. Production-only remainder: disable the timer (approval A-AFLT, or ISSUE-316 C5).
 - **What.** The AFL Tables nightly settle (`deploy/afldb-settle-afltables.timer` -> `.sh` ->
   `acquire_core.R` -> `import_fitzroy_core.py` -> `tools/current-season/settle-afltables.ts` ->
   `src/lib/acquisition/settle-afltables.ts`), `npm run settle:afltables`, and the admin trigger
@@ -236,6 +248,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-012 — The AFL API settle depends on helpers that live in `settle-afltables.ts`
 
+- **CLOSED, Launch F (2026-10-19, `aeea63d1`).** The helpers are now in `src/lib/acquisition/settle-shared.ts`; `settle-afl-api.ts` and `settle-report.ts` import it, and their ratchet edges are removed. The settle integration suites pass on isolated PG16 (see 009).
 - **What.** `src/lib/acquisition/settle-afl-api.ts:134-140` imports
   `automaticProposalUnderAuthority`, `scopeProposalToAuthority`, `PLAYER_MATCH_STAT_COLUMNS`,
   `CANONICAL_APPLY_ISSUE_OWNER` and `CANONICAL_APPLY_ISSUE_TYPE`, and
@@ -250,6 +263,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-013 — CUTOVER BLOCKER: the email-intake timer still runs; the CSV, email and Squiggle/Kali admin paths now refuse
 
+- **Launch F (2026-10-19).** `tools/email_intake/fetch_and_stage.py`, executed directly, refuses before reading the environment or the mailbox. The cutover preflight refuses the release while the email-intake timer can run. Production-only remainder: cutover-runbook step 4, not executed.
 - **What.** CSV upload (`src/app/admin/upload/**`), CSV submission review and promotion
   (`src/app/admin/submissions/[id]/actions.ts` -> `src/lib/ingest/pipeline.ts` ->
   `datasets.ts`), the email intake route (`src/app/api/admin/email-intake/route.ts`, fed by
@@ -302,6 +316,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-015 — The Coleman derivation has run on synthetic inputs only
 
+- **Launch F (2026-10-19).** `shadow-award-reports.ts coleman` on the locally rebuilt history (1980-2025) reports agree 46, disagree 0, not derivable 0. Comparing production data still needs the shadow rehearsal.
 - **What.** `deriveColeman` and the comparison report (`@afldb/derived`, ADR 0006) are tested on
   SYNTHETIC inputs (`tests/v2-coleman.test.ts`). No real season has been derived, and no
   comparison against the stored Coleman `award_winners` rows has been produced.
@@ -312,6 +327,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-016 — OWNER DECISION: Brownlow eligibility rule for API-era seasons
 
+- **Launch F (2026-10-19).** The rule is decided and implemented (ADR 0014; `brownlow_eligibility_decisions`, migration 113; PostgreSQL-tested). It stays open per ADR 0014's disposition: the projection path and the blast-radius count remain.
 - **What.** The reconciliation (`@afldb/derived`, ADR 0007) refuses a leader determination when an
   ineligible player polled votes, unless the caller selects `stored_eligible_rank_one` (the
   stored-table rule in `src/lib/brownlow/entry.ts`). No rule is recorded for API-era seasons, or
@@ -323,6 +339,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-017 — The Stage 4 migrations and grants are unexecuted on PostgreSQL
 
+- **CLOSED, Launch F (2026-10-19).** Migrations 001-114 were applied by the runner and `tools/db/privileges.ts` ran on isolated `afldb_v2_*_test` databases. `privileges.test.ts` and the V2 awards suites passed 134/134. Every operations-centre page rendered against them from the production build. The 111-114 reversal was rehearsed (`docs/v2/rollback-runbook.md` §7). A database named `afldb_test` was not used: the isolated cluster's `_test` databases served instead.
 - **What.** `src/db/migrations/111_curated_award_proposals.sql` and
   `112_derived_award_results.sql`, their `tools/maintenance/privileges.sql` blocks, the two new
   `tests/integration/privileges.test.ts` cases, the promotion inventory with its two extra tables
@@ -347,6 +364,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-018 — Revising an approved curated award is refused
 
+- **CLOSED, Launch F.** `reviseApprovedProposal` (migration 114, ADR 0008) records the revision and its ledger row in one transaction. `tests/integration/v2-curated-awards.test.ts` passes on isolated PG16.
 - **What.** `reviseProposal` refuses an approved proposal (`approved_revision_unsupported`).
   Correcting a promoted winner today uses the existing replace/correct lifecycle in
   `src/db/queries/admin-awards.ts`, which does not link back to the proposal chain.
@@ -356,6 +374,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-019 — No four-eyes rule on curated award approval
 
+- **CLOSED, Launch F.** Owner decision (ADR 0008): the creator may approve only with a written self-approval attestation recorded in the ledger. Tested on PGlite and isolated PG16; rendered in `docs/v2/evidence/launchF-visual/04-*`.
 - **What.** A holder of `data.awards.edit` may approve a proposal they created themselves. Every
   transition is still attributed in the append-only ledger.
 - **Why.** No existing AFLDB workflow enforces separation of duties, and the owner has not asked
@@ -371,6 +390,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-021 — Published Coleman results are not projected into `award_winners`
 
+- **Launch F (2026-10-19).** The projection into `award_winners` is built (ADR 0015, `derived_award_projections`, migration 114) and PostgreSQL-tested. Still open: the offline loader's coleman group is not retired (the rebuild's `coleman` stage still runs it), and production execution is pending.
 - **What.** `publishColemanResult` writes only the `derived_award_results` ledger (migration 112).
   The Coleman `award_winners` rows the public site reads remain owned by the offline
   `tools/migration/import_awards.py` coleman group. Nothing reads `derived_award_results` yet, and
@@ -390,6 +410,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-022 — The Stage 5 admin pages have never been rendered (VISUAL: UNVERIFIED)
 
+- **Launch F (2026-10-19).** The real pages were served by the production build from the isolated database, with synthetic staff, synthetic proposals and locally rebuilt history. 13 screens were captured as Super Admin and Admin at 1280x800 and 390x844, in `docs/v2/evidence/launchF-visual/` with `capture-log.txt`: HTTP 200, 0 horizontal overflow, 0 console errors and 0 external requests on every capture. The agent inspected the images and fixed one stale-copy defect. The owner's verdict is still required to close this gap.
 - **What.** No real page of the operations centre (`/admin/operations`, `/awards`, `/awards/[id]`,
   `/coleman`, `/brownlow`) and none of the changed admin pages (`/admin`, `/admin/current-season`,
   `/admin/upload`, `/admin/submissions/[id]`, the sidebar) has been rendered in a browser: each needs
@@ -417,6 +438,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-024 — Approving a curated award does not refresh the cached public award pages
 
+- **CLOSED, Launch F.** Approval returns the server-computed revalidation paths, which the page posts to `/admin/awards/revalidate` (ADR 0008). Tested on isolated PG16 (`v2-curated-awards`).
 - **What.** An approval writes `award_winners` through `insertAwardWinner`, but the operations
   centre does not trigger revalidation of the public award pages (`src/app/awards/**` use
   `revalidate = 86400`), so a new winner can be missing from those pages for up to a day per
@@ -439,6 +461,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-026 — The shadow rehearsal, the parity and capture tools on real data, and both rollback paths have never run
 
+- **Launch F (2026-10-19).** The mechanics and the DB reversal were rehearsed on isolated PG16 with local data, NOT a production dump (see `rollback-runbook.md` §7 and `docs/v2/evidence/launchF/`). The synthetic shadow copy went through 111-114 pending → applied, and parity returned VERDICT PASS (5/5). For the reversal, the 001-114 → 001-110 schema is identical and re-forward is identical. Still open: the production-dump rehearsal, real-data parity, the application rollback (§4, redeploying `PREV`) and the backup step (§2).
 - **What.** Stage 6 wrote the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`), the
   parity tool (`tools/v2/shadow-parity.ts`, policy `v2.parity.1`), the capture tools
   (`tools/v2/shadow-capture.ts`, `tools/v2/shadow-award-reports.ts`), the target guard
@@ -464,3 +487,20 @@ award results must be shown reconcilable before production; **no** — not a pro
   found while designing the Stage 6 parity inputs.
 - **Close.** Emit the report from `settle-afl-api.ts` (an `--report-out <file>` option), test it,
   and add it to the parity inputs under a new policy version.
+
+## V2-GAP-028 — Four integration files disagree with the rebuilt history and current code
+
+- **What.** These failures appeared on the isolated rebuild `afldb_v2_hist_test` (2026-10-19):
+  - `tests/integration/admin-draft.test.ts`: 11 failures. Manual picks 301/210 are refused with
+    "Pick number must be at most 200", and the dependent cases fail after them.
+  - `awards-reload-links.test.ts`: 1 failure. The pins are stale: 1,375 captaincies records
+    against 1,781 loaded, and 863 named-medal ids against 1,191 read.
+  - `admin-season-lists.test.ts`: 2 failures. The appearances projection for `maxYear` is empty.
+  - `match-admin-delete.test.ts`: its tests pass, but the teardown FK
+    (`data_edits_admin_user_id_fkey`) fails.
+
+  No file involved changed in V2 (`git diff 0f46c3ae..` is empty for them).
+- **Why open.** It is unknown whether a Linux `afldb_test` rebuilt at the same commit reproduces
+  them. The isolated rebuild ran without the DraftGuru bridge dataset.
+- **Close.** Run the four files on Linux `afldb_test` (S-A5). Fix each test or the code at its
+  cause, and never weaken an assertion.

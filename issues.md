@@ -15,7 +15,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
+| AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); D-229-1..8a decided; B1 COMPLETE; 2026-10-19 (V2 Launch F, `v2/rebuild` `d760280e`): fixture writer built and tested on isolated PostgreSQL 16 (17/17 integration; the 2026 feed dry-runs clean); never applied outside isolation; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture the first authentic 2027 pre-match feed (no 2027 compSeason exists yet), validate-only and dry-run it, then the owner approves the first apply |
 | AFLDB-ISSUE-266 | Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin | High | Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py` | Open (2026-10-08); 2026-10-08 full code review F-001; reproduced DB-free (W1; W2 adds substring injection and an unbound pass); D-266-1 and D-266-2 decided 2026-10-09; implemented and committed as `077af7ee`, merged and pushed to main; pre-commit review fixed two parser gaps (runbook §18.8); DB-free suite 160/160 on Windows Python 3.12.10 and 3.14.4 and on Linux (streamanator, CPython 3.12.3, 2026-10-09; runbook §18.9); **deployed to DEV only** (`7adfb3e8` → `077af7ee`, 2026-10-09; deployed suite 160/160, operator-reported; build and service unchanged; DEV `preflight` BLOCKED by nine untracked settle manifests, not passed; runbook §18.10); PROD inspected, not deployed (held at `cd3cf782` during ISSUE-265 observation); neither host has an intake timer, cron reference, IMAP settings or authserv-id in the places checked, so the fix is dormant; live mail not tested, no host accepted | Before intake is activated on any host: verify the receiving server's header insertion, forged-header removal, authserv-id and a legitimate message's format, set `AFLDB_INTAKE_AUTHSERV_ID`, then `--dry-run` a legitimate and a non-passing message (runbook §18.6, §18.10.8); PROD gets the code after ISSUE-265's observation |
 | AFLDB-ISSUE-267 | Override replay writes NULL period scores from a partial `score` override | High | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-002; implemented 2026-10-09 with ISSUE-269; **operator integration run 2026-10-09 FAILED (6 failed)**: replay `matches_score_components_ck` 23514 (components and totals written in two UPDATEs) and fixture cleanup `club_seasons_season_fkey` (score save derived 2 `club_seasons` rows; baseline 1,624 → 1,626); second fix pass: one atomic UPDATE, cleanup owns the derived ladder rows in one transaction; `py_compile`, `tsc` and source-contract 69/69 green; residue recovery dry run passed and rolled back, commit attempt refused before any DELETE (ladder rows already absent; remover unknown), fresh census empty with `club_seasons_total` 1,624; **second integration run 2026-10-09 10:47:03 PASSED on `afldb_test` (`afldb_owner`): 6 passed, 37 filtered skips, 33.80 s; implementation validated on `afldb_test`**; **DEV exposure census complete 2026-10-09** (operator-run before deployment; `afldb_dev`, `afldb_import`, read-only; 0 active `matches` overrides, sections 1–5 no rows, no replay blockers); **committed as `86e2d19fa6936f73872da45c7b5cb3200e274543`, merged to `main` and pushed; DEV deployed 2026-10-09** (operator-confirmed: `common.py` no working-tree diff from HEAD; migrations 110/110, nothing to apply; build OK, `BUILD_ID` `Jlf_U7HZnqispmedF-TaS`; respawn 844885 → 849656, active since 11:40:00 AEDT; readiness after 2 s; health ok, database ok, 28 ms); the deployment did not exercise the Python matches replay; **PROD exposure census complete 2026-10-09** (operator-run; `afldb_prod` via SSH alias `afldb`, `postgres`, read-only, `== Done.`, psql exit 0; 0 active `matches` overrides, sections 1–5 no rows, no section-3/4 replay blockers; does not establish the fix is installed on PROD); `merge:ready -- --issue 267` READY twice (after a fresh fetch too), 0 blockers, 2 metadata warnings (no `afldb-merge-readiness` JSON block in the ISSUE-267 runbook; no automated unexpected-file classification metadata); PROD installation deferred (PROD held at `cd3cf782` for ISSUE-265's observation; `cd3cf782..86e2d19f` measured at 9 commits, 40 files (assistant read-only review of GitHub's comparison, not operator-run Git evidence), no migration/package/deploy/next.config.ts change, but includes ISSUE-261's settle/retry change); historical corruption not established, historical impact remains unassessed, nothing repaired; runbook `issues/open/AFLDB-ISSUE-267.md` §17.10–§17.15 | The applicable after the ISSUE-265 observation hold at `cd3cf782` lifts, prepare and review a deployment procedure for this release (r6 pack must not be reused; range includes ISSUE-266 and ISSUE-261; preflight manifest FAILs expected), then the PROD deployment acceptance (§17.15: verify the installed `common.py`); then resolve with ISSUE-269 |
 | AFLDB-ISSUE-268 | Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd | High | Legacy intake / NULL-vs-zero — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-003. Validator fix, promotion-time re-check of retained cells and tests (DB-free + integration) committed 2026-10-09 as `5659f789`, merged and pushed to `main`, and deployed to DEV 2026-10-09 (installation and operational acceptance complete; attendance validation/promotion not exercised on DEV, ISSUE-107 gate off so no live build-header parity claimed); operator checks at 15:11:57 passed (ingest-datasets 181/181, tsc, eslint, diff-check) and the targeted ISSUE-268 integration cases passed twice on `afldb_test` as the test owner (15:21:42, 15:30:35; restricted-role path and full integration file not validated); both operator-run censuses complete 2026-10-09 (DEV 15:59:22, PROD 16:02:57: no retained submissions, no rows in Sections 2–5, no exposure found in the records checked); historical impact unassessed, nothing repaired, fix not installed by the censuses; not installed on PROD | Operator: PROD installation and acceptance after the unchanged ISSUE-265 hold; D-268-1 and D-268-3 are separate follow-ups, not merge gates |
@@ -42055,6 +42055,46 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     tracked.
   - **Next action:** B2, the first authentic 2027 pre-match feed (TBC representation,
     whole-season shape validation), before the writer is wired or applied.
+- **2026-10-19 (AFLDB V2 Launch F, branch `v2/rebuild`, commit `d760280e`; isolated PostgreSQL 16 only):
+  the fixture writer is BUILT AND TESTED; still Open, because B2 is not captured.**
+  - **Code.**
+    - Pure staging: `packages/acquisition/src/fixture-lifecycle.ts`.
+    - One-transaction writer under the per-season advisory lock:
+      `src/lib/acquisition/afl-api-fixture-writer.ts`.
+    - CLI `npm run settle:afl-api-fixture-schedule -- --label <fixtures-only snapshot>
+      (--validate-only|--dry-run|--apply)`. It verifies the manifest and requires the seed feed,
+      then applies the season seal and the ingestion gate.
+  - **How it works.**
+    - Identity is `(source_id, source_record_id)` (D-229-7).
+    - Clubs and the venue are resolved explicitly; an unresolved or ambiguous one refuses.
+    - It checks I-1/I-2/I-3 against foreign and played rows and never merges a foreign row
+      (D-229-4).
+    - It writes no match-spine rows and runs no absence sweep (D-229-8/8a).
+    - Any refusal writes nothing; no change writes nothing; a replay is idempotent.
+  - **Statuses.**
+    - `SCHEDULED` and `UNCONFIRMED_TEAMS` → scheduled (D-229-1).
+    - `CONCLUDED` → left to the match path.
+    - `POSTPONED`, `CANCELLED` and `ABANDONED` stay unobserved (D-229-3). Each refuses unless
+      the operator names it in a per-run `--acknowledge-unobserved-status`. Even then it only
+      updates an existing provider-owned row (postponed = TBC; cancelled/abandoned =
+      `cancelled` with a reason) and never creates one.
+  - **D-229-6.** `editFixture` refuses a provider-owned row (`provider_owned`, audited).
+  - **Validation.**
+    - `tests/integration/v2-fixture-writer.test.ts`: 17/17 on `afldb_v2_main_test` and on the
+      rebuilt `afldb_v2_hist_test`.
+    - `tests/v2-fixture-contract.test.ts`: 67/67.
+    - `tests/admin-fixture-actions.test.ts`: passes, including a new provider-owned refusal.
+    - tsc 0.
+    - A dry run of the tracked 2026 season feed against the locally rebuilt history: 217
+      CONCLUDED, 1 SCHEDULED, 0 refused; it would create `CD_M20260142901` (clubs and venue
+      resolved); 0 rows were left after the dry run.
+  - **Not done.**
+    - **B2:** a read-only check of the public compSeasons list (2026-10-19) shows no 2027 season
+      yet (latest `CD_S2026014`), so the first authentic 2027 pre-match feed cannot exist.
+    - No apply on any non-isolated database.
+    - No production action.
+  - **Next action:** capture B2 when the 2027 season is published. Run `--validate-only` and
+    `--dry-run` on it and review its TBC representation, then approve the first apply.
 
 ## AFLDB-ISSUE-231 — AFL API source-integrity hardening: retired-identity rekey and match-family absence sweep
 

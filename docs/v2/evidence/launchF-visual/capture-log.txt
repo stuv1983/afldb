@@ -1,0 +1,30 @@
+01-operations__desktop-1280x800.png as=super status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0
+03-awards-queue__desktop-1280x800.png as=super status=200 final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0
+04-proposal-validated-decide__desktop-1280x800.png as=super status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0
+06-proposal-rejected-history__desktop-1280x800.png as=super status=200 final=/admin/operations/awards/3 h1="Award proposal #3" horizontalOverflowPx=0 consoleErrors=0
+07-coleman__desktop-1280x800.png as=super status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0
+08-brownlow__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0
+09-brownlow-2025__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0
+10-current-season__desktop-1280x800.png as=super status=200 final=/admin/current-season h1="Current season" horizontalOverflowPx=0 consoleErrors=0
+11-upload-retired__desktop-1280x800.png as=super status=200 final=/admin/upload h1="Upload data" horizontalOverflowPx=0 consoleErrors=0
+12-admin-home__desktop-1280x800.png as=super status=200 final=/admin h1="Administration" horizontalOverflowPx=0 consoleErrors=0
+13-fixtures__desktop-1280x800.png as=super status=200 final=/admin/fixtures h1="Fixtures" horizontalOverflowPx=0 consoleErrors=0
+context desktop-1280x800/super blockedRequests=0
+02-operations-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0
+05-proposal-validated-readonly__desktop-1280x800.png as=admin status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0
+context desktop-1280x800/admin blockedRequests=0
+01-operations__mobile-390x844.png as=super status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0
+03-awards-queue__mobile-390x844.png as=super status=200 final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0
+04-proposal-validated-decide__mobile-390x844.png as=super status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0
+06-proposal-rejected-history__mobile-390x844.png as=super status=200 final=/admin/operations/awards/3 h1="Award proposal #3" horizontalOverflowPx=0 consoleErrors=0
+07-coleman__mobile-390x844.png as=super status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0
+08-brownlow__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0
+09-brownlow-2025__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0
+10-current-season__mobile-390x844.png as=super status=200 final=/admin/current-season h1="Current season" horizontalOverflowPx=0 consoleErrors=0
+11-upload-retired__mobile-390x844.png as=super status=200 final=/admin/upload h1="Upload data" horizontalOverflowPx=0 consoleErrors=0
+12-admin-home__mobile-390x844.png as=super status=200 final=/admin h1="Administration" horizontalOverflowPx=0 consoleErrors=0
+13-fixtures__mobile-390x844.png as=super status=200 final=/admin/fixtures h1="Fixtures" horizontalOverflowPx=0 consoleErrors=0
+context mobile-390x844/super blockedRequests=0
+02-operations-admin__mobile-390x844.png as=admin status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0
+05-proposal-validated-readonly__mobile-390x844.png as=admin status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0
+context mobile-390x844/admin blockedRequests=0

@@ -10,8 +10,8 @@ mkdir -p "$E"
 ISO="npx tsx tools/v2/isolated-pg.ts run"
 TSX="node node_modules/tsx/dist/cli.mjs"
 in_db() { local db=$1; shift; $ISO "$db" -- "$@"; }
-psqlq() { in_db "$1" node "D:/dev/afldbV2/docs/v2/evidence/launchF/pgtool.cjs" "$BIN/psql.exe" "${@:2}"; }
-dump() { in_db "$1" node "D:/dev/afldbV2/docs/v2/evidence/launchF/pgtool.cjs" "$BIN/pg_dump.exe" -s --no-owner "${@:3}" -f "$2"; }
+psqlq() { in_db "$1" node "D:/dev/afldbV2/docs/v2/evidence/launchF/pgtool.mjs" "$BIN/psql.exe" "${@:2}"; }
+dump() { in_db "$1" node "D:/dev/afldbV2/docs/v2/evidence/launchF/pgtool.mjs" "$BIN/pg_dump.exe" -s --no-owner "${@:3}" -f "$2"; }
 
 for d in afldb_v2_rbk_test afldb_v2_rbkbase_test; do npx tsx tools/v2/isolated-pg.ts drop-db $d --acknowledge-destroy $d | tail -1; npx tsx tools/v2/isolated-pg.ts create-db $d | tail -1; done
 echo "== A: forward 001-114 from an EMPTY database with the runner, then privileges"

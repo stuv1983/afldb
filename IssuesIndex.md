@@ -28,10 +28,15 @@
     sha256 `e39ac375cabf5f1fc2f182e4e7e28e53d072a4a8d49001320d163bb904867da7`).
   - Under the recorded D-229 decisions, both statuses map to fixture projection with AFLDB
     fixture status `scheduled`.
-  - No fixture writer has been built.
+  - **2026-10-19 (AFLDB V2 Launch F, `v2/rebuild` `d760280e`):** fixture writer built:
+    `packages/acquisition/src/fixture-lifecycle.ts`, `src/lib/acquisition/afl-api-fixture-writer.ts` and
+    `npm run settle:afl-api-fixture-schedule`. It resolves identity explicitly and fails closed;
+    promotion is one idempotent transaction; unobserved statuses are acknowledged per run. Tested
+    on isolated PostgreSQL 16 (17/17); the 2026 feed dry-runs clean. Never applied outside
+    isolation.
 - **Runbook:** `issues/open/AFLDB-ISSUE-229.md`.
-- **Next action:** B2: capture and review the first authentic 2027 pre-match season feed before
-  the fixture writer is wired or applied.
+- **Next action:** B2: capture the first authentic 2027 pre-match feed (no 2027 compSeason exists
+  as of 2026-10-19). Validate-only and dry-run it, then the owner approves the first apply.
 
 ### AFLDB-ISSUE-266 — Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin
 - **Severity:** High. **Area:** Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py`.

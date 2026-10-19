@@ -23,6 +23,9 @@
  * `fixture_key` of a new row is a fresh random UUID; the durable identity is the provider id.
  *
  * No absence sweep (D-229-8): a provider row that leaves a later feed is reported, never touched.
+ *
+ * It lives here, not in `@afldb/acquisition`: that package's index stays free of SQL and writers
+ * (tests/v2-acquisition-pipeline.test.ts (f)); its pure lifecycle and staging feed this module.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -30,8 +33,7 @@ import type { SqlExecutor, TransactionalSqlExecutor } from '@afldb/db';
 
 import { FIXTURE_SEASON_LOCK_NAMESPACE } from '@/lib/fixtures/spec';
 
-import type { AflApiFixtureProjection } from './fixture-contract';
-import type { AflApiFixtureStage, AflApiFixtureTransition } from './fixture-lifecycle';
+import type { AflApiFixtureProjection, AflApiFixtureStage, AflApiFixtureTransition } from '@afldb/acquisition';
 
 export const AFL_API_FIXTURE_SOURCE_KEY = 'afl_api';
 

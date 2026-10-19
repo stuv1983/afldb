@@ -1,5 +1,5 @@
-// usage: node pgtool.cjs <exe> [args...]; the isolated owner DSN is appended (psql: first) from the env.
-const { spawnSync } = require('child_process');
+// usage: node pgtool.mjs <exe> [args...]; the isolated owner DSN is appended (psql: first) from the env.
+import { spawnSync } from 'node:child_process';
 const [exe, ...args] = process.argv.slice(2);
 const dsn = process.env.AFLDB_TEST_DATABASE_URL;
 const full = /psql.exe$/i.test(exe) ? ['-X', '-q', '-v', 'ON_ERROR_STOP=1', ...args, dsn] : [...args, dsn];
