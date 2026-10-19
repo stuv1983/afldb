@@ -50,6 +50,15 @@ database; V2-GAP-002), every migrate/privileges/settle/acquire/rollover command,
 units, and anything that contacts DEV, production or the AFL API. The regression baseline and
 its pre-existing, environmental failures are recorded in `docs/v2/evidence/baseline-failures.txt`.
 
+**State (all six stages done, 2026-10-19).** V2 is implemented locally and **not deployed**:
+the AFL API pipeline contract (Stage 3), Coleman derivation, Brownlow reconciliation and curated
+awards (Stage 4), the audited operations centre at `/admin/operations` with the legacy admin
+controls refusing (Stage 5), and the shadow rehearsal tooling (Stage 6: `tools/v2/shadow-*.ts`).
+Verdicts (`docs/v2/go-no-go.md`): local development GO; an isolated shadow rehearsal GO only after
+the owner's approvals; production cutover **NO-GO**. Start with `docs/v2/final-report.md`, then
+`docs/v2/shadow-rehearsal.md`, `cutover-runbook.md`, `rollback-runbook.md`,
+`risk-register.md` and `known-gaps.md`. Every command in those runbooks is written, not executed.
+
 ## What AFLDB provides
 
 **Browsing and records**

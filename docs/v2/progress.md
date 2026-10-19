@@ -27,7 +27,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
 | 4 Derived + curated | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9`, `1374fc13` + this closure commit |
 | 5 Admin | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch D) | `68a026e2`, `458abe68`, `74d4b007` + this closure commit |
-| 6 | not started (Launch E) | — |
+| 6 Shadow-ready tooling, runbooks, go/no-go | done; afldb-closure CLOSURE_VERDICT (Launch E) | `d70389a8`, `0a3254cf`, DOCS_COMMIT + this closure commit |
 
 ## Stage 0 — evidence
 
@@ -347,16 +347,62 @@ answers 410 to any caller by design, R-031); C5-004 (LOW: the email-intake refus
 instead: nothing: ...", `packages/domain/src/legacy-retirement.ts`); C5-005 (INFO: this row, now
 updated). Not run by closure: `npm run build` (could reach a database), integration suites.
 
+## Stage 6 — shadow rehearsal tooling, runbooks and go/no-go (Launch E)
+
+Sub-agent returns: `.phaneslight/returns/launchE-20261019/` (git-ignored). No plan review was run
+(the launch continued the reviewed plan). No database, network, deploy or PostgreSQL command was
+run by any agent; every shadow and cutover command is written and statically tested, never executed.
+
+Milestone 1 (`d70389a8`, workers W1-W3 plus orchestrator): `@afldb/domain` shadow-target policy and
+the `afldb.v2.table-row-counts` v1 format; `@afldb/db` read-only row-count producer;
+`@afldb/derived` parity core (policy `v2.parity.1`); CLIs `tools/v2/shadow-parity.ts` (compare,
+coverage-export; exit 0 PASS / 1 FAIL / 2 INCOMPLETE / 3 ERROR), `tools/v2/shadow-capture.ts`,
+`tools/v2/shadow-award-reports.ts`, `tools/v2/shadow-guard.ts`. New suites:
+`v2-shadow-parity` 99, `v2-shadow-target` + `v2-shadow-capture` 149, `v2-shadow-award-reports` 59
+(307 tests, all passing). Worker findings: W2 F-001 (LOW, a percent-encoded DSN path judged
+differently from how postgres.js opens it) fixed by refusing `%`; W1 F-003 (LOW, a validator echoed
+the unsupported version value) fixed in `table-row-counts.ts`; the rest LOW/INFO, recorded.
+Offline smoke: `coverage-export` wrote 650 cells; `compare` with only coverage inputs exited 2
+(INCOMPLETE, coverage pass); `shadow-guard check` with an unset variable exited 2.
+
+Milestone 2 (`0a3254cf`, orchestrator MED): the admin text named D-316-2 as the decision that
+retires AFL Tables; corrected to D-316-1 (C2) and D-316-4 (C5) in two pages, the retired-trigger
+refusal and a comment, with the three pinning tests (plan §7 R-042). Wording only; VISUAL:
+UNVERIFIED (R-048). The Stage 5 "Gaps" narrative above says "until D-316-2"; read it as corrected
+by R-042.
+
+Documents: new `shadow-rehearsal.md`, `cutover-runbook.md`, `rollback-runbook.md`, `go-no-go.md`,
+`risk-register.md`, `final-report.md`; updated `known-gaps.md` (final table with the production
+blocker class and owner action per gap; new V2-GAP-026 High and 027 Low; 011 and 013 text),
+`plan.md` §7 R-042 to R-048, `architecture.md` §11, `legacy-disposition.md` L3/L4,
+`admin-operations.md`, `db-ownership-matrix.md`, README V2 section, CHANGELOG Stage 6 block.
+
+Stage-close results (orchestrator, committed tree, DSN variables unset):
+
+| Check | Result |
+|---|---|
+| full `npx vitest run --no-cache` (once, at stage close) | Test Files 96 failed / 188 passed / 2 skipped (286); Tests 15 failed / 9971 passed / 48 skipped (10034); 367.6 s; the 102 ` FAIL ` lines are identical to `docs/v2/evidence/baseline-failures.txt` (no new failure, none weakened) |
+| Stage 6 suites | `v2-shadow-parity` 99, `v2-shadow-target` + `v2-shadow-capture` 149, `v2-shadow-award-reports` 59: 307 passed |
+| `npx tsc --noEmit --incremental false` | exit 0 |
+| `npx next typegen` | exit 0 |
+| `npx eslint --no-cache .` | 253 errors, 132 warnings: unchanged, at the ceiling |
+| ESLint on the 22 code files Launch E created or edited | 0 errors, 0 warnings |
+| `tools/v2/coverage-matrix.ts --check`, `tools/v2/acquisition-stage-map.ts --check` | both exit 0 |
+| frozen ISSUE-316 files | source 19/19 sha256 match the snapshot; V2 18/19 equal, `CHANGELOG.md` differs by design |
+| source worktree status | differs from the snapshot only by `?? supplies` |
+
+## Next action for the owner
+
+1. Review `v2/rebuild` (`git log ff100dc2..v2/rebuild`) starting with `docs/v2/final-report.md`.
+2. Decide the rehearsal approvals S-A1..S-A5 (`docs/v2/go-no-go.md` §4.1); an operator then runs
+   `docs/v2/shadow-rehearsal.md` and fills in its §10 record.
+3. Decide V2-GAP-016 (Brownlow eligibility) and V2-GAP-024 (award-page revalidation); fix or disable
+   the user-level hook (V2-GAP-004).
+4. Production stays **NO-GO** until `go-no-go.md` §3 has no blocking line; the ISSUE-316 sequence
+   (D-316-1 ... D-316-13, D-316-4) is separate and is never executed by V2.
+
 ## Resumption point
 
-Stage 5 is done (closure PASS_WITH_FINDINGS, LOW/INFO only). **Launch E starts Stage 6**
-(final stage): parity and comparison tooling, shadow-run commands, cutover runbooks, the go/no-go
-record, the risk register and final closure. Read `docs/v2/plan.md` (stage 6 row, §7 R-030 to
-R-041), this file, `docs/v2/known-gaps.md` (the cutover blockers V2-GAP-008, 011 and 013; the
-operator-execution gaps 001, 002, 003, 007, 009, 010, 017 and 022; the owner decisions 016 and
-019), `docs/v2/legacy-disposition.md` (L3 timer, L4) and `docs/v2/admin-operations.md`. Stage 6
-must: put the email-intake timer's disablement in the cutover runbook in the same window as the
-Stage 5 deploy (V2-GAP-013); keep the AFL Tables settle behind the owner's D-316-2 (V2-GAP-011;
-never executed by V2); list every operator-executed verification (PostgreSQL migrations, grants
-and integration suites; the page eyeball list) as runbook steps, not as done; record go/no-go
-as **no-go** while any cutover blocker is open. Stage 6 has not been started.
+**All six V2 stages are done.** There is no further V2 launch in the plan. Any continuation is an
+owner decision from the list above; a new launch would read `docs/v2/final-report.md`,
+`go-no-go.md` and `known-gaps.md` first. The previous resumption text (Stage 5) is superseded.

@@ -1,35 +1,44 @@
 # AFLDB V2 — known gaps, blockers and deferred work
 
 `V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
-close it. An entry is removed only when the closing evidence exists.
+close it. An entry is removed only when the closing evidence exists. **Final state at the close of
+Stage 6 (Launch E, 2026-10-19): 27 gaps, none closed by V2 itself; every closing action below needs
+the owner or an operator acting under the owner's approval.**
 
-| ID | Severity | Area | State |
-|---|---|---|---|
-| V2-GAP-001 | Medium | test safety | open: unverifiable locally |
-| V2-GAP-002 | Medium | frontend build | open: needs a database |
-| V2-GAP-003 | Medium | environment | open: inherited, environmental |
-| V2-GAP-004 | Low | source worktree hygiene | open: owner action |
-| V2-GAP-005 | Low | historical baseline scope | open: AFLW not covered by the manifest |
-| V2-GAP-006 | Medium | historical baseline | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open |
-| V2-GAP-007 | Medium | historical baseline | open: manifest producer never run |
-| V2-GAP-008 | High | AFL API fixtures | **open: cutover blocker** (AFLDB-ISSUE-229 B2 and the unbuilt fixtures writer) |
-| V2-GAP-009 | Medium | AFL API promotion | open: transactional preservation unexecuted on PostgreSQL |
-| V2-GAP-010 | Medium | AFL API coverage | open: 2012-2025 API coverage has no committed evidence |
-| V2-GAP-011 | High | legacy runtime | **open: cutover blocker**, narrowed (Stage 5): the admin trigger refuses; the nightly settle, `npm run settle:afltables` and the trigger library stay until D-316-2 |
-| V2-GAP-012 | Medium | legacy runtime | open: AFL API settle imports shared helpers from `settle-afltables.ts` |
-| V2-GAP-013 | High | legacy runtime | **open: cutover blocker**, narrowed (Stage 5): every admin path refuses; the email-intake timer is still enabled (Stage 6) and the converted integration suites are unexecuted |
-| V2-GAP-014 | Low | legacy quarantine | open: Python/R tools not physically quarantined |
-| V2-GAP-015 | Medium | Coleman | open: derived on synthetic inputs only; no real season compared |
-| V2-GAP-016 | Medium | Brownlow | open: owner decision: no eligibility rule for API-era seasons |
-| V2-GAP-017 | Medium | Stage 4-5 SQL | open: migrations 111+, their grants and the Stage 5 operations-centre SQL unexecuted on PostgreSQL |
-| V2-GAP-018 | Low | curated awards | open: revising an approved proposal is refused |
-| V2-GAP-019 | Medium | curated awards | open: no four-eyes rule on approval |
-| V2-GAP-020 | Low | curated awards | open: winners without a resolved player identity cannot be approved |
-| V2-GAP-021 | Medium | Coleman | open, narrowed (Stage 5): the operations centre calls the publisher; published results are still not projected into `award_winners` |
-| V2-GAP-022 | Medium | admin UI | open: Stage 5 admin pages never rendered (VISUAL: UNVERIFIED); owner eyeball required before production |
-| V2-GAP-023 | Low | Brownlow | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping |
-| V2-GAP-024 | Medium | curated awards | open: approving a curated award does not refresh the cached public award pages |
-| V2-GAP-025 | Low | admin UI | open: no operations-centre view of AFL API settle refusals |
+Production-blocker classes (`docs/v2/go-no-go.md` §3): **cutover** — structural, must be resolved
+before an AFL API-only production pipeline; **rehearsal** — closed only by executing the isolated
+shadow rehearsal (`docs/v2/shadow-rehearsal.md`) and recording its evidence; **reconciliation** —
+award results must be shown reconcilable before production; **no** — not a production blocker.
+
+| ID | Severity | Area | Production blocker | State | Owner action |
+|---|---|---|---|---|---|
+| V2-GAP-001 | Medium | test safety | rehearsal | open: unverifiable locally | approve the shadow integration run (`shadow-rehearsal.md` §7) |
+| V2-GAP-002 | Medium | frontend build | rehearsal | open: needs a database | approve the shadow build (§6) |
+| V2-GAP-003 | Medium | environment | rehearsal | open: inherited, environmental | approve the Linux suite run (§7) |
+| V2-GAP-004 | Low | source worktree hygiene | no | open: owner action | fix or disable the user-level Read/Grep/Glob hook; decide whether to delete the stray `supplies` |
+| V2-GAP-005 | Low | historical baseline scope | no | open: AFLW not covered by the manifest | decide whether AFLW joins the manifest |
+| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open | decide on database-level seal enforcement |
+| V2-GAP-007 | Medium | historical baseline | rehearsal | open: manifest producer never run | approve the shadow captures (§4), then a read-only production run (cutover runbook step 3) |
+| V2-GAP-008 | High | AFL API fixtures | **cutover** | **open** (AFLDB-ISSUE-229 B2 and the unbuilt fixtures writer) | capture B2 and decide the ISSUE-229 items; fund the writer |
+| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open: transactional preservation unexecuted on PostgreSQL | approve the settle integration suites (§7) |
+| V2-GAP-010 | Medium | AFL API coverage | no (coverage is not claimed) | open: 2012-2025 API coverage has no committed evidence | decide which seasons to evidence |
+| V2-GAP-011 | High | legacy runtime | **cutover** | **open**, narrowed (Stage 5): the admin trigger refuses; the nightly settle, `npm run settle:afltables` and the trigger library stay until the ISSUE-316 sequence retires them (D-316-1 at C2; the timer disabled by C5 under D-316-4) | the ISSUE-316 decisions; V2 executes none |
+| V2-GAP-012 | Medium | legacy runtime | no (code dependency only) | open: AFL API settle imports shared helpers from `settle-afltables.ts` | none (V2 follow-up) |
+| V2-GAP-013 | High | legacy runtime | **cutover** | **open**, narrowed (Stages 5-6): every admin path refuses; disabling the email-intake timer is now cutover-runbook step 4, not executed; the converted integration suites are unexecuted | approve the release window that disables the timer; approve the integration run |
+| V2-GAP-014 | Low | legacy quarantine | no | open: Python/R tools not physically quarantined | none (V2 follow-up) |
+| V2-GAP-015 | Medium | Coleman | reconciliation | open: derived on synthetic inputs only; no real season compared | approve the shadow Coleman capture (§4/§8) and review every `disagree` |
+| V2-GAP-016 | Medium | Brownlow | reconciliation | open: owner decision: no eligibility rule for API-era seasons | state the rule |
+| V2-GAP-017 | Medium | Stage 4-5 SQL | rehearsal | open: migrations 111+, their grants and the Stage 5 operations-centre SQL unexecuted on PostgreSQL | approve the shadow migration and privileges steps (§5) |
+| V2-GAP-018 | Low | curated awards | no | open: revising an approved proposal is refused | none (V2 follow-up) |
+| V2-GAP-019 | Medium | curated awards | no | open: no four-eyes rule on approval | decide whether to require it |
+| V2-GAP-020 | Low | curated awards | no | open: winners without a resolved player identity cannot be approved | none |
+| V2-GAP-021 | Medium | Coleman | no | open, narrowed (Stage 5): the operations centre calls the publisher; published results are still not projected into `award_winners` | choose the projection's correction workflow |
+| V2-GAP-022 | Medium | admin UI | rehearsal | open: Stage 5 admin pages never rendered (VISUAL: UNVERIFIED) | eyeball the pages on the shadow app (§6) |
+| V2-GAP-023 | Low | Brownlow | no | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping | none (V2 follow-up) |
+| V2-GAP-024 | Medium | curated awards | no (workaround: no production approvals until fixed) | open: approving a curated award does not refresh the cached public award pages | decide: fix first, or accept up to a day of lag |
+| V2-GAP-025 | Low | admin UI | no | open: no operations-centre view of AFL API settle refusals | none (V2 follow-up) |
+| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | **open (Stage 6)**: the rehearsal, the parity and capture tools on real data, and both rollback paths have never run | approve and schedule the rehearsal (approvals S-A1..S-A5 in `go-no-go.md` §4) |
+| V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -200,8 +209,12 @@ close it. An entry is removed only when the closing evidence exists.
   (`src/app/admin/current-season/actions.ts` `startSettleRunAction` -> `settle-trigger.ts`) are
   still runtime paths in V2 (`docs/v2/legacy-disposition.md` L4, L5). They write the match spine,
   staging, promotion and derived tables (`legacy-disposition.md` §5).
-- **Why.** Retiring them is the owner's ISSUE-316 decision D-316-2 (the C4b cutover), which V2 may
-  not execute. The shell script, the trigger and the network register are frozen ISSUE-316 files.
+- **Why.** Retiring them is the owner's ISSUE-316 sequence, which V2 may not execute: D-316-1 (C2)
+  writes the AFL Tables switch `retired` in the 2026 rollover (and optionally disables the timer),
+  and the timer must be disabled by C5 under D-316-4, which needs a recorded C4b PASS (D-316-13,
+  never before C4 is deployed). Stage 6 correction (plan §7 R-042): this entry previously named
+  D-316-2, which is the inert AFL API unit installation (C3), not the AFL Tables retirement
+  (`issues/open/AFLDB-ISSUE-316.md` §7-§8). The shell script, the trigger and the network register are frozen ISSUE-316 files.
   The register (`data/reference/afltables-network.json`, gates in
   `src/lib/acquisition/afltables-network.ts`) already makes every network path refuse once
   retired.
@@ -214,8 +227,12 @@ close it. An entry is removed only when the closing evidence exists.
   `startSettleRun`; the start panel (`SettleRunPanel.tsx`) is deleted. The operations centre shows
   the AFL Tables unit's status only. `settle-trigger.ts` stays (frozen; read by
   `AflApiSettleUnitsPanel.tsx`, `current-season/page.tsx` type-only and `settle-status.ts`).
-- **Close.** The owner executes D-316-2 under ISSUE-316; Stage 6 disables the timer. Until then
-  the production go/no-go for an AFL API-only pipeline is **no-go**.
+- **Stage 6 (Launch E).** No change to the runtime: the AFL Tables timer belongs to ISSUE-316, so
+  the V2 cutover runbook deliberately leaves it alone and requires its state to be unchanged across
+  the V2 release window (`docs/v2/cutover-runbook.md` §1, step 8).
+- **Close.** The owner executes the ISSUE-316 sequence (D-316-1 at C2, the C4b PASS under
+  D-316-13, D-316-4 at C5). Until then the production go/no-go for an AFL API-only pipeline is
+  **no-go**.
 
 ## V2-GAP-012 — The AFL API settle depends on helpers that live in `settle-afltables.ts`
 
@@ -262,8 +279,13 @@ close it. An entry is removed only when the closing evidence exists.
   (`tests/integration/{admin-upload-route,email-intake,submission-promotion}.test.ts`) are
   unexecuted (V2-GAP-003); route-level ISSUE-273/304 coverage was retired with the routes, the
   library-level race coverage is kept through a test-local helper.
-- **Close.** Stage 6 disables the timer in the cutover runbook; an operator runs the three
-  integration suites on an isolated `afldb_test`.
+- **Stage 6 (Launch E).** `docs/v2/cutover-runbook.md` step 4 disables
+  `afldb-email-intake.timer` in the same window as the V2 code deploy, before the code, with
+  `is-enabled`/`is-active` gates; `docs/v2/rollback-runbook.md` §4.3 covers re-enabling it on a
+  rollback. **Written, not executed.** The three integration suites are steps of
+  `docs/v2/shadow-rehearsal.md` §7, also not executed.
+- **Close.** The owner approves the release window and the operator runs step 4; an operator runs
+  the three integration suites on an isolated copy (the shadow rehearsal) and records the result.
 
 ## V2-GAP-014 — Python and R legacy tools are not physically quarantined
 
@@ -414,3 +436,31 @@ close it. An entry is removed only when the closing evidence exists.
   reports) have no read-only view in the operations centre.
 - **Close.** A read-only, capability-guarded view over the refused `canonical_applications` rows
   and the open settle `data_issues`, linked from the overview.
+
+## V2-GAP-026 — The shadow rehearsal, the parity and capture tools on real data, and both rollback paths have never run
+
+- **What.** Stage 6 wrote the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`), the
+  parity tool (`tools/v2/shadow-parity.ts`, policy `v2.parity.1`), the capture tools
+  (`tools/v2/shadow-capture.ts`, `tools/v2/shadow-award-reports.ts`), the target guard
+  (`tools/v2/shadow-guard.ts`), the cutover runbook and the rollback runbook. The tools are unit
+  tested on committed synthetic inputs, fakes and in-memory PGlite only; no command in any of the
+  three documents has been run, so the rollback is untested (an owner no-go condition) and the
+  parity thresholds have never met real data.
+- **Why.** V2 has no database, host or network access (plan §1); restoring a production dump and
+  creating databases need the owner's approval (`docs/v2/go-no-go.md` §4, S-A1..S-A5).
+- **Close.** An operator runs the rehearsal under those approvals, the parity verdict is PASS (or
+  every FAIL is reconciled by the owner), both rollback paths are rehearsed, and the record in
+  `docs/v2/shadow-rehearsal.md` §10 is filled in.
+
+## V2-GAP-027 — The AFL API reconciliation report has no producer in the settle CLIs
+
+- **What.** `packages/acquisition/src/reconciliation-report.ts` (Stage 3) defines the
+  machine-readable `afldb.v2.afl-api-reconciliation-report` with a builder, validator and JSON
+  Schema, but no settle CLI emits it: the only callers are the package index, the stage contract and
+  the tests. A rehearsal therefore reads the AFL API settle's outcome from its printed counters and
+  exception report (`tools/current-season/settle-afl-api.ts` `counterLines`), not from that file,
+  and the parity tool does not take it as an input.
+- **Why.** Wiring it into the frozen-adjacent settle CLIs was not in any stage's reviewed scope;
+  found while designing the Stage 6 parity inputs.
+- **Close.** Emit the report from `settle-afl-api.ts` (an `--report-out <file>` option), test it,
+  and add it to the parity inputs under a new policy version.

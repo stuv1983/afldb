@@ -1,6 +1,6 @@
 # AFLDB V2 — architecture overview (implemented state)
 
-Status: describes what exists in `D:\dev\afldbV2` at the close of Stage 4 (2026-10-19). Planned
+Status: describes what exists in `D:\dev\afldbV2` at the close of Stage 6, the final V2 stage (2026-10-19). Planned
 work is labelled as such and points at its plan decision; nothing here is aspirational.
 
 ## 1. Shape
@@ -193,3 +193,22 @@ sealed-season loader `src/lib/seasons/sealed-seasons.ts`. Presentational compone
 (`_components/*`); `OperationsClientForms.tsx` is the only client module. Retired legacy admin
 surfaces refuse through `src/lib/admin/retired-admin.ts` (plan §7 R-030). Nothing here has run on
 PostgreSQL or been rendered in a browser (V2-GAP-017, V2-GAP-022).
+
+## 11. Shadow rehearsal tooling (Stage 6)
+
+Offline comparison and shadow-only capture for the operator-run rehearsal in
+`docs/v2/shadow-rehearsal.md`. None of it has run against a database.
+
+| Piece | Where | Role |
+|---|---|---|
+| shadow target policy | `packages/domain/src/shadow-target.ts` (`@afldb/domain`) | only `afldb_v2_shadow[_<tag>]_test` is a target; reserved names refused by name; pure (plan §7 R-044) |
+| row-count format | `packages/domain/src/table-row-counts.ts` | `afldb.v2.table-row-counts` v1 and `V2_ADDED_TABLES` (migrations 111/112) |
+| row-count producer | `packages/db/src/table-row-counts-producer.ts` (`@afldb/db`) | read-only census over an injected query function, with the manifest producer's discipline |
+| parity core | `packages/derived/src/shadow-parity.ts` (`@afldb/derived`) | policy `v2.parity.1`: five checks; report `afldb.v2.shadow-parity-report` v1; coverage export `afldb.v2.coverage-registry-export` v1 (plan §7 R-045) |
+| CLIs | `tools/v2/shadow-parity.ts` (offline `compare`, `coverage-export`), `tools/v2/shadow-capture.ts` (`row-counts`), `tools/v2/shadow-award-reports.ts` (`coleman`, `brownlow`; run with `--conditions=react-server` because it reuses the server-only Stage 5 loaders), `tools/v2/shadow-guard.ts` (`check`) | thin, testable entry points; the capture tools refuse every non-shadow target and have no override flag |
+
+The parity core lives in `@afldb/derived` because that is the only module allowed to see both the
+historical manifest (`@afldb/domain`) and the award report formats (`@afldb/derived`). Operational
+documents: `docs/v2/shadow-rehearsal.md`, `docs/v2/cutover-runbook.md` (with the migration plan),
+`docs/v2/rollback-runbook.md` (backup and rollback), `docs/v2/go-no-go.md`,
+`docs/v2/risk-register.md`, `docs/v2/final-report.md`.

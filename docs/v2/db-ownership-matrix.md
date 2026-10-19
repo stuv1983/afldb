@@ -1,7 +1,9 @@
 # AFLDB V2 — database compatibility and ownership matrix
 
 Status: drafted in Stage 2, **completed in Stage 4** (2026-10-19, plan §7 R-006); writers updated
-for Stage 5 (the retired admin paths and the operations-centre callers). Records, for
+for Stage 5 (the retired admin paths and the operations-centre callers); Stage 6 adds no writer
+(its shadow capture tools only read, inside a rolled-back read-only transaction, and only a database
+named `afldb_v2_shadow[_<tag>]_test`). Records, for
 every table and view the migrations create (001-112), which V2 component is to own its writes and
 how the schema stays compatible. The "V2 owner" column is a design assignment under plan D1, not
 an observed fact. The observed writers per table are the Stage 4 census below (static reading of

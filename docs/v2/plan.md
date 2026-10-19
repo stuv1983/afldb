@@ -283,8 +283,9 @@ continues the reviewed plan.
   at least 20 characters; files only create proposals.
 - **R-025 Legacy scope in Stage 4.** Only TypeScript entry points are moved: the Squiggle/Kali CLI
   is quarantined and its package script refuses through the `@afldb/domain` retired-entry
-  registry. The AFL Tables runtime stays behind the ISSUE-316 boundary (frozen files; D-316-2 is
-  the owner's, V2-GAP-011). Admin runtime paths (CSV upload, submission promotion, email intake,
+  registry. The AFL Tables runtime stays behind the ISSUE-316 boundary (frozen files; its retirement is
+  the owner's ISSUE-316 sequence, D-316-1 then D-316-4, V2-GAP-011; "D-316-2" here was corrected by
+  R-042). Admin runtime paths (CSV upload, submission promotion, email intake,
   Squiggle/Kali refresh) are Stage 5's (V2-GAP-013). Python/R tools stay in place because V2
   cannot run them to prove a move (V2-GAP-014). A ratchet test lists every known legacy runtime
   edge, so a new one fails.
@@ -368,3 +369,44 @@ Launch D continued the reviewed plan; no new plan review was run (launch instruc
 - **R-041 No dedicated settle-refusal view.** D9 names "reconciliation failures": Stage 5 surfaces
   the Brownlow reconciliation and run status only; AFL API settle refusals stay in their reports
   and tables (V2-GAP-025).
+
+### Launch E decisions (Stage 6, 2026-10-19)
+
+Launch E continued the reviewed plan; no new plan review was run (launch instruction). Sub-agent
+returns: `.phaneslight/returns/launchE-20261019/`.
+
+- **R-042 The ISSUE-316 decision that retires AFL Tables is D-316-1, not D-316-2.** Earlier V2
+  documents and four admin strings said the AFL Tables nightly settle stays "until D-316-2". In
+  `issues/open/AFLDB-ISSUE-316.md` §7-§8, D-316-2 is the inert AFL API unit installation (C3); the
+  AFL Tables switch is written `retired` by D-316-1 (C2) and the timer is disabled by C5 (D-316-4,
+  after a recorded C4b PASS under D-316-13). Corrected in the admin text, the refusal text, the
+  pinning tests and the V2 documents (orchestrator MED, fixed). V2-GAP-011 is unchanged in
+  substance.
+- **R-043 The migration reversal also deletes the ledger rows.** The 111/112 `-- ROLLBACK:` blocks
+  drop the tables but do not mention `afldb_meta.schema_migrations`; without deleting the two rows
+  a later V2 deploy would skip the migrations while their tables are gone. The rollback runbook
+  (§5) adds the delete inside the reversal transaction. The migration files are not edited (their
+  checksums are their identity).
+- **R-044 Shadow targets are named, not configured.** Only `afldb_v2_shadow[_<tag>]_test` is a
+  shadow target (`packages/domain/src/shadow-target.ts`); reserved names are refused by name; a
+  `%` in the path is refused because postgres.js opens the raw path (worker W2 F-001, fixed). The
+  name ends in `_test` so every existing test-database refusal still applies. No capture tool has an
+  override flag; production is read only by the existing manifest producer with its two non-test
+  flags.
+- **R-045 Parity policy `v2.parity.1`.** Five required checks; zero tolerance on sealed history,
+  reference tables and stable ids (the manifest's violation, unverified and review findings all
+  fail, and so does a moved seal); the only expected table deltas are the three V2 tables;
+  pre-existing award disagreements are info for owner reconciliation, never a pass condition and
+  never a fail; verdict FAIL > INCOMPLETE > PASS; exit 0/1/2/3; a missing or invalid input is
+  INCOMPLETE, never PASS. Changing a threshold needs a new policy version.
+- **R-046 Rehearsal environment.** A dedicated checkout with no `.env*`, one environment file of
+  password-free shadow DSNs, `tools/v2/shadow-guard.ts` before every state-changing step; the
+  integration suites run on `afldb_test` rebuilt at the V2 commit (owner approval S-A5), because they
+  were written for that state; the settle replays a retained snapshot and never acquires.
+- **R-047 Verdicts.** Local development GO; isolated shadow rehearsal GO only after the owner's
+  approvals S-A1..S-A5 (it touches no production system); production NO-GO. The label
+  "shadow-ready" in the owner's sense is NOT claimed: several of its criteria are unverified until
+  the rehearsal runs (`docs/v2/go-no-go.md` §2).
+- **R-048 Admin wording change without a capture.** The R-042 text change is wording inside
+  existing paragraphs; the Stage 5 capture harness was a scratch script, not committed, so no
+  capture was made and the change is recorded VISUAL: UNVERIFIED (V2-GAP-022 covers the pages).

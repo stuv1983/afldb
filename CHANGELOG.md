@@ -22,6 +22,31 @@ gaps as `V2-GAP-NNN` in `docs/v2/known-gaps.md` instead of allocating `AFLDB-ISS
 deliberate departure from CLAUDE.md §5 so the fork cannot collide with the mainline ledger
 (ADR 0003). `issues.md` and `IssuesIndex.md` are left as inherited.
 
+#### Stage 6 — shadow rehearsal tooling, runbooks and the go/no-go record - 19 October 2026
+
+- New offline shadow parity tool `tools/v2/shadow-parity.ts` (policy `v2.parity.1`, pure core in
+  `@afldb/derived`): five required checks (sealed-history manifest with zero tolerance, table row
+  counts where only the three V2 tables of migrations 111/112 may appear, Coleman, Brownlow,
+  coverage claims), a JSON report plus a human summary, and exit codes 0 PASS, 1 FAIL,
+  2 INCOMPLETE, 3 ERROR. A missing or invalid input is INCOMPLETE, never PASS.
+- New shadow-only capture tools: `tools/v2/shadow-capture.ts row-counts` and
+  `tools/v2/shadow-award-reports.ts` (Coleman range, Brownlow season), each one read-only
+  transaction that is always rolled back, refusing every database not named
+  `afldb_v2_shadow[_<tag>]_test` with no override; `tools/v2/shadow-guard.ts check` refuses a step
+  whose environment or checkout could reach anything else. None has run against a database.
+- New documents: `docs/v2/shadow-rehearsal.md` (shadow comparison plan; every command NOT
+  EXECUTED), `cutover-runbook.md` (with the migration plan), `rollback-runbook.md` (backup and
+  rollback; the migration reversal also deletes the two ledger rows), `go-no-go.md`,
+  `risk-register.md`, `final-report.md`. Verdicts: local development GO; isolated shadow
+  rehearsal GO only after the owner's approvals S-A1..S-A5; production cutover **NO-GO**.
+- Correction: the admin current-season page, the operations-centre note, the retired trigger's
+  refusal text and earlier V2 documents said the AFL Tables nightly settle stays "until D-316-2".
+  In ISSUE-316, D-316-2 is the inert AFL API unit installation; AFL Tables is retired by D-316-1
+  (C2) and its timer disabled by C5 under D-316-4. Wording only.
+- Gaps: V2-GAP-026 (High: the rehearsal, the tools on real data and both rollbacks have never run)
+  and V2-GAP-027 (Low: no producer for the AFL API reconciliation report); V2-GAP-011 and 013 text
+  updated; 27 gaps open, none closed by V2.
+
 #### Stage 5 — a small audited operations centre; the legacy admin controls refuse - 19 October 2026
 
 - The CSV upload, the CSV submission review and promotion, the email-intake route, the
@@ -30,7 +55,8 @@ deliberate departure from CLAUDE.md §5 so the fork cannot collide with the main
   `legacy_retired` (routes: HTTP 410) and one `admin.legacy_retired_refused` audit row; the
   email-intake route answers 410 without reading the request or writing anything. Four UI
   components are deleted; submissions stay readable as history. The AFL Tables nightly settle
-  itself is unchanged until the owner's ISSUE-316 decision D-316-2 (V2-GAP-011), and the
+  itself is unchanged until the owner's ISSUE-316 decisions retire it (D-316-1 at C2, the timer by C5
+  under D-316-4; this entry first said D-316-2, corrected in Stage 6) (V2-GAP-011), and the
   email-intake timer until Stage 6 (V2-GAP-013).
 - New operations centre at `/admin/operations` (Admin and Super Admin, new capability
   `operations.centre.read`): read-only data health, sealed seasons, acquisition-run status (no

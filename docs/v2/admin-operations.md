@@ -32,7 +32,8 @@ to every Admin and Super Admin; the retired "Legacy file intake" link is gone.
   approval and publication is refused (the seal fails closed).
 - **Acquisition runs, status only:** the AFL API settle units, and, labelled as such, the AFL
   Tables nightly settle that still runs on the host behind AFLDB-ISSUE-316 until the owner's
-  decision D-316-2. V2 neither starts nor stops it; there is no start button anywhere.
+  ISSUE-316 decisions retire it (D-316-1 at C2; the timer is disabled by C5 under D-316-4; plan §7
+  R-042). V2 neither starts nor stops it; there is no start button anywhere.
 - **Curated awards and derived results:** links, and the count of undecided proposals for a
   viewer holding `data.awards.read`.
 - **Inspection tools:** links shown only to a viewer holding each tool's capability: audit trail,
