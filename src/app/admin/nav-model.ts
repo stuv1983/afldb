@@ -73,11 +73,18 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
     ];
   }
 
+  // Stage 5 (AFLDB V2, plan D9): the operations centre follows the dashboard. It is read-only and
+  // gated on its own capability; the mutations it links to keep theirs.
   const groups: AdminNavGroup[] = [
     {
       id: 'overview',
       label: 'Overview',
-      links: [{ href: '/admin', label: 'Dashboard', exact: true }],
+      links: [
+        { href: '/admin', label: 'Dashboard', exact: true },
+        ...visibleLinks(viewer, [
+          { href: '/admin/operations', label: 'Operations centre', capability: 'operations.centre.read' },
+        ]),
+      ],
     },
   ];
 
@@ -98,9 +105,13 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
   ]);
   if (dataLinks.length > 0) groups.push({ id: 'data', label: 'Data', links: dataLinks });
 
+  // Stage 5 (AFLDB V2, plan D9/D10): the "Legacy file intake" link is gone for an admin and a super
+  // admin. CSV upload to the final tables is a retired runtime path (the page and its route only
+  // refuse or show history); a link to it would advertise a control that no longer exists. The
+  // contributor branch above is untouched: that role is already refused by getAdminUser
+  // (AFLDB-ISSUE-186) and acquisition.legacyIntake stays declared and enforced at the page.
   const acquisitionLinks = visibleLinks(viewer, [
     { href: '/admin/current-season', label: 'Current season', capability: 'acquisition.currentSeason' },
-    { href: '/admin/upload', label: 'Legacy file intake', capability: 'acquisition.legacyIntake' },
   ]);
   if (acquisitionLinks.length > 0) groups.push({ id: 'acquisition', label: 'Acquisition', links: acquisitionLinks });
 

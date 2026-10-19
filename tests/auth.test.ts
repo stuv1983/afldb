@@ -396,6 +396,16 @@ describe('capability policy', () => {
     }
   });
 
+  it('opens the operations centre to an admin and a super admin, never to a contributor (AFLDB V2 Stage 5, plan D9)', () => {
+    // READ-ONLY: its mutations keep their own capabilities (data.awards.edit is super-admin only).
+    expect(hasCapability(viewer('contributor'), 'operations.centre.read')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'operations.centre.read')).toBe(false);
+    expect(hasCapability(viewer('admin'), 'operations.centre.read')).toBe(true);
+    expect(hasCapability(viewer('admin', true), 'operations.centre.read')).toBe(true);
+    expect(hasCapability(viewer('super_admin'), 'operations.centre.read')).toBe(true);
+    expect(hasCapability(viewer('admin'), 'data.awards.edit'), 'reading the centre grants no edit').toBe(false);
+  });
+
   it('reserves the super-admin-only capabilities from a contributor and a plain admin', () => {
     for (const capability of SUPER_ADMIN_ONLY) {
       expect(hasCapability(viewer('contributor'), capability)).toBe(false);
@@ -1531,9 +1541,13 @@ describe('adminNavFor', () => {
     // (AFLDB-ISSUE-162 §23: data.fixtures.read is ADMIN_AND_UP too) joins the
     // same four, and Awards & honours (AFLDB-ISSUE-165 §7: data.awards.read is
     // ADMIN_AND_UP too) joins the same five.
+    //
+    // AFLDB V2 Stage 5 (plan D9) DELIBERATELY retires the "Legacy file intake" link, which was the
+    // only Acquisition link a plain admin held (the other, Current season, is super-admin only),
+    // so a plain admin now has no Acquisition group at all.
     const groups = adminNavFor({ role: 'admin', canManageAdmins: false });
     expect(groups.map((g) => g.id)).toEqual([
-      'overview', 'data', 'acquisition', 'people', 'operations', 'account',
+      'overview', 'data', 'people', 'operations', 'account',
     ]);
     expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards', '/admin/records']);
     expect(groups.find((g) => g.id === 'operations')?.links.map((l) => l.href)).toEqual(['/admin/audit']);
@@ -1595,10 +1609,28 @@ describe('adminNavFor', () => {
     expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/awards');
   });
 
-  it('groups current-season acquisition with legacy file intake', () => {
+  it('lists only current-season acquisition for a super admin: the legacy file intake link is retired (AFLDB V2 Stage 5)', () => {
     const groups = adminNavFor({ role: 'super_admin', canManageAdmins: false });
     const acquisition = groups.find((g) => g.id === 'acquisition');
-    expect(acquisition?.links.map((l) => l.href)).toEqual(['/admin/current-season', '/admin/upload']);
+    expect(acquisition?.links.map((l) => l.href)).toEqual(['/admin/current-season']);
+  });
+
+  it('lists the operations centre right after the dashboard for an admin and a super admin, and never legacy file intake (AFLDB V2 Stage 5)', () => {
+    for (const role of ['admin', 'super_admin'] as const) {
+      const groups = adminNavFor({ role, canManageAdmins: false });
+      expect(groups.find((g) => g.id === 'overview')?.links).toEqual([
+        { href: '/admin', label: 'Dashboard', exact: true },
+        { href: '/admin/operations', label: 'Operations centre', exact: undefined },
+      ]);
+      const hrefs = hrefsFor({ role, canManageAdmins: false });
+      expect(hrefs, role).toContain('/admin/operations');
+      expect(hrefs, role).not.toContain('/admin/upload');
+      expect(groups.flatMap((g) => g.links.map((l) => l.label)), role).not.toContain('Legacy file intake');
+    }
+    // The contributor branch is deliberately unchanged: the upload form and their own password.
+    const contributor = hrefsFor({ role: 'contributor', canManageAdmins: false });
+    expect(contributor).toEqual(['/admin/upload', '/admin/password']);
+    expect(contributor).not.toContain('/admin/operations');
   });
 
   it('always keeps the account group last, for every non-contributor role', () => {
@@ -2080,6 +2112,8 @@ const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmi
   'operations.appHealth': 'requireSuperAdmin',
   'operations.nlTelemetry': 'requireSuperAdmin',
   'operations.audit.read': 'requireAdmin',
+  // AFLDB V2 Stage 5 (plan D9): read-only operations centre views, any Admin.
+  'operations.centre.read': 'requireAdmin',
 };
 
 /** What each role guard in session.ts admits, restated from its source. */

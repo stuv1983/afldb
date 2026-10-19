@@ -26,7 +26,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
 | 4 Derived + curated | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9`, `1374fc13` + this closure commit |
-| 5 Admin | in progress (Launch D): legacy admin controls retired (milestone 1); operations centre in progress | this commit |
+| 5 Admin | in progress (Launch D): legacy admin controls retired (milestone 1); operations centre built (milestone 2); visual, documents and stage close pending | `68a026e2`, this commit |
 | 6 | not started (Launch E) | — |
 
 ## Stage 0 — evidence
@@ -278,6 +278,17 @@ with no body read, no secret, no database and no audit). Four UI components dele
 (`SettleRunPanel`, `CurrentSeasonControls`, `UploadForm`, `ReviewControls`); the legacy-edge ratchet
 shrinks from 18 pairs to 11. Focused run (orchestrator, 7 files): 5 failed / 988 passed / 1 skipped;
 the 5 failures are the 5 baseline lines of `tests/current-season-import.test.ts`.
+
+Milestone 2 (operations centre, workers W-B1 server wiring and W-B2 UI): sealed-season loader
+`src/lib/seasons/sealed-seasons.ts` (fail closed); read loaders `src/db/queries/coleman-inputs.ts` and
+`src/db/queries/brownlow-reconciliation-inputs.ts`; the server callers
+`src/lib/admin/operations-centre.ts`; six server actions (`src/app/admin/operations/awards/actions.ts`,
+`src/app/admin/operations/coleman/actions.ts`); capability `operations.centre.read` (Admin and up);
+pages `/admin/operations`, `/admin/operations/awards`, `/admin/operations/awards/[id]`,
+`/admin/operations/coleman`, `/admin/operations/brownlow`, each with the D9 action card before every
+mutation; the "Legacy file intake" sidebar link removed for admin and super admin. Coleman results
+are NOT projected into `award_winners` (V2-GAP-021 stays open, narrowed). Focused run (orchestrator,
+9 files): 598 passed; `tsc` exit 0; ESLint 0 errors / 0 warnings on every milestone-2 file.
 
 ## Resumption point
 

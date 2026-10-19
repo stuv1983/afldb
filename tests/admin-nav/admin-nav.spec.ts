@@ -30,7 +30,7 @@ const OUT_DIR = resolve('artifacts/admin-nav');
 /** Super-admin sidebar inventory, from src/app/admin/nav-model.ts. */
 const ROUTES = [
   '/admin',
-  '/admin/upload',
+  '/admin/operations',
   '/admin/query-builder',
   '/admin/player-links',
   '/admin/data-editor',
