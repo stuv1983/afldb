@@ -7,7 +7,7 @@
  * by the shadow parity tool (`packages/derived/src/shadow-parity.ts`); the season-grained,
  * zero-tolerance check of sealed history is the historical manifest's job
  * (`./historical-manifest.ts`), not this one's. This census answers two narrower questions: did any
- * table disappear or lose rows, and did exactly the tables V2 adds (migrations 111 and 112) appear.
+ * table disappear or lose rows, and did exactly the tables V2 adds (migrations 111, 112, 113 and 114) appear.
  *
  * Pure: no I/O, no database. The read-only producer lives in `@afldb/db`.
  */
@@ -19,12 +19,16 @@ export const TABLE_ROW_COUNTS_FORMAT_VERSION = 1;
  * The only tables a V2 shadow rehearsal may add (documented expected deltas). Each is created by a
  * V2 additive migration and is reversible by that migration's comment-only ROLLBACK block:
  * `src/db/migrations/111_curated_award_proposals.sql` (award_proposals, award_proposal_decisions)
- * and `src/db/migrations/112_derived_award_results.sql` (derived_award_results).
+ * `src/db/migrations/112_derived_award_results.sql` (derived_award_results),
+ * `src/db/migrations/113_brownlow_eligibility_decisions.sql` (brownlow_eligibility_decisions) and
+ * `src/db/migrations/114_award_projections_and_curated_revisions.sql` (derived_award_projections).
  */
 export const V2_ADDED_TABLES: readonly { readonly schema: string; readonly table: string; readonly migration: string }[] = [
   { schema: 'public', table: 'award_proposals', migration: '111_curated_award_proposals.sql' },
   { schema: 'public', table: 'award_proposal_decisions', migration: '111_curated_award_proposals.sql' },
   { schema: 'public', table: 'derived_award_results', migration: '112_derived_award_results.sql' },
+  { schema: 'public', table: 'brownlow_eligibility_decisions', migration: '113_brownlow_eligibility_decisions.sql' },
+  { schema: 'public', table: 'derived_award_projections', migration: '114_award_projections_and_curated_revisions.sql' },
 ];
 
 export const isV2AddedTable = (schema: string, table: string): boolean =>

@@ -101,7 +101,7 @@ export const SHADOW_PARITY_THRESHOLDS: Readonly<Record<ShadowParityCheckId, stri
     + 'and TABLE_ADDED are info. The manifest digests stable id columns as facts and reference tables whole, so any id change '
     + 'surfaces as a fail finding.',
   table_row_counts: 'Schemas must match; a dropped table FAILS; a table added after FAILS unless it is one of the V2-added tables '
-    + '(award_proposals, award_proposal_decisions, derived_award_results), which must all be present after; fewer rows in a non-V2 '
+    + '(award_proposals, award_proposal_decisions, derived_award_results, brownlow_eligibility_decisions, derived_award_projections), which must all be present after; fewer rows in a non-V2 '
     + 'table FAILS; more rows in a non-V2 table and any change in a V2-added table are info.',
   coleman: 'Per season present before: missing after, category, stored active rows, derived winners, input checksum or refusal '
     + 'code changed all FAIL, as does any change in stored seasons without an outcome; a season that disagrees (or is not derivable '

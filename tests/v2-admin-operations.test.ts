@@ -226,6 +226,8 @@ const ID_TWO = 'afltables:players/s/synthetic_two.html';
 
 const MIGRATION_111 = join(process.cwd(), 'src', 'db', 'migrations', '111_curated_award_proposals.sql');
 const MIGRATION_112 = join(process.cwd(), 'src', 'db', 'migrations', '112_derived_award_results.sql');
+const MIGRATION_113 = join(process.cwd(), 'src', 'db', 'migrations', '113_brownlow_eligibility_decisions.sql');
+const MIGRATION_114 = join(process.cwd(), 'src', 'db', 'migrations', '114_award_projections_and_curated_revisions.sql');
 
 let db: InMemoryPglite;
 
@@ -341,6 +343,8 @@ beforeAll(async () => {
   // The migrations under test, applied VERBATIM from disk (not edited to suit PGlite).
   await db.exec(readFileSync(MIGRATION_111, 'utf8'));
   await db.exec(readFileSync(MIGRATION_112, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_113, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_114, 'utf8'));
   bridge.withExecutor = asImportExecutor as unknown as typeof bridge.withExecutor;
   bridge.promote = (tx, request) => stubPromotion().promote(tx as SqlExecutor, request as Parameters<AwardPromotionPort['promote']>[1]);
 }, 60_000);
@@ -351,7 +355,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.query('RESET ROLE');
-  await db.exec(`TRUNCATE award_proposal_decisions, award_proposals, award_winners, derived_award_results,
+  await db.exec(`TRUNCATE award_proposal_decisions, award_proposals, award_winners, derived_award_projections,
+                          derived_award_results, brownlow_eligibility_decisions,
                           player_match_stats, matches, brownlow_season_votes, staging.afl_api_brownlow_vote RESTART IDENTITY CASCADE`);
   await db.exec('DELETE FROM external_identities WHERE player_id >= 11');
   session.actor = null;

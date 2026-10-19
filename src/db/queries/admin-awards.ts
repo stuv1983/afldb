@@ -861,7 +861,8 @@ async function refuseClaimedKey(
  * An award whose last active winner is voided ends with NULL on both halves —
  * honest ("no winner is recorded") rather than a stale span kept for tidiness.
  */
-async function recomputeAwardSpan(tx: Tx, awardId: number): Promise<void> {
+// Exported, behaviour unchanged, for AFLDB V2 Launch F (award projection and approved-revision correction).
+export async function recomputeAwardSpan(tx: Tx, awardId: number): Promise<void> {
   await tx`
     UPDATE awards a
        SET first_season = span.first_season,
@@ -890,7 +891,8 @@ async function recomputeAwardSpan(tx: Tx, awardId: number): Promise<void> {
  * `/hall-of-fame` is `force-dynamic` and needs no invalidation; it is listed
  * so the set reads as the complete consumer list rather than a filtered one.
  */
-function awardWinnerPaths(row: {
+// Exported, behaviour unchanged, for AFLDB V2 Launch F (award projection and approved-revision correction).
+export function awardWinnerPaths(row: {
   awardSlug: string; season: number | null; playerId: number | null;
   playerSlug: string | null; clubSlug: string | null;
 }): string[] {
@@ -1627,7 +1629,8 @@ export async function createAwardWinner(
   });
 }
 
-async function readAwardWinnerInTx(tx: Tx, id: number): Promise<AwardWinnerRow | null> {
+// Exported, behaviour unchanged, for AFLDB V2 Launch F (award projection and approved-revision correction).
+export async function readAwardWinnerInTx(tx: Tx, id: number): Promise<AwardWinnerRow | null> {
   const rows = await tx.unsafe(
     `SELECT ${AWARD_WINNER_COLUMNS} WHERE w.id = $1`, [id],
   ) as unknown as AwardWinnerRow[];

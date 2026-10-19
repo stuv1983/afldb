@@ -120,7 +120,7 @@ describe('evaluateSeasonWrite', () => {
   it('accepts every listed workflow, and the list excludes automatic settle application', () => {
     expect([...AUDITED_CORRECTION_WORKFLOWS]).toEqual([
       'data_editor', 'promotion_review', 'identity_adjudication', 'brownlow_authority', 'csv_submission_promotion',
-      'derived_award_publication', 'curated_award_approval',
+      'derived_award_publication', 'curated_award_approval', 'brownlow_eligibility_decision',
     ]);
     for (const workflow of AUDITED_CORRECTION_WORKFLOWS) {
       expect(evaluateSeasonWrite({ season: 1990, sealed: SEALED, correction: correction({ workflow }) }))

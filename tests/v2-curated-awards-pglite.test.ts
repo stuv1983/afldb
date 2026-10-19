@@ -41,6 +41,10 @@ import { sealedSeasonsFrom } from '@afldb/domain';
 import { createInMemoryPglite, pgliteExecutor, type InMemoryPglite } from '@afldb/testing';
 
 const MIGRATION = join(process.cwd(), 'src', 'db', 'migrations', '111_curated_award_proposals.sql');
+// Migration 114 section 2 widens three 111 constraints (V2-GAP-018) and section 1 references
+// derived_award_results, so 112 is applied too (it depends only on auth_users). Order: 111, 112, 114.
+const MIGRATION_112 = join(process.cwd(), 'src', 'db', 'migrations', '112_derived_award_results.sql');
+const MIGRATION_114 = join(process.cwd(), 'src', 'db', 'migrations', '114_award_projections_and_curated_revisions.sql');
 const NOW = () => new Date('2026-10-19T12:00:00Z');
 const OPTIONS = { now: NOW };
 // SYNTHETIC sealed range 1897-1899: the fixtures' seasons (1990+) are OPEN under it, so the existing
@@ -161,6 +165,8 @@ beforeAll(async () => {
   await db.exec(STUB_PREREQUISITES);
   // The migration under test, applied VERBATIM from disk (not edited to suit PGlite).
   await db.exec(readFileSync(MIGRATION, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_112, 'utf8'));
+  await db.exec(readFileSync(MIGRATION_114, 'utf8'));
 }, 60_000);
 
 afterAll(async () => {
@@ -326,6 +332,59 @@ describe('migration 111 applied verbatim to PGlite: constraints', () => {
     // And the machine itself is not vacuous.
     expect(expected.length).toBe(Object.values(CURATED_AWARD_TRANSITIONS).reduce((n, e) => n + e.length, 0));
     expect(expected.length).toBeGreaterThan(10);
+  });
+
+  // Migration 114 section 2 (V2-GAP-018): the three widened constraints are SUPERSETS. The triple test
+  // above probes only the actions the TypeScript state machine knows (that machine is updated by a later
+  // stream), so the two new ledger actions and the superseded-approval combination are proved here.
+  it('migration 114 admits the approved-revision actions and a superseded former approval, and nothing else new', async () => {
+    await db.query(`${INSERT_BASE}) VALUES ('s', 1990, 'X', 'manual_entry', NULL, 'c', '2026-10-19', 1)`);
+    const decide = (action: string, from: string | null, to: string) => db.query(
+      `INSERT INTO award_proposal_decisions (proposal_id, action, from_status, to_status, admin_user_id, note)
+       VALUES (1, $1, $2, $3, 1, 'a reason that is long enough')`, [action, from, to]);
+    await db.transaction(async (tx) => {
+      const attempt = async (action: string, from: string | null, to: string): Promise<boolean> => {
+        await tx.query('SAVEPOINT attempt');
+        try {
+          await tx.query(
+            `INSERT INTO award_proposal_decisions (proposal_id, action, from_status, to_status, admin_user_id, note)
+             VALUES (1, $1, $2, $3, 1, 'a reason that is long enough')`, [action, from, to]);
+          return true;
+        } catch {
+          return false;
+        } finally {
+          await tx.query('ROLLBACK TO SAVEPOINT attempt');
+        }
+      };
+      expect(await attempt('supersede_approved', 'approved', 'superseded')).toBe(true);
+      expect(await attempt('revise_approved', null, 'approved')).toBe(true);
+      // Nothing else is admitted for the new actions (including the NULL from_status trap).
+      for (const from of [null, 'proposed', 'validated', 'validation_failed', 'rejected', 'superseded']) {
+        expect(await attempt('supersede_approved', from, 'superseded'), `supersede_approved ${from}`).toBe(false);
+      }
+      for (const to of ['proposed', 'validated', 'approved', 'rejected']) {
+        expect(await attempt('supersede_approved', 'approved', to), `supersede_approved -> ${to}`).toBe(false);
+      }
+      expect(await attempt('revise_approved', null, 'proposed')).toBe(false);
+      expect(await attempt('revise_approved', 'approved', 'approved')).toBe(false);
+      expect(await attempt('revise_approved', 'proposed', 'approved')).toBe(false);
+      // An unlisted action is still refused, and the old approve transition is unchanged.
+      expect(await attempt('approve_approved', 'approved', 'superseded')).toBe(false);
+      expect(await attempt('approve', 'validated', 'approved')).toBe(true);
+      expect(await attempt('approve', 'approved', 'superseded')).toBe(false);
+    });
+    await expectRejected(decide('supersede_approved', null, 'superseded'), /award_proposal_decisions_transition_ck/);
+
+    // award_proposals_approval_ck: a superseded former approval may keep its key and time (both or neither).
+    await db.query(`UPDATE award_proposals SET status = 'approved', approved_entity_key = 'k', approved_at = now()`);
+    await db.query(`UPDATE award_proposals SET status = 'superseded'`);   // keeps key and time
+    await db.query(`UPDATE award_proposals SET approved_entity_key = NULL, approved_at = NULL`);   // superseded, never approved
+    await expectRejected(db.query(`UPDATE award_proposals SET approved_entity_key = 'k'`), /award_proposals_approval_ck/);
+    await expectRejected(db.query(`UPDATE award_proposals SET approved_at = now()`), /award_proposals_approval_ck/);
+    // The key is allowed only for approved | superseded, and an approved row still needs both.
+    await expectRejected(db.query(`UPDATE award_proposals SET status = 'rejected', approved_entity_key = 'k', approved_at = now()`), /award_proposals_approval_ck/);
+    await expectRejected(db.query(`UPDATE award_proposals SET status = 'approved'`), /award_proposals_approval_ck/);
+    await expectRejected(db.query(`UPDATE award_proposals SET status = 'approved', approved_entity_key = 'k'`), /award_proposals_approval_ck/);
   });
 });
 

@@ -164,8 +164,8 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | promote | `tools/current-season/settle-afl-api.ts:123` | `loadAflApiSettleBundle` | canonical |
 | promote | `tools/current-season/settle-afl-api.ts:225` | `runAflApiSettleCli` | canonical |
 | promote | `tools/current-season/settle-season-seal.ts:30` | `refuseSealedSeasonForSettle` | canonical |
-| promote | `packages/domain/src/season-seal.ts:122` | `evaluateSeasonWrite` | canonical |
-| promote | `packages/domain/src/season-seal.ts:168` | `assertSeasonWritable` | canonical |
+| promote | `packages/domain/src/season-seal.ts:124` | `evaluateSeasonWrite` | canonical |
+| promote | `packages/domain/src/season-seal.ts:170` | `assertSeasonWritable` | canonical |
 | promote | `src/lib/acquisition/settle-core.ts:392` | `acquireSettlePromotionGate` | canonical |
 | promote | `src/lib/acquisition/settle-afl-api.ts:1973` | `runSettleAflApi` | canonical |
 | promote | `src/lib/acquisition/settle-afl-api.ts:1969` | `normaliseAflApiCountersAfterFullRollback` | canonical |
