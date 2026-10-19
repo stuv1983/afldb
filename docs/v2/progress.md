@@ -24,7 +24,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 0 Evidence | done: `docs/v2/baseline.md` (primary session), `docs/v2/inventory.md` | `58ec8626` |
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
-| 3 AFL API pipeline | in progress (Launch B) | see Stage 3 below |
+| 3 AFL API pipeline | implemented; closure verification pending (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
 | 4-6 | not started (Launches C-E) | — |
 
 ## Stage 0 — evidence
@@ -125,20 +125,72 @@ ROLLBACK removed: 5 failures); 15+ migration citations checked, no false stateme
 After the fix (2026-10-19): `tests/v2-historical-manifest.test.ts` 37 tests; focused 3 files, 71
 passed; tsc exit 0; eslint clean on the changed files; full suite: **Test Files 96 failed, 170 passed, 2 skipped (268); Tests 15 failed, 9021 passed, 48 skipped (9084)**, 378 s; failing set identical to `baseline-failures.txt` (102 lines, none new, none missing); load-failure messages unchanged (83 + 4).
 
-## Stage 3 — AFL API pipeline (Launch B, in progress)
+## Stage 3 — AFL API pipeline (Launch B)
 
-Sub-agent returns: `.phaneslight/returns/launchB-20261019/` (01-05 mechanic digests, 06-10 worker
-returns). Commits so far are listed in the stage table when made; this section is rewritten at the
-Stage 3 close with the exact results.
+Sub-agent returns: `.phaneslight/returns/launchB-20261019/` (01-05 mechanic digests, 06-11 worker
+returns). Decisions: `docs/v2/plan.md` §7, "Launch B decisions" R-013..R-019. No database, network
+or PostgreSQL command was run; every database path below is unexecuted.
 
-- Done, uncommitted at the time of writing: coverage registry (D11), sealed-season refusal at the
-  three AFL API settle CLIs (V2-GAP-006), fixture contract and player-resolution refusal tests,
-  client resilience and manifest metadata, writer-free acquisition constants.
-- In flight: `@afldb/acquisition` stage contract and façade, replay, reconciliation report.
+Commits (branch `v2/rebuild`):
+
+- `b87a980e` feat(v2-acquisition): evidence-backed coverage registry (D11) and sealed-season
+  refusal at the AFL API settle CLIs (V2-GAP-006)
+- `fdd08ca3` feat(v2-acquisition): AFL API fixture identity contract and player-resolution
+  fail-closed tests
+- `7c2db0d5` feat(v2-acquisition): AFL API client resilience, acquisition metadata in snapshot
+  manifests, writer-free acquire constants
+- `a7738391` feat(v2-acquisition): @afldb/acquisition pipeline contract, generated stage map,
+  snapshot replay and machine-readable reconciliation report; Stage 3 docs and gaps
+
+Delivered (what exists):
+
+1. **Boundary.** `packages/acquisition/src/pipeline.ts` (`AFL_API_PIPELINE`, seven stages),
+   generated stage map in `docs/v2/architecture.md` §9 (66 rows, `tools/v2/acquisition-stage-map.ts
+   --check`). `tests/v2-acquisition-pipeline.test.ts` proves the client, season discovery and
+   enumeration and both acquire CLIs reach no writer, no `src/db/**`, no `server-only` and hold no
+   SQL mutation (negative controls included).
+2. **Coverage registry (D11).** `packages/domain/src/coverage-registry.ts` →
+   `docs/v2/coverage-matrix.md` (`tools/v2/coverage-matrix.ts --check`). 650 cells: api_verified 1
+   (2026 results), api_partial 4 (2026 fixtures, match_stats, player_stats, brownlow),
+   historical_baseline 614, manual_curated 0, unsupported 31 (Brownlow 1897-1923, 1942-1945).
+3. **Seal.** `packages/domain/src/season-seal.ts` + `tools/current-season/settle-season-seal.ts`,
+   wired into the three AFL API settle CLIs before any client (V2-GAP-006 narrowed). Negative
+   control by W2: gate call removed → 2 failed / 52 passed; restored → 54 passed.
+4. **Fixture contract.** `packages/acquisition/src/fixture-contract.ts` (13 refusal codes, collision
+   refusals); writer not built: **V2-GAP-008, cutover blocker** (AFLDB-ISSUE-229 B2).
+5. **Player resolution fail-closed** (tests only): captured resolver SQL, no `INSERT INTO players`
+   anywhere in the pipeline, Brownlow whole-set refusal on one unresolved vote.
+6. **Snapshot and replay.** Manifest metadata extended; `replayAflApiSnapshot` gives identical plan
+   digests; a failing unit is never planned. PostgreSQL transactional proof unexecuted (V2-GAP-009;
+   PGlite not installed, R-017).
+7. **Client resilience.** No 4xx retry (bar 408/425/429), capped `Retry-After`, option validation,
+   250 ms rate limiter, remedies in every message; tested with a fake fetch.
+8. **Reconciliation report.** `packages/acquisition/src/reconciliation-report.ts`
+   (`afldb.v2.afl-api-reconciliation-report` v1, builder, serialiser, validator, JSON Schema).
+
+Verification (executed 2026-10-19, Windows, DSN variables unset):
+
+- Focused: 18 suites, **1299 passed, 2 skipped (1301)** (v2-coverage-registry, v2-season-seal,
+  v2-fixture-contract, v2-acquisition-pipeline, v2-acquisition-replay, v2-reconciliation-report,
+  v2-module-boundaries, v2-historical-manifest, dsn-policy, afl-api-settle-cli-gate,
+  afl-api-settle-plan, afl-api-ingestion-safety, afl-api-brownlow, afl-api-brownlow-acquire,
+  afl-api-match, afl-api-rounds, afl-api-cutover, afl-api-player-evidence).
+- Full suite once: Test Files 96 failed | 176 passed | 2 skipped (274); Tests **15 failed | 9234
+  passed | 48 skipped (9297)**. The 102 `FAIL` lines are identical to
+  `docs/v2/evidence/baseline-failures.txt` (no new failure; all need a database DSN).
+- `npx tsc --noEmit --incremental false`: exit 0. ESLint on Stage 3 files: 0 problems; repository
+  wide: 253 errors / 132 warnings (at the ceiling, unchanged).
+- ISSUE-316 cutover files: sha256 unchanged (nine files). Source worktree status differs from the
+  snapshot only by `?? supplies`.
+
+Gaps created or changed: V2-GAP-006 (narrowed), V2-GAP-008 (High, **cutover blocker**), V2-GAP-009
+(Medium), V2-GAP-010 (Medium).
 
 ## Resumption point
 
-Launch A ends after `afldb-closure` verifies Stage 2. **Launch B starts Stage 3 (AFL API
-pipeline)**: read `docs/v2/plan.md` (stage 3 row, D2-D4, §7), this file, `docs/v2/known-gaps.md`,
-`docs/v2/inventory.md` (Part B, AFL API pipeline) and `docs/v2/historical-baseline.md` §2 (the
-promotion must refuse sealed seasons, V2-GAP-006). Stages 3-6 have not been started.
+Stage 3 is implemented and committed; `afldb-closure` verification of Stage 3 is the last Launch B
+step (its result is recorded below this line when it returns). **Launch C starts Stage 4** (legacy
+quarantine, plan D10): read `docs/v2/plan.md` (stage 4 row, D10, §7), this file,
+`docs/v2/known-gaps.md` (V2-GAP-006 remainder and V2-GAP-008 stay open),
+`docs/v2/db-ownership-matrix.md` ("Open for Stage 4") and `docs/v2/architecture.md` §9. Stages 4-6
+have not been started.
