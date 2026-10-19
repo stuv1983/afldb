@@ -53,8 +53,6 @@ export default async function AdminDashboard() {
     canReadBrownlow ? getBrownlowDashboardBadge() : Promise.resolve(null),
   ]);
 
-  const pending = submissions.filter((s) => ['staged', 'validated'].includes(s.status));
-
   return (
     <>
       <div className="page-header">
@@ -64,13 +62,6 @@ export default async function AdminDashboard() {
         </p>
       </div>
 
-      {pending.length > 0 && (
-        <p className="notice">
-          <a href="#submissions">
-            {pending.length} submission{pending.length === 1 ? '' : 's'} awaiting review.
-          </a>
-        </p>
-      )}
       {unresolvedLinks.length > 0 && (
         <p className="notice">
           <Link href="/admin/player-links">
@@ -99,11 +90,14 @@ export default async function AdminDashboard() {
 
       <section id="submissions" className="section">
         <div className="split-head">
-          <h2>Data submissions</h2>
-          <Link className="more" href="/admin/upload">Upload a file →</Link>
+          <h2>Data submissions (read-only history)</h2>
         </div>
+        <p className="section-note">
+          CSV upload, review and promotion are retired; these are the files submitted before that, kept for
+          reference. Nothing here can be validated, approved or promoted.
+        </p>
         {submissions.length === 0 ? (
-          <p className="muted">Nothing uploaded yet.</p>
+          <p className="muted">No files were ever submitted.</p>
         ) : (
           <CollapsibleTable title="Submissions log">
           <div className="table-wrap">

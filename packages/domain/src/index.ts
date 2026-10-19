@@ -100,3 +100,16 @@ export {
   renderUnknownRetiredEntry,
   type RetiredEntry,
 } from './legacy-retirement';
+// @v2-stage5:retired-admin
+// The registry of retired ADMIN surfaces (server actions, route handlers) and their typed refusal
+// (plan D9/D10, ADR 0009/0010, V2-GAP-013). Pure.
+export {
+  LEGACY_RETIRED_CODE,
+  RETIRED_ADMIN_SURFACES,
+  findRetiredAdminSurface,
+  renderRetiredAdminRefusal,
+  retiredAdminRefusal,
+  type RetiredAdminRefusal,
+  type RetiredAdminSurface,
+  type RetiredAdminSurfaceKind,
+} from './legacy-retirement';

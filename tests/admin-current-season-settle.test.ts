@@ -10,6 +10,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
  * AFLDB-ISSUE-127 — DB-free Server Action and boundary tests for the Super
  * Admin on-demand AFL Tables refresh.
  *
+ * AFLDB V2 Stage 5 (V2-GAP-013) RETIRED the two controls this file used to
+ * drive: the AFL Tables settle trigger and the Squiggle/Kali refresh. Their
+ * server actions now refuse, so the action tests below prove the refusal and
+ * that the old behaviour is never reached (every legacy library is a mock
+ * here, asserted to be uncalled). The pure systemd parse, the batch
+ * projection, the unit-table and AFL API panel tests are unchanged.
+ *
  * A new file rather than an extension of tests/current-season-import.test.ts:
  * the module-level vi.mock() calls this suite needs apply to a whole file, and
  * pushing them into that 4,000-line suite would rewrite its boundaries. It
@@ -76,6 +83,7 @@ vi.mock('@/db/queries/settle-runs', async (importOriginal) => ({
 import {
   readAflApiIngestionAdminView,
   refreshSettleRunStatusAction,
+  runCurrentSeasonAdminAction,
   setAflApiCurrentSeasonIngestionAction,
   startSettleRunAction,
 } from '@/app/admin/current-season/actions';
@@ -152,35 +160,62 @@ beforeEach(() => {
 });
 
 /* ------------------------------------------------------------------ *
- * Authorization
+ * AFLDB V2 Stage 5 (V2-GAP-013, legacy-disposition L5/L6): the AFL Tables
+ * settle trigger and the Squiggle/Kali refresh are RETIRED. Both server
+ * actions keep their name and their guard (the first awaited statement) and
+ * REFUSE; neither ever reaches the host boundary or the importer library.
  * ------------------------------------------------------------------ */
 
-describe('authorization', () => {
-  it('lets a super admin start the approved pipeline', async () => {
+const errorOf = (state: unknown) => (state as { error?: string }).error;
+
+/** What a stale `useActionState` client posts: (previous state, form data). The action declares neither. */
+const staleRefresh = runCurrentSeasonAdminAction as unknown as (
+  previous: object, form: FormData,
+) => ReturnType<typeof runCurrentSeasonAdminAction>;
+
+function manualRefreshForm(): FormData {
+  const form = new FormData();
+  form.set('mode', 'manual');
+  form.set('source', 'kali');
+  form.set('year', '2026');
+  form.set('apply', 'on');
+  form.set('insertMissingMatches', 'on');
+  form.set('force', 'on');
+  return form;
+}
+
+describe('authorization: the guard is unchanged and still comes first', () => {
+  it('lets a super admin reach the typed refusal of the settle trigger, and nothing behind it', async () => {
     const state = await startSettleRunAction();
 
     expect(mocks.requireCapability).toHaveBeenCalledOnce();
     expect(mocks.requireCapability).toHaveBeenCalledWith('acquisition.currentSeason');
-    expect(mocks.startSettleRun).toHaveBeenCalledOnce();
-    expect(state.outcome).toBe('started');
-    expect(state.error).toBeUndefined();
+    expect(state).toMatchObject({
+      refused: true, code: 'legacy_retired', surface: 'admin.afltables_settle_trigger',
+    });
+    expect(errorOf(state)).toMatch(/retired/i);
+    expect(errorOf(state)).toMatch(/AFL API/);
+    expect(mocks.startSettleRun).not.toHaveBeenCalled();
   });
 
-  it('stops an ordinary admin at the guard, before the host boundary', async () => {
+  it('stops an ordinary admin at the guard, before the refusal and its audit row', async () => {
     // requireCapability('acquisition.currentSeason') redirects a plain
     // admin, which in Next is a throw.
     mocks.requireCapability.mockRejectedValue(new Error('NEXT_REDIRECT /admin'));
 
     await expect(startSettleRunAction()).rejects.toThrow('NEXT_REDIRECT');
+    await expect(staleRefresh({}, manualRefreshForm())).rejects.toThrow('NEXT_REDIRECT');
     expect(mocks.startSettleRun).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
   });
 
-  it('stops an unauthenticated visitor at the guard, before the host boundary', async () => {
+  it('stops an unauthenticated visitor at the guard, before the refusal and its audit row', async () => {
     mocks.requireCapability.mockRejectedValue(new Error('NEXT_REDIRECT /admin/login'));
 
     await expect(startSettleRunAction()).rejects.toThrow('NEXT_REDIRECT');
+    await expect(staleRefresh({}, manualRefreshForm())).rejects.toThrow('NEXT_REDIRECT');
     expect(mocks.startSettleRun).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
 
   it('guards the status refresh with the same super-admin check', async () => {
@@ -192,70 +227,79 @@ describe('authorization', () => {
 });
 
 /* ------------------------------------------------------------------ *
- * No arbitrary arguments
+ * No arbitrary arguments, and nothing behind the refusal
  * ------------------------------------------------------------------ */
 
-describe('no arbitrary arguments', () => {
+describe('no arbitrary arguments, and nothing behind the refusal', () => {
   /**
-   * The strongest available proof, and the reason the panel calls these
-   * directly instead of binding them to a form: neither action declares a
-   * parameter, so there is no season, label, path, source, force or bypass
-   * value a caller could supply, and no `FormData` for a crafted field to
-   * ride in on. TypeScript rejects an argument at compile time; this asserts
-   * the same fact at runtime, where a `.bind()`-shaped call would show up.
+   * Neither the settle trigger nor the status refresh declares a parameter, so
+   * there is no season, label, path, source, force or bypass value a caller
+   * could supply, and no `FormData` for a crafted field to ride in on.
    */
-  it('declares no parameters on either action', () => {
+  it('declares no parameters on the settle trigger, the Squiggle/Kali refresh or the status refresh', () => {
     expect(startSettleRunAction.length).toBe(0);
+    expect(runCurrentSeasonAdminAction.length).toBe(0);
     expect(refreshSettleRunStatusAction.length).toBe(0);
   });
 
-  it('calls the host boundary with no arguments at all', async () => {
+  it('never calls the host boundary, reads no batch and consults no systemd state', async () => {
     const state = await startSettleRunAction();
 
-    expect(state.outcome).toBe('started');
-    expect(mocks.startSettleRun).toHaveBeenCalledExactlyOnceWith();
+    expect(state).toMatchObject({ refused: true });
+    expect(mocks.startSettleRun).not.toHaveBeenCalled();
+    expect(mocks.getLatestSettleRun).not.toHaveBeenCalled();
+    expect(mocks.readSettleRunStatus).not.toHaveBeenCalled();
+    expect(mocks.authSql).not.toHaveBeenCalled();
   });
 
-  it('still starts when the pre-start batch read fails', async () => {
-    mocks.getLatestSettleRun.mockRejectedValue(new Error('permission denied'));
-
-    const state = await startSettleRunAction();
-
-    expect(state.outcome).toBe('started');
-    expect(state.batchIdAtStart).toBeNull();
-    // The failure is not leaked into the audit detail or the operator message.
-    expect(JSON.stringify(mocks.audit.mock.calls[0][1])).not.toContain('permission denied');
+  it('refuses the same way whatever the host boundary would have answered', async () => {
+    for (const answer of [
+      { outcome: 'started' },
+      { outcome: 'unavailable', reason: 'On-demand refresh is not enabled on this host.' },
+      { outcome: 'error', reason: 'Failed to start afldb-settle-afltables.service: Access denied' },
+    ]) {
+      mocks.startSettleRun.mockResolvedValue(answer);
+      const state = await startSettleRunAction();
+      expect(state).toMatchObject({ refused: true, code: 'legacy_retired' });
+    }
+    expect(mocks.startSettleRun).not.toHaveBeenCalled();
   });
 
-  it('puts only the three fixed keys in the audit detail', async () => {
-    await startSettleRunAction();
+  it('refuses the Squiggle/Kali refresh and report, and never reaches the importer library', async () => {
+    const source = await import('@/lib/external-afl/current-season-import');
 
-    const [, detail] = mocks.audit.mock.calls[0];
-    expect(Object.keys(detail).sort()).toEqual(['batchIdAtStart', 'outcome', 'unit']);
+    const refreshed = await staleRefresh({}, manualRefreshForm());
+    const reportForm = new FormData();
+    reportForm.set('mode', 'report');
+    reportForm.set('year', '2026');
+    const reported = await staleRefresh({}, reportForm);
+
+    expect(refreshed).toMatchObject({ refused: true, code: 'legacy_retired', surface: 'admin.squiggle_kali_refresh' });
+    expect(reported).toMatchObject({ refused: true, code: 'legacy_retired', surface: 'admin.squiggle_kali_refresh' });
+    expect(errorOf(refreshed)).toMatch(/retired/i);
+    // Every importer entry point is a mock here, and none was called, whatever the form said
+    // (apply, insertMissingMatches and force were all on).
+    expect(vi.mocked(source.runCurrentSeasonRefresh)).not.toHaveBeenCalled();
+    expect(vi.mocked(source.getCurrentSeasonReport)).not.toHaveBeenCalled();
+    expect(vi.mocked(source.parseCurrentSeasonSources)).not.toHaveBeenCalled();
+    expect(vi.mocked(source.validateCurrentSeasonYear)).not.toHaveBeenCalled();
+    expect(mocks.authSql).not.toHaveBeenCalled();
+  });
+
+  it('returns the status on a refresh and asserts no correlation of its own', async () => {
+    const state = await refreshSettleRunStatusAction();
+
+    expect(state.outcome).toBe('status');
+    expect(state.status).toEqual(STATUS);
+    // A refresh asserts no start correlation, and a read is not an action:
+    // it writes no audit row.
+    expect(state.batchIdAtStart).toBeUndefined();
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
 });
 
-/* ------------------------------------------------------------------ *
- * Concurrency
- * ------------------------------------------------------------------ */
-
-describe('concurrency', () => {
-  it('refuses a second invocation while a run is active, rather than starting one', async () => {
-    mocks.startSettleRun.mockResolvedValue({
-      outcome: 'already-running',
-      unit: { ...IDLE_UNIT, phase: 'running', activeState: 'activating', subState: 'start' },
-    });
-
-    const state = await startSettleRunAction();
-
-    expect(state.outcome).toBe('already-running');
-    expect(state.error).toBeUndefined();
-    expect(state.message).toMatch(/already in progress/i);
-    // The refusal is still an auditable attempt.
-    expect(mocks.audit).toHaveBeenCalledOnce();
-  });
-
-  it('treats every non-idle systemd state as running, so no second start is offered', () => {
+describe('the systemd unit-state mapping is pure and unchanged', () => {
+  it('treats every non-idle systemd state as running', () => {
     expect(unitPhaseOf('activating')).toBe('running');
     expect(unitPhaseOf('active')).toBe('running');
     expect(unitPhaseOf('deactivating')).toBe('running');
@@ -267,79 +311,53 @@ describe('concurrency', () => {
 });
 
 /* ------------------------------------------------------------------ *
- * Outcome mapping
- * ------------------------------------------------------------------ */
-
-describe('outcome mapping', () => {
-  it('maps an unconfigured host to unavailable, not to a failure', async () => {
-    mocks.startSettleRun.mockResolvedValue({
-      outcome: 'unavailable', reason: 'On-demand refresh is not enabled on this host.',
-    });
-
-    const state = await startSettleRunAction();
-
-    expect(state.outcome).toBe('unavailable');
-    expect(state.error).toBe('On-demand refresh is not enabled on this host.');
-    expect(state.message).toBeUndefined();
-  });
-
-  it('maps a refused start to an error carrying only the bounded reason', async () => {
-    mocks.startSettleRun.mockResolvedValue({
-      outcome: 'error', reason: 'Failed to start afldb-settle-afltables.service: Access denied',
-    });
-
-    const state = await startSettleRunAction();
-
-    expect(state.outcome).toBe('error');
-    expect(state.error).toMatch(/Access denied/);
-  });
-
-  it('returns the status on a refresh and asserts no correlation of its own', async () => {
-    const state = await refreshSettleRunStatusAction();
-
-    expect(state.outcome).toBe('status');
-    expect(state.status).toEqual(STATUS);
-    // The correlation belongs to the start the panel performed; a refresh
-    // must not be able to claim one.
-    expect(state.batchIdAtStart).toBeUndefined();
-    // A read is not an action: it writes no audit row.
-    expect(mocks.audit).not.toHaveBeenCalled();
-  });
-});
-
-/* ------------------------------------------------------------------ *
- * Audit
+ * Audit: one row per authorised refusal, best effort, no secrets
  * ------------------------------------------------------------------ */
 
 describe('audit', () => {
-  it('records actor, action, unit, outcome and the safe run identifier', async () => {
+  it('records the actor, the retired surface and the export that was called', async () => {
     await startSettleRunAction();
 
     expect(mocks.audit).toHaveBeenCalledExactlyOnceWith(
-      'current_season.settle_triggered',
-      {
-        unit: 'afldb-settle-afltables.service',
-        outcome: 'started',
-        batchIdAtStart: '731',
-      },
+      'admin.legacy_retired_refused',
+      { surface: 'admin.afltables_settle_trigger', export: 'startSettleRunAction' },
       { userId: SUPER_ADMIN.id, label: SUPER_ADMIN.email },
     );
   });
 
-  it('audits a failed start too, so a refused attempt still leaves a trail', async () => {
-    mocks.startSettleRun.mockResolvedValue({ outcome: 'error', reason: 'Access denied' });
+  it('writes one row for the Squiggle/Kali refusal too, under its own surface', async () => {
+    await staleRefresh({}, manualRefreshForm());
 
-    await startSettleRunAction();
-
-    const [action, detail] = mocks.audit.mock.calls[0];
-    expect(action).toBe('current_season.settle_triggered');
-    expect(detail.outcome).toBe('error');
+    expect(mocks.audit).toHaveBeenCalledExactlyOnceWith(
+      'admin.legacy_retired_refused',
+      { surface: 'admin.squiggle_kali_refresh', export: 'runCurrentSeasonAdminAction' },
+      { userId: SUPER_ADMIN.id, label: SUPER_ADMIN.email },
+    );
   });
 
-  it('never puts a credential or an environment value in the audit detail', async () => {
+  it('puts only the two fixed keys in the audit detail', async () => {
     await startSettleRunAction();
 
-    const serialised = JSON.stringify(mocks.audit.mock.calls[0][1]);
+    const [, detail] = mocks.audit.mock.calls[0];
+    expect(Object.keys(detail).sort()).toEqual(['export', 'surface']);
+  });
+
+  it('still refuses when the audit write fails, and says so on the server log only', async () => {
+    mocks.audit.mockRejectedValue(new Error('audit insert failed'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const state = await startSettleRunAction();
+
+    expect(state).toMatchObject({ refused: true, code: 'legacy_retired' });
+    expect(JSON.stringify(state)).not.toContain('audit insert failed');
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it('never puts a credential or an environment value in the audit detail or the refusal', async () => {
+    const state = await startSettleRunAction();
+
+    const serialised = JSON.stringify([mocks.audit.mock.calls[0][1], state]);
     expect(serialised).not.toMatch(/postgres:\/\//);
     expect(serialised).not.toMatch(/DATABASE_URL/);
   });
@@ -656,116 +674,82 @@ describe('AFLDB-ISSUE-232 — AFL API settle units panel', () => {
 });
 
 /* ------------------------------------------------------------------ *
- * What ISSUE-127 must NOT have changed
+ * AFLDB V2 Stage 5 — the retired controls are gone from the page and the
+ * action module, and cannot quietly come back.
+ *
+ * Supersedes the AFLDB-ISSUE-127/128 assertions that read the AFL Tables
+ * settle panel and the Squiggle/Kali controls: those components are removed
+ * (docs/v2/legacy-disposition.md L5, L6), so what is pinned now is their
+ * absence and the truthful replacement text. The structural guards that no
+ * admin file imports the legacy libraries again live in
+ * tests/v2-module-boundaries.test.ts.
  * ------------------------------------------------------------------ */
 
-describe('unchanged contracts', () => {
-  it('starts the one approved unit the nightly timer already starts', async () => {
-    await startSettleRunAction();
-
-    const [, detail] = mocks.audit.mock.calls[0];
-    expect(detail.unit).toBe('afldb-settle-afltables.service');
-  });
-
-  it('the fallback action still refuses to insert canonical matches', async () => {
-    // AFLDB-ISSUE-122 §11.2: Squiggle/Kali have no canonical writer, and
-    // ISSUE-127 must not have reintroduced one. The Squiggle/Kali action
-    // hardcodes insertMissingMatches = false with no input that can change it.
-    const {
-      runCurrentSeasonRefresh, validateCurrentSeasonYear, getCurrentSeasonReport,
-      parseCurrentSeasonSources,
-    } = await import('@/lib/external-afl/current-season-import');
-    vi.mocked(validateCurrentSeasonYear).mockReturnValue(2026);
-    vi.mocked(parseCurrentSeasonSources).mockReturnValue(['kali']);
-    vi.mocked(getCurrentSeasonReport).mockResolvedValue({
-      year: 2026, rows: [], incompleteSamples: [], unresolvedMatchSamples: [],
-      unresolvedTeamSamples: [],
-    } as never);
-    vi.mocked(runCurrentSeasonRefresh).mockResolvedValue({
-      applied: true, observationsStaged: 0, canonicalMatchesResolved: 0,
-    } as never);
-
-    const { runCurrentSeasonAdminAction } = await import('@/app/admin/current-season/actions');
-    const form = new FormData();
-    form.set('mode', 'manual');
-    form.set('insertMissingMatches', 'on');
-    form.set('force', 'on');
-    await runCurrentSeasonAdminAction({}, form);
-
-    expect(vi.mocked(runCurrentSeasonRefresh).mock.calls[0][0])
-      .toMatchObject({ insertMissingMatches: false });
-  });
-});
-
-/* ------------------------------------------------------------------ *
- * AFLDB-ISSUE-128 — the admin surface must not present a dropped-rows
- * run as a clean one, and must name the real provider precedence.
- * ------------------------------------------------------------------ */
-
-describe('AFLDB-ISSUE-128 — provider precedence and completeness on the admin surface', () => {
+describe('AFLDB V2 Stage 5 — the current-season admin surface after the retirement', () => {
   const readSource = (relative: string) =>
-    readFileSync(resolve(process.cwd(), relative), 'utf8');
+    readFileSync(resolve(process.cwd(), relative), 'utf8').replace(/\r\n/g, '\n');
   const page = readSource('src/app/admin/current-season/page.tsx');
-  const controls = readSource('src/app/admin/current-season/CurrentSeasonControls.tsx');
-  const panel = readSource('src/app/admin/current-season/SettleRunPanel.tsx');
   const actions = readSource('src/app/admin/current-season/actions.ts');
   const query = readSource('src/db/queries/settle-runs.ts');
 
-  it('carries the completeness verdict beside the run, derived not stored', () => {
+  it('keeps the settle batch projection that the AFL API units still use', () => {
     // Derived on read, so a batch row written before ISSUE-128 existed still
     // gets today's reading rather than none at all.
     expect(query).toContain('assessSourceCompleteness(counters)');
     expect(query).toContain('sourceCompleteness: SourceCompletenessVerdict');
-  });
-
-  it('projects the snapshot coverage counters an operator needs to see', () => {
     for (const counter of [
       'snapshotMatches', 'snapshotPlayerMatchRows', 'snapshotRejections',
       'snapshotUnkeyedRejections', 'absenceSweepSkipped',
     ]) {
       expect(query).toContain(`${counter}: counterOf(raw, '${counter}')`);
-      expect(panel).toContain(`counters.${counter}`);
     }
   });
 
-  it('renders the verdict as a verdict, not as one more number in a table', () => {
-    expect(panel).toContain('run.sourceCompleteness');
-    expect(panel).toContain('Source INCOMPLETE');
-    expect(panel).toContain("role=\"alert\"");
-    expect(panel).toContain('Source completeness unknown');
+  it('renders neither the AFL Tables trigger panel nor the Squiggle/Kali controls', () => {
+    expect(page).not.toMatch(/SettleRunPanel|CurrentSeasonControls|CurrentSeasonReportTable/);
+    expect(page).not.toContain('current-season-import');
+    expect(page).not.toContain('getCurrentSeasonReport');
+    expect(page).not.toContain('Deprecated fallback diagnostics');
+    expect(page).toContain('<AflApiIngestionControls initialView={ingestionView} />');
+    expect(page).toContain('<AflApiSettleUnitsPanel units={aflApiUnits} error={aflApiUnitsError} />');
+    for (const gone of [
+      'src/app/admin/current-season/SettleRunPanel.tsx',
+      'src/app/admin/current-season/CurrentSeasonControls.tsx',
+    ]) {
+      expect(() => readSource(gone), gone).toThrow();
+    }
   });
 
-  it('names AFL Tables/fitzRoy as primary and Squiggle/Kali as deprecated fallback', () => {
-    expect(page).toContain('AFL Tables, acquired via fitzRoy, is the primary');
-    expect(page).toContain('only automatic');
-    expect(page).toContain('no canonical-write authority');
-    expect(page).toContain('Deprecated fallback diagnostics');
-    // The exact wording the observed defect displayed.
-    expect(page).not.toContain('Auto update uses Kali AFL Stats');
+  it('states the AFL Tables position truthfully: still on the host behind ISSUE-316, not started or stopped by V2', () => {
+    expect(page).toContain('AFLDB-ISSUE-316');
+    expect(page).toContain('D-316-2');
+    expect(page).toContain('neither starts nor');
+    expect(page).toContain('retired');
+    // The wording the observed ISSUE-128 defect displayed must not return.
+    expect(page).not.toContain('Auto update uses Kali');
+    expect(page).not.toContain('is the primary and only automatic');
   });
 
-  it('offers no automatic Squiggle/Kali path, by name or by shape', () => {
-    expect(controls).not.toContain('Auto update from API');
-    expect(controls).not.toContain('value="auto"');
-    expect(controls).toContain('value="manual"');
-    expect(actions).toContain("if (mode !== 'manual')");
-    expect(actions).not.toContain("['kali'] as const");
+  it('keeps the guard on the page, and the actions module free of the legacy libraries', () => {
+    expect(page).toContain("await requireCapability('acquisition.currentSeason');");
+    expect(actions).not.toMatch(/current-season-import|settle-trigger|external-afl/);
+    expect(actions).not.toContain('startSettleRun(');
+    expect(actions).not.toContain('runCurrentSeasonRefresh');
+    // The fallback providers have no write path of any kind from this module.
+    expect(actions).not.toContain('insertMissingMatches');
   });
 
-  it('does not offer AFL Tables in the fallback source list', () => {
-    // Wiring fitzRoy into the Squiggle/Kali dispatcher would be a SECOND
-    // canonical ingestion implementation inside Next.js. The fitzRoy control
-    // is the settle panel, which starts the one approved chain.
-    expect(controls).not.toMatch(/value="(afltables|fitzroy|afl_tables)"/);
-    expect(page).toContain('AFL Tables itself is deliberately absent from the source list');
-  });
-
-  it('keeps the fallback providers non-writing', () => {
-    // Unchanged by ISSUE-128, and asserted here so a wording change cannot
-    // quietly travel with a behaviour change.
-    expect(actions).toContain('const insertMissingMatches = false;');
-    expect(actions).not.toMatch(/insertMissingMatches\s*[:=]\s*true/);
-    expect(actions).not.toMatch(/insertMissingMatches\s*[:=]\s*formData/);
+  it('refuses through the shared helper, after the guard, in both retired actions', () => {
+    for (const [name, surface] of [
+      ['runCurrentSeasonAdminAction', 'admin.squiggle_kali_refresh'],
+      ['startSettleRunAction', 'admin.afltables_settle_trigger'],
+    ] as const) {
+      const body = actions.slice(actions.indexOf(`export async function ${name}(`));
+      const guard = body.indexOf("await requireCapability('acquisition.currentSeason')");
+      const refusal = body.indexOf(`refuseRetiredAdminAction('${surface}'`);
+      expect(guard, name).toBeGreaterThan(-1);
+      expect(refusal, name).toBeGreaterThan(guard);
+    }
   });
 });
 

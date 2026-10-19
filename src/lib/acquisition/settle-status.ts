@@ -92,8 +92,9 @@ export type SettleUnitStatus = {
  * counter breakdown, for the two new units.
  *
  * AFLDB-ISSUE-232: `/admin/current-season` renders the two AFL API rows
- * (`AflApiSettleUnitsPanel.tsx`); the AFL Tables row stays with
- * `SettleRunPanel`, which reads it through `readSettleRunStatus()` above.
+ * (`AflApiSettleUnitsPanel.tsx`). The AFL Tables row is read, status only,
+ * through `readSettleRunStatus()` above by the operations centre; its admin
+ * start panel was retired in AFLDB V2 Stage 5 (docs/v2/legacy-disposition.md L5).
  */
 export async function readSettleUnitTableStatus(): Promise<Record<SettleUnitKey, SettleUnitStatus>> {
   const configured = settleTriggerConfigured();

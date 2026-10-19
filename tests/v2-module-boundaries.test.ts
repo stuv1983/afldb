@@ -19,20 +19,27 @@ import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
 import {
+  LEGACY_RETIRED_CODE,
+  RETIRED_ADMIN_SURFACES,
   RETIRED_ENTRIES,
+  findRetiredAdminSurface,
   findRetiredEntry,
+  renderRetiredAdminRefusal,
   renderRetiredEntryRefusal,
   renderUnknownRetiredEntry,
+  retiredAdminRefusal,
 } from '@afldb/domain';
 import {
   LEGACY_RUNTIME_MODULES,
   PACKAGE_MODULES,
   boundaryRuleBroken,
   checkBoundaries,
+  extractImportSpecifiers,
   legacyRuntimeEdges,
   offlineToolImports,
   publicRuntimeLegacyReach,
   purityViolations,
+  resolveImportFile,
   resolveSpecifier,
   retiredEntryWiring,
   scheduledLegacyReferences,
@@ -270,18 +277,21 @@ function ratchetDiff(
  * The exact set of direct importers of LEGACY_RUNTIME_MODULES outside those modules (tests/**
  * excluded). Every one has a named disposition; the ratchet fails on a new edge and on a listed
  * edge that no longer exists, so the list can only shrink deliberately.
+ *
+ * Stage 5 (V2-GAP-013) deliberately retired seven edges, all admin entry points that refuse now:
+ *   src/app/admin/current-season/actions.ts -> settle-trigger.ts and -> current-season-import.ts
+ *   src/app/admin/current-season/page.tsx -> current-season-import.ts
+ *   src/app/admin/submissions/[id]/actions.ts -> pipeline.ts
+ *   src/app/admin/upload/page.tsx -> datasets.ts
+ *   src/app/admin/upload/stage/route.ts -> pipeline.ts
+ *   src/app/api/admin/email-intake/route.ts -> pipeline.ts
+ * Two admin edges remain, both reads of the AFL API settle unit table (a type and SETTLE_UNITS),
+ * never the AFL Tables trigger; the Stage 5 guards below pin that `startSettleRun` is not imported.
  */
 const KNOWN_LEGACY_RUNTIME_EDGES: readonly { from: string; to: string; disposition: string }[] = [
   { from: QUARANTINED_TOOL, to: 'src/lib/external-afl/current-season-import.ts', disposition: 'legacy/offline quarantine' },
-  { from: 'src/app/admin/current-season/AflApiSettleUnitsPanel.tsx', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'Stage 5: admin current-season controls' },
-  { from: 'src/app/admin/current-season/actions.ts', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'Stage 5: admin current-season controls' },
-  { from: 'src/app/admin/current-season/actions.ts', to: 'src/lib/external-afl/current-season-import.ts', disposition: 'Stage 5: admin current-season controls' },
-  { from: 'src/app/admin/current-season/page.tsx', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'Stage 5: admin current-season controls' },
-  { from: 'src/app/admin/current-season/page.tsx', to: 'src/lib/external-afl/current-season-import.ts', disposition: 'Stage 5: admin current-season controls' },
-  { from: 'src/app/admin/submissions/[id]/actions.ts', to: 'src/lib/ingest/pipeline.ts', disposition: 'Stage 5: CSV submission review' },
-  { from: 'src/app/admin/upload/page.tsx', to: 'src/lib/ingest/datasets.ts', disposition: 'Stage 5: CSV upload' },
-  { from: 'src/app/admin/upload/stage/route.ts', to: 'src/lib/ingest/pipeline.ts', disposition: 'Stage 5: CSV upload' },
-  { from: 'src/app/api/admin/email-intake/route.ts', to: 'src/lib/ingest/pipeline.ts', disposition: 'Stage 5: email intake' },
+  { from: 'src/app/admin/current-season/AflApiSettleUnitsPanel.tsx', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'retained: AFL API settle units panel reads SETTLE_UNITS and the unit-key type, never startSettleRun' },
+  { from: 'src/app/admin/current-season/page.tsx', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'retained: type-only read of the unit-key type for the AFL API settle units panel' },
   { from: 'src/lib/acquisition/settle-afl-api.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: AFL API settle shares the AFL Tables settle helpers' },
   { from: 'src/lib/acquisition/settle-report.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: settle report reads the AFL Tables settle types' },
   { from: 'src/lib/acquisition/settle-status.ts', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'ISSUE-316 C4b cutover: settle status reads the trigger contract' },
@@ -403,8 +413,18 @@ describe('public runtime independence: the public web layer reaches no legacy ru
   });
 
   it('the walker follows the real tree: an admin entry does reach a legacy runtime module', () => {
+    // Stage 5: the current-season page reaches only settle-trigger (the AFL API unit table's
+    // constants and type); the Squiggle/Kali importer it used to reach is gone from its closure.
     const reach = publicRuntimeLegacyReach(['src/app/admin/current-season/page.tsx'], diskReader);
-    expect(reach.map((r) => r.reached)).toContain('src/lib/external-afl/current-season-import.ts');
+    expect(reach.map((r) => r.reached)).toContain('src/lib/acquisition/settle-trigger.ts');
+    expect(reach.map((r) => r.reached)).not.toContain('src/lib/external-afl/current-season-import.ts');
+    // The upload and submission pages used to reach the ingest pipeline; neither does now.
+    const retired = publicRuntimeLegacyReach([
+      'src/app/admin/upload/page.tsx', 'src/app/admin/upload/stage/route.ts',
+      'src/app/admin/submissions/[id]/page.tsx', 'src/app/admin/submissions/[id]/actions.ts',
+      'src/app/api/admin/email-intake/route.ts',
+    ], diskReader);
+    expect(retired.map((r) => r.chain.join(' > '))).toEqual([]);
   });
 
   it('negative control: an import chain into a legacy module, tools/ or legacy/ is reported', () => {
@@ -509,4 +529,298 @@ describe('retired entry points are registered and wired in both directions', () 
     // No scheduler-style silent success: with no argument it also refuses.
     expect(run('').status).toBe(1);
   }, 60_000);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Stage 5 (plan D9/D10, ADR 0009/0010, V2-GAP-013): the retired admin controls.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Libraries no admin page, route handler or Server Action may import after Stage 5. They stay on
+ * disk for the offline tools (`tools/records/import-first-kick-goal.ts` uses `datasets.ts`; the
+ * quarantined CLI uses the external-afl pair) but no admin entry point may reach them again.
+ */
+const ADMIN_BANNED_LEGACY_MODULES: readonly string[] = [
+  'src/lib/ingest/pipeline.ts',
+  'src/lib/ingest/datasets.ts',
+  'src/lib/external-afl/current-season-import.ts',
+  'src/lib/external-afl/current-matches.ts',
+];
+const SETTLE_TRIGGER = 'src/lib/acquisition/settle-trigger.ts';
+
+const isAdminPath = (path: string): boolean => (
+  path.startsWith('src/app/admin/') || path.startsWith('src/app/api/admin/')
+);
+
+/** Source with block and line comments removed, so prose in a comment cannot satisfy or trip a guard. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
+
+/**
+ * The names a plain `import [type] { a, b as c } from '<specifier>'` brings in, or null when the
+ * specifier is imported in any other shape (namespace, default, side-effect, dynamic, re-export,
+ * or alongside a named import), so a banned name cannot hide behind a shape the guard cannot read.
+ */
+function namedImportsOf(source: string, specifier: string): string[] | null {
+  const code = stripComments(source);
+  const escaped = specifier.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const named = [...code.matchAll(new RegExp(`import\\s+(?:type\\s+)?\\{([^}]*)\\}\\s*from\\s*['"]${escaped}['"]`, 'g'))];
+  const mentions = [...code.matchAll(new RegExp(`['"]${escaped}['"]`, 'g'))];
+  if (named.length === 0 || named.length !== mentions.length) return null;
+  return named.flatMap((m) => m[1].split(',')
+    .map((part) => part.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim())
+    .filter((name) => name.length > 0));
+}
+
+/** Every admin import Stage 5 forbids, as `file -> target[: detail]`, sorted. */
+function adminLegacyImports(
+  files: readonly SourceFile[],
+  readFile: (path: string) => string | null,
+): string[] {
+  const admin = files.filter((f) => isAdminPath(f.path));
+  const found = legacyRuntimeEdges(admin, readFile, ADMIN_BANNED_LEGACY_MODULES).map((e) => `${e.from} -> ${e.to}`);
+  for (const file of admin) {
+    for (const specifier of extractImportSpecifiers(file.source)) {
+      if (resolveImportFile(file.path, specifier, readFile) !== SETTLE_TRIGGER) continue;
+      const names = namedImportsOf(file.source, specifier);
+      if (names === null) {
+        found.push(`${file.path} -> ${SETTLE_TRIGGER}: not a plain named import, so startSettleRun cannot be ruled out`);
+      } else if (names.includes('startSettleRun')) {
+        found.push(`${file.path} -> ${SETTLE_TRIGGER}: startSettleRun`);
+      }
+    }
+  }
+  return [...new Set(found)].sort();
+}
+
+const REMOVED_CONTROLS = /\b(SettleRunPanel|CurrentSeasonControls|CurrentSeasonReportTable|UploadForm|ReviewControls)\b/;
+
+/** Admin/components files (comments stripped) that mention a removed control, as `file: name`. */
+function removedControlMentions(files: readonly SourceFile[]): string[] {
+  return files
+    .filter((f) => /\.tsx?$/.test(f.path) && (isAdminPath(f.path) || f.path.startsWith('src/components/')))
+    .flatMap((f) => {
+      const hit = REMOVED_CONTROLS.exec(stripComments(f.source));
+      return hit ? [`${f.path}: ${hit[1]}`] : [];
+    })
+    .sort();
+}
+
+/**
+ * Why a retired surface no longer proves it refuses: a missing file, a missing export, or an
+ * export whose body does not reach the refusal helper for its own surface id. Comments are
+ * stripped first, so a comment naming the helper does not count.
+ */
+function retiredSurfaceViolations(
+  readFile: (path: string) => string | null,
+  surfaces: readonly { id: string; kind: string; paths: readonly string[]; exports: readonly string[] }[] = RETIRED_ADMIN_SURFACES,
+): string[] {
+  const violations: string[] = [];
+  for (const surface of surfaces) {
+    const helper = surface.kind === 'route_handler'
+      ? new RegExp(`(?:refuseRetiredAdminRoute|goneRetiredAdminRoute)\\(\\s*'${surface.id}'`)
+      : new RegExp(`refuseRetiredAdminAction\\(\\s*'${surface.id}'`);
+    for (const path of surface.paths) {
+      const source = readFile(path);
+      if (source === null) {
+        violations.push(`${surface.id}: ${path} is missing`);
+        continue;
+      }
+      const code = stripComments(source);
+      if (!code.includes("'@/lib/admin/retired-admin'")) violations.push(`${surface.id}: ${path} does not import the refusal helper`);
+      for (const name of surface.exports) {
+        const declaration = new RegExp(`export\\s+async\\s+function\\s+${name}\\s*\\(`).exec(code);
+        if (!declaration) {
+          violations.push(`${surface.id}: ${path} no longer exports ${name}`);
+          continue;
+        }
+        const rest = code.slice(declaration.index);
+        const close = rest.search(/\n\}[ \t]*(?:\n|$)/);
+        const body = close === -1 ? rest : rest.slice(0, close);
+        if (!helper.test(body)) violations.push(`${surface.id}: ${name} does not reach the refusal helper`);
+      }
+    }
+  }
+  return violations;
+}
+
+describe('retired admin controls (Stage 5): the pure registry', () => {
+  it('lists every retired surface once, with real paths and governing documents', () => {
+    expect(RETIRED_ADMIN_SURFACES.map((s) => s.id).sort()).toEqual([
+      'admin.afltables_settle_trigger', 'admin.csv_upload', 'admin.email_intake',
+      'admin.squiggle_kali_refresh', 'admin.submission_review',
+    ]);
+    expect(new Set(RETIRED_ADMIN_SURFACES.map((s) => s.id)).size).toBe(RETIRED_ADMIN_SURFACES.length);
+    for (const surface of RETIRED_ADMIN_SURFACES) {
+      expect(['server_action', 'route_handler', 'page'], surface.id).toContain(surface.kind);
+      expect(surface.exports.length, surface.id).toBeGreaterThan(0);
+      for (const path of surface.paths) expect(diskReader(path), `${surface.id}: ${path}`).not.toBeNull();
+      for (const doc of surface.governedBy) expect(diskReader(doc), `${surface.id}: ${doc}`).not.toBeNull();
+      expect(surface.governedBy).toContain('docs/v2/legacy-disposition.md');
+      expect(surface.was.length, surface.id).toBeGreaterThan(10);
+      expect(surface.why.length, surface.id).toBeGreaterThan(10);
+      expect(surface.replacedBy.length, surface.id).toBeGreaterThan(10);
+    }
+  });
+
+  it('looks surfaces up by id and answers null for an unknown one', () => {
+    expect(findRetiredAdminSurface('admin.csv_upload')?.paths).toEqual(['src/app/admin/upload/stage/route.ts']);
+    expect(findRetiredAdminSurface('admin.submission_review')?.exports).toEqual(['runValidation', 'decideSubmission', 'runPromotion']);
+    expect(findRetiredAdminSurface('admin.nope')).toBeNull();
+    expect(findRetiredAdminSurface('')).toBeNull();
+  });
+
+  it('renders one operator-facing text from the registry: what, why, what replaces it; no path, secret or stack', () => {
+    for (const surface of RETIRED_ADMIN_SURFACES) {
+      const text = renderRetiredAdminRefusal(surface);
+      expect(text, surface.id).toContain('retired');
+      expect(text, surface.id).toContain(surface.replacedBy);
+      expect(text, surface.id).not.toMatch(/\bsrc\/|\btools\/|\.tsx?\b|postgres:\/\/|DATABASE_URL|SECRET|\bat \w+ \(/);
+    }
+  });
+
+  it('builds the typed refusal: refused, a stable code, the surface id and the same text as `error`', () => {
+    const surface = findRetiredAdminSurface('admin.email_intake')!;
+    const refusal = retiredAdminRefusal(surface);
+    expect(refusal).toEqual({
+      refused: true,
+      code: 'legacy_retired',
+      surface: 'admin.email_intake',
+      error: renderRetiredAdminRefusal(surface),
+    });
+    expect(LEGACY_RETIRED_CODE).toBe('legacy_retired');
+    expect(Object.keys(refusal).sort()).toEqual(['code', 'error', 'refused', 'surface']);
+  });
+});
+
+describe('retired admin controls (Stage 5): no admin file reaches the legacy ingestion libraries', () => {
+  const files = sourceFiles(['src']);
+
+  it('no file under src/app/admin or src/app/api/admin imports the pipeline, datasets, the Squiggle/Kali libraries or startSettleRun', () => {
+    // Not vacuous: the admin tree is large, and the retained AFL API panel is a real, analysed
+    // importer of settle-trigger (SETTLE_UNITS and a type), which the guard admits by name.
+    expect(files.filter((f) => isAdminPath(f.path)).length).toBeGreaterThan(80);
+    const panel = files.find((f) => f.path === 'src/app/admin/current-season/AflApiSettleUnitsPanel.tsx')!;
+    expect(namedImportsOf(panel.source, '@/lib/acquisition/settle-trigger')).toEqual(['SETTLE_UNITS', 'SettleUnitKey']);
+    expect(adminLegacyImports(files, diskReader)).toEqual([]);
+  });
+
+  it('the libraries themselves still exist for the offline tools', () => {
+    for (const path of ADMIN_BANNED_LEGACY_MODULES) expect(diskReader(path), path).not.toBeNull();
+  });
+
+  it('negative control: every banned shape is reported; a plain named import of the unit table is not', () => {
+    const memory: Record<string, string> = {
+      'src/lib/ingest/pipeline.ts': 'export const p = 1;',
+      'src/lib/ingest/datasets.ts': 'export const d = 1;',
+      'src/lib/external-afl/current-season-import.ts': 'export const c = 1;',
+      'src/lib/external-afl/current-matches.ts': 'export const m = 1;',
+      [SETTLE_TRIGGER]: 'export const startSettleRun = 1; export const SETTLE_UNITS = 1; export type SettleUnitKey = string;',
+      'src/app/admin/a/actions.ts': "import { p } from '@/lib/ingest/pipeline';",
+      'src/app/admin/b/page.tsx': "import { d } from '@/lib/ingest/datasets';",
+      'src/app/api/admin/c/route.ts': "import { c } from '../../../../lib/external-afl/current-season-import';",
+      'src/app/admin/d/page.tsx': "import { m } from '@/lib/external-afl/current-matches';",
+      'src/app/admin/e/actions.ts': "import { startSettleRun, SETTLE_UNITS } from '@/lib/acquisition/settle-trigger';",
+      'src/app/admin/f/actions.ts': "import { startSettleRun as go } from '@/lib/acquisition/settle-trigger';",
+      'src/app/admin/g/actions.ts': "import * as trigger from '@/lib/acquisition/settle-trigger';",
+      'src/app/admin/h/actions.ts': "import type { SettleUnitKey } from '@/lib/acquisition/settle-trigger';\nconst t = await import('@/lib/acquisition/settle-trigger');",
+      'src/app/admin/ok/page.tsx': "import type { SettleUnitKey } from '@/lib/acquisition/settle-trigger';\nimport { SETTLE_UNITS } from '@/lib/acquisition/settle-trigger';",
+      'src/app/admin/ok2/page.tsx': "import { SETTLE_UNITS, type SettleUnitKey } from '@/lib/acquisition/settle-trigger';",
+      // Outside the admin tree the same imports are not this guard's business (the ratchet owns them).
+      'src/lib/other.ts': "import { p } from './ingest/pipeline';",
+      'tools/records/x.ts': "import { d } from '../../src/lib/ingest/datasets';",
+    };
+    const memFiles: SourceFile[] = Object.entries(memory).map(([path, source]) => ({ path, source }));
+    expect(adminLegacyImports(memFiles, (p) => memory[p] ?? null)).toEqual([
+      'src/app/admin/a/actions.ts -> src/lib/ingest/pipeline.ts',
+      'src/app/admin/b/page.tsx -> src/lib/ingest/datasets.ts',
+      'src/app/admin/d/page.tsx -> src/lib/external-afl/current-matches.ts',
+      `src/app/admin/e/actions.ts -> ${SETTLE_TRIGGER}: startSettleRun`,
+      `src/app/admin/f/actions.ts -> ${SETTLE_TRIGGER}: startSettleRun`,
+      `src/app/admin/g/actions.ts -> ${SETTLE_TRIGGER}: not a plain named import, so startSettleRun cannot be ruled out`,
+      `src/app/admin/h/actions.ts -> ${SETTLE_TRIGGER}: not a plain named import, so startSettleRun cannot be ruled out`,
+      'src/app/api/admin/c/route.ts -> src/lib/external-afl/current-season-import.ts',
+    ]);
+  });
+
+  it('negative control: names inside a comment are not imports', () => {
+    expect(namedImportsOf("// import { startSettleRun } from '@/lib/acquisition/settle-trigger';\nconst a = 1;", '@/lib/acquisition/settle-trigger')).toBeNull();
+    expect(stripComments("const a = 1; // hello\n/* block */ const b = 2;")).not.toMatch(/hello|block/);
+  });
+});
+
+describe('retired admin controls (Stage 5): the removed controls stay removed and the refusals stay refusals', () => {
+  const files = sourceFiles(['src']);
+
+  it('no admin page or shared component renders or imports SettleRunPanel, CurrentSeasonControls, UploadForm or ReviewControls', () => {
+    expect(removedControlMentions(files)).toEqual([]);
+    for (const gone of [
+      'src/app/admin/current-season/SettleRunPanel.tsx',
+      'src/app/admin/current-season/CurrentSeasonControls.tsx',
+      'src/app/admin/upload/UploadForm.tsx',
+      'src/app/admin/submissions/[id]/ReviewControls.tsx',
+    ]) expect(diskReader(gone), gone).toBeNull();
+  });
+
+  it('negative control: a page that renders a removed control is reported; a comment about one is not', () => {
+    const memory: SourceFile[] = [
+      { path: 'src/app/admin/x/page.tsx', source: "import { UploadForm } from './UploadForm';\nexport default () => <UploadForm />;" },
+      { path: 'src/components/Y.tsx', source: 'export const Y = () => <ReviewControls id={1} />;' },
+      { path: 'src/app/admin/z/page.tsx', source: '/* the SettleRunPanel was retired */ export default () => null; // CurrentSeasonControls' },
+      { path: 'src/lib/w.ts', source: 'export const SettleRunPanel = 1;' },
+    ];
+    expect(removedControlMentions(memory)).toEqual([
+      'src/app/admin/x/page.tsx: UploadForm',
+      'src/components/Y.tsx: ReviewControls',
+    ]);
+  });
+
+  it('every retired export still exists and its body reaches the refusal helper for its own surface', () => {
+    expect(retiredSurfaceViolations(diskReader)).toEqual([]);
+    // Not vacuous: seven exports across five surfaces are checked.
+    expect(RETIRED_ADMIN_SURFACES.flatMap((s) => s.exports.map((e) => `${s.id}:${e}`))).toHaveLength(7);
+  });
+
+  it('negative control: a refusal that regained behaviour, lost its export or names the wrong surface is reported', () => {
+    const surfaces = [
+      { id: 'admin.csv_upload', kind: 'route_handler', paths: ['r.ts'], exports: ['POST'] },
+      { id: 'admin.submission_review', kind: 'server_action', paths: ['a.ts'], exports: ['runValidation', 'decideSubmission'] },
+    ];
+    const helperImport = "import { refuseRetiredAdminAction, refuseRetiredAdminRoute } from '@/lib/admin/retired-admin';\n";
+    const good: Record<string, string> = {
+      'r.ts': `${helperImport}export async function POST(request: Request) {\n  const admin = await requireCapability('x');\n  return refuseRetiredAdminRoute('admin.csv_upload', admin, 'POST');\n}\n`,
+      'a.ts': `${helperImport}export async function runValidation() {\n  const admin = await requireAdmin();\n  return refuseRetiredAdminAction('admin.submission_review', admin, 'runValidation');\n}\nexport async function decideSubmission() {\n  const admin = await requireAdmin();\n  return refuseRetiredAdminAction('admin.submission_review', admin, 'decideSubmission');\n}\n`,
+    };
+    expect(retiredSurfaceViolations((p) => good[p] ?? null, surfaces)).toEqual([]);
+
+    const regained: Record<string, string> = {
+      ...good,
+      'a.ts': good['a.ts'].replace(
+        "  return refuseRetiredAdminAction('admin.submission_review', admin, 'runValidation');",
+        '  return promoteSubmission(1);',
+      ),
+    };
+    expect(retiredSurfaceViolations((p) => regained[p] ?? null, surfaces))
+      .toEqual(['admin.submission_review: runValidation does not reach the refusal helper']);
+
+    const lostExport: Record<string, string> = { ...good, 'a.ts': good['a.ts'].replace('export async function decideSubmission', 'async function decideSubmission') };
+    expect(retiredSurfaceViolations((p) => lostExport[p] ?? null, surfaces))
+      .toEqual(['admin.submission_review: a.ts no longer exports decideSubmission']);
+
+    const wrongSurface: Record<string, string> = { ...good, 'r.ts': good['r.ts'].replace("'admin.csv_upload'", "'admin.email_intake'") };
+    expect(retiredSurfaceViolations((p) => wrongSurface[p] ?? null, surfaces))
+      .toEqual(['admin.csv_upload: POST does not reach the refusal helper']);
+
+    const commentOnly: Record<string, string> = {
+      ...good,
+      'r.ts': `${helperImport}export async function POST() {\n  // refuseRetiredAdminRoute('admin.csv_upload', admin, 'POST')\n  return new Response('ok');\n}\n`,
+    };
+    expect(retiredSurfaceViolations((p) => commentOnly[p] ?? null, surfaces))
+      .toEqual(['admin.csv_upload: POST does not reach the refusal helper']);
+
+    expect(retiredSurfaceViolations(() => null, surfaces)).toEqual([
+      'admin.csv_upload: r.ts is missing', 'admin.submission_review: a.ts is missing',
+    ]);
+  });
 });

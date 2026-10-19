@@ -1,48 +1,29 @@
 import type { Metadata } from 'next';
 
 import {
-  readSettleRunStatus,
   readSettleUnitTableStatus,
-  type SettleRunStatus,
   type SettleUnitStatus,
 } from '@/lib/acquisition/settle-status';
 import type { SettleUnitKey } from '@/lib/acquisition/settle-trigger';
 import { requireCapability } from '@/lib/auth/session';
-import { getCurrentSeasonReport } from '@/lib/external-afl/current-season-import';
 
 import { readAflApiIngestionAdminView } from './actions';
 import { AflApiIngestionControls } from './AflApiIngestionControls';
 import { AflApiSettleUnitsPanel } from './AflApiSettleUnitsPanel';
-import {
-  CurrentSeasonControls,
-  CurrentSeasonReportTable,
-} from './CurrentSeasonControls';
-import { SettleRunPanel } from './SettleRunPanel';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Current season refresh',
+  title: 'Current season ingestion',
   robots: { index: false, follow: false },
 };
 
 export default async function CurrentSeasonPage() {
   await requireCapability('acquisition.currentSeason');
 
-  const year = new Date().getFullYear();
-
-  // AFLDB-ISSUE-127. Never allowed to take the page down: a host without
-  // systemd, or a database that refuses the batch read, must still render the
-  // fallback diagnostics below.
-  let settleStatus: SettleRunStatus | undefined;
-  try {
-    settleStatus = await readSettleRunStatus();
-  } catch {
-    settleStatus = undefined;
-  }
-
-  // AFLDB-ISSUE-232. Same rule: each unit row already reports its own read
-  // failures, and anything that still throws is shown, never fatal.
+  // AFLDB-ISSUE-232. Never allowed to take the page down: each unit row already
+  // reports its own read failures, and anything that still throws is shown, never
+  // fatal.
   let aflApiUnits: Record<SettleUnitKey, SettleUnitStatus> | null = null;
   let aflApiUnitsError: string | null = null;
   try {
@@ -51,19 +32,10 @@ export default async function CurrentSeasonPage() {
     aflApiUnitsError = error instanceof Error ? error.message : String(error);
   }
 
-  let report = null;
-  let reportError: string | null = null;
-  try {
-    report = await getCurrentSeasonReport(year);
-  } catch (error) {
-    reportError = error instanceof Error ? error.message : String(error);
-  }
-
   // AFLDB-ISSUE-228 follow-up. Never allowed to take the page down, matching
-  // the settleStatus/report reads above: a database that has not run the
-  // relevant migration, or a transient read failure, must still render the
-  // rest of the page — the CLI/timer's own fail-closed check does not
-  // depend on this read succeeding.
+  // the unit read above: a database that has not run the relevant migration, or
+  // a transient read failure, must still render the rest of the page — the
+  // CLI/timer's own fail-closed check does not depend on this read succeeding.
   let ingestionView = null;
   let ingestionViewError: string | null = null;
   try {
@@ -77,10 +49,11 @@ export default async function CurrentSeasonPage() {
       <div className="page-header">
         <h1>Current season</h1>
         <p className="subtitle">
-          <strong>AFL Tables, acquired via fitzRoy, is the primary and only automatic
-          current-season source.</strong> It is the only provider with canonical-write
-          authority. Squiggle and Kali AFL Stats are deprecated fallback providers, kept for
-          manual diagnostics and corroboration evidence only.
+          The AFL API is the current-season source: its ingestion switches and the state of its
+          settle units are below. The AFL Tables nightly settle still runs on the host behind
+          AFLDB-ISSUE-316 until the owner&rsquo;s decision D-316-2; AFLDB V2 neither starts nor
+          stops it. Its on-demand admin trigger and the Squiggle and Kali controls are retired
+          (AFLDB V2 Stage 5, docs/v2/legacy-disposition.md).
         </p>
       </div>
 
@@ -90,40 +63,7 @@ export default async function CurrentSeasonPage() {
         ingestionView && <AflApiIngestionControls initialView={ingestionView} />
       )}
 
-      <SettleRunPanel initialStatus={settleStatus} />
-
       <AflApiSettleUnitsPanel units={aflApiUnits} error={aflApiUnitsError} />
-
-      <div className="page-header">
-        <h2>Deprecated fallback diagnostics — Squiggle and Kali AFL Stats</h2>
-        <p className="subtitle">
-          Acquire Squiggle and Kali observations server-side and retain staging and history for
-          diagnostics or explicit human fallback investigation without exposing provider keys.
-        </p>
-      </div>
-
-      <p className="notice">
-        <strong>These controls are not the current-season refresh.</strong> Squiggle and Kali
-        are deprecated fallback sources with no canonical-write authority: nothing here inserts
-        or updates a canonical match, and nothing here can change an existing final score. They
-        are also never invoked automatically. To refresh current-season data, use the AFL Tables
-        control above. AFL Tables itself is deliberately absent from the source list below,
-        because it is not acquired through this path — duplicating it here would be a second
-        ingestion implementation.
-      </p>
-
-      <CurrentSeasonControls year={year} />
-
-      <section className="section">
-        <h2>Staged report</h2>
-        {reportError ? (
-          <p className="notice" role="alert">{reportError}</p>
-        ) : report ? (
-          <CurrentSeasonReportTable report={report} />
-        ) : (
-          <p className="muted">No report loaded.</p>
-        )}
-      </section>
     </>
   );
 }

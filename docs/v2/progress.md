@@ -26,7 +26,8 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
 | 4 Derived + curated | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9`, `1374fc13` + this closure commit |
-| 5-6 | not started (Launches D-E) | — |
+| 5 Admin | in progress (Launch D): legacy admin controls retired (milestone 1); operations centre in progress | this commit |
+| 6 | not started (Launch E) | — |
 
 ## Stage 0 — evidence
 
@@ -255,6 +256,28 @@ legacy commits' focused runs reported 6 failures because they also ran
 `tests/awards-admin.test.ts`, whose one failure is a baseline line); C0-001 (LOW, procedural:
 closure itself ran `npm view @electric-sql/pglite@0.2.17 time`, a network command its brief did
 not authorise; output discarded, no repository change; reported to the owner).
+
+## Stage 5 — admin operations centre (Launch D, in progress)
+
+Sub-agent returns: `.phaneslight/returns/launchD-20261019/` (git-ignored). No database, network,
+deploy or PostgreSQL command was run.
+
+Visual Evidence Mandate declaration (made by the orchestrator before any UI change was applied):
+target viewports 1280x800 and 390x844; affected screens `/admin` (dashboard), `/admin/current-season`,
+`/admin/upload`, `/admin/submissions/[id]`, the admin sidebar, and the new `/admin/operations`,
+`/admin/operations/awards`, `/admin/operations/awards/[id]`, `/admin/operations/coleman`,
+`/admin/operations/brownlow`; reference design: the existing admin pages and `src/styles/globals.css`
+(no separate design document). Rendering a real admin page needs a database and a session, which
+this workstation does not have.
+
+Milestone 1 (legacy retirement, worker W-A): the CSV upload route, the submission review actions,
+the email-intake route, the Squiggle/Kali refresh action and the AFL Tables settle trigger keep
+their existing guards and then refuse (`legacy_retired`; routes HTTP 410; one
+`admin.legacy_retired_refused` audit row per attributed refusal; the email-intake route answers 410
+with no body read, no secret, no database and no audit). Four UI components deleted
+(`SettleRunPanel`, `CurrentSeasonControls`, `UploadForm`, `ReviewControls`); the legacy-edge ratchet
+shrinks from 18 pairs to 11. Focused run (orchestrator, 7 files): 5 failed / 988 passed / 1 skipped;
+the 5 failures are the 5 baseline lines of `tests/current-season-import.test.ts`.
 
 ## Resumption point
 

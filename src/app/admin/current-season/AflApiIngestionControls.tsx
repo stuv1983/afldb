@@ -7,7 +7,7 @@
  * rather than one ambiguous master switch"): AFL API current-season
  * ingestion, and Brownlow live ingestion. Both call Server Actions directly
  * rather than submitting a form — `startTransition`/no `FormData`, the same
- * shape `SettleRunPanel.tsx` uses — so authorization is entirely server-side
+ * shape the retired AFL Tables settle panel used — so authorization is entirely server-side
  * in `actions.ts`; `disabled` here is a courtesy to the operator, never the
  * control (§C).
  *

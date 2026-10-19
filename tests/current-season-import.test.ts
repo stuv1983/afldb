@@ -42,7 +42,6 @@ function readSource(path: string): string {
 const tool = readSource('legacy/offline/tools/current-season/update-current-season.ts');
 const importer = readSource('src/lib/external-afl/current-season-import.ts');
 const adminAction = readSource('src/app/admin/current-season/actions.ts');
-const adminControls = readSource('src/app/admin/current-season/CurrentSeasonControls.tsx');
 const adminPage = readSource('src/app/admin/current-season/page.tsx');
 const adminNav = readSource('src/app/admin/nav-model.ts');
 const migration = readSource('src/db/migrations/063_external_current_match_sources.sql');
@@ -200,50 +199,44 @@ describe('current-season external source import contracts', () => {
     expect(importer).toContain('${sourceId}, ${match.externalGameId}');
   });
 
-  it('exposes the refresh only through a super-admin server action', () => {
+  it('no longer exposes the refresh through any admin server action (AFLDB V2 Stage 5, V2-GAP-013)', () => {
+    // The Squiggle/Kali refresh and staged report were removed from the admin surface
+    // (docs/v2/legacy-disposition.md L6): the action keeps its super-admin guard (the capability's
+    // role list is held by tests/auth.test.ts) and REFUSES. Its behaviour is proved in
+    // tests/admin-current-season-settle.test.ts; what is pinned here is that the quarantined CLI's
+    // importer is no longer reachable from it.
     expect(adminAction).toContain("'use server'");
-    // acquisition.currentSeason is super-admin-only (AFLDB-ISSUE-158); the
-    // capability's role list is held by tests/auth.test.ts.
     expect(adminAction).toContain("requireCapability('acquisition.currentSeason')");
-    expect(adminAction).toContain('runCurrentSeasonRefresh');
+    expect(adminAction).toContain("refuseRetiredAdminAction('admin.squiggle_kali_refresh'");
+    expect(adminAction).not.toContain('current-season-import');
+    expect(adminAction).not.toContain('runCurrentSeasonRefresh');
     expect(adminPage).toContain("requireCapability('acquisition.currentSeason')");
+    expect(adminPage).not.toContain('current-season-import');
     expect(adminNav).toContain("href: '/admin/current-season'");
   });
 
-  it('keeps the admin path server-side and staging/diagnostic only', () => {
-    // AFLDB-ISSUE-128 supersedes the old assertions here. The admin action
-    // used to carry `mode === 'auto'` mapping to `['kali'] as const` — the
-    // legacy automatic Kali writer's shape. There is no automatic mode on
-    // this surface any more: automatic current-season ingestion is the AFL
-    // Tables settle chain, and a `mode=auto` post is REFUSED rather than
-    // reinterpreted, so a stale client cannot resurrect it by name.
+  it('keeps the admin path free of every automatic or writing Squiggle/Kali shape', () => {
+    // AFLDB-ISSUE-128 removed `mode === 'auto'` (the legacy automatic Kali writer's shape);
+    // AFLDB V2 Stage 5 removed the manual mode with the control. Neither can come back by name.
     expect(adminAction).not.toContain("mode === 'auto'");
     expect(adminAction).not.toContain("['kali'] as const");
-    expect(adminAction).toContain("if (mode !== 'manual')");
-    expect(adminAction).toContain('Unknown current-season fallback mode');
     expect(adminAction).not.toContain('updateMatches');
-    expect(adminControls).not.toContain('updateMatches');
-    expect(adminControls).not.toContain('Overwrite existing resolved final scores');
-    expect(adminPage).toContain('deprecated fallback sources');
-    expect(adminPage).toContain('no canonical-write authority');
+    expect(adminAction).not.toContain('insertMissingMatches');
+    expect(adminPage).not.toContain('deprecated fallback sources');
+    expect(adminPage).not.toContain('Deprecated fallback diagnostics');
+    expect(() => readSource('src/app/admin/current-season/CurrentSeasonControls.tsx')).toThrow();
   });
 
-  it('names AFL Tables/fitzRoy as the primary current-season source in the admin UI', () => {
-    // AFLDB-ISSUE-128 Stage 4. The observed defect was a page that said
-    // "Auto update uses Kali AFL Stats". The page must now state provider
-    // precedence, and must not offer AFL Tables in the fallback source list —
-    // AFL Tables is not acquired through that code path, and adding it there
-    // would be a second ingestion implementation.
-    expect(adminPage).toContain('AFL Tables, acquired via fitzRoy, is the primary');
+  it('states the AFL Tables position truthfully in the admin UI instead of offering a Squiggle/Kali control', () => {
+    // AFLDB-ISSUE-128 required the page to state provider precedence (the observed defect was
+    // "Auto update uses Kali AFL Stats"). After Stage 5 the page states that the nightly AFL
+    // Tables settle remains on the host behind AFLDB-ISSUE-316 until D-316-2, and that the admin
+    // trigger and the Squiggle/Kali controls are retired.
+    expect(adminPage).toContain('AFLDB-ISSUE-316');
+    expect(adminPage).toContain('D-316-2');
+    expect(adminPage).toContain('Squiggle and Kali controls are retired');
     expect(adminPage).not.toContain('Auto update uses Kali');
-    expect(adminControls).not.toContain('Auto update from API');
-    expect(adminControls).not.toContain('Refresh Kali fallback staging');
-    expect(adminControls).toContain('There is deliberately no automatic option here');
-    for (const value of ['"squiggle"', '"kali"', '"all"']) {
-      expect(adminControls).toContain(`<option value=${value}`);
-    }
-    expect(adminControls).not.toContain('value="afltables"');
-    expect(adminControls).not.toContain('value="fitzroy"');
+    expect(adminPage).not.toContain('CurrentSeasonControls');
   });
 
   it('has no default fallback source: Kali is never what "unspecified" means', () => {
