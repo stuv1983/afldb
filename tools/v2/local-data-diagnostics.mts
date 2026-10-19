@@ -26,7 +26,14 @@ try {
       ids.push(...result.rows.map((r) => r.id));
       if (ids.length >= result.total) break;
     }
-    const [hashes] = await sql`SELECT count(*)::int AS identities,
+    const oracle = params.goals_min
+      ? await sql<{ id: number }[]>`SELECT player_id AS id FROM player_career_stats
+          WHERE goals BETWEEN 50 AND 199 AND brownlow_votes=0 ORDER BY player_id`
+      : await sql<{ id: number }[]>`SELECT player_id AS id FROM player_career_stats
+          WHERE debut_season BETWEEN 1960 AND 1969 AND clubs_played=2 ORDER BY player_id`;
+    const agreesWithIndependentSql = JSON.stringify([...ids].sort((a,b) => a-b)) === JSON.stringify(oracle.map((r) => r.id));
+    if (!agreesWithIndependentSql) throw new Error('Advanced Search differs from the independent cohort SQL; do not classify as a reference-only gap');
+    const [hashes] = await sql`SELECT count(*)::int AS identities, count(DISTINCT ei.player_id)::int AS people,
       substr(encode(sha256(convert_to(string_agg(ei.external_id,',' ORDER BY ei.external_id),'UTF8')),'hex'),1,16) AS native,
       substr(encode(sha256(convert_to(string_agg(ei.external_id,',' ORDER BY lower(ei.external_id) COLLATE "C", ei.external_id COLLATE "C"),'UTF8')),'hex'),1,16) AS folded,
       substr(encode(sha256(convert_to(string_agg(ei.external_id,',' ORDER BY ei.external_id COLLATE "C"),'UTF8')),'hex'),1,16) AS c
@@ -40,7 +47,12 @@ try {
         WHERE ei.match_method='afltables_profile_url' AND ei.status IN ('unique','resolved') AND ei.player_id=ANY(${ids})`;
       localeHashes.push({ collation: collation.name, hash: row.hash });
     }
-    cohorts.push({ params, count: ids.length, hashes, localeHashes });
+    const identityKeys = await sql<{ key: string }[]>`SELECT ei.external_id AS key
+      FROM external_identities ei JOIN sources s ON s.id=ei.source_id AND s.key='afltables'
+      WHERE ei.match_method='afltables_profile_url' AND ei.status IN ('unique','resolved')
+        AND ei.player_id=ANY(${ids}) ORDER BY ei.external_id COLLATE "C"`;
+    cohorts.push({ params, count: ids.length, hashes, localeHashes,
+      independentSqlCount: oracle.length, agreesWithIndependentSql, identityKeys: identityKeys.map((r) => r.key) });
   }
   const [coverage] = await sql`SELECT min(season)::int AS first, max(season)::int AS last, count(*)::int AS matches FROM matches`;
   const [locale] = await sql`SELECT datcollate,datctype FROM pg_database WHERE datname=current_database()`;

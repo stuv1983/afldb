@@ -117,7 +117,8 @@ row that supersedes the old; nothing is edited or removed.
   `brownlow_eligibility_decision` (added to `AUDITED_CORRECTION_WORKFLOWS` and pinned by the
   migration's CHECK), actor = the deciding user, the note, and the evidence reference
   `brownlow_eligibility:<season>:<identity>`, stored verbatim in `correction`;
-- it **never** writes `brownlow_season_votes`, `brownlow_round_votes` or any staging table.
+- it never changes raw season/round votes or staging. Authorised application requests also
+  publish eligibility/medal metadata in the decision transaction, as amended below.
 
 The operations-centre callers (`src/lib/admin/operations-centre.ts`) are
 `determineBrownlowSeasonForAdmin` (read, `data.brownlow.read`) and `recordBrownlowEligibilityForAdmin`
@@ -159,6 +160,14 @@ fingerprint preservation, idempotent publication and rollback on required audit 
 browser revalidation endpoint is capability-guarded and accepts no caller-controlled paths.
 
 ## Historical Launch F limitations (superseded above where stated)
+
+The local follow-up also reserves the generic award read model: retained DraftGuru Brownlow
+medal rows remain source evidence, but generic public award reads exclude them and old award
+URLs permanently redirect to `/brownlow[/season]`. Generic award criteria resolve Brownlow
+from `brownlow_season_votes.is_winner`. All rank-one Brownlow criteria likewise use `is_winner`,
+not an eligible rank that could name one co-leader while another still requires review.
+The real PostgreSQL test now proves that an unresolved tie publishes nobody through any winner
+criterion, then an authorised decision publishes both joint winners without changing raw votes.
 
 - **No write to `brownlow_season_votes`.** A decision is new evidence *beside* the raw votes. When the
   determination disagrees with the stored `is_winner` flags the page says so and changes nothing.

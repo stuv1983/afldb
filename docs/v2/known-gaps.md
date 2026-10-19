@@ -1,5 +1,13 @@
 # AFLDB V2 — known gaps, blockers and deferred work
 
+Current local-release follow-up: see `local-release-review.md` for final verification. Gap 014
+and 021 and 028 are closed locally; 016 has its publication and 98-season evidence complete but remains
+open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
+not technical inspection. Gap 026 now requires the host/production-data rehearsal, not local
+application rollback. The historical Launch F counts below are retained as history.
+Current register: **29 total / 9 closed / 20 open**, including the separately tracked strict
+historical-source/membership verification gap 029. No remaining failed test is treated as green.
+
 `V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
 close it. A gap is marked CLOSED only when its closing evidence exists; closed entries are kept
 with that evidence. **State at the close of Launch F (2026-10-19): 28 gaps.**
@@ -16,7 +24,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 | ID | Severity | Area | Production blocker | State | Owner action |
 |---|---|---|---|---|---|
-| V2-GAP-001 | Medium | test safety | rehearsal | open, narrowed (Launch F): the strip held for 26 integration files run on isolated PG16; not yet run on a Linux `afldb_test` | approve the Linux integration run (S-A5) |
+| V2-GAP-001 | Medium | test safety | rehearsal | open, narrowed: live guarded local workflow demonstrated; supported Linux runtime remains separate acceptance evidence | approve Linux isolated-cluster verification (S-A5), not a literal-name bypass |
 | V2-GAP-002 | Medium | frontend build | no | **CLOSED (Launch F)**: `npm run build` exit 0 against the isolated `afldb_v2_visual_test`, telemetry disabled | none |
 | V2-GAP-003 | Medium | environment | rehearsal | open, narrowed (Launch F): integration suites ran on Windows against isolated PG16; Linux/POSIX still unexercised | approve the Linux suite run (§7) |
 | V2-GAP-004 | Low | source worktree hygiene | no | open: owner action | fix or disable the user-level Read/Grep/Glob hook; decide whether to delete the stray `supplies` |
@@ -24,28 +32,34 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open | decide on database-level seal enforcement |
 | V2-GAP-007 | Medium | historical baseline | rehearsal | open, narrowed (Launch F): the producer ran repeatedly on the isolated rebuild with identical results; no real-baseline manifest | approve the shadow captures (§4), then a read-only production run (cutover runbook step 3) |
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
-| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed (Launch F): 5 of 7 `settle-afl-api*` files pass on the isolated rebuild; the 2 `afldb_test`-pinned files need Linux `afldb_test` | approve the settle integration suites on `afldb_test` (§7) |
+| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed: the two formerly name-pinned files pass locally (6/6 and 1/1); strict isolated proofs replace the name pin | Linux/production-dump replay under the same guarded target contract |
 | V2-GAP-010 | Medium | AFL API coverage | no (coverage is not claimed) | open: 2012-2025 API coverage has no committed evidence | decide which seasons to evidence |
 | V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains | approve A-AFLT (disable the timer in the window) or complete ISSUE-316 C5 |
 | V2-GAP-012 | Medium | legacy runtime | no | **CLOSED (Launch F)**: helpers moved to `settle-shared.ts`, both edges removed from the ratchet, settle integration suites pass on isolated PG16 | none |
 | V2-GAP-013 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): the poller refuses in V2; the preflight refuses the release while the email-intake timer runs | approve the release window (step 4, 4a) |
-| V2-GAP-014 | Low | legacy quarantine | no | open: Python/R tools not physically quarantined | none (V2 follow-up) |
+| V2-GAP-014 | Low | legacy quarantine | no | **CLOSED locally**: acquisition implementations quarantined, refusing old entry points; deterministic rebuild retained and verified | no live retirement authorised |
 | V2-GAP-015 | Medium | Coleman | reconciliation | open, narrowed (Launch F): 46/46 seasons (1980-2025) agree on the locally rebuilt history; production data not compared | approve the shadow Coleman capture on the production dump (§4/§8) |
-| V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed (Launch F): rule decided and implemented (ADR 0014); the projection path and blast-radius count remain | confirm the projection path (ADR 0014) |
+| V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed: atomic audited public publication implemented; 98/98 local seasons agree, none unresolved | owner release acceptance and production-dump reconciliation |
 | V2-GAP-017 | Medium | Stage 4-5 SQL | no | **CLOSED (Launch F)**: 111-114 applied, privileges run, `privileges` and awards integration suites pass, operations pages rendered (isolated PG16) | none |
 | V2-GAP-018 | Low | curated awards | no | **CLOSED (Launch F)**: `reviseApprovedProposal` (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
 | V2-GAP-020 | Low | curated awards | no | open: winners without a resolved player identity cannot be approved | none |
-| V2-GAP-021 | Medium | Coleman | no | open, narrowed (Launch F): projection into `award_winners` built (ADR 0015); the offline loader's coleman group is not retired | retire the loader group for publisher-covered seasons |
-| V2-GAP-022 | Medium | admin UI | rehearsal | open, narrowed (Launch F): real pages captured from the production build at 1280x800 and 390x844 (`docs/v2/evidence/launchF-visual/`); the owner's eyeball verdict is pending | record a verdict per screen |
+| V2-GAP-021 | Medium | Coleman | no | **CLOSED locally**: explicit guarded offline bootstrap refuses publisher-owned seasons; session locks survive batch commits; 27/27 publication tests | production comparison remains gap 015 |
+| V2-GAP-022 | Medium | admin UI | rehearsal | open, narrowed: 26 images technically inspected; four Brownlow replacements recaptured/inspected after material wording/status fixes | owner acceptance per screen |
 | V2-GAP-023 | Low | Brownlow | no | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping | none (V2 follow-up) |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | open: no operations-centre view of AFL API settle refusals | none (V2 follow-up) |
-| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed (Launch F): the mechanics (parity PASS 5/5) and the 111-114 DB reversal are rehearsed on isolated PG16 with local data; the production-dump rehearsal and the application rollback have not run | approve S-A1..S-A5 |
+| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 local standalone rehearsal passes; raw votes and non-empty proposal/audit history preserved, including after 115 | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
-| V2-GAP-028 | Low | integration tests | no | open (Launch F): admin-draft, awards-reload-links, admin-season-lists and a match-admin-delete teardown fail on the isolated rebuild; files untouched by V2 | run on Linux `afldb_test` (S-A5), fix at the cause |
+| V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
+| V2-GAP-029 | Medium | strict historical baseline verification | rehearsal | open: fresh local snapshot lacks required later-season/event evidence; exact identity membership digests also disagree and remain asserted | supply/reconcile approved full baseline and membership evidence; no blind repins |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
+
+- **Current local follow-up (2026-10-20):** the present-DSN path runs against native isolated
+  PostgreSQL with explicit owner/import/auth role DSNs and live identity proofs. The remaining
+  acceptance condition is the supported Linux environment, not a database literally named
+  `afldb_test`. Stage 6's absent-database statements below are historical.
 
 - **Launch F (2026-10-19).** 26 integration files ran on isolated PG16 databases with `AFLDB_TEST_DATABASE_URL` present and the strip active. No suite reached a non-`_test` database. A Linux `afldb_test` run is still needed.
 - **What.** When `AFLDB_TEST_DATABASE_URL` names a `_test` database, `applyTestDsnPolicy`
@@ -186,6 +200,11 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-009 — Transactional preservation of promoted data is not executed on PostgreSQL
 
+- **Current local follow-up (2026-10-20):** all seven AFL API integration files pass locally:
+  backtest 6, Brownlow reschedule 3, Brownlow 21, fixtures 16, issue276 4, state-B 1, main 73
+  (**124/124**). The former name pin is replaced with strict isolated proofs. Remaining:
+  supported Linux/production-dump rehearsal under that same target contract, not a name bypass.
+
 - **Launch F (2026-10-19).** On the isolated rebuild, `settle-afl-api.test.ts` (73 tests), `-brownlow`, `-brownlow-reschedule`, `-fixtures` and `-issue276` pass. `-brownlow-backtest` and `-state-b` refuse any database not named `afldb_test`, by design.
 - **What.** "Preserve previous promoted data when validation fails" is proved at the plan level
   only (`tests/v2-acquisition-replay.test.ts`: a unit that fails validation is a build failure and
@@ -303,6 +322,12 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-014 — Python and R legacy tools are not physically quarantined
 
+- **CLOSED locally, 2026-10-19.** Six acquisition implementations/poller moved under
+  `legacy/offline/tools/`; original entry points refuse. Offline deterministic replay remains
+  reproducible: fresh 30-stage rebuild, 89 validation checks. No normal runtime/package/deploy
+  caller can import legacy code. `legacy/offline/README.md` records entry points and boundaries.
+  The historical rationale below is superseded; no live timer/service was touched.
+
 - **What.** `tools/migration/*`, `tools/rebuild/**` and `tools/email_intake/*` stay in place
   (`legacy-disposition.md` L8-L10). Only the TypeScript CLI `update-current-season.ts` moved to
   `legacy/offline/`.
@@ -326,6 +351,17 @@ award results must be shown reconcilable before production; **no** — not a pro
   every `disagree` and `not_derivable` row before any publication.
 
 ## V2-GAP-016 — OWNER DECISION: Brownlow eligibility rule for API-era seasons
+
+- **Local follow-up, 2026-10-19.** Publication now shares the authorised decision transaction,
+  updates only metadata, requires the data-edit audit, refuses unresolved leaders and supports
+  joint eligible winners. Public queries demonstrably change after a decision; raw values and
+  provenance remain identical. 98/98 locally available seasons determined/agreed; none unresolved.
+  `evidence/local-brownlow-history-final.json`, ADR 0014 amendment. No bulk historical rewrite.
+  Remaining: owner release acceptance and production-dump comparison, NOT implementation/count.
+  Final follow-up also closes legacy generic Brownlow read exposure: old URLs redirect to the
+  canonical pages, generic award criteria use published flags, and every rank-one criterion
+  refuses an unresolved tied leader. Actual public joint winners and unchanged raw votes are
+  covered by the final 324/324 focused checks.
 
 - **Launch F (2026-10-19).** The rule is decided and implemented (ADR 0014; `brownlow_eligibility_decisions`, migration 113; PostgreSQL-tested). It stays open per ADR 0014's disposition: the projection path and the blast-radius count remain.
 - **What.** The reconciliation (`@afldb/derived`, ADR 0007) refuses a leader determination when an
@@ -390,6 +426,12 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-021 — Published Coleman results are not projected into `award_winners`
 
+- **CLOSED locally, 2026-10-19.** Existing canonical projection retained; offline loader now
+  requires the explicitly named offline bootstrap, dedicated isolated DSN and live identity
+  proofs. It shares canonical season locks and refuses publisher-owned seasons. Real PostgreSQL
+  publication suite 27/27 after migration 115 (`evidence/local-coleman-complete.json`), including
+  a commit between acquisition and a competing lock probe; protection lasts until session close.
+
 - **Launch F (2026-10-19).** The projection into `award_winners` is built (ADR 0015, `derived_award_projections`, migration 114) and PostgreSQL-tested. Still open: the offline loader's coleman group is not retired (the rebuild's `coleman` stage still runs it), and production execution is pending.
 - **What.** `publishColemanResult` writes only the `derived_award_results` ledger (migration 112).
   The Coleman `award_winners` rows the public site reads remain owned by the offline
@@ -409,6 +451,11 @@ award results must be shown reconcilable before production; **no** — not a pro
   seasons the publisher covers.
 
 ## V2-GAP-022 — The Stage 5 admin pages have never been rendered (VISUAL: UNVERIFIED)
+
+- **Technically inspected, 2026-10-19.** All 26 Launch F images opened and reviewed for
+  readability/mobile/permissions/action wording/status clarity; material Brownlow wording and
+  missing-API clarity corrected. Four affected screenshots recaptured and opened after final
+  build, `evidence/local-visual/`. Assessment: `local-release-review.md`. Owner acceptance pending.
 
 - **Launch F (2026-10-19).** The real pages were served by the production build from the isolated database, with synthetic staff, synthetic proposals and locally rebuilt history. 13 screens were captured as Super Admin and Admin at 1280x800 and 390x844, in `docs/v2/evidence/launchF-visual/` with `capture-log.txt`: HTTP 200, 0 horizontal overflow, 0 console errors and 0 external requests on every capture. The agent inspected the images and fixed one stale-copy defect. The owner's verdict is still required to close this gap.
 - **What.** No real page of the operations centre (`/admin/operations`, `/awards`, `/awards/[id]`,
@@ -461,6 +508,13 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-026 — The shadow rehearsal, the parity and capture tools on real data, and both rollback paths have never run
 
+- **Local application rollback demonstrated, 2026-10-19.** Archived previous compatible app
+  `ff100dc2` (no new worktree), V2, previous retaining additive schema, then V2: all start and
+  pass critical public/admin permission checks. Final post-115 previous 15/15 and V2 19/19.
+  Raw vote hashes and ledgers unchanged across phases; three proposals/six decisions retained.
+  Evidence `local-rollback-*.json`. This does not demonstrate pre-migration schema 110, host
+  systemd/Caddy/TLS/backup, production data or destructive reversal with populated new ledgers.
+
 - **Launch F (2026-10-19).** The mechanics and the DB reversal were rehearsed on isolated PG16 with local data, NOT a production dump (see `rollback-runbook.md` §7 and `docs/v2/evidence/launchF/`). The synthetic shadow copy went through 111-114 pending → applied, and parity returned VERDICT PASS (5/5). For the reversal, the 001-114 → 001-110 schema is identical and re-forward is identical. Still open: the production-dump rehearsal, real-data parity, the application rollback (§4, redeploying `PREV`) and the backup step (§2).
 - **What.** Stage 6 wrote the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`), the
   parity tool (`tools/v2/shadow-parity.ts`, policy `v2.parity.1`), the capture tools
@@ -490,6 +544,21 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-028 — Four integration files disagree with the rebuilt history and current code
 
+- **CLOSED locally, 2026-10-20.** All original cases and teardowns pass on the freshly rebuilt
+  `afldb_v2_rb_release_test`: admin-draft **46**, admin-season-lists **40**, awards-reload-links
+  **107**, match-admin-delete **7** (**200/200**). Exact original 14 failures are preserved in
+  `evidence/local-verification-initial.json`. Illegal test picks corrected inside the real
+  <=200 production constraint; registered-season appearances explicitly seeded; captaincy and
+  named-medal assertions reconciled by actual source scope; test-owned deletion audit cleaned
+  before deleting its administrator. No production rule/assertion was disabled.
+  Brownlow backtest/state-B also pass **6/6 + 1/1** without a literal `afldb_test`: loopback,
+  approved port, `_test` name, cluster, live current database and marker are all required.
+  Frozen DraftGuru provenance/sample checks pass independently of the checkout prefix. Linux
+  remains a distinct platform gate, not a condition for closing this demonstrated local defect.
+  The final verification follow-up also corrected a counterfactual test's unsupported deadlock
+  victim assumption; 46/46 cases retain deadlock, atomicity, timeout and retry assertions for
+  both outcomes permitted by PostgreSQL. No runtime guard or role privilege changed.
+
 - **What.** These failures appeared on the isolated rebuild `afldb_v2_hist_test` (2026-10-19):
   - `tests/integration/admin-draft.test.ts`: 11 failures. Manual picks 301/210 are refused with
     "Pick number must be at most 200", and the dependent cases fail after them.
@@ -504,3 +573,37 @@ award results must be shown reconcilable before production; **no** — not a pro
   them. The isolated rebuild ran without the DraftGuru bridge dataset.
 - **Close.** Run the four files on Linux `afldb_test` (S-A5). Fix each test or the code at its
   cause, and never weaken an assertion.
+
+## V2-GAP-029 — Strict baseline/reference evidence differs from locally reproduced history
+
+- **Status:** Open, 2026-10-20. Medium; rehearsal/release verification, not a waiver.
+- **Final measured scope:** nine failed assertions, 13,740 passed and 31 skipped in the full
+  workflow; separate Coleman 27/27. No setup/teardown-only failure. The original gap-028 four
+  files are 200/200. All nine remaining assertions below retain their strict expected values.
+- **Observed repeatedly:** club-comparison route expects 42 Adelaide/Brisbane meetings, local
+  history has 41; home venue totals are pinned to a later snapshot; cross-domain coached-player
+  tests expect 367 but local match evidence yields 365. Local matches end in 2025 (16,838 rows).
+  The 368 linked coach identities include three with no local match: Jim Adamson, Josh Carr,
+  Josh Fraser. The independent matchless-coach control passes; the two fixed 367 assertions do not.
+- Gridley strict coverage/cell checks require event/player-register/current-season data beyond
+  the rebuilt local history. The detailed final corpus report is retained, not diagnostic-waived.
+  It also records one unresolved known-answer disagreement: board **541**, cell **2-1**,
+  `traded1 × WB`, Gridley player **3663** / AFLDB **6700**. Local linked facts include a 2020
+  national pick and a 2025 Gold Coast trade; the archived key omits the player. This needs
+  date-qualified source/oracle adjudication, not deletion of a trade or an invented exception.
+- Advanced Search cohorts have the expected **261 / 110 members and identity keys**, but hashes
+  are **79d3e6eea83a4620 / 258396e0512a2212**, not the pinned
+  **ca65f15239aaf0b5 / 4b4c6a2aa975cc17**. This is NOT a surrogate-ID hash. Read-only C/folded/ICU
+  ordering probes produce the same local hashes; locale ordering is not the cause. Exact expected
+  membership lists were not available in the targeted reference/runbook search (only digest pins).
+  Independent SQL exactly matches both current query cohorts, with 261/110 distinct people and
+  identity keys. Current keys are retained in `local-reference-oracles-final.json` for comparison.
+  The scoped retained API bundle check found a roster manifest, not a complete current-season
+  match/statistics bundle; the authentic pre-match fixtures do not supply that missing baseline.
+- **Evidence:** final assertion names/stack locations in `evidence/local-delivery-summary.json` and
+  its full input report; `local-reference-oracles-final.json` and `local-gridley-delivered.json`.
+  Required-source skips/platform/special-harness omissions are listed explicitly, not passes.
+- **Close:** reconcile with an approved reference identity list or authorized production-dump
+  shadow baseline and the required current-season/event inputs. Determine each membership
+  difference before any approved baseline change. Do not invent matches/links or merely repin
+  hashes/counts to green. No access to that external baseline or production is authorised here.

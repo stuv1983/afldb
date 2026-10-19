@@ -1,5 +1,24 @@
 # AFLDB V2 — final report (close of Launch F, 2026-10-19; first written at Stage 6)
 
+## Local release follow-up — current owner-review package
+
+The current evidence, exact test identifiers, reproducible commands and narrowed release gates
+are in [local-release-review.md](local-release-review.md). This supersedes historical Launch F
+statements below about missing Brownlow publication, untested local application rollback,
+uninspected screenshots, literal `afldb_test` requirements and unquarantined acquisition tools.
+The previous compatible build and V2 run locally against additive migrations through 115.
+Raw votes/audit history survive the rollback sequence. The final V2 build passes (1,516 pages).
+Brownlow historical reconciliation is 98/98; Coleman retains 46/46 local agreement.
+The dedicated local cluster's six exposed credentials were rotated and old logins rejected.
+The complete workflow is reported by assertion identity, NOT failure-output line counts.
+Final complete run: **13,740 passed / 9 failed / 31 skipped**; separate Coleman **27/27**.
+The original four gap-028 files pass **200/200**. Nine strict reference/source disagreements
+remain gap 029, so the full workflow is **not green**. Typecheck passes; repository lint debt
+is **234 errors / 131 warnings**, with **0 new changed-file findings**.
+Production remains **NO-GO**: no production-dump/Linux-host rehearsal, deployment or owner
+acceptance is implied. No subagent/worktree was created, no remote added, and nothing pushed.
+All unmodified sections below are retained Launch F history, not current verification claims.
+
 Everything the owner's final response needs, from committed evidence. Detail lives in the
 documents linked from each section. **Nothing was pushed, tagged or deployed, and no production,
 DEV or shared database, host or service was contacted or changed by any V2 launch.**

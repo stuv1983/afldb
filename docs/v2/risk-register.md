@@ -1,6 +1,6 @@
 # AFLDB V2 — risk register
 
-Status: Launch F (2026-10-19; first written at Stage 6). Risks of putting V2 into production and of the way V2 was
+Status: local release follow-up (2026-10-20; first written at Stage 6). Risks of putting V2 into production and of the way V2 was
 built, ranked by severity (High, Medium, Low; within a level, by impact on production data first).
 Likelihood and impact use the same three levels. "Owner" is who must act: **owner** (the product
 owner's decision or approval), **operator** (a person with host/database access, acting under the
@@ -13,6 +13,35 @@ shared database, no host and no service was contacted. The only network use was 
 GET of the public AFL API compSeasons list. "Isolated" below means that cluster.
 
 ## High
+
+### Current local-release reassessment (2026-10-20)
+
+This amendment supersedes stale claims in the historical rows below:
+
+- RISK-03: literal-name portability is repaired with stricter live isolated proofs; Linux and
+  production-dump verification remain outstanding. Migration 115 corrects a missing FK index.
+- RISK-04: final workstation production build passes with 1,516 pages; not a production-data build.
+- RISK-07: previous `ff100dc2` → V2 → previous → V2 standalone compatibility is locally rehearsed
+  without destructive reversal. Non-empty proposal/audit history and raw-vote hashes survive.
+  Host backup/Caddy/systemd/TLS and production-dump rollback remain untested.
+- RISK-10: all 26 original desktop/mobile images inspected; four affected Brownlow screens
+  recaptured and inspected after fixes. Technical assessment is not owner acceptance.
+- RISK-11: Brownlow publishes atomically and reconciles 98/98 local seasons; Coleman 46/46 local
+  comparison retained. Offline Coleman cannot overwrite publisher-owned seasons. Production
+  data and missing API leaderboard/team mapping remain separate evidence gaps.
+- RISK-12: final repo-wide debt is 234 errors/131 warnings, not the older ceiling below.
+  Changed-file comparison reports zero new findings while retaining existing lint errors.
+- RISK-22: acquisition implementations physically quarantined; historical replay preserved.
+- RISK-26: original 14 historical failures are repaired and individually tracked in the release
+  evidence. Any residual complete-workflow failures are NOT converted into a green release gate.
+- Exposed isolated credentials: all six rotated locally; each old password rejected with 28P01.
+  No production/shared credential changed and no secret was committed.
+
+Exact results and remaining source-input limitations: `local-release-review.md`.
+Final complete run: **13,740 passed / 9 failed / 31 skipped**, plus separate Coleman **27/27**.
+Strict baseline/count/membership residuals are now **V2-GAP-029**. They block a green verification
+claim and require approved reference evidence, not blind assertion changes. The historical risk
+rows below retain Launch F wording; the reassessment above is the current state.
 
 | # | Risk | Likelihood | Impact | Mitigation | Owner | Gap |
 |---|---|---|---|---|---|---|

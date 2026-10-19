@@ -41895,6 +41895,12 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 
 ## AFLDB-ISSUE-229 — AFL API fixture ingestion
 
+- **Local release clarification (2026-10-19):** B2 is the first-season operational acceptance
+  gate, not missing implementation or a hard-coded 2027 technical requirement. Authentic 2026
+  pre-match evidence proves the existing contract; it cannot substitute for the first genuine
+  2027 whole-season/TBC/status/key/mapping check and owner-approved first apply. Still OPEN.
+  Details: `issues/open/AFLDB-ISSUE-229.md`, B2 classification; `docs/v2/local-release-review.md`.
+
 - **Status:** Open (2026-09-23). **Severity:** Medium. **Area:** data acquisition / fixtures:
   `afl_api` season feed → `fixtures`, `canonical_applications`, `admin-fixtures.ts`.
 - **Origin.** Reserved by the frozen ISSUE-228 plan (§13.1, §16 S10) and opened at the ISSUE-228

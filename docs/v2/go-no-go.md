@@ -1,5 +1,15 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
+**Current local-release addendum (2026-10-20): production NO-GO.** See
+`local-release-review.md` for actual assertion-level results; earlier failure-*line* comparisons
+are historical, not a green test gate. Local Brownlow publication, 98-season reconciliation,
+physical legacy quarantine, six-role credential rotation, technical visual inspection and
+previous/V2 application rollback have now been demonstrated. Linux/production-dump parity,
+host rollback/backup/service operations, owner visual acceptance and first authentic 2027 B2
+operational acceptance remain. No production authority is granted by these local results.
+Final complete workflow: **13,740 passed / 9 failed / 31 skipped**; Coleman separately **27/27**.
+The nine retained reference/source assertions are V2-GAP-029, not an approved baseline waiver.
+
 Status: updated at the close of Launch F (2026-10-19); first recorded at Stage 6 (Launch E). The
 criteria are the owner's (`docs/v2/owner-instruction-2026-10-19.md`, "Go/no-go criteria"), and
 each is judged against committed evidence only.
@@ -46,7 +56,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | 10 | Runtime code has no dependency on CSV, AFL Tables, Squiggle or Kali | **met in code; not met on the host** | a V2 checkout refuses the AFL Tables settle and the email poller; no runtime import remains (V2-GAP-012 closed). The AFL Tables and email-intake timers are still enabled on the production host until the release window (V2-GAP-011, 013), and the cutover preflight refuses the release until they are disabled |
 | 11 | Valuable historical tools are safely quarantined | **partly met** | TypeScript entry points refuse through the retired-entry registry; Python/R tools stay in place (V2-GAP-014) |
 | 12 | Admin operations are narrow, permissioned and audited | **met**, isolated PG16 | capability guards and audit rows (Stage 5); `privileges.test.ts` and the awards suites pass on PG16; pages rendered for Admin and Super Admin |
-| 13 | Tests, type checking and linting pass | **met, with no regression** (environmental failures documented) | tsc 0. The full suite has 98 failing lines against the 102-line baseline (`final-report.md` §3); the one real regression it found was fixed and its suites re-run (144/144 unit, 17/17 integration). The integration suites ran on isolated PG16, with the residue classified in V2-GAP-028. Repo-wide ESLint is 235 / 131, all pre-existing, and every file created or edited in Launch F lints with 0 findings |
+| 13 | Tests, type checking and linting pass | **NOT GREEN: see final assertion-level evidence** | `local-release-review.md` records the complete workflow and residual test identities. Typecheck and production build pass. Changed-file lint has 0 new findings but inherited errors remain; final repository debt is 234 errors / 131 warnings. No failure-line-count comparison is accepted as a pass. |
 | 14 | Production access is not needed to run the test suite | **met** | ADR 0005: the test setup strips DSNs and refuses any non-`_test` database |
 | 15 | Migration, comparison, rollback and cutover instructions are complete | **met**; DB rollback rehearsed locally, application rollback untested | `cutover-runbook.md` (now with step 4a and 111-114), `rollback-runbook.md` §5 (111-114) and §7 record; V2-GAP-026 |
 | 16 | No secrets are committed | **met** | no `.env*` beyond `.env.example`; DSNs in tests are synthetic placeholders; closure scans at every stage |

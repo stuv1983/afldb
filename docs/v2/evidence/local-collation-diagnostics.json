@@ -1,0 +1,72 @@
+{
+  "database": "afldb_v2_hist_test",
+  "locale": {
+    "datcollate": "C",
+    "datctype": "C"
+  },
+  "coverage": {
+    "first": 1897,
+    "last": 2025,
+    "matches": 16838
+  },
+  "cohorts": [
+    {
+      "params": {
+        "goals_min": "50",
+        "goals_max": "199",
+        "brownlow_votes_min": "0",
+        "brownlow_votes_max": "0"
+      },
+      "count": 261,
+      "hashes": {
+        "identities": 261,
+        "native": "79d3e6eea83a4620",
+        "folded": "79d3e6eea83a4620",
+        "c": "79d3e6eea83a4620"
+      },
+      "localeHashes": [
+        {
+          "collation": "en-US-x-icu",
+          "hash": "79d3e6eea83a4620"
+        },
+        {
+          "collation": "en-x-icu",
+          "hash": "79d3e6eea83a4620"
+        },
+        {
+          "collation": "und-x-icu",
+          "hash": "79d3e6eea83a4620"
+        }
+      ]
+    },
+    {
+      "params": {
+        "debut_min": "1960",
+        "debut_max": "1969",
+        "clubs_min": "2",
+        "clubs_max": "2"
+      },
+      "count": 110,
+      "hashes": {
+        "identities": 110,
+        "native": "258396e0512a2212",
+        "folded": "258396e0512a2212",
+        "c": "258396e0512a2212"
+      },
+      "localeHashes": [
+        {
+          "collation": "en-US-x-icu",
+          "hash": "258396e0512a2212"
+        },
+        {
+          "collation": "en-x-icu",
+          "hash": "258396e0512a2212"
+        },
+        {
+          "collation": "und-x-icu",
+          "hash": "258396e0512a2212"
+        }
+      ]
+    }
+  ]
+}

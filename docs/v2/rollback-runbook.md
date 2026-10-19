@@ -1,7 +1,8 @@
 # AFLDB V2 — backup and rollback runbook
 
-Status: written in Stage 6 (Launch E, 2026-10-19). **NOT EXECUTED.** No step below has been run
-against any database, host or service. Nothing here is an approval: every production step needs
+Status: production steps **NOT EXECUTED**. Local database reversal was demonstrated at Launch F;
+application rollback was demonstrated on this workstation in the local-release follow-up
+(`local-release-review.md`). No host/service or production step was executed. Every production step needs
 the owner's explicit approval for that window (`docs/v2/go-no-go.md` §4), and the ISSUE-316 gates
 (`issues/open/AFLDB-ISSUE-316.md` §7-§8) are separate owner decisions that this rebuild neither
 grants nor satisfies.
@@ -13,6 +14,14 @@ their own rollback and roll-forward rules in ISSUE-316 §7 ("Roll-forward point"
 
 ## 1. What V2 changes in a production deployment
 
+**Current additive stream: 111–115.** In addition to the historical table summary below,
+113 adds the Brownlow eligibility ledger, 114 the canonical award projection ledger, and 115
+an index on existing adjudication supersession references. Application rollback keeps all of
+them and every publication/decision/audit row. The prior 111–114 reversal evidence is not a
+115 destructive-reversal rehearsal. No schema reversal is needed to run the previous app;
+the index can safely remain. Never treat the historical drop procedure as a generic undo
+of authorised publication data. Host execution/backup approval is still required.
+
 | Layer | Change | Reversible by |
 |---|---|---|
 | Schema | migration `111_curated_award_proposals.sql` (tables `award_proposals`, `award_proposal_decisions`) and `112_derived_award_results.sql` (table `derived_award_results`). Additive: no existing table, column, row, id or FK is altered | §5 (drop the three tables, after exporting them) |
@@ -20,8 +29,9 @@ their own rollback and roll-forward rules in ISSUE-316 §7 ("Roll-forward point"
 | Code | the V2 application (operations centre, retired legacy admin surfaces, seal checks, Coleman publisher, curated awards) | §4 (redeploy the previous release) |
 | Host | the email-intake timer disabled in the deploy window (`docs/v2/cutover-runbook.md` step 4) | §4.3 (re-enable it only if the previous release is restored and the owner wants CSV intake back) |
 
-V2 does **not** rewrite any existing row. A rollback therefore never needs a data restore for the
-existing tables; the backup in §2 is the safety net for an unexpected outcome, not a planned step.
+V2's migrations are additive; authorised publications can update existing award metadata.
+Application rollback retains that data and all audit ledgers. It is NOT a database restore or
+destructive migration reversal. The backup in §2 remains necessary for unexpected outcomes.
 
 ## 2. Backup before the window (operator, production host)
 

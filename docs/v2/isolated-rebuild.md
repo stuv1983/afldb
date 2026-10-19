@@ -69,7 +69,7 @@ This proves that the rebuild mechanics reproduce the accepted local contracts fr
 retained sources. **It is not historical parity with production.** No approved production backup
 was restored, and nothing was compared with production (`docs/v2/shadow-rehearsal.md`).
 
-## 4. Suites that cannot run here
+## 4. Historical Launch F limitation (resolved locally)
 
 Two integration files pin a database literally named `afldb_test` as the only authorised target
 for a deliberate bypass:
@@ -78,5 +78,35 @@ for a deliberate bypass:
   backtest bypass;
 - `tests/integration/settle-afl-api-state-b.test.ts` (1 test).
 
-The isolated cluster cannot create that name (`afldb_v2_*_test` only), so both refuse here by
-design. They run on the Linux `afldb_test` host. Neither guard is relaxed.
+The local-release follow-up removed that literal-name dependency. Both now require the isolated
+runner, loopback/approved port, V2 `_test` name, matching live database, cluster identity and
+database marker. Remote/redirected DSNs and unmarked databases refuse. Linux verification is
+still a separate release gate, not a reason to require a literal local database name.
+
+## 5. Reproducing the local-release inputs
+
+Use an absolute existing `AFLDB_PYTHON` executable with psycopg and the retained source snapshots
+listed above. No network acquisition is necessary. Missing snapshots or Python are errors.
+Run `export_person_bridge.py --resolve-against isolated --parent
+data/reference/draftguru-person-bridge-20260918-v2.json --out <new-child.json>` inside the isolated
+runner. This rolled-back read-only export checks live cluster identity, retains parent provenance
+and withholds targets not registered exactly once. Supply that child to rebuild's
+`--draftguru-bridge <new-child.json>` and set `AFLDB_DRAFTGURU_BRIDGE` to the same absolute file
+for tests. The final target is `afldb_v2_rb_final_test` (not an arbitrary test name: the
+reinstatement suite intentionally requires the protected rebuild-target pattern).
+
+The completed fresh replay ran migrations 001–114, all 30 stages and 89 validations; additive
+migration 115 subsequently supplies the missing adjudication supersession FK index. The bridge
+was then replayed from the authentic parent against its own measured registration. No assertions
+or isolation guards were bypassed. The final workflow and evidence are in `local-release-review.md`.
+
+For the final broad run a fresh delivery database was cloned from the preserved historical
+template, migrated through 115 and supplied its own measured bridge child before any read-only
+acceptance test. The full importer suite restores that child after its deliberate no-bridge
+cases. Repetition must import the child before starting, irrespective of test-file order.
+Choose an unused `afldb_v2_rb_<label>_test` for a new fresh clone; retain existing evidence databases.
+
+Credentials were rotated for this dedicated cluster only. `isolated-pg.ts rotate-credentials`
+checks identity, stores a local recovery file before the transaction, rotates all six roles,
+replaces the local secret files and verifies new login success and old password rejection.
+Neither passwords nor DSNs belong in evidence or version control. All retained databases survive.

@@ -37,6 +37,9 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-229.md`.
 - **Next action:** B2: capture the first authentic 2027 pre-match feed (no 2027 compSeason exists
   as of 2026-10-19). Validate-only and dry-run it, then the owner approves the first apply.
+  B2 is seasonal first-season operational acceptance, not missing fixture-writer implementation;
+  authentic 2026 evidence already proves the technical status/projection contract. Whole-season
+  2027/TBC/status/key/mapping evidence and owner approval are not waived.
 
 ### AFLDB-ISSUE-266 — Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin
 - **Severity:** High. **Area:** Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py`.

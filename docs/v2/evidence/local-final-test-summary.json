@@ -1,0 +1,2504 @@
+{
+  "baseline": "36679a1e",
+  "changedFiles": [
+    ".gitignore",
+    "CHANGELOG.md",
+    "IssuesIndex.md",
+    "data/reference/afltables-network.json",
+    "docs/rebuild-manifests/draftguru/bridge-operator-verdicts-20260918-v1.md",
+    "docs/v2/adr/0014-brownlow-eligibility.md",
+    "docs/v2/adr/0015-coleman-publication.md",
+    "docs/v2/architecture.md",
+    "docs/v2/evidence/README.local-release.md",
+    "docs/v2/evidence/local-awards-verification.json",
+    "docs/v2/evidence/local-brownlow-complete-final.json",
+    "docs/v2/evidence/local-brownlow-history-final.json",
+    "docs/v2/evidence/local-brownlow-history.json",
+    "docs/v2/evidence/local-brownlow-public-criteria-final.json",
+    "docs/v2/evidence/local-brownlow-unified-final.json",
+    "docs/v2/evidence/local-canonical-brownlow-final.json",
+    "docs/v2/evidence/local-changed-lint-final.json",
+    "docs/v2/evidence/local-changed-lint.json",
+    "docs/v2/evidence/local-coleman-115-final.json",
+    "docs/v2/evidence/local-coleman-complete.json",
+    "docs/v2/evidence/local-coleman-publication-tests-final.json",
+    "docs/v2/evidence/local-coleman-publication-tests.json",
+    "docs/v2/evidence/local-coleman-session-lock-final.json",
+    "docs/v2/evidence/local-collation-diagnostics.json",
+    "docs/v2/evidence/local-complete-tests.json",
+    "docs/v2/evidence/local-contract-repairs.json",
+    "docs/v2/evidence/local-data-coverage-final.json",
+    "docs/v2/evidence/local-final-contracts.json",
+    "docs/v2/evidence/local-final-isolation-repairs.json",
+    "docs/v2/evidence/local-focused-final.json",
+    "docs/v2/evidence/local-frozen-source-final.json",
+    "docs/v2/evidence/local-gridley-candidate.json",
+    "docs/v2/evidence/local-gridley-complete.json",
+    "docs/v2/evidence/local-gridley-delivery.json",
+    "docs/v2/evidence/local-gridley-release.json",
+    "docs/v2/evidence/local-import-role-lock-final.json",
+    "docs/v2/evidence/local-import-role-lock.json",
+    "docs/v2/evidence/local-last-edits.json",
+    "docs/v2/evidence/local-lint-candidate-final.json",
+    "docs/v2/evidence/local-lint-complete-final.json",
+    "docs/v2/evidence/local-lint-complete.json",
+    "docs/v2/evidence/local-lint-delivered-source.json",
+    "docs/v2/evidence/local-lint-delivery.json",
+    "docs/v2/evidence/local-lint-final.json",
+    "docs/v2/evidence/local-lint-handoff.json",
+    "docs/v2/evidence/local-lint-post-repair.json",
+    "docs/v2/evidence/local-lint-release-final.json",
+    "docs/v2/evidence/local-lint-release.json",
+    "docs/v2/evidence/local-reference-oracles-final.json",
+    "docs/v2/evidence/local-repository-lint-complete.json",
+    "docs/v2/evidence/local-repository-lint.json",
+    "docs/v2/evidence/local-rollback-1-previous.json",
+    "docs/v2/evidence/local-rollback-10-v2-final-capture.json",
+    "docs/v2/evidence/local-rollback-2-v2.json",
+    "docs/v2/evidence/local-rollback-3-previous.json",
+    "docs/v2/evidence/local-rollback-4-v2.json",
+    "docs/v2/evidence/local-rollback-5-previous-115.json",
+    "docs/v2/evidence/local-rollback-6-v2-115.json",
+    "docs/v2/evidence/local-rollback-7-previous-public.json",
+    "docs/v2/evidence/local-rollback-8-v2-public.json",
+    "docs/v2/evidence/local-rollback-9-v2-canonical.json",
+    "docs/v2/evidence/local-secret-scan.json",
+    "docs/v2/evidence/local-snapshot-diagnostics.json",
+    "docs/v2/evidence/local-supported-tests-complete.json",
+    "docs/v2/evidence/local-supported-tests-final.json",
+    "docs/v2/evidence/local-supported-tests-release.json",
+    "docs/v2/evidence/local-test-summary.json",
+    "docs/v2/evidence/local-verification-initial.json",
+    "docs/v2/evidence/local-verification-portability.json",
+    "docs/v2/evidence/local-visual-before-public-guards/08-brownlow__1280.png",
+    "docs/v2/evidence/local-visual-before-public-guards/08-brownlow__390.png",
+    "docs/v2/evidence/local-visual-before-public-guards/09-brownlow-2025__1280.png",
+    "docs/v2/evidence/local-visual-before-public-guards/09-brownlow-2025__390.png",
+    "docs/v2/evidence/local-visual/08-brownlow__1280.png",
+    "docs/v2/evidence/local-visual/08-brownlow__390.png",
+    "docs/v2/evidence/local-visual/09-brownlow-2025__1280.png",
+    "docs/v2/evidence/local-visual/09-brownlow-2025__390.png",
+    "docs/v2/final-report.md",
+    "docs/v2/go-no-go.md",
+    "docs/v2/isolated-rebuild.md",
+    "docs/v2/known-gaps.md",
+    "docs/v2/legacy-disposition.md",
+    "docs/v2/local-release-review.md",
+    "docs/v2/risk-register.md",
+    "docs/v2/rollback-runbook.md",
+    "eslint.config.mjs",
+    "issues.md",
+    "issues/open/AFLDB-ISSUE-229.md",
+    "legacy/offline/README.md",
+    "legacy/offline/coleman.py",
+    "legacy/offline/tools/email_intake/fetch_and_stage.py",
+    "legacy/offline/tools/rebuild/afltables/acquire_club_lists.R",
+    "legacy/offline/tools/rebuild/afltables/acquire_coaches.py",
+    "legacy/offline/tools/rebuild/draftguru/acquire_draft.py",
+    "legacy/offline/tools/rebuild/draftguru/acquire_persons.py",
+    "legacy/offline/tools/rebuild/fitzroy/acquire_core.R",
+    "packages/derived/src/brownlow-eligibility.ts",
+    "src/app/admin/operations/_components/BrownlowDeterminationViews.tsx",
+    "src/app/admin/operations/_components/BrownlowEligibilityClient.tsx",
+    "src/app/admin/operations/_components/BrownlowViews.tsx",
+    "src/app/admin/operations/brownlow/actions.ts",
+    "src/app/admin/operations/brownlow/eligibility-consequences.ts",
+    "src/app/admin/operations/brownlow/page.tsx",
+    "src/app/admin/operations/brownlow/revalidate/route.ts",
+    "src/app/awards/[slug]/[season]/page.tsx",
+    "src/app/awards/[slug]/page.tsx",
+    "src/db/migrations/115_adjudication_supersession_fk_index.sql",
+    "src/db/queries/admin-brownlow.ts",
+    "src/db/queries/awards.ts",
+    "src/db/queries/brownlow-eligibility.ts",
+    "src/db/queries/brownlow-reconciliation-inputs.ts",
+    "src/db/queries/grid-solver.ts",
+    "src/lib/acquisition/afl-api-brownlow.ts",
+    "src/lib/admin/operations-centre.ts",
+    "src/lib/format.ts",
+    "tests/admin-match-mutations.test.ts",
+    "tests/afl-api-brownlow.test.ts",
+    "tests/afl-api-cutover.test.ts",
+    "tests/afl-api-settle-cli-gate.test.ts",
+    "tests/awards-admin.test.ts",
+    "tests/behind-holder.test.ts",
+    "tests/current-season-import.test.ts",
+    "tests/data-overrides-source-contract.test.ts",
+    "tests/db-test-rebuild.test.ts",
+    "tests/draftguru-acquisition.test.ts",
+    "tests/email-intake-route.test.ts",
+    "tests/fitzroy-acquisition.test.ts",
+    "tests/fitzroy-core-import.test.ts",
+    "tests/format.test.ts",
+    "tests/import-role-lock-fixture.test.ts",
+    "tests/integration/admin-draft.test.ts",
+    "tests/integration/admin-season-lists.test.ts",
+    "tests/integration/admin-upload-route.test.ts",
+    "tests/integration/afl-api-adjudication-fixtures.ts",
+    "tests/integration/awards-reload-links.test.ts",
+    "tests/integration/draftguru-import.test.ts",
+    "tests/integration/fk-indexes.test.ts",
+    "tests/integration/grid-solver.test.ts",
+    "tests/integration/guard.ts",
+    "tests/integration/import-role-match-lock.test.ts",
+    "tests/integration/match-admin-delete.test.ts",
+    "tests/integration/settle-afl-api-brownlow-backtest.test.ts",
+    "tests/integration/settle-afl-api-state-b.test.ts",
+    "tests/integration/special-records-public-suppression.test.ts",
+    "tests/integration/v2-brownlow-eligibility.test.ts",
+    "tests/integration/v2-coleman-publication.test.ts",
+    "tests/python/draftguru_bridge_resolution_contract.py",
+    "tests/python/draftguru_child_validation_contract.py",
+    "tests/python/draftguru_import_gate_contract.py",
+    "tests/v2-admin-operations-ui.test.ts",
+    "tests/v2-admin-operations.test.ts",
+    "tests/v2-brownlow-eligibility.test.ts",
+    "tools/db/rebuild-test.ts",
+    "tools/email_intake/fetch_and_stage.py",
+    "tools/email_intake/test_fetch_and_stage.py",
+    "tools/migration/import_awards.py",
+    "tools/rebuild/afltables/acquire_club_lists.R",
+    "tools/rebuild/afltables/acquire_coaches.py",
+    "tools/rebuild/draftguru/acquire_draft.py",
+    "tools/rebuild/draftguru/acquire_persons.py",
+    "tools/rebuild/draftguru/export_person_bridge.py",
+    "tools/rebuild/draftguru/stage_b1_sample.py",
+    "tools/rebuild/fitzroy/acquire_core.R",
+    "tools/rebuild/fitzroy/validate_ladder_witness.py",
+    "tools/v2/brownlow-history.ts",
+    "tools/v2/check-local-secret-leaks.mjs",
+    "tools/v2/isolated-pg.ts",
+    "tools/v2/lint-changes.mjs",
+    "tools/v2/local-data-diagnostics.mts",
+    "tools/v2/local-import-lock.mjs",
+    "tools/v2/local-release.mjs",
+    "tools/v2/local-runtime-check.mts",
+    "tools/v2/release-test-summary.mjs",
+    "tsconfig.json"
+  ],
+  "preservedUntracked": [
+    ".codex/agents/afldb-closure.toml",
+    ".codex/agents/afldb-mechanic.toml",
+    ".codex/agents/afldb-orchestrator.toml",
+    ".codex/agents/afldb-reviewer.toml",
+    ".codex/agents/afldb-worker.toml"
+  ],
+  "reports": [
+    {
+      "path": "docs/v2/evidence/local-supported-tests-complete.json",
+      "passed": 13739,
+      "failed": 10,
+      "skipped": 31,
+      "total": 13780
+    },
+    {
+      "path": "docs/v2/evidence/local-coleman-complete.json",
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "total": 27
+    }
+  ],
+  "green": false,
+  "gap028": [
+    {
+      "file": "integration/admin-draft.test.ts",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-season-lists.test.ts",
+      "status": "passed",
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/awards-reload-links.test.ts",
+      "status": "passed",
+      "passed": 107,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/match-admin-delete.test.ts",
+      "status": "passed",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "failures": [
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/club-comparison-route.test.ts",
+      "name": "Stage 7 route state: valid pair loads the comparison with dynamic defaults",
+      "messages": [
+        "AssertionError: expected 41 to be 42 // Object.is equality\n    at D:/dev/afldbV2/tests/integration/club-comparison-route.test.ts:92:41\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "classification": "Later snapshot count versus local through-2025 history; assertion retained"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/club-comparison-route.test.ts",
+      "name": "Stage FR-2 route state: era filtering (Club Rivalry Explorer follow-up) falls back to all time on an era outside this rivalry’s recorded history, with a notice",
+      "messages": [
+        "AssertionError: expected 41 to be 42 // Object.is equality\n    at D:/dev/afldbV2/tests/integration/club-comparison-route.test.ts:226:47\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "classification": "Later snapshot count versus local through-2025 history; assertion retained"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/gridley-corpus.test.ts",
+      "name": "Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode",
+      "messages": [
+        "AssertionError: expected [ 'anzac-playedin-1', …(5) ] to deeply equal []\n    at D:/dev/afldbV2/tests/integration/gridley-corpus.test.ts:493:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ],
+      "classification": "Strict dataset/answer-key evidence gap; diagnostic waiver not used"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/gridley-corpus.test.ts",
+      "name": "Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells",
+      "messages": [
+        "AssertionError: expected [ …(40) ] to deeply equal []\n    at D:/dev/afldbV2/tests/integration/gridley-corpus.test.ts:784:152\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ],
+      "classification": "Strict dataset/answer-key evidence gap; diagnostic waiver not used"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/home-records.test.ts",
+      "name": "AFL home record catalogue against afldb_test preserves venue counts and NULL attendance semantics",
+      "messages": [
+        "AssertionError: expected { kind: 'venue-total', …(3) } to match object { kind: 'venue-total', …(2) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///D:/dev/afldbV2/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///D:/dev/afldbV2/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///D:/dev/afldbV2/node_modules/chai/index.js:1700:25)\n    at D:/dev/afldbV2/tests/integration/home-records.test.ts:52:30\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "classification": "Later snapshot count versus local through-2025 history; assertion retained"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/match-results-promotion.test.ts",
+      "name": "AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion AFLDB-ISSUE-264 durable Match Sheet authority refuses a reverting row F-002: match lock order and bounded waits of the legacy promotion hooks an UNGATED settle holding match locks for its whole run (emulated at the lock-statement level) characterises that an UNGATED settle can still be the deadlock victim",
+      "messages": [
+        "AssertionError: expected undefined to be '40P01' // Object.is equality\n    at D:/dev/afldbV2/tests/integration/match-results-promotion.test.ts:2104:37\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "classification": "Unclassified failure: must review, never baseline-waived"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/nl-answers-cross-domain.test.ts",
+      "name": "X1 -- played and also coached T1: answers 367, and agrees with hand-written coaches ⋈ match_coaches SQL",
+      "messages": [
+        "AssertionError: expected 365 to be 367 // Object.is equality\n    at D:/dev/afldbV2/tests/integration/nl-answers-cross-domain.test.ts:206:19\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "classification": "Later snapshot count versus local through-2025 history; assertion retained"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/nl-answers-cross-domain.test.ts",
+      "name": "X1 -- played and also coached T12: the capped list states its own cap -- 100 of 367, never silently",
+      "messages": [
+        "AssertionError: expected 365 to be 367 // Object.is equality\n    at D:/dev/afldbV2/tests/integration/nl-answers-cross-domain.test.ts:252:27\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "classification": "Later snapshot count versus local through-2025 history; assertion retained"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the exact 261 players",
+      "messages": [
+        "AssertionError: expected '79d3e6eea83a4620' to be 'ca65f15239aaf0b5' // Object.is equality\n    at D:/dev/afldbV2/tests/integration/release-gates.test.ts:288:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "classification": "Exact stable-identity membership mismatch; approved reference cohort required; no repin"
+    },
+    {
+      "report": "docs/v2/evidence/local-supported-tests-complete.json",
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: Advanced Search regression cases debuted in the 1960s with exactly two clubs returns the exact 110 players",
+      "messages": [
+        "AssertionError: expected '258396e0512a2212' to be '4b4c6a2aa975cc17' // Object.is equality\n    at D:/dev/afldbV2/tests/integration/release-gates.test.ts:326:25\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "classification": "Exact stable-identity membership mismatch; approved reference cohort required; no repin"
+    }
+  ],
+  "skipped": [
+    {
+      "file": "afl-api-cutover.test.ts",
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process that ignores SIGTERM (POSIX): SIGKILL ends it after the grace"
+    },
+    {
+      "file": "afl-api-cutover.test.ts",
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process (POSIX): SIGTERM alone ends a default process, reported by its signal"
+    },
+    {
+      "file": "current-season-import.test.ts",
+      "name": "AFLDB-ISSUE-130 — the R runtime declaration the settle script, executed from a temporary alternate checkout sources the fragment beside ITSELF, not one under /home/arm/projects/afldb"
+    },
+    {
+      "file": "current-season-import.test.ts",
+      "name": "AFLDB-ISSUE-130 — the R runtime declaration the settle script, executed from a temporary alternate checkout runs the real fragment it found: a missing AFLDB_R_LIBS is refused before anything else"
+    },
+    {
+      "file": "current-season-import.test.ts",
+      "name": "AFLDB-ISSUE-130 — the R runtime declaration the settle script, executed from a temporary alternate checkout still honours AFLDB_PROJECT_ROOT as an explicit override of its own location"
+    },
+    {
+      "file": "current-season-import.test.ts",
+      "name": "AFLDB-ISSUE-130 — the R runtime declaration the settle script, executed from a temporary alternate checkout fails loudly, not silently, when the resolved root is not a checkout"
+    },
+    {
+      "file": "db-promotion-check.test.ts",
+      "name": "AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate prepare-promotion-source: the run (fake settles, no database) ISSUE-314: --record-out is checked before anything is verified, opened or written recordOutProblems refuses a dangling symbolic link, which the exclusive write also refuses"
+    },
+    {
+      "file": "external-grids-import.test.ts",
+      "name": "the rescued Gridley archive validates all 1,123 archived boards without a single rejection"
+    },
+    {
+      "file": "integration/data-editor.test.ts",
+      "name": "Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (5) D-257-9: a save records the folded continuing_url identity and the replay resolves it back"
+    },
+    {
+      "file": "integration/gridley-aa-oracle.test.ts",
+      "name": "ISSUE-118 All-Australian oracle compares AFLDB against Gridley answer keys"
+    },
+    {
+      "file": "integration/gridley-height-oracle.test.ts",
+      "name": "ISSUE-118 height oracle measures coverage and compares AFLDB against Gridley answer keys"
+    },
+    {
+      "file": "integration/import-role-match-lock.test.ts",
+      "name": "AFLDB-ISSUE-274 D-274-2 — runtime lock permission of afldb_import on afldb_test afldb_import takes FOR NO KEY UPDATE on exactly one test-owned matches row, which is free again after the rollback"
+    },
+    {
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: draft links resolves identity once per person across 5,057 people"
+    },
+    {
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: draft links separates genuine non-players from a real matching backlog"
+    },
+    {
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: draft links records the backlog as open data issues"
+    },
+    {
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: birth dates retains the existing date wherever a source disagrees"
+    },
+    {
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: birth dates opens a data issue for every disputed date"
+    },
+    {
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: 2026 is provisional (snapshot-pinned) marks the season in progress with an explicit as-at date"
+    },
+    {
+      "file": "integration/release-gates.test.ts",
+      "name": "gate: 2026 is provisional (snapshot-pinned) preserves the raw ladder untouched in staging"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B1: AFL Tables · match_results · the promotion is refused at the gate while a settle holds it, and a retry succeeds"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B2: AFL Tables · match_results · the promotion waits at the gate, then succeeds once the settle commits"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B3: AFL API · player_match_stats · the promotion waits at the gate, not on (p, M1); the M2 unit applies; a retry succeeds"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B4: AFL API · F-265-1 · the attendance enrichment no longer loses the whole run; the promotion waits at the gate"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B6: a settle waits behind a promotion that is stuck after its hook, holding nothing, and then completes"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B7: both settles give up at the gate after the full wait with a named error, write nothing, and their connections are reused"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B8: two settles hold the shared gate at once, neither waits on the other, and a dry-run rollback releases it"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B9: promotions serialise on the gate: the second is refused while the first holds it, and succeeds once it commits"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B10: acquireSettlePromotionGate restores both previous settings, holds the gate to commit and releases it after"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B11: a waiting promotion delays a later settle, and a waiting settle delays a later promotion"
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "name": "AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions B5: match_attendance · refused at the gate with nothing written; its re-promotion locks the matches in ascending id"
+    },
+    {
+      "file": "integration/special-records-lifecycle.test.ts",
+      "name": "the privilege contract, asked of the real roles reports the restricted importer validation was skipped"
+    }
+  ],
+  "files": [
+    {
+      "file": "admin-access-actions.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-audit-viewer.test.ts",
+      "status": "passed",
+      "passed": 33,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-awards-hall-of-fame-years.test.ts",
+      "status": "passed",
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-brownlow-actions.test.ts",
+      "status": "passed",
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-club-leadership-actions.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-coach-actions.test.ts",
+      "status": "passed",
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-current-season-settle.test.ts",
+      "status": "passed",
+      "passed": 53,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-draft-actions.test.ts",
+      "status": "passed",
+      "passed": 60,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-fixture-actions.test.ts",
+      "status": "passed",
+      "passed": 81,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-lifecycle-actions.test.ts",
+      "status": "passed",
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-match-input.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-match-mutations.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-nl-search-actions.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-season-list-actions.test.ts",
+      "status": "passed",
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-settings-actions.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "admin-upload-route.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "advanced-spec.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-adjudication-actions-contract.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-adjudication-recovery.test.ts",
+      "status": "passed",
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-brownlow-acquire.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-brownlow.test.ts",
+      "status": "passed",
+      "passed": 58,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-cutover.test.ts",
+      "status": "passed",
+      "passed": 419,
+      "failed": 0,
+      "skipped": 2
+    },
+    {
+      "file": "afl-api-identity-correction.test.ts",
+      "status": "passed",
+      "passed": 141,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-ingestion-control.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-ingestion-safety.test.ts",
+      "status": "passed",
+      "passed": 170,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-lineup-migration.test.ts",
+      "status": "passed",
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-lineup-store.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-lineup.test.ts",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-match-migration.test.ts",
+      "status": "passed",
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-match.test.ts",
+      "status": "passed",
+      "passed": 243,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-page-table-wrap-contract.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-player-bridge-cli.test.ts",
+      "status": "passed",
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-player-bridge-import.test.ts",
+      "status": "passed",
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-player-evidence.test.ts",
+      "status": "passed",
+      "passed": 58,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-rounds.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-settle-cli-gate.test.ts",
+      "status": "passed",
+      "passed": 54,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "afl-api-settle-plan.test.ts",
+      "status": "passed",
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "aflw-match-outcome-guard.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "after-siren-format.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "after-siren-normalisation.test.ts",
+      "status": "passed",
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "all-australian-source.test.ts",
+      "status": "passed",
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "audit-afl-api-brownlow-canonical-equality.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "audit-link-fk-indexes.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "auth.test.ts",
+      "status": "passed",
+      "passed": 203,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "award-definitions-source.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "award-stat-line.test.ts",
+      "status": "passed",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "awards-admin.test.ts",
+      "status": "passed",
+      "passed": 41,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "awards-replace-panel.test.ts",
+      "status": "passed",
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "behind-holder.test.ts",
+      "status": "passed",
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "beta-verify.test.ts",
+      "status": "passed",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "brownlow-entry.test.ts",
+      "status": "passed",
+      "passed": 95,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "brownlow-focus-restore.test.ts",
+      "status": "passed",
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "brownlow-season-artefact.test.ts",
+      "status": "passed",
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "brownlow-vote-form-data.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "captaincies-source.test.ts",
+      "status": "passed",
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "catalogue-lookups.test.ts",
+      "status": "passed",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "census-afl-api-brownlow-identities.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "club-best-and-fairest-source.test.ts",
+      "status": "passed",
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "club-coach-records.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "club-comparison-view.test.ts",
+      "status": "passed",
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "club-comparison.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "club-list-sources.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "club-premierships.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "club-records-sections.test.ts",
+      "status": "passed",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coach-career-record.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coach-comparison-career.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coach-comparison-url.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coach-head-to-head-view.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coach-profile-route.test.ts",
+      "status": "passed",
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coach-reconciliation.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coach-slug.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coaches.test.ts",
+      "status": "passed",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "coleman-derivation.test.ts",
+      "status": "passed",
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "correct-afl-api-identity-cli.test.ts",
+      "status": "passed",
+      "passed": 274,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "csv.test.ts",
+      "status": "passed",
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "current-season-import.test.ts",
+      "status": "passed",
+      "passed": 356,
+      "failed": 0,
+      "skipped": 4
+    },
+    {
+      "file": "data-overrides-source-contract.test.ts",
+      "status": "passed",
+      "passed": 74,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "db-promotion-check.test.ts",
+      "status": "passed",
+      "passed": 464,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "file": "db-test-rebuild.test.ts",
+      "status": "passed",
+      "passed": 677,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "deploy-web-unit.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "draft-linkage-invariants.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "draftguru-acquisition.test.ts",
+      "status": "passed",
+      "passed": 167,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "draftguru-import.test.ts",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "dsn-policy.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "early-access-questions.test.ts",
+      "status": "passed",
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "edit-spec.test.ts",
+      "status": "passed",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "email-intake-route.test.ts",
+      "status": "passed",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "executable-statements.test.ts",
+      "status": "passed",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "expandable-table-frame.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "external-grids-import.test.ts",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "file": "family-records-surfaces.test.ts",
+      "status": "passed",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "father-son-reconciliation.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "finals-semantics-contract.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "first-kick-goal-source.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "fitzroy-acquisition.test.ts",
+      "status": "passed",
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "fitzroy-core-import.test.ts",
+      "status": "passed",
+      "passed": 116,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "format.test.ts",
+      "status": "passed",
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "grid-solver-spec.test.ts",
+      "status": "passed",
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "grid-solver-timeout.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "grid-solver-under22.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "gridley-acquisition.test.ts",
+      "status": "passed",
+      "passed": 45,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "gridley-compat.test.ts",
+      "status": "passed",
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "hall-of-fame-source.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "health-event-route.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "height-reconciliation.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "home-records.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "honour-teams-source.test.ts",
+      "status": "passed",
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "honours-lifecycle-public-contract.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "import-role-lock-fixture.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "import-role-parity.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "indexing.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "ingest-datasets.test.ts",
+      "status": "passed",
+      "passed": 305,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "issue246-retire-issue109-fixture.test.ts",
+      "status": "passed",
+      "passed": 88,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "issue248-cleanup-dev-auth-fixtures.test.ts",
+      "status": "passed",
+      "passed": 138,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "like.test.ts",
+      "status": "passed",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "match-backtest-compare.test.ts",
+      "status": "passed",
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "match-lineup-editor.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "match-sheet.test.ts",
+      "status": "passed",
+      "passed": 91,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "match-spec.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "migration-checksum.test.ts",
+      "status": "passed",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "named-medals-source.test.ts",
+      "status": "passed",
+      "passed": 44,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-answer-feedback-boundary.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-audit-acceptance.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-describe.test.ts",
+      "status": "passed",
+      "passed": 89,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-expanded-ui-corpus-generator.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-feedback.test.ts",
+      "status": "passed",
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-finals-without-premiership-corpus-fix.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-head-to-head-describe.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-issue-199-corpus-fix.test.ts",
+      "status": "passed",
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-issue-200-audit-cluster.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-issue-200-audit-extract.test.ts",
+      "status": "passed",
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-issue-201-corpus-fix.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-issue-204-corpus-fix.test.ts",
+      "status": "passed",
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-issue-205-corpus-fix.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-parser.test.ts",
+      "status": "passed",
+      "passed": 623,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-plan.test.ts",
+      "status": "passed",
+      "passed": 219,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-player-career-metric-guard.test.ts",
+      "status": "passed",
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-regression-corpus.test.ts",
+      "status": "passed",
+      "passed": 163,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-search-log.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-semantic-mapping.test.ts",
+      "status": "passed",
+      "passed": 178,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-stress-corpus.test.ts",
+      "status": "passed",
+      "passed": 65,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-stress-v2.test.ts",
+      "status": "passed",
+      "passed": 58,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "nl-ui-corpus.test.ts",
+      "status": "passed",
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-after-siren-events.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-coaching-career.test.ts",
+      "status": "passed",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-compare.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-family-card.test.ts",
+      "status": "passed",
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-identity-source.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-link-mutations.test.ts",
+      "status": "passed",
+      "passed": 160,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-links-page.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-matching-describe.test.ts",
+      "status": "passed",
+      "passed": 38,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "player-matching.test.ts",
+      "status": "passed",
+      "passed": 100,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "playwright-timeout-policy.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "query-builder-spec.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "query-intent.test.ts",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "rate-limit.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "reference-data.test.ts",
+      "status": "passed",
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "register-issue224-s9-dev-write-gate.test.ts",
+      "status": "passed",
+      "passed": 154,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "rising-star-source.test.ts",
+      "status": "passed",
+      "passed": 33,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "rising-star-winners-source.test.ts",
+      "status": "passed",
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "search-rate-limit.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "season-rollover.test.ts",
+      "status": "passed",
+      "passed": 143,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "seo.test.ts",
+      "status": "passed",
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "settle-season-revalidation.test.ts",
+      "status": "passed",
+      "passed": 69,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "sibling-reconciliation.test.ts",
+      "status": "passed",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "site-content.test.ts",
+      "status": "passed",
+      "passed": 48,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "site-settings.test.ts",
+      "status": "passed",
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "special-records-admin.test.ts",
+      "status": "passed",
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "special-records-identity.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "special-records-public-filter-contract.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "special-records-replay-parity.test.ts",
+      "status": "passed",
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "submission-review-actions.test.ts",
+      "status": "passed",
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "table-filters.test.ts",
+      "status": "passed",
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "under-22-importer.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "under-22-source.test.ts",
+      "status": "passed",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-acquisition-pipeline.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-acquisition-replay.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-admin-operations-ui.test.ts",
+      "status": "passed",
+      "passed": 84,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-admin-operations.test.ts",
+      "status": "passed",
+      "passed": 75,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-brownlow-eligibility.test.ts",
+      "status": "passed",
+      "passed": 45,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-brownlow-reconciliation.test.ts",
+      "status": "passed",
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-coleman-projection.test.ts",
+      "status": "passed",
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-coleman-publication-pglite.test.ts",
+      "status": "passed",
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-coleman-publication.test.ts",
+      "status": "passed",
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-coleman.test.ts",
+      "status": "passed",
+      "passed": 45,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-coverage-registry.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-curated-awards-pglite.test.ts",
+      "status": "passed",
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-curated-awards.test.ts",
+      "status": "passed",
+      "passed": 124,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-fixture-contract.test.ts",
+      "status": "passed",
+      "passed": 67,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-historical-manifest.test.ts",
+      "status": "passed",
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-isolated-test-target.test.ts",
+      "status": "passed",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-module-boundaries.test.ts",
+      "status": "passed",
+      "passed": 53,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-reconciliation-report.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-season-seal.test.ts",
+      "status": "passed",
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-shadow-award-reports.test.ts",
+      "status": "passed",
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-shadow-capture.test.ts",
+      "status": "passed",
+      "passed": 77,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-shadow-parity.test.ts",
+      "status": "passed",
+      "passed": 99,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "v2-shadow-target.test.ts",
+      "status": "passed",
+      "passed": 72,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "venue-records-sections.test.ts",
+      "status": "passed",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "workflow-preflight.test.ts",
+      "status": "passed",
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/access-codes.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-audit.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-awards.test.ts",
+      "status": "passed",
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-brownlow.test.ts",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-club-leadership.test.ts",
+      "status": "passed",
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-coaches.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-draft.test.ts",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-fixtures.test.ts",
+      "status": "passed",
+      "passed": 39,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-lifecycle.test.ts",
+      "status": "passed",
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-season-lists.test.ts",
+      "status": "passed",
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-special-records.test.ts",
+      "status": "passed",
+      "passed": 41,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/admin-upload-route.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/afl-api-lineup-store.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/afl-api-ownership-census.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/after-siren.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/auth-audit-jsonb.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/awards-reload-links.test.ts",
+      "status": "passed",
+      "passed": 107,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-coach-records.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-comparison-route.test.ts",
+      "status": "failed",
+      "passed": 27,
+      "failed": 2,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-comparison-view.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-comparison.test.ts",
+      "status": "passed",
+      "passed": 70,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-crowd-records.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-honours.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-match-records.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-players.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-premiership-players.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/club-premierships.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/coach-comparison-route.test.ts",
+      "status": "passed",
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/coach-head-to-head.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/data-editor.test.ts",
+      "status": "passed",
+      "passed": 51,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "file": "integration/database.test.ts",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/datasets.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/db-health.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/derived-rebuild-parity.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/dob-enrichment-issues.test.ts",
+      "status": "passed",
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/draft-linkage.test.ts",
+      "status": "passed",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/draftguru-import.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/email-intake.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/first-kick-goal-reload-links.test.ts",
+      "status": "passed",
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/fk-indexes.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/grid-solver-investigation.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/grid-solver.test.ts",
+      "status": "passed",
+      "passed": 216,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/gridley-aa-oracle.test.ts",
+      "status": "passed",
+      "passed": 55,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "file": "integration/gridley-corpus.test.ts",
+      "status": "failed",
+      "passed": 1203,
+      "failed": 2,
+      "skipped": 0
+    },
+    {
+      "file": "integration/gridley-height-oracle.test.ts",
+      "status": "passed",
+      "passed": 55,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "file": "integration/home-records.test.ts",
+      "status": "failed",
+      "passed": 3,
+      "failed": 1,
+      "skipped": 0
+    },
+    {
+      "file": "integration/import-role-match-lock.test.ts",
+      "status": "passed",
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "file": "integration/import-role-parity.test.ts",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/join-request-approval.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/match-admin-create.test.ts",
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/match-admin-delete.test.ts",
+      "status": "passed",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/match-results-promotion.test.ts",
+      "status": "failed",
+      "passed": 45,
+      "failed": 1,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answer-boundary.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answers-after-siren.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answers-coaching.test.ts",
+      "status": "passed",
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answers-cross-domain.test.ts",
+      "status": "failed",
+      "passed": 20,
+      "failed": 2,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answers-first-kick-goal.test.ts",
+      "status": "passed",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answers-game-season.test.ts",
+      "status": "passed",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answers-relationships.test.ts",
+      "status": "passed",
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answers-team-club.test.ts",
+      "status": "passed",
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-answers.test.ts",
+      "status": "passed",
+      "passed": 33,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-search-telemetry-clear.test.ts",
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-semantic-mapping.test.ts",
+      "status": "passed",
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/nl-vocab.test.ts",
+      "status": "passed",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/observation-spine.test.ts",
+      "status": "passed",
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/player-compare.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/player-family-and-coaching.test.ts",
+      "status": "passed",
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/player-honours.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/player-link-concurrency.test.ts",
+      "status": "passed",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/player-matching.test.ts",
+      "status": "passed",
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/privileges.test.ts",
+      "status": "passed",
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/query-builder.test.ts",
+      "status": "passed",
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/release-gates.test.ts",
+      "status": "failed",
+      "passed": 57,
+      "failed": 2,
+      "skipped": 7
+    },
+    {
+      "file": "integration/settle-afl-api-brownlow-backtest.test.ts",
+      "status": "passed",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/settle-afl-api-brownlow-reschedule.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/settle-afl-api-brownlow.test.ts",
+      "status": "passed",
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/settle-afl-api-fixtures.test.ts",
+      "status": "passed",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/settle-afl-api-issue276.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/settle-afl-api-state-b.test.ts",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/settle-afl-api.test.ts",
+      "status": "passed",
+      "passed": 73,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/settle-afltables.test.ts",
+      "status": "passed",
+      "passed": 85,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/settle-promotion-deadlock.test.ts",
+      "status": "passed",
+      "passed": 0,
+      "failed": 0,
+      "skipped": 11
+    },
+    {
+      "file": "integration/special-records-lifecycle.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "file": "integration/special-records-public-suppression.test.ts",
+      "status": "passed",
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/submission-promotion.test.ts",
+      "status": "passed",
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/v2-brownlow-eligibility.test.ts",
+      "status": "passed",
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/v2-curated-awards.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/v2-fixture-writer.test.ts",
+      "status": "passed",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/venue-records.test.ts",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "unit/NlAnswerSection.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "unit/qualifying-matches-gate.test.ts",
+      "status": "passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "unit/sorting.test.ts",
+      "status": "passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "integration/v2-coleman-publication.test.ts",
+      "status": "passed",
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0
+    }
+  ]
+}

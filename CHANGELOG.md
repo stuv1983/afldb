@@ -19,6 +19,12 @@ commit.
 
 #### Local release-readiness follow-up — 19–20 October 2026
 
+- Retained the final assertion-level release package, reproducible local-input commands,
+  independent reference-cohort SQL/identity evidence, standalone rollback results and visual
+  assessment. Original gaps 014/021/028 close locally; strict source/reference disagreements
+  remain gap 029. Production remains NO-GO; host operations and owner acceptance are not waived.
+  Final complete workflow: 13,740 passed, 9 strict reference/source failures, 31 skipped;
+  Coleman separately 27/27. Original gap-028 suites pass 200/200.
 - Corrected the ungated deadlock fixture's unsupported assumption about which transaction
   PostgreSQL aborts. Both documented outcomes now require exact failure/commit behaviour,
   atomic rollback, bounded waits and successful retry; no runtime guard or privilege changed.

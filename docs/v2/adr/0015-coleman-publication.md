@@ -121,16 +121,15 @@ does. `isAllowedRevalidatePath` admits every path a Coleman row can produce
 
 ### Coexistence with the offline loader
 
-The loader's `reload_keyed` is scoped to `(award coleman, source afltables)` and keyed on the same
-`(source_id, source_record_id)`, so it MATCHES projected rows rather than inserting duplicates, and
-re-asserts the same values. Measured on the isolated PostgreSQL (Launch F step B1,
-`tests/integration/v2-coleman-publication.test.ts`): after a projection of a four-way tie the
-loader reports `coleman winners 4 (1 seasons, 4 updated, 0 inserted, 0 deleted)` and every column of
-the tuple is unchanged; the projection then reports every key `retained`. The loader's `updated`
-counts every matched row (its UPDATE carries no changed-values guard, `tools/migration/common.py`
-`reload_keyed`), so "0 updated" is not the loader's parity signature; "0 inserted, 0 deleted, values
-unchanged" is. A row the loader inserted first is `retained` by the next projection. The
-loader remains the bulk path for a rebuild; the projection is the audited, per-season path.
+The explicit `legacy/offline/coleman.py` entry point is a dedicated-cluster historical bootstrap,
+not an alternative publisher. It requires loopback port 55432, V2 `_test` name, live cluster and
+database marker. It refuses if canonical Coleman publications exist. It acquires the canonical
+season lock keys using **session-scoped** locks: historical `ImportBatch` commits would release
+transaction-scoped locks before the award write. The connection finalizer releases all locks.
+The real PostgreSQL regression commits after acquisition, proves a competing publisher cannot
+take the lock, closes the loader connection, then proves acquisition succeeds. Publication suite
+**27/27**: `evidence/local-coleman-complete.json`. A bootstrap-written row is still retained by
+the first canonical publication; after publication, a bootstrap refuses without changing tuples.
 
 ## Consequences and what remains
 

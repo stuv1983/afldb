@@ -33,11 +33,11 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['
 const untracked = git('ls-files','--others','--exclude-standard').split('\n').filter(Boolean);
 const preservedUntracked = untracked.filter((file) => file.startsWith('.codex/'));
 const changedFiles = [...new Set([...git('diff','--name-only','36679a1e').split('\n'),
-  ...untracked.filter((file) => !preservedUntracked.includes(file))])].filter(Boolean).sort();
+  ...untracked.filter((file) => !preservedUntracked.includes(file)), output])].filter(Boolean).sort();
 const classification = (file) => {
   if (file.endsWith('release-gates.test.ts')) return 'Exact stable-identity membership mismatch; approved reference cohort required; no repin';
   if (file.endsWith('gridley-corpus.test.ts')) return 'Strict dataset/answer-key evidence gap; diagnostic waiver not used';
-  if (/club-comparison-route|home-records|nl-answers-cross-domain/.test(file)) return 'Later snapshot count versus local through-2025 history; assertion retained';
+  if (/club-comparison-route|home-records|nl-answers-cross-domain/.test(file)) return 'Snapshot/count disagreement against local through-2025 history; approved source baseline required; assertion retained';
   return 'Unclassified failure: must review, never baseline-waived';
 };
 const summary = { baseline: '36679a1e', changedFiles, preservedUntracked,

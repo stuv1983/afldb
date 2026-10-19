@@ -1,0 +1,221 @@
+{
+  "baseline": "36679a1e",
+  "summary": {
+    "files": 30,
+    "errors": 53,
+    "warnings": 1,
+    "newFindings": 0
+  },
+  "records": [
+    {
+      "file": "packages/derived/src/brownlow-eligibility.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/app/admin/operations/_components/BrownlowDeterminationViews.tsx",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/app/admin/operations/_components/BrownlowEligibilityClient.tsx",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/app/admin/operations/_components/BrownlowViews.tsx",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/app/admin/operations/brownlow/eligibility-consequences.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/app/admin/operations/brownlow/page.tsx",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/db/queries/admin-brownlow.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/db/queries/brownlow-eligibility.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/db/queries/brownlow-reconciliation-inputs.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/lib/acquisition/afl-api-brownlow.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/lib/admin/operations-centre.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/afl-api-brownlow.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/afl-api-cutover.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/draftguru-acquisition.test.ts",
+      "errors": 49,
+      "warnings": 0,
+      "baseline": 49,
+      "added": []
+    },
+    {
+      "file": "tests/integration/admin-draft.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/integration/admin-season-lists.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/integration/awards-reload-links.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/integration/match-admin-delete.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/integration/settle-afl-api-brownlow-backtest.test.ts",
+      "errors": 3,
+      "warnings": 0,
+      "baseline": 3,
+      "added": []
+    },
+    {
+      "file": "tests/integration/settle-afl-api-state-b.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/integration/v2-brownlow-eligibility.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/integration/v2-coleman-publication.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tests/v2-admin-operations.test.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tools/db/rebuild-test.ts",
+      "errors": 1,
+      "warnings": 1,
+      "baseline": 2,
+      "added": []
+    },
+    {
+      "file": "tools/v2/isolated-pg.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "src/app/admin/operations/brownlow/revalidate/route.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tools/v2/brownlow-history.ts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tools/v2/lint-changes.mjs",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tools/v2/local-release.mjs",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    },
+    {
+      "file": "tools/v2/local-runtime-check.mts",
+      "errors": 0,
+      "warnings": 0,
+      "baseline": 0,
+      "added": []
+    }
+  ]
+}

@@ -517,6 +517,16 @@ pre-match season feed, and it must provide:
 - the genuine TBC date/time representation, if present;
 - whole-season validation of the pre-match shape and of any new status or key variants.
 
+**Local release review (2026-10-19): gate classification.** B2 is first-season operational
+acceptance based on seasonal source evidence, not a code contract that requires the integer
+2027. The implementation's technical contract is already exercised using authentic retained
+2026 `SCHEDULED` and `UNCONFIRMED_TEAMS` bytes (17/17 fixture integration, 67/67 contract tests;
+the 2026 feed dry run is established evidence). Those inputs cannot demonstrate the unseen
+whole-season 2027 shape, genuine TBC representation if present, new status/key variants, or
+the season's venue/round mappings. Therefore B2 and owner-approved first apply remain mandatory.
+The same-day Launch F public season-list check found no 2027 compSeason; this review reused that
+evidence and made no further API request. No simulated 2027 response or owner waiver is implied.
+
 - **D-229-1 — DECIDED (status routing), revised in pass 6 on B1 evidence (§2c).**
   - `SCHEDULED`: eligible for fixture projection, subject to the rest of the contract.
   - `UNCONFIRMED_TEAMS`: **now also eligible** for fixture projection. Authentic B1 bytes show it is
