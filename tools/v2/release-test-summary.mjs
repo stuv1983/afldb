@@ -30,15 +30,17 @@ const gap028 = originalGapFiles.map((name) => {
   return file;
 });
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] });
+const untracked = git('ls-files','--others','--exclude-standard').split('\n').filter(Boolean);
+const preservedUntracked = untracked.filter((file) => file.startsWith('.codex/'));
 const changedFiles = [...new Set([...git('diff','--name-only','36679a1e').split('\n'),
-  ...git('ls-files','--others','--exclude-standard').split('\n')])].filter(Boolean).sort();
+  ...untracked.filter((file) => !preservedUntracked.includes(file))])].filter(Boolean).sort();
 const classification = (file) => {
   if (file.endsWith('release-gates.test.ts')) return 'Exact stable-identity membership mismatch; approved reference cohort required; no repin';
   if (file.endsWith('gridley-corpus.test.ts')) return 'Strict dataset/answer-key evidence gap; diagnostic waiver not used';
   if (/club-comparison-route|home-records|nl-answers-cross-domain/.test(file)) return 'Later snapshot count versus local through-2025 history; assertion retained';
   return 'Unclassified failure: must review, never baseline-waived';
 };
-const summary = { baseline: '36679a1e', changedFiles,
+const summary = { baseline: '36679a1e', changedFiles, preservedUntracked,
   reports: reports.map(({ path, report }) => ({ path, passed: report.numPassedTests,
   failed: report.numFailedTests, skipped: report.numPendingTests, total: report.numTotalTests })),
   green: failures.length === 0 && skipped.length === 0, gap028,

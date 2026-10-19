@@ -8,7 +8,7 @@ const out = process.argv[3];
 if (!/^[a-f0-9]{8,40}$/.test(baseline ?? '') || !out) throw new Error('baseline SHA and output path required');
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 const files = [...new Set([...git('diff', '--name-only', baseline).split('\n'), ...git('ls-files', '--others', '--exclude-standard').split('\n')])]
-  .filter((file) => /\.(ts|tsx|mts|mjs)$/.test(file));
+  .filter((file) => !file.startsWith('.codex/') && /\.(ts|tsx|mts|mjs)$/.test(file));
 const eslint = new ESLint({ cache: false });
 const records = [];
 for (const file of files) {
