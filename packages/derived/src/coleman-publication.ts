@@ -23,11 +23,14 @@
  *
  * Any SQL error rejects the transaction callback, so nothing is written.
  *
- * This module does NOT write `award_winners`. The Coleman `award_winners` rows remain owned by the
- * offline `tools/migration/import_awards.py` coleman group. A future projection of a published
- * result into `award_winners` must call `assertSeasonWritable` with a correction and supply
- * `player_name_raw` (ADR 0006, divergence 8). Nothing here reads a clock (`published_at` is the
- * database default), the network or the file system.
+ * This module itself never writes the canonical winners table. Launch F (ADR 0015) adds an optional
+ * PROJECTION PORT: `publishColemanResult(executor, request, { projection })` hands the transaction
+ * and the current ledger row id to the port AFTER the ledger step (also when the ledger outcome is
+ * `unchanged`), so the projection and the ledger commit or roll back as one. Without a port the
+ * Stage 4 ledger-only behaviour is unchanged. The port is implemented server-side
+ * (`src/db/queries/coleman-award-winners.ts`); a refusal it raises (`ColemanProjectionRefusal`)
+ * rolls the whole transaction back and is returned as a typed refusal. Nothing here reads a clock
+ * (`published_at` is the database default), the network or the file system.
  */
 import type { SqlExecutor, TransactionalSqlExecutor } from '@afldb/db';
 import { evaluateSeasonWrite, sealedSeasonsFrom, type AuditedCorrection } from '@afldb/domain';
@@ -63,7 +66,25 @@ export const COLEMAN_PUBLICATION_REFUSAL_CODES = [
   'actor_mismatch',
   'season_not_sealed',
 ] as const;
-export type ColemanPublicationRefusalCode = (typeof COLEMAN_PUBLICATION_REFUSAL_CODES)[number];
+
+/**
+ * Refusals raised by the PROJECTION into the canonical winners table (ADR 0015). Each one is thrown
+ * from inside the publisher's transaction, so the ledger row rolls back with it.
+ */
+export const COLEMAN_PROJECTION_REFUSAL_CODES = [
+  'projection_unavailable',
+  'award_definition_missing',
+  'source_missing',
+  'player_missing',
+  'derived_row_voided',
+  'admin_override_present',
+  'foreign_winner_rows',
+] as const;
+export type ColemanProjectionRefusalCode = (typeof COLEMAN_PROJECTION_REFUSAL_CODES)[number];
+
+export type ColemanPublicationRefusalCode =
+  | (typeof COLEMAN_PUBLICATION_REFUSAL_CODES)[number]
+  | ColemanProjectionRefusalCode;
 
 export interface ColemanPublicationRefusal {
   readonly code: ColemanPublicationRefusalCode;
@@ -71,6 +92,80 @@ export interface ColemanPublicationRefusal {
   readonly season: number;
   /** Present only for `derivation_refused`: the derivation's own typed refusal, passed through. */
   readonly derivation?: ColemanRefusal;
+  /** Present only for a projection refusal: the rows or keys that caused it (capped by the port). */
+  readonly subjects?: readonly string[];
+}
+
+/* ------------------------------------------------------------------ *
+ * The projection port (ADR 0015)
+ * ------------------------------------------------------------------ */
+
+export const COLEMAN_PROJECTION_ACTIONS = ['inserted', 'updated', 'voided', 'retained'] as const;
+export type ColemanProjectionActionKind = (typeof COLEMAN_PROJECTION_ACTIONS)[number];
+
+/** One projected row, by durable key. `awardWinnerId` is a snapshot (null in a read-only preview of an insert). */
+export interface ColemanProjectionAction {
+  readonly entityKey: string;
+  readonly action: ColemanProjectionActionKind;
+  readonly awardWinnerId: number | null;
+}
+
+export interface ColemanProjectionCounts {
+  readonly inserted: number;
+  readonly updated: number;
+  readonly voided: number;
+  readonly retained: number;
+}
+
+/** What the port tells the publisher after it has written inside the transaction. */
+export interface ColemanProjectionResult {
+  /** The `derived_award_projections` row written by this call, or null when nothing was recorded (an idempotent rerun). */
+  readonly projectionId: number | null;
+  readonly actions: readonly ColemanProjectionAction[];
+  readonly counts: ColemanProjectionCounts;
+  /** inserted + updated + voided. */
+  readonly changedCount: number;
+  /** Public pages the changed rows can move (empty when nothing changed). Computed server-side, never client-supplied. */
+  readonly revalidatePaths: readonly string[];
+}
+
+/** What the port is given: the ledger step has already run in the same transaction. */
+export interface ColemanProjectionRequest {
+  readonly derivation: ColemanDerivation;
+  /** The CURRENT `derived_award_results` row: the new row, or the existing one for `unchanged`. */
+  readonly derivedAwardResultId: number;
+  readonly ledgerOutcome: ColemanPublicationPlan['outcome'];
+  /** The season seal's audit record (workflow `derived_award_publication`). */
+  readonly audit: ColemanPublicationAudit;
+  readonly publishedBy: number;
+}
+
+/**
+ * The port the publisher calls inside its transaction. It must write only through `tx`, and it
+ * refuses by throwing {@link ColemanProjectionRefusal}; any other error is an unexpected failure
+ * and propagates. The production implementation is `src/db/queries/coleman-award-winners.ts`.
+ */
+export interface ColemanProjectionPort {
+  project(tx: SqlExecutor, request: ColemanProjectionRequest): Promise<ColemanProjectionResult>;
+}
+
+export interface ColemanPublishOptions {
+  /** Absent: ledger-only behaviour (Stage 4). Present: the projection runs in the same transaction. */
+  readonly projection?: ColemanProjectionPort;
+}
+
+/** Thrown by a projection port to refuse; rolls the publisher's transaction back. */
+export class ColemanProjectionRefusal extends Error {
+  readonly code: ColemanProjectionRefusalCode;
+
+  readonly subjects: readonly string[];
+
+  constructor(code: ColemanProjectionRefusalCode, message: string, subjects: readonly string[] = []) {
+    super(message);
+    this.name = 'ColemanProjectionRefusal';
+    this.code = code;
+    this.subjects = subjects;
+  }
 }
 
 export interface ColemanPublicationRequest {
@@ -128,6 +223,8 @@ export type ColemanPublicationOutcome =
     readonly derivationVersion: string;
     readonly inputChecksum: string;
     readonly winnerKeys: readonly string[];
+    /** The projection into the canonical winners table; null when no port was supplied (ledger-only). */
+    readonly projection: ColemanProjectionResult | null;
   };
 
 /* ------------------------------------------------------------------ *
@@ -139,8 +236,18 @@ function refuse(
   message: string,
   season: number,
   derivation?: ColemanRefusal,
+  subjects?: readonly string[],
 ): { readonly ok: false; readonly refusal: ColemanPublicationRefusal } {
-  return { ok: false, refusal: derivation === undefined ? { code, message, season } : { code, message, season, derivation } };
+  return {
+    ok: false,
+    refusal: {
+      code,
+      message,
+      season,
+      ...(derivation === undefined ? {} : { derivation }),
+      ...(subjects === undefined ? {} : { subjects }),
+    },
+  };
 }
 
 /**
@@ -243,57 +350,84 @@ async function readCurrent(tx: SqlExecutor, season: number): Promise<ColemanCurr
 
 /**
  * Publish the Coleman result for one season, atomically. Resolves to a typed refusal (no SQL was
- * run) or to the outcome; a SQL error rejects and rolls the whole transaction back.
+ * run, or a projection refusal rolled everything back) or to the outcome; a SQL error rejects and
+ * rolls the whole transaction back. With `options.projection` the winners are projected inside the
+ * SAME transaction, after the ledger step, for every ledger outcome including `unchanged`.
  */
 export async function publishColemanResult(
   executor: TransactionalSqlExecutor,
   request: ColemanPublicationRequest,
+  options: ColemanPublishOptions = {},
 ): Promise<ColemanPublicationOutcome> {
   const gate = checkColemanPublication(request);
   if (!gate.ok) return gate;
   const { derivation, audit } = gate;
 
-  return executor.transaction(async (tx): Promise<ColemanPublicationOutcome> => {
-    await tx.query('SELECT pg_advisory_xact_lock(hashtext($1), $2::int)', [LOCK_NAMESPACE, derivation.season]);
-    const current = await readCurrent(tx, derivation.season);
-    const plan = planColemanPublication(current, derivation);
-    const common = {
-      ok: true as const,
-      season: derivation.season,
-      methodVersion: derivation.methodVersion,
-      derivationVersion: derivation.derivationVersion,
-      inputChecksum: derivation.inputChecksum,
-      winnerKeys: derivation.winners.map((winner) => winner.key),
-    };
-    if (plan.outcome === 'unchanged') {
-      return { ...common, outcome: 'unchanged', id: plan.currentId, supersededId: null };
+  try {
+    return await executor.transaction(async (tx): Promise<ColemanPublicationOutcome> => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtext($1), $2::int)', [LOCK_NAMESPACE, derivation.season]);
+      const current = await readCurrent(tx, derivation.season);
+      const plan = planColemanPublication(current, derivation);
+
+      let id: number;
+      let supersededId: number | null = null;
+      if (plan.outcome === 'unchanged') {
+        id = plan.currentId;
+      } else {
+        const inserted = await tx.query<{ id: number | string }>(
+          `INSERT INTO derived_award_results
+             (award_slug, season, method_version, derivation_version, input_checksum,
+              result, winners, derived_at, published_by, basis, correction, supersedes_id)
+           VALUES ($1, $2::int, $3::int, $4, $5, $6::text::jsonb, $7::text::jsonb, $8::timestamptz, $9::int,
+                   'audited_correction', $10::text::jsonb, $11::bigint)
+           RETURNING id::int AS id`,
+          [
+            COLEMAN_AWARD_SLUG,
+            derivation.season,
+            derivation.methodVersion,
+            derivation.derivationVersion,
+            derivation.inputChecksum,
+            serialiseColemanDerivation(derivation),
+            canonicalJson(derivation.winners),
+            derivation.derivedAt,
+            request.publishedBy,
+            JSON.stringify(audit),
+            plan.supersedesId,
+          ],
+        );
+        id = Number(inserted[0].id);
+        supersededId = plan.supersedesId;
+      }
+
+      // The projection runs AFTER the ledger step, on the same transaction, for EVERY ledger outcome.
+      const projection = options.projection === undefined
+        ? null
+        : await options.projection.project(tx, {
+          derivation,
+          derivedAwardResultId: id,
+          ledgerOutcome: plan.outcome,
+          audit,
+          publishedBy: request.publishedBy,
+        });
+
+      return {
+        ok: true,
+        outcome: plan.outcome,
+        id,
+        supersededId,
+        season: derivation.season,
+        methodVersion: derivation.methodVersion,
+        derivationVersion: derivation.derivationVersion,
+        inputChecksum: derivation.inputChecksum,
+        winnerKeys: derivation.winners.map((winner) => winner.key),
+        projection,
+      };
+    });
+  } catch (error) {
+    // The callback rejected, so the ledger row and every projection write rolled back together.
+    if (error instanceof ColemanProjectionRefusal) {
+      return refuse(error.code, error.message, derivation.season, undefined, error.subjects);
     }
-    const inserted = await tx.query<{ id: number | string }>(
-      `INSERT INTO derived_award_results
-         (award_slug, season, method_version, derivation_version, input_checksum,
-          result, winners, derived_at, published_by, basis, correction, supersedes_id)
-       VALUES ($1, $2::int, $3::int, $4, $5, $6::jsonb, $7::jsonb, $8::timestamptz, $9::int,
-               'audited_correction', $10::jsonb, $11::bigint)
-       RETURNING id::int AS id`,
-      [
-        COLEMAN_AWARD_SLUG,
-        derivation.season,
-        derivation.methodVersion,
-        derivation.derivationVersion,
-        derivation.inputChecksum,
-        serialiseColemanDerivation(derivation),
-        canonicalJson(derivation.winners),
-        derivation.derivedAt,
-        request.publishedBy,
-        JSON.stringify(audit),
-        plan.supersedesId,
-      ],
-    );
-    return {
-      ...common,
-      outcome: plan.outcome,
-      id: Number(inserted[0].id),
-      supersededId: plan.supersedesId,
-    };
-  });
+    throw error;
+  }
 }

@@ -13,7 +13,10 @@
  *   - postgres.js returns `int8` as a STRING and PGlite returns it as a number. Services cast
  *     `::int` in SQL and coerce with `Number()`.
  *   - Parameters are positional (`$1`). Pass a jsonb value as `JSON.stringify(x)` with an
- *     explicit `$n::jsonb` cast so it is written single-encoded by both drivers.
+ *     explicit `$n::text::jsonb` cast so it is written single-encoded by both drivers. A bare
+ *     `$n::jsonb` lets postgres.js serialise the (already JSON) string a second time, so the
+ *     value is stored double-encoded as a jsonb string (proved on PostgreSQL 16 in AFLDB V2
+ *     Launch F; PGlite does not show it).
  */
 import type postgres from 'postgres';
 

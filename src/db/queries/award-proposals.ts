@@ -4,6 +4,9 @@ import postgres from 'postgres';
 
 import {
   CuratedAwardError,
+  type ApprovedWinnerRevisionPort,
+  type ApprovedWinnerRevisionRequest,
+  type ApprovedWinnerRevisionResult,
   type AwardPromotionPort,
   type AwardPromotionRequest,
   type AwardPromotionResult,
@@ -16,7 +19,12 @@ import {
   type TransactionalSqlExecutor,
 } from '@afldb/db';
 
-import { insertAwardWinner } from '@/db/queries/admin-awards';
+import {
+  awardWinnerPaths,
+  insertAwardWinner,
+  readAwardWinnerInTx,
+  reviseApprovedAwardWinnerInTx,
+} from '@/db/queries/admin-awards';
 
 /**
  * Curated-award approval, wired to production (AFLDB V2 Stage 4, docs/v2/adr/0008-curated-awards.md).
@@ -38,8 +46,14 @@ import { insertAwardWinner } from '@/db/queries/admin-awards';
  * pins the mapping with the promotion function mocked; the PostgreSQL behaviour of `insertAwardWinner`
  * itself is covered by tests/integration/admin-awards.test.ts, unchanged.
  *
- * STAGE 5 NOTE: revalidate pages from the route handler or a client-side refresh, never with
- * `revalidatePath` inside a server action (it hangs the client; see CLAUDE.md known traps).
+ * REVALIDATION (V2-GAP-024). The port returns the public paths the created row moves, computed
+ * server-side with `awardWinnerPaths` from the row it just wrote. The caller posts them to
+ * /admin/awards/revalidate after success; nothing here (or in any server action) calls
+ * `revalidatePath`, which hangs the client (see CLAUDE.md known traps).
+ *
+ * APPROVED REVISIONS (V2-GAP-018). `awardWinnerRevisionPort` wires the revision service to the
+ * tx-level replace/correct variants extracted from `replaceAwardWinner` / `correctAwardWinner`
+ * (`reviseApprovedAwardWinnerInTx`), on the SAME transaction as the proposal rows and ledger.
  */
 
 type RollbackLike = { name?: unknown; reason?: unknown; detail?: unknown };
@@ -89,11 +103,81 @@ export const awardWinnerPromotionPort: AwardPromotionPort = {
           curated_acquired_on: request.evidence.acquiredOn,
         },
       });
-      return { entityKey: created.entityKey };
+      const row = await readAwardWinnerInTx(native, created.rowId);
+      return { entityKey: created.entityKey, revalidatePaths: row ? awardWinnerPaths(row) : [] };
     } catch (error) {
       const detail = rollbackRefusalDetail(error);
       if (detail !== null) throw new CuratedAwardError('promotion_refused', detail);
       throw error;
+    }
+  },
+};
+
+/**
+ * A refusal from the approved-revision lookup/lifecycle. `not_found` and `invalid_transition` are
+ * exactly "the approved winner is missing or void" (the only places the lifecycle raises them); every
+ * other reason is the existing replace/correct rule refusing, surfaced as `promotion_refused`.
+ */
+function revisionRefusal(error: unknown): CuratedAwardError | null {
+  if (!(error instanceof Error)) return null;
+  const candidate = error as Error & RollbackLike;
+  if (candidate.name !== 'RollbackRefusal') return null;
+  const detail = String(candidate.detail ?? error.message);
+  return candidate.reason === 'not_found' || candidate.reason === 'invalid_transition'
+    ? new CuratedAwardError('approved_winner_not_active', detail)
+    : new CuratedAwardError('promotion_refused', `${String(candidate.reason ?? 'refused')}: ${detail}`);
+}
+
+/** The production {@link ApprovedWinnerRevisionPort}: the tx-level replace/correct on the service's own transaction. */
+export const awardWinnerRevisionPort: ApprovedWinnerRevisionPort = {
+  async revise(tx: SqlExecutor, request: ApprovedWinnerRevisionRequest): Promise<ApprovedWinnerRevisionResult> {
+    const native = nativeTransactionOf(tx);
+    if (!native) {
+      throw new CuratedAwardError(
+        'promotion_refused',
+        'The revision port needs the postgres.js transaction executor made by withAwardProposalExecutor().',
+      );
+    }
+    try {
+      const revised = await reviseApprovedAwardWinnerInTx(native, {
+        approvedEntityKey: request.previousEntityKey,
+        adminUserId: request.adminUserId,
+        adminNote: request.adminNote,
+        mode: request.mode,
+        correction: request.correction,
+        replacement: {
+          awardId: request.target.awardId,
+          season: request.target.season,
+          playerId: request.target.playerId,
+          playerNameRaw: request.target.playerNameRaw,
+          clubId: request.target.clubId,
+          votes: request.target.votes,
+          position: request.target.position,
+          isCaptain: request.target.isCaptain,
+          isViceCaptain: request.target.isViceCaptain,
+          note: request.target.note,
+          confirmDuplicate: request.target.confirmDuplicate,
+        },
+        auditExtra: {
+          curated_proposal_id: request.proposalId,
+          curated_proposal_key: request.proposalKey,
+          curated_proposal_revision: request.toRevision,
+          curated_revises_revision: request.fromRevision,
+          curated_revises_entity_key: request.previousEntityKey,
+          curated_source_kind: request.evidence.sourceKind,
+          curated_source_url: request.evidence.sourceUrl,
+          curated_citation: request.evidence.citation,
+          curated_acquired_on: request.evidence.acquiredOn,
+        },
+      });
+      return {
+        entityKey: revised.entityKey,
+        mode: revised.mode,
+        voidedEntityKey: revised.voidedEntityKey,
+        revalidatePaths: revised.revalidatePaths,
+      };
+    } catch (error) {
+      throw revisionRefusal(error) ?? error;
     }
   },
 };

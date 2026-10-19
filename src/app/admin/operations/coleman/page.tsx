@@ -22,7 +22,8 @@ export const metadata: Metadata = {
  * Any Admin (`data.awards.read`) sees the current publications and may run the read-only
  * comparison. Publishing is offered only to a viewer holding `data.awards.edit` (Super Admin), and
  * its Server Action checks that capability first again. A publication is an append-only record in
- * `derived_award_results`; it never touches the public `award_winners` rows (V2-GAP-021).
+ * `derived_award_results` AND a projection of the derived winners into the public `award_winners`
+ * rows in the same transaction (ADR 0015); the client then posts the public paths to revalidate.
  */
 export default async function ColemanPage() {
   const admin = await requireCapability('data.awards.read');
@@ -37,8 +38,9 @@ export default async function ColemanPage() {
         <h1>Coleman Medal derivation</h1>
         <p className="subtitle">
           The Coleman Medal result is derived from the recorded home-and-away goals, compared with the
-          stored winners, and published as an audited, append-only record. A season with a goal that
-          is not recorded cannot be derived: a missing statistic is never counted as zero.
+          stored winners, and published as an audited, append-only record that also updates the
+          public winners. A season with a goal that is not recorded cannot be derived: a missing
+          statistic is never counted as zero.
         </p>
       </div>
 

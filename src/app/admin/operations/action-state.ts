@@ -38,6 +38,15 @@ export type CuratedActionState = OperationsActionState & {
   entityKey?: string;
   /** Approve only: the season was sealed, so the approval was an audited correction. */
   sealedSeason?: boolean;
+  /** Approve only: the approver created the revision and attested (a super admin). */
+  selfApproval?: boolean;
+  /** Revise-approved only: whether the winner row was corrected in place or voided and replaced. */
+  mode?: 'correct' | 'replace';
+  /**
+   * Approve and revise-approved: the public pages the change moves, computed server-side
+   * (V2-GAP-024). The client posts them to `/admin/awards/revalidate` after success.
+   */
+  revalidatePaths?: string[];
 };
 
 /** The Coleman actions (`/admin/operations/coleman/actions`). */
@@ -46,6 +55,11 @@ export type ColemanActionState = OperationsActionState & {
   comparison?: ColemanComparisonView;
   /** Set by publish. */
   publication?: ColemanPublicationResult;
+  /**
+   * Set by publish: the public pages the projection can have moved, computed server-side. The client
+   * posts them to `/admin/awards/revalidate` after success (never `revalidatePath` in the action).
+   */
+  revalidatePaths?: string[];
 };
 
 export const IDLE_OPERATIONS_STATE: OperationsActionState = {};

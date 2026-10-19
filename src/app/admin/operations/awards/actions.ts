@@ -4,6 +4,7 @@ import {
   approveCurated,
   createCuratedFromFile,
   rejectCurated,
+  reviseApprovedCurated,
   validateCurated,
 } from '@/lib/admin/operations-centre';
 import { requireCapability } from '@/lib/auth/session';
@@ -15,6 +16,7 @@ import {
   parseCreateForm,
   parseOptionalNote,
   parseProposalId,
+  parseReviseApprovedForm,
 } from '../form';
 
 /**
@@ -27,7 +29,9 @@ import {
  * transaction and writes the best-effort activity-trail row.
  *
  * NO `revalidatePath` here: it hangs the client from inside a Server Action. Nothing on these pages
- * is cached; the client refreshes the route after a successful action.
+ * is cached; the client refreshes the route after a successful action. The PUBLIC pages an approval or
+ * a revision moves (V2-GAP-024) are returned as `revalidatePaths`, computed server-side from the row
+ * written, and the client posts them to /admin/awards/revalidate (the allowlisted route) afterwards.
  *
  * FormData in, a serialisable {@link CuratedActionState} out (`useActionState` shape).
  */
@@ -94,7 +98,15 @@ export async function approveCuratedProposalAction(
   const fields = decisionFields(formData);
   if (!fields.ok) return invalidInputState(fields.fieldErrors);
 
-  const result = await approveCurated(admin, { proposalId: fields.proposalId, decisionNote: fields.decisionNote });
+  // V2-GAP-019: only meaningful (and only recorded) when the approver created this revision.
+  const attestation = parseOptionalNote(formData.get('selfApprovalAttestation'));
+  if (!attestation.ok) return invalidInputState({ selfApprovalAttestation: attestation.error });
+
+  const result = await approveCurated(admin, {
+    proposalId: fields.proposalId,
+    decisionNote: fields.decisionNote,
+    selfApprovalAttestation: attestation.value,
+  });
   if (!result.ok) return failureState(result);
   return {
     ok: true,
@@ -104,6 +116,8 @@ export async function approveCuratedProposalAction(
     proposal: result.proposal,
     entityKey: result.entityKey,
     sealedSeason: result.sealedSeason,
+    selfApproval: result.selfApproval,
+    revalidatePaths: result.revalidatePaths,
     ...(result.auditWarning === undefined ? {} : { auditWarning: result.auditWarning }),
   };
 }
@@ -123,6 +137,31 @@ export async function rejectCuratedProposalAction(
     ok: true,
     message: 'Rejected. The reason is kept in the decision ledger.',
     proposal: result.proposal,
+    ...(result.auditWarning === undefined ? {} : { auditWarning: result.auditWarning }),
+  };
+}
+
+export async function reviseApprovedProposalAction(
+  _previous: CuratedActionState,
+  formData: FormData,
+): Promise<CuratedActionState> {
+  const admin = await requireCapability('data.awards.edit');
+
+  const parsed = parseReviseApprovedForm(formData);
+  if (!parsed.ok) return invalidInputState(parsed.fieldErrors);
+
+  const result = await reviseApprovedCurated(admin, parsed.value);
+  if (!result.ok) return failureState(result);
+  return {
+    ok: true,
+    message: result.mode === 'replace'
+      ? 'Revised. The previous winner row was voided and a replacement now stands.'
+      : 'Revised. The award winner row was corrected in place.',
+    proposal: result.proposal,
+    entityKey: result.entityKey,
+    sealedSeason: result.sealedSeason,
+    mode: result.mode,
+    revalidatePaths: result.revalidatePaths,
     ...(result.auditWarning === undefined ? {} : { auditWarning: result.auditWarning }),
   };
 }

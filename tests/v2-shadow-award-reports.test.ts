@@ -76,6 +76,15 @@ vi.mock('@/lib/auth/session', () => ({ audit: vi.fn(async () => undefined), requ
 vi.mock('@/db/queries/award-proposals', () => ({
   withAwardProposalExecutor: () => { throw new Error('not used by the capture tests'); },
   awardWinnerPromotionPort: { promote: () => { throw new Error('not used by the capture tests'); } },
+  awardWinnerRevisionPort: { revise: () => { throw new Error('not used by the capture tests'); } },
+}));
+// operations-centre also imports the production Coleman projection port (Launch F, ADR 0015), which
+// reaches the app connection pool. The comparison report this suite checks does not depend on its preview.
+vi.mock('@/db/queries/coleman-award-winners', () => ({
+  colemanAwardWinnerProjection: {
+    project: () => { throw new Error('not used by the capture tests'); },
+    preview: async () => ({ ok: true, counts: { inserted: 0, updated: 0, voided: 0, retained: 0 }, changedCount: 0, actions: [] }),
+  },
 }));
 
 /* ---------------------------------------------------------------------------------------------

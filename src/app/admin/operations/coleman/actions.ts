@@ -13,10 +13,13 @@ import { failureState, invalidInputState, parseChecked, parseRequiredNote, parse
  * derives the season from the database and compares it with the stored Coleman `award_winners`
  * rows and the current publication. `publishColemanSeasonAction` writes (`data.awards.edit`, Super
  * Admin only): one append-only `derived_award_results` row through the season seal, as an audited
- * correction. Neither touches `award_winners`.
+ * correction AND projects the derived winners into the canonical `award_winners` table in the same
+ * transaction (ADR 0015). The compare action previews that projection read-only.
  *
  * The guard is the FIRST awaited statement of each action; the caller checks the capability again.
- * NO `revalidatePath` (it hangs the client from a Server Action).
+ * NO `revalidatePath` (it hangs the client from a Server Action): the result carries the
+ * server-computed public `revalidatePaths`, and the CLIENT posts them to `/admin/awards/revalidate`
+ * after the action succeeds, exactly as `src/app/admin/awards/submit-helper.ts` does.
  *
  * Form fields: `season` (four digits), `settled` (checkbox: the operator's attestation that every
  * promotion and settle for the season has concluded), and, for publish, `note` (the reason,
@@ -68,15 +71,30 @@ export async function publishColemanSeasonAction(
     inputChecksum: result.inputChecksum,
     winnerKeys: result.winnerKeys,
     evidenceRef: result.evidenceRef,
+    projection: result.projection,
+    revalidatePaths: result.revalidatePaths,
   };
   return {
     ok: true,
-    message: result.outcome === 'unchanged'
-      ? 'Nothing changed: the current publication already matches this derivation.'
-      : result.outcome === 'superseded'
-        ? 'Published. The previous publication for this season was superseded.'
-        : 'Published.',
+    message: publishMessage(publication),
     publication,
+    revalidatePaths: result.revalidatePaths,
     ...(auditWarning === undefined ? {} : { auditWarning }),
   };
+}
+
+/** The operator-facing sentence for a successful publication (ledger outcome, then the winners table). */
+function publishMessage(publication: ColemanPublicationResult): string {
+  const { counts, provenanceOnly, alreadyProjected } = publication.projection;
+  const ledger = publication.outcome === 'unchanged'
+    ? 'The derivation ledger already matched this derivation.'
+    : publication.outcome === 'superseded'
+      ? 'Published. The previous ledger row for this season was superseded.'
+      : 'Published.';
+  const winners = alreadyProjected
+    ? 'Nothing changed: the winners were already published from this derivation.'
+    : provenanceOnly
+      ? `The stored winners already matched, so no award_winners row changed; the provenance was recorded (${counts.retained} retained).`
+      : `award_winners: ${counts.inserted} inserted, ${counts.updated} updated, ${counts.voided} voided, ${counts.retained} retained.`;
+  return `${ledger} ${winners}`;
 }

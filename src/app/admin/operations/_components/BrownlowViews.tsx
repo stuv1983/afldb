@@ -34,7 +34,8 @@ export function BrownlowCaveats() {
         <span className="mono">unrecorded</span> rule therefore refuses to state a leader whenever an
         ineligible player polled votes. The <span className="mono">stored_eligible_rank_one</span>{' '}
         rule reproduces the convention measured on the stored AFL Tables table; it is applied only if
-        you choose it, and choosing it here decides nothing: this page writes nothing.
+        you choose it, and choosing it here decides nothing: the reconciliation writes nothing. The medal
+        determination on this page decides eligibility from its own evidence (ADR 0014), not from this rule.
       </p>
       <p className="notice" data-caveat="leaderboard-not-staged">
         <strong>The API leaderboard is not staged (F-WB1-005).</strong> There is no staged table for

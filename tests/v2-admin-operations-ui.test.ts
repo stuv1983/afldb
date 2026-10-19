@@ -49,6 +49,7 @@ import {
   CreateProposalsFormView,
   DecisionPanelView,
 } from '@/app/admin/operations/_components/OperationForms';
+import { ReviseApprovedPanelView, ReviseApprovedUnavailable } from '@/app/admin/operations/_components/ReviseApprovedViews';
 import {
   AcquisitionRunsSection,
   CuratedDerivedSection,
@@ -252,6 +253,27 @@ describe('describeConsequences: the six D9 fields for every mutation', () => {
     expect(describeConsequences('publish_coleman', {
       comparison: { season: 2024, category: 'not_derivable', plan: null, sealed: true },
     }).validationState).toMatch(/NOT derivable.*refused/);
+  });
+
+  it('the Coleman card states the award_winners effect, the sealed-season note, reversibility and the audit rows BEFORE submit', () => {
+    const none = describeConsequences('publish_coleman');
+    expect(none.changes.join(' ')).toMatch(/award_winners/);
+    expect(none.changes.join(' ')).toMatch(/Run the read-only comparison first/);
+    expect(none.validationState).toMatch(new RegExp(`settled attestation and a note of ${SEAL_NOTE_MIN_LENGTH} to ${SEAL_NOTE_MAX_LENGTH} characters`));
+    expect(none.reversibility).toMatch(/^Not reversible in place.*later publish.*never a delete/);
+    expect(none.audit.durable).toMatch(/derived_award_projections.*data_edits/);
+
+    const previewed = describeConsequences('publish_coleman', {
+      comparison: {
+        season: 2024, category: 'disagree', plan: 'published', sealed: true,
+        projection: { ok: true, inserted: 1, updated: 2, voided: 3, retained: 4 },
+      },
+    });
+    expect(previewed.changes.join(' ')).toContain('Preview: 1 to insert, 2 to update, 3 to void, 4 unchanged.');
+    const refused = describeConsequences('publish_coleman', {
+      comparison: { season: 2024, category: 'disagree', plan: 'published', sealed: true, projection: { ok: false, code: 'foreign_winner_rows' } },
+    });
+    expect(refused.changes.join(' ')).toMatch(/REFUSED \(foreign_winner_rows\)/);
   });
 
   describe('no drift from the code the card describes', () => {
@@ -516,6 +538,155 @@ describe('mutation forms: the consequences come BEFORE the submit control', () =
   });
 });
 
+describe('curated awards: four eyes and revising an approved winner (V2-GAP-019, V2-GAP-018)', () => {
+  const email = 'synthetic.super@example.invalid';
+  const approvedProposal = () => syntheticProposal({
+    status: 'approved', approvedEntityKey: 'manual_admin_edit:award_winner:synthetic-1', approvedAt: '2026-10-18T10:00:00Z',
+  });
+
+  it('the attestation field is offered only to the creator of a validated revision, with the rule explained', () => {
+    const creator = html(createElement(DecisionPanelView, {
+      proposal: syntheticProposal({ status: 'validated' }), actingEmail: email, sealedSeason: false, binding: noopBinding, viewerCreatedRevision: true,
+    }));
+    expect(creator).toContain('name="selfApprovalAttestation"');
+    expect(creator).toContain('data-self-approval="true"');
+    expect(creator).toMatch(/You created this revision/);
+    expect(creator).toMatch(/at least 20 characters/);
+    expect(at(creator, 'name="selfApprovalAttestation"')).toBeLessThan(at(creator, 'value="approve"'));
+
+    const notCreator = html(createElement(DecisionPanelView, {
+      proposal: syntheticProposal({ status: 'validated' }), actingEmail: email, sealedSeason: false, binding: noopBinding, viewerCreatedRevision: false,
+    }));
+    expect(notCreator).not.toContain('name="selfApprovalAttestation"');
+    const notApprovable = html(createElement(DecisionPanelView, {
+      proposal: syntheticProposal({ status: 'proposed' }), actingEmail: email, sealedSeason: false, binding: noopBinding, viewerCreatedRevision: true,
+    }));
+    expect(notApprovable).not.toContain('name="selfApprovalAttestation"');
+  });
+
+  it('a four-eyes refusal shows on the attestation field and an approval shows the pages it refreshed', () => {
+    const refused = html(createElement(DecisionPanelView, {
+      proposal: syntheticProposal({ status: 'validated' }), actingEmail: email, sealedSeason: false, viewerCreatedRevision: true,
+      binding: {
+        state: { code: 'self_approval_attestation_required', error: 'A self-approval attestation needs at least 20 characters.', fieldErrors: { selfApprovalAttestation: 'A self-approval attestation needs at least 20 characters.' } },
+        pending: false,
+      },
+    }));
+    expect(refused).toContain('data-field-error="selfApprovalAttestation"');
+    expect(refused).toContain('self_approval_attestation_required');
+
+    const done = html(createElement(DecisionPanelView, {
+      proposal: syntheticProposal({ status: 'approved' }), actingEmail: email, sealedSeason: false,
+      binding: {
+        state: { ok: true, message: 'Approved. The award winner now exists.', entityKey: 'manual_admin_edit:award_winner:u', selfApproval: true, revalidatePaths: ['/awards', '/awards/synthetic-medal'] },
+        pending: false,
+      },
+    }));
+    expect(done).toContain('self-approved with an attestation');
+    expect(done).toContain('data-revalidated-paths="true"');
+    expect(done).toContain('/awards/synthetic-medal');
+  });
+
+  it('the approve card now states the four-eyes rule and where an approved winner is changed afterwards', () => {
+    const c = describeConsequences('approve_proposal', {});
+    expect(c.changes.join(' ')).toMatch(/Four eyes.*cannot approve it.*attestation/);
+    expect(c.reversibility).toMatch(/revising the approved winner/);
+  });
+
+  it('the revise card states what changes, the records, the seal, irreversibility, the actor and the audit rows BEFORE the submit control', () => {
+    const markup = html(createElement(ReviseApprovedPanelView, {
+      proposal: approvedProposal(), actingEmail: email, sealedSeason: true, binding: noopBinding,
+    }));
+    expect(at(markup, 'Before you submit: Revise this approved winner')).toBeLessThan(at(markup, 'type="submit"'));
+    expect(markup).toMatch(/corrected in place|corrects the row in place/);
+    expect(markup).toMatch(/voided and a replacement is created|voids the row and records a replacement/);
+    expect(markup).toContain('award_winners');
+    expect(markup).toContain('SEALED');
+    expect(markup).toContain('Not reversible');
+    expect(markup).toContain(email);
+    expect(markup).toContain('supersede_approved');
+    expect(markup).toContain('revise_approved');
+    expect(markup).toContain('admin.curated_award_revised');
+    expect(markup).toMatch(/\/admin\/player-links/);
+    // The revision-note field says it is required, and the form starts from the approved values.
+    expect(markup).toContain('name="decisionNote"');
+    expect(markup).toContain('20 to 2000 characters, required');
+    expect(markup).toContain('name="proposalId" value="501"');
+    expect(markup).toContain('value="32"');
+    expect(markup).toContain('value="afltables:players/S/Synthetic_Player_A.html"');
+    expect(markup).toContain('Revise the approved winner');
+  });
+
+  it('the revise card for an open season and for an unreadable registry says so', () => {
+    expect(describeConsequences('revise_approved_winner', { sealedSeason: false }).affected).toMatch(/open \(in progress\)/);
+    expect(describeConsequences('revise_approved_winner', { sealedSeason: null }).affected).toMatch(/fails closed/);
+    const c = describeConsequences('revise_approved_winner', { proposalStatus: 'validated' });
+    expect(c.validationState).toMatch(/Requires status "approved" \(current: validated\)/);
+    expect(c.validationState).toContain(`${SEAL_NOTE_MIN_LENGTH} to ${SEAL_NOTE_MAX_LENGTH} characters is ALWAYS required`);
+  });
+
+  it('shows pending, success, error and permission-denied states', () => {
+    const pending = html(createElement(ReviseApprovedPanelView, {
+      proposal: approvedProposal(), actingEmail: email, sealedSeason: false, binding: { state: {}, pending: true },
+    }));
+    expect(pending).toContain('Revising…');
+    expect(/<button[^>]*type="submit"[^>]*disabled/.test(pending) || /<button[^>]*disabled[^>]*type="submit"/.test(pending)).toBe(true);
+
+    const success = html(createElement(ReviseApprovedPanelView, {
+      proposal: approvedProposal(), actingEmail: email, sealedSeason: true,
+      binding: {
+        state: {
+          ok: true, message: 'Revised. The previous winner row was voided and a replacement now stands.',
+          entityKey: 'manual_admin_edit:award_winner:new-key', mode: 'replace', sealedSeason: true,
+          proposal: syntheticProposal({ id: 502, revision: 2, status: 'approved' }),
+          revalidatePaths: ['/awards', '/awards/synthetic-medal/2024'],
+        },
+        pending: false,
+      },
+    }));
+    expect(success).toContain('data-action-outcome="ok"');
+    expect(success).toContain('data-revision-result="replace"');
+    expect(success).toContain('manual_admin_edit:award_winner:new-key');
+    expect(success).toContain('a replacement; the previous row is void');
+    expect(success).toContain('proposal #502 (revision 2)');
+    expect(success).toContain('an audited correction of a sealed season');
+    expect(success).toContain('data-revalidated-paths="true"');
+
+    const refused = html(createElement(ReviseApprovedPanelView, {
+      proposal: approvedProposal(), actingEmail: email, sealedSeason: true,
+      binding: {
+        state: {
+          code: 'note_required', error: 'Revising an approved winner needs a decision note of at least 20 characters recording why the approved record is being changed.',
+          fieldErrors: { decisionNote: 'Revising an approved winner needs a decision note of at least 20 characters.' },
+          auditWarning: 'SYNTHETIC audit warning: do not resubmit.',
+        },
+        pending: false,
+      },
+    }));
+    expect(refused).toContain('data-action-outcome="refused"');
+    expect(refused).toContain('data-field-error="decisionNote"');
+    expect(refused).toContain('note_required');
+    expect(refused).toContain('SYNTHETIC audit warning: do not resubmit.');
+
+    const denied = html(createElement(ReviseApprovedUnavailable, { reason: 'permission' }));
+    expect(denied).toContain('data-revise-unavailable="permission"');
+    expect(denied).toContain('Super Admin action');
+    expect(denied).not.toContain('<form');
+    expect(html(createElement(ReviseApprovedUnavailable, { reason: 'not_newest' }))).toContain('Only the newest revision');
+  });
+
+  it('the awards forms post their server-computed paths to the allowlisted revalidate route; the actions never revalidate', () => {
+    const client = readFileSync(join(process.cwd(), 'src', 'app', 'admin', 'operations', '_components', 'OperationsClientForms.tsx'), 'utf8');
+    expect(client.match(/revalidateEndpoint: AWARDS_REVALIDATE_ENDPOINT/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(client).toContain("AWARDS_REVALIDATE_ENDPOINT = '/admin/awards/revalidate'");
+    const actions = readFileSync(join(process.cwd(), 'src', 'app', 'admin', 'operations', 'awards', 'actions.ts'), 'utf8');
+    expect(actions).not.toMatch(/revalidatePath\(/);
+    // Every exported member of the 'use server' module is an async function (a const array 500s on first call).
+    expect([...actions.matchAll(/^export (\w+) (\w+)/gm)].map((m) => m[1])).toEqual(Array(5).fill('async'));
+    expect(actions).toMatch(/export async function reviseApprovedProposalAction[\s\S]*?await requireCapability\('data\.awards\.edit'\)/);
+  });
+});
+
 describe('Coleman views', () => {
   it('lists current publications, or says there are none', () => {
     expect(html(createElement(ColemanPublicationsTable, { publications: [] }))).toContain('data-empty-publications="true"');
@@ -584,12 +755,66 @@ describe('Coleman views', () => {
           publication: {
             outcome: 'published', id: 8, supersededId: null, season: 2024, methodVersion: 1, derivationVersion: 'SYNTHETIC-v1',
             inputChecksum: 'SYNTHETICSUM', winnerKeys: ['coleman:2024:players/S/Synthetic_Player_A.html'], evidenceRef: 'coleman_derivation:2024:SYNTHETICSUM',
+            projection: {
+              projectionId: 3, counts: { inserted: 1, updated: 0, voided: 0, retained: 0 }, changedCount: 1,
+              provenanceOnly: false, alreadyProjected: false,
+              actions: [{ entityKey: 'afltables:coleman:2024:players/S/Synthetic_Player_A.html', action: 'inserted', awardWinnerId: 41 }],
+            },
+            revalidatePaths: ['/awards', '/awards/coleman', '/awards/coleman/2024'],
           },
+          revalidatePaths: ['/awards', '/awards/coleman', '/awards/coleman/2024'],
         },
       },
     }));
     expect(markup).toContain('data-publication-result="published"');
     expect(markup).toContain('coleman_derivation:2024:SYNTHETICSUM');
+    // The effect on the public winners and the provenance record are stated (ADR 0015).
+    expect(markup).toContain('data-projection-outcome="changed"');
+    expect(markup).toContain('1 inserted, 0 updated, 0 voided, 0 unchanged');
+    expect(markup).toContain('derived_award_projections #3');
+  });
+
+  it('states provenance-only and already-projected outcomes, and the refusal preview, in words', () => {
+    const outcome = (projection: Record<string, unknown>) => html(createElement(ColemanWorkbenchView, {
+      canPublish: true, actingEmail: 'synthetic.super@example.invalid', defaultSeason: 2024, compare: noopBinding,
+      publish: {
+        pending: false,
+        state: {
+          ok: true,
+          message: 'SYNTHETIC',
+          publication: {
+            outcome: 'unchanged', id: 8, supersededId: null, season: 2024, methodVersion: 1, derivationVersion: 'SYNTHETIC-v1',
+            inputChecksum: 'SYNTHETICSUM', winnerKeys: [], evidenceRef: 'coleman_derivation:2024:SYNTHETICSUM',
+            projection: { actions: [], changedCount: 0, ...projection }, revalidatePaths: [],
+          } as never,
+        },
+      },
+    }));
+    const provenance = outcome({ projectionId: 5, counts: { inserted: 0, updated: 0, voided: 0, retained: 1 }, provenanceOnly: true, alreadyProjected: false });
+    expect(provenance).toContain('data-projection-outcome="provenance_only"');
+    expect(provenance).toContain('Provenance only: the stored winners already matched');
+    const rerun = outcome({ projectionId: null, counts: { inserted: 0, updated: 0, voided: 0, retained: 1 }, provenanceOnly: false, alreadyProjected: true });
+    expect(rerun).toContain('data-projection-outcome="already_projected"');
+    expect(rerun).toContain('none written');
+
+    const refused = html(createElement(ColemanComparisonResult, {
+      comparison: {
+        ...syntheticColemanComparison('disagree'),
+        projection: {
+          ok: false,
+          refusal: { code: 'foreign_winner_rows', message: 'SYNTHETIC refusal words.', subjects: ['#7 manual_admin_edit:award_winner:SYNTHETIC'] },
+        },
+      },
+    }));
+    expect(refused).toContain('data-coleman-projection="refused"');
+    expect(refused).toContain('Publishing would be refused');
+    expect(refused).toContain('foreign_winner_rows');
+    expect(refused).toContain('#7 manual_admin_edit:award_winner:SYNTHETIC');
+    const preview = html(createElement(ColemanComparisonResult, { comparison: syntheticColemanComparison('disagree') }));
+    expect(preview).toContain('data-coleman-projection="ok"');
+    expect(preview).toContain('1 inserted, 0 updated, 0 voided, 0 unchanged');
+    expect(html(createElement(ColemanComparisonResult, { comparison: syntheticColemanComparison('agree') })))
+      .toContain('publishing would record provenance only');
   });
 });
 

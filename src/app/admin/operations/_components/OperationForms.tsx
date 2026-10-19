@@ -6,7 +6,7 @@ import type { ColemanActionState, CuratedActionState } from '../action-state';
 import { describeConsequences } from '../consequences';
 
 import { ActionConsequences } from './ActionConsequences';
-import { ColemanComparisonResult } from './ColemanViews';
+import { ColemanComparisonResult, ColemanProjectionOutcome } from './ColemanViews';
 import { ActionOutcome, FieldError } from './Shared';
 
 /**
@@ -133,13 +133,15 @@ const UNDECIDED = ['proposed', 'validated', 'validation_failed'] as const;
 const isUndecided = (status: ProposalRecord['status']): boolean => (UNDECIDED as readonly string[]).includes(status);
 
 export function DecisionPanelView({
-  proposal, actingEmail, sealedSeason, binding,
+  proposal, actingEmail, sealedSeason, binding, viewerCreatedRevision = false,
 }: {
   proposal: ProposalRecord;
   actingEmail: string;
   /** True/false when the season registry could be read; null when it could not (it fails closed). */
   sealedSeason: boolean | null;
   binding: FormBinding<CuratedActionState>;
+  /** V2-GAP-019: the signed-in administrator created this revision, so approving it needs an attestation. */
+  viewerCreatedRevision?: boolean;
 }) {
   const { state, pending, onSubmit } = binding;
   const undecided = isUndecided(proposal.status);
@@ -179,6 +181,21 @@ export function DecisionPanelView({
 
         <h3>Approve</h3>
         <ActionConsequences consequences={describeConsequences('approve_proposal', context)} />
+        {viewerCreatedRevision && canApprove && (
+          <div data-self-approval="true">
+            <p className="notice" role="note">
+              You created this revision. Four eyes: another administrator should approve it. As a
+              Super Admin you may approve your own revision only by attesting below why a second
+              reviewer is not used (at least 20 characters). The attestation is recorded in the
+              decision ledger as a self-approval.
+            </p>
+            <p>
+              <label htmlFor="self-approval-attestation">Self-approval attestation</label>
+              <textarea id="self-approval-attestation" name="selfApprovalAttestation" rows={3} style={textareaStyle} disabled={pending} />
+              <FieldError state={state} name="selfApprovalAttestation" />
+            </p>
+          </div>
+        )}
         <p>
           <button className="btn" type="submit" name="intent" value="approve" disabled={pending || !canApprove}>
             Approve into the public record
@@ -199,7 +216,13 @@ export function DecisionPanelView({
       {state.entityKey !== undefined && (
         <p className="muted">
           Written as <span className="mono">{state.entityKey}</span>
-          {state.sealedSeason === true ? ' (an audited correction of a sealed season)' : ''}.
+          {state.sealedSeason === true ? ' (an audited correction of a sealed season)' : ''}
+          {state.selfApproval === true ? ' (self-approved with an attestation)' : ''}.
+        </p>
+      )}
+      {state.revalidatePaths !== undefined && state.revalidatePaths.length > 0 && state.entityKey !== undefined && (
+        <p className="muted" data-revalidated-paths="true">
+          Public pages refreshed: <span className="mono" style={{ overflowWrap: 'anywhere' }}>{state.revalidatePaths.join(' ')}</span>
         </p>
       )}
     </section>
@@ -214,7 +237,18 @@ function comparisonContext(state: ColemanActionState) {
   const comparison = state.comparison;
   const category = comparison?.report.seasons[0]?.category;
   if (comparison === undefined || category === undefined) return null;
-  return { season: comparison.season, category, plan: comparison.plan, sealed: comparison.sealed };
+  const preview = comparison.projection;
+  return {
+    season: comparison.season,
+    category,
+    plan: comparison.plan,
+    sealed: comparison.sealed,
+    projection: preview === null || preview === undefined
+      ? null
+      : preview.ok
+        ? { ok: true as const, ...preview.counts }
+        : { ok: false as const, code: preview.refusal.code },
+  };
 }
 
 export function ColemanWorkbenchView({
@@ -268,9 +302,16 @@ export function ColemanWorkbenchView({
         ) : (
           <>
             <p className="section-note">
-              Publishing records the derivation as an append-only, audited correction. It does not
-              change the public Coleman rows (V2-GAP-021): those stay owned by the offline loader.
+              Publishing records the derivation as an append-only, audited correction and projects the
+              derived winners into the public Coleman rows in the same transaction. Compare the season
+              first: the card below shows how many rows it would insert, update, void or leave alone.
             </p>
+            {compare.state.comparison === undefined && (
+              <p className="muted" data-publish-empty="true">
+                No season has been compared in this session. Compare a season above to see its effect
+                before you publish.
+              </p>
+            )}
             <ActionConsequences
               consequences={describeConsequences('publish_coleman', {
                 actingEmail,
@@ -311,6 +352,9 @@ export function ColemanWorkbenchView({
                 <dd>{publish.state.publication.season}</dd>
                 <dt>Winners</dt>
                 <dd className="mono" style={{ overflowWrap: 'anywhere' }}>{publish.state.publication.winnerKeys.join(', ') || 'none'}</dd>
+                {publish.state.publication.projection !== undefined && (
+                  <ColemanProjectionOutcome projection={publish.state.publication.projection} />
+                )}
                 <dt>Evidence reference</dt>
                 <dd className="mono" style={{ overflowWrap: 'anywhere' }}>{publish.state.publication.evidenceRef}</dd>
               </dl>

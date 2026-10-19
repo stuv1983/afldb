@@ -51,13 +51,23 @@ export {
 // @v2-stage4:coleman-publication
 export {
   COLEMAN_AWARD_SLUG,
+  COLEMAN_PROJECTION_ACTIONS,
+  COLEMAN_PROJECTION_REFUSAL_CODES,
   COLEMAN_PUBLICATION_CAPABILITY,
   COLEMAN_PUBLICATION_REFUSAL_CODES,
   COLEMAN_PUBLICATION_WORKFLOW,
+  ColemanProjectionRefusal,
   checkColemanPublication,
   planColemanPublication,
   publishColemanResult,
   type ColemanCurrentPublication,
+  type ColemanProjectionAction,
+  type ColemanProjectionActionKind,
+  type ColemanProjectionCounts,
+  type ColemanProjectionPort,
+  type ColemanProjectionRefusalCode,
+  type ColemanProjectionRequest,
+  type ColemanProjectionResult,
   type ColemanPublicationAudit,
   type ColemanPublicationGate,
   type ColemanPublicationOutcome,
@@ -65,7 +75,26 @@ export {
   type ColemanPublicationRefusal,
   type ColemanPublicationRefusalCode,
   type ColemanPublicationRequest,
+  type ColemanPublishOptions,
 } from './coleman-publication';
+// @v2-launchF:coleman-projection
+// The pure planner of the Coleman projection into award_winners (ADR 0015).
+export {
+  COLEMAN_ROW_FIELDS,
+  COLEMAN_ROW_LINK_STATUS,
+  changedColemanFields,
+  colemanProjectionNote,
+  desiredColemanRow,
+  planColemanProjection,
+  previewOfColemanProjection,
+  type ColemanPlannedRow,
+  type ColemanProjectionPlan,
+  type ColemanProjectionPlanInput,
+  type ColemanProjectionPlanRefusal,
+  type ColemanProjectionPreview,
+  type ColemanStoredRow,
+  type ColemanWinnerRowValues,
+} from './coleman-projection';
 // @v2-stage4:brownlow-reconciliation
 export * from './brownlow-reconciliation';
 export * from './brownlow-reconciliation-report';
@@ -105,3 +134,33 @@ export {
   type ShadowParityStatus,
   type ShadowParityVerdict,
 } from './shadow-parity';
+// @launchF:brownlow-eligibility
+// The eligibility-aware Brownlow Medal determination (docs/v2/adr/0014-brownlow-eligibility.md). Pure.
+export {
+  BROWNLOW_ELIGIBILITY_SOURCES,
+  BROWNLOW_ELIGIBILITY_STATUSES,
+  BROWNLOW_ELIGIBILITY_VERDICTS,
+  BROWNLOW_MEDAL_BLOCKING_FINDINGS_LIMIT,
+  BROWNLOW_MEDAL_FORMAT,
+  BROWNLOW_MEDAL_FORMAT_VERSION,
+  BROWNLOW_MEDAL_STATUSES,
+  determineBrownlowMedal,
+  evaluateBrownlowEligibility,
+  isEligibilityEvidenceFinding,
+  validateBrownlowMedalInput,
+  type BrownlowBlockingFinding,
+  type BrownlowDecisionFact,
+  type BrownlowEligibilityDetail,
+  type BrownlowEligibilitySource,
+  type BrownlowEligibilityStatus,
+  type BrownlowEligibilityVerdict,
+  type BrownlowMedalDetermination,
+  type BrownlowMedalInput,
+  type BrownlowMedalStatus,
+  type BrownlowMedalWinner,
+  type BrownlowPlayerEligibility,
+  type BrownlowPlayerEligibilityEvidence,
+  type BrownlowRawLeaderboardEntry,
+  type BrownlowReviewPlayer,
+  type BrownlowStoredEligibilityFact,
+} from './brownlow-eligibility';

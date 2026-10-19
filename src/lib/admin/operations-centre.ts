@@ -11,7 +11,9 @@ import {
   listProposals,
   readProposalHistory,
   rejectProposal,
+  reviseApprovedProposal,
   validateProposal,
+  type ApprovedWinnerRevisionPort,
   type AwardProposalFileDefaults,
   type AwardProposalFileFormat,
   type AwardPromotionPort,
@@ -19,6 +21,7 @@ import {
   type CuratedAwardsViewer,
   type ProposalFilter,
   type ProposalHistory,
+  type ProposalInput,
   type ProposalRecord,
   type ValidationIssue,
 } from '@afldb/admin';
@@ -38,11 +41,23 @@ import {
   type ColemanContract,
   type ColemanDerivationOutcome,
   type ColemanLeaderboardEntry,
+  type ColemanProjectionPreview,
+  type ColemanProjectionResult,
   type ColemanPublicationOutcome,
   type ColemanPublicationRefusalCode,
   type ColemanRefusal,
   type ColemanRefusalCode,
   type ColemanWinner,
+} from '@afldb/derived';
+// Launch F F-D stream A (Brownlow eligibility): a separate import, so the block above stays untouched.
+import {
+  BROWNLOW_ELIGIBILITY_VERDICTS,
+  determineBrownlowMedal,
+  type BrownlowEligibilityVerdict,
+  type BrownlowEvidenceBasis,
+  type BrownlowMedalDetermination,
+  type BrownlowOutcome,
+  type BrownlowSeasonState,
 } from '@afldb/derived';
 import {
   CORRECTION_NOTE_MAX_LENGTH,
@@ -53,8 +68,20 @@ import {
   type SeasonRegistry,
 } from '@afldb/domain';
 
-import { awardWinnerPromotionPort, withAwardProposalExecutor } from '@/db/queries/award-proposals';
+import {
+  awardWinnerPromotionPort,
+  awardWinnerRevisionPort,
+  withAwardProposalExecutor,
+} from '@/db/queries/award-proposals';
 import { BrownlowInputError, loadBrownlowReconciliationInput } from '@/db/queries/brownlow-reconciliation-inputs';
+import {
+  loadBrownlowEligibilityEvidence,
+  recordBrownlowEligibilityDecision,
+  type BrownlowEligibilityDecisionView,
+  type BrownlowEligibilityRefusalCode,
+  type BrownlowPlayerIdentityView,
+} from '@/db/queries/brownlow-eligibility';
+import { colemanAwardWinnerProjection, type ColemanAwardWinnerProjectionPort } from '@/db/queries/coleman-award-winners';
 import {
   listColemanPublications,
   loadColemanContract,
@@ -112,6 +139,8 @@ export type OperationErrorCode =
   | 'coleman_contract_unavailable'
   /** The staged Brownlow rows of one match contradict each other; nothing was reconciled. */
   | 'brownlow_input_inconsistent'
+  /** Launch F F-D: the typed refusals of a Brownlow eligibility decision (src/db/queries/brownlow-eligibility.ts). */
+  | Exclude<BrownlowEligibilityRefusalCode, 'capability_denied'>
   | 'unexpected';
 
 export type OperationFailure = {
@@ -136,9 +165,12 @@ export const OPERATIONS_AUDIT_ACTIONS = {
   curatedValidated: 'admin.curated_award_validated',
   curatedApproved: 'admin.curated_award_approved',
   curatedRejected: 'admin.curated_award_rejected',
+  curatedRevised: 'admin.curated_award_revised',
   curatedRefused: 'admin.curated_award_refused',
   colemanPublished: 'admin.coleman_published',
   colemanRefused: 'admin.coleman_publication_refused',
+  brownlowEligibilityDecided: 'admin.brownlow_eligibility_decided',
+  brownlowEligibilityRefused: 'admin.brownlow_eligibility_refused',
 } as const;
 
 /** Said when the activity-trail row could not be written. The change itself is already committed. */
@@ -155,6 +187,8 @@ export type OperationsDeps = {
   withExecutor: <T>(work: (executor: TransactionalSqlExecutor) => Promise<T>) => Promise<T>;
   /** The promotion port an approval writes `award_winners` through. */
   promotion: AwardPromotionPort;
+  /** The port an approved-winner revision writes `award_winners` through (V2-GAP-018). */
+  revision: ApprovedWinnerRevisionPort;
   /** The sealed range, read FRESH on every approval. Throws {@link SeasonRegistryError}. */
   loadSealed: () => SealedSeasons;
   /** The season registry (Coleman completeness, Brownlow season state). Throws {@link SeasonRegistryError}. */
@@ -168,6 +202,7 @@ function resolveDeps(deps?: Partial<OperationsDeps>): OperationsDeps {
   return {
     withExecutor: deps?.withExecutor ?? withAwardProposalExecutor,
     promotion: deps?.promotion ?? awardWinnerPromotionPort,
+    revision: deps?.revision ?? awardWinnerRevisionPort,
     loadSealed: deps?.loadSealed ?? (() => loadSealedSeasons()),
     loadRegistry: deps?.loadRegistry ?? (() => loadSeasonRegistry()),
     loadContract: deps?.loadContract ?? (() => loadColemanContract()),
@@ -355,8 +390,12 @@ export async function validateCurated(
  * Approve a validated proposal (`data.awards.edit`): ONE transaction that re-validates, passes the
  * season seal, writes the canonical `award_winners` row (with its `data_overrides` and `data_edits`
  * rows) through the production promotion port, sets the proposal `approved` and writes the ledger
- * row. IRREVERSIBLE through this surface: `approved` is terminal, and correcting the winner is the
- * existing replace/correct lifecycle in /admin/awards.
+ * row. `approved` is terminal for this action; correcting the approved winner afterwards is
+ * {@link reviseApprovedCurated} (V2-GAP-018) or the existing replace/correct lifecycle in /admin/awards.
+ *
+ * FOUR EYES (V2-GAP-019): the creator of the revision may not approve it unless they are a super
+ * admin and supply `selfApprovalAttestation`. The result carries `revalidatePaths` (V2-GAP-024): the
+ * public pages the new winner moves, for the client to post to /admin/awards/revalidate.
  *
  * The sealed range is read from `data/reference/seasons.json` on EVERY call. A loader failure
  * refuses (`season_registry_unavailable`) before any connection is opened. An approval into a
@@ -365,9 +404,15 @@ export async function validateCurated(
  */
 export async function approveCurated(
   admin: AdminUser,
-  input: { proposalId: number; decisionNote?: string | null },
+  input: { proposalId: number; decisionNote?: string | null; selfApprovalAttestation?: string | null },
   deps?: Partial<OperationsDeps>,
-): Promise<OperationResult<{ proposal: ProposalRecord; entityKey: string; sealedSeason: boolean }>> {
+): Promise<OperationResult<{
+  proposal: ProposalRecord;
+  entityKey: string;
+  sealedSeason: boolean;
+  selfApproval: boolean;
+  revalidatePaths: string[];
+}>> {
   const d = resolveDeps(deps);
   const viewer = viewerOf(admin);
   return runMutation(
@@ -382,12 +427,76 @@ export async function approveCurated(
         viewer, executor, input, { promotion: d.promotion, sealed }, { now: d.now },
       ));
       const sealedSeason = isSealedSeason(sealed, approved.proposal.season);
+      const selfApproval = approved.proposal.createdBy === viewer.userId;
       return {
-        value: { proposal: approved.proposal, entityKey: approved.promotion.entityKey, sealedSeason },
+        value: {
+          proposal: approved.proposal,
+          entityKey: approved.promotion.entityKey,
+          sealedSeason,
+          selfApproval,
+          revalidatePaths: [...(approved.promotion.revalidatePaths ?? [])],
+        },
         detail: {
           season: approved.proposal.season,
           outcome: 'approved',
           approvedEntityKey: approved.promotion.entityKey,
+          sealedSeason,
+          selfApproval,
+        },
+      };
+    },
+  );
+}
+
+/**
+ * Revise an APPROVED proposal and the canonical winner it produced (`data.awards.edit`, V2-GAP-018):
+ * ONE transaction that validates the new values, passes the season seal for the old and the new
+ * season, changes `award_winners` through the production revision port (an in-place correction of the
+ * non-identity fields, or a void plus a replacement when the award, season, player or player name
+ * changes), supersedes the approved revision and records the new one as approved, with both ledger
+ * rows. A decision note of 20..2000 characters is ALWAYS required. NOT reversible except by another
+ * revision. The result carries `revalidatePaths` (V2-GAP-024) for the client to post to
+ * /admin/awards/revalidate.
+ */
+export async function reviseApprovedCurated(
+  admin: AdminUser,
+  input: { proposalId: number; changes: Partial<ProposalInput>; decisionNote: string | null },
+  deps?: Partial<OperationsDeps>,
+): Promise<OperationResult<{
+  proposal: ProposalRecord;
+  entityKey: string;
+  mode: 'correct' | 'replace';
+  sealedSeason: boolean;
+  revalidatePaths: string[];
+}>> {
+  const d = resolveDeps(deps);
+  const viewer = viewerOf(admin);
+  return runMutation(
+    admin,
+    { done: OPERATIONS_AUDIT_ACTIONS.curatedRevised, refused: OPERATIONS_AUDIT_ACTIONS.curatedRefused },
+    { operation: 'revise_approved', proposalId: idOrNull(input.proposalId) },
+    async () => {
+      assertCanEditAwards(viewer);
+      const sealed = d.loadSealed();
+      const done = await d.withExecutor((executor) => reviseApprovedProposal(
+        viewer, executor, input, { revision: d.revision, sealed }, { now: d.now },
+      ));
+      const sealedSeason = isSealedSeason(sealed, done.revision.season)
+        || isSealedSeason(sealed, done.superseded.season);
+      return {
+        value: {
+          proposal: done.revision,
+          entityKey: done.revised.entityKey,
+          mode: done.revised.mode,
+          sealedSeason,
+          revalidatePaths: [...done.revised.revalidatePaths],
+        },
+        detail: {
+          season: done.revision.season,
+          outcome: 'revised',
+          mode: done.revised.mode,
+          approvedEntityKey: done.revised.entityKey,
+          previousEntityKey: done.superseded.approvedEntityKey,
           sealedSeason,
         },
       };
@@ -498,6 +607,15 @@ export type ColemanDerivationSummary =
 
 export type ColemanPublicationView = Omit<ColemanPublicationRow, 'winners'>;
 
+/**
+ * The Coleman callers' dependencies: the shared {@link OperationsDeps} plus the projection port the
+ * derived winners are published through (ADR 0015). Absent, the PRODUCTION port is used, always; a
+ * test may inject its own (the PGlite stubs cannot host the production SQL).
+ */
+export type ColemanOperationsDeps = Partial<OperationsDeps> & {
+  colemanProjection?: ColemanAwardWinnerProjectionPort;
+};
+
 export type ColemanComparisonView = {
   season: number;
   settled: boolean;
@@ -511,6 +629,12 @@ export type ColemanComparisonView = {
   current: ColemanPublicationView | null;
   /** What publishing now would do; null when the season is not derivable. */
   plan: 'published' | 'unchanged' | 'superseded' | null;
+  /**
+   * What publishing now would do to the canonical `award_winners` rows (inserted / updated / voided
+   * / retained counts), or the refusal publishing would hit. Computed by the same planner as the
+   * write, read-only. Null when the season is not derivable or not sealed.
+   */
+  projection: ColemanProjectionPreview | null;
 };
 
 function summarise(outcome: ColemanDerivationOutcome): ColemanDerivationSummary {
@@ -558,9 +682,10 @@ function viewOf(row: ColemanPublicationRow): ColemanPublicationView {
 export async function compareColemanSeason(
   admin: AdminUser,
   input: { season: number; settled: boolean },
-  deps?: Partial<OperationsDeps>,
+  deps?: ColemanOperationsDeps,
 ): Promise<OperationResult<{ comparison: ColemanComparisonView }>> {
   const d = resolveDeps(deps);
+  const projection = deps?.colemanProjection ?? colemanAwardWinnerProjection;
   return runRead(async () => {
     if (!hasCapability(admin, 'data.awards.read')) {
       throw new OperationRefusal('forbidden', 'Comparing a derived Coleman result needs the data.awards.read capability.');
@@ -570,15 +695,21 @@ export async function compareColemanSeason(
     const registry = d.loadRegistry();
     const contract = d.loadContract();
     const generatedAt = d.now().toISOString();
-    const loaded = await d.withExecutor(async (executor) => ({
-      derivationInput: await loadColemanDerivationInput(executor, { season, settled, derivedAt: generatedAt, registry, contract }),
-      stored: await loadStoredColemanWinners(executor, season),
-      publications: await listColemanPublications(executor, season),
-    }));
-    const outcome = deriveColeman(loaded.derivationInput);
+    const sealed = isSealedSeason(sealedSeasonsFrom(registry), season);
+    const loaded = await d.withExecutor(async (executor) => {
+      const derivationInput = await loadColemanDerivationInput(executor, { season, settled, derivedAt: generatedAt, registry, contract });
+      const derived = deriveColeman(derivationInput);
+      return {
+        derived,
+        stored: await loadStoredColemanWinners(executor, season),
+        publications: await listColemanPublications(executor, season),
+        // Read-only: the same planner the write uses, so the preview and the publication cannot disagree.
+        projection: derived.ok && sealed ? await projection.preview(executor, derived.result) : null,
+      };
+    });
+    const outcome = loaded.derived;
     const report = buildColemanComparisonReport({ generatedAt, outcomes: [outcome], stored: loaded.stored });
     const current = loaded.publications[0] ?? null;
-    const sealed = isSealedSeason(sealedSeasonsFrom(registry), season);
     const plan = outcome.ok && sealed
       ? planColemanPublication(
         current === null ? null : {
@@ -594,6 +725,7 @@ export async function compareColemanSeason(
         report,
         current: current === null ? null : viewOf(current),
         plan,
+        projection: loaded.projection,
       },
     };
   });
@@ -621,6 +753,20 @@ export async function listColemanPublicationsForAdmin(
   });
 }
 
+/** What publishing did to the canonical `award_winners` rows, as the operator is told (ADR 0015). */
+export type ColemanProjectionSummary = {
+  /** The `derived_award_projections` row written by this publication, or null (an idempotent rerun wrote none). */
+  projectionId: number | null;
+  counts: ColemanProjectionResult['counts'];
+  /** inserted + updated + voided. */
+  changedCount: number;
+  /** Nothing in `award_winners` changed; only the provenance row was recorded. */
+  provenanceOnly: boolean;
+  /** Nothing changed and nothing was recorded: the projection was already recorded for this result. */
+  alreadyProjected: boolean;
+  actions: ColemanProjectionResult['actions'];
+};
+
 /** What a successful (or `unchanged`) Coleman publication reports. */
 export type ColemanPublicationResult = {
   outcome: 'published' | 'unchanged' | 'superseded';
@@ -634,15 +780,39 @@ export type ColemanPublicationResult = {
   inputChecksum: string;
   winnerKeys: readonly string[];
   evidenceRef: string;
+  /** What publishing did to `award_winners`. */
+  projection: ColemanProjectionSummary;
+  /**
+   * The public pages the changed rows can move, computed server-side. The CLIENT posts them to
+   * `/admin/awards/revalidate` after the action succeeds (a Server Action never revalidates).
+   */
+  revalidatePaths: string[];
 };
+
+function summariseProjection(projection: ColemanProjectionResult): ColemanProjectionSummary {
+  return {
+    projectionId: projection.projectionId,
+    counts: projection.counts,
+    changedCount: projection.changedCount,
+    provenanceOnly: projection.changedCount === 0 && projection.projectionId !== null,
+    alreadyProjected: projection.changedCount === 0 && projection.projectionId === null,
+    actions: projection.actions,
+  };
+}
 
 /**
  * Publish one season's Coleman result (`data.awards.edit`). The publisher DERIVES INSIDE from the
  * database (a caller cannot hand in a result) and writes ONE `derived_award_results` row in ONE
  * transaction: `published` (first publication), `unchanged` (same inputs, version and winners: no
- * write) or `superseded` (a new row pointing at the previous one). Append-only: nothing is ever
- * updated or deleted, so a publication is not undone — a recompute supersedes it. It does NOT
- * touch `award_winners` (V2-GAP-021).
+ * new ledger row) or `superseded` (a new row pointing at the previous one). The ledger is
+ * append-only, so a publication is not undone — a recompute supersedes it.
+ *
+ * It then PROJECTS the derived winners into the canonical `award_winners` table, in the SAME
+ * transaction, through the production port (`colemanAwardWinnerProjection`, ADR 0015) on every
+ * publication including `unchanged`: inserts new winners, updates a row whose values moved, voids a
+ * derived winner the facts no longer support, and leaves an equal row untouched (provenance only).
+ * Any projection refusal rolls the ledger row back too. The result carries the public
+ * `revalidatePaths` for the client to post.
  *
  * Every publication is an audited correction through the season seal: workflow
  * `derived_award_publication`, actor = the publishing admin, `note` = the operator's reason
@@ -658,9 +828,11 @@ export type ColemanPublicationResult = {
 export async function publishColemanSeason(
   admin: AdminUser,
   input: { season: number; settled: boolean; note: string },
-  deps?: Partial<OperationsDeps>,
+  deps?: ColemanOperationsDeps,
 ): Promise<OperationResult<ColemanPublicationResult>> {
   const d = resolveDeps(deps);
+  // ALWAYS a projection port: the production one unless a test injects another (a unit test pins this).
+  const projection = deps?.colemanProjection ?? colemanAwardWinnerProjection;
   return runMutation(
     admin,
     { done: OPERATIONS_AUDIT_ACTIONS.colemanPublished, refused: OPERATIONS_AUDIT_ACTIONS.colemanRefused },
@@ -702,19 +874,27 @@ export async function publishColemanSeason(
           },
           publishedBy: admin.id,
           viewer: { role: admin.role, canManageAdmins: admin.canManageAdmins },
-        });
+        }, { projection });
         return { publication, evidenceRef };
       });
 
       const publication = outcome.publication;
       if (!publication.ok) {
         const { refusal } = publication;
+        const subjects = refusal.subjects === undefined || refusal.subjects.length === 0
+          ? ''
+          : ` Rows: ${refusal.subjects.join('; ')}.`;
         throw new OperationRefusal(
           refusal.code === 'capability_denied' ? 'forbidden' : refusal.code,
-          refusal.message,
+          `${refusal.message}${subjects}`,
           refusal.derivation?.code,
         );
       }
+      if (publication.projection === null) {
+        // Unreachable: a port was passed. Fail closed rather than report an unprojected success.
+        throw new Error('The Coleman publication returned no projection although a projection port was supplied.');
+      }
+      const projected = summariseProjection(publication.projection);
       return {
         value: {
           outcome: publication.outcome,
@@ -726,6 +906,8 @@ export async function publishColemanSeason(
           inputChecksum: publication.inputChecksum,
           winnerKeys: publication.winnerKeys,
           evidenceRef: outcome.evidenceRef,
+          projection: projected,
+          revalidatePaths: [...publication.projection.revalidatePaths],
         },
         detail: {
           outcome: publication.outcome,
@@ -735,6 +917,9 @@ export async function publishColemanSeason(
           inputChecksum: publication.inputChecksum,
           winnerCount: publication.winnerKeys.length,
           evidenceRef: outcome.evidenceRef,
+          projected: projected.counts,
+          projectionId: projected.projectionId,
+          provenanceOnly: projected.provenanceOnly,
         },
       };
     },
@@ -773,4 +958,229 @@ export async function reconcileBrownlowSeasonForAdmin(
     }));
     return { report: reconcileBrownlowSeason(reconciliationInput) };
   });
+}
+
+/* Brownlow eligibility (Launch F F-D stream A) */
+
+/*
+ * The eligibility-aware Brownlow Medal determination (docs/v2/adr/0014-brownlow-eligibility.md).
+ *
+ * `determineBrownlowSeasonForAdmin` is a READ (`data.brownlow.read`): it reconciles the season with
+ * the default rule, loads the raw eligibility evidence (current decisions, stored rows, staged
+ * flags), and runs the pure `determineBrownlowMedal`. `recordBrownlowEligibilityForAdmin` is the
+ * MUTATION (`data.brownlow.finalise`, Super Admin only): one append-only decision row through
+ * `recordBrownlowEligibilityDecision`, then the determination is RECOMPUTED. Neither writes
+ * `brownlow_season_votes`, `brownlow_round_votes` or a staging table: raw votes are never altered
+ * and the published table is changed only by the existing /admin/brownlow publish workflow.
+ */
+
+/** Whether the stored `is_winner` flags agree with the determination (informational; nothing is changed). */
+export type BrownlowStoredFlagCheck = {
+  /** `not_applicable` unless the determination is `determined` and the season has stored rows. */
+  state: 'agrees' | 'disagrees' | 'not_applicable';
+  /** The players the stored table flags `is_winner`; null when the season has no stored rows. */
+  storedWinners: number[] | null;
+  determinedWinners: number[];
+};
+
+export type BrownlowDeterminationView = {
+  season: number;
+  generatedAt: string;
+  /** The season is sealed in the registry (a decision is then an audited correction). */
+  sealed: boolean;
+  seasonAdminPublished: boolean;
+  report: {
+    outcome: BrownlowOutcome;
+    seasonState: BrownlowSeasonState;
+    basis: BrownlowEvidenceBasis | null;
+    findingCounts: Record<string, number>;
+    voteGetters: number;
+  };
+  determination: BrownlowMedalDetermination;
+  identities: BrownlowPlayerIdentityView[];
+  /** Every decision of the season, oldest first, each marked `current`. */
+  decisions: BrownlowEligibilityDecisionView[];
+  storedFlagCheck: BrownlowStoredFlagCheck;
+};
+
+async function computeBrownlowDetermination(
+  executor: TransactionalSqlExecutor,
+  season: number,
+  registry: SeasonRegistry,
+  generatedAt: string,
+): Promise<BrownlowDeterminationView> {
+  const reconciliationInput = await loadBrownlowReconciliationInput(executor, { season, registry, generatedAt });
+  const report = reconcileBrownlowSeason(reconciliationInput);
+  const evidence = await loadBrownlowEligibilityEvidence(executor, {
+    season,
+    playerIds: report.rawVotes.playerTotals.map((total) => total.playerId),
+  });
+  const determination = determineBrownlowMedal({
+    report,
+    seasonAdminPublished: evidence.seasonAdminPublished,
+    players: evidence.players,
+  });
+  const storedWinners = report.awardResultPresentation.providerClaims.storedWinners;
+  const determinedWinners = determination.winners.map((winner) => winner.playerId);
+  const comparable = determination.status === 'determined' && storedWinners !== null;
+  const same = comparable
+    && storedWinners.length === determinedWinners.length
+    && storedWinners.every((id, index) => id === determinedWinners[index]);
+  return {
+    season,
+    generatedAt,
+    sealed: isSealedSeason(sealedSeasonsFrom(registry), season),
+    seasonAdminPublished: evidence.seasonAdminPublished,
+    report: {
+      outcome: report.outcome,
+      seasonState: report.source.seasonState,
+      basis: report.rawVotes.basis,
+      findingCounts: { ...report.findingCounts },
+      voteGetters: report.rawVotes.playerTotals.length,
+    },
+    determination,
+    identities: evidence.identities,
+    decisions: evidence.decisions,
+    storedFlagCheck: { state: !comparable ? 'not_applicable' : same ? 'agrees' : 'disagrees', storedWinners, determinedWinners },
+  };
+}
+
+/**
+ * Determine one season's Brownlow Medal winner(s) under the owner's eligibility-aware model
+ * (`data.brownlow.read`). READ-ONLY: writes and audits nothing. The raw leaderboard is returned for
+ * every vote-getter; a winner is stated only when the status is `determined`, and a missing or
+ * ambiguous leader gives `requires_review` (never an invented winner).
+ */
+export async function determineBrownlowSeasonForAdmin(
+  admin: AdminUser,
+  input: { season: number },
+  deps?: Partial<OperationsDeps>,
+): Promise<OperationResult<{ view: BrownlowDeterminationView }>> {
+  const d = resolveDeps(deps);
+  return runRead(async () => {
+    if (!hasCapability(admin, 'data.brownlow.read')) {
+      throw new OperationRefusal('forbidden', 'Determining the Brownlow Medal needs the data.brownlow.read capability.');
+    }
+    const season = requireSeason(input.season);
+    const registry = d.loadRegistry();
+    const generatedAt = d.now().toISOString();
+    const view = await d.withExecutor((executor) => computeBrownlowDetermination(executor, season, registry, generatedAt));
+    return { view };
+  });
+}
+
+/** What a recorded eligibility decision reports. */
+export type BrownlowEligibilityRecorded = {
+  decision: BrownlowEligibilityDecisionView;
+  /** The decision this one superseded, or null. */
+  supersededId: number | null;
+  /** The determination RECOMPUTED after the decision; null when it could not be recomputed (the decision stands). */
+  determination: BrownlowDeterminationView | null;
+  /** Why `determination` is null; the decision is committed regardless. */
+  recomputeError?: string;
+};
+
+/**
+ * Record one Brownlow eligibility decision (`data.brownlow.finalise`, Super Admin only): ONE
+ * append-only row in `brownlow_eligibility_decisions` carrying the verdict, a citation (1..2000
+ * characters) and a note (20..2000), in ONE transaction under a per-season advisory lock. A later
+ * decision for the same player supersedes it and nothing is ever updated or deleted, so a decision
+ * is not undone - it is superseded. A decision into a SEALED season is an audited correction
+ * (workflow `brownlow_eligibility_decision`) stored verbatim on the row. It never writes
+ * `brownlow_season_votes`, the round votes or staging.
+ *
+ * `expectedCurrentDecisionId` is the id of the decision the administrator SAW as current (null for
+ * none): if it changed meanwhile the decision is refused `stale_decision`. After the commit the
+ * determination is recomputed and returned, deterministically.
+ *
+ * Refused with nothing written: `forbidden` (no `data.brownlow.finalise`), `invalid_input`,
+ * `citation_required`, `note_invalid`, `unknown_player`, `identity_missing`, `identity_ambiguous`,
+ * `player_not_vote_getter`, `stale_decision`, `season_sealed` / `correction_invalid` (the seal),
+ * `season_registry_unavailable` (the registry fails closed).
+ */
+export async function recordBrownlowEligibilityForAdmin(
+  admin: AdminUser,
+  input: {
+    season: number;
+    playerId: number;
+    verdict: BrownlowEligibilityVerdict;
+    citation: string;
+    note: string;
+    expectedCurrentDecisionId: number | null;
+  },
+  deps?: Partial<OperationsDeps>,
+): Promise<OperationResult<BrownlowEligibilityRecorded>> {
+  const d = resolveDeps(deps);
+  return runMutation(
+    admin,
+    {
+      done: OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityDecided,
+      refused: OPERATIONS_AUDIT_ACTIONS.brownlowEligibilityRefused,
+    },
+    {
+      operation: 'decide_eligibility',
+      season: idOrNull(input.season),
+      playerId: idOrNull(input.playerId),
+      verdict: (BROWNLOW_ELIGIBILITY_VERDICTS as readonly unknown[]).includes(input.verdict) ? input.verdict : null,
+      expectedCurrentDecisionId: idOrNull(input.expectedCurrentDecisionId),
+    },
+    async () => {
+      // Capability first: a refused viewer must not even cause the registry to be read.
+      if (!hasCapability(admin, 'data.brownlow.finalise')) {
+        throw new OperationRefusal('forbidden', 'Recording a Brownlow eligibility decision needs the data.brownlow.finalise capability.');
+      }
+      const season = requireSeason(input.season);
+      const registry = d.loadRegistry();
+      const generatedAt = d.now().toISOString();
+
+      const recorded = await d.withExecutor(async (executor) => {
+        const outcome = await recordBrownlowEligibilityDecision(executor, {
+          season,
+          playerId: input.playerId,
+          verdict: input.verdict,
+          citation: input.citation,
+          note: input.note,
+          expectedCurrentDecisionId: input.expectedCurrentDecisionId,
+          decidedBy: admin.id,
+          viewer: { role: admin.role, canManageAdmins: admin.canManageAdmins },
+          sealed: sealedSeasonsFrom(registry),
+        });
+        if (!outcome.ok) return { outcome, determination: null, recomputeError: undefined };
+        // The decision is committed. A failure to RECOMPUTE must not turn it into a refusal.
+        try {
+          return { outcome, determination: await computeBrownlowDetermination(executor, season, registry, generatedAt), recomputeError: undefined };
+        } catch (error) {
+          console.error('Operations centre: recomputing the Brownlow determination after a decision failed', error);
+          return {
+            outcome,
+            determination: null,
+            recomputeError: 'The decision was recorded, but the determination could not be recomputed. Reload the page to see it.',
+          };
+        }
+      });
+
+      if (!recorded.outcome.ok) {
+        const { refusal } = recorded.outcome;
+        throw new OperationRefusal(refusal.code === 'capability_denied' ? 'forbidden' : refusal.code, refusal.message);
+      }
+      const { decision, supersededId } = recorded.outcome;
+      return {
+        value: {
+          decision,
+          supersededId,
+          determination: recorded.determination,
+          ...(recorded.recomputeError === undefined ? {} : { recomputeError: recorded.recomputeError }),
+        },
+        detail: {
+          outcome: 'decided',
+          decisionId: decision.id,
+          supersededId,
+          verdict: decision.verdict,
+          basis: decision.basis,
+          determinationStatus: recorded.determination === null ? null : recorded.determination.determination.status,
+          inputChecksum: recorded.determination === null ? null : recorded.determination.determination.inputChecksum,
+        },
+      };
+    },
+  );
 }

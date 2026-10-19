@@ -37,6 +37,7 @@ import {
   assertCanReadAwards,
   assertTransition,
   checkDecisionNote,
+  decideFourEyes,
   normaliseProposalInput,
   splitPlayerIdentity,
   utcDate,
@@ -132,7 +133,77 @@ export type AwardPromotionRequest = {
 export type AwardPromotionResult = {
   /** The durable data_overrides entity key of the award_winners row created. Never an id. */
   entityKey: string;
+  /**
+   * V2-GAP-024: the public paths the created row moves, computed SERVER-SIDE from the row's own ids
+   * by the production port (`awardWinnerPaths`). The caller posts them to /admin/awards/revalidate
+   * after success; nothing here revalidates. Optional only so a test stub need not invent paths.
+   */
+  revalidatePaths?: readonly string[];
 };
+
+/**
+ * V2-GAP-018: one audited revision of an APPROVED proposal, fully resolved. `mode` is decided by the
+ * service from the proposal values: `replace` when an identity-bearing value changed (award, season,
+ * player identity, player name: void the old canonical row and create the new one), else `correct`
+ * (an in-place correction of the non-identity fields named in `correction`).
+ */
+export type ApprovedWinnerRevisionRequest = {
+  proposalId: number;
+  proposalKey: string;
+  /** The approved revision being revised, and the revision that will replace it. */
+  fromRevision: number;
+  toRevision: number;
+  /** The canonical row to locate and lock IN the transaction: the approved proposal's entity key. */
+  previousEntityKey: string;
+  mode: 'correct' | 'replace';
+  /** `correct` only: the canonical fields that changed (absent = unchanged); clubId only when the club changed. */
+  correction: {
+    votes?: string | null;
+    position?: string | null;
+    isCaptain?: boolean;
+    isViceCaptain?: boolean;
+    note?: string | null;
+    clubId?: number | null;
+  };
+  /** The fully resolved new values (`replace` creates a row from them). */
+  target: {
+    awardId: number;
+    season: number;
+    playerId: number;
+    playerNameRaw: string;
+    clubId: number | null;
+    votes: string | null;
+    position: string | null;
+    isCaptain: boolean;
+    isViceCaptain: boolean;
+    note: string | null;
+    confirmDuplicate: boolean;
+  };
+  adminUserId: number;
+  /** The decision note (20..2000): the canonical audit row's administrator note and the void reason. */
+  adminNote: string;
+  evidence: AwardPromotionRequest['evidence'];
+};
+
+export type ApprovedWinnerRevisionResult = {
+  /** The canonical row's durable key after the revision: unchanged for `correct`, the NEW key for `replace`. */
+  entityKey: string;
+  mode: 'correct' | 'replace';
+  /** `replace` only: the key of the row that was voided. */
+  voidedEntityKey: string | null;
+  revalidatePaths: readonly string[];
+};
+
+/**
+ * Applies one approved-winner revision to the canonical award_winners table ON THE GIVEN
+ * TRANSACTION. Production wires the tx-level replace/correct variants extracted from
+ * src/db/queries/admin-awards.ts (see award-proposals.ts); tests inject a stub. It must locate and
+ * lock the canonical row by `previousEntityKey`, throw to refuse (`approved_winner_not_active` when
+ * that row is missing or void), and must not commit or open a transaction.
+ */
+export interface ApprovedWinnerRevisionPort {
+  revise(tx: SqlExecutor, request: ApprovedWinnerRevisionRequest): Promise<ApprovedWinnerRevisionResult>;
+}
 
 /**
  * Promotes one validated proposal into the canonical award_winners table ON THE GIVEN
@@ -279,6 +350,11 @@ async function gatherValidationFacts(
   executor: SqlExecutor,
   values: ProposalValues,
   ownProposalKey: string | null,
+  /**
+   * Revising an APPROVED proposal: the approved canonical row is itself an active winner for the same
+   * award, season and player and must not be reported as a duplicate of its own revision.
+   */
+  excludeEntityKey: string | null = null,
 ): Promise<ValidationFacts> {
   const [award] = await executor.query<{ id: number; slug: string; category: string }>(
     'SELECT id::int AS id, slug, category FROM awards WHERE slug = $1',
@@ -315,11 +391,18 @@ async function gatherValidationFacts(
 
   let activeWinnerIds: number[] = [];
   if (award && playerIds !== null && playerIds.length === 1) {
+    // `<sources.key>:<source_record_id>`: the key has no colon, the record id may.
+    const excluded = excludeEntityKey === null || excludeEntityKey.indexOf(':') < 1
+      ? null
+      : { sourceKey: excludeEntityKey.slice(0, excludeEntityKey.indexOf(':')), sourceRecordId: excludeEntityKey.slice(excludeEntityKey.indexOf(':') + 1) };
     const rows = await executor.query<{ id: number }>(
       `SELECT id::int AS id FROM award_winners
         WHERE award_id = $1::int AND season = $2::smallint AND player_id = $3::int AND status = 'active'
+        ${excluded === null ? '' : 'AND NOT (source_record_id = $5 AND source_id IN (SELECT id FROM sources WHERE key = $4))'}
         ORDER BY id`,
-      [award.id, values.season, playerIds[0]],
+      excluded === null
+        ? [award.id, values.season, playerIds[0]]
+        : [award.id, values.season, playerIds[0], excluded.sourceKey, excluded.sourceRecordId],
     );
     activeWinnerIds = rows.map((row) => Number(row.id));
   }
@@ -470,7 +553,16 @@ export async function createProposalsFromFile(
 // validate
 // ---------------------------------------------------------------------------
 
-export type DecisionInput = { proposalId: number; decisionNote?: string | null };
+export type DecisionInput = {
+  proposalId: number;
+  decisionNote?: string | null;
+  /**
+   * V2-GAP-019, `approveProposal` only: the self-approval attestation (trimmed >= 20 characters) a
+   * super admin supplies to approve a revision they created themselves. Ignored when the approver is
+   * not the creator.
+   */
+  selfApprovalAttestation?: string | null;
+};
 
 /** Validate against the database; moves the proposal to `validated` or `validation_failed`. */
 export async function validateProposal(
@@ -540,6 +632,13 @@ export type ApproveDependencies = {
  * (workflow `curated_award_approval`, the approver as actor, the decision note as the reason, the
  * proposal as evidence), which needs a note of 20..2000 characters. Otherwise it is refused with
  * `season_sealed_correction_invalid`, and nothing is written.
+ *
+ * FOUR EYES (V2-GAP-019): the creator of the revision being approved (`created_by`) may not approve it
+ * (`self_approval_forbidden`) unless the viewer's role is explicitly `super_admin` and they supply a
+ * `selfApprovalAttestation` of at least 20 trimmed characters (`self_approval_attestation_required`
+ * when it is present but short). The approve ledger row records `selfApproval` (and the attestation
+ * text when true) in `new_values`. The promotion result's `revalidatePaths` are returned for the
+ * caller to post to the revalidate route (V2-GAP-024).
  */
 export async function approveProposal(
   viewer: CuratedAwardsViewer,
@@ -555,6 +654,9 @@ export async function approveProposal(
     const proposal = await lockProposal(tx, proposalId);
     assertTransition('approve', proposal.status, 'approved');
     const note = checkDecisionNote('approve', input.decisionNote, proposal.sourceKind);
+    // Four eyes (V2-GAP-019), before any lookup or write: the creator of THIS revision may not
+    // approve it unless a super admin attests. Refused here, nothing has been written.
+    const fourEyes = decideFourEyes(viewer, proposal.createdBy, input.selfApprovalAttestation);
 
     // Serialise approvals of the same award and season; the row lock above already serialises
     // everything that touches this proposal.
@@ -633,7 +735,13 @@ export async function approveProposal(
       to: 'approved',
       adminUserId: viewer.userId,
       previous: { status: 'validated', approved_entity_key: null },
-      next: { status: 'approved', approved_entity_key: promotion.entityKey, validation_result: result },
+      next: {
+        status: 'approved',
+        approved_entity_key: promotion.entityKey,
+        validation_result: result,
+        selfApproval: fourEyes.selfApproval,
+        ...(fourEyes.selfApproval ? { selfApprovalAttestation: fourEyes.attestation } : {}),
+      },
       note,
     });
     return { proposal: (await readProposal(tx, proposalId, false)) as ProposalRecord, promotion };
@@ -694,10 +802,9 @@ export type ReviseInput = {
  * (its own ledger row) and is never edited again; the new revision starts at `proposed` and must be
  * validated afresh.
  *
- * An APPROVED proposal cannot be revised here: its winner already exists in award_winners, and a
- * correction of a canonical row is the existing replace/correct lifecycle in
- * src/db/queries/admin-awards.ts (`replaceAwardWinner` / `correctAwardWinner`). Refused with the typed
- * code `approved_revision_unsupported` (tracked as a follow-up gap, not built as a partial path).
+ * An APPROVED proposal cannot be revised here: its winner already exists in award_winners. Refused
+ * with the typed code `approved_revision_unsupported`; use `reviseApprovedProposal` (V2-GAP-018),
+ * which changes the canonical row and records the revision in one transaction.
  */
 export async function reviseProposal(
   viewer: CuratedAwardsViewer,
@@ -713,8 +820,9 @@ export async function reviseProposal(
     if (current.status === 'approved') {
       throw new CuratedAwardError(
         'approved_revision_unsupported',
-        'An approved proposal already produced an award_winners row. Correct that row through the awards '
-        + 'admin replace/correct path; revising the proposal would not change it.',
+        'An approved proposal already produced an award_winners row. Revise the approved winner '
+        + '(reviseApprovedProposal) so the canonical row and the proposal change together; editing the '
+        + 'pending-proposal path would not change it.',
       );
     }
     if (!PENDING_STATUSES.includes(current.status)) {
@@ -761,6 +869,240 @@ export async function reviseProposal(
       ledgerExtra: { revision: current.revision + 1, revision_of_id: current.id },
     });
     return { superseded: (await readProposal(tx, proposalId, false)) as ProposalRecord, revision };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// revise an APPROVED proposal (V2-GAP-018)
+// ---------------------------------------------------------------------------
+
+export type ReviseApprovedInput = {
+  proposalId: number;
+  changes: Partial<ProposalInput>;
+  /** REQUIRED: why the approved record is being changed (trimmed 20..2000). */
+  decisionNote: string | null | undefined;
+};
+
+export type ReviseApprovedDependencies = {
+  revision: ApprovedWinnerRevisionPort;
+  /** REQUIRED, as for `approveProposal`: both the old and the new season are checked against the seal. */
+  sealed: SealedSeasons;
+};
+
+export type ReviseApprovedResult = {
+  superseded: ProposalRecord;
+  revision: ProposalRecord;
+  revised: ApprovedWinnerRevisionResult;
+};
+
+/** Votes are compared as numbers: '12.5' and '12.50' are the same recorded value. */
+function sameVotes(a: string | null, b: string | null): boolean {
+  if (a === null || b === null) return a === b;
+  return Number(a) === Number(b);
+}
+
+/**
+ * Revise an APPROVED proposal and the canonical award_winners row it produced, as ONE transaction:
+ *
+ *   1. lock the approved proposal row (status must be `approved`);
+ *   2. validate the new values against the database exactly as approval does (errors refuse with
+ *      `invalid_input`); the approved canonical row itself is not a "duplicate" of its own revision;
+ *   3. consult the season seal for the old AND the new season (workflow `curated_award_approval`,
+ *      the decision note as the reason) BEFORE any canonical write, then require the note itself
+ *      (20..2000 characters, `note_required`);
+ *   4. through the injected port, locate and lock the canonical row by the proposal's
+ *      `approved_entity_key` and apply either the tx-level REPLACE (an identity-bearing value changed:
+ *      award, season, player identity, player name) or the tx-level CORRECT (only non-identity values
+ *      changed). The port compares-and-swaps against the `updated_at` it reads under its own lock, and
+ *      refuses `approved_winner_not_active` when the row is missing or void;
+ *   5. the old revision `approved -> superseded` (ledger `supersede_approved`), then the new revision
+ *      inserted directly as `approved` with the new `approved_entity_key` (ledger `revise_approved`,
+ *      from no state), in that order because of the one-live-revision index.
+ *
+ * Any refusal or failure, including one raised by the port, rolls ALL of it back: no ledger row, the
+ * proposal still approved, award_winners unchanged. The reviser applies the revision themselves, so the
+ * `revise_approved` row records `selfApproval: true`; the audit of that is the mandatory decision note.
+ * A revision that would not change the canonical row (evidence-only edits) is refused `no_change`.
+ */
+export async function reviseApprovedProposal(
+  viewer: CuratedAwardsViewer,
+  executor: TransactionalSqlExecutor,
+  input: ReviseApprovedInput,
+  deps: ReviseApprovedDependencies,
+  options?: ServiceOptions,
+): Promise<ReviseApprovedResult> {
+  assertCanEditAwards(viewer);
+  const proposalId = requireProposalId(input.proposalId);
+  const clock = clockOf(options);
+  return executor.transaction(async (tx) => {
+    const current = await lockProposal(tx, proposalId);
+    assertTransition('supersede_approved', current.status, 'superseded');
+    const previousEntityKey = current.approvedEntityKey;
+    if (previousEntityKey === null) {
+      throw new CuratedAwardError('approved_winner_not_active', `Approved proposal ${proposalId} records no canonical entity key.`);
+    }
+
+    const changes = Object.fromEntries(
+      Object.entries(input.changes ?? {}).filter(([, value]) => value !== undefined),
+    ) as Partial<ProposalInput>;
+    const next = normaliseProposalInput({ ...current, ...changes });
+    if (JSON.stringify(valuesToJson(next)) === JSON.stringify(valuesToJson(current))) {
+      throw new CuratedAwardError('no_change', 'The revision changes nothing.');
+    }
+    const shape = validateAwardProposal(next, null, { today: clock.today, checkedAt: clock.iso });
+    if (!shape.ok) refuseInvalid(shape);
+
+    // Serialise with approvals and other revisions of either award/season (sorted: no lock-order deadlock).
+    const lockKeys = [...new Set([
+      `award_proposal:${current.awardSlug}:${current.season}`,
+      `award_proposal:${next.awardSlug}:${next.season}`,
+    ])].sort();
+    for (const key of lockKeys) await tx.query('SELECT pg_advisory_xact_lock(hashtext($1::text))', [key]);
+
+    const facts = await gatherValidationFacts(tx, next, current.proposalKey, previousEntityKey);
+    const result = validateAwardProposal(next, facts, { today: clock.today, checkedAt: clock.iso });
+    if (!result.ok) refuseInvalid(result);
+    const awardId = facts.award?.id;
+    const playerId = facts.playerIds?.[0];
+    if (awardId === undefined || playerId === undefined) {
+      throw new CuratedAwardError('invalid_input', 'The revised proposal does not resolve to an award and a player.');
+    }
+
+    // The seal, for every season the canonical writes touch, BEFORE the port is called.
+    const rawNote = typeof input.decisionNote === 'string' ? input.decisionNote.trim() : '';
+    for (const season of new Set([current.season, next.season])) {
+      const sealDecision = evaluateSeasonWrite({
+        season,
+        sealed: deps.sealed,
+        correction: {
+          workflow: 'curated_award_approval',
+          actorUserId: viewer.userId,
+          note: rawNote,
+          evidenceRef: `award_proposals:${proposalId}`,
+        },
+      });
+      if (!sealDecision.allowed) throw new CuratedAwardError('season_sealed_correction_invalid', sealDecision.message);
+    }
+    const note = checkDecisionNote('revise_approved', input.decisionNote, next.sourceKind) as string;
+
+    const identityChanged = current.awardSlug !== next.awardSlug
+      || current.season !== next.season
+      || current.playerIdentity !== next.playerIdentity
+      || current.playerNameRaw !== next.playerNameRaw;
+    const mode = identityChanged ? 'replace' : 'correct';
+    const correction: ApprovedWinnerRevisionRequest['correction'] = {};
+    if (!sameVotes(current.votes, next.votes)) correction.votes = next.votes;
+    if (current.position !== next.position) correction.position = next.position;
+    if (current.isCaptain !== next.isCaptain) correction.isCaptain = next.isCaptain;
+    if (current.isViceCaptain !== next.isViceCaptain) correction.isViceCaptain = next.isViceCaptain;
+    if (current.note !== next.note) correction.note = next.note;
+    if (current.clubSlug !== next.clubSlug) correction.clubId = facts.club ? facts.club.id : null;
+    if (mode === 'correct' && Object.keys(correction).length === 0) {
+      throw new CuratedAwardError('no_change',
+        'The revision changes nothing in the canonical award_winners row (evidence-only edits are not '
+        + 'applied by this action); change a value, or leave the approved record as it is.');
+    }
+
+    const revised = await deps.revision.revise(tx, {
+      proposalId,
+      proposalKey: current.proposalKey,
+      fromRevision: current.revision,
+      toRevision: current.revision + 1,
+      previousEntityKey,
+      mode,
+      correction: mode === 'correct' ? correction : {},
+      target: {
+        awardId,
+        season: next.season,
+        playerId,
+        playerNameRaw: next.playerNameRaw,
+        clubId: facts.club ? facts.club.id : null,
+        votes: next.votes,
+        position: next.position,
+        isCaptain: next.isCaptain,
+        isViceCaptain: next.isViceCaptain,
+        note: next.note,
+        confirmDuplicate: next.duplicateConfirmed,
+      },
+      adminUserId: viewer.userId,
+      adminNote: note,
+      evidence: {
+        sourceKind: next.sourceKind,
+        sourceUrl: next.sourceUrl,
+        citation: next.citation,
+        acquiredOn: next.acquiredOn,
+      },
+    });
+
+    // Supersede first: the unique "one live revision per proposal" index forbids two live rows.
+    const superseded = await tx.query<{ id: number }>(
+      `UPDATE award_proposals SET status = 'superseded', updated_at = now()
+        WHERE id = $1::bigint AND status = 'approved'
+        RETURNING id::int AS id`,
+      [proposalId],
+    );
+    if (superseded.length !== 1) {
+      throw new CuratedAwardError('concurrent_modification', `Proposal ${proposalId} changed while it was being revised.`);
+    }
+    await writeLedger(tx, {
+      proposalId,
+      action: 'supersede_approved',
+      from: 'approved',
+      to: 'superseded',
+      adminUserId: viewer.userId,
+      previous: { status: 'approved', approved_entity_key: previousEntityKey },
+      next: { status: 'superseded', superseded_by_revision: current.revision + 1, mode: revised.mode },
+      note,
+    });
+
+    const inserted = await tx.query<{ id: number }>(
+      `INSERT INTO award_proposals
+         (proposal_key, revision, revision_of_id, award_slug, season, player_identity, player_name_raw,
+          club_slug, votes, position, is_captain, is_vice_captain, note, duplicate_confirmed,
+          source_kind, source_url, citation, acquired_on, created_by,
+          status, validation_result, validated_at, approved_entity_key, approved_at)
+       VALUES ($1::uuid, $2::smallint, $3::bigint, $4, $5::smallint, $6, $7,
+               $8, $9::numeric, $10, $11, $12, $13, $14,
+               $15, $16, $17, $18::date, $19::int,
+               'approved', $20::jsonb, now(), $21, now())
+       RETURNING id::int AS id`,
+      [
+        current.proposalKey, current.revision + 1, current.id,
+        next.awardSlug, next.season, next.playerIdentity, next.playerNameRaw,
+        next.clubSlug, next.votes, next.position, next.isCaptain, next.isViceCaptain,
+        next.note, next.duplicateConfirmed,
+        next.sourceKind, next.sourceUrl, next.citation, next.acquiredOn, viewer.userId,
+        jsonParam(result), revised.entityKey,
+      ],
+    );
+    const newId = Number(inserted[0]?.id);
+    if (!Number.isInteger(newId)) throw new CuratedAwardError('concurrent_modification', 'The revised proposal row was not written.');
+    await writeLedger(tx, {
+      proposalId: newId,
+      action: 'revise_approved',
+      from: null,
+      to: 'approved',
+      adminUserId: viewer.userId,
+      previous: valuesToJson(current),
+      next: {
+        ...valuesToJson(next),
+        status: 'approved',
+        approved_entity_key: revised.entityKey,
+        previous_entity_key: previousEntityKey,
+        mode: revised.mode,
+        revision: current.revision + 1,
+        revision_of_id: current.id,
+        validation_result: result,
+        selfApproval: true,
+      },
+      note,
+    });
+
+    return {
+      superseded: (await readProposal(tx, proposalId, false)) as ProposalRecord,
+      revision: (await readProposal(tx, newId, false)) as ProposalRecord,
+      revised,
+    };
   });
 }
 
