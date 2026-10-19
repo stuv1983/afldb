@@ -17,10 +17,26 @@ commit.
 
 ### AFLDB V2
 
+#### Local release-readiness follow-up — 19 October 2026
+
+- Added guarded six-role credential rotation for the dedicated isolated PostgreSQL cluster;
+  all new logins succeeded and all old passwords were rejected. No secrets committed.
+- Completed atomic, audited Brownlow eligibility publication without changing raw votes,
+  including public-query updates, unresolved-leader refusal and joint winners. All 98 locally
+  available historical seasons reconcile with the canonical medal interpretation.
+- Physically quarantined retained acquisition implementations, refused their former entry
+  points, and prevented the offline Coleman bootstrap from overwriting canonical publications.
+- Repaired historical integration fixtures, live isolated-target proofs and checkout-portable
+  frozen DraftGuru verification. Added migration 115 for the missing adjudication FK index.
+- Rehearsed previous/V2 standalone application rollback locally, inspected all 26 existing
+  admin captures, corrected Brownlow status/publication wording and recaptured affected screens.
+  Release evidence and remaining gates: `docs/v2/local-release-review.md`. Production stays NO-GO.
+
 Local controlled-fork rebuild in `D:\dev\afldbV2` (no remote, nothing deployed). V2 records its
 gaps as `V2-GAP-NNN` in `docs/v2/known-gaps.md` instead of allocating `AFLDB-ISSUE-NNN` IDs, a
 deliberate departure from CLAUDE.md §5 so the fork cannot collide with the mainline ledger
-(ADR 0003). `issues.md` and `IssuesIndex.md` are left as inherited.
+(ADR 0003). The local follow-up only clarifies ISSUE-229 B2 in the inherited ledgers; it does not
+close that issue or alter its approval requirements.
 
 #### Launch F — awards integration, fixture writer, legacy retirement, isolated rebuild and verification - 19 October 2026
 

@@ -32,7 +32,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -165,6 +165,58 @@ async function ensureRoles(cfg: IsolatedConfig): Promise<void> {
   } finally {
     await sql.end({ timeout: 5 });
   }
+}
+
+/** Rotate only this dedicated cluster. Never log a query, password or connection URL. */
+async function rotateCredentials(cfg: IsolatedConfig): Promise<void> {
+  const oldRoles = rolePasswords(cfg);
+  const oldSuper = readSecret(cfg, 'superuser.pw');
+  const nextRoles = Object.fromEntries(AFLDB_ROLES.map((r) => [r, randomBytes(32).toString('base64url')])) as Record<Role, string>;
+  const nextSuper = randomBytes(32).toString('base64url');
+  const pending = join(secretsDir(cfg), 'rotation-pending.json');
+  if (existsSync(pending)) throw new Error('Unfinished credential rotation: recover from secrets/rotation-pending.json before retrying');
+  const sql = superSql(cfg);
+  try {
+    const [facts] = await sql`SELECT current_setting('cluster_name') AS cluster,
+      host(inet_server_addr()) AS address, inet_server_port() AS port`;
+    console.log(`rotation target: cluster=${facts.cluster}; address=${facts.address}; port=${facts.port}`);
+    if (facts.cluster !== ISOLATED_CLUSTER_NAME || facts.address !== '127.0.0.1' || Number(facts.port) !== cfg.port) {
+      throw new Error('Credential rotation refused: not the dedicated loopback cluster');
+    }
+    // Durable recovery material before the transaction; removed only after both secret files land.
+    writeFileSync(pending, JSON.stringify({ roles: nextRoles, superuser: nextSuper }), { mode: 0o600, flag: 'wx' });
+    await sql.begin(async (tx) => {
+      for (const role of AFLDB_ROLES) await tx.unsafe(`ALTER ROLE ${role} PASSWORD '${nextRoles[role]}'`);
+      await tx.unsafe(`ALTER ROLE ${SUPERUSER} PASSWORD '${nextSuper}'`);
+    });
+    const replaceSecret = (name: string, value: string) => {
+      const temporary = join(secretsDir(cfg), `${name}.next`);
+      writeFileSync(temporary, value, { mode: 0o600, flag: 'wx' });
+      renameSync(temporary, join(secretsDir(cfg), name));
+    };
+    replaceSecret('roles.json', `${JSON.stringify(nextRoles, null, 2)}\n`);
+    replaceSecret('superuser.pw', nextSuper);
+    for (const role of [...AFLDB_ROLES, SUPERUSER]) {
+      const next = role === SUPERUSER ? nextSuper : nextRoles[role as Role];
+      const old = role === SUPERUSER ? oldSuper : oldRoles[role as Role];
+      const fresh = postgres(dsnFor(cfg, role, next, 'postgres'), { max: 1, connect_timeout: 5 });
+      try { await fresh`SELECT 1`; } finally { await fresh.end({ timeout: 5 }); }
+      const stale = postgres(dsnFor(cfg, role, old, 'postgres'), { max: 1, connect_timeout: 5 });
+      let rejected = false;
+      try { await stale`SELECT 1`; } catch (error) {
+        rejected = (error as { code?: string }).code === '28P01';
+      } finally { await stale.end({ timeout: 5 }); }
+      if (!rejected) throw new Error(`Old credential rejection not proven for ${role}`);
+      console.log(`rotation: ${role}: new login PASS; old login rejected (28P01)`);
+    }
+    // Recovery file contains the same new secrets, never the old passwords.
+    const { unlinkSync } = await import('node:fs');
+    unlinkSync(pending);
+    console.log('rotation: six credentials rotated; databases and audit history preserved');
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    throw new Error(`Credential rotation failed (${code ?? 'guard or verification'}); inspect local secret recovery state without printing its contents`);
+  } finally { await sql.end({ timeout: 5 }); }
 }
 
 /** The per-database bootstrap of tools/maintenance/00_install_postgres.sh step [4/5]. */
@@ -314,6 +366,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     case 'stop': return runPg(cfg, 'pg_ctl', ['-D', dataDir(cfg), '-w', '-m', 'fast', 'stop']);
     case 'status': return runPg(cfg, 'pg_ctl', ['-D', dataDir(cfg), 'status']);
     case 'roles': await ensureRoles(cfg); return 0;
+    case 'rotate-credentials': await rotateCredentials(cfg); return 0;
     case 'create-db': await createDb(cfg, rest[0], opt('--template')); return 0;
     case 'drop-db': await dropDb(cfg, rest[0], opt('--acknowledge-destroy')); return 0;
     case 'list': await list(cfg); return 0;
