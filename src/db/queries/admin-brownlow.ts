@@ -1,9 +1,11 @@
 import 'server-only';
 
 import postgres from 'postgres';
+import { postgresTransactionExecutor } from '@afldb/db';
 
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { publishBrownlowEligibilityInTransaction } from '@/db/queries/brownlow-eligibility';
 import {
   recomputeBrownlowCareerTotals,
   recomputeBrownlowCoverage,
@@ -1153,6 +1155,11 @@ async function runMatchMutation(
                    updated_at = now()
              WHERE season = ${match.season}
           `;
+          const publication = await publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
+            season: match.season, actorId: input.actorId, note: reason ?? 'Recompute after an authorised match correction',
+            registry: { first_season: match.season, last_season: match.season, in_progress_seasons: [] },
+          });
+          summary.winners = publication.determination.winners.map((winner) => winner.playerId);
           await recordDataEdit(tx, {
             tableName: 'brownlow_season_authority',
             rowId: match.season,
@@ -1388,6 +1395,12 @@ export async function publishBrownlowSeason(input: {
                updated_at = now()
          WHERE season = ${input.season}
       `;
+
+      const publication = await publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
+        season: input.season, actorId: input.actorId, note: input.note ?? 'Authorised completed-season publication',
+        registry: { first_season: input.season, last_season: input.season, in_progress_seasons: [] },
+      });
+      summary.winners = publication.determination.winners.map((winner) => winner.playerId);
 
       await recordDataEdit(tx, {
         tableName: 'brownlow_season_authority',

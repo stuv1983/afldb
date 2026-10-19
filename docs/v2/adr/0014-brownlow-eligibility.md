@@ -133,7 +133,32 @@ executor transaction (not by copying its SQL), one player at a time. The cost is
 per vote-getter on a read of a season's evidence; over a non-postgres.js executor (PGlite) the loader
 and the writer refuse rather than guess.
 
-## What is NOT done
+## Publication amendment — local release follow-up, 2026-10-19
+
+The authorised decision service now records the decision and projects medal/eligibility metadata
+in ONE transaction. `publishBrownlowEligibilityInTransaction` also runs after existing manual
+season publication and match corrections. All consumers continue to read the same canonical
+`is_winner` result. `votes`, `vote_rank`, round votes and source/provenance columns never change.
+Only `is_winner`, `is_ineligible` and `eligible_rank` are projected; the required `data_edits`
+publication record preserves prior eligibility statements, decision IDs, checksum and actor/note.
+Audit failure rolls back both the decision and the projection. Replaying an unchanged projection
+creates no duplicate publication audit. The existing season-seal correction gates remain.
+
+The stored season table contains authoritative season totals, not a replacement API leaderboard.
+Where no API votes exist, medal determination can use those totals with recorded stored eligibility
+or cited decisions; the diagnostic still reports missing API evidence and cannot claim API parity.
+Missing/ambiguous relevant eligibility means `requires_review` and no published winner. Joint
+eligible leaders are published together. The raw vote leaderboard remains visible, ineligible
+players included. Historical read-only reconciliation found 98/98 seasons determined and agreeing,
+zero unresolved/disagreeing (`evidence/local-brownlow-history-final.json`). This is local evidence,
+not production parity. No Brownlow migration was needed: migration 113 and existing audit columns
+already provide the contract. Migration 115 is an unrelated FK-index correction.
+
+Integration coverage demonstrates public winner changes after authorised decisions, raw-content
+fingerprint preservation, idempotent publication and rollback on required audit failure. The
+browser revalidation endpoint is capability-guarded and accepts no caller-controlled paths.
+
+## Historical Launch F limitations (superseded above where stated)
 
 - **No write to `brownlow_season_votes`.** A decision is new evidence *beside* the raw votes. When the
   determination disagrees with the stored `is_winner` flags the page says so and changes nothing.
@@ -164,14 +189,11 @@ and the writer refuse rather than guess.
 - `tests/v2-admin-operations.test.ts` — the callers' capability refusals and audit rows, the Server
   Action's guard and parsing, the action card, the audit-action drift test.
 
-## V2-GAP-016 disposition (proposal)
+## V2-GAP-016 disposition
 
-Narrow, do not close. The *rule* is decided and implemented: V2 names a winner only where eligibility
-is established by an administrator decision or a recorded stored statement, otherwise `requires_review`,
-and never alters a raw vote. Proposed text: "decided (ADR 0014); remaining: projecting decisions into
-the published `brownlow_season_votes` table (the `/admin/brownlow` publish workflow) and the F-001
-historical blast-radius count". Close once the owner confirms the projection path and the count has
-been run on the rebuilt database.
+Local implementation, publication and historical reconciliation are demonstrated. Keep the gap
+narrowly open for owner release acceptance and production-dump reconciliation, not missing local
+publication code. No historical flags were bulk rewritten during the read-only reconciliation.
 
 ## Deploy order
 

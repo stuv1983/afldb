@@ -195,8 +195,8 @@ export function MedalDeterminationSection({
             <strong>The stored winner flags disagree with this determination.</strong> The stored
             season table flags {view.storedFlagCheck.storedWinners?.map((id) => `player ${id}`).join(', ') || 'no player'} as
             the winner; this determination names {view.storedFlagCheck.determinedWinners.map((id) => `player ${id}`).join(', ')}.
-            Nothing was changed: projecting a decision into the published table is the existing
-            Brownlow publish workflow (/admin/brownlow), which is not run from here.
+            This read changed nothing. An authorised eligibility decision recomputes and publishes
+            the medal flags transactionally, preserving raw votes.
           </p>
         )}
         {view.storedFlagCheck.state === 'agrees' && (

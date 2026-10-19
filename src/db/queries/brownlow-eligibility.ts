@@ -7,12 +7,16 @@ import {
 } from '@afldb/db';
 import {
   BROWNLOW_ELIGIBILITY_VERDICTS,
+  determineBrownlowMedal,
+  reconcileBrownlowSeason,
   type BrownlowEligibilityVerdict,
   type BrownlowPlayerEligibilityEvidence,
 } from '@afldb/derived';
-import { evaluateSeasonWrite, type AuditedCorrection, type SealedSeasons } from '@afldb/domain';
+import { evaluateSeasonWrite, type AuditedCorrection, type SealedSeasons, type SeasonRegistry } from '@afldb/domain';
 
-import { BROWNLOW_VOTE_SOURCE_KEY } from '@/db/queries/brownlow-reconciliation-inputs';
+import { BROWNLOW_VOTE_SOURCE_KEY, loadBrownlowReconciliationInput } from '@/db/queries/brownlow-reconciliation-inputs';
+import { recordDataEdit } from '@/db/queries/audit-log';
+import { recomputeBrownlowCareerTotals } from '@/db/queries/player-derived';
 import { resolvePlayerIdentity } from '@/db/queries/player-identity';
 import { hasCapability, type CapabilityViewer } from '@/lib/auth/capabilities';
 
@@ -30,8 +34,8 @@ import { hasCapability, type CapabilityViewer } from '@/lib/auth/capabilities';
  *     (`brownlow_season_authority.published_revision IS NOT NULL`). It does not interpret them.
  *  2. {@link recordBrownlowEligibilityDecision} - the ONE writer of the ledger: ONE transaction, a
  *     per-season advisory lock, every refusal decided before anything is inserted, and at most one
- *     INSERT into `brownlow_eligibility_decisions`. It NEVER writes `brownlow_season_votes`,
- *     `brownlow_round_votes` or any staging table: a decision is new evidence BESIDE the raw votes.
+ *     INSERT into `brownlow_eligibility_decisions`. The application caller also projects medal and
+ *     eligibility metadata atomically; raw votes and staging are never changed by this decision.
  *
  * DURABLE IDENTITY. A decision names its player by the durable identity string
  * (`afltables:<profile path>` or `manual_admin_edit:<token>`), never by `players.id` (a rebuild or a
@@ -186,13 +190,21 @@ export async function loadBrownlowEligibilityEvidence(
   executor: TransactionalSqlExecutor,
   request: BrownlowEligibilityEvidenceRequest,
 ): Promise<BrownlowEligibilityEvidence> {
+  return executor.transaction(async (tx) => {
+    await tx.query('SET TRANSACTION READ ONLY');
+    return loadEligibilityInTransaction(tx, request);
+  });
+}
+
+async function loadEligibilityInTransaction(
+  tx: SqlExecutor,
+  request: BrownlowEligibilityEvidenceRequest,
+): Promise<BrownlowEligibilityEvidence> {
   const { season } = request;
   const playerIds = [...new Set(request.playerIds)].sort((a, b) => a - b);
 
-  return executor.transaction(async (tx) => {
     const native = nativeTransactionOf(tx);
     if (native === undefined) throw new BrownlowEligibilityInfrastructureError();
-    await tx.query('SET TRANSACTION READ ONLY');
 
     const decisionRows = await tx.query<DecisionRow>(
       `SELECT ${DECISION_COLUMNS}
@@ -262,7 +274,64 @@ export async function loadBrownlowEligibilityEvidence(
       identities,
       decisions,
     };
+}
+
+/** Project medal and eligibility metadata. Raw votes and their provenance remain intact;
+ * the required audit retains the previous eligibility source statement.
+ * Shared by audited decisions and the explicit reconciliation rehearsal. The caller owns the
+ * transaction; audit failure aborts the projection. No schema addition is needed. */
+export async function publishBrownlowEligibilityInTransaction(
+  tx: SqlExecutor,
+  request: { season: number; registry: SeasonRegistry; actorId: number; note: string },
+) {
+  const native = nativeTransactionOf(tx);
+  if (!native) throw new BrownlowEligibilityInfrastructureError();
+  await tx.query('SELECT pg_advisory_xact_lock(717275, 3)');
+  await tx.query('SELECT pg_advisory_xact_lock(hashtext($1), $2::int)', [LOCK_NAMESPACE, request.season]);
+  const input = await loadBrownlowReconciliationInput(tx, {
+    season: request.season, registry: request.registry, generatedAt: new Date().toISOString(), storedOnlyFallback: true,
   });
+  const stored = input.storedTotals ?? [];
+  const evidence = await loadEligibilityInTransaction(tx, { season: request.season, playerIds: stored.map((r) => r.playerId) });
+  if (evidence.seasonAdminPublished) input.seasonState = 'complete';
+  const determination = determineBrownlowMedal({ report: reconcileBrownlowSeason(input), ...evidence });
+  const winners = determination.status === 'determined' ? determination.winners.map((w) => w.playerId) : [];
+  const previous = stored.filter((r) => r.isWinner).map((r) => r.playerId).sort((a, b) => a - b);
+  // There is no public projection without authoritative season totals. Staged votes alone
+  // remain proposals and never replace historical raw totals.
+  if (stored.length === 0) return { determination, changed: false };
+  const metadata = determination.rawLeaderboard.map((row) => ({
+    playerId: row.playerId,
+    isIneligible: row.eligibility.status === 'ineligible',
+    eligibleRank: row.eligibility.status === 'eligible'
+      ? 1 + determination.rawLeaderboard.filter((other) => other.eligibility.status !== 'ineligible' && other.votes > row.votes).length : null,
+    isWinner: winners.includes(row.playerId),
+  }));
+  for (const row of stored) if (!metadata.some((r) => r.playerId === row.playerId)) {
+    metadata.push({ playerId: row.playerId, isIneligible: row.isIneligible, eligibleRank: row.eligibleRank, isWinner: false });
+  }
+  const changed = stored.some((row) => {
+    const next = metadata.find((r) => r.playerId === row.playerId);
+    return next && (row.isWinner !== next.isWinner || row.isIneligible !== next.isIneligible || row.eligibleRank !== next.eligibleRank);
+  });
+  if (changed) {
+    for (const row of metadata) await tx.query(`UPDATE brownlow_season_votes
+      SET is_winner = $3, is_ineligible = $4, eligible_rank = $5::int
+      WHERE season = $1::int AND player_id = $2::int
+        AND (is_winner, is_ineligible, eligible_rank) IS DISTINCT FROM ($3::boolean, $4::boolean, $5::int)`,
+    [request.season, row.playerId, row.isWinner, row.isIneligible, row.eligibleRank]);
+    await recomputeBrownlowCareerTotals(native, stored.map((r) => r.playerId));
+    await recordDataEdit(native, {
+      tableName: 'brownlow_season_authority', rowId: request.season, fieldGroup: 'eligibility_publication',
+      oldValues: { winners: previous, eligibility: stored.map((r) => ({ playerId: r.playerId, isIneligible: r.isIneligible, eligibleRank: r.eligibleRank })) },
+      newValues: { winners, status: determination.status, inputChecksum: determination.inputChecksum,
+        decisionIds: evidence.decisions.filter((d) => d.current).map((d) => d.id),
+        basis: determination.basis, eligibility: metadata,
+        votesTotal: stored.reduce((n, r) => n + r.votes, 0) },
+      adminUserId: request.actorId, note: request.note,
+    });
+  }
+  return { determination, changed };
 }
 
 /* ------------------------------------------------------------------ *
@@ -306,6 +375,8 @@ export interface BrownlowEligibilityDecisionRequest {
   readonly viewer: CapabilityViewer;
   /** The sealed range, built from the season registry by the caller. */
   readonly sealed: SealedSeasons;
+  /** The authorised application caller publishes the decision's effect atomically. */
+  readonly publicationRegistry?: SeasonRegistry;
 }
 
 export type BrownlowEligibilityDecisionOutcome =
@@ -416,6 +487,7 @@ export async function recordBrownlowEligibilityDecision(
   return executor.transaction(async (tx): Promise<BrownlowEligibilityDecisionOutcome> => {
     const native = nativeTransactionOf(tx);
     if (native === undefined) throw new BrownlowEligibilityInfrastructureError();
+    await tx.query('SELECT pg_advisory_xact_lock(717275, 3)');
     await tx.query('SELECT pg_advisory_xact_lock(hashtext($1), $2::int)', [LOCK_NAMESPACE, season]);
 
     const player = await tx.query<{ id: number | string }>('SELECT p.id::int AS id FROM players p WHERE p.id = $1::int', [playerId]);
@@ -493,6 +565,9 @@ export async function recordBrownlowEligibilityDecision(
         current,
       ],
     );
+    if (request.publicationRegistry) await publishBrownlowEligibilityInTransaction(tx, {
+      season, registry: request.publicationRegistry, actorId: decidedBy, note,
+    });
     return { ok: true, decision: decisionViewOf(inserted[0]), supersededId: current };
   });
 }

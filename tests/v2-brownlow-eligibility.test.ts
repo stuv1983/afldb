@@ -604,7 +604,7 @@ describe('the determination page markup', () => {
     expect(markup).toContain('Joint winners');
     expect(markup).toContain('player 1002 (30 votes), player 1005 (30 votes)');
     expect(markup).toContain('data-stored-flag-disagreement="true"');
-    expect(markup).toContain('Nothing was changed');
+    expect(markup).toContain('This read changed nothing');
     expect(markup).toContain('data-no-review="true"');
   });
 

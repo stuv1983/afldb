@@ -20,8 +20,8 @@ import {
  *
  * `recordBrownlowEligibilityAction` writes (`data.brownlow.finalise`, Super Admin only): ONE
  * append-only `brownlow_eligibility_decisions` row (verdict, citation, note) in one transaction,
- * and returns the RECOMPUTED determination. It never changes a raw vote, the stored season table
- * or a staging row. The guard is the FIRST awaited statement; the caller checks the capability
+ * publishes medal/eligibility metadata atomically, and returns the recomputed determination.
+ * Raw votes and staging are preserved. The guard is the FIRST awaited statement; the caller checks the capability
  * again. NO `revalidatePath` (it hangs the client from a Server Action): the Client Component
  * refreshes the route.
  *

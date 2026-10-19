@@ -69,8 +69,8 @@ export function describeBrownlowEligibilityConsequences(
     title: `rule on eligibility for player ${context.playerId}, season ${context.season}`,
     changes: [
       'Adds ONE append-only decision row (verdict, citation, note) to the eligibility ledger.',
-      'Recomputes the medal determination from it, deterministically.',
-      'Does NOT change any raw vote, the stored season table or the published Brownlow table.',
+      'Recomputes the medal result and publishes its winner flags in the same transaction; joint eligible leaders share the medal.',
+      'Preserves every raw vote. Updates eligibility metadata with the medal flags and audits the previous source statement. If relevant eligibility remains unresolved, no medal winner is published.',
     ],
     affected: `Season ${context.season}, player ${context.playerId} (durable identity ${identity}).`,
     validationState: `${sealWords(context.sealedSeason)} A citation (1 to 2000 characters) is required. ${
@@ -84,7 +84,7 @@ export function describeBrownlowEligibilityConsequences(
       ? 'The signed-in Super Admin (their email could not be shown here); the ledger records their user id and the activity trail their email.'
       : `${email}, the signed-in Super Admin. The ledger records their user id and the activity trail their email.`,
     audit: {
-      durable: 'The ledger row itself (decided by, decided at, verdict, citation, note, basis; the season seal record for a sealed season).',
+      durable: 'The decision ledger (actor, timestamp, verdict, citation, note and seal record), plus a required data_edits publication audit when winner flags change.',
       activity: 'One administrative activity row, whatever the outcome (done or refused):',
       activityActions: [
         BROWNLOW_ELIGIBILITY_AUDIT_ACTIONS.brownlowEligibilityDecided,

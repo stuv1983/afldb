@@ -39,7 +39,15 @@ export function BrownlowDecisionWorkbench({
     formData: FormData,
   ): Promise<BrownlowEligibilityActionState> => {
     const result = await recordBrownlowEligibilityAction(previous, formData);
-    if (result.ok === true) router.refresh();
+    if (result.ok === true) {
+      try {
+        const response = await fetch('/admin/operations/brownlow/revalidate', { method: 'POST' });
+        if (!response.ok) return { ...result, message: `${result.message} Public cache refresh failed; reload before checking the public result.` };
+      } catch {
+        return { ...result, message: `${result.message} Public cache refresh failed; reload before checking the public result.` };
+      }
+      router.refresh();
+    }
     return result;
   };
   const [state, dispatch, pending] = useActionState<BrownlowEligibilityActionState, FormData>(wrapped, {});

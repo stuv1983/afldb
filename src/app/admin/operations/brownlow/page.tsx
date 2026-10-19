@@ -39,7 +39,7 @@ export const metadata: Metadata = {
  * LAUNCH F F-D (ADR 0014) adds the eligibility-aware MEDAL DETERMINATION above the reconciliation.
  * Its decision form is the only thing here that writes, and only for `data.brownlow.finalise`
  * (Super Admin): an Admin sees the same evidence and history read-only. The form posts to a Server
- * Action that adds one audited ledger row; it changes no raw vote and not the published table.
+ * Action that records evidence and projects eligibility/medal metadata transactionally; raw votes stay unchanged.
  */
 export default async function BrownlowReconciliationPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
@@ -59,8 +59,8 @@ export default async function BrownlowReconciliationPage(
         <p className="subtitle">
           Compares the staged AFL API Brownlow votes with the stored authoritative totals for one
           season and states the medal winner only where eligibility is established. The reconciliation
-          only reads. A Super Admin can record an audited eligibility decision; it changes no vote,
-          total or published award.
+          only reads. A Super Admin can record an audited eligibility decision and publish its effect
+          on the medal result in the same transaction. Raw votes and totals are preserved.
         </p>
       </div>
 

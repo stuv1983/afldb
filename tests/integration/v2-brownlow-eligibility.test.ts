@@ -29,7 +29,7 @@ import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { postgresExecutor, type TransactionalSqlExecutor } from '@afldb/db';
+import { postgresExecutor, postgresTransactionExecutor, type TransactionalSqlExecutor } from '@afldb/db';
 import type { SeasonRegistry } from '@afldb/domain';
 
 import {
@@ -41,8 +41,10 @@ import {
 import {
   loadBrownlowEligibilityEvidence,
   recordBrownlowEligibilityDecision,
+  publishBrownlowEligibilityInTransaction,
   type BrownlowEligibilityDecisionRequest,
 } from '@/db/queries/brownlow-eligibility';
+import { getBrownlowWinners } from '@/db/queries/brownlow';
 import { audit, type AdminUser } from '@/lib/auth/session';
 
 vi.mock('@/lib/auth/session', () => ({
@@ -233,6 +235,8 @@ afterAll(async () => {
   let failure: unknown;
   const step = async (work: () => Promise<unknown>) => { try { await work(); } catch (error) { failure ??= error; } };
   await step(() => owner`DELETE FROM brownlow_eligibility_decisions WHERE season = ANY(${seasons})`);
+  await step(() => owner`DELETE FROM data_edits WHERE admin_user_id = ANY(${createdUsers})`);
+  await step(() => owner`DELETE FROM player_career_stats WHERE player_id = ANY(${players})`);
   await step(() => owner`DELETE FROM brownlow_season_authority WHERE season = ANY(${seasons})`);
   await step(() => owner`DELETE FROM staging.afl_api_brownlow_vote WHERE provider_match_id LIKE ${`${MARKER}%`}`);
   await step(() => owner`DELETE FROM staging.source_record_versions WHERE external_record_id LIKE ${`${MARKER}%`}`);
@@ -285,7 +289,7 @@ async function rawVoteFingerprint(): Promise<string> {
   const seasons = Object.values(SEASONS);
   const [row] = await owner<{ fingerprint: string }[]>`
     SELECT md5(
-      coalesce((SELECT string_agg(b::text, '|' ORDER BY b.season, b.player_id)
+      coalesce((SELECT string_agg((to_jsonb(b) - 'is_winner' - 'is_ineligible' - 'eligible_rank')::text, '|' ORDER BY b.season, b.player_id)
                   FROM brownlow_season_votes b WHERE b.season = ANY(${seasons})), '')
       || '#' ||
       coalesce((SELECT string_agg(r::text, '|' ORDER BY r.id)
@@ -346,6 +350,17 @@ describe('sealed season 2089: a missing leader, a decision, a superseding decisi
     expect(auditMock).not.toHaveBeenCalled(); // a read audits nothing
   });
 
+  it('with unresolved leading eligibility publication clears a stale medal flag and preserves raw votes', async () => {
+    const rawBefore = await rawVoteFingerprint();
+    const result = await importSql.begin((tx) => publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
+      season: SEASONS.sealed, registry: REGISTRY, actorId: superAdmin.id, note: NOTE,
+    }));
+    expect(result.determination.status).toBe('requires_review');
+    expect(result.determination.winners).toEqual([]);
+    expect((await getBrownlowWinners()).filter((r) => r.season === SEASONS.sealed)).toEqual([]);
+    expect(await rawVoteFingerprint()).toBe(rawBefore);
+  });
+
   it('the determination is deterministic: the same evidence gives the identical determination and checksum', async () => {
     const a = await determine(SEASONS.sealed);
     const b = await determine(SEASONS.sealed);
@@ -400,7 +415,9 @@ describe('sealed season 2089: a missing leader, a decision, a superseding decisi
     expect(after!.determination.rawLeaderboard[0]).toMatchObject({
       playerId: playerIds.a1, votes: 30, eligibility: { status: 'ineligible', source: 'admin_decision', detail: { decisionId: firstDecisionId } },
     });
-    expect(after!.storedFlagCheck).toEqual({ state: 'disagrees', storedWinners: [playerIds.a1], determinedWinners: [playerIds.a2] });
+    expect(after!.storedFlagCheck).toEqual({ state: 'agrees', storedWinners: [playerIds.a2], determinedWinners: [playerIds.a2] });
+    const publicWinners = await getBrownlowWinners();
+    expect(publicWinners.filter((r) => r.season === SEASONS.sealed).map((r) => r.playerId)).toEqual([playerIds.a2]);
     expect(after!.determination.inputChecksum).not.toBe(reviewChecksum);
 
     // Audited once, as done, with ids and codes only.
@@ -460,6 +477,35 @@ describe('sealed season 2089: a missing leader, a decision, a superseding decisi
 
   it('through all of it the RAW VOTES are untouched, byte for byte', async () => {
     expect(await rawVoteFingerprint()).toBe(before);
+  });
+
+  it('republication is idempotent and preserves the audited decision history', async () => {
+    const [before] = await owner`SELECT count(*)::int AS n FROM data_edits WHERE field_group = 'eligibility_publication'`;
+    const result = await importSql.begin((tx) => publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
+      season: SEASONS.sealed, registry: REGISTRY, actorId: superAdmin.id, note: NOTE,
+    }));
+    expect(result.changed).toBe(false);
+    const [after] = await owner`SELECT count(*)::int AS n FROM data_edits WHERE field_group = 'eligibility_publication'`;
+    expect(after.n).toBe(before.n);
+    expect((await ledger(SEASONS.sealed)).length).toBe(2);
+  });
+
+  it('a required publication audit failure rolls back the decision and every public metadata change', async () => {
+    const before = await owner`SELECT to_jsonb(b) AS row FROM brownlow_season_votes b WHERE season=${SEASONS.sealed} ORDER BY player_id`;
+    const history = await ledger(SEASONS.sealed);
+    await owner`CREATE FUNCTION fd_test_publication_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW.field_group='eligibility_publication' THEN RAISE EXCEPTION 'forced publication audit failure'; END IF; RETURN NEW; END $$`;
+    await owner`CREATE TRIGGER fd_test_publication_failure BEFORE INSERT ON data_edits FOR EACH ROW EXECUTE FUNCTION fd_test_publication_failure()`;
+    try {
+      await expect(recordBrownlowEligibilityDecision(executor, request({
+        expectedCurrentDecisionId: history.at(-1)!.id, publicationRegistry: REGISTRY,
+      }))).rejects.toThrow('forced publication audit failure');
+      expect(await ledger(SEASONS.sealed)).toEqual(history);
+      expect(await owner`SELECT to_jsonb(b) AS row FROM brownlow_season_votes b WHERE season=${SEASONS.sealed} ORDER BY player_id`).toEqual(before);
+    } finally {
+      await owner`DROP TRIGGER fd_test_publication_failure ON data_edits`;
+      await owner`DROP FUNCTION fd_test_publication_failure()`;
+    }
   });
 });
 

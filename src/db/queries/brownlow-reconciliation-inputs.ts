@@ -55,6 +55,9 @@ export class BrownlowInputError extends Error {
 }
 
 export interface BrownlowInputRequest {
+  /** Medal publication may use authoritative historical totals when no API votes exist.
+   * This does not claim API coverage or per-match reconciliation. */
+  readonly storedOnlyFallback?: boolean;
   readonly season: number;
   readonly registry: SeasonRegistry;
   /** ISO-8601 UTC instant supplied by the caller. */
@@ -204,7 +207,7 @@ export async function loadBrownlowReconciliationInput(
     matchVotes: groupMatchVotes(voteRows),
     leaderboard: null,
     storedTotals,
-    matchContext,
+    matchContext: request.storedOnlyFallback && voteRows.length === 0 ? [] : matchContext,
   };
   return request.eligibilityRule === undefined ? input : { ...input, eligibilityRule: request.eligibilityRule };
 }

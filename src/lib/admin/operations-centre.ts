@@ -1009,12 +1009,15 @@ async function computeBrownlowDetermination(
   registry: SeasonRegistry,
   generatedAt: string,
 ): Promise<BrownlowDeterminationView> {
-  const reconciliationInput = await loadBrownlowReconciliationInput(executor, { season, registry, generatedAt });
-  const report = reconcileBrownlowSeason(reconciliationInput);
+  const reconciliationInput = await loadBrownlowReconciliationInput(executor, { season, registry, generatedAt, storedOnlyFallback: true });
+  let report = reconcileBrownlowSeason(reconciliationInput);
   const evidence = await loadBrownlowEligibilityEvidence(executor, {
     season,
     playerIds: report.rawVotes.playerTotals.map((total) => total.playerId),
   });
+  if (evidence.seasonAdminPublished && reconciliationInput.seasonState !== 'complete') {
+    report = reconcileBrownlowSeason({ ...reconciliationInput, seasonState: 'complete' });
+  }
   const determination = determineBrownlowMedal({
     report,
     seasonAdminPublished: evidence.seasonAdminPublished,
@@ -1086,8 +1089,8 @@ export type BrownlowEligibilityRecorded = {
  * characters) and a note (20..2000), in ONE transaction under a per-season advisory lock. A later
  * decision for the same player supersedes it and nothing is ever updated or deleted, so a decision
  * is not undone - it is superseded. A decision into a SEALED season is an audited correction
- * (workflow `brownlow_eligibility_decision`) stored verbatim on the row. It never writes
- * `brownlow_season_votes`, the round votes or staging.
+ * (workflow `brownlow_eligibility_decision`) stored verbatim on the row. Medal/eligibility metadata
+ * and its required audit are published in that transaction; raw votes and staging are preserved.
  *
  * `expectedCurrentDecisionId` is the id of the decision the administrator SAW as current (null for
  * none): if it changed meanwhile the decision is refused `stale_decision`. After the commit the
@@ -1144,6 +1147,7 @@ export async function recordBrownlowEligibilityForAdmin(
           decidedBy: admin.id,
           viewer: { role: admin.role, canManageAdmins: admin.canManageAdmins },
           sealed: sealedSeasonsFrom(registry),
+          publicationRegistry: registry,
         });
         if (!outcome.ok) return { outcome, determination: null, recomputeError: undefined };
         // The decision is committed. A failure to RECOMPUTE must not turn it into a refusal.

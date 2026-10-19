@@ -1566,7 +1566,8 @@ describe('Brownlow eligibility: callers, Server Action and form (Launch F F-D st
     const { describeBrownlowEligibilityConsequences } = await import('@/app/admin/operations/brownlow/eligibility-consequences');
     const sealed = describeBrownlowEligibilityConsequences({ actingEmail: 'super@example.invalid', season: 1990, playerId: 7, identity: 'afltables:players/s/x.html', sealedSeason: true, supersedesId: 4 });
     expect(sealed.changes.join(' ')).toMatch(/append-only/);
-    expect(sealed.changes.join(' ')).toMatch(/NOT change any raw vote/);
+    expect(sealed.changes.join(' ')).toMatch(/Preserves every raw vote/);
+    expect(sealed.changes.join(' ')).toMatch(/publishes its winner flags in the same transaction/);
     expect(sealed.affected).toContain('afltables:players/s/x.html');
     expect(sealed.validationState).toMatch(/SEALED/);
     expect(sealed.validationState).toMatch(/supersede decision #4/);

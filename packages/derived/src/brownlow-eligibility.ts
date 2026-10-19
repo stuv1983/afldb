@@ -278,6 +278,9 @@ export function validateBrownlowMedalInput(input: unknown): string[] {
  *     stored rank that is present but wrong still refuses.
  */
 export function isEligibilityEvidenceFinding(finding: BrownlowFinding): boolean {
+  // Winner flags are the publication OUTPUT, not vote or eligibility evidence.
+  // A superseding decision may deliberately disagree with the old projection.
+  if (finding.code === 'stored_winner_flag_inconsistent') return true;
   if (finding.code === 'eligibility_flag_inconsistent') return true;
   return finding.code === 'stored_rank_inconsistent'
     && finding.detail.field === 'eligible_rank'

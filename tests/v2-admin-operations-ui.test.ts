@@ -842,7 +842,7 @@ describe('Coleman views', () => {
 describe('Brownlow views', () => {
   it('states both caveats up front', () => {
     const markup = html(createElement(BrownlowCaveats));
-    expect(markup).toContain('V2-GAP-016');
+    expect(markup).toContain('audited eligibility evidence (ADR 0014)');
     expect(markup).toContain('F-WB1-005');
     expect(markup).toContain('data-caveat="eligibility-rule"');
     expect(markup).toContain('data-caveat="leaderboard-not-staged"');
@@ -1224,7 +1224,7 @@ describe('page modules', () => {
 
     const none = html(await Page({ searchParams: Promise.resolve({}) } as never));
     expect(none).toContain('data-no-season="true"');
-    expect(none).toContain('V2-GAP-016');
+    expect(none).toContain('audited eligibility evidence (ADR 0014)');
     expect(opsMocks.reconcileBrownlowSeasonForAdmin).not.toHaveBeenCalled();
 
     const shown = html(await Page({ searchParams: Promise.resolve({ season: '2090', rule: 'stored_eligible_rank_one' }) } as never));
@@ -1241,7 +1241,7 @@ describe('page modules', () => {
     const refused = html(await Page({ searchParams: Promise.resolve({ season: '2090' }) } as never));
     expect(refused).toContain('data-load-failure="true"');
     expect(refused).toContain('SYNTHETIC: staged rows disagree.');
-    expect(refused).toContain('V2-GAP-016');
+    expect(refused).toContain('audited eligibility evidence (ADR 0014)');
   });
 });
 

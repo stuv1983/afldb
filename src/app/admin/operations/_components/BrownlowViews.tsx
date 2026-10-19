@@ -30,7 +30,8 @@ export function BrownlowCaveats() {
     <section className="section" id="brownlow-caveats" aria-labelledby="brownlow-caveats-heading">
       <h2 id="brownlow-caveats-heading">Read this first</h2>
       <p className="notice" data-caveat="eligibility-rule">
-        <strong>No eligibility rule is recorded for API-era seasons (V2-GAP-016).</strong> The default{' '}
+        <strong>The medal uses audited eligibility evidence (ADR 0014).</strong> The diagnostic{' '}
+        reconciliation has a separate default{' '}
         <span className="mono">unrecorded</span> rule therefore refuses to state a leader whenever an
         ineligible player polled votes. The <span className="mono">stored_eligible_rank_one</span>{' '}
         rule reproduces the convention measured on the stored AFL Tables table; it is applied only if
@@ -110,6 +111,13 @@ export function BrownlowReportView({ report }: { report: BrownlowReconciliationR
     <div data-brownlow-report={report.source.season}>
       <section className="section" id="brownlow-outcome" aria-labelledby="brownlow-outcome-heading">
         <h2 id="brownlow-outcome-heading">Season {report.source.season}: {OUTCOME_LABELS[report.outcome]}</h2>
+        {evidence.matchVoteRecords === 0 && (
+          <p className="notice" data-api-votes-absent="true">
+            No API match votes are staged for this season. This diagnostic cannot establish API
+            agreement. The medal determination above may use the authoritative historical season
+            totals; missing API evidence does not change those raw votes.
+          </p>
+        )}
         <dl className="audit-kv">
           <dt>Outcome</dt>
           <dd><span className={report.outcome === 'reconciled' ? 'badge' : 'badge badge-warn'}>{OUTCOME_LABELS[report.outcome]}</span></dd>
@@ -191,7 +199,8 @@ export function BrownlowReportView({ report }: { report: BrownlowReconciliationR
         {report.findings.length === 0 ? (
           <p className="muted">No findings.</p>
         ) : (
-          <>
+          <details>
+            <summary>Inspect {report.findings.length} diagnostic findings</summary>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -219,7 +228,7 @@ export function BrownlowReportView({ report }: { report: BrownlowReconciliationR
             {report.findings.length > shown.length && (
               <p className="section-note">Showing the first {shown.length} of {report.findings.length} findings.</p>
             )}
-          </>
+          </details>
         )}
       </section>
 
