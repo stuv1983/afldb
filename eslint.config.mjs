@@ -65,6 +65,8 @@ const eslintConfig = defineConfig([
   ...moduleBoundaries,
   globalIgnores([
     ".next/**",
+    // Standalone rollback archives are generated evidence, not another source checkout.
+    ".local-release/**",
     "artifacts/**",
     "coverage/**",
     "node_modules/**",
