@@ -113,6 +113,18 @@ export {
   type RetiredAdminSurface,
   type RetiredAdminSurfaceKind,
 } from './legacy-retirement';
+// @v2-launchF:legacy-writer-preflight
+// The cutover preflight that refuses the release while a legacy production writer can run. Pure.
+export {
+  LEGACY_WRITER_UNITS,
+  assessLegacyWriterPreflight,
+  parseSystemctlShow,
+  renderLegacyWriterPreflight,
+  type LegacyUnitFacts,
+  type LegacyWriterFacts,
+  type LegacyWriterFinding,
+  type LegacyWriterPreflight,
+} from './legacy-writer-preflight';
 // @v2-stage6:table-row-counts
 // The table row-count inventory format (shadow parity input; docs/v2/shadow-rehearsal.md). Pure.
 export {

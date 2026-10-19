@@ -21,6 +21,8 @@ import { describe, expect, it } from 'vitest';
 import {
   LEGACY_RETIRED_CODE,
   RETIRED_ADMIN_SURFACES,
+  assessLegacyWriterPreflight,
+  parseSystemctlShow,
   RETIRED_ENTRIES,
   findRetiredAdminSurface,
   findRetiredEntry,
@@ -45,6 +47,8 @@ import {
   scheduledLegacyReferences,
   type SourceFile,
 } from '@afldb/testing';
+
+import { runCutoverPreflight } from '../tools/v2/cutover-preflight';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -287,13 +291,15 @@ function ratchetDiff(
  *   src/app/api/admin/email-intake/route.ts -> pipeline.ts
  * Two admin edges remain, both reads of the AFL API settle unit table (a type and SETTLE_UNITS),
  * never the AFL Tables trigger; the Stage 5 guards below pin that `startSettleRun` is not imported.
+ *
+ * Launch F (V2-GAP-012) retired two more: settle-afl-api.ts and settle-report.ts -> settle-afltables.ts.
+ * Their shared helpers moved verbatim to src/lib/acquisition/settle-shared.ts, so the AFL API runtime
+ * no longer imports the AFL Tables settle module.
  */
 const KNOWN_LEGACY_RUNTIME_EDGES: readonly { from: string; to: string; disposition: string }[] = [
   { from: QUARANTINED_TOOL, to: 'src/lib/external-afl/current-season-import.ts', disposition: 'legacy/offline quarantine' },
   { from: 'src/app/admin/current-season/AflApiSettleUnitsPanel.tsx', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'retained: AFL API settle units panel reads SETTLE_UNITS and the unit-key type, never startSettleRun' },
   { from: 'src/app/admin/current-season/page.tsx', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'retained: type-only read of the unit-key type for the AFL API settle units panel' },
-  { from: 'src/lib/acquisition/settle-afl-api.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: AFL API settle shares the AFL Tables settle helpers' },
-  { from: 'src/lib/acquisition/settle-report.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: settle report reads the AFL Tables settle types' },
   { from: 'src/lib/acquisition/settle-status.ts', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'ISSUE-316 C4b cutover: settle status reads the trigger contract' },
   { from: 'tools/current-season/settle-afltables.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: AFL Tables settle CLI (retired through ISSUE-316: D-316-1 at C2, the timer by C5 under D-316-4; plan R-042)' },
   { from: 'tools/db/afl-api-identity-correction-rehearsal.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'offline rehearsal tooling (tools/db)' },
@@ -822,5 +828,88 @@ describe('retired admin controls (Stage 5): the removed controls stay removed an
     expect(retiredSurfaceViolations(() => null, surfaces)).toEqual([
       'admin.csv_upload: r.ts is missing', 'admin.submission_review: a.ts is missing',
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Launch F (V2-GAP-011 / 012 / 013): no legacy writer executes from a V2 checkout, and the cutover
+// preflight refuses the release while one can still run on the host.
+// ---------------------------------------------------------------------------------------------
+
+describe('Launch F: the legacy entry points refuse before doing anything', () => {
+  it('the AFL Tables settle CLI, run directly, refuses before .env or a connection (exit 1)', () => {
+    const r = spawnSync(process.execPath, [join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs'), 'tools/current-season/settle-afltables.ts', '--label', 'x', '--apply'], {
+      cwd: ROOT, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', NODE_ENV: 'test' },
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('AFLDB_LEGACY_RETIRED_V2: the AFL Tables settle is retired');
+  }, 60_000);
+
+  it('the AFL Tables deploy script stops after the out-of-season exit and before step 1 (acquisition)', () => {
+    const script = readFileSync(join(ROOT, 'deploy', 'afldb-settle-afltables.sh'), 'utf8');
+    const guard = script.indexOf('echo "AFLDB_LEGACY_RETIRED_V2');
+    expect(guard).toBeGreaterThan(script.indexOf('AMBIGUOUS:0)'));
+    expect(guard).toBeLessThan(script.indexOf('[1/3] acquire'));
+    expect(script.slice(guard, script.indexOf('[1/3] acquire'))).toMatch(/\nexit 1\n/);
+  });
+
+  it('the email-intake poller, executed directly, refuses before reading the environment or the mailbox', () => {
+    const source = readFileSync(join(ROOT, 'tools', 'email_intake', 'fetch_and_stage.py'), 'utf8');
+    const entry = source.slice(source.indexOf('if __name__ == "__main__":'));
+    expect(entry).toContain('print(LEGACY_RETIRED_V2, file=sys.stderr)');
+    expect(entry).toContain('sys.exit(1)');
+    expect(entry).not.toContain('main()');
+  });
+
+  it('the AFL API settle and the settle report import no AFL Tables module (V2-GAP-012)', () => {
+    for (const path of ['src/lib/acquisition/settle-afl-api.ts', 'src/lib/acquisition/settle-report.ts', 'src/lib/acquisition/settle-shared.ts']) {
+      expect(readFileSync(join(ROOT, path), 'utf8'), path).not.toMatch(/from '\.\/settle-afltables'/);
+    }
+  });
+});
+
+describe('Launch F: the legacy-writer cutover preflight', () => {
+  const unit = (id: string, loadState: string, unitFileState: string, activeState: string) => ({ id, loadState, unitFileState, activeState });
+  const retired = [
+    unit('afldb-settle-afltables.timer', 'loaded', 'disabled', 'inactive'),
+    unit('afldb-settle-afltables.service', 'loaded', 'static', 'inactive'),
+    unit('afldb-email-intake.timer', 'not-found', '', 'inactive'),
+    unit('afldb-email-intake.service', 'loaded', 'static', 'failed'),
+  ];
+
+  it('passes only when every legacy timer is disabled, nothing runs and no on-demand rule remains', () => {
+    expect(assessLegacyWriterPreflight({ units: retired, polkitRules: ['10-other.rules'] }).verdict).toBe('PASS');
+  });
+
+  it.each([
+    ['an enabled AFL Tables timer', 0, unit('afldb-settle-afltables.timer', 'loaded', 'enabled', 'active'), 'sudo systemctl disable --now afldb-settle-afltables.timer'],
+    ['a running email-intake run', 3, unit('afldb-email-intake.service', 'loaded', 'static', 'activating'), 'wait for afldb-email-intake.service'],
+    ['an unknown state', 2, unit('afldb-email-intake.timer', 'loaded', 'enabled-runtime', 'inactive'), 'sudo systemctl disable --now afldb-email-intake.timer'],
+  ])('refuses %s, naming the reversible remedy', (_label, index, replacement, remedy) => {
+    const units = retired.map((u, i) => (i === index ? replacement : u));
+    const result = assessLegacyWriterPreflight({ units, polkitRules: [] });
+    expect(result.verdict).toBe('REFUSE');
+    expect(result.findings.find((f) => !f.ok)?.remedy).toContain(remedy);
+  });
+
+  it('fails closed on a missing unit record, an unlisted rules directory and an on-demand rule', () => {
+    expect(assessLegacyWriterPreflight({ units: retired.slice(1), polkitRules: [] }).verdict).toBe('REFUSE');
+    expect(assessLegacyWriterPreflight({ units: retired, polkitRules: null }).verdict).toBe('REFUSE');
+    const rule = assessLegacyWriterPreflight({ units: retired, polkitRules: ['50-afldb-settle-afltables-trigger.rules'] });
+    expect(rule.verdict).toBe('REFUSE');
+    expect(rule.findings.at(-1)?.remedy).toBe('sudo mv /etc/polkit-1/rules.d/50-afldb-settle-afltables-trigger.rules /root/afldb-v2-retired/50-afldb-settle-afltables-trigger.rules');
+  });
+
+  it('parses systemctl show output and the CLI maps verdicts to exit codes without running a host command', () => {
+    const show = 'Id=afldb-settle-afltables.timer\nLoadState=loaded\nUnitFileState=enabled\nActiveState=active\n\nId=afldb-email-intake.timer\nLoadState=not-found\nUnitFileState=\nActiveState=inactive\n';
+    expect(parseSystemctlShow(show)).toEqual([
+      unit('afldb-settle-afltables.timer', 'loaded', 'enabled', 'active'), unit('afldb-email-intake.timer', 'not-found', '', 'inactive'),
+    ]);
+    const log = () => {};
+    expect(runCutoverPreflight(['legacy-writers'], { platform: 'linux', systemctlShow: () => ({ status: 0, stdout: show }), listPolkitRules: () => [], log })).toBe(1);
+    expect(runCutoverPreflight(['legacy-writers'], { platform: 'win32', log })).toBe(2);
+    expect(runCutoverPreflight(['legacy-writers', '--facts', 'f.json'], { readFacts: () => JSON.stringify({ units: retired, polkitRules: [] }), log })).toBe(0);
+    expect(runCutoverPreflight(['legacy-writers', '--facts', 'f.json'], { readFacts: () => '{', log })).toBe(2);
+    expect(runCutoverPreflight(['nope'], { log })).toBe(2);
   });
 });

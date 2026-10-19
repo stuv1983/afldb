@@ -46,11 +46,11 @@ import type { JsonValue } from './observations';
 import {
   CANONICAL_APPLY_ISSUE_OWNER,
   CANONICAL_APPLY_ISSUE_TYPE,
+  DEFAULT_SETTLE_REPORT_SOURCE_KEY,
   MATCH_TARGET_TABLES,
   SETTLE_ISSUE_OWNER,
   SETTLE_ISSUE_TYPE,
-  SETTLE_SOURCE_KEY,
-} from './settle-afltables';
+} from './settle-shared';
 
 type Db = postgres.Sql;
 
@@ -403,7 +403,7 @@ export async function buildSettleExceptionReport(
     deferredRecords?: Readonly<Record<string, number>>;
   },
 ): Promise<SettleExceptionReport> {
-  const sourceKey = input.sourceKey ?? SETTLE_SOURCE_KEY;
+  const sourceKey = input.sourceKey ?? DEFAULT_SETTLE_REPORT_SOURCE_KEY;
   const tool = input.tool ?? SETTLE_BATCH_TOOL;
   const disagreementIssueType = input.disagreementIssueType ?? SETTLE_ISSUE_TYPE;
   const disagreementIssueOwner = input.disagreementIssueOwner ?? SETTLE_ISSUE_OWNER;

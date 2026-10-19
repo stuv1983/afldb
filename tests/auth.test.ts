@@ -1512,12 +1512,12 @@ describe('adminNavFor', () => {
   const idsFor = (v: AdminNavViewer) => adminNavFor(v).map((g) => g.id);
   const hrefsFor = (v: AdminNavViewer) => adminNavFor(v).flatMap((g) => g.links.map((l) => l.href));
 
-  it('gives a contributor exactly the upload form and their own password, nothing else', () => {
+  it('gives a contributor exactly their own password: the retired upload form is not listed (V2 Launch F)', () => {
     const groups = adminNavFor({ role: 'contributor', canManageAdmins: false });
     expect(groups.map((g) => g.links.map((l) => l.href))).toEqual([
-      ['/admin/upload'],
       ['/admin/password'],
     ]);
+    expect(groups.flatMap((g) => g.links.map((l) => l.label))).not.toContain('Upload a file');
   });
 
   it('never lists the grid solver: it left the admin area when audience became a setting', () => {
@@ -1627,9 +1627,9 @@ describe('adminNavFor', () => {
       expect(hrefs, role).not.toContain('/admin/upload');
       expect(groups.flatMap((g) => g.links.map((l) => l.label)), role).not.toContain('Legacy file intake');
     }
-    // The contributor branch is deliberately unchanged: the upload form and their own password.
+    // Launch F: the contributor branch lists only their own password; the retired upload is gone.
     const contributor = hrefsFor({ role: 'contributor', canManageAdmins: false });
-    expect(contributor).toEqual(['/admin/upload', '/admin/password']);
+    expect(contributor).toEqual(['/admin/password']);
     expect(contributor).not.toContain('/admin/operations');
   });
 

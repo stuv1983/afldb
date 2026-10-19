@@ -11,23 +11,34 @@ Companion documents: `docs/v2/rollback-runbook.md` (backup and rollback),
 
 ## 1. Two separate tracks: the V2 release and the AFL API cutover
 
-1. **The V2 release** (this runbook): migrations 111 and 112, their grants, and the V2 code (the
+1. **The V2 release** (this runbook): migrations 111-114, their grants, and the V2 code (the
    operations centre, the retired legacy admin surfaces, the seal checks, curated awards, the
-   Coleman publisher), plus disabling the email-intake timer in the same window
-   (`docs/v2/legacy-disposition.md` L3, V2-GAP-013).
+   Coleman publisher and projection, Brownlow eligibility, the AFL API fixture writer), plus
+   retiring every legacy production writer in the same window: the email-intake timer
+   (`docs/v2/legacy-disposition.md` L3, V2-GAP-013) **and, since Launch F, the AFL Tables nightly
+   settle** (V2-GAP-011). A V2 checkout refuses both at their entry points
+   (`deploy/afldb-settle-afltables.sh`, `tools/current-season/settle-afltables.ts`,
+   `tools/email_intake/fetch_and_stage.py`), and `tools/v2/cutover-preflight.ts legacy-writers`
+   refuses the release while either timer, a running legacy unit or the on-demand AFL Tables polkit
+   rule remains (step 4a).
 2. **The AFL API cutover** (`issues/open/AFLDB-ISSUE-316.md` §7, steps C0-C9): retiring AFL Tables
    network acquisition and turning on the AFL API pipeline for 2027. It is governed entirely by
    ISSUE-316's own owner decisions. **V2 does not execute, grant, satisfy or shorten any of them.**
    In particular:
-   - the AFL Tables nightly settle (`deploy/afldb-settle-afltables.timer`, L4, V2-GAP-011) keeps
-     running until the ISSUE-316 sequence retires it: **D-316-1** (C2) writes the AFL Tables switch
-     `retired` in the 2026 rollover and optionally disables the timer; the timer must be disabled
-     by **C5** at the latest, which needs **D-316-4** (the cutover go) and a recorded C4b PASS;
+   - the AFL Tables nightly settle (`deploy/afldb-settle-afltables.timer`, L4, V2-GAP-011): under
+     ISSUE-316, **D-316-1** (C2) writes the AFL Tables switch `retired` in the 2026 rollover and the
+     timer is disabled by **C5**, which needs **D-316-4** (the cutover go) and a recorded C4b PASS.
+     **Launch F changes the order:** the V2 code refuses the AFL Tables settle, so the V2 release
+     can only go live once that timer is disabled. Either the release follows ISSUE-316 C5, or the
+     owner approves disabling the timer in the release window (approval A-AFLT, `go-no-go.md` §4);
+     V2 grants neither;
    - **D-316-2** (C3) installs the four AFL API units on PROD as inert units (nothing started, no
      timer enabled); it is also a separate owner approval and is not part of the V2 release;
    - **D-316-13** (C4b, the production D1 rehearsal) must not be granted or used before C4 is
      deployed (ISSUE-316 §7 C4b, §8);
-   - AFL API pre-match fixtures stay unsupported until AFLDB-ISSUE-229 B2 (V2-GAP-008).
+   - AFL API pre-match fixtures: the writer exists (`npm run settle:afl-api-fixture-schedule`,
+     V2-GAP-008) and is proved on the isolated PostgreSQL 16 only; its first production apply waits
+     for AFLDB-ISSUE-229 B2 (the first authentic 2027 pre-match feed) and its own approval.
 
    Correction (plan §7 R-042): earlier V2 documents said the AFL Tables runtime stays "until
    D-316-2". In ISSUE-316, D-316-2 is the inert AFL API unit installation (C3); the AFL Tables
@@ -43,6 +54,8 @@ AFL API or AFL Tables unit. It must not be combined with any ISSUE-316 step in o
 |---|---|---|
 | 1 | `src/db/migrations/111_curated_award_proposals.sql` | creates `award_proposals` and the append-only `award_proposal_decisions`; their only FKs are to `auth_users` and to `award_proposals` itself (no FK into football tables) |
 | 2 | `src/db/migrations/112_derived_award_results.sql` | creates the append-only `derived_award_results` ledger; FKs only to `auth_users` and to itself (the supersession chain); none into football tables |
+| 2a | `src/db/migrations/113_brownlow_eligibility_decisions.sql` | creates the append-only `brownlow_eligibility_decisions` ledger (no FK into players or seasons; ADR 0014) |
+| 2b | `src/db/migrations/114_award_projections_and_curated_revisions.sql` | creates the append-only `derived_award_projections` provenance table and widens the curated decision / proposal checks for four-eyes and approved revisions (ADR 0008, 0015) |
 | 3 | `tools/maintenance/privileges.sql` (owner role) | grants `afldb_import` SELECT/INSERT (+ the column-scoped UPDATE on `award_proposals`, sequence USAGE) and `afldb_auth` SELECT; no `afldb_app` grant (not app-readable). Before the code, because code that reaches a table before its grant fails closed with "permission denied" (AFLDB-ISSUE-027) |
 | 4 | the V2 application build and restart | the operations centre reads and writes the new tables through `afldb_import` (plan §7 R-037) |
 
@@ -78,7 +91,7 @@ npm run preflight -- --mode deploy --environment <prod environment name used by 
 ```
 
 Record `PREV` (the commit currently serving). Gate 1: the preflight's only migration findings are
-`pending-migration` for exactly 111 and 112.
+`pending-migration` for exactly 111, 112, 113 and 114.
 
 ### Step 2 — record the scheduler state (read-only)
 
@@ -112,11 +125,32 @@ Why before the code: once the V2 code is live, the email-intake route answers 41
 (`tools/email_intake/fetch_and_stage.py:606-607`, `:742-744`). Disabling the timer first means no
 message is consumed by a refusing route. Approval: part of A-REL. Gate 4: both checks as shown.
 
-### Step 5 — migrations 111 and 112
+### Step 4a — retire the AFL Tables settle and prove no legacy writer remains (Launch F)
+
+Requires approval A-AFLT (or ISSUE-316 C5 already done). Each command has its exact reverse, used
+only with a code rollback to `PREV` (`docs/v2/rollback-runbook.md`):
+
+| Do (in the window) | Reverse (rollback only) |
+|---|---|
+| `sudo systemctl disable --now afldb-settle-afltables.timer` | `sudo systemctl enable --now afldb-settle-afltables.timer` |
+| `sudo install -d -m 700 /root/afldb-v2-retired && sudo mv /etc/polkit-1/rules.d/<the afldb-settle-afltables rule> /root/afldb-v2-retired/` (only if step 2 or the preflight lists one) | `sudo mv /root/afldb-v2-retired/<rule> /etc/polkit-1/rules.d/` |
+| (step 4) `sudo systemctl disable --now afldb-email-intake.timer` | `sudo systemctl enable --now afldb-email-intake.timer` |
+
+Nothing is deleted: unit files stay installed and the rule file is moved aside, so every reverse is
+one command. Then, read-only:
 
 ```bash
-AFLDB_MIGRATE_TARGET=prod npm run db:status      # 111 and 112 PENDING, nothing else pending
-AFLDB_MIGRATE_TARGET=prod npm run db:migrate     # applies 111 then 112
+npx tsx tools/v2/cutover-preflight.ts legacy-writers   # exit 0 = PASS; 1 = REFUSE; 2 = cannot determine
+```
+
+Gate 4a: PASS. A REFUSE prints the failing unit and its reversible remedy; the window does not
+continue until the preflight passes. Do not run step 7 against a REFUSE.
+
+### Step 5 — migrations 111 to 114
+
+```bash
+AFLDB_MIGRATE_TARGET=prod npm run db:status      # 111-114 PENDING, nothing else pending
+AFLDB_MIGRATE_TARGET=prod npm run db:migrate     # applies 111, 112, 113, 114 in order
 AFLDB_MIGRATE_TARGET=prod npm run db:status      # 0 pending
 ```
 
@@ -178,8 +212,9 @@ npx tsx tools/v2/historical-manifest.ts compare ~/backups/afldb/v2-manifest-befo
 ```
 
 Gate 8: the comparison is `sealed-scope-identical` (exit 0); the step 2 loop prints the same
-`enabled`/`active` values for the AFL Tables and both AFL API timers as before the window, and
-`disabled`/`inactive` for the email-intake timer.
+`enabled`/`active` values for both AFL API timers as before the window, and `disabled`/`inactive`
+for the email-intake and AFL Tables timers; `tools/v2/cutover-preflight.ts legacy-writers` still
+passes.
 
 ### Step 9 — cache and ISR
 
@@ -193,7 +228,7 @@ awards in production, or accept up to a day of staleness per worker for the affe
 
 ### Step 10 — what this window does NOT do
 
-No AFL Tables timer change; no AFL API unit install, start or enable; no change to
+No AFL Tables network-switch or rollover write (ISSUE-316 D-316-1 stays its own step); no AFL API unit install, start or enable; no change to
 `acquisition.afl_api_current_season_enabled`; no settle, acquire, rollover, C4b or Brownlow window;
 no Coleman publication (and no projection into `award_winners`, V2-GAP-021); no curated approval;
 no historical correction. Each of those has its own approval (ISSUE-316 §8, `docs/v2/go-no-go.md` §4).

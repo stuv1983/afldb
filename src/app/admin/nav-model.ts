@@ -52,19 +52,14 @@ function visibleLinks(viewer: AdminNavViewer, links: GatedLink[]): AdminNavLink[
 /**
  * The groups, in the order they appear.
  *
- * A contributor sees one item, because there is one they can reach: the
- * upload form. Everything else in the admin area bounces them back to it
- * (`requireAdmin` redirects a contributor to /admin/upload), so listing more
- * would be listing places to be turned away from.
+ * A contributor sees one item: their own password. The upload form they used to
+ * reach is retired (AFLDB V2 Launch F, V2-GAP-013); `requireAdmin` still lands a
+ * contributor on /admin/upload, which only explains the retirement, so a nav link
+ * to it would advertise a control that no longer exists.
  */
 export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
   if (viewer.role === 'contributor') {
     return [
-      {
-        id: 'data',
-        label: 'Data',
-        links: [{ href: '/admin/upload', label: 'Upload a file' }],
-      },
       {
         id: 'account',
         label: 'Account',

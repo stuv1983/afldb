@@ -782,5 +782,16 @@ def main() -> int:
         conn.logout()
 
 
+# AFLDB V2 Launch F (V2-GAP-013): email intake is retired. The app route this poller posts to
+# answers HTTP 410, so a run would only file every message as rejected. Executed directly (the
+# systemd unit), it now stops before reading the environment or opening the mailbox. main() stays
+# importable for tools/email_intake/test_fetch_and_stage.py, the retained offline evidence. The
+# cutover preflight refuses a release while afldb-email-intake.timer is still enabled.
+LEGACY_RETIRED_V2 = (
+    "AFLDB_LEGACY_RETIRED_V2: email intake is retired in AFLDB V2 (docs/v2/legacy-disposition.md). "
+    "Nothing was read from the mailbox. Disable afldb-email-intake.timer (docs/v2/cutover-runbook.md)."
+)
+
 if __name__ == "__main__":
-    sys.exit(main())
+    print(LEGACY_RETIRED_V2, file=sys.stderr)
+    sys.exit(1)

@@ -156,6 +156,15 @@ case "$season" in
     ;;
 esac
 
+# --- AFLDB V2 Launch F: retired on every V2 checkout (V2-GAP-011) ------------
+# V2 has one current-season writer, the AFL API settle. The cutover preflight
+# (tools/v2/cutover-preflight.ts) refuses a release while this unit's timer is
+# enabled, so reaching this line means a timer or a manual start survived the
+# cutover. Fail the unit loudly, before anything is fetched from AFL Tables or
+# written to PostgreSQL. Out of season (above) stays a quiet success.
+echo "AFLDB_LEGACY_RETIRED_V2: the AFL Tables settle is retired in AFLDB V2 (docs/v2/legacy-disposition.md)."      "Nothing fetched, nothing settled. Disable afldb-settle-afltables.timer (docs/v2/cutover-runbook.md)." >&2
+exit 1
+
 # --- the label ------------------------------------------------------------
 # Snapshots are immutable (ISSUE-093 §4): acquire_core.R refuses a label whose
 # manifest already exists. The minute is included so a supervised rerun on the
