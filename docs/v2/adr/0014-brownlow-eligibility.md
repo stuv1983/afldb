@@ -172,3 +172,8 @@ and never alters a raw vote. Proposed text: "decided (ADR 0014); remaining: proj
 the published `brownlow_season_votes` table (the `/admin/brownlow` publish workflow) and the F-001
 historical blast-radius count". Close once the owner confirms the projection path and the count has
 been run on the rebuilt database.
+
+## Deploy order
+
+Apply migration 113 (and 114, which ships in the same stream), then run `npm run db:privileges`, then deploy
+the code (AFLDB-ISSUE-027): the new caller fails closed until the table and its grants exist.

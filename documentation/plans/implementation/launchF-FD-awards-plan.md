@@ -63,7 +63,7 @@ Owner decisions are binding and quoted in the launch brief; this plan only seque
   `player_id_at_decision` (snapshot, no FK), verdict `eligible|ineligible`, `citation` (required,
   1..2000, URL or source reference), `note` (required, 20..2000 trimmed), `decided_by` FK
   auth_users, `decided_at` default now(), `basis` `open_season|audited_correction`, `correction`
-  jsonb (required iff audited; workflow `brownlow_authority`, actor = decided_by, season matches),
+  jsonb (required iff audited; workflow `brownlow_eligibility_decision` (per section 5 F-006), actor = decided_by, season matches),
   `supersedes_id` chain exactly as mig 112 (root partial unique per (season, identity), one successor,
   composite FK, `supersedes_id < id`). No FK into players/seasons. Grants: `afldb_import` SELECT,
   INSERT + sequence; `afldb_auth` SELECT; `afldb_app` none; mirrored in
@@ -74,7 +74,7 @@ Owner decisions are binding and quoted in the launch brief; this plan only seque
   flags, durable identities of every vote-getter); `recordBrownlowEligibilityDecision` — capability
   `data.brownlow.finalise` checked first; refuses unknown player, identity-less player, a player who
   polled no votes in the season, missing citation/note, stale `expectedCurrentDecisionId`; sealed
-  season => `evaluateSeasonWrite` with workflow `brownlow_authority`, note 20..2000, evidence
+  season => `evaluateSeasonWrite` with workflow `brownlow_eligibility_decision` (section 5 F-006), note 20..2000, evidence
   `brownlow_eligibility:<season>:<identity>`; one transaction with a per-season advisory lock; returns
   the recomputed determination; one `auth_audit_log` activity row (existing pattern).
   Never writes `brownlow_season_votes` (raw votes and published flags untouched); the page shows when
@@ -183,3 +183,13 @@ The launch brief instructs the orchestrator to resolve CRIT/HIGH within the owne
   = `created_by` of the revision approved; `approved` insert variant; widened approval CHECK allows the key
   only for `approved|superseded`; revise locks the canonical row by `approved_entity_key` in-transaction;
   V2-GAP-020 test drives approval and asserts `stale_validation`; named test lists).
+
+## 6. Closure ratifications (orchestrator)
+
+- Closure F-003 ratified: a `stored_rank_inconsistent` finding on `eligible_rank` whose stored value is NULL is the
+  "not recorded" gap of F-001 (per-player `missing`, so `requires_review` when decisive), not a whole-season
+  refusal; a present-but-wrong rank still refuses. It cannot invent a winner. Pinned in ADR 0014 and tests.
+- Closure F-002 (approved revisions are self-applied by one super admin with a 20+ character note, recorded as
+  `selfApproval: true`) is reported to the owner for confirmation; not changed.
+- Stream B1 measured that the loader reports `updated` = rows matched; the parity criterion is "0 inserted,
+  0 deleted, values unchanged" (ADR 0015), correcting section 5 F-003 wording.
