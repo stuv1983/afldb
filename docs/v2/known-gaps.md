@@ -244,7 +244,9 @@ close it. An entry is removed only when the closing evidence exists.
   (`legacy-disposition.md` L8-L10). Only the TypeScript CLI `update-current-season.ts` moved to
   `legacy/offline/`.
 - **Why.** The sealed historical rebuild (`tools/db/rebuild-test.ts`) invokes them by path, and V2
-  cannot execute Python or R to prove a moved script still runs. Two are frozen ISSUE-316 files.
+  cannot execute Python or R to prove a moved script still runs. Three are frozen ISSUE-316 files
+  (`tools/rebuild/afltables/acquire_club_lists.R`, `acquire_coaches.py`,
+  `tools/rebuild/fitzroy/acquire_core.R`).
 - **Guard.** No runtime TypeScript imports them (guard e in `legacy-disposition.md` §2).
 - **Close.** Move them with the rebuild's path references updated, then run the rebuild on an
   isolated `afldb_test` to prove it still completes.

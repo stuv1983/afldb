@@ -25,7 +25,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
-| 4 Derived + curated | done pending afldb-closure (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9` + the documents commit |
+| 4 Derived + curated | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9`, `1374fc13` + this closure commit |
 | 5-6 | not started (Launches D-E) | — |
 
 ## Stage 0 — evidence
@@ -243,11 +243,22 @@ Stage-close results (orchestrator runs on the committed tree plus these document
 | frozen ISSUE-316 files | source: 19 of 19 sha256 match the snapshot; V2: 18 of 19 match, `CHANGELOG.md` differs by design (the V2 section) |
 | source worktree status | differs from the snapshot only by `?? supplies` |
 
-`afldb-closure` verdict: recorded in the next commit.
+`afldb-closure` (`.phaneslight/returns/launchC-20261019/09-closure-stage4.md`) re-derived every
+check independently and returned **PASS_WITH_FINDINGS**: tsc 0; focused 12 files 1227 passed, 5
+failed (all baseline lines); full suite identical to the above (102 `FAIL` lines byte-identical
+to the baseline); ESLint 253/132; both generators 0; frozen hashes as above; 57 changed paths, no
+drift; migrations 111/112 additive with comment-only rollback, no `afldb_app` grant, no UPDATE or
+DELETE on the ledgers. Findings: C8-001 (LOW, V2-GAP-014 said two frozen rebuild files; there are
+three) and C8-002 (LOW, `.env.example` and `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` still
+named the retired CLI as live), both corrected in the closure commit; C2-001 (INFO: the curated and
+legacy commits' focused runs reported 6 failures because they also ran
+`tests/awards-admin.test.ts`, whose one failure is a baseline line); C0-001 (LOW, procedural:
+closure itself ran `npm view @electric-sql/pglite@0.2.17 time`, a network command its brief did
+not authorise; output discarded, no repository change; reported to the owner).
 
 ## Resumption point
 
-Stage 4 is done pending `afldb-closure`. **Launch D starts Stage 5** (admin operations centre and
+Stage 4 is done. **Launch D starts Stage 5** (admin operations centre and
 UI, ADR 0009): read `docs/v2/plan.md` (stage 5 row, D9, §7 R-020 to R-029), this file,
 `docs/v2/known-gaps.md` (V2-GAP-011, 013, 016, 018, 019 and 021 are the Stage 5
 inputs), `docs/v2/legacy-disposition.md` (L1-L3, L5, L6 are Stage 5's) and ADR 0008's "What Stage

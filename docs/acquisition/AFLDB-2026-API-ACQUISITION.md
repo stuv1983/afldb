@@ -108,7 +108,7 @@ for 2026 and every future season should be.
 | Match provenance | `064_matches_external_provenance.sql` | `add_provenance_columns('matches')` → `source_id`, `source_record_id`, `import_batch_id` |
 | API clients | `src/lib/external-afl/current-matches.ts` | Squiggle `?q=teams` + `?q=games`; Kali `GET /matches?year=&limit=200` with `Authorization: Bearer` |
 | Orchestration | `src/lib/external-afl/current-season-import.ts` | fetch → resolve club → resolve local match → upsert staging → optional canonical update/insert, all inside one `sql.begin` |
-| CLI | `tools/current-season/update-current-season.ts` | `npm run current-season:update`, dry-run default, `--apply`, `--insert-missing-matches`, `--update-matches`, `--report` |
+| CLI | `legacy/offline/tools/current-season/update-current-season.ts` (**retired in AFLDB V2 Stage 4**: offline only, `--source` required; `npm run current-season:update` now refuses, see `docs/v2/legacy-disposition.md` L6) | formerly `npm run current-season:update`, dry-run default, `--apply`, `--insert-missing-matches`, `--update-matches`, `--report` |
 | Admin | `src/app/admin/current-season/{page,actions}.tsx` | super-admin only, audited. **Superseded by ISSUE-128:** `mode=auto` is gone; the only fallback modes are `manual` (explicit source, no canonical write) and `report` |
 | Debug contract | `.agents/skills/afldb-api-data-debug/SKILL.md` | pipeline-correctness skill; records a live 2026 dry-run whose aggregate and per-source counters contradict each other |
 
