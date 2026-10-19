@@ -3,6 +3,10 @@
 - Status: Accepted; implemented (Stage 4: pure derivation and comparison report, then the audited
   transactional publisher and migration 112)
 - Plan decision: `docs/v2/plan.md` §3 D6
+- Launch F note (2026-10-19): the statements below that the publisher "does not write `award_winners`"
+  describe Stages 4 and 5 and are kept as history. Launch F adds an optional projection of the
+  published result into `award_winners` in the same transaction; see ADR 0015
+  (`docs/v2/adr/0015-coleman-publication.md`).
 
 ## Context
 
@@ -91,7 +95,8 @@ publisher on top of the plain JSON-serialisable result type (below, "The publish
   - **It does not write `award_winners`.** The Coleman `award_winners` rows remain owned by the
     offline `tools/migration/import_awards.py` coleman group. A future projection of a published
     result into `award_winners` must call `assertSeasonWritable` with a correction and supply
-    `player_name_raw` (divergence 8). It is not built here.
+    `player_name_raw` (divergence 8). It is not built here. *(Launch F: built as an injected
+    projection port, ADR 0015.)*
 - Migration `src/db/migrations/112_derived_award_results.sql`: the append-only ledger
   `derived_award_results` (award slug, season, method version, derivation version, input checksum,
   the full `serialiseColemanDerivation` result, winners, `derived_at`, `published_at`,
@@ -150,6 +155,8 @@ separator refusal, the NULL-goals refusal) are the same. The differences are:
 Unchanged and untouched: the one-time legacy rekey (`--rekey-coleman`), `reload_keyed`
 ownership, admin-override replay and every write to `award_winners`. The loader remains the only
 writer of the Coleman `award_winners` rows; the V2 publisher writes only `derived_award_results`.
+*(Launch F: with the projection port the publisher also writes `award_winners`, under the loader's
+own keys and values; ADR 0015.)*
 
 ## Consequences
 
@@ -173,4 +180,6 @@ then nothing publishes.
 Stage 5 (Launch D): `/admin/operations/coleman` compares (read-only) and publishes through
 `publishColemanSeason` (`src/lib/admin/operations-centre.ts`) on the import connection; evidence
 reference `coleman_derivation:<season>:<inputChecksum>`. Still no projection into `award_winners`
-(V2-GAP-021); unexecuted on PostgreSQL (V2-GAP-017).
+(V2-GAP-021); unexecuted on PostgreSQL (V2-GAP-017). *(Launch F: the projection exists and the
+publisher, projection and public queries have run on an isolated PostgreSQL 16 with synthetic
+fixtures; ADR 0015.)*

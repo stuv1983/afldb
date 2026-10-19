@@ -113,6 +113,16 @@ eligible leaders joint); the report records the rule used. Whether that conventi
 or retrospective API seasons is a product decision this ADR does not make; it is raised with the
 owner as an open decision.
 
+### Eligibility-aware medal determination (Launch F) — see ADR 0014
+
+The "unrecorded" default above is unchanged for reporting evidence, but it is no longer the end of the
+road for naming a winner: [ADR 0014](0014-brownlow-eligibility.md) implements the owner's
+eligibility-aware model on top of this reconciliation. It keeps the raw leaderboard for every player,
+excludes a player only on authoritative stored eligibility evidence, reports `requires_review` instead of
+inventing a winner when a leader's eligibility is missing or ambiguous, and lets a Super Admin resolve it
+through an audited, append-only decision (`brownlow_eligibility_decisions`, migration 113). It writes no
+raw vote. V2-GAP-016 is narrowed accordingly.
+
 ### Executed evidence
 
 - On COMMITTED real data: `data/brownlow/season-votes.csv` (98 seasons, 1924-2025, 16,120 rows) is
