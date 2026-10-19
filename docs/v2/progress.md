@@ -25,7 +25,8 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
-| 4-6 | not started (Launches C-E) | — |
+| 4 Derived + curated | in progress (Launch C) | `fad164cd` (derived) |
+| 5-6 | not started (Launches D-E) | — |
 
 ## Stage 0 — evidence
 
@@ -187,6 +188,14 @@ Verification (executed 2026-10-19, Windows, DSN variables unset):
 
 Gaps created or changed: V2-GAP-006 (narrowed), V2-GAP-008 (High, **cutover blocker**), V2-GAP-009
 (Medium), V2-GAP-010 (Medium).
+
+## Stage 4 — derived and curated data (Launch C, in progress)
+
+Sub-agent returns: `.phaneslight/returns/launchC-20261019/`. Committed so far: `fad164cd`
+(Coleman derivation + comparison report, Brownlow reconciliation + report; 5 focused files, 289
+tests passed; v2-module-boundaries 14 passed). Curated awards (D8), the Coleman publisher, the
+legacy disposition (D10) and the ownership matrix are in progress; this section is rewritten at
+the stage close.
 
 ## Resumption point
 
