@@ -1,10 +1,10 @@
-# AFLDB V2 — database compatibility and ownership matrix (DRAFT)
+# AFLDB V2 — database compatibility and ownership matrix
 
-Status: **draft**, Stage 2 (2026-10-19); completed in Stage 4 (plan §7 R-006). Records, for every
-table and view the migrations create (001-110), which V2 component is to own its writes and how
-the schema stays compatible. The "V2 owner" column is a design assignment under plan D1, not an
-observed fact. The "write role" column states only what migrations establish; per-call-site
-writers are re-derived in Stage 4 from `docs/v2/inventory.md` and the code.
+Status: drafted in Stage 2, **completed in Stage 4** (2026-10-19, plan §7 R-006). Records, for
+every table and view the migrations create (001-112), which V2 component is to own its writes and
+how the schema stays compatible. The "V2 owner" column is a design assignment under plan D1, not
+an observed fact. The observed writers per table are the Stage 4 census below (static reading of
+the code; nothing was executed against a database).
 
 ## Rules
 
@@ -32,10 +32,12 @@ writers are re-derived in Stage 4 from `docs/v2/inventory.md` and the code.
 | AFL API projections | `staging.afl_api_match`, `staging.afl_api_player_match`, `staging.afl_api_brownlow_vote`, `staging.afl_api_lineup` | `@afldb/acquisition` | 103, 077 |
 | Legacy source projections | `staging.afltables_match`, `staging.afltables_player_match`, `staging.external_current_matches`, `staging.team_seasons` | legacy (Stage 4 disposition) | AFL Tables settle, Squiggle/Kali, historical staging |
 | Promotion | `promotion_candidates`, `canonical_applications` | `@afldb/acquisition` | 074, 083, 107 |
-| Promotion decisions and identity | `promotion_decisions`, `afl_api_identity_adjudications` | `@afldb/admin` | human decisions; 074, 104, 106 |
-| Canonical match facts | `matches`, `match_period_scores`, `player_match_stats`, `player_match_period_stats` | `@afldb/acquisition` (promotion) for open seasons; `@afldb/admin` (audited correction) for sealed ones | sealed baseline; `docs/v2/historical-baseline.md` |
+| Promotion decisions and identity | `promotion_decisions`, `afl_api_identity_adjudications` | `@afldb/admin` | human decisions; 074, 104, 106. `promotion_decisions` has no writer outside migrations today (census; grant only, `tools/maintenance/privileges.sql:502`) |
+| Canonical match facts | `matches`, `match_period_scores`, `player_match_stats`, `player_match_period_stats` | `@afldb/acquisition` (promotion) for open seasons; `@afldb/admin` (audited correction) for sealed ones | sealed baseline; `docs/v2/historical-baseline.md`. Also written today by the legacy CSV promotion (`src/lib/ingest/datasets.ts`) and the AFL Tables settle (V2-GAP-011, V2-GAP-013). `player_match_period_stats` has no writer outside migrations (census) |
 | Brownlow | `brownlow_round_votes`, `brownlow_season_votes`, `brownlow_season_authority`, `brownlow_vote_entry_state` | `@afldb/acquisition` (round votes from the AFL API); `@afldb/derived` (season reconciliation, plan D7); `@afldb/admin` (authority, vote entry) | totals stay with their authoritative source |
-| Awards and honours | `awards`, `award_winners`, `award_nominations`, `hall_of_fame`, `honour_team_members` | `@afldb/admin` (curated, plan D8); `@afldb/derived` for derived awards (Coleman, plan D6) | 101 lifecycle |
+| Awards and honours | `awards`, `award_winners`, `award_nominations`, `hall_of_fame`, `honour_team_members` | `@afldb/admin` (curated, plan D8); `@afldb/derived` for derived awards (Coleman, plan D6) | 101 lifecycle. Coleman `award_winners` rows stay with the offline `import_awards.py` coleman group (ADR 0006); curated approvals write through `insertAwardWinner` (ADR 0008) |
+| Curated award workflow | `award_proposals`, `award_proposal_decisions` | `@afldb/admin` (`createProposal` ... `approveProposal`; ADR 0008) | 111 (Stage 4). Writer `afldb_import`: INSERT, UPDATE on workflow columns only; the decisions ledger is append-only for every role; `afldb_auth` SELECT; no `afldb_app`. Natural-identity keyed (no FK into football tables). `approveProposal` consults the season seal (workflow `curated_award_approval`) before promoting into `award_winners`. Promotion: `reinstate`, production-only. Unexecuted on PostgreSQL |
+| Derived award results | `derived_award_results` | `@afldb/derived` (`publishColemanResult`; ADR 0006) | 112 (Stage 4). Append-only for every role; supersession by `supersedes_id`; writer `afldb_import` (one transaction, `data.awards.edit` plus a `derived_award_publication` audited correction through the season seal); `afldb_auth` SELECT; no `afldb_app`. Promotion: `reinstate`, production-only; ids in the `result` jsonb are a snapshot, the durable identity is `winners[].key`. Does not write `award_winners`. Unexecuted on PostgreSQL |
 | Club and season context | `seasons`, `clubs`, `club_aliases`, `club_organizations`, `club_organization_relations`, `club_seasons`, `venues`, `venue_aliases` | `@afldb/db` (reference data) | loaded from `data/reference/*.json` |
 | People and identity | `players`, `player_name_aliases`, `external_identities`, `player_birth_evidence`, `player_height_evidence`, `draft_persons`, `player_relationships` | `@afldb/admin` (identity decisions); `@afldb/acquisition` (AFL API identities only) | never a placeholder player (owner rule) |
 | Player links | `player_link_suggestions`, `player_link_resolutions`, `player_link_match_candidates` | `@afldb/admin` | 056, 067 |
@@ -44,10 +46,10 @@ writers are re-derived in Stage 4 from `docs/v2/inventory.md` and the code.
 | Fixtures | `fixtures` | `@afldb/acquisition` (AFL API fixture, **not built**: V2-GAP-008); `@afldb/admin` (corrections) | 097; the only writers today are the admin fixture editor and offline loaders; the V2 fixture contract (`packages/acquisition/src/fixture-contract.ts`) refuses but writes nothing |
 | Admin audit and overrides | `data_edits`, `data_overrides`, `data_submissions`, `data_submission_rows` | `@afldb/admin` | 057, 073, 023 |
 | Derived | `player_club_season_stats`, `player_career_stats`, `player_clubs`, `derived_rebuilds`, `stat_availability`, `stat_definitions` | `@afldb/derived` (`stat_*` reference: `@afldb/db`) | 007, 015 |
-| External grids | `external_grids`, `external_grid_axes`, `external_grid_sources` | apps/web (Grid Solver) | 080 |
+| External grids | `external_grids`, `external_grid_axes`, `external_grid_sources` | apps/web (Grid Solver) | 080. Rows are loaded by the offline `tools/migration/import_external_grids.py`; `external_grid_sources` has no writer outside migrations (census) |
 | Auth and site | `auth_users`, `auth_sessions`, `auth_audit_log`, `beta_access_codes`, `beta_allowed_emails`, `beta_login_tokens`, `beta_join_requests`, `admin_invites`, `site_settings`, `site_media`, `app_health_events` | apps/web (`afldb_auth`) | production-owned |
 | NL search telemetry | `nl_search_log`, `nl_search_feedback`, `nl_search_review` | apps/web | operational |
-| Privilege registries | `afldb_meta.app_readable_tables`, `afldb_meta.import_writable_tables` | `@afldb/db` (migrations only) | 039, 045; never written by hand |
+| Privilege registries | `afldb_meta.app_readable_tables`, `afldb_meta.import_writable_tables` | `@afldb/db` (migrations and the privileges reconcile) | 039, 045. Written by migrations and by the reconcile script `tools/maintenance/privileges.sql` (:104, :117 delete stale registry rows), never by application code |
 | AFLW | `staging_aflw.*` (8 tables), `aflw.*` (12 views) | unchanged, outside V2 scope | `tools/aflw/`, `docs/aflw.md`; V2-GAP-005 |
 
 ## Acquisition-owned tables as implemented (Stage 3)
@@ -67,10 +69,51 @@ import no writer module (`tests/v2-acquisition-pipeline.test.ts`). Identity rows
 `external_identities` for `afl_api` are written only by the bridge importer, the admin
 adjudication path and the audited correction/replay CLIs (`tools/migration/`), never by a settle.
 
-## Open for Stage 4
+## Stage 4 writer census
 
-- Re-derive every current writer per table from the code (call sites, roles, tools) and mark any
-  table with more than one writer.
-- Decide the owner of `external_identities` rows that historical loaders and the AFL API both
-  write.
-- Confirm no table above is written by a legacy runtime path after the Stage 4 disposition.
+Static reading of `src/`, `packages/` and `tools/` (tests, docs and migrations excluded), by
+`afldb-mechanic` M2 and spot-checked by the orchestrator (`.phaneslight/returns/launchC-20261019/03-mechanic-M2-table-writers.md`,
+git-ignored working memory). Writer classes: runtime web, runtime admin, AFL API worker, legacy
+runtime, shared settle library, offline tool, test rehearsal.
+
+- 86 tables have at least one writer file; 66 of them have more than one. The multiplicity is
+  expected: offline historical loaders and test rehearsals write most tables alongside one runtime
+  owner. The tables with more than one **runtime** writer class are `matches`,
+  `player_match_stats`, `players`, `award_winners`, `award_nominations` (admin, AFL API or shared
+  settle library, and the legacy CSV promotion), `import_batches`, `import_rejections` (worker and
+  legacy), and `data_overrides`, `seasons`, `club_seasons`, `player_career_stats`,
+  `player_club_season_stats`, `player_clubs` (admin and the shared derived recompute reached by
+  both settles, `settle-afltables.ts:1924-1928`, `match-rekey.ts:388-431`).
+- No writer outside migrations: `promotion_decisions`, `player_match_period_stats`,
+  `external_grid_sources`.
+- Writers with no scheduler or package-script reference: `tools/current-season/repair-match-rekeys.ts`
+  (writes `matches`, `canonical_applications`, `import_batches`; manual repair tool, offline
+  class). `tools/current-season/afl-api-c4b-rehearsal.ts` writes `site_settings` and
+  `auth_audit_log`; it is the frozen ISSUE-316 C4b tool, which V2 never runs.
+- `src/db/queries/awards-admin.ts` writers are reached by tests (`tests/awards-admin.test.ts:23`,
+  `tests/integration/awards-reload-links.test.ts:12`), not by runtime code.
+
+### Decision: `external_identities` ownership (Stage 4)
+
+`UNIQUE (source_id, external_id)` (002:189) already makes each key single-row. Ownership is
+assigned **per source partition**, one owner each:
+
+| Partition (`sources.key`) | Owner | Writers allowed |
+|---|---|---|
+| `afl_api` | `@afldb/admin` (identity adjudication, migration 104) | admin link/revoke (`src/db/queries/afl-api-player-links.ts:784`, `:918`); offline bridge, correction and replay tools (`tools/migration/import_afl_api_player_bridge.ts`, `correct_afl_api_identity.ts`, `replay_afl_api_adjudications.ts`). Never a settle |
+| `afltables` (`afltables_profile_url`) | offline historical loaders (`import_fitzroy_core.py:2813-2818`, `enrich_birth_dates.py:558-566`) | plus the audited admin attach (`src/db/queries/admin-draft.ts:1544`), restored after a reload by the replay (`tools/migration/common.py:1705`) |
+| `draftguru` | offline `tools/rebuild/draftguru/import_draftguru.py` | that loader only |
+| `manual_admin_edit` | `@afldb/admin` | admin create/adopt (`players.ts:415`, `admin-draft.ts:1358`), replayed by `common.py:1689` |
+
+The AFL API never writes the `afltables` partition and the historical loaders never write the
+`afl_api` partition. The one overlap is the `afltables` partition, shared by the loaders'
+DELETE-then-INSERT and the admin attach; restoration of admin rows rests on the replay ordering,
+which is a static reading only (census F-010, LOW).
+
+### Legacy runtime writers after the Stage 4 disposition
+
+The open question "no table is written by a legacy runtime path after the disposition" is answered
+**not yet**. The AFL Tables settle and trigger (V2-GAP-011), the CSV upload, submission promotion
+and email intake, and the Squiggle/Kali admin refresh (V2-GAP-013) still write; the list of
+tables is `docs/v2/legacy-disposition.md` §5. These writes end when Stage 5 removes the admin
+paths and the ISSUE-316 cutover retires the AFL Tables settle.

@@ -25,7 +25,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
-| 4 Derived + curated | in progress (Launch C) | `fad164cd` (derived), `4c34be93` (progress), `ddb42525` (curated), `498fd46d` (legacy), Coleman publisher commit (this one) |
+| 4 Derived + curated | done pending afldb-closure (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9` + the documents commit |
 | 5-6 | not started (Launches D-E) | — |
 
 ## Stage 0 — evidence
@@ -189,60 +189,70 @@ Verification (executed 2026-10-19, Windows, DSN variables unset):
 Gaps created or changed: V2-GAP-006 (narrowed), V2-GAP-008 (High, **cutover blocker**), V2-GAP-009
 (Medium), V2-GAP-010 (Medium).
 
-## Stage 4 — derived and curated data (Launch C, in progress)
+## Stage 4 — derived and curated data (Launch C)
 
-Sub-agent returns: `.phaneslight/returns/launchC-20261019/`. Committed so far: `fad164cd`
-(Coleman derivation + comparison report, Brownlow reconciliation + report; 5 focused files, 289
-tests passed; v2-module-boundaries 14 passed).
+Sub-agent returns: `.phaneslight/returns/launchC-20261019/` (git-ignored working memory). Commits:
+`fad164cd` (Coleman derivation + comparison report, Brownlow reconciliation + report),
+`4c34be93` (progress), `ddb42525` (curated awards, migration 111, PGlite), `498fd46d` (legacy
+disposition), `034f6947` (Coleman publisher, migration 112), `4c54e0d9` (curated approval through
+the season seal), then the Stage 4 documents commit.
 
-Curated awards (D8) commit `(v2-curated)`: migration 111 (`award_proposals`, append-only
-`award_proposal_decisions`; natural-identity keyed, no FK into football tables; comment-only
-ROLLBACK block), `@afldb/db` `SqlExecutor` port, `@afldb/admin` proposal services and offline
-file parser, server-only promotion port `src/db/queries/award-proposals.ts`, `@afldb/testing`
-in-memory PGlite helper, `@electric-sql/pglite` 0.2.17 installed exact-pinned as a devDependency
-(ADR 0012). Verification on the working tree (curated and legacy workstreams both present):
-focused vitest over 10 files 6 failed | 1175 passed | 1 skipped (1182), all 6 failures are
-lines of `baseline-failures.txt`; the two new curated suites 114 passed (92 unit, 22 PGlite);
-tsc exit 0; ESLint on every touched file 0 errors except `tests/reference-data.test.ts`
-(29 errors, all pre-existing and equal at `HEAD`, R-011). Migration 111 and its grants were
-executed only on in-memory PGlite over labelled stub prerequisites; **unexecuted on
-PostgreSQL** (no database is reachable from V2).
+Delivered:
+- **Coleman (D6, ADR 0006).** `deriveColeman` (pure, versioned `v2.coleman.1`, home-and-away only,
+  complete = sealed plus a settled attestation, joint winners on ties) and the comparison report
+  (agree / disagree / not derivable; never an overwrite). `publishColemanResult` writes the
+  append-only `derived_award_results` ledger (migration 112) in one transaction, only as an
+  audited correction through the season seal (`derived_award_publication`); identical recompute
+  is `unchanged`, a corrected one `superseded`. Status: **synthetic fixtures only**; no real
+  season derived or compared (V2-GAP-015); no projection into `award_winners` and no caller yet
+  (V2-GAP-021).
+- **Brownlow (D7, ADR 0007).** `reconcileBrownlowSeason` and a versioned, schema-validated JSON
+  report; joint leaders on ties; an unresolved identity refuses the whole set; an ineligible
+  vote-getter refuses the leader determination unless `stored_eligible_rank_one` is selected.
+  Status: **committed synthetic fixtures only**; the API-era eligibility rule is an owner
+  decision (V2-GAP-016).
+- **Curated awards (D8, ADR 0008).** Migration 111 (`award_proposals`, append-only
+  `award_proposal_decisions`), `@afldb/admin` services (create, validate, approve, reject,
+  revise, list, history, offline file parser), the server-only promotion port, approval through
+  the season seal (`curated_award_approval`). Services only; Stage 5 owns the UI.
+- **PGlite.** `@electric-sql/pglite` 0.2.17, exact-pinned devDependency, in memory only
+  (ADR 0012). Migrations 111 and 112 ran only on PGlite over stub prerequisites; **unexecuted on
+  PostgreSQL** (V2-GAP-017).
+- **Legacy (D10, ADR 0010).** `docs/v2/legacy-disposition.md`. Quarantined: 1 file
+  (`update-current-season.ts` to `legacy/offline/`, F-001 fixed). Retired with a refusal: 1
+  package script (`current-season:update`). Retained with a recorded disposition: everything
+  else (rows L1-L13), including the AFL Tables runtime behind ISSUE-316 (V2-GAP-011) and the CSV,
+  email and Squiggle/Kali admin paths until Stage 5 (V2-GAP-013). Guards and a legacy-edge
+  ratchet in `tests/v2-module-boundaries.test.ts`.
+- **Ownership matrix** completed (`docs/v2/db-ownership-matrix.md`): writer census,
+  `external_identities` owner per source partition, legacy runtime writers ("not yet" removed).
+- Decisions R-020 to R-029 in `plan.md` §7. Gaps: V2-GAP-011 (High, **cutover blocker**), 012
+  (Medium), 013 (High, **cutover blocker**), 014 (Low), 015 (Medium), 016 (Medium, owner
+  decision), 017 (Medium), 018 (Low), 019 (Medium), 020 (Low), 021 (Medium); V2-GAP-006 narrowed
+  again.
 
-Legacy disposition (D10) commit `(v2-legacy)`: `docs/v2/legacy-disposition.md` (rows L1-L13,
-guards a-f, the 18 ratchet-listed legacy runtime edges, tables still written by legacy runtime
-paths). Quarantined: 1 file (`tools/current-season/update-current-season.ts` moved to
-`legacy/offline/tools/current-season/`, F-001 fixed: `--source` has no default and is required).
-Retired with a refusal: 1 package script (`current-season:update` runs `tools/v2/retired-entry.ts`,
-which prints the `@afldb/domain` refusal and exits 1). Everything else is retained with its
-disposition recorded. Guards added to `packages/testing/src/module-boundaries.ts` and exercised in
-`tests/v2-module-boundaries.test.ts`. Gaps V2-GAP-011 (High, cutover blocker), 012 (Medium), 013
-(High, cutover blocker) and 014 (Low) recorded. Verification: the same working-tree run as the
-curated commit (10 focused files, failures all baseline; tsc exit 0; ESLint 0 errors on every
-file this commit touches).
+Stage-close results (orchestrator runs on the committed tree plus these documents):
 
-Coleman publisher commit `(v2-derived)`: migration 112 (`derived_award_results`, append-only;
-supersession by `supersedes_id`, never UPDATE; no FK into football tables) and
-`publishColemanResult` (`packages/derived/src/coleman-publication.ts`): derives inside the call,
-refuses an incomplete or unsettled season, and publishes only as an audited correction through
-the season seal (new workflow `derived_award_publication`); identical recompute is `unchanged`
-(no write), a corrected recompute is `superseded`. It never writes `award_winners`. Verification
-(orchestrator re-run): 11 focused files 860 passed | 1 skipped (861), no failures; publisher
-suites 32 unit + 23 PGlite; tsc exit 0; ESLint 0 errors on every created file, existing files
-equal to `HEAD`. Migration 112 executed only on in-memory PGlite over stubs; unexecuted on
-PostgreSQL. Remaining: curated approval through the seal (W6), the ownership matrix and the
-stage-close documents; this section is rewritten at the stage close.
+| Check | Result |
+|---|---|
+| full `npx vitest run --no-cache` | Test Files 96 failed / 182 passed / 2 skipped (280); Tests 15 failed / 9532 passed / 48 skipped (9595); the 102 ` FAIL ` lines are identical to `docs/v2/evidence/baseline-failures.txt` (no new failure, none weakened) |
+| `npx tsc --noEmit --incremental false` | exit 0 |
+| `npx eslint --no-cache .` | 253 errors, 132 warnings: unchanged, exactly at the ceiling |
+| ESLint on every created/edited file | 0 errors on every created file; edited files equal to `HEAD` (`tests/reference-data.test.ts` 29 errors, `tests/db-promotion-check.test.ts` 2 warnings, pre-existing, R-011) |
+| `tools/v2/coverage-matrix.ts --check`, `tools/v2/acquisition-stage-map.ts --check` | both exit 0 |
+| frozen ISSUE-316 files | source: 19 of 19 sha256 match the snapshot; V2: 18 of 19 match, `CHANGELOG.md` differs by design (the V2 section) |
+| source worktree status | differs from the snapshot only by `?? supplies` |
+
+`afldb-closure` verdict: recorded in the next commit.
 
 ## Resumption point
 
-Stage 3 is done. `afldb-closure` re-derived every check independently
-(`.phaneslight/returns/launchB-20261019/12-closure-stage3.md`): tsc 0; focused 1299 passed, 2
-skipped; full-suite FAIL set identical to the baseline; generated docs in sync; ISSUE-316 hashes
-intact; source status differs only by `?? supplies`; 43 changed files, no undisclosed edit.
-Verdict PASS_WITH_FINDINGS: C3-001 and C3-002 (LOW, doc wording, corrected in the commit that
-records this result), C3-003 (INFO, ESLint exactly at its ceiling, zero headroom) and C3-004
-(INFO, intended client behaviour change R-019). **Launch C starts Stage 4** (derived and
-curated: Coleman D6, Brownlow reconciliation D7, curated awards D8, legacy imports quarantined
-D10): read `docs/v2/plan.md` (stage 4 row, D6-D8, D10, §7), this file,
-`docs/v2/known-gaps.md` (V2-GAP-006 remainder and V2-GAP-008 stay open),
-`docs/v2/db-ownership-matrix.md` ("Open for Stage 4") and `docs/v2/architecture.md` §9. Stages 4-6
-have not been started.
+Stage 4 is done pending `afldb-closure`. **Launch D starts Stage 5** (admin operations centre and
+UI, ADR 0009): read `docs/v2/plan.md` (stage 5 row, D9, §7 R-020 to R-029), this file,
+`docs/v2/known-gaps.md` (V2-GAP-011, 013, 016, 018, 019 and 021 are the Stage 5
+inputs), `docs/v2/legacy-disposition.md` (L1-L3, L5, L6 are Stage 5's) and ADR 0008's "What Stage
+5 must wire". Stage 5 must: wire a server-only caller for the curated services and the Coleman
+publisher; supply a `src/` sealed-set loader for `ApproveDependencies.sealed` (today the only
+loader is `tools/current-season/settle-season-seal.ts:22`); make the CSV upload, submission
+promotion, email-intake route and Squiggle/Kali admin actions refuse; and remove the AFL Tables
+admin trigger. Stages 5 and 6 have not been started.

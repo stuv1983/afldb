@@ -251,3 +251,65 @@ continues the reviewed plan.
 - **R-019 Client defaults.** 4xx other than 408/425/429 are not retried; `Retry-After` is capped at
   30 s; the acquire tools space request starts by 250 ms, an implementation default because no
   provider limit is documented.
+
+### Launch C decisions (Stage 4, 2026-10-19)
+
+- **R-020 PGlite installed (D2).** `@electric-sql/pglite` 0.2.17, exact-pinned devDependency
+  (ADR 0012). Used only in memory (no `dataDir`) by tests, to execute V2's own migrations over
+  labelled stub prerequisites and stub roles. It is never extended to the 001-110 schema with its
+  real roles and grants (D2), and a PGlite pass is not evidence for PostgreSQL: every V2 migration
+  stays "unexecuted on PostgreSQL".
+- **R-021 Read-only search under §9.** A mechanic declined to run `grep`/`sed` because the owner's
+  command list does not name them. The launch rules' hook-hazard rule directs search through Bash
+  (`grep -rn`, `find`) inside V2, so the orchestrator treats read-only search and file reading in
+  V2 as authorised for this launch; nothing else is widened. The blocked enumeration was redone by
+  the orchestrator.
+- **R-022 Coleman season completeness.** "Complete" is the seal: a season is complete when it is
+  sealed in `data/reference/seasons.json`; "settled" is an explicit caller attestation. So every
+  derivable season is a sealed season. The derivation's comparison with stored rows is a report
+  (agree / disagree / not derivable), never an overwrite (ADR 0006).
+- **R-023 Brownlow eligibility.** The reconciliation's default `eligibilityRule` is `unrecorded`:
+  if an ineligible player polled votes, the leader determination is refused. The opt-in
+  `stored_eligible_rank_one` mirrors the stored-table rule (`src/lib/brownlow/entry.ts`:
+  eligible rank 1). No rule exists for API-era seasons or retrospective/vacated awards; that is an
+  owner decision (ADR 0007, V2-GAP-016). Ties give joint leaders; no winner rule is invented.
+- **R-024 Curated awards shape.** Proposals and their append-only decision ledger are new tables
+  (migration 111) keyed by natural identity (award slug, durable player identity string, club
+  slug) with no FK into football tables, so a rebuild cannot empty them and promotion needs no
+  remap. Transitions are audited in that ledger, not in `data_edits`: widening the `data_edits`
+  allowlist would cascade into the promotion-inventory lineage rules. The approved winner is
+  written by the existing `insertAwardWinner` in the same transaction. No four-eyes rule
+  (V2-GAP-019). A Wikipedia-sourced proposal needs a `wikipedia.org` URL and an approval note of
+  at least 20 characters; files only create proposals.
+- **R-025 Legacy scope in Stage 4.** Only TypeScript entry points are moved: the Squiggle/Kali CLI
+  is quarantined and its package script refuses through the `@afldb/domain` retired-entry
+  registry. The AFL Tables runtime stays behind the ISSUE-316 boundary (frozen files; D-316-2 is
+  the owner's, V2-GAP-011). Admin runtime paths (CSV upload, submission promotion, email intake,
+  Squiggle/Kali refresh) are Stage 5's (V2-GAP-013). Python/R tools stay in place because V2
+  cannot run them to prove a move (V2-GAP-014). A ratchet test lists every known legacy runtime
+  edge, so a new one fails.
+- **R-026 `external_identities` ownership.** One owner per source partition: `afl_api` rows belong
+  to `@afldb/admin` adjudication (plus the offline bridge, correction and replay tools, never a
+  settle); `afltables` rows to the offline historical loaders, with the admin attach as the audited
+  correction restored by the replay; `draftguru` rows to its loader; `manual_admin_edit` rows to
+  `@afldb/admin` (`docs/v2/db-ownership-matrix.md`).
+- **R-027 CSV promotion classification.** The CSV submission promotion writes canonical tables
+  directly (`src/lib/ingest/datasets.ts`), so it is classified remove-from-runtime and listed as a
+  cutover blocker, not disabled in Stage 4: making admin server actions refuse is Stage 5's admin
+  scope, and the email-intake timer is a deployment act.
+- **R-028 Coleman publication.** Because a derivable season is complete and therefore sealed
+  (R-022), every publication is an audited correction through the season seal, under one new
+  workflow id `derived_award_publication` (`docs/v2/historical-baseline.md` §2). The publisher
+  derives inside the call (it never accepts a prebuilt result), requires `data.awards.edit`, and
+  requires the publishing user to be the correction's actor. Recompute is idempotent (`unchanged`,
+  no write) or `superseded` (a new row pointing at the previous one). "Current" is derived from an
+  append-only chain, never an UPDATE; the ledger has no FK into football tables; the publisher
+  never writes `award_winners` (V2-GAP-021). Migration 112, ADR 0006.
+- **R-029 Curated approval and the seal.** The orchestrator found (MED) that `approveProposal`
+  wrote `award_winners`, a sealed historical table, without consulting the seal. Approval now
+  evaluates the seal inside its transaction, before the promotion port, under a new workflow
+  `curated_award_approval`: an open season proceeds as before; a sealed season needs a decision
+  note of 20-2000 characters, otherwise the approval is refused and rolled back. The caller
+  supplies the sealed set (`ApproveDependencies.sealed`); the package does no file I/O. The only
+  sealed-set loader today is `tools/current-season/settle-season-seal.ts`; Stage 5 supplies one for
+  `src/`.

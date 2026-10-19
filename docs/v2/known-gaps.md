@@ -10,7 +10,7 @@ close it. An entry is removed only when the closing evidence exists.
 | V2-GAP-003 | Medium | environment | open: inherited, environmental |
 | V2-GAP-004 | Low | source worktree hygiene | open: owner action |
 | V2-GAP-005 | Low | historical baseline scope | open: AFLW not covered by the manifest |
-| V2-GAP-006 | Medium | historical baseline | narrowed (Stage 3): enforced at the AFL API settle CLIs; database-level and other writers open |
+| V2-GAP-006 | Medium | historical baseline | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open |
 | V2-GAP-007 | Medium | historical baseline | open: manifest producer never run |
 | V2-GAP-008 | High | AFL API fixtures | **open: cutover blocker** (AFLDB-ISSUE-229 B2 and the unbuilt fixtures writer) |
 | V2-GAP-009 | Medium | AFL API promotion | open: transactional preservation unexecuted on PostgreSQL |
@@ -19,6 +19,13 @@ close it. An entry is removed only when the closing evidence exists.
 | V2-GAP-012 | Medium | legacy runtime | open: AFL API settle imports shared helpers from `settle-afltables.ts` |
 | V2-GAP-013 | High | legacy runtime | **open: cutover blocker** (CSV upload, submission promotion, email intake and Squiggle/Kali admin refresh stay in runtime until Stage 5) |
 | V2-GAP-014 | Low | legacy quarantine | open: Python/R tools not physically quarantined |
+| V2-GAP-015 | Medium | Coleman | open: derived on synthetic inputs only; no real season compared |
+| V2-GAP-016 | Medium | Brownlow | open: owner decision: no eligibility rule for API-era seasons |
+| V2-GAP-017 | Medium | Stage 4 migrations | open: migrations 111+ and their grants unexecuted on PostgreSQL |
+| V2-GAP-018 | Low | curated awards | open: revising an approved proposal is refused |
+| V2-GAP-019 | Medium | curated awards | open: no four-eyes rule on approval |
+| V2-GAP-020 | Low | curated awards | open: winners without a resolved player identity cannot be approved |
+| V2-GAP-021 | Medium | Coleman | open: published results are not projected into `award_winners`; nothing calls the publisher yet |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -97,8 +104,19 @@ close it. An entry is removed only when the closing evidence exists.
   writes only; staging, candidates, `data_issues` and `applyAttendanceEnrichment` are not covered by
   it). (2) The CLIs' real database paths are unexecuted (ordering proved through a throwing SQL
   stub only).
-- **Close.** An owner decision on database-level enforcement (an additive `111_`+ migration under
-  plan D4), and the Stage 4 legacy quarantine (plan D10) for the other writers.
+- **Stage 4 (2026-10-19) narrowed it further.** Two new V2 writers consult the seal before any
+  write: the Coleman publisher (`publishColemanResult`, workflow `derived_award_publication`) and
+  curated award approval (`approveProposal`, workflow `curated_award_approval`, which needs a
+  decision note of 20-2000 characters for a sealed season). Both workflows are rows of
+  `docs/v2/historical-baseline.md` §2. Tests: `tests/v2-coleman-publication*.test.ts`,
+  `tests/v2-curated-awards*.test.ts` (unit and in-memory PGlite).
+- **Still open after Stage 4.** The existing admin editors (data editor, award editor and others in
+  `src/db/queries/`) and the legacy runtime writers (V2-GAP-011, V2-GAP-013) do not call
+  `evaluateSeasonWrite`; the Stage 4 disposition classified the legacy writers but did not remove
+  them.
+- **Close.** An owner decision on database-level enforcement (an additive migration under plan
+  D4), Stage 5 for the admin editors, and the ISSUE-316 cutover plus Stage 5 for the legacy
+  writers.
 
 ## V2-GAP-007 — No manifest of the real baseline exists yet
 
@@ -230,3 +248,76 @@ close it. An entry is removed only when the closing evidence exists.
 - **Guard.** No runtime TypeScript imports them (guard e in `legacy-disposition.md` §2).
 - **Close.** Move them with the rebuild's path references updated, then run the rebuild on an
   isolated `afldb_test` to prove it still completes.
+
+## V2-GAP-015 — The Coleman derivation has run on synthetic inputs only
+
+- **What.** `deriveColeman` and the comparison report (`@afldb/derived`, ADR 0006) are tested on
+  SYNTHETIC inputs (`tests/v2-coleman.test.ts`). No real season has been derived, and no
+  comparison against the stored Coleman `award_winners` rows has been produced.
+- **Why.** The repository has no committed per-match goal data, and V2 may not read a database.
+- **Close.** Export the home-and-away goal facts and identities for the sealed seasons from an
+  isolated `afldb_test` (read-only), run the derivation and the comparison report, and review
+  every `disagree` and `not_derivable` row before any publication.
+
+## V2-GAP-016 — OWNER DECISION: Brownlow eligibility rule for API-era seasons
+
+- **What.** The reconciliation (`@afldb/derived`, ADR 0007) refuses a leader determination when an
+  ineligible player polled votes, unless the caller selects `stored_eligible_rank_one` (the
+  stored-table rule in `src/lib/brownlow/entry.ts`). No rule is recorded for API-era seasons, or
+  for retrospective and vacated awards.
+- **Why.** Naming a winner is a product rule; V2 does not invent one (plan §7 R-023).
+- **Close.** The owner states the rule; it is added as an explicit `eligibilityRule` with tests.
+  Related: V2-GAP-010 (API coverage of 2012-2025 has no committed evidence), so even with a rule
+  the API-era reconciliation has no committed inputs yet.
+
+## V2-GAP-017 — The Stage 4 migrations and grants are unexecuted on PostgreSQL
+
+- **What.** `src/db/migrations/111_curated_award_proposals.sql` and
+  `112_derived_award_results.sql`, their `tools/maintenance/privileges.sql` blocks, the two new
+  `tests/integration/privileges.test.ts` cases, the promotion inventory with its two extra tables
+  (the F0 pin is now 40), the server-only promotion port (`src/db/queries/award-proposals.ts`,
+  which calls the real `insertAwardWinner`), the Coleman publisher SQL and the postgres.js adapter
+  (`packages/db/src/sql-executor.ts`) have not run against PostgreSQL. Both migrations ran only on
+  in-memory PGlite over labelled stub prerequisites and stub roles
+  (`tests/v2-curated-awards-pglite.test.ts`, `tests/v2-coleman-publication-pglite.test.ts`).
+- **Why.** No database is reachable from V2 (plan §1); PGlite is not evidence for PostgreSQL
+  (plan §7 R-020).
+- **Close.** An operator applies the migrations to an isolated `afldb_test`, runs
+  `npm run db:privileges`, and runs `tests/integration/privileges.test.ts` and the awards
+  integration suites; record the result here.
+
+## V2-GAP-018 — Revising an approved curated award is refused
+
+- **What.** `reviseProposal` refuses an approved proposal (`approved_revision_unsupported`).
+  Correcting a promoted winner today uses the existing replace/correct lifecycle in
+  `src/db/queries/admin-awards.ts`, which does not link back to the proposal chain.
+- **Close.** A wrapper over the existing replace/correct functions that records the new revision
+  and its ledger row in the same transaction (Stage 5, with the admin UI).
+
+## V2-GAP-019 — No four-eyes rule on curated award approval
+
+- **What.** A holder of `data.awards.edit` may approve a proposal they created themselves. Every
+  transition is still attributed in the append-only ledger.
+- **Why.** No existing AFLDB workflow enforces separation of duties, and the owner has not asked
+  for it; V2 did not invent one (plan §7 R-024).
+- **Close.** Owner decision; if wanted, refuse approval by the creator in `approveProposal` and
+  add the test.
+
+## V2-GAP-020 — Curated winners need a resolved player identity
+
+- **What.** A proposal whose player has no durable identity (`afltables:` or `manual_admin_edit:`)
+  is refused at validation, so an identity-less legacy player cannot be approved as a winner.
+- **Close.** Link the player first through the existing identity tools, then propose.
+
+## V2-GAP-021 — Published Coleman results are not projected into `award_winners`
+
+- **What.** `publishColemanResult` writes only the `derived_award_results` ledger (migration 112).
+  The Coleman `award_winners` rows the public site reads remain owned by the offline
+  `tools/migration/import_awards.py` coleman group. Nothing reads `derived_award_results` yet, and
+  no admin route, server action or script calls the publisher.
+- **Why.** Writing `award_winners` for a sealed season needs an owner-chosen correction workflow
+  and a `player_name_raw` the pure derivation has no table for (ADR 0006 divergence 8); the admin
+  surface is Stage 5's. V2-GAP-015 (no real season derived yet) comes first.
+- **Close.** Stage 5 wires a server-only caller (postgres.js `postgresExecutor`) and an admin view;
+  a projection into `award_winners` calls `assertSeasonWritable` with a correction and supplies
+  names; then the offline loader's coleman group is retired for seasons the publisher covers.

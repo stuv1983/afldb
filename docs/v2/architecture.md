@@ -1,6 +1,6 @@
 # AFLDB V2 — architecture overview (implemented state)
 
-Status: describes what exists in `D:\dev\afldbV2` at the close of Stage 3 (2026-10-19). Planned
+Status: describes what exists in `D:\dev\afldbV2` at the close of Stage 4 (2026-10-19). Planned
 work is labelled as such and points at its plan decision; nothing here is aspirational.
 
 ## 1. Shape
@@ -19,7 +19,7 @@ packages/
   derived      database-derived results               -> domain, db
   admin        restricted, audited admin services     -> domain, db
   testing      test fixtures and contract checks      -> any package; imported only by tests/**
-legacy/        (not created yet; plan D10, Stage 4)   imported only by legacy/**
+legacy/offline/  quarantined offline tools (Stage 4)    imported only by legacy/**
 ```
 
 ## 2. Application mapping
@@ -28,20 +28,21 @@ legacy/        (not created yet; plan D10, Stage 4)   imported only by legacy/**
 |---|---|---|
 | `apps/web` | repository root: `src/app` (52 public pages, 56 admin pages, 19 route handlers, 30 server-action files), `src/components`, `src/search`, `src/db/queries` (74 modules), `src/lib` (118 files) | `deploy/afldb.service` → `deploy/server-cluster.mjs` |
 | `apps/worker` | `tools/current-season/*` (AFL API acquire/settle CLIs) | `deploy/afldb-settle-afl-api.{service,timer,sh}` (05:00 nightly), `deploy/afldb-settle-afl-api-brownlow.{service,timer,sh}` (every 5 minutes) |
-| legacy runtime ingestion | CSV upload/submissions, email intake, AFL Tables settle, Squiggle/Kali refresh | see `docs/v2/inventory.md` invoker matrix L1-L13; disposition is Stage 4/5 work |
+| legacy runtime ingestion | CSV upload/submissions, email intake, AFL Tables settle, Squiggle/Kali admin refresh | classified in `docs/v2/legacy-disposition.md` (Stage 4); still runtime until Stage 5 and the ISSUE-316 cutover (V2-GAP-011, V2-GAP-013) |
+| offline legacy tools | `legacy/offline/**` (the Squiggle/Kali CLI), `tools/migration/*`, `tools/rebuild/**` | manual only; no scheduler, no runtime import (guards in `tests/v2-module-boundaries.test.ts`); `npm run current-season:update` refuses |
 
 Counts are from `docs/v2/inventory.md`, where each has its re-derivation command.
 
 ## 3. Packages as they exist
 
-| Package | Exports (Stage 1) | Source of each export |
+| Package | Exports | Source of each export |
 |---|---|---|
-| `@afldb/domain` | fixture status and round vocabulary, finals round codes, `isFixtureRoundType`, `isFixtureStatus`; `ImportBatchId`, `asImportBatchId`; the historical baseline manifest spec, sealed-season rule, validation and comparator (Stage 2); the coverage registry (`COVERAGE_REGISTRY`, `validateCoverageRegistry`, `checkCoverageEvidence`, `renderCoverageMatrix`) and the seal decision (`evaluateSeasonWrite`, `assertSeasonWritable`, `AUDITED_CORRECTION_WORKFLOWS`) (Stage 3) | re-exports of `src/lib/fixtures/spec.ts`, `src/lib/import-batch-id.ts` (both pure leaf modules); `packages/domain/src/historical-manifest.ts`, `coverage-registry.ts`, `season-seal.ts` (new in V2) |
-| `@afldb/db` | `assertTestProcessDsn`, `testProcessDsnRefusal`, `isTestProcess`; the read-only manifest producer (`produceManifest`, `resolveProducerTarget`; never run) | re-export of `src/db/test-process-guard.ts` (new in V2, ADR 0005); `packages/db/src/historical-manifest-producer.ts` (new in V2) |
+| `@afldb/domain` | fixture status and round vocabulary, finals round codes, `isFixtureRoundType`, `isFixtureStatus`; `ImportBatchId`, `asImportBatchId`; the historical baseline manifest spec, sealed-season rule, validation and comparator (Stage 2); the coverage registry (`COVERAGE_REGISTRY`, `validateCoverageRegistry`, `checkCoverageEvidence`, `renderCoverageMatrix`) and the seal decision (`evaluateSeasonWrite`, `assertSeasonWritable`, `AUDITED_CORRECTION_WORKFLOWS`) (Stage 3; Stage 4 added the audited workflow ids for derived-award publication and curated-award approval); the retired-entry registry (`RETIRED_ENTRIES`, `findRetiredEntry`, `renderRetiredEntryRefusal`) (Stage 4) | re-exports of `src/lib/fixtures/spec.ts`, `src/lib/import-batch-id.ts` (both pure leaf modules); `packages/domain/src/historical-manifest.ts`, `coverage-registry.ts`, `season-seal.ts`, `legacy-retirement.ts` (new in V2) |
+| `@afldb/db` | `assertTestProcessDsn`, `testProcessDsnRefusal`, `isTestProcess`; the read-only manifest producer (`produceManifest`, `resolveProducerTarget`; never run); (Stage 4) the SQL port `SqlExecutor`, `TransactionalSqlExecutor`, the postgres.js adapters `postgresExecutor`, `postgresTransactionExecutor`, `nativeTransactionOf` | re-export of `src/db/test-process-guard.ts` (new in V2, ADR 0005); `packages/db/src/historical-manifest-producer.ts`, `sql-executor.ts` (new in V2) |
 | `@afldb/acquisition` | the source-family registry contract; (Stage 3) the pipeline stage contract `AFL_API_PIPELINE` and stage map (§9), `replayAflApiSnapshot`/`aflApiPlanDigest`, the reconciliation report (`buildAflApiReconciliationReport`, validator, JSON Schema), the fixture contract (`classifyAflApiFixtureStatus`, `evaluateAflApiFixtureProjection`, `detectAflApiFixtureCollisions`), and re-exports of the pure/read-only stage code (client, rate limiter, season discovery and enumeration, snapshot readers, `claimSnapshotDir`, bundle emitters, `reconcile`) | re-exports of `src/lib/acquisition/*` modules whose runtime import closure reaches no `src/db/**`, `server-only`, `postgres` or writer module (`tests/v2-acquisition-pipeline.test.ts`); writers (settle, canonical apply, observation store, derived recompute) are cited by path in the stage contract, never re-exported (plan §7 R-016); `packages/acquisition/src/{pipeline,stage-map,replay,reconciliation-report,fixture-contract}.ts` (new in V2) |
-| `@afldb/derived` | nothing | deliberately empty until Stage 4 (ADR 0006) |
-| `@afldb/admin` | `hasCapability`, `Capability`, `CapabilityRole`, `CapabilityViewer` | re-export of `src/lib/auth/capabilities.ts` |
-| `@afldb/testing` | `applyTestDsnPolicy` and DSN helpers; the module-boundary checker | `packages/testing/src/dsn-policy.ts`, `packages/testing/src/module-boundaries.ts` (new in V2) |
+| `@afldb/derived` | (Stage 4) the Coleman derivation (`deriveColeman`, `parseColemanContract`, `colemanKey`, `serialiseColemanDerivation`, `COLEMAN_DERIVATION_VERSION`), the comparison report (`buildColemanComparisonReport`, validator), the audited publisher (`publishColemanResult`, `checkColemanPublication`, `planColemanPublication`; ADR 0006); the Brownlow reconciliation (`reconcileBrownlowSeason`, `validateBrownlowReconciliationInput`) and its report (`serialiseBrownlowReconciliationReport`, `validateBrownlowReconciliationReport`, JSON Schema; ADR 0007) | `packages/derived/src/{coleman,coleman-comparison,coleman-publication,brownlow-reconciliation,brownlow-reconciliation-report}.ts` (new in V2) |
+| `@afldb/admin` | `hasCapability`, `Capability`, `CapabilityRole`, `CapabilityViewer`; (Stage 4) the curated award workflow: `createProposal`, `createProposalsFromFile`, `validateProposal`, `approveProposal`, `rejectProposal`, `reviseProposal`, `listProposals`, `readProposalHistory`, `parseAwardProposalFile`, `CURATED_AWARD_TRANSITIONS`, `assertTransition`, `validateAwardProposal` (ADR 0008) | re-export of `src/lib/auth/capabilities.ts`; `packages/admin/src/{curated-awards-model,curated-awards,curated-awards-file}.ts` (new in V2). The production promotion port is the server-only `src/db/queries/award-proposals.ts` (calls `insertAwardWinner`), never imported by the package |
+| `@afldb/testing` | `applyTestDsnPolicy` and DSN helpers; the module-boundary checker; (Stage 4) the legacy guards (`LEGACY_RUNTIME_MODULES`, `legacyRuntimeEdges`, `publicRuntimeLegacyReach`, `offlineToolImports`, `scheduledLegacyReferences`, `retiredEntryWiring`) and the in-memory PGlite helper (`createInMemoryPglite`, `pgliteExecutor`; ADR 0012) | `packages/testing/src/dsn-policy.ts`, `module-boundaries.ts`, `pglite.ts` (new in V2) |
 
 The connection pools (`src/db/client.ts`, `src/db/authClient.ts`) are not re-exported: importing
 `client.ts` builds a pool, so a package index that re-exported it would open a pool on import.
@@ -91,8 +92,12 @@ A). Table ownership is drafted in `docs/v2/db-ownership-matrix.md`.
 
 ## 8. Decisions
 
-ADRs 0001-0011 in `docs/v2/adr/` record plan decisions D1-D11; ADRs 0006-0011 are accepted but
-not implemented yet, and say so.
+ADRs 0001-0012 in `docs/v2/adr/` record plan decisions D1-D11 and the PGlite test database
+(0012). ADRs 0006 (Coleman), 0007 (Brownlow reconciliation), 0008 (curated awards) and 0010
+(legacy disposition) are implemented in Stage 4, each stating what is unexecuted; 0009 (admin
+operations centre) is not implemented yet (Stage 5), and says so. Migrations from
+Stage 4: `111_curated_award_proposals.sql`, `112_derived_award_results.sql` (ADR 0004; executed
+only on in-memory PGlite, unexecuted on PostgreSQL, V2-GAP-017).
 
 ## 9. AFL API pipeline stage map (Stage 3)
 

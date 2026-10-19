@@ -22,6 +22,43 @@ gaps as `V2-GAP-NNN` in `docs/v2/known-gaps.md` instead of allocating `AFLDB-ISS
 deliberate departure from CLAUDE.md §5 so the fork cannot collide with the mainline ledger
 (ADR 0003). `issues.md` and `IssuesIndex.md` are left as inherited.
 
+#### Stage 4 — Coleman derivation and audited publication, Brownlow reconciliation, curated awards, legacy disposition - 19 October 2026
+
+- Coleman Medal is derived, not ingested: `@afldb/derived` `deriveColeman` computes it from
+  home-and-away goal facts under the existing ISSUE-111 contract
+  (`data/reference/coleman-derivation.json`), refuses an incomplete, unsettled or incomplete-round
+  season, gives joint winners on a tie, and records the derivation version, timestamp, input
+  checksum, leaderboard and inputs. A comparison report sets it against stored rows (agree /
+  disagree / not derivable) and never overwrites them (ADR 0006).
+- `publishColemanResult` publishes into the new append-only ledger `derived_award_results`
+  (migration 112) in one transaction, only as an audited correction through the season seal
+  (workflow `derived_award_publication`): identical recompute writes nothing, a corrected
+  recompute supersedes. It does not write `award_winners`, whose Coleman rows stay with the
+  offline loader (V2-GAP-021).
+- Brownlow reconciliation (`reconcileBrownlowSeason`) produces a versioned, schema-validated JSON
+  report: duplicate votes, totals against the leaderboard, round/match/club consistency; joint
+  leaders on a tie; one unresolved player or match identity refuses the whole set; an ineligible
+  vote-getter refuses the leader determination unless a rule is selected; no winner rule is
+  invented (eligibility for API-era seasons is an owner decision, V2-GAP-016; ADR 0007).
+- Curated awards (ADR 0008, migration 111): proposal, validation, review, transactional approve or
+  reject, and revisions; every transition writes one row of the append-only
+  `award_proposal_decisions` ledger in the same transaction; `data.awards.read`/`data.awards.edit`
+  role checks; approval re-validates under a lock, passes the season seal (workflow
+  `curated_award_approval`: a sealed season needs a 20-2000 character note) and writes the winner
+  through the existing `insertAwardWinner`. Offline JSON/CSV files only create proposals; there is
+  no Wikipedia-to-production path. Services only; no UI (Stage 5).
+- `@electric-sql/pglite` 0.2.17 is a pinned devDependency used in memory by tests (ADR 0012).
+  Migrations 111 and 112 ran only on PGlite over stub prerequisites; they are unexecuted on
+  PostgreSQL (V2-GAP-017).
+- Legacy disposition (`docs/v2/legacy-disposition.md`, ADR 0010): the Squiggle/Kali CLI moved to
+  `legacy/offline/` and its `--source` no longer defaults to Squiggle; `npm run
+  current-season:update` now refuses with a pointer to the retirement record; a ratchet test fails
+  on any new legacy runtime edge. The AFL Tables runtime (behind ISSUE-316) and the CSV, email and
+  Squiggle/Kali admin paths remain in runtime and are recorded cutover blockers (V2-GAP-011,
+  V2-GAP-013).
+- `docs/v2/db-ownership-matrix.md` is complete: a writer census, `external_identities` ownership
+  per source partition, and the tables legacy runtime paths still write.
+
 #### Stage 3 — AFL API pipeline boundary, coverage registry, seal enforcement, fixture and identity contracts - 19 October 2026
 
 - `@afldb/acquisition` is the canonical boundary for `AFL API → immutable snapshot → validated

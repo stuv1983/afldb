@@ -1,7 +1,8 @@
 # ADR 0004 — Additive, reversible migrations from `111_`
 
-- Status: Accepted (2026-10-19). First V2 migration: `111_curated_award_proposals.sql` (Stage 4,
-  ADR 0008), executed on in-memory PGlite over stub prerequisites only; unexecuted on PostgreSQL.
+- Status: Accepted (2026-10-19). V2 migrations: `111_curated_award_proposals.sql` (ADR 0008) and
+  `112_derived_award_results.sql` (ADR 0006), both Stage 4, executed on in-memory PGlite over stub
+  prerequisites only; unexecuted on PostgreSQL (V2-GAP-017).
 - Plan decision: `docs/v2/plan.md` §3 D4; review resolution R-008 (§7)
 
 ## Context
