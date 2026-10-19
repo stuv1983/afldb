@@ -190,3 +190,191 @@ export function purityViolations(
   }
   return violations;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Stage 4 (plan D10, ADR 0010, R-006): legacy quarantine and runtime-independence guards.
+// Every function below is pure apart from the caller-supplied reader. NOTE: these are not yet
+// re-exported from ./index (that file is owned by another workstream in this launch);
+// tests/v2-module-boundaries.test.ts imports them from this module directly.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The legacy runtime modules: the Squiggle/Kali refresh and the AFL Tables ingestion/settle code
+ * that the V2 plan keeps only behind named dispositions (docs/v2/legacy-disposition.md). The
+ * ratchet in tests/v2-module-boundaries.test.ts pins every direct importer of these files.
+ */
+export const LEGACY_RUNTIME_MODULES: readonly string[] = [
+  'src/lib/external-afl/current-matches.ts',
+  'src/lib/external-afl/current-season-import.ts',
+  'src/lib/ingest/pipeline.ts',
+  'src/lib/ingest/datasets.ts',
+  'src/lib/acquisition/settle-afltables.ts',
+  'src/lib/acquisition/settle-trigger.ts',
+];
+
+/** Offline tool trees that no runtime source (src/**, packages/<m>/src/**) may import. */
+export const OFFLINE_TOOL_PREFIXES: readonly string[] = [
+  'tools/migration/', 'tools/rebuild/', 'tools/records/', 'tools/aflw/', 'tools/email_intake/', 'legacy/',
+];
+
+export interface ImportEdge {
+  from: string;
+  to: string;
+  specifier: string;
+}
+
+/**
+ * The existing repository file a specifier written in `fromPath` points at, or null for an
+ * external package, a missing file or an asset. `@afldb/<module>` resolves to its package index.
+ */
+export function resolveImportFile(
+  fromPath: string,
+  specifier: string,
+  readFile: (path: string) => string | null,
+): string | null {
+  const resolved = resolveSpecifier(fromPath, specifier);
+  if (resolved.kind === 'external') return null;
+  const base = resolved.kind === 'package' ? `packages/${resolved.module}/src/index` : resolved.path;
+  return CANDIDATE_SUFFIXES.map((s) => `${base}${s}`).find((c) => readFile(c) !== null) ?? null;
+}
+
+/**
+ * Every direct import of one of `modules` from a file that is not itself one of `modules`,
+ * sorted by importer then target. Callers exclude tests/** from `files`.
+ */
+export function legacyRuntimeEdges(
+  files: readonly SourceFile[],
+  readFile: (path: string) => string | null,
+  modules: readonly string[] = LEGACY_RUNTIME_MODULES,
+): ImportEdge[] {
+  const edges: ImportEdge[] = [];
+  for (const file of files) {
+    if (modules.includes(file.path)) continue;
+    for (const specifier of extractImportSpecifiers(file.source)) {
+      const to = resolveImportFile(file.path, specifier, readFile);
+      if (to && modules.includes(to)) edges.push({ from: file.path, to, specifier });
+    }
+  }
+  return edges.sort((a, b) => (a.from + a.to).localeCompare(b.from + b.to));
+}
+
+/** A forbidden file reached from a public runtime entry, with the import chain that reaches it. */
+export interface RuntimeReach {
+  entry: string;
+  reached: string;
+  chain: string[];
+}
+
+/**
+ * Walk the transitive import closure of `entries` and report every file in it that is a legacy
+ * runtime module, or lives under `tools/` or `legacy/`. One breadth-first search with a shared
+ * visited set (each file is read once); `chain` is the shortest path found from an entry.
+ */
+export function publicRuntimeLegacyReach(
+  entries: readonly string[],
+  readFile: (path: string) => string | null,
+  modules: readonly string[] = LEGACY_RUNTIME_MODULES,
+): RuntimeReach[] {
+  const parent = new Map<string, string | null>();
+  const queue: string[] = [];
+  for (const entry of entries) {
+    parent.set(entry, null);
+    queue.push(entry);
+  }
+  const reaches: RuntimeReach[] = [];
+  const chainOf = (path: string): string[] => {
+    const chain: string[] = [];
+    for (let at: string | null | undefined = path; at; at = parent.get(at)) chain.unshift(at);
+    return chain;
+  };
+  for (let i = 0; i < queue.length; i += 1) {
+    const path = queue[i];
+    if (modules.includes(path) || path.startsWith('tools/') || path.startsWith('legacy/')) {
+      const chain = chainOf(path);
+      reaches.push({ entry: chain[0], reached: path, chain });
+      continue;
+    }
+    const source = readFile(path);
+    if (source === null) continue;
+    for (const specifier of extractImportSpecifiers(source)) {
+      const to = resolveImportFile(path, specifier, readFile);
+      if (to && !parent.has(to)) {
+        parent.set(to, path);
+        queue.push(to);
+      }
+    }
+  }
+  return reaches;
+}
+
+/**
+ * Runtime sources (src/**, packages/<module>/src/**) that import an offline tool tree. Resolved by
+ * path, so a relative escape such as `../../tools/rebuild/x` is caught like an `@/` import.
+ */
+export function offlineToolImports(files: readonly SourceFile[]): BoundaryViolation[] {
+  const violations: BoundaryViolation[] = [];
+  for (const file of files) {
+    if (!/^(src\/|packages\/[^/]+\/src\/)/.test(file.path)) continue;
+    for (const specifier of extractImportSpecifiers(file.source)) {
+      const resolved = resolveSpecifier(file.path, specifier);
+      if (resolved.kind === 'file' && OFFLINE_TOOL_PREFIXES.some((p) => resolved.path.startsWith(p))) {
+        violations.push({ file: file.path, specifier, rule: `runtime code must not import the offline tree ${resolved.path}` });
+      }
+    }
+  }
+  return violations;
+}
+
+const LEGACY_PATH_REFERENCE = /(^|[^A-Za-z0-9_-])legacy\//;
+
+/**
+ * Anything scheduled or deployed that names `legacy/`: a `package.json` script, or a line of a
+ * `deploy/` file (systemd unit/timer, shell, PowerShell, Caddy, supervisor). Quarantined tools
+ * are run by hand only.
+ */
+export function scheduledLegacyReferences(
+  packageJsonText: string,
+  deployFiles: readonly SourceFile[],
+): string[] {
+  const found: string[] = [];
+  const scripts = (JSON.parse(packageJsonText) as { scripts?: Record<string, string> }).scripts ?? {};
+  for (const [name, command] of Object.entries(scripts)) {
+    if (LEGACY_PATH_REFERENCE.test(command)) found.push(`package.json script ${name}: ${command}`);
+  }
+  for (const file of deployFiles) {
+    file.source.split(/\r?\n/).forEach((line, index) => {
+      if (LEGACY_PATH_REFERENCE.test(line)) found.push(`${file.path}:${index + 1}: ${line.trim()}`);
+    });
+  }
+  return found;
+}
+
+export interface RetiredEntryWiring {
+  /** Scripts that run the retired-entry CLI with a name that is not in the registry. */
+  unregistered: string[];
+  /** Scripts whose key differs from the registry name they pass to the CLI. */
+  mismatched: string[];
+  /** Registry entries no script runs. */
+  orphans: string[];
+}
+
+const RETIRED_ENTRY_CLI = /tools\/v2\/retired-entry\.ts\s+(\S+)/;
+
+/** Cross-check `package.json` scripts against the retirement registry, in both directions. */
+export function retiredEntryWiring(
+  packageJsonText: string,
+  registeredNames: readonly string[],
+): RetiredEntryWiring {
+  const scripts = (JSON.parse(packageJsonText) as { scripts?: Record<string, string> }).scripts ?? {};
+  const wired = new Set<string>();
+  const wiring: RetiredEntryWiring = { unregistered: [], mismatched: [], orphans: [] };
+  for (const [scriptName, command] of Object.entries(scripts)) {
+    const named = RETIRED_ENTRY_CLI.exec(command)?.[1];
+    if (named === undefined) continue;
+    if (!registeredNames.includes(named)) wiring.unregistered.push(`${scriptName} -> ${named}`);
+    else if (named !== scriptName) wiring.mismatched.push(`${scriptName} -> ${named}`);
+    else wired.add(named);
+  }
+  wiring.orphans = registeredNames.filter((name) => !wired.has(name));
+  return wiring;
+}

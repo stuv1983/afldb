@@ -25,7 +25,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
-| 4 Derived + curated | in progress (Launch C) | `fad164cd` (derived), `4c34be93` (progress), curated-awards commit (this one) |
+| 4 Derived + curated | in progress (Launch C) | `fad164cd` (derived), `4c34be93` (progress), `ddb42525` (curated), legacy commit (this one) |
 | 5-6 | not started (Launches D-E) | — |
 
 ## Stage 0 — evidence
@@ -206,8 +206,20 @@ lines of `baseline-failures.txt`; the two new curated suites 114 passed (92 unit
 tsc exit 0; ESLint on every touched file 0 errors except `tests/reference-data.test.ts`
 (29 errors, all pre-existing and equal at `HEAD`, R-011). Migration 111 and its grants were
 executed only on in-memory PGlite over labelled stub prerequisites; **unexecuted on
-PostgreSQL** (no database is reachable from V2). The Coleman publisher, the legacy disposition
-(D10) and the ownership matrix are in progress; this section is rewritten at the stage close.
+PostgreSQL** (no database is reachable from V2).
+
+Legacy disposition (D10) commit `(v2-legacy)`: `docs/v2/legacy-disposition.md` (rows L1-L13,
+guards a-f, the 18 ratchet-listed legacy runtime edges, tables still written by legacy runtime
+paths). Quarantined: 1 file (`tools/current-season/update-current-season.ts` moved to
+`legacy/offline/tools/current-season/`, F-001 fixed: `--source` has no default and is required).
+Retired with a refusal: 1 package script (`current-season:update` runs `tools/v2/retired-entry.ts`,
+which prints the `@afldb/domain` refusal and exits 1). Everything else is retained with its
+disposition recorded. Guards added to `packages/testing/src/module-boundaries.ts` and exercised in
+`tests/v2-module-boundaries.test.ts`. Gaps V2-GAP-011 (High, cutover blocker), 012 (Medium), 013
+(High, cutover blocker) and 014 (Low) recorded. Verification: the same working-tree run as the
+curated commit (10 focused files, failures all baseline; tsc exit 0; ESLint 0 errors on every
+file this commit touches). The Coleman publisher and the ownership matrix are in progress; this
+section is rewritten at the stage close.
 
 ## Resumption point
 

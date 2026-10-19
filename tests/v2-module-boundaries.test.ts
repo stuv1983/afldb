@@ -10,6 +10,7 @@
  *      stay silent on allowed ones.
  * Plus: every `@afldb/<module>` alias resolves in vitest to the package index.
  */
+import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,11 +19,23 @@ import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
 import {
+  RETIRED_ENTRIES,
+  findRetiredEntry,
+  renderRetiredEntryRefusal,
+  renderUnknownRetiredEntry,
+} from '@afldb/domain';
+import {
+  LEGACY_RUNTIME_MODULES,
   PACKAGE_MODULES,
   boundaryRuleBroken,
   checkBoundaries,
+  legacyRuntimeEdges,
+  offlineToolImports,
+  publicRuntimeLegacyReach,
   purityViolations,
   resolveSpecifier,
+  retiredEntryWiring,
+  scheduledLegacyReferences,
   type SourceFile,
 } from '@afldb/testing';
 
@@ -211,5 +224,289 @@ describe('ESLint no-restricted-imports enforces the same boundaries', () => {
       'tests/__v2_boundary_probe__.test.ts',
       "import { applyTestDsnPolicy } from '@afldb/testing';\nexport const p = applyTestDsnPolicy;\n",
     )).toEqual([]);
+  }, 60_000);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Stage 4 (plan D10, ADR 0010, R-006): legacy quarantine and runtime independence.
+// ---------------------------------------------------------------------------------------------
+
+const QUARANTINED_TOOL = 'legacy/offline/tools/current-season/update-current-season.ts';
+
+function walkAll(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name.startsWith('.')) continue;
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) walkAll(full, out);
+    else if (!/\.(png|jpe?g|gif|webp|ico|woff2?|zip)$/i.test(name)) out.push(full);
+  }
+  return out;
+}
+
+function sourceFiles(dirs: readonly string[]): SourceFile[] {
+  return dirs
+    .flatMap((d) => walk(join(ROOT, d)))
+    .map((full) => ({ path: rel(full), source: readFileSync(full, 'utf8') }));
+}
+
+function edgeKey(edge: { from: string; to: string }): string {
+  return `${edge.from} -> ${edge.to}`;
+}
+
+/** Unexpected and stale ratchet entries: both directions must be empty. */
+function ratchetDiff(
+  actual: readonly { from: string; to: string }[],
+  known: readonly { from: string; to: string }[],
+): { unexpected: string[]; stale: string[] } {
+  const actualKeys = new Set(actual.map(edgeKey));
+  const knownKeys = new Set(known.map(edgeKey));
+  return {
+    unexpected: [...actualKeys].filter((k) => !knownKeys.has(k)).sort(),
+    stale: [...knownKeys].filter((k) => !actualKeys.has(k)).sort(),
+  };
+}
+
+/**
+ * The exact set of direct importers of LEGACY_RUNTIME_MODULES outside those modules (tests/**
+ * excluded). Every one has a named disposition; the ratchet fails on a new edge and on a listed
+ * edge that no longer exists, so the list can only shrink deliberately.
+ */
+const KNOWN_LEGACY_RUNTIME_EDGES: readonly { from: string; to: string; disposition: string }[] = [
+  { from: QUARANTINED_TOOL, to: 'src/lib/external-afl/current-season-import.ts', disposition: 'legacy/offline quarantine' },
+  { from: 'src/app/admin/current-season/AflApiSettleUnitsPanel.tsx', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'Stage 5: admin current-season controls' },
+  { from: 'src/app/admin/current-season/actions.ts', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'Stage 5: admin current-season controls' },
+  { from: 'src/app/admin/current-season/actions.ts', to: 'src/lib/external-afl/current-season-import.ts', disposition: 'Stage 5: admin current-season controls' },
+  { from: 'src/app/admin/current-season/page.tsx', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'Stage 5: admin current-season controls' },
+  { from: 'src/app/admin/current-season/page.tsx', to: 'src/lib/external-afl/current-season-import.ts', disposition: 'Stage 5: admin current-season controls' },
+  { from: 'src/app/admin/submissions/[id]/actions.ts', to: 'src/lib/ingest/pipeline.ts', disposition: 'Stage 5: CSV submission review' },
+  { from: 'src/app/admin/upload/page.tsx', to: 'src/lib/ingest/datasets.ts', disposition: 'Stage 5: CSV upload' },
+  { from: 'src/app/admin/upload/stage/route.ts', to: 'src/lib/ingest/pipeline.ts', disposition: 'Stage 5: CSV upload' },
+  { from: 'src/app/api/admin/email-intake/route.ts', to: 'src/lib/ingest/pipeline.ts', disposition: 'Stage 5: email intake' },
+  { from: 'src/lib/acquisition/settle-afl-api.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: AFL API settle shares the AFL Tables settle helpers' },
+  { from: 'src/lib/acquisition/settle-report.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: settle report reads the AFL Tables settle types' },
+  { from: 'src/lib/acquisition/settle-status.ts', to: 'src/lib/acquisition/settle-trigger.ts', disposition: 'ISSUE-316 C4b cutover: settle status reads the trigger contract' },
+  { from: 'tools/current-season/settle-afltables.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'ISSUE-316 C4b cutover: AFL Tables settle CLI (retirement is the owner decision D-316-2)' },
+  { from: 'tools/db/afl-api-identity-correction-rehearsal.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'offline rehearsal tooling (tools/db)' },
+  { from: 'tools/db/prepare-promotion-source.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'offline promotion tooling (tools/db)' },
+  { from: 'tools/db/promotion-source-dependency-rehearsal.ts', to: 'src/lib/acquisition/settle-afltables.ts', disposition: 'offline rehearsal tooling (tools/db)' },
+  { from: 'tools/records/import-first-kick-goal.ts', to: 'src/lib/ingest/datasets.ts', disposition: 'offline records import (tools/records)' },
+];
+
+describe('legacy quarantine: nothing scheduled or deployed runs legacy/ (plan D10)', () => {
+  const packageJsonText = readFileSync(join(ROOT, 'package.json'), 'utf8');
+  const deployFiles = (): SourceFile[] => walkAll(join(ROOT, 'deploy'))
+    .map((full) => ({ path: rel(full), source: readFileSync(full, 'utf8') }));
+
+  it('no package.json script and no file under deploy/ references legacy/', () => {
+    const files = deployFiles();
+    // Not vacuous: the scan really covered the deploy units, timers and scripts.
+    expect(files.length).toBeGreaterThan(15);
+    expect(files.some((f) => f.path === 'deploy/afldb-settle-afltables.timer')).toBe(true);
+    expect(files.some((f) => f.path === 'deploy/afldb.service')).toBe(true);
+    expect(JSON.parse(packageJsonText).scripts['current-season:update']).toBeTruthy();
+    expect(scheduledLegacyReferences(packageJsonText, files)).toEqual([]);
+  });
+
+  it('negative control: a script or a deploy line naming legacy/ is reported', () => {
+    const bad = JSON.stringify({ scripts: { ok: 'tsx tools/a.ts', bad: 'tsx legacy/offline/x.ts' } });
+    const found = scheduledLegacyReferences(bad, [
+      { path: 'deploy/x.service', source: '[Service]\nExecStart=/usr/bin/npx tsx legacy/offline/x.ts\n' },
+      { path: 'deploy/y.sh', source: 'echo "not a legacy-looking path legacy-tools"\n' },
+    ]);
+    expect(found).toEqual([
+      'package.json script bad: tsx legacy/offline/x.ts',
+      'deploy/x.service:2: ExecStart=/usr/bin/npx tsx legacy/offline/x.ts',
+    ]);
+    expect(scheduledLegacyReferences(JSON.stringify({ scripts: { ok: 'tsx tools/a.ts' } }), [])).toEqual([]);
+  });
+});
+
+describe('legacy quarantine: only legacy/** imports legacy/** (real target exists)', () => {
+  it('the quarantined tool exists and the whole tree has no violation', () => {
+    expect(diskReader(QUARANTINED_TOOL)).not.toBeNull();
+    expect(diskReader('tools/current-season/update-current-season.ts')).toBeNull();
+    const files = sourceFiles(['src', 'tools', 'packages', 'deploy', 'legacy']);
+    expect(files.some((f) => f.path === QUARANTINED_TOOL)).toBe(true);
+    expect(checkBoundaries(files)).toEqual([]);
+    // The quarantined tool is allowed to import src/** (and only that direction is allowed).
+    expect(checkBoundaries(files.filter((f) => f.path === QUARANTINED_TOOL))).toEqual([]);
+  });
+
+  it('negative control: an admin page importing legacy/offline is refused', () => {
+    expect(violationsFor('src/app/admin/x.tsx', "import { run } from '../../../legacy/offline/tools/current-season/update-current-season';"))
+      .toEqual(['only legacy/** may import legacy/**']);
+    expect(violationsFor('src/lib/x.ts', "const m = await import('../../legacy/offline/y');"))
+      .toEqual(['only legacy/** may import legacy/**']);
+  });
+});
+
+describe('legacy runtime ratchet: the importers of the legacy runtime modules are exactly the known list', () => {
+  it('declares real, existing modules', () => {
+    expect(LEGACY_RUNTIME_MODULES.length).toBeGreaterThanOrEqual(6);
+    for (const legacyModule of LEGACY_RUNTIME_MODULES) expect(diskReader(legacyModule), legacyModule).not.toBeNull();
+  });
+
+  it('every real edge is known and every known edge is real (tests/** excluded)', () => {
+    const files = sourceFiles(['src', 'packages', 'tools', 'deploy', 'legacy']);
+    const diff = ratchetDiff(legacyRuntimeEdges(files, diskReader), KNOWN_LEGACY_RUNTIME_EDGES);
+    expect(diff).toEqual({ unexpected: [], stale: [] });
+    for (const edge of KNOWN_LEGACY_RUNTIME_EDGES) {
+      expect(LEGACY_RUNTIME_MODULES, edge.to).toContain(edge.to);
+      expect(edge.disposition.length, edgeKey(edge)).toBeGreaterThan(8);
+    }
+    expect(new Set(KNOWN_LEGACY_RUNTIME_EDGES.map(edgeKey)).size).toBe(KNOWN_LEGACY_RUNTIME_EDGES.length);
+  });
+
+  it('negative control: a new importer is unexpected and a vanished one is stale', () => {
+    const memory: Record<string, string> = {
+      'src/lib/ingest/pipeline.ts': 'export const p = 1;',
+      'src/lib/a.ts': "import { p } from './ingest/pipeline';\nexport const a = p;",
+      'src/lib/ingest/pipeline-helper.ts': "import { p } from './pipeline';\nexport const h = p;",
+    };
+    const files: SourceFile[] = Object.entries(memory).map(([path, source]) => ({ path, source }));
+    const edges = legacyRuntimeEdges(files, (p) => memory[p] ?? null);
+    expect(edges.map(edgeKey)).toEqual([
+      'src/lib/a.ts -> src/lib/ingest/pipeline.ts',
+      'src/lib/ingest/pipeline-helper.ts -> src/lib/ingest/pipeline.ts',
+    ]);
+    expect(ratchetDiff(edges, [{ from: 'src/lib/a.ts', to: 'src/lib/ingest/pipeline.ts' }]))
+      .toEqual({ unexpected: ['src/lib/ingest/pipeline-helper.ts -> src/lib/ingest/pipeline.ts'], stale: [] });
+    expect(ratchetDiff([], [{ from: 'src/lib/a.ts', to: 'src/lib/ingest/pipeline.ts' }]))
+      .toEqual({ unexpected: [], stale: ['src/lib/a.ts -> src/lib/ingest/pipeline.ts'] });
+    // A module importing another legacy module is not an external edge.
+    const both: Record<string, string> = {
+      'src/lib/ingest/pipeline.ts': "import './datasets';",
+      'src/lib/ingest/datasets.ts': 'export const d = 1;',
+    };
+    expect(legacyRuntimeEdges(
+      Object.entries(both).map(([path, source]) => ({ path, source })),
+      (p) => both[p] ?? null,
+    )).toEqual([]);
+  });
+});
+
+describe('public runtime independence: the public web layer reaches no legacy runtime or offline tool', () => {
+  const isPublicEntry = (path: string): boolean => (
+    (path.startsWith('src/app/') && !path.startsWith('src/app/admin/') && !path.startsWith('src/app/api/admin/'))
+    || path.startsWith('src/components/')
+  );
+
+  it('the transitive closure of every public src/app and src/components file is clean', () => {
+    const entries = sourceFiles(['src']).map((f) => f.path).filter(isPublicEntry);
+    // Not vacuous: the public web layer is large, and includes pages, route handlers and components.
+    expect(entries.length).toBeGreaterThan(100);
+    expect(entries.some((p) => /^src\/app\/.*page\.tsx$/.test(p))).toBe(true);
+    expect(entries.some((p) => p.startsWith('src/components/'))).toBe(true);
+    expect(entries.some((p) => p.startsWith('src/app/admin/'))).toBe(false);
+    const reach = publicRuntimeLegacyReach(entries, diskReader);
+    expect(reach.map((r) => r.chain.join(' > '))).toEqual([]);
+  });
+
+  it('the walker follows the real tree: an admin entry does reach a legacy runtime module', () => {
+    const reach = publicRuntimeLegacyReach(['src/app/admin/current-season/page.tsx'], diskReader);
+    expect(reach.map((r) => r.reached)).toContain('src/lib/external-afl/current-season-import.ts');
+  });
+
+  it('negative control: an import chain into a legacy module, tools/ or legacy/ is reported', () => {
+    const memory: Record<string, string> = {
+      'src/app/page.tsx': "import { x } from '@/lib/x';",
+      'src/lib/x.ts': "export { run } from '../../tools/current-season/settle-afltables';",
+      'tools/current-season/settle-afltables.ts': 'export const run = 1;',
+      'src/components/C.tsx': "import { p } from '@/lib/ingest/pipeline';",
+      'src/lib/ingest/pipeline.ts': 'export const p = 1;',
+    };
+    const reach = publicRuntimeLegacyReach(['src/app/page.tsx', 'src/components/C.tsx'], (p) => memory[p] ?? null);
+    expect(reach.map((r) => r.chain.join(' > '))).toEqual([
+      'src/components/C.tsx > src/lib/ingest/pipeline.ts',
+      'src/app/page.tsx > src/lib/x.ts > tools/current-season/settle-afltables.ts',
+    ]);
+    expect(publicRuntimeLegacyReach(['src/app/page.tsx'], (p) => (
+      { ...memory, 'src/lib/x.ts': 'export const run = 1;' }[p] ?? null
+    ))).toEqual([]);
+  });
+});
+
+describe('offline tools are never imported by runtime code', () => {
+  it('no file under src/ or packages/*/src/ imports tools/{migration,rebuild,records,aflw,email_intake}/ or legacy/', () => {
+    const files = sourceFiles(['src', 'packages']);
+    expect(files.length).toBeGreaterThan(300);
+    // packages/testing is not excluded: it needs no offline tool, so the guard covers it too.
+    expect(files.some((f) => f.path.startsWith('packages/testing/src/'))).toBe(true);
+    expect(offlineToolImports(files)).toEqual([]);
+  });
+
+  it('negative control: every offline tree is refused, tools/db and tests are not in scope', () => {
+    const prefixes = ['tools/migration/a', 'tools/rebuild/a', 'tools/records/a', 'tools/aflw/a', 'tools/email_intake/a', 'legacy/offline/a'];
+    for (const target of prefixes) {
+      const violations = offlineToolImports([
+        { path: 'src/lib/x.ts', source: `import { a } from '../../${target}';` },
+        { path: 'packages/db/src/x.ts', source: `import { a } from '../../../${target}';` },
+      ]);
+      expect(violations.map((v) => v.file), target).toEqual(['src/lib/x.ts', 'packages/db/src/x.ts']);
+    }
+    expect(offlineToolImports([{ path: 'src/lib/x.ts', source: "import { a } from '../../tools/db/a';" }])).toEqual([]);
+    expect(offlineToolImports([{ path: 'tools/db/x.ts', source: "import { a } from '../migration/a';" }])).toEqual([]);
+  });
+});
+
+describe('retired entry points are registered and wired in both directions', () => {
+  const packageJsonText = readFileSync(join(ROOT, 'package.json'), 'utf8');
+  const names = RETIRED_ENTRIES.map((e) => e.name);
+
+  it('every retired-entry script names a registry entry and every entry is wired', () => {
+    expect(names).toContain('current-season:update');
+    expect(retiredEntryWiring(packageJsonText, names)).toEqual({ unregistered: [], mismatched: [], orphans: [] });
+    expect(JSON.parse(packageJsonText).scripts['current-season:update'])
+      .toBe('tsx tools/v2/retired-entry.ts current-season:update');
+  });
+
+  it('every entry points at a real offline tool and real governing documents', () => {
+    for (const entry of RETIRED_ENTRIES) {
+      expect(diskReader(entry.offlineLocation), entry.name).not.toBeNull();
+      expect(entry.offlineLocation.startsWith('legacy/offline/')).toBe(true);
+      expect(entry.governedBy).toContain('docs/v2/legacy-disposition.md');
+      expect(diskReader('docs/v2/adr/0010-legacy-disposition.md')).not.toBeNull();
+    }
+  });
+
+  it('negative control: an unregistered script, a mismatched key and an orphan entry are reported', () => {
+    const bad = JSON.stringify({ scripts: {
+      'old:thing': 'tsx tools/v2/retired-entry.ts old:thing',
+      'renamed': 'tsx tools/v2/retired-entry.ts current-season:update',
+      'plain': 'tsx tools/a.ts',
+    } });
+    expect(retiredEntryWiring(bad, names)).toEqual({
+      unregistered: ['old:thing -> old:thing'],
+      mismatched: ['renamed -> current-season:update'],
+      orphans: ['current-season:update'],
+    });
+  });
+
+  it('the refusal names what, why, where and which document; unknown names also refuse', () => {
+    const entry = findRetiredEntry('current-season:update');
+    expect(entry).not.toBeNull();
+    const text = renderRetiredEntryRefusal(entry as NonNullable<typeof entry>);
+    expect(text).toContain('RETIRED: "current-season:update"');
+    expect(text).toContain('Squiggle and Kali are retired sources');
+    expect(text).toContain(QUARANTINED_TOOL);
+    expect(text).toContain('docs/v2/legacy-disposition.md');
+    expect(findRetiredEntry('nope')).toBeNull();
+    expect(renderUnknownRetiredEntry('nope')).toContain('not a registered retired entry point');
+  });
+
+  it('the CLI exits 1 with the refusal for a retired entry and for an unknown name', () => {
+    const tsx = join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+    const run = (name: string) => spawnSync(process.execPath, [tsx, 'tools/v2/retired-entry.ts', name], {
+      cwd: ROOT, encoding: 'utf8', timeout: 20_000,
+    });
+    const retired = run('current-season:update');
+    expect(retired.status).toBe(1);
+    expect(retired.stderr).toContain('RETIRED: "current-season:update"');
+    expect(retired.stderr).toContain(QUARANTINED_TOOL);
+    const unknown = run('no-such-script');
+    expect(unknown.status).toBe(1);
+    expect(unknown.stderr).toContain('not a registered retired entry point');
+    // No scheduler-style silent success: with no argument it also refuses.
+    expect(run('').status).toBe(1);
   }, 60_000);
 });

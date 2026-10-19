@@ -39,7 +39,7 @@
     "preflight": "tsx tools/dev/preflight.ts",
     "worktree:bootstrap": "tsx tools/dev/bootstrap-worktree.ts",
     "merge:ready": "tsx tools/dev/merge-readiness.ts",
-    "current-season:update": "tsx tools/current-season/update-current-season.ts",
+    "current-season:update": "tsx tools/v2/retired-entry.ts current-season:update",
     "settle:afltables": "tsx tools/current-season/settle-afltables.ts",
     "acquire:afl-api": "tsx tools/current-season/acquire-afl-api.ts",
     "emit:afl-api": "tsx tools/current-season/emit-afl-api-bundle.ts",

@@ -15,6 +15,10 @@ close it. An entry is removed only when the closing evidence exists.
 | V2-GAP-008 | High | AFL API fixtures | **open: cutover blocker** (AFLDB-ISSUE-229 B2 and the unbuilt fixtures writer) |
 | V2-GAP-009 | Medium | AFL API promotion | open: transactional preservation unexecuted on PostgreSQL |
 | V2-GAP-010 | Medium | AFL API coverage | open: 2012-2025 API coverage has no committed evidence |
+| V2-GAP-011 | High | legacy runtime | **open: cutover blocker** (AFL Tables nightly settle and trigger stay until D-316-2) |
+| V2-GAP-012 | Medium | legacy runtime | open: AFL API settle imports shared helpers from `settle-afltables.ts` |
+| V2-GAP-013 | High | legacy runtime | **open: cutover blocker** (CSV upload, submission promotion, email intake and Squiggle/Kali admin refresh stay in runtime until Stage 5) |
+| V2-GAP-014 | Low | legacy quarantine | open: Python/R tools not physically quarantined |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -165,3 +169,64 @@ close it. An entry is removed only when the closing evidence exists.
 - **Why.** Raw acquisitions under `data/sources/afl_api/` are git-ignored; V2 may not fetch.
 - **Close.** Commit sanitised stored snapshots for each season to be claimed, with tests, then
   regenerate the matrix (`tools/v2/coverage-matrix.ts --write`). Never relabel without evidence.
+
+## V2-GAP-011 — CUTOVER BLOCKER: the AFL Tables runtime remains until the ISSUE-316 retirement
+
+- **What.** The AFL Tables nightly settle (`deploy/afldb-settle-afltables.timer` -> `.sh` ->
+  `acquire_core.R` -> `import_fitzroy_core.py` -> `tools/current-season/settle-afltables.ts` ->
+  `src/lib/acquisition/settle-afltables.ts`), `npm run settle:afltables`, and the admin trigger
+  (`src/app/admin/current-season/actions.ts` `startSettleRunAction` -> `settle-trigger.ts`) are
+  still runtime paths in V2 (`docs/v2/legacy-disposition.md` L4, L5). They write the match spine,
+  staging, promotion and derived tables (`legacy-disposition.md` §5).
+- **Why.** Retiring them is the owner's ISSUE-316 decision D-316-2 (the C4b cutover), which V2 may
+  not execute. The shell script, the trigger and the network register are frozen ISSUE-316 files.
+  The register (`data/reference/afltables-network.json`, gates in
+  `src/lib/acquisition/afltables-network.ts`) already makes every network path refuse once
+  retired.
+- **Guard.** `tests/v2-module-boundaries.test.ts` ratchets the known legacy runtime edges
+  (`legacyRuntimeEdges`, `publicRuntimeLegacyReach`, `scheduledLegacyReferences`): a new edge
+  fails the test.
+- **Close.** The owner executes D-316-2 under ISSUE-316; Stage 5 removes the admin trigger; Stage 6
+  disables the timer. Until then the production go/no-go for an AFL API-only pipeline is
+  **no-go**.
+
+## V2-GAP-012 — The AFL API settle depends on helpers that live in `settle-afltables.ts`
+
+- **What.** `src/lib/acquisition/settle-afl-api.ts:134-140` imports
+  `automaticProposalUnderAuthority`, `scopeProposalToAuthority`, `PLAYER_MATCH_STAT_COLUMNS`,
+  `CANONICAL_APPLY_ISSUE_OWNER` and `CANONICAL_APPLY_ISSUE_TYPE`, and
+  `src/lib/acquisition/settle-report.ts:46-53` imports the canonical-apply and settle issue keys,
+  `MATCH_TARGET_TABLES` and `SETTLE_SOURCE_KEY`, from `src/lib/acquisition/settle-afltables.ts`.
+  This is a code dependency on the module, not a data dependency on AFL Tables.
+- **Why.** Moving the helpers is a refactor of shared settle code that the integration suites
+  (which need a database) must cover; Stage 4 did not attempt it.
+- **Close.** Move the helpers into a source-neutral module, re-point both settles, run the settle
+  integration suites on an isolated `afldb_test`, then `settle-afltables.ts` can be quarantined
+  with L4.
+
+## V2-GAP-013 — CUTOVER BLOCKER: CSV, email intake and Squiggle/Kali admin paths remain in runtime
+
+- **What.** CSV upload (`src/app/admin/upload/**`), CSV submission review and promotion
+  (`src/app/admin/submissions/[id]/actions.ts` -> `src/lib/ingest/pipeline.ts` ->
+  `datasets.ts`), the email intake route (`src/app/api/admin/email-intake/route.ts`, fed by
+  `deploy/afldb-email-intake.timer`) and the Squiggle/Kali admin refresh
+  (`src/app/admin/current-season/actions.ts` -> `src/lib/external-afl/current-season-import.ts`)
+  are still reachable (`legacy-disposition.md` L1-L3, L6). On promotion the CSV path writes
+  `matches`, `player_match_stats`, `players`, `award_winners` and `award_nominations` directly.
+- **Why.** These are admin routes and server actions; Stage 5 owns the admin surface. Disabling the
+  email intake timer is a deployment act (Stage 6). Stage 4 retired only the Squiggle/Kali CLI
+  (quarantined to `legacy/offline/`, package script refuses).
+- **Guard.** The legacy runtime edges are ratchet-listed in `tests/v2-module-boundaries.test.ts`.
+- **Close.** Stage 5 makes the routes and actions refuse (or removes them) and replaces them with
+  the curated admin entry (ADR 0008) and the audited editors; Stage 6 disables the timer.
+
+## V2-GAP-014 — Python and R legacy tools are not physically quarantined
+
+- **What.** `tools/migration/*`, `tools/rebuild/**` and `tools/email_intake/*` stay in place
+  (`legacy-disposition.md` L8-L10). Only the TypeScript CLI `update-current-season.ts` moved to
+  `legacy/offline/`.
+- **Why.** The sealed historical rebuild (`tools/db/rebuild-test.ts`) invokes them by path, and V2
+  cannot execute Python or R to prove a moved script still runs. Two are frozen ISSUE-316 files.
+- **Guard.** No runtime TypeScript imports them (guard e in `legacy-disposition.md` §2).
+- **Close.** Move them with the rebuild's path references updated, then run the rebuild on an
+  isolated `afldb_test` to prove it still completes.

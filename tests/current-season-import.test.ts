@@ -39,7 +39,7 @@ function readSource(path: string): string {
   return readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 }
 
-const tool = readSource('tools/current-season/update-current-season.ts');
+const tool = readSource('legacy/offline/tools/current-season/update-current-season.ts');
 const importer = readSource('src/lib/external-afl/current-season-import.ts');
 const adminAction = readSource('src/app/admin/current-season/actions.ts');
 const adminControls = readSource('src/app/admin/current-season/CurrentSeasonControls.tsx');
@@ -171,6 +171,16 @@ describe('current-season external source import contracts', () => {
     expect(importer).toContain('EXTERNAL_CLUB_NAME_ALIASES');
     expect(importer).toContain("['brisbane', 'Brisbane Lions']");
     expect(importer).toContain('localClubNameCandidate(raw)');
+  });
+
+  it('has no default source: a refresh without --source is refused (AFLDB V2 finding F-001)', () => {
+    expect(tool).not.toContain("?? 'squiggle'");
+    expect(tool).toContain('--source is required for a refresh');
+    expect(tool).toContain('Squiggle and Kali are retired sources');
+    expect(tool).toContain('AFLDB V2 plan D10');
+    expect(tool).toContain('docs/v2/legacy-disposition.md');
+    // The read-only report must keep working without a source.
+    expect(tool).toContain('const sources = report ? [] : parseCurrentSeasonSources(sourceValue ?? \'\');');
   });
 
   it('can report staged resolution counts without fetching or mutating source rows', () => {

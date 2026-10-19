@@ -1,3 +1,29 @@
+/**
+ * QUARANTINED OFFLINE DIAGNOSTIC -- Squiggle / Kali current-season refresh CLI.
+ *
+ * Status: RETIRED from runtime by AFLDB V2 plan D10 / ADR 0010 (see docs/v2/legacy-disposition.md).
+ * Squiggle and Kali are retired sources: AFLDB-ISSUE-122/128 already made them staging,
+ * observation and diagnostic only, and V2 removes them from every runtime path.
+ *
+ * Rules for this file (enforced by tests/v2-module-boundaries.test.ts):
+ *   - offline only: it is run by hand, deliberately, never by a scheduler;
+ *   - no scheduler, systemd unit, deploy script or package.json script may reference legacy/;
+ *   - nothing under src/, packages/ or the rest of tools/ may import it;
+ *   - it is never wired to an admin button (the admin current-season controls are Stage 5's).
+ *
+ * Why it is kept: it is the only reader of the staged Squiggle/Kali observations
+ * (staging.external_current_matches and its versions). The staged rows are diagnostic evidence
+ * for ISSUE-122/128 and stay readable through `--report` until the owner retires the evidence.
+ *
+ * It cannot write canonical matches. `--update-matches` and `--insert-missing-matches` are
+ * refused, and a refresh without an explicit `--source` is refused (AFLDB V2 finding F-001:
+ * the old default silently selected the retired Squiggle source).
+ *
+ * Deliberate run (needs DATABASE_URL in .env; stages observations only):
+ *   npx tsx legacy/offline/tools/current-season/update-current-season.ts --report --year 2026
+ *   npx tsx legacy/offline/tools/current-season/update-current-season.ts --source squiggle --year 2026
+ * `npm run current-season:update` now only prints the retirement notice (tools/v2/retired-entry.ts).
+ */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,10 +34,10 @@ import {
   runCurrentSeasonRefresh,
   validateCurrentSeasonYear,
   type CurrentSeasonRunOptions,
-} from '../../src/lib/external-afl/current-season-import';
+} from '../../../../src/lib/external-afl/current-season-import';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = join(__dirname, '..', '..');
+const PROJECT_ROOT = join(__dirname, '..', '..', '..', '..');
 
 type Args = CurrentSeasonRunOptions & {
   report: boolean;
@@ -49,14 +75,25 @@ function parseArgs(argv: string[]): Args {
       '--insert-missing-matches is disabled: current API observations do not own the complete canonical match family.',
     );
   }
-  const sources = parseCurrentSeasonSources(valueFor(argv, '--source') ?? 'squiggle');
+  const report = argv.includes('--report');
+  const sourceValue = valueFor(argv, '--source');
+  // F-001: no default source. Squiggle and Kali are retired, so a refresh must name its source.
+  if (!report && (sourceValue === null || sourceValue.startsWith('--') || !sourceValue.trim())) {
+    throw new Error(
+      '--source is required for a refresh: name squiggle, kali or all explicitly. There is no default '
+      + 'because Squiggle and Kali are retired sources; this is an offline diagnostic quarantined by '
+      + 'AFLDB V2 plan D10 (see docs/v2/legacy-disposition.md). --report needs no --source.',
+    );
+  }
+  // --report is read-only and never fetches, so it carries no sources.
+  const sources = report ? [] : parseCurrentSeasonSources(sourceValue ?? '');
   const year = validateCurrentSeasonYear(Number(valueFor(argv, '--year') ?? new Date().getFullYear()));
   return {
     year,
     sources,
     apply: argv.includes('--apply'),
     insertMissingMatches: false,
-    report: argv.includes('--report'),
+    report,
   };
 }
 

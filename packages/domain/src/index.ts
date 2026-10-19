@@ -91,3 +91,12 @@ export {
   type SeasonWriteDecision,
   type SeasonWriteInput,
 } from './season-seal';
+// @v2-stage4:legacy-retirement
+// The registry of retired entry points and their refusal text (plan D10, ADR 0010, R-006).
+export {
+  RETIRED_ENTRIES,
+  findRetiredEntry,
+  renderRetiredEntryRefusal,
+  renderUnknownRetiredEntry,
+  type RetiredEntry,
+} from './legacy-retirement';
