@@ -19,6 +19,21 @@ import { resolveDraftKind, type GridAxisState } from '@/search/grid-solver-spec'
 import { normalisePlayerName, type GridleyPlayerRef } from '@/search/gridley-compat';
 import { KNOWN_ANSWER_EVIDENCE_KIND, type GridleyKnownAnswerAdjudication } from './gridley-known-answer-adjudications';
 import board541Trade from '../data/reference/gridley-board-541-trade.json';
+import siblingEligibility from '../data/reference/gridley-sibling-eligibility-evidence.json';
+
+/** Evidence classification only: this category is deliberately NOT informational or an approved deferral. */
+export function siblingCriterionDisagreement(input: {
+  board: number; cell: string; row: string; col: string; profile: string; gridleyPlayerId: number;
+  inGridley: boolean; inAfldb: boolean; lackingBuilders: readonly string[];
+}): string | null {
+  if (!input.inGridley || input.inAfldb || input.profile !== siblingEligibility.profile
+    || input.gridleyPlayerId !== siblingEligibility.gridleyPlayerId
+    || input.lackingBuilders.length !== 1 || input.lackingBuilders[0] !== 'has_brother'
+    || !siblingEligibility.cells.some((cell) => cell.board === input.board && cell.cell === input.cell
+      && cell.row === input.row && cell.col === input.col)) return null;
+  return `unapproved criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; `
+    + `has_brother requires games > 0; ${siblingEligibility.sources[0].url}; ${siblingEligibility.sources[1].url}`;
+}
 
 export type PlayerRow = {
   id: number; displayName: string; givenName: string | null; surname: string | null;

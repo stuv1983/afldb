@@ -1,8 +1,11 @@
 # Local release package — owner review
 
 Scope: single-agent continuation of `36679a1e` on `v2/rebuild`, 2026-10-19–20.
-No additional worktree, remote, production/shared database, host, deployment, service operation
-or push. All five existing worktrees were preserved. Focused local commits are recorded in
+No additional worktree, deployment, live service change or push in this follow-up.
+**Incident correction:** earlier launcher authentication reached the documented shared development
+PostgreSQL endpoint through SSH-owned port 55432. Successful login/SQL and remote cluster
+identity were not established; blanket no-production/shared-contact wording is withdrawn.
+The SSH process was not altered. New local listener ownership checks precede credentials. All five existing worktrees were preserved. Focused local commits are recorded in
 the final handoff. Production verdict: **NO-GO**.
 An unrelated untracked `.codex/` directory appeared during execution. It was not read, changed,
 staged or committed; evidence tooling lists it separately from task changes.
@@ -113,8 +116,8 @@ the delivery summary):
 | `release-gates.test.ts` | exact 261 players; exact 110 players | **Resolved.** Membership unchanged: both original digests reproduce exactly under the punctuation-ignoring key order; the gate is now collation-independent. |
 | `gridley-corpus.test.ts` | no probed dataset gap; no failing cells; bounded policy conformance | **Open:** 149 strict findings (78 approved deferrals, 71 unapproved); rookie 23 findings / 7 cells repaired. Exact inventory and raw strict results: `gap-029-gridley-resolution.md`. |
 
-The earlier six-file baseline was 1,374 passed / 2 failed / 7 skipped. The latest GAP-029
-run on the preserved isolated clone is **1,378 passed / 3 failed / 7 skipped (1,388)**:
+The earlier six-file baseline was 1,374 passed / 2 failed / 7 skipped. The latest seven-file GAP-029
+run on the preserved isolated clone is **1,397 passed / 3 failed / 7 skipped (1,407)**:
 the two original Gridley strict checks and the new independent approved-policy check fail.
 **23 rookie findings across 7 cells are repaired**, using eight audited, replayable manual
 selections. A newly exposed all-source draft-count assertion was corrected to retain exactly
@@ -123,10 +126,13 @@ unexplained source rows. Typecheck and changed-file lint pass.
 
 Strict parity remains **FAIL: 149 findings / 149 cells**. Existing §23.36 approvals account for
 **78 deferrals, 0 data matches**; policy conformance remains **FAIL: 71 unapproved** (42 event,
-8 board-dated 2026, 21 Jarryd/Corey sibling findings). No new deferral or diagnostic waiver.
+8 board-dated 2026, 21 sourced but unapproved Jarryd/Corey criterion disagreements). No new deferral or diagnostic waiver.
 The raw strict failures, inventory, citations and exact commands are retained in
 [Gridley closeout](gap-029-gridley-resolution.md) and `evidence/gap-029-gridley-verification.json`.
 The broad workflow was **not rerun**; its historical result remains 13,740 / 9 / 31.
+The earlier owner authentication failure is correlated to the shared-development tunnel;
+remote identity and logs were not queried. Real rookie override replay now restores 8/8 on a
+rollback-only clone with audit/override history preserved.
 The documented cluster was stopped and port 55432 belongs to ssh.exe; its preserved data now
 runs and verifies on loopback **55433**, with existing credentials and authentication unchanged.
 

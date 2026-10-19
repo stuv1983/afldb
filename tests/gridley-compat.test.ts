@@ -27,7 +27,7 @@ import {
 } from '@/search/gridley-compat';
 import {
   buildCriterionListingIndex, buildResolver, criterionListedElsewhere, knownAnswerAdjudication, knownAnswerEvidence, knownAnswerEvidenceStaleness, nationalPickKeyDisagreement,
-  rookieSourceCoverageGap, teammateListMembership, tradesAfterBoard, triageDraftFinding, type KnownAnswerFacts, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
+  rookieSourceCoverageGap, siblingCriterionDisagreement, teammateListMembership, tradesAfterBoard, triageDraftFinding, type KnownAnswerFacts, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
 } from './gridley-corpus-support';
 import { GRIDLEY_KNOWN_ANSWER_COLUMNS, loadGridleyKnownAnswerAdjudications } from './gridley-known-answer-adjudications';
 import { CAPTAIN_CENSUS, classifyIssue225Cell, ISSUE225_GIDS, issue225Population, TEAMMATE_CENSUS } from './issue225-acceptance';
@@ -37,6 +37,22 @@ import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from './rook
 const FIXTURES = join(__dirname, 'fixtures', 'gridley');
 
 describe('GAP-029 release policy', () => {
+  it('keeps sourced sibling semantics strict and unapproved, without widening the played-sibling rule', () => {
+    const evidence = JSON.parse(readFileSync(join(__dirname, '../data/reference/gridley-sibling-eligibility-evidence.json'), 'utf8'));
+    expect(evidence.ownerApproved).toBe(false);
+    expect(evidence.cells).toHaveLength(21);
+    const base = { ...evidence.cells[0], profile: evidence.profile, gridleyPlayerId: 3746,
+      inGridley: true, inAfldb: false, lackingBuilders: ['has_brother'] };
+    expect(siblingCriterionDisagreement(base)).toContain('unapproved criterion disagreement');
+    for (const changed of [{ board: -1 }, { profile: 'players/X/Other.html' }, { gridleyPlayerId: 1 },
+      { inGridley: false }, { inAfldb: true }, { lackingBuilders: ['has_brother', 'played_for_club'] }]) {
+      expect(siblingCriterionDisagreement({ ...base, ...changed })).toBeNull();
+    }
+    const result = gridleyPolicyResults([{ ...base, category: 'criterion disagreement' }], loadGridleyDeferrals());
+    expect(result.strictCorpusParity.passed).toBe(false);
+    expect(result.approvedPolicyConformance.passed).toBe(false);
+    expect(result.approvedDeferrals).toEqual({ findings: 0, dataMatches: 0 });
+  });
   it('bounds the seven retained deferrals to their original 78 cells and keeps strict results', () => {
     const policy = loadGridleyDeferrals();
     expect(policy.criteria).toEqual(['intrulesplayer', 'irish', 'nfl', 'recruitedByDodoro', 'season2024player', 'spoils5season', 'tasmanian']);

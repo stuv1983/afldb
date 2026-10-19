@@ -1,5 +1,10 @@
 # AFLDB V2 — final report (close of Launch F, 2026-10-19; first written at Stage 6)
 
+**Port-incident correction:** earlier authentication reached the documented shared development
+PostgreSQL endpoint through SSH-owned 55432; successful login/SQL and remote identity were not
+established. New launcher listener-ownership checks precede credentials. This follow-up used
+verified isolated 55433 only. No production/shared-contact exclusion is inferred from loopback.
+
 ## Local release follow-up — current owner-review package
 
 The current evidence, exact test identifiers, reproducible commands and narrowed release gates
@@ -15,7 +20,7 @@ Final complete run: **13,740 passed / 9 failed / 31 skipped**; separate Coleman 
 The original four gap-028 files pass **200/200**. Nine strict reference/source disagreements
 were gap 029. Latest follow-up: rookie 23 findings / 7 cells repaired through eight audited
 manual selections; strict Gridley has 149 findings (78 approved deferrals, 71 unapproved).
-Latest six-file focused result: **1,378 passed / 3 failed / 7 skipped**; two original strict
+Latest seven-file relevant result: **1,397 passed / 3 failed / 7 skipped**; two original strict
 checks and the independent policy check fail. Approved deferrals are 0 data matches.
 The full workflow was not rerun and remains **not green**. Typecheck and changed-file lint pass.
 Detailed evidence and remaining source/owner decisions: [Gridley closeout](gap-029-gridley-resolution.md).

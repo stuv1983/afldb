@@ -1,5 +1,10 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
+**Port-incident correction:** earlier authentication reached the documented shared development
+PostgreSQL endpoint through SSH-owned 55432; successful login/SQL and remote identity were not
+established. New launcher listener-ownership checks precede credentials. This follow-up used
+verified isolated 55433 only. No production/shared-contact exclusion is inferred from loopback.
+
 **Current local-release addendum (2026-10-20): production NO-GO.** See
 `local-release-review.md` for actual assertion-level results; earlier failure-*line* comparisons
 are historical, not a green test gate. Local Brownlow publication, 98-season reconciliation,
@@ -8,11 +13,11 @@ previous/V2 application rollback have now been demonstrated. Linux/production-du
 host rollback/backup/service operations, owner visual acceptance and first authentic 2027 B2
 operational acceptance remain. No production authority is granted by these local results.
 Final complete workflow: **13,740 passed / 9 failed / 31 skipped**; Coleman separately **27/27**.
-GAP-029 remains **open**. Latest six-file focused run: **1,378 passed / 3 failed / 7 skipped**;
+GAP-029 remains **open**. Latest seven-file relevant run: **1,397 passed / 3 failed / 7 skipped**;
 strict parity **FAIL, 149 findings**, including **78 approved deferrals (0 data matches)** and
 **71 unapproved**. Rookie coverage repaired: **23 findings / 7 cells**, through eight audited
 manual selections on an isolated clone. Missing evidence: 42 exact event labels, 8 board-dated
-2026 cells, and senior-game identity/evidence or an explicit decision for 21 sibling cells.
+2026 cells, and the unapproved eligibility-population decision for 21 sibling cells.
 The independent policy gate rejects the unapproved differences even in diagnostic mode.
 Typecheck and changed-file lint pass. The full workflow was not rerun. Broader production gates
 are unchanged. See [Gridley closeout](gap-029-gridley-resolution.md).

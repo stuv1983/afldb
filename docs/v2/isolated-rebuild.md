@@ -1,7 +1,11 @@
 # AFLDB V2 — isolated PostgreSQL 16 and the isolated historical rebuild
 
-Launch F. Local development and rehearsal only: nothing here contacts production, `afldb_dev`,
-`afldb_test` or any shared server.
+Launch F intends local development and rehearsal only. **Incident correction (2026-10-20):**
+the earlier launcher attempted authentication through SSH-owned 55432, forwarded to the documented shared
+development PostgreSQL endpoint. Successful login/SQL and remote cluster identity are not
+established. The launcher now checks local postmaster ownership before credentials, followed
+by the original SQL identity checks. See `evidence/gap-029-port-incident.json`. Do not infer
+isolation from a loopback address alone.
 
 ## 1. The cluster
 
@@ -11,11 +15,14 @@ only `afldb_v2_*_test` databases that carry its marker comment (`afldb-v2-isolat
 
 ```bash
 export AFLDB_V2_PG_ROOT=/d/tmp/afldb-v2-pg16
+export AFLDB_V2_PG_PORT=55433 # current verified cluster; 55432 belongs to an unchanged SSH forward
 npx tsx tools/v2/isolated-pg.ts start | list | create-db <name> [--template <name>] | drop-db <name> --acknowledge-destroy <name>
 npx tsx tools/v2/isolated-pg.ts run <name> -- <command...>
 ```
 
-`run` verifies the database's identity on the live server, then runs the command without a shell
+`run` first proves the local listener belongs to this data directory’s postmaster (PID, executable,
+data-directory argument and loopback address), refusing unavailable process evidence. It then
+verifies the database’s identity on the live server and runs the command without a shell
 with `AFLDB_TEST_DATABASE_URL`, `AFLDB_TEST_IMPORT_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL` (and
 the other role DSNs) pointed at it, plus `AFLDB_V2_ISOLATED_PG=1` and `AFLDB_V2_ISOLATED_PORT`. It
 spawns without a shell, so run `node node_modules/<pkg>/...` directly, not `npm` or `npx`:

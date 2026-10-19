@@ -56,7 +56,7 @@ import { type GridAxisState } from '@/search/grid-solver-spec';
 import { loadAnswers, loadCorpus, type CorpusBoard } from '../gridley-compat.test';
 import {
   buildCoachResolver, buildCriterionListingIndex, buildResolver, CLUB_COUNT_BUILDER, criterionListedElsewhere, knownAnswerAdjudication,
-  knownAnswerEvidenceStaleness, LIST_MEMBERSHIP_LACKING_BUILDER, nationalPickKeyDisagreement, playerRegisterHorizon, type CoachRow, rookieSourceCoverageGap, teammateListMembership, tradesAfterBoard, triageDraftFinding, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
+  knownAnswerEvidenceStaleness, LIST_MEMBERSHIP_LACKING_BUILDER, nationalPickKeyDisagreement, playerRegisterHorizon, type CoachRow, rookieSourceCoverageGap, siblingCriterionDisagreement, teammateListMembership, tradesAfterBoard, triageDraftFinding, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
 } from '../gridley-corpus-support';
 import { loadGridleyKnownAnswerAdjudications } from '../gridley-known-answer-adjudications';
 import { adjudicationStaleness, loadHeightAdjudications, type HeightAdjudication } from '../height-adjudications';
@@ -111,7 +111,7 @@ type CellFinding = {
   category: 'parse' | 'unsupported' | 'dataset gap' | 'partial dataset' | 'query failure' | 'timeout' | 'empty answer'
     | 'incorrect known answer' | 'count mismatch' | 'time of board' | 'list membership'
     | 'external source disagreement' | 'source conflict' | 'adjudicated source conflict' | 'source coverage gap'
-    | 'adjudicated key disagreement';
+    | 'adjudicated key disagreement' | 'criterion disagreement';
   row: string;
   col: string;
   rowAxis: string;
@@ -692,7 +692,10 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         else if (category === 'incorrect known answer' && axisBuilders.includes('has_brother')
                  && ((!inAfldb && lackingIdx.includes(axisBuilders.indexOf('has_brother'))) || (inAfldb && !inGridley && brotherEvidence.has(afldbId)))) {
           if (!inAfldb) {
-            findings.push({ ...base, category: 'source coverage gap', detail: `${detail}; no canonical brothers row links him to a VFL/AFL player` });
+            const disagreement = siblingCriterionDisagreement({ ...base, profile: afltablesProfiles.get(afldbId) ?? '',
+              gridleyPlayerId: gid, inGridley, inAfldb, lackingBuilders: lackingIdx.map((i) => axisBuilders[i]) });
+            findings.push({ ...base, category: disagreement ? 'criterion disagreement' : 'source coverage gap',
+              detail: `${detail}; ${disagreement ?? 'no canonical brothers row links him to a VFL/AFL player'}` });
           } else {
             findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; canonical brothers row: ${brotherEvidence.get(afldbId)}` });
           }

@@ -17,6 +17,15 @@ commit.
 
 ### AFLDB V2
 
+- GAP-029 evidence follow-up: local process ownership is now checked before isolated-launcher
+  authentication; unavailable evidence or an unexpected listener fails closed, with SQL identity
+  checks retained. Corrected the earlier port incident to shared-development authentication
+  contact with unverified remote identity/logs. Primary sibling history now classifies 21
+  findings as unapproved criterion disagreements, preserving `games > 0` and both gates.
+  Proved real rookie replay (8/8 restored, idempotent, audits/overrides preserved) on a rollback-only
+  clone. Relevant suites: 1,397 passed / 3 failed / 7 skipped; typecheck/lint pass. Strict 149,
+  existing deferrals 78 (0 data matches), unapproved 71. GAP-029 and production gates remain open.
+
 - V2-GAP-029 Gridley follow-up: eight sourced rookie selections now use the audited, replayable
   manual-selection pathway on an isolated clone (23 findings / 7 cells repaired, idempotent).
   Added a corpus-pinned 78-cell representation of existing §23.36 approvals, with separate

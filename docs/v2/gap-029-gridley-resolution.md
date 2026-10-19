@@ -1,5 +1,47 @@
 # V2-GAP-029 — Gridley residual closeout, 20 October 2026
 
+## Evidence follow-up — current state (20 October 2026)
+
+GAP-029 remains **open**. Relevant seven-file run: **1,397 passed / 3 failed / 7 skipped** (1,407); focused unit regressions 76/76 and final launcher retest 17/17. Typecheck and changed-file lint pass. No full repository workflow was run.
+
+Strict parity: **FAIL, 149 findings / 149 cells**. Policy: **FAIL, 71 unapproved**. The 78 previously approved deferrals remain **0 data matches**. The 21 sibling findings are now **unapproved criterion disagreements**, not missing sibling-source rows; the other 50 missing-source findings are 42 event and eight board-dated 2026 cells. No additional data-match cell was resolved in this follow-up; the earlier 23 rookie findings / seven cells remain repaired.
+
+### Port incident: correction to earlier isolation claims
+
+Local process 25804, started at 2026-10-19 21:14:49 UTC, owns 55432 and forwards it to remote-loopback PostgreSQL 5432 on the documented development host, 10.0.40.100. The retained owner authentication failure log is timestamped 21:15:44 UTC; the same PID was observed during the incident. Local SSH configuration and deployment records corroborate the development destination. This supports **shared-development authentication contact**, not isolated-cluster contact. The earlier blanket claim of no production/shared contact is withdrawn. Remote cluster identity, requested-database existence, authentication method and remote logs remain unverified. Production contact and successful login/SQL are not established. No new tunnel connection or SSH process change was made in this follow-up.
+
+The launcher now checks local listener ownership **before authentication**: loopback bind, PID and port from the preserved data directory's postmaster.pid, exact postgres executable and process data-directory argument. Unavailable/ambiguous evidence fails closed. The existing SQL cluster/database identity checks remain additional defence. A live negative check refused 55432 without credentials; the positive check verified 55433. The local-process check has a residual check-to-connect race; Windows was demonstrated live, while the Linux ss/proc branch has not been live-validated here. Full evidence: [port incident](evidence/gap-029-port-incident.json).
+
+### Primary evidence and stopping conditions
+
+- **Siblings:** directly read Lions departure coverage records no senior appearance during Corey's Brisbane career; league coverage confirms the 2017–2020 no-AFL-game history and subsequent state-league NEAFL/VFL football. That establishes no missing qualifying AFL correction. The frozen criterion says “Has at least one brother who has played in the VFL/AFL.” Its key alone does not establish whether listing, modern state-league VFL or a key error explains the discrepancy. Keep the top-tier games > 0 rule. [Bounded evidence and 21 cells](../../data/reference/gridley-sibling-eligibility-evidence.json).
+- **Events:** partial official histories and two exact canonical fixtures were recovered (1995 Anzac draw; 2021 Big Freeze at the SCG). No complete exact-label export exists in the scoped local artifacts; the documented legacy SQLite path is remote and was not accessed. Partial labels were not promoted as complete eligibility data. The current presence probe would mistake any label for available event data. Need complete per-edition label evidence, including the 2020 exception and 2021 relocation. [Recovery evidence](evidence/gap-029-targeted-recovery.json), [exact candidates](evidence/gap-029-exact-event-candidates.json).
+- **2026:** pre-board club affiliation/selection evidence was recovered for all four named players. Complete canonical registrations and senior teammate/participant snapshots through April 1, April 3, April 11 and May 16 remain missing. Preseason/state-league selection and September membership cannot supply those intersections. No incomplete dataset or invented registration was applied.
+
+### Replay demonstrated
+
+A separate marked clone, afldb_v2_gap029_replay_test, was created from the repaired clone. The committed verifier removes only the eight repair rows in a rollback-only fixture, calls the real common.py replay_admin_overrides(draft_picks), checks exact stable-identity restoration, calls it again, and verifies audits/overrides remain unchanged. **8/8 restored; second replay idempotent; eight audits and eight durable overrides preserved; fixture rolled back.** Only clone sequences may advance. The original baseline and repair database are preserved. [Replay proof](evidence/gap-029-rookie-actual-replay.json).
+
+After setting the existing root and port 55433, reproduce on an unused dedicated clone:
+
+~~~powershell
+node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts create-db afldb_v2_gap029_replay_test --template afldb_v2_gap029_test
+node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts run afldb_v2_gap029_replay_test -- python tools/v2/verify-gridley-rookie-replay.py --report .local-release/new-rookie-replay.json
+~~~
+
+The retained clone already exists: reuse it for the verifier; do not drop/reset it to rerun create-db.
+
+### Exact owner decision package — not approved
+
+Proposed wording: **“Accept only the 21 enumerated Jarryd Lyons/brother frozen-key differences as an external eligibility-population disagreement. Preserve the existing has_brother requirement player_career_stats.games > 0 and every raw strict mismatch. This approval does not establish that Gridley intended listed players, include modern state-league games in AFL career totals, or apply to any other player/cell.”**
+
+If approved and implemented separately, strict remains **149**, policy unapproved falls **71 → 50**, with 21 approved disagreements separate from 78 existing deferrals and no new data matches. Until then all 21 fail both relevant gates. Further event/2026 work needs the exact artifacts above, not another waiver. A remote incident audit would separately require owner-authorized development-server authentication logs around 21:15:44 UTC; none were accessed.
+
+Latest raw strict findings: [gap-029-evidence-strict-final.json](evidence/gap-029-evidence-strict-final.json). Exact suite results/commands: [gap-029-evidence-verification.json](evidence/gap-029-evidence-verification.json). The inventory preserves baseline findings separately from current classifications and approval state. Broader production gates remain unchanged.
+
+## Earlier closeout — historical evidence, superseded above where noted
+
+
 Status: **partly resolved; strict release gate remains failed**. Code/reference commit: cc11e0d9, followed by the source-denominator assertion correction. Production and broader release gates are unchanged. No full workflow was rerun.
 
 ## Counts and evidence
@@ -43,7 +85,7 @@ Primary citations and precise limitations are retained in gap-029-reference-revi
 
 ## Isolated runtime and reproduction
 
-Port 55432 was owned by ssh.exe; the documented isolated cluster was stopped. No SQL ran against that listener: authentication failed before verification. No further connection to it was attempted after its process owner was identified. The preserved data directory was started on unused loopback **55433**, and the launcher verified live cluster afldb_v2_isolated plus the database marker. Existing credentials worked; no reset, reinitialisation, credential change or authentication weakening occurred. The SSH listener was left alone. The isolated cluster remains running on 55433; retain this port override until the unrelated port conflict is resolved.
+Port 55432 was owned by ssh.exe; the documented isolated cluster was stopped. The retained failure shows authentication failed before verification; shared-development authentication contact is now established by local forensic correlation above, while successful remote SQL is not demonstrated. No further connection to it was attempted after its process owner was identified. The preserved data directory was started on unused loopback **55433**, and the launcher verified live cluster afldb_v2_isolated plus the database marker. Existing credentials worked; no reset, reinitialisation, credential change or authentication weakening occurred. The SSH listener was left alone. The isolated cluster remains running on 55433; retain this port override until the unrelated port conflict is resolved.
 
 PowerShell, repository root (no DSN required):
 
@@ -54,7 +96,7 @@ node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts verify afldb_v2_gap02
 node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts run afldb_v2_gap029_test -- node node_modules/tsx/dist/cli.mjs --conditions=react-server tools/v2/repair-gridley-rookies.ts
 ~~~
 
-Add --apply only for the authorized isolated repair; existing correct rows are idempotent. The full six-file focused command and exact assertion results are retained in gap-029-gridley-verification.json. No production or shared database was modified.
+Add --apply only for the authorized isolated repair; existing correct rows are idempotent. The full six-file focused command and exact assertion results are retained in gap-029-gridley-verification.json. All demonstrated football-data writes were isolated. Remote authentication logs were not collected; the failed shared-development contact and the limits of that evidence are recorded above.
 
 ## Verification outcome
 
@@ -89,3 +131,30 @@ Final combined focused run: **1,378 passed / 3 failed / 7 skipped** of 1,388. Th
 - `tools/v2/repair-gridley-rookies.ts`
 
 The pre-existing untracked .codex/ directory was untouched. Ignored .local-release diagnostics/test reports and generated typecheck output were also produced; no temporary diagnostic script is part of the retained implementation. IssuesIndex.md and issues.md were not changed: this is the existing V2-GAP-029 ledger entry in known-gaps.md, whose open index is synchronized above.
+
+## Files changed in the evidence follow-up
+
+- `CHANGELOG.md`
+- `data/reference/gridley-sibling-eligibility-evidence.json`
+- `docs/v2/evidence/gap-029-evidence-strict-final.json`
+- `docs/v2/evidence/gap-029-evidence-verification.json`
+- `docs/v2/evidence/gap-029-exact-event-candidates.json`
+- `docs/v2/evidence/gap-029-gridley-residual-inventory.json`
+- `docs/v2/evidence/gap-029-port-incident.json`
+- `docs/v2/evidence/gap-029-rookie-actual-replay.json`
+- `docs/v2/evidence/gap-029-targeted-recovery.json`
+- `docs/v2/final-report.md`
+- `docs/v2/gap-029-gridley-resolution.md`
+- `docs/v2/go-no-go.md`
+- `docs/v2/isolated-rebuild.md`
+- `docs/v2/known-gaps.md`
+- `docs/v2/local-release-review.md`
+- `docs/v2/risk-register.md`
+- `tests/gridley-compat.test.ts`
+- `tests/gridley-corpus-support.ts`
+- `tests/integration/gridley-corpus.test.ts`
+- `tests/v2-isolated-test-target.test.ts`
+- `tools/v2/isolated-pg.ts`
+- `tools/v2/verify-gridley-rookie-replay.py`
+
+The pre-existing .codex/ directory remains untouched. Ignored .local-release test/diagnostic output was generated. IssuesIndex.md and issues.md are unchanged; the existing V2-GAP-029 open index and detailed ledger above are synchronized. No full-workflow result or production gate was waived.

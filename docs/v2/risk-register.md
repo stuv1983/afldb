@@ -1,5 +1,10 @@
 # AFLDB V2 — risk register
 
+**Port-incident correction:** earlier authentication reached the documented shared development
+PostgreSQL endpoint through SSH-owned 55432; successful login/SQL and remote identity were not
+established. New launcher listener-ownership checks precede credentials. This follow-up used
+verified isolated 55433 only. No production/shared-contact exclusion is inferred from loopback.
+
 Status: local release follow-up (2026-10-20; first written at Stage 6). Risks of putting V2 into production and of the way V2 was
 built, ranked by severity (High, Medium, Low; within a level, by impact on production data first).
 Likelihood and impact use the same three levels. "Owner" is who must act: **owner** (the product
@@ -39,10 +44,10 @@ This amendment supersedes stale claims in the historical rows below:
 
 Exact results and remaining source-input limitations: `local-release-review.md`.
 Final complete run: **13,740 passed / 9 failed / 31 skipped**, plus separate Coleman **27/27**.
-Strict baseline/count/membership residuals remain **V2-GAP-029**: latest focused result
-1,378 passed / 3 failed / 7 skipped; 149 strict findings, including 78 approved deferrals
+Strict baseline/count/membership residuals remain **V2-GAP-029**: latest relevant result
+1,397 passed / 3 failed / 7 skipped; 149 strict findings, including 78 approved deferrals
 (0 data matches) and 71 unapproved. Eight audited rookie selections resolve 23 findings / 7 cells.
-Event labels, board-dated 2026 participation and the sibling scope/evidence remain open.
+Event labels, board-dated 2026 participation and the sourced sibling eligibility-population disagreement remain open.
 See `gap-029-gridley-resolution.md`; no full-workflow or production waiver. The historical risk
 rows below retain Launch F wording; the reassessment above is the current state.
 
