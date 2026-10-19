@@ -15,17 +15,21 @@ close it. An entry is removed only when the closing evidence exists.
 | V2-GAP-008 | High | AFL API fixtures | **open: cutover blocker** (AFLDB-ISSUE-229 B2 and the unbuilt fixtures writer) |
 | V2-GAP-009 | Medium | AFL API promotion | open: transactional preservation unexecuted on PostgreSQL |
 | V2-GAP-010 | Medium | AFL API coverage | open: 2012-2025 API coverage has no committed evidence |
-| V2-GAP-011 | High | legacy runtime | **open: cutover blocker** (AFL Tables nightly settle and trigger stay until D-316-2) |
+| V2-GAP-011 | High | legacy runtime | **open: cutover blocker**, narrowed (Stage 5): the admin trigger refuses; the nightly settle, `npm run settle:afltables` and the trigger library stay until D-316-2 |
 | V2-GAP-012 | Medium | legacy runtime | open: AFL API settle imports shared helpers from `settle-afltables.ts` |
-| V2-GAP-013 | High | legacy runtime | **open: cutover blocker** (CSV upload, submission promotion, email intake and Squiggle/Kali admin refresh stay in runtime until Stage 5) |
+| V2-GAP-013 | High | legacy runtime | **open: cutover blocker**, narrowed (Stage 5): every admin path refuses; the email-intake timer is still enabled (Stage 6) and the converted integration suites are unexecuted |
 | V2-GAP-014 | Low | legacy quarantine | open: Python/R tools not physically quarantined |
 | V2-GAP-015 | Medium | Coleman | open: derived on synthetic inputs only; no real season compared |
 | V2-GAP-016 | Medium | Brownlow | open: owner decision: no eligibility rule for API-era seasons |
-| V2-GAP-017 | Medium | Stage 4 migrations | open: migrations 111+ and their grants unexecuted on PostgreSQL |
+| V2-GAP-017 | Medium | Stage 4-5 SQL | open: migrations 111+, their grants and the Stage 5 operations-centre SQL unexecuted on PostgreSQL |
 | V2-GAP-018 | Low | curated awards | open: revising an approved proposal is refused |
 | V2-GAP-019 | Medium | curated awards | open: no four-eyes rule on approval |
 | V2-GAP-020 | Low | curated awards | open: winners without a resolved player identity cannot be approved |
-| V2-GAP-021 | Medium | Coleman | open: published results are not projected into `award_winners`; nothing calls the publisher yet |
+| V2-GAP-021 | Medium | Coleman | open, narrowed (Stage 5): the operations centre calls the publisher; published results are still not projected into `award_winners` |
+| V2-GAP-022 | Medium | admin UI | open: Stage 5 admin pages never rendered (VISUAL: UNVERIFIED); owner eyeball required before production |
+| V2-GAP-023 | Low | Brownlow | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping |
+| V2-GAP-024 | Medium | curated awards | open: approving a curated award does not refresh the cached public award pages |
+| V2-GAP-025 | Low | admin UI | open: no operations-centre view of AFL API settle refusals |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -204,9 +208,14 @@ close it. An entry is removed only when the closing evidence exists.
 - **Guard.** `tests/v2-module-boundaries.test.ts` ratchets the known legacy runtime edges
   (`legacyRuntimeEdges`, `publicRuntimeLegacyReach`, `scheduledLegacyReferences`): a new edge
   fails the test.
-- **Close.** The owner executes D-316-2 under ISSUE-316; Stage 5 removes the admin trigger; Stage 6
-  disables the timer. Until then the production go/no-go for an AFL API-only pipeline is
-  **no-go**.
+- **Stage 5 (Launch D).** The admin trigger is retired: `startSettleRunAction` keeps its
+  `acquisition.currentSeason` guard and then refuses (`legacy_retired`, surface
+  `admin.afltables_settle_trigger`, one `admin.legacy_retired_refused` audit row) and never reaches
+  `startSettleRun`; the start panel (`SettleRunPanel.tsx`) is deleted. The operations centre shows
+  the AFL Tables unit's status only. `settle-trigger.ts` stays (frozen; read by
+  `AflApiSettleUnitsPanel.tsx`, `current-season/page.tsx` type-only and `settle-status.ts`).
+- **Close.** The owner executes D-316-2 under ISSUE-316; Stage 6 disables the timer. Until then
+  the production go/no-go for an AFL API-only pipeline is **no-go**.
 
 ## V2-GAP-012 — The AFL API settle depends on helpers that live in `settle-afltables.ts`
 
@@ -222,7 +231,7 @@ close it. An entry is removed only when the closing evidence exists.
   integration suites on an isolated `afldb_test`, then `settle-afltables.ts` can be quarantined
   with L4.
 
-## V2-GAP-013 — CUTOVER BLOCKER: CSV, email intake and Squiggle/Kali admin paths remain in runtime
+## V2-GAP-013 — CUTOVER BLOCKER: the email-intake timer still runs; the CSV, email and Squiggle/Kali admin paths now refuse
 
 - **What.** CSV upload (`src/app/admin/upload/**`), CSV submission review and promotion
   (`src/app/admin/submissions/[id]/actions.ts` -> `src/lib/ingest/pipeline.ts` ->
@@ -235,8 +244,26 @@ close it. An entry is removed only when the closing evidence exists.
   email intake timer is a deployment act (Stage 6). Stage 4 retired only the Squiggle/Kali CLI
   (quarantined to `legacy/offline/`, package script refuses).
 - **Guard.** The legacy runtime edges are ratchet-listed in `tests/v2-module-boundaries.test.ts`.
-- **Close.** Stage 5 makes the routes and actions refuse (or removes them) and replaces them with
-  the curated admin entry (ADR 0008) and the audited editors; Stage 6 disables the timer.
+- **Stage 5 (Launch D).** Every admin path refuses after its unchanged guard, with the typed
+  refusal `legacy_retired` from `RETIRED_ADMIN_SURFACES` (`packages/domain/src/legacy-retirement.ts`)
+  and one best-effort `admin.legacy_retired_refused` audit row: `runCurrentSeasonAdminAction`
+  (Squiggle/Kali), `runValidation`, `decideSubmission`, `runPromotion` (submissions) and the upload
+  route (HTTP 410 after its same-origin check and `acquisition.legacyIntake`). The email-intake
+  route answers 410 without reading the request, comparing the secret, touching the database or
+  auditing (an unattributable caller must not write audit rows). The upload form, the review
+  controls and the Squiggle/Kali controls are deleted; no admin file imports the pipeline,
+  `datasets.ts` or the Squiggle/Kali libraries (`tests/v2-module-boundaries.test.ts`). The
+  libraries stay because offline tools use them. The replacement is the curated award entry
+  (`/admin/operations/awards`) and the existing audited editors.
+- **Still open.** `deploy/afldb-email-intake.timer` still polls every 5 minutes: each message now
+  gets 410 and the poller files it to its Errors folder, kept, never deleted
+  (`tools/email_intake/fetch_and_stage.py:606-607`, `:742-744`), so disable the timer in the same
+  window as the Stage 5 deploy or accept the pile-up. The changed integration suites
+  (`tests/integration/{admin-upload-route,email-intake,submission-promotion}.test.ts`) are
+  unexecuted (V2-GAP-003); route-level ISSUE-273/304 coverage was retired with the routes, the
+  library-level race coverage is kept through a test-local helper.
+- **Close.** Stage 6 disables the timer in the cutover runbook; an operator runs the three
+  integration suites on an isolated `afldb_test`.
 
 ## V2-GAP-014 — Python and R legacy tools are not physically quarantined
 
@@ -282,11 +309,19 @@ close it. An entry is removed only when the closing evidence exists.
   (`packages/db/src/sql-executor.ts`) have not run against PostgreSQL. Both migrations ran only on
   in-memory PGlite over labelled stub prerequisites and stub roles
   (`tests/v2-curated-awards-pglite.test.ts`, `tests/v2-coleman-publication-pglite.test.ts`).
+- **Stage 5 additions, also unexecuted on PostgreSQL.** The operations-centre read loaders
+  `src/db/queries/coleman-inputs.ts` and `src/db/queries/brownlow-reconciliation-inputs.ts`, the
+  callers in `src/lib/admin/operations-centre.ts` (every database call goes through the
+  `afldb_import` connection opened by `withAwardProposalExecutor`, including the reads of
+  `staging.afl_api_brownlow_vote`, `brownlow_season_votes`, `matches` and the Coleman goal
+  facts) and the activity-trail writes. They ran only against PGlite over the same stubs and
+  against in-memory fakes (`tests/v2-admin-operations.test.ts`).
 - **Why.** No database is reachable from V2 (plan §1); PGlite is not evidence for PostgreSQL
   (plan §7 R-020).
 - **Close.** An operator applies the migrations to an isolated `afldb_test`, runs
   `npm run db:privileges`, and runs `tests/integration/privileges.test.ts` and the awards
-  integration suites; record the result here.
+  integration suites, then exercises each operations-centre page once (V2-GAP-022); record the
+  result here.
 
 ## V2-GAP-018 — Revising an approved curated award is refused
 
@@ -294,7 +329,8 @@ close it. An entry is removed only when the closing evidence exists.
   Correcting a promoted winner today uses the existing replace/correct lifecycle in
   `src/db/queries/admin-awards.ts`, which does not link back to the proposal chain.
 - **Close.** A wrapper over the existing replace/correct functions that records the new revision
-  and its ledger row in the same transaction (Stage 5, with the admin UI).
+  and its ledger row in the same transaction. Not built in Stage 5: the approval card says an
+  approved winner is corrected only through `/admin/awards`.
 
 ## V2-GAP-019 — No four-eyes rule on curated award approval
 
@@ -320,6 +356,61 @@ close it. An entry is removed only when the closing evidence exists.
 - **Why.** Writing `award_winners` for a sealed season needs an owner-chosen correction workflow
   and a `player_name_raw` the pure derivation has no table for (ADR 0006 divergence 8); the admin
   surface is Stage 5's. V2-GAP-015 (no real season derived yet) comes first.
-- **Close.** Stage 5 wires a server-only caller (postgres.js `postgresExecutor`) and an admin view;
-  a projection into `award_winners` calls `assertSeasonWritable` with a correction and supplies
-  names; then the offline loader's coleman group is retired for seasons the publisher covers.
+- **Stage 5 (Launch D).** Narrowed: `/admin/operations/coleman` compares a season (read-only,
+  `data.awards.read`) and publishes it (`data.awards.edit`, a 20-2000 character note, the
+  operator's settled attestation) through `publishColemanSeason` in
+  `src/lib/admin/operations-centre.ts`, evidence reference
+  `coleman_derivation:<season>:<inputChecksum>`. Decision (plan §7 R-035): still **no** projection
+  into `award_winners`; the page says so.
+- **Close.** A projection into `award_winners` calls `assertSeasonWritable` with a correction and
+  supplies names (owner-chosen workflow); then the offline loader's coleman group is retired for
+  seasons the publisher covers.
+
+## V2-GAP-022 — The Stage 5 admin pages have never been rendered (VISUAL: UNVERIFIED)
+
+- **What.** No real page of the operations centre (`/admin/operations`, `/awards`, `/awards/[id]`,
+  `/coleman`, `/brownlow`) and none of the changed admin pages (`/admin`, `/admin/current-season`,
+  `/admin/upload`, `/admin/submissions/[id]`, the sidebar) has been rendered in a browser: each needs
+  a database and a staff session. The run-status rows read systemd through `settle-status.ts`; on a
+  host without it they show "not available", which is intended but unproven on the real host.
+- **Evidence that exists.** Component-level captures of the presentational components from
+  SYNTHETIC props (`tests/fixtures/v2/operations-centre/props.synthetic.ts`) with the repository's
+  own CSS, at 1280x800 and 390x844, offline (local Playwright Chromium, every non-file request
+  aborted, 0 attempted): `docs/v2/evidence/stage5-visual/` (12 images and `capture-log.txt`). An
+  automated check found horizontal overflow on one capture (a long durable identity, +29px at
+  390px); it was fixed with `overflow-wrap` and the re-capture shows none. The images have not been
+  inspected by any agent or person. They are not the pages: no layout shell, no session, no data.
+- **Close.** The owner eyeballs the screens listed in `docs/v2/admin-operations.md` §6 on an
+  isolated environment at desktop and mobile widths, and records the result here.
+
+## V2-GAP-023 — Brownlow reconciliation view: no staged leaderboard, no provider-team mapping
+
+- **What.** `src/db/queries/brownlow-reconciliation-inputs.ts` passes `leaderboard: null` (no staged
+  table holds the API leaderboard; `src/db/migrations/103_afl_api_match_projections.sql:18`) and
+  maps no provider team id to a club (no committed mapping), so the leaderboard comparison is "not
+  supplied". `staging.afl_api_brownlow_vote` is an upsert, so a provider player removed from a
+  match's vote set could leave a stale row; the reconciliation's 3/2/1 vote-set finding would
+  surface it. The page states these caveats; it is read-only.
+- **Close.** Stage the leaderboard and commit a provider-team mapping, then pass both.
+
+## V2-GAP-024 — Approving a curated award does not refresh the cached public award pages
+
+- **What.** An approval writes `award_winners` through `insertAwardWinner`, but the operations
+  centre does not trigger revalidation of the public award pages (`src/app/awards/**` use
+  `revalidate = 86400`), so a new winner can be missing from those pages for up to a day per
+  worker. The existing awards admin posts its server-computed paths to `/admin/awards/revalidate`
+  after the action returns (`src/app/admin/awards/submit-helper.ts`); the operations centre does
+  not yet.
+- **Why.** The curated services return no revalidation paths; adding them crosses the
+  `@afldb/admin` promotion port and was not in Stage 5's reviewed scope.
+- **Close.** Return the paths `insertAwardWinner` already computes through the promotion port and
+  post them to `/admin/awards/revalidate` after a successful approval, as `/admin/awards` does.
+
+## V2-GAP-025 — The operations centre has no view of AFL API settle refusals
+
+- **What.** Plan D9 lists "reconciliation failures". The overview shows each settle unit's run
+  status and links to the existing inspection tools; the Brownlow reconciliation has its own page.
+  The AFL API settle's per-unit refusals (`canonical_applications`, `data_issues`, the settle
+  reports) have no read-only view in the operations centre.
+- **Close.** A read-only, capability-guarded view over the refused `canonical_applications` rows
+  and the open settle `data_issues`, linked from the overview.

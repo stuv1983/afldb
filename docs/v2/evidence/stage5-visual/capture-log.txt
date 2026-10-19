@@ -1,0 +1,13 @@
+01-overview.html desktop-1280x800 horizontalOverflowPx=0
+02-overview-reads-failed.html desktop-1280x800 horizontalOverflowPx=0
+03-awards-queue.html desktop-1280x800 horizontalOverflowPx=0
+04-proposal-detail.html desktop-1280x800 horizontalOverflowPx=0
+05-coleman.html desktop-1280x800 horizontalOverflowPx=0
+06-brownlow.html desktop-1280x800 horizontalOverflowPx=0
+01-overview.html mobile-390x844 horizontalOverflowPx=0
+02-overview-reads-failed.html mobile-390x844 horizontalOverflowPx=0
+03-awards-queue.html mobile-390x844 horizontalOverflowPx=0
+04-proposal-detail.html mobile-390x844 horizontalOverflowPx=0
+05-coleman.html mobile-390x844 horizontalOverflowPx=0
+06-brownlow.html mobile-390x844 horizontalOverflowPx=0
+blockedRequests=0

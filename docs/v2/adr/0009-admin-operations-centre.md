@@ -1,6 +1,7 @@
 # ADR 0009 — A small, audited operations-focused admin centre
 
-- Status: Accepted (2026-10-19); not implemented (Stage 5)
+- Status: Accepted (2026-10-19); implemented in Stage 5 (Launch D, 2026-10-19); unexecuted on
+  PostgreSQL and never rendered against a database (V2-GAP-017, V2-GAP-022)
 - Plan decision: `docs/v2/plan.md` §3 D9
 
 ## Context
@@ -22,3 +23,14 @@ normally impossible and are marked `VISUAL: UNVERIFIED` with the reason.
 ## Consequences
 
 Role and audit tests accompany every action; no visual pass is ever claimed without captures.
+
+## Implementation (Stage 5)
+
+Operating guide: `docs/v2/admin-operations.md`; decisions: `docs/v2/plan.md` §7 R-030 to R-041.
+Implemented: data health (coverage registry), acquisition-run status (no start control), unresolved
+identities and the audit log as inspection links, award proposals, derived-result status and
+publication (Coleman), Brownlow reconciliation (read-only), an action card with the six required
+facts before every mutation, the retired legacy controls refusing after their guards. Not
+implemented: a view of AFL API settle refusals (V2-GAP-025); public-page revalidation after a
+curated approval (V2-GAP-024). Visual evidence: component-level captures from synthetic props
+only; every real page is `VISUAL: UNVERIFIED`.

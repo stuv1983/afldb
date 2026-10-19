@@ -22,6 +22,34 @@ gaps as `V2-GAP-NNN` in `docs/v2/known-gaps.md` instead of allocating `AFLDB-ISS
 deliberate departure from CLAUDE.md §5 so the fork cannot collide with the mainline ledger
 (ADR 0003). `issues.md` and `IssuesIndex.md` are left as inherited.
 
+#### Stage 5 — a small audited operations centre; the legacy admin controls refuse - 19 October 2026
+
+- The CSV upload, the CSV submission review and promotion, the email-intake route, the
+  Squiggle/Kali refresh and the AFL Tables settle trigger are retired from the admin UI. Each
+  server action and route keeps its name and its existing guard, then refuses with
+  `legacy_retired` (routes: HTTP 410) and one `admin.legacy_retired_refused` audit row; the
+  email-intake route answers 410 without reading the request or writing anything. Four UI
+  components are deleted; submissions stay readable as history. The AFL Tables nightly settle
+  itself is unchanged until the owner's ISSUE-316 decision D-316-2 (V2-GAP-011), and the
+  email-intake timer until Stage 6 (V2-GAP-013).
+- New operations centre at `/admin/operations` (Admin and Super Admin, new capability
+  `operations.centre.read`): read-only data health, sealed seasons, acquisition-run status (no
+  start control), and links to curated awards, derived results and the inspection tools.
+- Award proposals at `/admin/operations/awards`: create from a local JSON or CSV file, validate,
+  approve (through the season seal, in one transaction with the award-winner write) and reject,
+  each Super Admin only. Coleman Medal at `/admin/operations/coleman`: a read-only comparison for
+  any Admin and an audited publication into `derived_award_results` for Super Admin; it does not
+  write the public Coleman rows (V2-GAP-021). Brownlow reconciliation at
+  `/admin/operations/brownlow`, read-only.
+- Every mutation form shows, before submit, what it changes, the affected season or records,
+  the validation state, whether it is reversible, the acting user and the audit rows it writes.
+  The sealed-season registry is read fresh for every approval and publication and refuses when
+  it cannot be read.
+- Unverified: nothing has run on PostgreSQL (V2-GAP-017) and no real page has been rendered
+  (`VISUAL: UNVERIFIED`, V2-GAP-022; component captures from synthetic props in
+  `docs/v2/evidence/stage5-visual/`). A curated approval does not yet refresh the cached public
+  award pages (V2-GAP-024). Operating guide: `docs/v2/admin-operations.md`.
+
 #### Stage 4 — Coleman derivation and audited publication, Brownlow reconciliation, curated awards, legacy disposition - 19 October 2026
 
 - Coleman Medal is derived, not ingested: `@afldb/derived` `deriveColeman` computes it from

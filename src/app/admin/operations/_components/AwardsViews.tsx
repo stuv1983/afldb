@@ -137,7 +137,7 @@ export function ProposalValues({ proposal }: { proposal: ProposalRecord }) {
         <Fact label="Stable identity">
           {proposal.playerIdentity === null
             ? <span className="muted">unresolved — link the player first (/admin/player-links)</span>
-            : <span className="mono">{proposal.playerIdentity}</span>}
+            : <span className="mono" style={{ overflowWrap: 'anywhere' }}>{proposal.playerIdentity}</span>}
         </Fact>
         <Fact label="Club">{proposal.clubSlug === null ? '—' : <span className="mono">{proposal.clubSlug}</span>}</Fact>
         <Fact label="Votes / value">{proposal.votes ?? NOT_RECORDED}</Fact>
@@ -147,7 +147,7 @@ export function ProposalValues({ proposal }: { proposal: ProposalRecord }) {
         <Fact label="Duplicate confirmed">{proposal.duplicateConfirmed ? 'yes (a legitimate repeat was confirmed)' : 'no'}</Fact>
         <Fact label="Created">{formatInstant(proposal.createdAt)} by user #{proposal.createdBy}</Fact>
         {proposal.approvedEntityKey !== null && (
-          <Fact label="Approved as"><span className="mono">{proposal.approvedEntityKey}</span> at {formatInstant(proposal.approvedAt)}</Fact>
+          <Fact label="Approved as"><span className="mono" style={{ overflowWrap: 'anywhere' }}>{proposal.approvedEntityKey}</span> at {formatInstant(proposal.approvedAt)}</Fact>
         )}
       </dl>
     </section>

@@ -169,3 +169,8 @@ through 112). Deploy order, when the owner takes this to a database: apply 112, 
 No admin route, server action or package script calls the publisher: a server-only production
 wiring (a postgres.js executor from `postgresExecutor`) and the admin surface are Stage 5. Until
 then nothing publishes.
+
+Stage 5 (Launch D): `/admin/operations/coleman` compares (read-only) and publishes through
+`publishColemanSeason` (`src/lib/admin/operations-centre.ts`) on the import connection; evidence
+reference `coleman_derivation:<season>:<inputChecksum>`. Still no projection into `award_winners`
+(V2-GAP-021); unexecuted on PostgreSQL (V2-GAP-017).

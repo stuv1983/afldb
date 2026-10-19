@@ -1,6 +1,7 @@
 # AFLDB V2 — database compatibility and ownership matrix
 
-Status: drafted in Stage 2, **completed in Stage 4** (2026-10-19, plan §7 R-006). Records, for
+Status: drafted in Stage 2, **completed in Stage 4** (2026-10-19, plan §7 R-006); writers updated
+for Stage 5 (the retired admin paths and the operations-centre callers). Records, for
 every table and view the migrations create (001-112), which V2 component is to own its writes and
 how the schema stays compatible. The "V2 owner" column is a design assignment under plan D1, not
 an observed fact. The observed writers per table are the Stage 4 census below (static reading of
@@ -33,11 +34,11 @@ the code; nothing was executed against a database).
 | Legacy source projections | `staging.afltables_match`, `staging.afltables_player_match`, `staging.external_current_matches`, `staging.team_seasons` | legacy (Stage 4 disposition) | AFL Tables settle, Squiggle/Kali, historical staging |
 | Promotion | `promotion_candidates`, `canonical_applications` | `@afldb/acquisition` | 074, 083, 107 |
 | Promotion decisions and identity | `promotion_decisions`, `afl_api_identity_adjudications` | `@afldb/admin` | human decisions; 074, 104, 106. `promotion_decisions` has no writer outside migrations today (census; grant only, `tools/maintenance/privileges.sql:502`) |
-| Canonical match facts | `matches`, `match_period_scores`, `player_match_stats`, `player_match_period_stats` | `@afldb/acquisition` (promotion) for open seasons; `@afldb/admin` (audited correction) for sealed ones | sealed baseline; `docs/v2/historical-baseline.md`. Also written today by the legacy CSV promotion (`src/lib/ingest/datasets.ts`) and the AFL Tables settle (V2-GAP-011, V2-GAP-013). `player_match_period_stats` has no writer outside migrations (census) |
+| Canonical match facts | `matches`, `match_period_scores`, `player_match_stats`, `player_match_period_stats` | `@afldb/acquisition` (promotion) for open seasons; `@afldb/admin` (audited correction) for sealed ones | sealed baseline; `docs/v2/historical-baseline.md`. Also written today by the AFL Tables settle (V2-GAP-011); the legacy CSV promotion's admin path refuses since Stage 5. `player_match_period_stats` has no writer outside migrations (census) |
 | Brownlow | `brownlow_round_votes`, `brownlow_season_votes`, `brownlow_season_authority`, `brownlow_vote_entry_state` | `@afldb/acquisition` (round votes from the AFL API); `@afldb/derived` (season reconciliation, plan D7); `@afldb/admin` (authority, vote entry) | totals stay with their authoritative source |
 | Awards and honours | `awards`, `award_winners`, `award_nominations`, `hall_of_fame`, `honour_team_members` | `@afldb/admin` (curated, plan D8); `@afldb/derived` for derived awards (Coleman, plan D6) | 101 lifecycle. Coleman `award_winners` rows stay with the offline `import_awards.py` coleman group (ADR 0006); curated approvals write through `insertAwardWinner` (ADR 0008) |
-| Curated award workflow | `award_proposals`, `award_proposal_decisions` | `@afldb/admin` (`createProposal` ... `approveProposal`; ADR 0008) | 111 (Stage 4). Writer `afldb_import`: INSERT, UPDATE on workflow columns only; the decisions ledger is append-only for every role; `afldb_auth` SELECT; no `afldb_app`. Natural-identity keyed (no FK into football tables). `approveProposal` consults the season seal (workflow `curated_award_approval`) before promoting into `award_winners`. Promotion: `reinstate`, production-only. Unexecuted on PostgreSQL |
-| Derived award results | `derived_award_results` | `@afldb/derived` (`publishColemanResult`; ADR 0006) | 112 (Stage 4). Append-only for every role; supersession by `supersedes_id`; writer `afldb_import` (one transaction, `data.awards.edit` plus a `derived_award_publication` audited correction through the season seal); `afldb_auth` SELECT; no `afldb_app`. Promotion: `reinstate`, production-only; ids in the `result` jsonb are a snapshot, the durable identity is `winners[].key`. Does not write `award_winners`. Unexecuted on PostgreSQL |
+| Curated award workflow | `award_proposals`, `award_proposal_decisions` | `@afldb/admin` (`createProposal` ... `approveProposal`; ADR 0008) | 111 (Stage 4). Writer `afldb_import`: INSERT, UPDATE on workflow columns only; the decisions ledger is append-only for every role; `afldb_auth` SELECT; no `afldb_app`. Natural-identity keyed (no FK into football tables). `approveProposal` consults the season seal (workflow `curated_award_approval`) before promoting into `award_winners`. Runtime caller (Stage 5): `src/lib/admin/operations-centre.ts` via `/admin/operations/awards`. Promotion: `reinstate`, production-only. Unexecuted on PostgreSQL |
+| Derived award results | `derived_award_results` | `@afldb/derived` (`publishColemanResult`; ADR 0006) | 112 (Stage 4). Append-only for every role; supersession by `supersedes_id`; writer `afldb_import` (one transaction, `data.awards.edit` plus a `derived_award_publication` audited correction through the season seal); `afldb_auth` SELECT; no `afldb_app`. Promotion: `reinstate`, production-only; ids in the `result` jsonb are a snapshot, the durable identity is `winners[].key`. Does not write `award_winners`. Runtime caller (Stage 5): `publishColemanSeason` via `/admin/operations/coleman`. Unexecuted on PostgreSQL |
 | Club and season context | `seasons`, `clubs`, `club_aliases`, `club_organizations`, `club_organization_relations`, `club_seasons`, `venues`, `venue_aliases` | `@afldb/db` (reference data) | loaded from `data/reference/*.json` |
 | People and identity | `players`, `player_name_aliases`, `external_identities`, `player_birth_evidence`, `player_height_evidence`, `draft_persons`, `player_relationships` | `@afldb/admin` (identity decisions); `@afldb/acquisition` (AFL API identities only) | never a placeholder player (owner rule) |
 | Player links | `player_link_suggestions`, `player_link_resolutions`, `player_link_match_candidates` | `@afldb/admin` | 056, 067 |
@@ -117,3 +118,19 @@ The open question "no table is written by a legacy runtime path after the dispos
 and email intake, and the Squiggle/Kali admin refresh (V2-GAP-013) still write; the list of
 tables is `docs/v2/legacy-disposition.md` §5. These writes end when Stage 5 removes the admin
 paths and the ISSUE-316 cutover retires the AFL Tables settle.
+
+### Writers after Stage 5
+
+- **Removed from runtime:** the CSV upload and submission promotion (`data_submissions`,
+  `data_submission_rows`, `import_batches`, and on promotion `matches`, `player_match_stats`,
+  `players`, `award_winners`, `award_nominations`), the email-intake route (staging into the same
+  submission tables), and the Squiggle/Kali admin refresh (`staging.external_current_matches`,
+  `import_batches`, the observation spine). Their actions and routes refuse
+  (`docs/v2/legacy-disposition.md` L1-L3, L6). The offline first-kick-goal import still uses
+  `datasets.ts`.
+- **Added:** the operations-centre callers (`src/lib/admin/operations-centre.ts`) write
+  `award_proposals` and `award_proposal_decisions`, and on approval `award_winners`,
+  `data_overrides` and `data_edits` through `insertAwardWinner`, all on the `afldb_import`
+  connection; `derived_award_results` through `publishColemanResult`; and `auth_audit_log` (the
+  activity trail, auth pool). No new table and no new grant.
+- **Still a legacy runtime writer:** the AFL Tables settle (L4) until the ISSUE-316 cutover.

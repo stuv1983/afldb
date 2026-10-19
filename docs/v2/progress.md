@@ -26,7 +26,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
 | 4 Derived + curated | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9`, `1374fc13` + this closure commit |
-| 5 Admin | in progress (Launch D): legacy admin controls retired (milestone 1); operations centre built (milestone 2); visual, documents and stage close pending | `68a026e2`, this commit |
+| 5 Admin | done; stage-close checks pass; afldb-closure pending (Launch D) | `68a026e2`, `458abe68` + this documents commit |
 | 6 | not started (Launch E) | — |
 
 ## Stage 0 — evidence
@@ -257,7 +257,7 @@ legacy commits' focused runs reported 6 failures because they also ran
 closure itself ran `npm view @electric-sql/pglite@0.2.17 time`, a network command its brief did
 not authorise; output discarded, no repository change; reported to the owner).
 
-## Stage 5 — admin operations centre (Launch D, in progress)
+## Stage 5 — admin operations centre (Launch D)
 
 Sub-agent returns: `.phaneslight/returns/launchD-20261019/` (git-ignored). No database, network,
 deploy or PostgreSQL command was run.
@@ -290,14 +290,58 @@ mutation; the "Legacy file intake" sidebar link removed for admin and super admi
 are NOT projected into `award_winners` (V2-GAP-021 stays open, narrowed). Focused run (orchestrator,
 9 files): 598 passed; `tsc` exit 0; ESLint 0 errors / 0 warnings on every milestone-2 file.
 
+Visual evidence (orchestrator): the presentational components were rendered from the SYNTHETIC
+props to static HTML with the repository CSS and captured with the local Playwright Chromium at
+1280x800 and 390x844, offline (every non-file request aborted; 0 attempted): 12 images and
+`capture-log.txt` in `docs/v2/evidence/stage5-visual/`. The automated overflow check found one
+overflow (proposal detail at 390px, +29px, a long durable identity); fixed with `overflow-wrap` in
+`AwardsViews.tsx` and `ActionConsequences.tsx`, re-capture 0 at both widths. Nobody has inspected the
+images. **VISUAL: UNVERIFIED** for every real page (no database, no session): V2-GAP-022; the
+eyeball list is `docs/v2/admin-operations.md` §6.
+
+Documents: new `docs/v2/admin-operations.md`; `legacy-disposition.md` (L1-L3, L5, L6, L11, guards
+g-i, §4 eleven pairs, §5), `architecture.md` (§2, §3, §8, new §10), `db-ownership-matrix.md`
+(writers after Stage 5), `known-gaps.md`, ADRs 0006/0008/0009, `plan.md` §7 R-030 to R-041,
+`CHANGELOG.md` Stage 5 block.
+
+Gaps: V2-GAP-011 narrowed (High, **cutover blocker**: the admin trigger refuses; the nightly settle
+stays until D-316-2); V2-GAP-013 narrowed (High, **cutover blocker**: every admin path refuses; the
+email-intake timer still runs until Stage 6; the changed integration suites are unexecuted);
+V2-GAP-017 extended (Medium: the Stage 5 SQL); V2-GAP-018 close text updated (not built);
+V2-GAP-021 narrowed (Medium: a caller and a view exist, still no projection). New: V2-GAP-022
+(Medium, VISUAL: UNVERIFIED), 023 (Low, Brownlow leaderboard and team mapping), 024 (Medium, no
+public-page revalidation after a curated approval; orchestrator MED, recorded, R-040), 025 (Low, no
+view of AFL API settle refusals). None closed.
+
+Admin actions: added 6 server actions (create, validate, approve, reject curated proposals;
+compare, publish Coleman) and 5 pages; retired 7 exports on 5 surfaces (`runCurrentSeasonAdminAction`,
+`startSettleRunAction`, `runValidation`, `decideSubmission`, `runPromotion`, upload `POST`,
+email-intake `POST`), each refusing after its unchanged guard.
+
+Stage-close results (orchestrator, committed tree plus these documents, DSN variables unset):
+
+| Check | Result |
+|---|---|
+| full `npx vitest run --no-cache` | Test Files 96 failed / 184 passed / 2 skipped (282); Tests 15 failed / 9664 passed / 48 skipped (9727); the 102 ` FAIL ` lines are identical to `docs/v2/evidence/baseline-failures.txt` (no new failure, none weakened) |
+| deliberate Stage 5 retirements (changed expectations, named per test in `.phaneslight/returns/launchD-20261019/01-worker-WA-legacy-retirement.md` `retired_expectations`) | `tests/admin-current-season-settle.test.ts`, `admin-upload-route.test.ts`, `email-intake-route.test.ts`, `submission-review-actions.test.ts`, `current-season-import.test.ts`, `auth.test.ts` (nav), `v2-module-boundaries.test.ts` (ratchet 18 to 11), `admin-nav/admin-nav.spec.ts` (route list); integration `admin-upload-route`, `email-intake`, `submission-promotion` (unexecuted) |
+| `npx tsc --noEmit --incremental false` | exit 0 |
+| `npx next typegen` | route types generated, exit 0 |
+| `npx eslint --no-cache .` | 253 errors, 132 warnings: unchanged, exactly at the ceiling |
+| ESLint on every created/edited file | 0 errors |
+| `tools/v2/coverage-matrix.ts --check`, `tools/v2/acquisition-stage-map.ts --check` | both exit 0 |
+| frozen ISSUE-316 files | source: 19 of 19 sha256 match the snapshot; V2: 18 of 19 equal the source, `CHANGELOG.md` differs by design |
+| source worktree status | differs from the snapshot only by `?? supplies` |
+
 ## Resumption point
 
-Stage 4 is done. **Launch D starts Stage 5** (admin operations centre and
-UI, ADR 0009): read `docs/v2/plan.md` (stage 5 row, D9, §7 R-020 to R-029), this file,
-`docs/v2/known-gaps.md` (V2-GAP-011, 013, 016, 018, 019 and 021 are the Stage 5
-inputs), `docs/v2/legacy-disposition.md` (L1-L3, L5, L6 are Stage 5's) and ADR 0008's "What Stage
-5 must wire". Stage 5 must: wire a server-only caller for the curated services and the Coleman
-publisher; supply a `src/` sealed-set loader for `ApproveDependencies.sealed` (today the only
-loader is `tools/current-season/settle-season-seal.ts:22`); make the CSV upload, submission
-promotion, email-intake route and Squiggle/Kali admin actions refuse; and remove the AFL Tables
-admin trigger. Stages 5 and 6 have not been started.
+Stage 5 is done (closure result recorded above once it returns). **Launch E starts Stage 6**
+(final stage): parity and comparison tooling, shadow-run commands, cutover runbooks, the go/no-go
+record, the risk register and final closure. Read `docs/v2/plan.md` (stage 6 row, §7 R-030 to
+R-041), this file, `docs/v2/known-gaps.md` (the cutover blockers V2-GAP-008, 011 and 013; the
+operator-execution gaps 001, 002, 003, 007, 009, 010, 017 and 022; the owner decisions 016 and
+019), `docs/v2/legacy-disposition.md` (L3 timer, L4) and `docs/v2/admin-operations.md`. Stage 6
+must: put the email-intake timer's disablement in the cutover runbook in the same window as the
+Stage 5 deploy (V2-GAP-013); keep the AFL Tables settle behind the owner's D-316-2 (V2-GAP-011;
+never executed by V2); list every operator-executed verification (PostgreSQL migrations, grants
+and integration suites; the page eyeball list) as runbook steps, not as done; record go/no-go
+as **no-go** while any cutover blocker is open. Stage 6 has not been started.

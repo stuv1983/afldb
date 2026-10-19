@@ -200,6 +200,14 @@ the server-described type and would double-encode it).
 
 ## What Stage 5 must wire
 
+> **Wired in Stage 5 (Launch D)**, under `/admin/operations/awards` rather than `/admin/awards`:
+> list, history, create from a local file, validate, approve (with `ApproveDependencies.sealed`
+> from `src/lib/seasons/sealed-seasons.ts` and the sealed-season note as a field error), reject;
+> the acting user's `auth_users.id` as `CuratedAwardsViewer.userId`; no `revalidatePath`. Not
+> wired: manual single-entry with `resolvePlayerIdentity` (proposals come from a file only),
+> revising (V2-GAP-018) and public-page revalidation after approval (V2-GAP-024). The list below
+> is the Stage 4 instruction, kept as written.
+
 - Pages under `/admin/awards` (or the data editor) that call the services through
   `withAwardProposalExecutor` and `awardWinnerPromotionPort`; guard each with
   `requireCapability('data.awards.edit' | 'data.awards.read')`, and pass the acting user's

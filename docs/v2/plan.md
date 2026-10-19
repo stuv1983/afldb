@@ -313,3 +313,58 @@ continues the reviewed plan.
   supplies the sealed set (`ApproveDependencies.sealed`); the package does no file I/O. The only
   sealed-set loader today is `tools/current-season/settle-season-seal.ts`; Stage 5 supplies one for
   `src/`.
+
+### Launch D decisions (Stage 5, 2026-10-19)
+
+Launch D continued the reviewed plan; no new plan review was run (launch instruction).
+
+- **R-030 Retire by refusal, not removal.** Each retired admin surface keeps its export name and its
+  existing guard as the first awaited statement, then returns the typed refusal from
+  `RETIRED_ADMIN_SURFACES` (`packages/domain/src/legacy-retirement.ts`; 5 surfaces, 7 exports):
+  `{ refused: true, code: 'legacy_retired', surface, error }`; routes answer HTTP 410. One
+  best-effort `admin.legacy_retired_refused` audit row (detail `{ surface, export }`) per
+  attributed refusal (`src/lib/admin/retired-admin.ts`). Retired actions take no parameters, so no
+  caller input is read. The retired UI components are deleted; guards g-i in
+  `docs/v2/legacy-disposition.md` §2 keep them deleted and the refusals refusing.
+- **R-031 Email intake refuses unattributed.** `POST /api/admin/email-intake` answers 410 without
+  reading the body, comparing the shared secret, touching the database or auditing: a caller
+  that cannot be attributed must not be able to write audit rows. The poller files a 4xx to its
+  Errors folder and never deletes it; disabling the timer is Stage 6 (V2-GAP-013).
+- **R-032 Libraries stay.** `pipeline.ts`, `datasets.ts` and `src/lib/external-afl/*` remain because
+  offline tools and the quarantined CLI use them; no admin file may import them (guard h). The
+  ISSUE-273/304 race coverage is kept at library level through a test-local helper; the
+  route-level coverage went with the routes.
+- **R-033 One new capability.** `operations.centre.read` (Admin and Super Admin) gates the read-only
+  overview. Mutations reuse existing capabilities (`data.awards.edit`; reads `data.awards.read`,
+  `data.brownlow.read`). The sidebar gains "Operations centre" and loses "Legacy file intake" for
+  Admin and Super Admin; the contributor branch is unchanged (its one link now shows the
+  retirement notice; the role is otherwise refused by `getAdminUser`, AFLDB-ISSUE-186).
+- **R-034 Two audit layers.** The durable audit is in the mutation's own transaction: the proposal
+  ledger and `data_edits` (curated awards), `derived_award_results.correction` (Coleman). The
+  activity trail is one best-effort `auth_audit_log` row per mutation attempt (success,
+  unchanged, refusal), written on the auth pool after the transaction settles, as in the
+  awards admin; it never changes the outcome, and an audit failure is reported to the operator
+  as "the change WAS made". Reads write no audit row.
+- **R-035 Coleman wiring without projection.** Compare is read-only (`data.awards.read`); publish
+  needs `data.awards.edit`, a 20-2000 character note and the operator's settled attestation
+  (R-022), with evidence reference `coleman_derivation:<season>:<inputChecksum>`. The goal facts are
+  read before the publisher opens its transaction (it cannot nest); the stored checksum and inputs
+  make the record reproducible. Still no projection into `award_winners` (V2-GAP-021).
+- **R-036 Sealed-season loader in `src/`.** `src/lib/seasons/sealed-seasons.ts` reads
+  `data/reference/seasons.json` fresh on every approval and publication; a missing or malformed
+  registry raises `SeasonRegistryError` and the action is refused (the seal fails closed).
+- **R-037 One connection role.** Every operations-centre database call uses the `afldb_import`
+  connection (`withAwardProposalExecutor`, `AFLDB_IMPORT_DATABASE_URL`), as the other audited
+  editors do; never `afldb_app`. Unexecuted on PostgreSQL (V2-GAP-017).
+- **R-038 Brownlow view read-only.** Default eligibility rule `unrecorded` (R-023); no leaderboard
+  and no provider-team mapping are passed (V2-GAP-023); a leader is shown only when determined.
+- **R-039 Visual evidence.** Real pages need a database and a session, so they stay
+  `VISUAL: UNVERIFIED` (V2-GAP-022). The presentational components were captured offline from
+  SYNTHETIC props with the local Playwright Chromium (every non-file request aborted);
+  the one overflow the automated check found was fixed. No visual pass is claimed.
+- **R-040 Public revalidation deferred.** The orchestrator found (MED) that a curated approval
+  does not refresh the cached public award pages. Fixing it needs revalidation paths through the
+  `@afldb/admin` promotion port, outside the reviewed Stage 5 scope; recorded as V2-GAP-024.
+- **R-041 No dedicated settle-refusal view.** D9 names "reconciliation failures": Stage 5 surfaces
+  the Brownlow reconciliation and run status only; AFL API settle refusals stay in their reports
+  and tables (V2-GAP-025).

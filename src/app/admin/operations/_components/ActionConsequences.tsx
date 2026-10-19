@@ -37,7 +37,7 @@ export function ActionConsequences({ consequences }: { consequences: Consequence
           {c.audit.durable}
           {' '}{c.audit.activity}
           {' '}
-          <span className="mono">{c.audit.activityActions.join(' · ')}</span>
+          <span className="mono" style={{ overflowWrap: 'anywhere' }}>{c.audit.activityActions.join(' · ')}</span>
         </dd>
       </dl>
     </div>

@@ -28,16 +28,17 @@ legacy/offline/  quarantined offline tools (Stage 4)    imported only by legacy/
 |---|---|---|
 | `apps/web` | repository root: `src/app` (52 public pages, 56 admin pages, 19 route handlers, 30 server-action files), `src/components`, `src/search`, `src/db/queries` (74 modules), `src/lib` (118 files) | `deploy/afldb.service` → `deploy/server-cluster.mjs` |
 | `apps/worker` | `tools/current-season/*` (AFL API acquire/settle CLIs) | `deploy/afldb-settle-afl-api.{service,timer,sh}` (05:00 nightly), `deploy/afldb-settle-afl-api-brownlow.{service,timer,sh}` (every 5 minutes) |
-| legacy runtime ingestion | CSV upload/submissions, email intake, AFL Tables settle, Squiggle/Kali admin refresh | classified in `docs/v2/legacy-disposition.md` (Stage 4); still runtime until Stage 5 and the ISSUE-316 cutover (V2-GAP-011, V2-GAP-013) |
+| legacy runtime ingestion | AFL Tables nightly settle; the email-intake timer posting to a retired route | classified in `docs/v2/legacy-disposition.md` (Stage 4); the CSV, submission, email-intake, Squiggle/Kali and AFL Tables trigger admin paths refuse since Stage 5; the settle stays until the ISSUE-316 cutover (V2-GAP-011) and the timer until Stage 6 (V2-GAP-013) |
 | offline legacy tools | `legacy/offline/**` (the Squiggle/Kali CLI), `tools/migration/*`, `tools/rebuild/**` | manual only; no scheduler, no runtime import (guards in `tests/v2-module-boundaries.test.ts`); `npm run current-season:update` refuses |
 
-Counts are from `docs/v2/inventory.md`, where each has its re-derivation command.
+Counts are from `docs/v2/inventory.md`, where each has its re-derivation command; Stage 5 added 5
+admin pages (`/admin/operations/**`) and 2 server-action files, and deleted 4 admin components.
 
 ## 3. Packages as they exist
 
 | Package | Exports | Source of each export |
 |---|---|---|
-| `@afldb/domain` | fixture status and round vocabulary, finals round codes, `isFixtureRoundType`, `isFixtureStatus`; `ImportBatchId`, `asImportBatchId`; the historical baseline manifest spec, sealed-season rule, validation and comparator (Stage 2); the coverage registry (`COVERAGE_REGISTRY`, `validateCoverageRegistry`, `checkCoverageEvidence`, `renderCoverageMatrix`) and the seal decision (`evaluateSeasonWrite`, `assertSeasonWritable`, `AUDITED_CORRECTION_WORKFLOWS`) (Stage 3; Stage 4 added the audited workflow ids for derived-award publication and curated-award approval); the retired-entry registry (`RETIRED_ENTRIES`, `findRetiredEntry`, `renderRetiredEntryRefusal`) (Stage 4) | re-exports of `src/lib/fixtures/spec.ts`, `src/lib/import-batch-id.ts` (both pure leaf modules); `packages/domain/src/historical-manifest.ts`, `coverage-registry.ts`, `season-seal.ts`, `legacy-retirement.ts` (new in V2) |
+| `@afldb/domain` | fixture status and round vocabulary, finals round codes, `isFixtureRoundType`, `isFixtureStatus`; `ImportBatchId`, `asImportBatchId`; the historical baseline manifest spec, sealed-season rule, validation and comparator (Stage 2); the coverage registry (`COVERAGE_REGISTRY`, `validateCoverageRegistry`, `checkCoverageEvidence`, `renderCoverageMatrix`) and the seal decision (`evaluateSeasonWrite`, `assertSeasonWritable`, `AUDITED_CORRECTION_WORKFLOWS`) (Stage 3; Stage 4 added the audited workflow ids for derived-award publication and curated-award approval); the retired-entry registry (`RETIRED_ENTRIES`, `findRetiredEntry`, `renderRetiredEntryRefusal`) (Stage 4); the retired admin surfaces (`RETIRED_ADMIN_SURFACES`, `findRetiredAdminSurface`, `renderRetiredAdminRefusal`, `retiredAdminRefusal`, `LEGACY_RETIRED_CODE`) (Stage 5) | re-exports of `src/lib/fixtures/spec.ts`, `src/lib/import-batch-id.ts` (both pure leaf modules); `packages/domain/src/historical-manifest.ts`, `coverage-registry.ts`, `season-seal.ts`, `legacy-retirement.ts` (new in V2) |
 | `@afldb/db` | `assertTestProcessDsn`, `testProcessDsnRefusal`, `isTestProcess`; the read-only manifest producer (`produceManifest`, `resolveProducerTarget`; never run); (Stage 4) the SQL port `SqlExecutor`, `TransactionalSqlExecutor`, the postgres.js adapters `postgresExecutor`, `postgresTransactionExecutor`, `nativeTransactionOf` | re-export of `src/db/test-process-guard.ts` (new in V2, ADR 0005); `packages/db/src/historical-manifest-producer.ts`, `sql-executor.ts` (new in V2) |
 | `@afldb/acquisition` | the source-family registry contract; (Stage 3) the pipeline stage contract `AFL_API_PIPELINE` and stage map (§9), `replayAflApiSnapshot`/`aflApiPlanDigest`, the reconciliation report (`buildAflApiReconciliationReport`, validator, JSON Schema), the fixture contract (`classifyAflApiFixtureStatus`, `evaluateAflApiFixtureProjection`, `detectAflApiFixtureCollisions`), and re-exports of the pure/read-only stage code (client, rate limiter, season discovery and enumeration, snapshot readers, `claimSnapshotDir`, bundle emitters, `reconcile`) | re-exports of `src/lib/acquisition/*` modules whose runtime import closure reaches no `src/db/**`, `server-only`, `postgres` or writer module (`tests/v2-acquisition-pipeline.test.ts`); writers (settle, canonical apply, observation store, derived recompute) are cited by path in the stage contract, never re-exported (plan §7 R-016); `packages/acquisition/src/{pipeline,stage-map,replay,reconciliation-report,fixture-contract}.ts` (new in V2) |
 | `@afldb/derived` | (Stage 4) the Coleman derivation (`deriveColeman`, `parseColemanContract`, `colemanKey`, `serialiseColemanDerivation`, `COLEMAN_DERIVATION_VERSION`), the comparison report (`buildColemanComparisonReport`, validator), the audited publisher (`publishColemanResult`, `checkColemanPublication`, `planColemanPublication`; ADR 0006); the Brownlow reconciliation (`reconcileBrownlowSeason`, `validateBrownlowReconciliationInput`) and its report (`serialiseBrownlowReconciliationReport`, `validateBrownlowReconciliationReport`, JSON Schema; ADR 0007) | `packages/derived/src/{coleman,coleman-comparison,coleman-publication,brownlow-reconciliation,brownlow-reconciliation-report}.ts` (new in V2) |
@@ -95,7 +96,7 @@ A). Table ownership is drafted in `docs/v2/db-ownership-matrix.md`.
 ADRs 0001-0012 in `docs/v2/adr/` record plan decisions D1-D11 and the PGlite test database
 (0012). ADRs 0006 (Coleman), 0007 (Brownlow reconciliation), 0008 (curated awards) and 0010
 (legacy disposition) are implemented in Stage 4, each stating what is unexecuted; 0009 (admin
-operations centre) is not implemented yet (Stage 5), and says so. Migrations from
+operations centre) is implemented in Stage 5 (§10). Migrations from
 Stage 4: `111_curated_award_proposals.sql`, `112_derived_award_results.sql` (ADR 0004; executed
 only on in-memory PGlite, unexecuted on PostgreSQL, V2-GAP-017).
 
@@ -177,3 +178,18 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | derive | `src/db/queries/player-derived.ts:383` | `recomputeSeasonBrownlowStatus` | derived |
 | derive | `src/db/queries/player-derived.ts:678` | `recomputeBrownlowCoverage` | derived |
 <!-- stage-map:end -->
+
+## 10. Admin operations centre (Stage 5)
+
+Pages `/admin/operations` (read-only overview), `/admin/operations/awards`, `/awards/[id]`,
+`/coleman` and `/brownlow` (`src/app/admin/operations/**`; operating guide
+`docs/v2/admin-operations.md`). Layering: page or server action (capability guard first) ->
+`src/lib/admin/operations-centre.ts` (server-only; capability checked again; one transaction per
+mutation through the Stage 4 services; best-effort activity-trail row after it settles) ->
+`@afldb/admin` / `@afldb/derived` over the `SqlExecutor` port, with the server-only adapters
+`withAwardProposalExecutor` and `awardWinnerPromotionPort` (`src/db/queries/award-proposals.ts`),
+the read loaders `src/db/queries/{coleman-inputs,brownlow-reconciliation-inputs}.ts` and the
+sealed-season loader `src/lib/seasons/sealed-seasons.ts`. Presentational components are pure
+(`_components/*`); `OperationsClientForms.tsx` is the only client module. Retired legacy admin
+surfaces refuse through `src/lib/admin/retired-admin.ts` (plan §7 R-030). Nothing here has run on
+PostgreSQL or been rendered in a browser (V2-GAP-017, V2-GAP-022).
