@@ -11,6 +11,7 @@ import {
   ROW_COUNTS_END_SQL,
   ROW_COUNTS_LOCAL_SETTINGS,
   ROW_COUNTS_SESSION_SQL,
+  ROW_COUNTS_STATE_SQL,
   ROW_COUNTS_STATEMENT_ALLOWLIST,
   RowCountsProducerRefusal,
   produceTableRowCounts,
@@ -20,6 +21,8 @@ import {
   type RowCountsRow,
 } from '@afldb/db';
 import { TableRowCountsFormatError, parseTableRowCounts, validateTableRowCounts } from '@afldb/domain';
+import { capturePreservation } from '../tools/v2/preservation-capture';
+import { REQUIRED_PRESERVED_TABLES, digest } from '../tools/v2/migration-preservation';
 
 import {
   CaptureUsageError,
@@ -32,6 +35,40 @@ import {
 } from '../tools/v2/shadow-capture';
 
 const CLOCK = () => new Date('2026-10-20T01:02:03.000Z');
+
+describe('preservation capture (synthetic server, no database)', () => {
+  function server(failure?: 'rls' | 'query' | 'target') {
+    const sent: string[] = [];
+    const query = async (sql: string): Promise<Record<string, unknown>[]> => {
+      sent.push(sql);
+      if (sql === ROW_COUNTS_STATE_SQL) return [{ database_name: failure === 'target' ? 'afldb_dev' : 'afldb_v2_shadow_test', transaction_read_only: 'on', transaction_isolation: 'repeatable read' }];
+      if (sql === schemaExistsSql(DEFAULT_ROW_COUNT_SCHEMAS)) return DEFAULT_ROW_COUNT_SCHEMAS.map(schema_name => ({ schema_name }));
+      if (sql === rowCountCatalogSql(DEFAULT_ROW_COUNT_SCHEMAS)) return REQUIRED_PRESERVED_TABLES.map(t => ({ schema_name: t.split('.')[0], table_name: t.split('.')[1], kind: 'r', row_security: failure === 'rls' }));
+      if (sql.startsWith('SELECT to_jsonb(q)') && failure === 'query') throw new Error('query unavailable');
+      if (sql.startsWith('SELECT to_jsonb')) return [{ content: '{"id":1,"value":null}' }];
+      return [];
+    };
+    return { query, sent };
+  }
+  it('captures all tables and queries, emits only hashes, rolls back', async () => {
+    const db = server();
+    const result = await capturePreservation(db.query, 'afldb_v2_shadow_test', 'docs/v2/preservation-queries.json', digest('synthetic backup'), 2025);
+    expect(Object.keys(result.tables)).toHaveLength(REQUIRED_PRESERVED_TABLES.length);
+    expect(result.tables['public.matches'].rows).toEqual([digest('{"id":1,"value":null}')]);
+    expect(db.sent.at(-1)).toBe('ROLLBACK');
+    expect(JSON.stringify(result)).not.toContain('"value"');
+    expect(db.sent.some(s => s.includes('pg_get_constraintdef'))).toBe(true);
+  });
+  it.each(['rls', 'query', 'target'] as const)('refuses %s and still rolls back', async failure => {
+    const db = server(failure);
+    await expect(capturePreservation(db.query, 'afldb_v2_shadow_test', 'docs/v2/preservation-queries.json', digest('synthetic backup'), 2025)).rejects.toThrow();
+    expect(db.sent.at(-1)).toBe('ROLLBACK');
+  });
+  it('requires complete scope and all preservation inputs', () => {
+    expect(() => parseCaptureArgs(['preservation', '--dsn-env', 'SHADOW_DATABASE_URL', '--out', 'x'])).toThrow();
+    expect(() => parseCaptureArgs(['preservation', '--contract', 'x', '--backup-sha256', digest('x'), '--seal', '2025', '--schema', 'public'])).toThrow();
+  });
+});
 type Table = { schema: string; table: string; kind?: string; rls?: boolean };
 
 // SYNTHETIC catalog, deliberately returned out of sorted order.
@@ -504,10 +541,10 @@ describe('shadow-capture row-counts', () => {
   });
 
   it('parseCaptureArgs and the usage text', () => {
-    expect(parseCaptureArgs(ARGS)).toEqual({ dsnEnv: 'SHADOW_DATABASE_URL', out: 'inventory.json', schemas: DEFAULT_ROW_COUNT_SCHEMAS });
+    expect(parseCaptureArgs(ARGS)).toEqual({ mode: 'row-counts', contract: null, backupSha256: null, seal: null, dsnEnv: 'SHADOW_DATABASE_URL', out: 'inventory.json', schemas: DEFAULT_ROW_COUNT_SCHEMAS });
     expect(() => parseCaptureArgs([])).toThrow(SHADOW_CAPTURE_USAGE);
     expect(() => parseCaptureArgs(['row-counts', '--bad'])).toThrow(CaptureUsageError);
-    expect(SHADOW_CAPTURE_USAGE).toBe('usage: shadow-capture.ts row-counts --dsn-env <VARIABLE> --out <inventory.json> [--schema <name> ...]');
+    expect(SHADOW_CAPTURE_USAGE).toBe('usage: shadow-capture.ts row-counts --dsn-env <VARIABLE> --out <inventory.json> [--schema <name> ...]; or preservation --dsn-env <VARIABLE> --out <snapshot.json> --contract <queries.json> --backup-sha256 <hash> --seal <year>');
   });
 
   it('redactDsn removes the whole DSN, the password (raw and decoded) and the user', () => {

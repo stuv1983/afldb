@@ -16,6 +16,9 @@
 > runbooks and `issues.md` are. Update it whenever a listed blocker or acceptance state changes.
 
 ### AFLDB-ISSUE-229 — AFL API fixture ingestion
+- **2026-10-20 clarification:** B2 gates wiring/first applying the new-season fixture writer,
+  with authentic whole-season/TBC/status/key/mapping evidence and first-apply approval. An
+  inactive-writer backend preservation rehearsal is separate; ISSUE-229 remains OPEN.
 - **Severity:** Medium. **Area:** acquisition / fixtures — `afl_api` season feed → `fixtures`,
   `canonical_applications`, `admin-fixtures.ts`.
 - **State:** Open (2026-09-23). Fixture ingestion only. **Not resolved.**

@@ -517,6 +517,12 @@ pre-match season feed, and it must provide:
 - the genuine TBC date/time representation, if present;
 - whole-season validation of the pre-match shape and of any new status or key variants.
 
+**Owner migration-policy separation (2026-10-20):** B2 gates wiring/first applying the new-season
+fixture schedule writer, including authentic TBC/status/key and venue/round-mapping evidence
+and separately approved first apply. It does not prevent an inactive-writer backend migration
+preservation rehearsal. B2 remains OPEN; no feed was acquired and no first apply was authorised.
+See `docs/v2/migration-acceptance-2026-10-20.md`. ISSUE-316 sequencing remains unchanged.
+
 **Local release review (2026-10-19): gate classification.** B2 is first-season operational
 acceptance based on seasonal source evidence, not a code contract that requires the integer
 2027. The implementation's technical contract is already exercised using authentic retained

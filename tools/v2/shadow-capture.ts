@@ -29,8 +29,10 @@ import {
 } from '@afldb/db';
 import { TableRowCountsFormatError, evaluateShadowDsn, parseTableRowCounts } from '@afldb/domain';
 
+import { capturePreservation } from './preservation-capture';
+
 export const SHADOW_CAPTURE_USAGE =
-  'usage: shadow-capture.ts row-counts --dsn-env <VARIABLE> --out <inventory.json> [--schema <name> ...]';
+  'usage: shadow-capture.ts row-counts --dsn-env <VARIABLE> --out <inventory.json> [--schema <name> ...]; or preservation --dsn-env <VARIABLE> --out <snapshot.json> --contract <queries.json> --backup-sha256 <hash> --seal <year>';
 
 export class CaptureUsageError extends Error {
   constructor(message: string) {
@@ -57,6 +59,10 @@ export interface CaptureDeps {
 }
 
 export interface RowCountsArgs {
+  readonly mode: 'row-counts' | 'preservation';
+  readonly contract: string | null;
+  readonly backupSha256: string | null;
+  readonly seal: string | null;
   readonly dsnEnv: string | null;
   readonly out: string | null;
   readonly schemas: readonly string[];
@@ -67,9 +73,14 @@ export function parseCaptureArgs(argv: readonly string[]): RowCountsArgs {
   let dsnEnv: string | null = null;
   let out: string | null = null;
   const schemas: string[] = [];
+  const extra = new Map<string, string>();
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--dsn-env' || arg === '--out' || arg === '--schema') {
+    if (['--contract', '--backup-sha256', '--seal'].includes(arg)) {
+      const value = argv[++i];
+      if (!value || value.startsWith('--') || extra.has(arg)) throw new CaptureUsageError('Invalid preservation option');
+      extra.set(arg, value);
+    } else if (arg === '--dsn-env' || arg === '--out' || arg === '--schema') {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith('--')) throw new CaptureUsageError(`${arg} needs a value`);
       i += 1;
@@ -88,10 +99,14 @@ export function parseCaptureArgs(argv: readonly string[]): RowCountsArgs {
       positional.push(arg);
     }
   }
-  if (positional.length !== 1 || positional[0] !== 'row-counts') {
+  if (positional.length !== 1 || !['row-counts', 'preservation'].includes(positional[0])) {
     throw new CaptureUsageError(SHADOW_CAPTURE_USAGE);
   }
-  return { dsnEnv, out, schemas: schemas.length ? schemas : DEFAULT_ROW_COUNT_SCHEMAS };
+  if (positional[0] === 'row-counts' && extra.size) throw new CaptureUsageError('Preservation options require preservation mode');
+  if (positional[0] === 'preservation' && (schemas.length || extra.size !== 3)) throw new CaptureUsageError('Preservation requires --contract, --backup-sha256, --seal and the complete default schema scope');
+  return { mode: positional[0] as RowCountsArgs['mode'], contract: extra.get('--contract') ?? null,
+    backupSha256: extra.get('--backup-sha256') ?? null, seal: extra.get('--seal') ?? null,
+    dsnEnv, out, schemas: schemas.length ? schemas : DEFAULT_ROW_COUNT_SCHEMAS };
 }
 
 /** Strips the DSN, its user and its password from any text that might echo them. */
@@ -124,7 +139,7 @@ async function realClient(dsn: string): Promise<CaptureClient> {
 }
 
 const exclusiveWrite = (path: string, text: string): void => {
-  writeFileSync(path, text, { encoding: 'utf8', flag: 'wx' });
+  writeFileSync(path, text, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
 };
 
 export function defaultCaptureDeps(): CaptureDeps {
@@ -169,6 +184,12 @@ export async function runCli(argv: readonly string[], deps: CaptureDeps = defaul
 
     const client = await (deps.createClient ?? realClient)(dsn);
     try {
+      if (args.mode === 'preservation') {
+        const snapshot = await capturePreservation(client.query, verdict.database!, args.contract!, args.backupSha256!, Number(args.seal));
+        deps.writeExclusive(args.out, `${JSON.stringify(snapshot, null, 2)}\n`);
+        deps.log('Preservation snapshot written (hashes only)');
+        return 0;
+      }
       const inventory = await produceTableRowCounts(client.query, {
         schemas: args.schemas,
         now: deps.clock,

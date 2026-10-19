@@ -1,5 +1,13 @@
 # AFLDB V2 — isolated shadow rehearsal and shadow comparison plan
 
+**Current execution package (2026-10-20):** use
+[production-shadow-commands.md](production-shadow-commands.md) for the reviewed production-data
+rehearsal, migrations 111–115, complete preservation captures and separate release-gate results.
+Its [owner policy](migration-acceptance-2026-10-20.md) supersedes the older migration-blocker
+classification and baseline-112 examples below. No approved local production backup is available.
+Prior local mechanics are retained evidence; no production-data rehearsal has occurred.
+The old full-suite/rebuild/visual examples are outside this task's execution authority.
+
 Status: written in Stage 6 (Launch E, 2026-10-19). **Every command in this document is NOT
 EXECUTED.** V2 has no database, host or network access (plan §1). The tools it names exist, are
 committed, and are unit-tested on committed synthetic inputs, fakes and in-memory PGlite only

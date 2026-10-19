@@ -61,7 +61,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 local standalone rehearsal passes; raw votes and non-empty proposal/audit history preserved, including after 115 | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
-| V2-GAP-029 | Medium | strict historical baseline verification | rehearsal | open: 149 strict; 99 approved (78 deferrals + 21 exact sibling disagreements), 0 data matches; 50 unapproved source findings; both gates fail; dedicated credentials rotated after ownership guard | source requests: gap-029-source-requests.md; separate owner release-policy decision required; shared-development incident uncertainty preserved |
+| V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; currently INCOMPLETE | approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -584,6 +584,14 @@ award results must be shown reconcilable before production; **no** — not a pro
   cause, and never weaken an assertion.
 
 ## V2-GAP-029 — Strict baseline/reference evidence differs from locally reproduced history
+
+- **Owner decision 2026-10-20:** OPEN as data quality debt. D-V2-MIGRATION-SEPARATION approves
+  distinct backend and exact-reference criteria, conditional on existing records, IDs,
+  relationships, event/registration/participation coverage and public results being preserved;
+  functional ingestion/publication, permissions, audit and rollback must hold. New discrepancies
+  block migration. 149 strict, 99 approved, 50 unapproved unchanged; no additional approvals.
+  Production compatibility remains INCOMPLETE (no approved local backup). Production NO-GO.
+  [Decision](migration-acceptance-2026-10-20.md), [commands](production-shadow-commands.md).
 
 - **Current acceptance:** D-GAP029-21 implemented; 149 strict, 99 approved, 50 unapproved. No data match or release waiver. [Readiness](gap-029-readiness.md), [verification](evidence/gap-029-acceptance-verification.json). The seven-file run below predates this bounded follow-up.
 

@@ -1,5 +1,24 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
+**Current migration-policy amendment (2026-10-20):**
+[D-V2-MIGRATION-SEPARATION](migration-acceptance-2026-10-20.md) is approved. Report five separate
+results: backend functional **PASS on retained local evidence**; production migration
+preservation/query compatibility **INCOMPLETE**; strict Gridley **FAIL (149)**; adjudication
+conformance **FAIL (99 approved, 50 unapproved)**; production operational acceptance
+**INCOMPLETE / NO-GO**. Missing evidence cannot pass. GAP-029 remains OPEN data quality debt;
+it stops being an automatic backend-migration blocker only under the approved preservation
+conditions. New discrepancies still block. No strict assertion, bounded adjudication,
+production approval or data-preservation requirement is waived. The full suite remains
+13,740 passed / 9 failed / 31 skipped, not green. No approved local production backup exists.
+[Reviewable Linux rehearsal package](production-shadow-commands.md).
+
+**ISSUE-229 B2 scope:** authentic first-season evidence and approved first apply are required
+before wiring/applying the new-season fixture schedule writer. An inactive-writer schema/data
+rehearsal can be reviewed separately. This does not authorise that writer or shorten ISSUE-316
+sequencing. Historical blanket B2 migration-blocker statements below are superseded only in
+that limited scope. Production compatibility, Linux, host backup/restore/rollback, legacy-writer
+retirement, ISSUE-316 sequencing and explicit release approval remain required.
+
 **Current bounded acceptance (2026-10-20, D-GAP029-21):** 149 strict findings;
 99 approved (78 deferrals + 21 exact sibling disagreements), **0 data matches**;
 50 unapproved (42 event + eight board-date membership). Both gates remain failed.

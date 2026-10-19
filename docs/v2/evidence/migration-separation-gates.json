@@ -1,0 +1,24 @@
+{
+  "policy": "v2.migration-separation.1",
+  "backendFunctional": "PASS",
+  "migrationCompatibility": "INCOMPLETE",
+  "gridleyEvidence": "Retained 2026-10-20 at 12abe77f; not rerun by this offline report",
+  "strictGridley": {
+    "result": "FAIL",
+    "findings": 149
+  },
+  "adjudicationConformance": {
+    "result": "FAIL",
+    "approved": 99,
+    "unapproved": 50
+  },
+  "productionOperational": "INCOMPLETE",
+  "backendAcceptance": "INCOMPLETE",
+  "productionDecision": "NO-GO",
+  "preservation": {
+    "result": "INCOMPLETE",
+    "findings": [
+      "Required complete preservation snapshots missing or invalid"
+    ]
+  }
+}

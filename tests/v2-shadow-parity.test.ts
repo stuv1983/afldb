@@ -67,10 +67,100 @@ import {
 } from '@afldb/derived';
 
 import { USAGE, defaultDeps, parseCliArgs, runCli, type CliDeps } from '../tools/v2/shadow-parity';
+import { comparePreservation, digest, releaseGates, REQUIRED_PUBLIC_QUERIES, REQUIRED_PRESERVED_TABLES,
+  type PreservationSnapshot } from '../tools/v2/migration-preservation';
+import { runReleaseGates } from '../tools/v2/release-gates';
 
 const ROOT = process.cwd();
 const NOW = '2026-10-20T00:00:00Z';
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+describe('owner migration separation: synthetic preservation policy', () => {
+  const snapshot = (): PreservationSnapshot => ({ format: 'afldb.v2.preservation.1',
+    scope: { backupSha256: digest('synthetic archive'), queryContractSha256: digest('synthetic contract'), seal: 2025, phase: 'migration' },
+    tables: Object.fromEntries(REQUIRED_PRESERVED_TABLES.map(t => [t, { definition: digest(t), rows: [digest(`${t}:id=1,NULL,votes=3`)] }])),
+    queries: Object.fromEntries(REQUIRED_PUBLIC_QUERIES.map(q => [q, digest(q)])) });
+  const evidence = { result: 'PASS', evidence: ['synthetic contract-test reference'] };
+  const functional = Object.fromEntries(['ingestion', 'publication', 'permissions', 'auditing', 'rollback'].map(k => [k, evidence]));
+  it('accepts identical rows, additive V2 tables and retained existing rows', () => {
+    const b = snapshot(), a = clone(b);
+    a.tables['public.derived_award_results'] = { definition: digest('new'), rows: [digest('new result')] };
+    a.tables['afldb_meta.schema_migrations'].rows.push(digest('migration 115'));
+    expect(comparePreservation(b, a).result).toBe('PASS');
+  });
+  it.each(['public.matches', 'public.player_clubs', 'public.player_match_stats', 'public.brownlow_round_votes',
+    'public.award_winners', 'public.auth_audit_log'])('fails lost rows/coverage in %s', table => {
+    const b = snapshot(), a = clone(b); a.tables[table].rows = [];
+    expect(releaseGates({ functional, parity: run(), before: b, after: a }).migrationCompatibility).toBe('FAIL');
+  });
+  it.each([
+    ['stable-id', 'public.players'], ['event-label', 'public.matches'], ['raw-vote', 'public.brownlow_round_votes'],
+    ['award-provenance', 'public.award_winners'], ['NULL-to-zero', 'public.brownlow_season_votes'],
+  ])('fails equal-count content replacement: %s', (change, table) => {
+    const b = snapshot(), a = clone(b); a.tables[table].rows = [digest(change)];
+    expect(comparePreservation(b, a).result).toBe('FAIL');
+  });
+  it('preserves duplicate multiplicity', () => {
+    const b = snapshot(), a = clone(b); b.tables['public.matches'].rows.push(b.tables['public.matches'].rows[0]);
+    expect(comparePreservation(b, a).result).toBe('FAIL');
+  });
+  it('fails changed FK/column definitions and unexplained public query output', () => {
+    const b = snapshot(), a = clone(b); a.tables['public.matches'].definition = digest('changed FK');
+    a.queries.match_detail = digest('different output');
+    expect(comparePreservation(b, a).findings).toEqual(['public.matches: DEFINITION_OR_RELATIONSHIP_CHANGED', 'match_detail: PUBLIC_OUTPUT_CHANGED']);
+  });
+  it('fails unexpected tables', () => {
+    const b = snapshot(), a = clone(b); a.tables['public.unapproved'] = { definition: digest('d'), rows: [] };
+    expect(comparePreservation(b, a).result).toBe('FAIL');
+  });
+  it('fails a dropped baseline table', () => {
+    const b = snapshot(), a = clone(b); delete a.tables['public.clubs'];
+    expect(comparePreservation(b, a)).toEqual({ result: 'FAIL', findings: ['public.clubs: TABLE_LOST'] });
+  });
+  it.each(['backupSha256', 'queryContractSha256', 'seal'] as const)('incomplete for unlike snapshot %s', key => {
+    const b = snapshot(), a = clone(b);
+    if (key === 'seal') a.scope.seal++; else a.scope[key] = digest('different');
+    expect(comparePreservation(b, a).result).toBe('INCOMPLETE');
+  });
+  it('incomplete for missing required evidence, table or query', () => {
+    expect(comparePreservation(undefined, snapshot()).result).toBe('INCOMPLETE');
+    const a = snapshot(); delete a.queries.match_detail;
+    expect(comparePreservation(snapshot(), a).result).toBe('INCOMPLETE');
+    const b = snapshot(); delete b.tables['public.player_clubs'];
+    expect(comparePreservation(b, snapshot()).result).toBe('INCOMPLETE');
+    expect(releaseGates({}).backendAcceptance).toBe('INCOMPLETE');
+  });
+  it('reports strict and conformance failures separately from complete backend acceptance', () => {
+    const report = releaseGates({ functional, parity: run(), before: snapshot(), after: snapshot() });
+    expect(report.backendAcceptance).toBe('PASS');
+    expect(report.strictGridley).toEqual({ result: 'FAIL', findings: 149 });
+    expect(report.adjudicationConformance).toEqual({ result: 'FAIL', approved: 99, unapproved: 50 });
+    expect(report.productionOperational).toBe('INCOMPLETE');
+    expect(report.productionDecision).toBe('NO-GO');
+  });
+  it('cannot pass on missing functional contracts or missing legacy parity evidence', () => {
+    const missingRollback = { ...functional, rollback: { result: 'PASS', evidence: [] } };
+    expect(releaseGates({ functional: missingRollback, parity: run(), before: snapshot(), after: snapshot() }).backendAcceptance).toBe('INCOMPLETE');
+    expect(releaseGates({ functional, before: snapshot(), after: snapshot() }).backendAcceptance).toBe('INCOMPLETE');
+    expect(releaseGates({ functional, parity: { verdict: 'PASS' }, before: snapshot(), after: snapshot() }).backendAcceptance).toBe('INCOMPLETE');
+  });
+  it('offline release CLI writes incomplete evidence explicitly and refuses overwrites', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'v2-release-gates-'));
+    try {
+      const out = join(dir, 'gates.json');
+      expect(runReleaseGates(['--out', out])).toBe(2);
+      expect(JSON.parse(readFileSync(out, 'utf8')).migrationCompatibility).toBe('INCOMPLETE');
+      expect(() => runReleaseGates(['--out', out])).toThrow();
+      expect(() => runReleaseGates(['--unknown', 'x', '--out', out])).toThrow();
+      const attestation = join(dir, 'functional.json');
+      writeFileSync(attestation, JSON.stringify(Object.fromEntries(Object.keys(functional).map(k => [k,
+        { result: 'PASS', evidence: ['does-not-exist/missing.json: absent proof'] }]))));
+      const missing = join(dir, 'missing-proof-gates.json');
+      expect(runReleaseGates(['--functional', attestation, '--out', missing])).toBe(2);
+      expect(JSON.parse(readFileSync(missing, 'utf8')).backendFunctional).toBe('INCOMPLETE');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
 // A deliberately loose view of JSON documents, so tests can mutate them freely.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Loose = Record<string, any>;

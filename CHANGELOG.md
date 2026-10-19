@@ -15,6 +15,19 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — separate migration gates and production shadow package (2026-10-20)
+
+- Record D-V2-MIGRATION-SEPARATION: keep backend functionality, migration preservation/query
+  compatibility, strict Gridley, adjudication conformance and production operations separate.
+  Missing evidence is INCOMPLETE. GAP-029 stays OPEN: 149 strict / 99 approved / 50 unapproved;
+  new discrepancies still block migration and production remains NO-GO.
+- Extend shadow capture with complete row-content/ID/relationship hashes and public output
+  comparisons; retain original parity checks and strict assertions. Add focused deletion,
+  identity/content loss, coverage, output-change and incomplete-evidence regressions.
+- Prepare immutable-backup provenance requirements and isolated Linux restore/migration-only
+  commands. No approved local production backup exists; production parity is unverified.
+  Clarify ISSUE-229 B2 as new-season fixture-writer wiring/first-apply acceptance.
+
 ### AFLDB V2 — bounded Gridley acceptance and credential containment (2026-10-20)
 
 - Apply owner decision D-GAP029-21 only to the 21 hash-bound Jarryd/Corey Lyons sibling

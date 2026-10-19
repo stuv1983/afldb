@@ -1,5 +1,15 @@
 # GAP-029 bounded acceptance and backend handoff
 
+**Current owner decision (2026-10-20):** [D-V2-MIGRATION-SEPARATION](migration-acceptance-2026-10-20.md)
+approves separate backend-migration and strict Gridley criteria. GAP-029 stays OPEN as data
+quality debt: **149 strict / 99 approved / 50 unapproved**. Its 50 findings remain unapproved.
+It is no longer an automatic backend blocker only if production-data preservation and query
+compatibility prove no newly introduced discrepancy and functional contracts, permissions,
+audit and rollback hold. That evidence is currently **INCOMPLETE**; production remains NO-GO.
+The recommendation/next-decision section below is historical and superseded by that decision.
+See [the concrete rehearsal commands](production-shadow-commands.md). No approved local backup
+is available; no synthetic result substitutes for production parity.
+
 2026-10-20; starting HEAD `ed4c429c`, `v2/rebuild`. Owner instruction and approval provenance:
 [D-GAP029-21](owner-instruction-2026-10-20.md). This record supersedes earlier 71-unapproved
 and unapproved-sibling statements; those remain historical evidence.
@@ -48,7 +58,7 @@ establish a backend migration defect or general corruption of the stored history
   performed or claimed. A September roster and club selection announcements cannot establish
   April/May eligibility. The approved sibling discrepancy establishes no missing senior game.
 
-## Recommendation and next owner decision
+## Historical recommendation and next owner decision (now decided above)
 
 Recommend **separating exact external Gridley parity from acceptance of a data-preserving
 backend migration**, but only by an explicit owner release-policy amendment. Strict 149 and

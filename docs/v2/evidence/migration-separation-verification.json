@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-20",
+  "startingHead": "12abe77f7f7b65f83b9adb079460ca9392d98cc8",
+  "branch": "v2/rebuild",
+  "agents": 1,
+  "focusedTests": {
+    "command": "node node_modules/vitest/vitest.mjs run tests/v2-shadow-parity.test.ts tests/v2-shadow-capture.test.ts --no-cache",
+    "passed": 204,
+    "failed": 0,
+    "skipped": 0,
+    "files": 2,
+    "scope": "Offline synthetic policy/capture fixtures and existing local CLI comparisons; not production-data parity",
+    "environmentNote": "Windows sandbox tsx subprocess failed uv_os_get_passwd; same focused suites passed with local sandbox escalation. No assertion was skipped or weakened."
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit --incremental false",
+    "exitCode": 0
+  },
+  "lint": {
+    "command": "node node_modules/eslint/bin/eslint.js tools/v2/migration-preservation.ts tools/v2/preservation-capture.ts tools/v2/release-gates.ts tools/v2/shadow-capture.ts tests/v2-shadow-parity.test.ts tests/v2-shadow-capture.test.ts",
+    "exitCode": 0
+  },
+  "retainedFullWorkflow": { "passed": 13740, "failed": 9, "skipped": 31, "rerun": false, "green": false },
+  "retainedGridley": { "strict": 149, "approved": 99, "unapproved": 50, "rerun": false },
+  "backup": {
+    "documentedLocation": "~/backups/afldb/",
+    "localLocation": "C:/Users/stuar/backups/afldb",
+    "exists": false,
+    "approvedLocalProductionBackupAvailable": false,
+    "diskWideSearch": false
+  },
+  "productionCompatibility": "INCOMPLETE",
+  "linuxVerification": "INCOMPLETE",
+  "productionDecision": "NO-GO",
+  "databaseConnectionsMade": false,
+  "productionOrSharedAccess": false,
+  "fullSuiteRebuildVisualRerun": false,
+  "deploymentsPushesLiveServiceChanges": false,
+  "rehearsalCommands": "docs/v2/production-shadow-commands.md",
+  "changedFiles": [
+    "CHANGELOG.md",
+    "IssuesIndex.md",
+    "docs/v2/evidence/migration-separation-gates.json",
+    "docs/v2/evidence/migration-separation-verification.json",
+    "docs/v2/gap-029-readiness.md",
+    "docs/v2/go-no-go.md",
+    "docs/v2/known-gaps.md",
+    "docs/v2/migration-acceptance-2026-10-20.md",
+    "docs/v2/migration-functional-evidence.json",
+    "docs/v2/preservation-queries.json",
+    "docs/v2/production-shadow-commands.md",
+    "docs/v2/shadow-rehearsal.md",
+    "issues.md",
+    "issues/open/AFLDB-ISSUE-229.md",
+    "tests/v2-shadow-capture.test.ts",
+    "tests/v2-shadow-parity.test.ts",
+    "tools/v2/migration-preservation.ts",
+    "tools/v2/preservation-capture.ts",
+    "tools/v2/release-gates.ts",
+    "tools/v2/shadow-capture.ts"
+  ]
+}

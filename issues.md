@@ -41895,6 +41895,12 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 
 ## AFLDB-ISSUE-229 — AFL API fixture ingestion
 
+- **Owner migration-policy separation (2026-10-20):** B2 remains OPEN before wiring/first
+  application of the new-season fixture schedule writer; authentic whole-season/TBC/status/key
+  and venue/round-mapping evidence and first-apply approval remain required. It is not a blanket
+  blocker for an inactive-writer backend preservation rehearsal. No acquisition or apply was
+  authorised. See `docs/v2/migration-acceptance-2026-10-20.md`; ISSUE-316 sequencing unchanged.
+
 - **Local release clarification (2026-10-19):** B2 is the first-season operational acceptance
   gate, not missing implementation or a hard-coded 2027 technical requirement. Authentic 2026
   pre-match evidence proves the existing contract; it cannot substitute for the first genuine
