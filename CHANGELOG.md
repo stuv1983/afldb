@@ -25,6 +25,15 @@ commit.
   remain gap 029. Production remains NO-GO; host operations and owner acceptance are not waived.
   Final complete workflow: 13,740 passed, 9 strict reference/source failures, 31 skipped;
   Coleman separately 27/27. Original gap-028 suites pass 200/200.
+- V2-GAP-029 follow-up: seven of the nine strict reference/source failures repaired with evidence,
+  none by skip, tolerance or waiver. Snapshot-scoped pins (Adelaide v Brisbane 41, MCG 3151/484,
+  X1 365) now assert the through-2025 value strictly plus independent 2026+ rows; the 261/110
+  identity digests were ordering-only (original pins reproduce exactly under the Linux
+  punctuation-ignoring key order, membership unchanged) and the gate is collation-independent;
+  Gridley board 541 cell 2-1 is a trade confirmed 2025-10-15, after the board's 2025-01-07 key.
+  Two Gridley strict assertions remain open (172 cells needing absent datasets/owner decisions).
+  Focused six-file strict run 1,374 passed / 2 failed / 7 skipped; no full-workflow rerun.
+  Production stays NO-GO.
 - Corrected the ungated deadlock fixture's unsupported assumption about which transaction
   PostgreSQL aborts. Both documented outcomes now require exact failure/commit behaviour,
   atomic rollback, bounded waits and successful retry; no runtime guard or privilege changed.

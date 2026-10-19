@@ -78,7 +78,8 @@ Final measured result: **13,740 passed / 9 failed / 31 skipped / 13,780 total** 
 no failed setup/teardown-only suite. The separately executed Coleman suite is **27/27**.
 Together: **13,767 passed / 9 failed / 31 skipped / 13,807 total**, not green. All four original
 gap-028 files pass **200/200**, including cleanup. The nine residual assertions below are the
-only final failures and remain open under gap 029.
+only final failures of that run. GAP-029 follow-up (2026-10-20): seven are repaired and two
+Gridley strict assertions remain; see the table below. The figures above are not restated.
 Two incomplete broad runs were deliberately stopped for the Coleman lock-boundary and canonical
 Brownlow read-model repairs; their isolated databases remain preserved. They are not completed
 test evidence. An earlier parallel typecheck/build collided with regenerated `.next/types`;
@@ -106,15 +107,21 @@ the delivery summary):
 
 | File | Test identifiers | Evidence still required |
 |---|---|---|
-| `club-comparison-route.test.ts` | Stage 7 valid pair; Stage FR-2 invalid-era fallback | Reconcile pinned 42 meetings against 41 local meetings. |
-| `home-records.test.ts` | preserves venue counts and NULL attendance semantics | Approved venue/attendance snapshot versus through-2025 local history. |
-| `nl-answers-cross-domain.test.ts` | X1 T1; X1 T12 | Reconcile 367 pinned played-and-coached people against 365 with local match evidence. |
-| `release-gates.test.ts` | exact 261 players; exact 110 players | Approved durable identity lists for the two unchanged digest pins; independent SQL agrees with current query membership. |
-| `gridley-corpus.test.ts` | no probed dataset gap; no failing cells | Missing source/coverage inputs and date-qualified adjudication of board 541 cell 2-1. |
+| `club-comparison-route.test.ts` | Stage 7 valid pair; Stage FR-2 invalid-era fallback | **Resolved 2026-10-20.** 42 was 41 through 2025 plus a 2026 meeting; asserted as 41 strict + independent 2026+. |
+| `home-records.test.ts` | preserves venue counts and NULL attendance semantics | **Resolved.** 3200 / 485 were 3151 / 484 through 2025 plus 49 / 1 MCG matches played in 2026. |
+| `nl-answers-cross-domain.test.ts` | X1 T1; X1 T12 | **Resolved.** 367 was 365 through 2025 plus two 2026-only coaches (Carr, Fraser); Adamson stays matchless in the source. |
+| `release-gates.test.ts` | exact 261 players; exact 110 players | **Resolved.** Membership unchanged: both original digests reproduce exactly under the punctuation-ignoring key order; the gate is now collation-independent. |
+| `gridley-corpus.test.ts` | no probed dataset gap; no failing cells | Board 541 cell 2-1 **resolved** (Gridley's key predates the 2025-10-15 trade). **Still open:** 172 cells need `match_event` labels, the 2026 register, owner treatment of the §23.36 accepted deferrals, and source-coverage rows. |
 
-These are nine assertions, not a count of diagnostic output lines. Their assertions remain
-strict. Missing approved reference evidence is not permission to relabel every disagreement
-as a proven data-only defect, to repin digests, or to waive the release gate.
+Seven of the nine assertions are repaired (commits `0faf8607`, `2ee29ade`, `642011c3`); two remain.
+Focused run of the six GAP-029 files together, strict, on `afldb_v2_rb_final_test`:
+**1,374 passed / 2 failed / 7 skipped (1,383)**, typecheck clean, changed-file lint 0 new findings
+(`evidence/gap-029-focused-tests.json`). That is a focused result, not a new complete workflow:
+the last complete result remains 13,740 passed / 9 failed / 31 skipped, and a full rerun would
+be expected to show 2 failures. Cause, evidence and correction for each: **V2-GAP-029**.
+Assertions remain strict; no tolerance, skip or diagnostic mode was used. Missing approved
+reference evidence is not permission to relabel a disagreement as a proven data-only defect, to
+repin digests, or to waive the release gate.
 
 The 31 default-workflow skips are not passes: seven POSIX-only checks; one unavailable rescued
 legacy archive; one synthetic continuity fixture with no collision-free source identity; two
@@ -275,10 +282,12 @@ Its own fixture is rolled back/cleaned, the role must be `afldb_import` and non-
 both DSN and live cluster/marker/current-database proofs remain mandatory.
 
 Strict residuals are tracked as **V2-GAP-029**, not hidden under the closed original 14 failures.
-The two stable-identity digest mismatches are genuine unresolved membership/reference evidence,
-NOT surrogate-ID churn or collation (C/folded/three ICU orders agree on the local digests).
-An approved reference cohort or authorised production-dump comparison is needed before any
-baseline change. Count/coverage assertions are likewise retained; no matches, event labels,
+The two stable-identity digest mismatches were an **ordering-only** disagreement: the original
+pins reproduce exactly from the local 261/110 membership under the punctuation-ignoring key
+order of the Linux collation they were taken under (2026-10-20); membership is unchanged. The
+other count assertions were snapshot-scope pins (through-2025 values plus 2026 rows). Only the
+two Gridley strict-mode assertions remain, needing `match_event` labels, the 2026 register,
+an owner decision on the accepted deferrals and source-coverage rows. No matches, event labels,
 player links or 2027 responses were invented.
 
 ## Remaining authority and approvals

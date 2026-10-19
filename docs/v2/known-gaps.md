@@ -52,7 +52,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 local standalone rehearsal passes; raw votes and non-empty proposal/audit history preserved, including after 115 | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
-| V2-GAP-029 | Medium | strict historical baseline verification | rehearsal | open: fresh local snapshot lacks required later-season/event evidence; exact identity membership digests also disagree and remain asserted | supply/reconcile approved full baseline and membership evidence; no blind repins |
+| V2-GAP-029 | Medium | strict historical baseline verification | rehearsal | partly resolved 2026-10-20: 7 of 9 failed assertions repaired with evidence (snapshot scope, ordering-only digests, board-dated trade); 2 Gridley strict-mode assertions remain open (absent `match_event` labels, 2026 register, accepted deferrals, source-coverage rows) | supply those inputs or decide the accepted-deferral treatment; no blind repins |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -576,34 +576,87 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-029 — Strict baseline/reference evidence differs from locally reproduced history
 
-- **Status:** Open, 2026-10-20. Medium; rehearsal/release verification, not a waiver.
-- **Final measured scope:** nine failed assertions, 13,740 passed and 31 skipped in the full
-  workflow; separate Coleman 27/27. No setup/teardown-only failure. The original gap-028 four
-  files are 200/200. All nine remaining assertions below retain their strict expected values.
-- **Observed repeatedly:** club-comparison route expects 42 Adelaide/Brisbane meetings, local
-  history has 41; home venue totals are pinned to a later snapshot; cross-domain coached-player
-  tests expect 367 but local match evidence yields 365. Local matches end in 2025 (16,838 rows).
-  The 368 linked coach identities include three with no local match: Jim Adamson, Josh Carr,
-  Josh Fraser. The independent matchless-coach control passes; the two fixed 367 assertions do not.
-- Gridley strict coverage/cell checks require event/player-register/current-season data beyond
-  the rebuilt local history. The detailed final corpus report is retained, not diagnostic-waived.
-  It also records one unresolved known-answer disagreement: board **541**, cell **2-1**,
-  `traded1 × WB`, Gridley player **3663** / AFLDB **6700**. Local linked facts include a 2020
-  national pick and a 2025 Gold Coast trade; the archived key omits the player. This needs
-  date-qualified source/oracle adjudication, not deletion of a trade or an invented exception.
-- Advanced Search cohorts have the expected **261 / 110 members and identity keys**, but hashes
-  are **79d3e6eea83a4620 / 258396e0512a2212**, not the pinned
-  **ca65f15239aaf0b5 / 4b4c6a2aa975cc17**. This is NOT a surrogate-ID hash. Read-only C/folded/ICU
-  ordering probes produce the same local hashes; locale ordering is not the cause. Exact expected
-  membership lists were not available in the targeted reference/runbook search (only digest pins).
-  Independent SQL exactly matches both current query cohorts, with 261/110 distinct people and
-  identity keys. Current keys are retained in `local-reference-oracles-final.json` for comparison.
-  The scoped retained API bundle check found a roster manifest, not a complete current-season
-  match/statistics bundle; the authentic pre-match fixtures do not supply that missing baseline.
-- **Evidence:** final assertion names/stack locations in `evidence/local-delivery-summary.json` and
-  its full input report; `local-reference-oracles-final.json` and `local-gridley-delivered.json`.
-  Required-source skips/platform/special-harness omissions are listed explicitly, not passes.
-- **Close:** reconcile with an approved reference identity list or authorized production-dump
-  shadow baseline and the required current-season/event inputs. Determine each membership
-  difference before any approved baseline change. Do not invent matches/links or merely repin
-  hashes/counts to green. No access to that external baseline or production is authorised here.
+- **Status:** Partly resolved 2026-10-20 (focused run at `642011c3`). Medium; rehearsal/release
+  verification, not a waiver. **7 of the 9** failed assertions are repaired with evidence; **2**
+  Gridley strict-mode assertions remain open (below). No assertion was skipped, widened or given a
+  tolerance, and no baseline waiver or diagnostic mode was used.
+- **Previous full-workflow result (unchanged until rerun):** 13,740 passed / 9 failed / 31 skipped;
+  Coleman 27/27; original gap-028 files 200/200. **Focused result after the repairs** (the six GAP-029
+  files together on `afldb_v2_rb_final_test`, strict, `evidence/gap-029-focused-tests.json`): 1,374 passed /
+  2 failed / 7 skipped of 1,383 (the 7 skips are the existing release-gates skips). Typecheck clean;
+  changed-file lint 0 errors / 0 new findings. The full workflow was not rerun: only test files changed.
+
+### Resolved (previous expectation → corrected expectation → why)
+
+1. **club-comparison-route (2 assertions): 42 → 41 through 2025, plus independent later meetings.**
+   Adelaide v Brisbane Lions has 41 meetings 1997-2025 in the AFL Tables `results.csv`
+   (`full-history-20260902`, 16,838 rows to 2025; its 1991-96 rows are Brisbane Bears, a distinct
+   organisation). Independent SQL on organisation slugs gives the same 41. The retained 2026 AFL API feed
+   holds two further meetings (Round 7, 2026-04-26; Semi Final, 2026-09-12). The 2026-09-15 pin of 42
+   (commit `d9105aba`) was 41 plus one 2026 meeting; which one is not recorded. Not an application defect.
+   Regression: the test asserts `through2025 = 41` strictly and `summary.meetings = 41 + season>=2026`.
+2. **home-records venue totals: 3200 / 485 → 3151 / 484 through 2025, plus independent 2026.** Source
+   `M.C.G.` rows: 3,151 matches, 484 finals; the DB agrees (119 grand finals and max attendance 121,696
+   unchanged). The retained 2026 feed has 49 concluded MCG matches by 2026-09-14, exactly 3151 + 49 = 3200,
+   and one finals-series match (the 2026-09-04 qualifying/elimination final; Wildcard Finals are
+   `is_finals_series = false`), 484 + 1 = 485. The pin was the 2026-09-14 snapshot (`e4f872b9`). Not a defect.
+3. **X1 played-and-coached (2 assertions): 367 → 365 through 2025, plus independent 2026-only coaches.**
+   The 2026-09-09 evidence was **365** with three matchless coach identities (the original test header
+   said so); the 2026-09-12 re-pin to 367 added Josh Carr (Port Adelaide, 23 games, season 2026 only) and
+   Josh Fraser (Carlton, 15 games, 2026 only) when 2026 coaching assignments were loaded (AFL Tables
+   `coaches_index.csv`). Jim Adamson (North Melbourne 1940, 11 games) is matchless in both snapshots: the
+   per-match `Coach` column of `player_stats_1940.csv` is blank for North Melbourne rounds 8-18 (11 matches,
+   matching his 11 games) and names Len Thomas for rounds 1-7. **Not repaired:** attributing those 11
+   matches to Adamson would be an inference beyond the accepted source (owner decision if wanted; X1 would
+   then be 366). Regression: `through2025 = 365` strictly; total = 365 + linked people whose only coached
+   matches are 2026+.
+4. **release-gates exact 261 / 110 digests (2 assertions): membership UNCHANGED; ordering-only
+   disagreement.** The pinned digests are reproduced exactly from the local membership when the AFL Tables
+   profile keys are ordered ignoring punctuation (`_`, `/`, `.`) and case — the order a punctuation-ignoring
+   Linux en_US.UTF-8 `afldb_test` gives `string_agg(... ORDER BY external_id)` — and under none of the
+   other orderings tried (C, case-folded, ICU `en`/`en-US`/`sv`/`und` at four strengths, numeric on/off;
+   only the punctuation-ignoring variants match). The earlier note that locale ordering is not the cause had
+   tried only punctuation-significant orders. Membership difference against the reference: **none** (261 =
+   261 and 110 = 110 keys; the two original digests are the reference). The V1 host collation itself is not
+   observable here. Fix: the test reads keys in C order, asserts the original pins from the legacy ordering
+   applied in code (so it holds on any collation) and pins the canonical C-order digests
+   `79d3e6eea83a4620` / `258396e0512a2212`. Key lists retained: `evidence/gap-029-identity-cohorts.json`.
+5. **Gridley board 541, cell 2-1 (`traded1 × WB`, Gridley 3663 / AFLDB 6700, Jamarra Ugle-Hagan): Gridley's
+   key is correct for its date.** The board is dated **2025-01-07**; AFLDB lists him on the 2025 trade
+   (DraftGuru `years/2025#32`, Western Bulldogs to Gold Coast), confirmed by both clubs on **2025-10-15**
+   (westernbulldogs.com.au "Ugle-Hagan departs the Bulldogs"; goldcoastfc.com.au "Ugle-Hagan to play for the
+   Gold Coast SUNS in 2026"; he played no 2025 game). His 2020 national pick 1 is not the trade criterion.
+   The harness had compared him as a finished career because his last game season (2024) precedes the board
+   year. `tradesAfterBoard` (tests/gridley-corpus-support.ts) now classifies a Gridley-omits traded cell as
+   `time of board` only when AFLDB's linked trade rows show fewer trades complete at the board date than the
+   threshold (trade period held in October; a year-Y trade counts complete from 1 November). It never reaches
+   the Gridley-lists direction. Unit regression in `tests/gridley-compat.test.ts`. `incorrect known answer`
+   is now 0 (was 1). This refines an informational category; the owner may prefer a tracked adjudication
+   row instead.
+
+### Still open (2 assertions, both in `gridley-corpus.test.ts`, strict mode)
+
+`has no probed dataset gap` and `has no failing cells` fail on **172 cells** (50 dataset gap, 78
+unsupported, 44 source coverage gap) that need data or decisions this repository does not hold:
+
+- **42 `dataset gap` cells: `matches.match_event` is empty.** Anzac Day (`anzac-playedin-1` 15,
+  `anzac-won-1` 3), Dreamtime at the 'G (6) and King's Birthday / Big Freeze (18). The labels came from the
+  legacy `games.match_event` column (`import_legacy_afl.py`); that dataset is not in the repository and no
+  derivation rule has been approved. Needed: the legacy labels or an owner-approved rule. None invented.
+- **8 `dataset gap` cells: 2026.** Teammate references to players absent from the through-2025 register
+  (Willem Duursma, Jagga Smith, Malcolm Rosas, Finnbar Maley) and two cells of a 2026 board (43 answers).
+  Needed: the 2026 register/season (current-season import).
+- **78 `unsupported` cells: the seven formally accepted ISSUE-118 §23.36 deferrals** (`tasmanian`,
+  `intrulesplayer`, `irish`, `nfl`, `recruitedByDodoro`, `season2024player`, `spoils5season`). The sibling
+  assertion passes because the unsupported set equals that list exactly; strict mode nevertheless fails the
+  cells, so strict mode cannot be green while the deferrals stand. The V1 acceptance proof was the diagnostic
+  run (`AFLDB_GRIDLEY_DIAGNOSTIC=1`). Owner decision: accept diagnostic as the acceptance mode, treat
+  accepted deferrals as non-failing in strict, or acquire the data.
+- **44 `source coverage gap` cells:** `pickrookie` (Rookie Draft selections DraftGuru pages omit,
+  independently sourced) and `has_brother` (no sibling row). Needed: evidenced rows in
+  `data/players/rookie-relisting-outcomes.csv` / `sibling-supplements.csv` and the DraftGuru supplement.
+- For reference only, **not** acceptance: the same corpus in diagnostic mode passes 1,206/1,206 after the
+  board-541 repair.
+
+**Close:** the two Gridley assertions need the items above. No production access or external baseline was
+used; the public web was consulted only for the 2025-10-15 trade date.

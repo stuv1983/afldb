@@ -39,8 +39,10 @@ This amendment supersedes stale claims in the historical rows below:
 
 Exact results and remaining source-input limitations: `local-release-review.md`.
 Final complete run: **13,740 passed / 9 failed / 31 skipped**, plus separate Coleman **27/27**.
-Strict baseline/count/membership residuals are now **V2-GAP-029**. They block a green verification
-claim and require approved reference evidence, not blind assertion changes. The historical risk
+Strict baseline/count/membership residuals are **V2-GAP-029**. 2026-10-20: seven of the nine were
+repaired with evidence (snapshot scope, ordering-only digests, a board-dated trade); two Gridley
+strict assertions remain. They still block a green verification claim and require the named inputs,
+not blind assertion changes. The historical risk
 rows below retain Launch F wording; the reassessment above is the current state.
 
 | # | Risk | Likelihood | Impact | Mitigation | Owner | Gap |
