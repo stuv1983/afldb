@@ -47,7 +47,7 @@ wrong dump) is a **violation**, even if the new value is right: it must be recon
 5) and re-applied through a workflow above.
 
 Stage 3 enforces the seal at the AFL API settle entry points: the three settle CLIs refuse a
-sealed season in every writing mode before opening a database client
+sealed season in every writing mode before opening a database client (except the Brownlow completed-season backtest, which first opens a client to prove the database is `afldb_test`)
 (`packages/domain/src/season-seal.ts`, `tools/current-season/settle-season-seal.ts`). No
 constraint or trigger stops other writers (V2-GAP-006, narrowed); for them the manifest
 comparison remains the control. Settle is never a correction workflow: the refusal points at the

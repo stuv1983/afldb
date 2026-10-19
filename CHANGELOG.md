@@ -33,7 +33,8 @@ deliberate departure from CLAUDE.md §5 so the fork cannot collide with the main
   `packages/domain/src/coverage-registry.ts`) labels every season and family; only 2026 results
   is `api_verified`; nothing before 2026 is labelled API-rebuildable (V2-GAP-010).
 - The AFL API settle CLIs refuse sealed historical seasons (1897-2025 today) before opening a
-  database client; corrections go through the audited workflows only (V2-GAP-006, narrowed).
+  database client (except the Brownlow completed-season backtest, which first opens a client to prove the database is `afldb_test`); corrections go through the audited workflows only (V2-GAP-006,
+  narrowed).
 - AFL API fixture identity contract (pure refusals for unsupported statuses, unproven start times,
   unmapped venues, duplicate or colliding provider ids and swapped orientation). The fixtures
   writer itself stays unbuilt: AFLDB-ISSUE-229 B2 is a recorded cutover blocker (V2-GAP-008).

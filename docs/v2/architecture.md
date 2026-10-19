@@ -70,7 +70,7 @@ The connection pools (`src/db/client.ts`, `src/db/authClient.ts`) are not re-exp
   (`src/lib/acquisition/settle-afl-api.ts`, `settle-core.ts`), and the ingestion switches
   (`src/lib/acquisition/afl-api-ingestion-control.ts`). Stage 3 maps them as the stages of
   `@afldb/acquisition` (§9), enforces the historical seal at the three settle CLIs before any
-  database client opens (`tools/current-season/settle-season-seal.ts`, V2-GAP-006 narrowed), and
+  database client opens (except the Brownlow completed-season backtest, which first opens a client to prove the database is `afldb_test`; `tools/current-season/settle-season-seal.ts`, V2-GAP-006 narrowed), and
   proves that the acquire side imports no writer. Coverage per season and family:
   `docs/v2/coverage-matrix.md`. The AFL API fixtures writer is not built (V2-GAP-008, cutover
   blocker).

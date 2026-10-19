@@ -79,8 +79,9 @@ close it. An entry is removed only when the closing evidence exists.
   (`tools/current-season/settle-afl-api.ts`, `settle-afl-api-fixtures.ts`,
   `settle-afl-api-brownlow.ts`, through `tools/current-season/settle-season-seal.ts`) refuse a
   sealed season in every writing mode before any database client is created; `--validate-only`
-  and `--report` stay allowed; the Brownlow completed-season backtest keeps its live
-  `afldb_test` proof and is logged as a non-correction basis. Settle is never a correction
+  and `--report` stay allowed. The one exception is the Brownlow completed-season backtest
+  (`--allow-completed-season-backtest`): it opens a client first, admits the sealed season only
+  after the live `afldb_test` proof passes, and logs it as a non-correction basis. Settle is never a correction
   workflow: the refusal names the audited workflows of `docs/v2/historical-baseline.md` §2.
   Tests: `tests/v2-season-seal.test.ts`, the "V2-GAP-006" block of
   `tests/afl-api-settle-cli-gate.test.ts` (refusal before the SQL stub is touched; negative

@@ -24,7 +24,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 0 Evidence | done: `docs/v2/baseline.md` (primary session), `docs/v2/inventory.md` | `58ec8626` |
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
-| 3 AFL API pipeline | implemented; closure verification pending (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
+| 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
 | 4-6 | not started (Launches C-E) | — |
 
 ## Stage 0 — evidence
@@ -178,8 +178,10 @@ Verification (executed 2026-10-19, Windows, DSN variables unset):
 - Full suite once: Test Files 96 failed | 176 passed | 2 skipped (274); Tests **15 failed | 9234
   passed | 48 skipped (9297)**. The 102 `FAIL` lines are identical to
   `docs/v2/evidence/baseline-failures.txt` (no new failure; all need a database DSN).
-- `npx tsc --noEmit --incremental false`: exit 0. ESLint on Stage 3 files: 0 problems; repository
-  wide: 253 errors / 132 warnings (at the ceiling, unchanged).
+- `npx tsc --noEmit --incremental false`: exit 0. ESLint on the files Stage 3 changed: 7 problems (6
+  errors, 1 warning), all on lines that predate Stage 3 (`tests/afl-api-match.test.ts`,
+  `tests/afl-api-settle-plan.test.ts`, `tests/afl-api-brownlow-acquire.test.ts`; blame bbf87566),
+  none introduced; repository wide: 253 errors / 132 warnings (exactly at the ceiling, unchanged).
 - ISSUE-316 cutover files: sha256 unchanged (nine files). Source worktree status differs from the
   snapshot only by `?? supplies`.
 
@@ -188,8 +190,13 @@ Gaps created or changed: V2-GAP-006 (narrowed), V2-GAP-008 (High, **cutover bloc
 
 ## Resumption point
 
-Stage 3 is implemented and committed; `afldb-closure` verification of Stage 3 is the last Launch B
-step (its result is recorded below this line when it returns). **Launch C starts Stage 4** (derived and
+Stage 3 is done. `afldb-closure` re-derived every check independently
+(`.phaneslight/returns/launchB-20261019/12-closure-stage3.md`): tsc 0; focused 1299 passed, 2
+skipped; full-suite FAIL set identical to the baseline; generated docs in sync; ISSUE-316 hashes
+intact; source status differs only by `?? supplies`; 43 changed files, no undisclosed edit.
+Verdict PASS_WITH_FINDINGS: C3-001 and C3-002 (LOW, doc wording, corrected in the commit that
+records this result), C3-003 (INFO, ESLint exactly at its ceiling, zero headroom) and C3-004
+(INFO, intended client behaviour change R-019). **Launch C starts Stage 4** (derived and
 curated: Coleman D6, Brownlow reconciliation D7, curated awards D8, legacy imports quarantined
 D10): read `docs/v2/plan.md` (stage 4 row, D6-D8, D10, §7), this file,
 `docs/v2/known-gaps.md` (V2-GAP-006 remainder and V2-GAP-008 stay open),
