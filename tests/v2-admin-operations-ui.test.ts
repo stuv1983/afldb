@@ -348,7 +348,11 @@ describe('overview sections', () => {
     expect(markup).not.toContain('<form');
     expect(markup).not.toContain('<button');
     expect(markup).toContain('AFLDB-ISSUE-316');
-    expect(markup).toContain('D-316-2');
+    // Plan section 7 R-042: the AFL Tables retirement is D-316-1 (C2) and the timer goes at C5
+    // (D-316-4); D-316-2 is the inert AFL API unit installation and must not be named here.
+    expect(markup).toContain('D-316-1');
+    expect(markup).toContain('D-316-4');
+    expect(markup).not.toContain('D-316-2');
     expect(markup).toContain('AFL Tables nightly settle');
     expect(markup).toContain('AFL API match and player statistics settle');
     expect(markup).toMatch(/There is no run-everything control/);

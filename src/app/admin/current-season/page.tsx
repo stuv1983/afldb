@@ -51,7 +51,8 @@ export default async function CurrentSeasonPage() {
         <p className="subtitle">
           The AFL API is the current-season source: its ingestion switches and the state of its
           settle units are below. The AFL Tables nightly settle still runs on the host behind
-          AFLDB-ISSUE-316 until the owner&rsquo;s decision D-316-2; AFLDB V2 neither starts nor
+          AFLDB-ISSUE-316 until the owner&rsquo;s ISSUE-316 decisions retire it (D-316-1 at C2; the
+          timer is disabled by C5 under D-316-4); AFLDB V2 neither starts nor
           stops it. Its on-demand admin trigger and the Squiggle and Kali controls are retired
           (AFLDB V2 Stage 5, docs/v2/legacy-disposition.md).
         </p>

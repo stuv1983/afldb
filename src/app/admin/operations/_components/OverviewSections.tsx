@@ -208,7 +208,8 @@ export function AcquisitionRunsSection({
         : <LoadFailure what="The AFL API run status" error={aflApi.error} code={aflApi.code} />}
       <h3>AFL Tables nightly settle</h3>
       <p className="section-note">
-        This timer still runs on the host behind AFLDB-ISSUE-316 until the owner decision D-316-2.
+        This timer still runs on the host behind AFLDB-ISSUE-316 until the owner&rsquo;s ISSUE-316
+        decisions retire it (D-316-1 at C2; the timer is disabled by C5 under D-316-4).
         AFLDB V2 neither starts nor stops it; the row below only reports it.
       </p>
       {aflTables.ok

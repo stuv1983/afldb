@@ -230,10 +230,12 @@ describe('current-season external source import contracts', () => {
   it('states the AFL Tables position truthfully in the admin UI instead of offering a Squiggle/Kali control', () => {
     // AFLDB-ISSUE-128 required the page to state provider precedence (the observed defect was
     // "Auto update uses Kali AFL Stats"). After Stage 5 the page states that the nightly AFL
-    // Tables settle remains on the host behind AFLDB-ISSUE-316 until D-316-2, and that the admin
+    // Tables settle remains on the host behind AFLDB-ISSUE-316 until the ISSUE-316 decisions retire
+    // it (D-316-1 at C2, the timer by C5 under D-316-4; plan section 7 R-042), and that the admin
     // trigger and the Squiggle/Kali controls are retired.
     expect(adminPage).toContain('AFLDB-ISSUE-316');
-    expect(adminPage).toContain('D-316-2');
+    expect(adminPage).toContain('D-316-1');
+    expect(adminPage).not.toContain('D-316-2');
     expect(adminPage).toContain('Squiggle and Kali controls are retired');
     expect(adminPage).not.toContain('Auto update uses Kali');
     expect(adminPage).not.toContain('CurrentSeasonControls');

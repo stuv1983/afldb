@@ -58,8 +58,8 @@ export async function runCurrentSeasonAdminAction(): Promise<CurrentSeasonAdminS
 /* ------------------------------------------------------------------ *
  * RETIRED (AFLDB V2 Stage 5, V2-GAP-013, legacy-disposition L5): the on-demand AFL Tables settle
  * trigger. The nightly AFL Tables settle still runs on the host behind AFLDB-ISSUE-316 until the
- * owner's decision D-316-2; V2 neither starts nor stops it, and this admin control no longer
- * starts it either.
+ * owner's ISSUE-316 decisions retire it (D-316-1 at C2; the timer is disabled by C5 under D-316-4);
+ * V2 neither starts nor stops it, and this admin control no longer starts it either.
  * ------------------------------------------------------------------ */
 
 /**

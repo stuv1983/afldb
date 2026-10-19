@@ -722,7 +722,9 @@ describe('AFLDB V2 Stage 5 — the current-season admin surface after the retire
 
   it('states the AFL Tables position truthfully: still on the host behind ISSUE-316, not started or stopped by V2', () => {
     expect(page).toContain('AFLDB-ISSUE-316');
-    expect(page).toContain('D-316-2');
+    expect(page).toContain('D-316-1');
+    expect(page).toContain('D-316-4');
+    expect(page).not.toContain('D-316-2'); // plan section 7 R-042
     expect(page).toContain('neither starts nor');
     expect(page).toContain('retired');
     // The wording the observed ISSUE-128 defect displayed must not return.
