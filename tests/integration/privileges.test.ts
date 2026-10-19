@@ -785,6 +785,10 @@ describe('afldb_import is confined to the statistical tables', () => {
     // UPDATE of the workflow columns) and its append-only decision ledger. Neither is
     // registered import-writable, for the same reason; their exact narrow shape is asserted in
     // the curated-awards test below. NOT RUN on any database from the V2 workstation.
+    //
+    // derived_award_results (migration 112, AFLDB V2 Stage 4) is the twelfth: the append-only
+    // ledger of published derivations (SELECT, INSERT and sequence USAGE only), not registered
+    // import-writable for the same reason. Its shape is asserted in the derived-awards test below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -800,7 +804,8 @@ describe('afldb_import is confined to the statistical tables', () => {
                                'brownlow_season_authority',
                                'external_grids', 'external_grid_axes',
                                'afl_api_identity_adjudications',
-                               'award_proposals', 'award_proposal_decisions')
+                               'award_proposals', 'award_proposal_decisions',
+                               'derived_award_results')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);
@@ -1174,6 +1179,48 @@ describe('afldb_import is confined to the statistical tables', () => {
     expect(others.authSelect).toBe(true);
     expect(others.authWrites).toBe(false);
     // Proposals hold unvetted data: never a public read surface.
+    expect(others.appAny).toBe(false);
+    expect(others.appRegistered).toBe(false);
+  });
+
+  // AFLDB V2 Stage 4 (migration 112). The published-derivation ledger: afldb_import inserts a
+  // row per publication (and a new row per supersession) and can never rewrite one. NOT RUN from
+  // the V2 workstation: this needs a database migrated through 112 and reconciled by
+  // db:privileges (the in-memory PGlite proof in tests/v2-coleman-publication-pglite.test.ts runs
+  // the migration's own grants against STUB roles only).
+  it('inserts derived award results and can never rewrite or delete one (migration 112)', async () => {
+    const [results] = await sql<{
+      selects: boolean; inserts: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean; sequenceUsage: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'INSERT')   AS inserts,
+             (has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'UPDATE')
+              OR has_any_column_privilege(${IMPORT_ROLE}, 'derived_award_results', 'UPDATE')) AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'derived_award_results') AS registered,
+             has_sequence_privilege(${IMPORT_ROLE}, 'derived_award_results_id_seq', 'USAGE') AS "sequenceUsage"
+    `;
+    expect(results).toEqual({
+      selects: true, inserts: true, updates: false, deletes: false,
+      truncates: false, registered: false, sequenceUsage: true,
+    });
+
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'derived_award_results', 'SELECT') AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'derived_award_results', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'derived_award_results', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'derived_award_results', 'DELETE')) AS "authWrites",
+             has_any_column_privilege(${APP_ROLE}, 'derived_award_results', 'SELECT') AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name = 'derived_award_results') AS "appRegistered"
+    `;
+    expect(others.authSelect).toBe(true);
+    expect(others.authWrites).toBe(false);
     expect(others.appAny).toBe(false);
     expect(others.appRegistered).toBe(false);
   });

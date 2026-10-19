@@ -17,8 +17,8 @@ import { isSealedSeason, type SealedSeasons } from './historical-manifest';
 
 /**
  * The closed list of human/audited correction workflows that may change a sealed row, one stable
- * id per row of the table in docs/v2/historical-baseline.md §2 — EXCEPT line 39 ("automatic
- * canonical application by a settle"), which is the routine ingestion path, not a correction.
+ * id per row of the table in docs/v2/historical-baseline.md §2 — EXCEPT line 39 (automatic canonical application
+ * by a settle: routine ingestion, not a correction). Stage 4 added `derived_award_publication` (the last row of §2).
  */
 export const AUDITED_CORRECTION_WORKFLOWS = [
   // line 37: super-admin data editor -> data_edits / data_overrides.
@@ -30,7 +30,7 @@ export const AUDITED_CORRECTION_WORKFLOWS = [
   // line 41: Brownlow authority and vote entry -> brownlow_season_authority / brownlow_vote_entry_state.
   'brownlow_authority',
   // line 42: user-submitted CSV correction, promoted by an admin -> data_submissions(+_rows).
-  'csv_submission_promotion',
+  'csv_submission_promotion', 'derived_award_publication', // last: Coleman publisher -> derived_award_results (112).
 ] as const;
 
 export type AuditedCorrectionWorkflow = (typeof AUDITED_CORRECTION_WORKFLOWS)[number];

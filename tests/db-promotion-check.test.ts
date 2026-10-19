@@ -7109,17 +7109,18 @@ describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
 
     // 37 -> 39 with migration 111 (AFLDB V2 Stage 4): award_proposals and award_proposal_decisions are
     // two more reinstated contract tables, so F0 (generated from the contract) now covers 38 + external_identities.
-    it('a fresh F0 holds 39 tables (38 + external_identities), with a count and a digest for external_identities', async () => {
-      expect(freezeDigestTables()).toHaveLength(39);
+    // 39 -> 40 with migration 112 (derived_award_results): one more reinstated contract table, 39 + external_identities.
+    it('a fresh F0 holds 40 tables (39 + external_identities), with a count and a digest for external_identities', async () => {
+      expect(freezeDigestTables()).toHaveLength(40);
       const record = recordFor(baseline());
-      expect(record.tables).toHaveLength(39);
+      expect(record.tables).toHaveLength(40);
       expect(record.tables.find((t) => t.table === IDENT)).toEqual({ table: IDENT, rows: 19321, digest: DIGEST_A });
       // the record is produced by the generic frozen phase from a live read, with no second digest format
       const opts = baseOpts({ phase: 'frozen', database: 'afldb_prod', freezeManifest: join(dir, 'm.json'), freezeRecordOut: join(dir, 'r.json') });
       writeFileSync(opts.freezeManifest!, JSON.stringify(manifest));
       await runFrozenPhase(fakeQuery(frozenDb({ tables: baseline() })), opts, new Report());
       const written = parseFreezeRecord(readFileSync(opts.freezeRecordOut!, 'utf8'), 'prod');
-      expect(written.tables).toHaveLength(39);
+      expect(written.tables).toHaveLength(40);
       expect(written.tables.find((t) => t.table === IDENT)).toMatchObject({ rows: 19321, digest: DIGEST_A });
     });
 
@@ -7179,10 +7180,10 @@ describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
       expect(main.match(/gateFreezeDigest\(/g)).toHaveLength(3);                // the definition, gateFrozenTarget and the freeze-dump phase; never a candidate connection
     });
 
-    it('an old 38-table freeze record fails closed under the current contract (never synthesised, never downgraded)', async () => {
-      const old38 = new Map([...baseline()].filter(([k]) => k !== IDENT));
-      expect(old38.size).toBe(38);
-      const oldRecord = recordFor(old38);
+    it('an old 39-table freeze record fails closed under the current contract (never synthesised, never downgraded)', async () => {
+      const old39 = new Map([...baseline()].filter(([k]) => k !== IDENT));
+      expect(old39.size).toBe(39);
+      const oldRecord = recordFor(old39);
       expect(() => parseFreezeRecord(JSON.stringify(oldRecord), 'prod')).toThrow(/different table set/);
       // even a record object that bypassed the parser is refused by the gate: external_identities is not in it
       const report = new Report();

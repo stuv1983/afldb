@@ -788,6 +788,27 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       + 'import-writable (no UPDATE, DELETE or TRUNCATE for any role). Reinstated after '
       + 'award_proposals, which it references; both keep their ids.',
   },
+  // --- Derived award results (migration 112, AFLDB V2 Stage 4, docs/v2/adr/0006) --------
+  // Decided exactly like award_proposals (reinstate, no football reference): a published
+  // derivation is an audited HUMAN act (the season seal's correction record and published_by)
+  // that no rebuild can recompute, so it must survive; and it carries no foreign key into
+  // awards, players, clubs, matches or award_winners, only auth_users and itself.
+  {
+    schema: 'public', name: 'derived_award_results', subsystem: 'derived awards', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
+    note: 'Append-only ledger of PUBLISHED award derivations, today the Coleman Medal (AFLDB V2 '
+      + 'Stage 4). Production-only audited publication state: each row holds the derivation '
+      + 'result, its method and code versions, the input checksum and the season seal '
+      + 'correction record, and a recompute after an authorised correction is a NEW row whose '
+      + 'supersedes_id names the old (no UPDATE for any role). Reinstated with ids preserved '
+      + '(supersedes_id is an intra-table reference). It names its award by slug and has no '
+      + 'foreign key into awards, players, clubs, matches or award_winners; BUT result.inputs '
+      + 'and the leaderboard embed the producing database player, club and match ids, which a '
+      + 'rebuild renumbers. They are a snapshot, not a durable reference: the durable winner '
+      + 'identity is the AFL Tables profile path in winners[].key (coleman:<season>:<path>). '
+      + 'References auth_users and itself.',
+  },
   // --- NL search telemetry and review (migrations 046–051, 055, 079, 081) -------------
   {
     schema: 'public', name: 'nl_search_log', subsystem: 'NL search telemetry', category: 'operations',

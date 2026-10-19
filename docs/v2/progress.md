@@ -25,7 +25,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 1 Foundation | done; closure verified (no CRIT/HIGH/MED) | `37f4fc0e` |
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
-| 4 Derived + curated | in progress (Launch C) | `fad164cd` (derived), `4c34be93` (progress), `ddb42525` (curated), legacy commit (this one) |
+| 4 Derived + curated | in progress (Launch C) | `fad164cd` (derived), `4c34be93` (progress), `ddb42525` (curated), `498fd46d` (legacy), Coleman publisher commit (this one) |
 | 5-6 | not started (Launches D-E) | — |
 
 ## Stage 0 — evidence
@@ -218,8 +218,19 @@ disposition recorded. Guards added to `packages/testing/src/module-boundaries.ts
 `tests/v2-module-boundaries.test.ts`. Gaps V2-GAP-011 (High, cutover blocker), 012 (Medium), 013
 (High, cutover blocker) and 014 (Low) recorded. Verification: the same working-tree run as the
 curated commit (10 focused files, failures all baseline; tsc exit 0; ESLint 0 errors on every
-file this commit touches). The Coleman publisher and the ownership matrix are in progress; this
-section is rewritten at the stage close.
+file this commit touches).
+
+Coleman publisher commit `(v2-derived)`: migration 112 (`derived_award_results`, append-only;
+supersession by `supersedes_id`, never UPDATE; no FK into football tables) and
+`publishColemanResult` (`packages/derived/src/coleman-publication.ts`): derives inside the call,
+refuses an incomplete or unsettled season, and publishes only as an audited correction through
+the season seal (new workflow `derived_award_publication`); identical recompute is `unchanged`
+(no write), a corrected recompute is `superseded`. It never writes `award_winners`. Verification
+(orchestrator re-run): 11 focused files 860 passed | 1 skipped (861), no failures; publisher
+suites 32 unit + 23 PGlite; tsc exit 0; ESLint 0 errors on every created file, existing files
+equal to `HEAD`. Migration 112 executed only on in-memory PGlite over stubs; unexecuted on
+PostgreSQL. Remaining: curated approval through the seal (W6), the ownership matrix and the
+stage-close documents; this section is rewritten at the stage close.
 
 ## Resumption point
 

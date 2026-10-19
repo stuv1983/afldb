@@ -403,6 +403,21 @@ BEGIN
     GRANT USAGE ON SEQUENCE award_proposal_decisions_id_seq TO afldb_import;
   END IF;
 
+  -- Migration 112 (AFLDB V2 Stage 4, derived awards): the append-only ledger
+  -- of PUBLISHED derivations (today the Coleman Medal). The V2 publisher
+  -- (packages/derived/src/coleman-publication.ts) reads the current row and
+  -- inserts a new one, as afldb_import, in a single transaction. SELECT,
+  -- INSERT and sequence USAGE only: a recompute after an authorised
+  -- correction is a NEW row that supersedes the old, never an UPDATE, and no
+  -- role gets DELETE or TRUNCATE. The table is not registered in
+  -- import_writable_tables, whose loop above would grant UPDATE, DELETE and
+  -- TRUNCATE. It is not app-readable. The revoke loop strips these each run;
+  -- re-grant them here.
+  IF to_regclass('public.derived_award_results') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON derived_award_results TO afldb_import;
+    GRANT USAGE ON SEQUENCE derived_award_results_id_seq TO afldb_import;
+  END IF;
+
   -- Migration 094 (AFLDB-ISSUE-155 Phase C1): the Brownlow administration
   -- workflow. These two tables record administrative decisions -- who
   -- drafted, who finalised, who published a season and from which
@@ -538,6 +553,10 @@ DECLARE
     -- Stage 4). The admin history view may only read them.
     ['award_proposals',        'SELECT'],                            -- 111
     ['award_proposal_decisions', 'SELECT'],                          -- 111
+    -- Read-only: the published derivation ledger is written by afldb_import
+    -- alone (see migration 112, AFLDB V2 Stage 4). The admin history view may
+    -- only read it.
+    ['derived_award_results',  'SELECT'],                            -- 112
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023

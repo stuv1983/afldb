@@ -1,6 +1,7 @@
 # ADR 0006 — Coleman Medal is derived, never ingested
 
-- Status: Accepted; implemented (Stage 4, pure derivation and comparison report)
+- Status: Accepted; implemented (Stage 4: pure derivation and comparison report, then the audited
+  transactional publisher and migration 112)
 - Plan decision: `docs/v2/plan.md` §3 D6
 
 ## Context
@@ -20,8 +21,8 @@ recomputes idempotently. Publication goes through an explicit audited operation.
 
 ## Implementation
 
-Stage 4 delivers the PURE half only: no database writer exists yet. A later step builds the
-transactional, audited publisher on top of the result type, which is plain JSON-serialisable.
+Stage 4 delivers the pure derivation and comparison report, and then the audited, transactional
+publisher on top of the plain JSON-serialisable result type (below, "The publisher").
 
 - `packages/derived/src/coleman.ts`
   - `parseColemanContract(json)` validates the same required keys as the Python loader
@@ -56,6 +57,61 @@ transactional, audited publisher on top of the result type, which is plain JSON-
 - `tests/v2-coleman.test.ts`: contract parser, every refusal, winners and ties, finals exclusion,
   NULL versus 0, checksum, idempotence under shuffled input, corrected statistics, the comparison
   report and its validator.
+
+### The publisher
+
+- `packages/derived/src/coleman-publication.ts` (export anchor `// @v2-stage4:coleman-publication`).
+  `publishColemanResult(executor, request)` takes the DERIVATION INPUT (never a ready-made result,
+  so a caller cannot hand in a forged one), the audited correction, `publishedBy` and a capability
+  viewer, and derives inside. It never reads a clock, the network or a file; `published_at` is the
+  database default.
+  - **Every publication is an audited operation through the season seal.** A derivable season is a
+    complete season and a complete season is a sealed one, so the write always targets sealed
+    history. The publisher calls `evaluateSeasonWrite` with the sealed range built from the SAME
+    registry the derivation used: `correction: null` is refused (`season_sealed`), an invalid
+    correction is refused (`correction_invalid`). One workflow id was added to
+    `AUDITED_CORRECTION_WORKFLOWS`: `derived_award_publication`, with its own row in
+    `docs/v2/historical-baseline.md` §2. The publisher accepts no other workflow. `open_season` cannot
+    happen after a successful derivation and is refused defensively (`season_not_sealed`).
+  - **Typed refusals, all before any SQL**: `capability_denied` (needs `data.awards.edit`, i.e. super
+    admin; checked first so a forbidden viewer learns nothing), `invalid_actor` (`publishedBy` not a
+    positive integer), `derivation_refused` (the derivation's own `ColemanRefusal` passed through:
+    `season_not_complete`, `season_not_settled`, `incomplete_rounds`, `goals_not_recorded`, identity
+    refusals ...), `correction_invalid`, `season_sealed`, `actor_mismatch` (`publishedBy` must equal
+    the correction's `actorUserId`: one accountable user) and `season_not_sealed`. An incomplete or
+    unsettled season can never be published.
+  - **One transaction** (`executor.transaction`): lock the (award, season) with
+    `pg_advisory_xact_lock(hashtext('derived_award_results:coleman'), season)` (the import role has no
+    UPDATE privilege, so `SELECT ... FOR UPDATE` is unavailable by design), read the CURRENT row (the
+    one no other row supersedes), then `planColemanPublication`: no row -> `published`; same input
+    checksum AND derivation version AND winners -> `unchanged` (an idempotent recompute writes
+    nothing and returns the existing id); anything else -> `superseded`, inserting a NEW row whose
+    `supersedes_id` names the current one (a recompute after an authorised correction to the goal
+    facts; the correction record says why). Any SQL error rolls back everything.
+  - **It does not write `award_winners`.** The Coleman `award_winners` rows remain owned by the
+    offline `tools/migration/import_awards.py` coleman group. A future projection of a published
+    result into `award_winners` must call `assertSeasonWritable` with a correction and supply
+    `player_name_raw` (divergence 8). It is not built here.
+- Migration `src/db/migrations/112_derived_award_results.sql`: the append-only ledger
+  `derived_award_results` (award slug, season, method version, derivation version, input checksum,
+  the full `serialiseColemanDerivation` result, winners, `derived_at`, `published_at`,
+  `published_by`, `basis` = `audited_correction`, the seal's `correction` record,
+  `supersedes_id`). No role gets UPDATE, DELETE or TRUNCATE, so "current" is derived rather than
+  flagged: a partial unique index allows one first publication per (award, season), a second unique
+  index allows each row at most one successor, a composite foreign key keeps a successor in the same
+  (award, season), and `supersedes_id < id` forbids a cycle; the current row is the one nothing
+  supersedes. CHECKs tie the scalar columns and `winners` to the stored result, and the audit record
+  to this workflow, season and actor. No foreign key into players, clubs, matches, awards or
+  `award_winners` (a rebuild `TRUNCATE ... CASCADE` must not empty the ledger): only `auth_users` and
+  itself. `result.inputs` and the leaderboard embed database ids a rebuild renumbers; the durable
+  winner identity is the profile path in `winners[].key`. Grants: `afldb_import` SELECT, INSERT and
+  the sequence; `afldb_auth` SELECT; nothing for `afldb_app`; not registered with `grant_app_read` or
+  `grant_import_write`. Mirrored in `tools/maintenance/privileges.sql`; classified `reinstate`
+  (production-only) in `tools/db/promotion-inventory.ts`.
+- `tests/v2-coleman-publication.test.ts` (refusals, the pure plan, the exact statements against a
+  fake executor, static no-I/O / no-`award_winners` proofs) and
+  `tests/v2-coleman-publication-pglite.test.ts` (migration 112 verbatim and the real publisher SQL on
+  in-memory PGlite). Fixtures are SYNTHETIC (`tests/v2-coleman-publication-fixtures.ts`).
 
 ## Divergences from the ISSUE-111 loader
 
@@ -92,12 +148,24 @@ separator refusal, the NULL-goals refusal) are the same. The differences are:
    string-normalised ids, and the comparison report.
 
 Unchanged and untouched: the one-time legacy rekey (`--rekey-coleman`), `reload_keyed`
-ownership, admin-override replay and every database write. The loader remains the writer until
-the V2 publisher exists.
+ownership, admin-override replay and every write to `award_winners`. The loader remains the only
+writer of the Coleman `award_winners` rows; the V2 publisher writes only `derived_award_results`.
 
 ## Consequences
 
-`@afldb/derived` now exports the Coleman derivation and comparison report. The derivation has
-been exercised on SYNTHETIC inputs only: there is no committed per-match goal data in the
-repository, so no real season has been derived or compared in V2 yet. Publication (the audited,
-transactional write) is a later step and is not implemented here.
+`@afldb/derived` exports the Coleman derivation, the comparison report and the audited publisher.
+The derivation and the publisher have been exercised on SYNTHETIC inputs only: there is no
+committed per-match goal data in the repository, so no real season has been derived, compared or
+published in V2.
+
+Migration 112, its grants and the publisher's SQL were EXECUTED ONLY ON IN-MEMORY PGLITE over
+labelled stub prerequisites (`auth_users`, `players`, `award_winners`, three stub roles); they are
+UNEXECUTED ON POSTGRESQL (no database is reachable from the V2 workstation). The real roles,
+`afldb_meta`, `npm run db:privileges` and the promotion inventory have not seen migration 112; the
+new case in `tests/integration/privileges.test.ts` is unexecuted (it needs a database migrated
+through 112). Deploy order, when the owner takes this to a database: apply 112, then
+`npm run db:privileges`, then deploy code.
+
+No admin route, server action or package script calls the publisher: a server-only production
+wiring (a postgres.js executor from `postgresExecutor`) and the admin surface are Stage 5. Until
+then nothing publishes.

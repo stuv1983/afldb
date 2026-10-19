@@ -48,6 +48,24 @@ export {
   type ColemanReportStoredRow,
   type ColemanStoredWinner,
 } from './coleman-comparison';
+// @v2-stage4:coleman-publication
+export {
+  COLEMAN_AWARD_SLUG,
+  COLEMAN_PUBLICATION_CAPABILITY,
+  COLEMAN_PUBLICATION_REFUSAL_CODES,
+  COLEMAN_PUBLICATION_WORKFLOW,
+  checkColemanPublication,
+  planColemanPublication,
+  publishColemanResult,
+  type ColemanCurrentPublication,
+  type ColemanPublicationAudit,
+  type ColemanPublicationGate,
+  type ColemanPublicationOutcome,
+  type ColemanPublicationPlan,
+  type ColemanPublicationRefusal,
+  type ColemanPublicationRefusalCode,
+  type ColemanPublicationRequest,
+} from './coleman-publication';
 // @v2-stage4:brownlow-reconciliation
 export * from './brownlow-reconciliation';
 export * from './brownlow-reconciliation-report';

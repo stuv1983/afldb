@@ -41,6 +41,7 @@ append-only audit row in the same transaction (`docs/v2/provenance.md` §4-5):
 | AFL API player identity adjudication | `afl_api_identity_adjudications` (104, 106) |
 | Brownlow authority and vote entry | `brownlow_season_authority`, `brownlow_vote_entry_state` (094), audited in `data_edits` |
 | user-submitted CSV correction, promoted by an admin | `data_submissions`, `data_submission_rows` (023) |
+| publication of a derived award result (Coleman Medal), by the V2 Coleman publisher (super admin, `data.awards.edit`) | `derived_award_results` (112): append-only, the season seal's audit record in `correction` (workflow `derived_award_publication`), a recompute after a corrected fact is a NEW row whose `supersedes_id` names the old |
 
 Anything else that changes a sealed row (a bulk reload, an ad hoc SQL fix, a restore from the
 wrong dump) is a **violation**, even if the new value is right: it must be reconciled (section

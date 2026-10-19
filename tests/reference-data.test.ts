@@ -466,6 +466,14 @@ describe('load_reference_data.py', () => {
         // the column-scoped Data Editor upsert capability, and keeps the
         // table outside afldb_meta.import_writable_tables.
         'data_overrides',
+        // 112 (AFLDB V2 Stage 4, derived awards). The append-only ledger of published
+        // derivations (today the Coleman Medal). It carries NO foreign key into awards,
+        // players, clubs, matches or award_winners (only auth_users and itself), so it
+        // sits outside the reference loader's FK cascade closure. Not registered
+        // import-writable: it is append-only by grant (SELECT, INSERT and the sequence,
+        // re-granted in privileges.sql); the registry loop would restore
+        // UPDATE/DELETE/TRUNCATE on every reconcile.
+        'derived_award_results',
         // 080 (AFLDB-ISSUE-118). The external grid corpus: immutable
         // captured evidence, append-only by grant (SELECT/INSERT plus the
         // one is_current column), never registered for import write. It is
