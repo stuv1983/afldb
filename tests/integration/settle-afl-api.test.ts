@@ -157,7 +157,13 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-const REAL_MATCH_ID = 'CD_M20260142801';
+/**
+ * Raw AFL API provider JSON as the fixtures mutate it: deep, schemaless property writes on cloned
+ * payloads. One alias so the escape hatch is declared once, here, and nowhere else.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- schemaless provider JSON, mutated in place by the cases
+type RawJson = Record<string, any>;
+
 /** This suite's own namespace. Appears nowhere else in the repository. */
 const NS = 'CD_M2026ISSUE228';
 const SEASON = 2026;
@@ -208,11 +214,11 @@ const UNBRIDGED_PROVIDER_PLAYER_ID = 'CD_I500001'; // "Test Forward", away side 
  * `unproved_match_date`.
  */
 function unitSourceFor(providerMatchId: string, mutate?: (raw: {
-  fixture: Record<string, any>; roster: Record<string, any>; stats: Record<string, any>;
+  fixture: RawJson; roster: RawJson; stats: RawJson;
 }) => void): AflApiSettleUnitSource {
-  const fixture = clone(readFixture('01-fixture-result.json')) as Record<string, any>;
-  const roster = clone(readFixture('03-match-roster.raw.json')) as Record<string, any>;
-  const stats = clone(readFixture('02-player-stats.raw.json')) as Record<string, any>;
+  const fixture = clone(readFixture('01-fixture-result.json')) as RawJson;
+  const roster = clone(readFixture('03-match-roster.raw.json')) as RawJson;
+  const stats = clone(readFixture('02-player-stats.raw.json')) as RawJson;
   const matchDate = matchDateFor(providerMatchId);
 
   fixture.providerId = providerMatchId;
@@ -446,7 +452,7 @@ const KEEPALIVE_MATCH_KEY = `${NS}-keepalive`;
  * family's own round (grepped: only the Brownlow path reads it), but both
  * are set for internal consistency of the fixture.
  */
-function toHomeAndAwayRound(raw: { fixture: Record<string, any>; roster: Record<string, any> }): void {
+function toHomeAndAwayRound(raw: { fixture: RawJson; roster: RawJson }): void {
   raw.fixture.round = { ...raw.fixture.round, abbreviation: 'Rd 1', name: 'Round 1', roundNumber: 1 };
   raw.roster.matchRoster.roundNumber = 1;
 }
@@ -2884,7 +2890,7 @@ async function identityFindingsFor(providerId: string): Promise<ApplyFindingRow[
 /** The unit for `providerId` with its match date replaced (both halves, so §11.1's cross-check still proves it). */
 function sourceWithMatchDate(
   providerId: string, matchDate: string,
-  extra?: (raw: { fixture: Record<string, any>; roster: Record<string, any>; stats: Record<string, any> }) => void,
+  extra?: (raw: { fixture: RawJson; roster: RawJson; stats: RawJson }) => void,
 ): AflApiSettleUnitSource {
   return unitSourceFor(providerId, (raw) => {
     raw.fixture.utcStartTime = `${matchDate}T07:15:00.000+0000`;
@@ -2907,8 +2913,8 @@ function f010Options(
   };
 }
 
-async function matchRowByKey(matchKey: string): Promise<Record<string, any>> {
-  const [row] = await sql<{ snapshot: Record<string, any> }[]>`
+async function matchRowByKey(matchKey: string): Promise<RawJson> {
+  const [row] = await sql<{ snapshot: RawJson }[]>`
     SELECT to_jsonb(m) AS snapshot FROM matches m WHERE m.match_key = ${matchKey}
   `;
   expect(row).toBeDefined();
@@ -2932,8 +2938,9 @@ describe('AFLDB-ISSUE-257 §17.8 — Match Sheet authority over an afl_api-owned
 
     const providerId = CASE_IDS.matchSheetAuthority;
     const matchKey = matchKeyFor(providerId);
-    const [actor] = await sql<{ id: number }[]>`SELECT id FROM auth_users ORDER BY id LIMIT 1`;
-    const adminUserId = actor?.id ?? await seedS6Actor(sql);
+    // The suite's own disabled fixture actor, never an arbitrary existing account (ISSUE-235 S6:
+    // a rebuilt afldb_test has zero auth_users; tests/player-link-mutations.test.ts I14 pins this).
+    const adminUserId = await seedS6Actor(sql);
     const priorImportUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
     process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
 
@@ -3034,7 +3041,7 @@ describe('AFLDB-ISSUE-244 I244-F010 — identity-bearing corrections are withhel
     expect(created.counters.canonicalRowsInserted).toBeGreaterThan(0);
     expect(await identityFindingsFor(providerId)).toHaveLength(0);
     const before = await canonicalSnapshot(keyA, providerId);
-    const matchRow = before.match as Record<string, any>;
+    const matchRow = before.match as RawJson;
     expect(matchRow.match_key).toBe(keyA);
     expect(String(matchRow.match_date)).toBe(matchDateFor(providerId));
 
@@ -3093,7 +3100,7 @@ describe('AFLDB-ISSUE-244 I244-F010 — identity-bearing corrections are withhel
     // PARTIAL: the same corrected date arrives together with a score correction. The non-identity
     // part applies (and recomputes derived state); the date is still withheld and the key still
     // renders the row.
-    const withScore = (raw: { fixture: Record<string, any> }) => {
+    const withScore = (raw: { fixture: RawJson }) => {
       raw.fixture.home.score = { goals: 23, behinds: 12, totalScore: 150, superGoals: 0 };
     };
     const partial = await runSettleAflApi(sql, f010Options(providerId, 'partial', correctedDate(withScore)));
@@ -3183,8 +3190,8 @@ describe('AFLDB-ISSUE-244 I244-F010 — identity-bearing corrections are withhel
     }, other);
     const targetBefore = await canonicalSnapshot(keyTarget, target);
     const otherBefore = await canonicalSnapshot(keyOther, other);
-    const targetId = (targetBefore.match as Record<string, any>).id as number;
-    const otherId = (otherBefore.match as Record<string, any>).id as number;
+    const targetId = (targetBefore.match as RawJson).id as number;
+    const otherId = (otherBefore.match as RawJson).id as number;
     expect(targetId).not.toBe(otherId);
 
     // COLLISION — the provider now says the target match is played on the OTHER match's date, so
@@ -3675,10 +3682,10 @@ describe('AFLDB-ISSUE-244 I244-F030 — an unresolved record vs a canonical fixt
     const other = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, { max: 1, onnotice: () => {} });
     try {
       let raced: { id: number; matchKey: string } | null = null;
-      let racedSnapshot: Record<string, any> | null = null;
+      let racedSnapshot: RawJson | null = null;
       const wrapped = sqlCommittingAfterPlanning(sql, async () => {
         raced = await seedCanonicalMatch(other, F030_SEEDS.raceForeign);
-        const [row] = await other<{ snapshot: Record<string, any> }[]>`
+        const [row] = await other<{ snapshot: RawJson }[]>`
           SELECT to_jsonb(m) AS snapshot FROM matches m WHERE m.id = ${raced.id}
         `;
         racedSnapshot = row.snapshot;

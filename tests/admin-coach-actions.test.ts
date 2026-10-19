@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { isAllowedRevalidatePath } from '@/app/admin/coaches/revalidate-paths';
 import { optionalText, parseAssignments, parsePositiveInt } from '@/app/admin/coaches/validation';
@@ -9,6 +9,15 @@ import {
   createCoach,
   saveCoachMetadata,
 } from '@/db/queries/admin-coaches';
+
+// A DB-free unit file: the paths under test refuse before any query. `@/db/client` builds its pool
+// at import and throws without DATABASE_URL, which the D5 test-DSN policy removes when no test
+// database is configured, so the module is replaced; a test that reached the database would throw.
+vi.mock('@/db/client', () => ({
+  sql: () => {
+    throw new Error('DB-free unit test reached the database client');
+  },
+}));
 
 /**
  * Admin action unit contracts for coach administration (AFLDB-ISSUE-159

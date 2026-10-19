@@ -200,6 +200,11 @@ describe('parseSiteSettings', () => {
       pageIntros: DEFAULT_PAGE_INTROS,
       frontendTheme: DEFAULT_SITE_THEME,
       frontendLayout: DEFAULT_SITE_LAYOUT,
+      // The AFL API write-path switches default OFF (src/lib/site-settings.ts: they gate a WRITE
+      // path and must never fail open). Pinned as literals so a default that silently turned
+      // acquisition on would fail here.
+      aflApiCurrentSeasonEnabled: false,
+      aflApiBrownlowEnabled: false,
     });
   });
 
