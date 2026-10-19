@@ -26,7 +26,7 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 | 2 Historical baseline | done; closure verified, its MED fixed | `80e110d6`, `a4b2c8d8` (closure fix) |
 | 3 AFL API pipeline | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch B) | b87a980e, fdd08ca3, 7c2db0d5, a7738391 + this progress commit |
 | 4 Derived + curated | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch C) | `fad164cd`, `4c34be93`, `ddb42525`, `498fd46d`, `034f6947`, `4c54e0d9`, `1374fc13` + this closure commit |
-| 5 Admin | done; stage-close checks pass; afldb-closure pending (Launch D) | `68a026e2`, `458abe68` + this documents commit |
+| 5 Admin | done; afldb-closure PASS_WITH_FINDINGS (LOW/INFO only) (Launch D) | `68a026e2`, `458abe68`, `74d4b007` + this closure commit |
 | 6 | not started (Launch E) | — |
 
 ## Stage 0 — evidence
@@ -332,9 +332,24 @@ Stage-close results (orchestrator, committed tree plus these documents, DSN vari
 | frozen ISSUE-316 files | source: 19 of 19 sha256 match the snapshot; V2: 18 of 19 equal the source, `CHANGELOG.md` differs by design |
 | source worktree status | differs from the snapshot only by `?? supplies` |
 
+`afldb-closure` (`.phaneslight/returns/launchD-20261019/04-closure-stage5.md`) re-derived every
+check independently, ran no network or database command, and returned **PASS_WITH_FINDINGS**: tsc
+0; focused 13 files 1034 passed, 5 failed (all baseline lines of `tests/current-season-import.test.ts`);
+full suite identical to the above (102 `FAIL` lines byte-identical to the baseline); ESLint 253/132,
+0/0 on the 55 created or edited files; both generators and `next typegen` 0; frozen hashes as above;
+deploy untouched; refusal contract and operations-centre guards confirmed from code; no drift;
+the offline re-capture reproduced 0 blocked requests and 0px overflow. Visual verdict: **VISUAL:
+UNVERIFIED**. Findings, none creating work: C5-001 (LOW: the 1 MiB proposal-file cap equals the
+framework's default server-action body limit, so a file near the cap gets a generic framework
+error rather than the field message, `src/app/admin/operations/form.ts:23`); C5-002 (LOW: the
+Coleman read precedes the publisher's transaction, R-035); C5-003 (INFO: the email-intake route
+answers 410 to any caller by design, R-031); C5-004 (LOW: the email-intake refusal reads "Use
+instead: nothing: ...", `packages/domain/src/legacy-retirement.ts`); C5-005 (INFO: this row, now
+updated). Not run by closure: `npm run build` (could reach a database), integration suites.
+
 ## Resumption point
 
-Stage 5 is done (closure result recorded above once it returns). **Launch E starts Stage 6**
+Stage 5 is done (closure PASS_WITH_FINDINGS, LOW/INFO only). **Launch E starts Stage 6**
 (final stage): parity and comparison tooling, shadow-run commands, cutover runbooks, the go/no-go
 record, the risk register and final closure. Read `docs/v2/plan.md` (stage 6 row, §7 R-030 to
 R-041), this file, `docs/v2/known-gaps.md` (the cutover blockers V2-GAP-008, 011 and 013; the
