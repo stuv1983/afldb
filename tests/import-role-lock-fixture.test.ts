@@ -242,8 +242,10 @@ describe('ISSUE-274 D-274-2 — the integration file carries the marker on every
   });
 
   it('the lock proof and identity assertions are in place', () => {
-    expect(source).toContain("expect(ownerIdentity).toMatchObject({ database: 'afldb_test', currentUser: 'afldb_owner', sessionUser: 'afldb_owner' });");
-    expect(source).toContain("database: 'afldb_test', currentUser: 'afldb_import', sessionUser: 'afldb_import', superuser: false,");
+    expect(source).toContain("expect(ownerIdentity).toMatchObject({ database, currentUser: 'afldb_owner', sessionUser: 'afldb_owner' });");
+    expect(source).toContain("database, currentUser: 'afldb_import', sessionUser: 'afldb_import', superuser: false,");
+    expect(source).toContain('await verifyIsolatedIntegrationDatabase(owner)');
+    expect(source).toContain('await verifyIsolatedIntegrationDatabase(role)');
     expect(source).toContain('SELECT id::int AS id FROM matches WHERE match_key = ${MATCH_KEY} FOR NO KEY UPDATE');
     expect(source).toContain("FOR UPDATE NOWAIT`");
     expect(source).toContain(".toBe('55P03');");

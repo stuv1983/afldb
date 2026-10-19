@@ -28,6 +28,10 @@ commit.
   points, and prevented the offline Coleman bootstrap from overwriting canonical publications.
 - Repaired historical integration fixtures, live isolated-target proofs and checkout-portable
   frozen DraftGuru verification. Added migration 115 for the missing adjudication FK index.
+- Retained the authentic release bridge across importer tests, corrected the independent draft
+  oracle to count eligible people rather than list moves/repeated picks, and made ledger fixture
+  ordering numeric across ID-width boundaries. Strict historical membership failures remain
+  tracked under V2-GAP-029 instead of being blindly repinned.
 - Rehearsed previous/V2 standalone application rollback locally, inspected all 26 existing
   admin captures, corrected Brownlow status/publication wording and recaptured affected screens.
   Release evidence and remaining gates: `docs/v2/local-release-review.md`. Production stays NO-GO.

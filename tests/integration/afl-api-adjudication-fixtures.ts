@@ -354,7 +354,7 @@ export async function s6LedgerRows(db: Db, providerIds: readonly string[]): Prom
            admin_user_id AS "adminUserId", note
       FROM afl_api_identity_adjudications
      WHERE external_id = ANY(${providerIds as string[]}::text[])
-     ORDER BY id
+     ORDER BY afl_api_identity_adjudications.id
   `;
   return rows.map((r) => ({
     ...r, id: Number(r.id), supersedesId: r.supersedesId === null ? null : Number(r.supersedesId),
