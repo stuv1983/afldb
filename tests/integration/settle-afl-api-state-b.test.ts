@@ -44,6 +44,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { loadMatchSheetStaleToken, saveMatchSheet } from '@/db/queries/match-sheet';
 import { playerMatchStatsAuthorityStorable } from '@/lib/acquisition/manual-authority';
+import { requireAflApiBrownlowBacktestDatabase } from '@/lib/acquisition/afl-api-brownlow';
 import { parseAflApiIdentities, type AflApiIdentities } from '@/lib/acquisition/afl-api-bundle';
 import {
   buildAflApiSettleBundle,
@@ -280,7 +281,7 @@ let setupOk = false;
 beforeAll(async () => {
   // ---- assert the target and the roles BEFORE any write ----
   const [id] = await sql<{ db: string; user: string }[]>`SELECT current_database() AS db, current_user AS "user"`;
-  if (id.db !== 'afldb_test') throw new Error(`Refusing to run: connected to '${id.db}', not afldb_test.`);
+  await requireAflApiBrownlowBacktestDatabase(sql);
   if (id.user !== 'afldb_owner') throw new Error(`Refusing to run: connected as '${id.user}', not afldb_owner.`);
   const roles = (await sql<{ rolname: string }[]>`SELECT rolname FROM pg_roles WHERE rolname = ANY(${REQUIRED_ROLES}::text[])`)
     .map((r) => r.rolname).sort();

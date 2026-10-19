@@ -5985,10 +5985,10 @@ describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
         expect(start).toBeGreaterThan(0);
         const block = settle.slice(start, settle.indexOf('\n      }', start));
         const order = [
-          'recomputeSeasonMetadata(tx, bundle.season)',
-          'recomputeClubSeasons(tx, bundle.season)',
-          'recomputePlayerDerivedStats(tx, playerIds, bundle.season)',
-          'recomputeSeasonBrownlowStatus(tx, bundle.season)',
+          'recomputeSeasonMetadata(scope, bundle.season)',
+          'recomputeClubSeasons(scope, bundle.season)',
+          'recomputePlayerDerivedStats(scope, playerIds, bundle.season)',
+          'recomputeSeasonBrownlowStatus(scope, bundle.season)',
         ];
         let cursor = 0;
         for (const call of order) {

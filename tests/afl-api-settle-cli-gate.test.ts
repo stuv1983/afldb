@@ -31,6 +31,15 @@ import {
   afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
+const ISOLATED_CLI_DATABASE = 'afldb_v2_cli_test';
+beforeEach(() => {
+  vi.stubEnv('AFLDB_TEST_DATABASE_URL', `postgresql://test:test@127.0.0.1:55432/${ISOLATED_CLI_DATABASE}`);
+  vi.stubEnv('AFLDB_V2_ISOLATED_PORT', '55432');
+  vi.stubEnv('AFLDB_V2_ISOLATED_PG', '1');
+});
+afterEach(() => vi.unstubAllEnvs());
+const isolatedFacts = async () => [{ cluster_name: 'afldb_v2_isolated', database_comment: 'afldb-v2-isolated-test' }];
+
 import { SealedSeasonRefusal } from '@afldb/domain';
 import { AflApiBrownlowFixtureIdentityRequiredError, BROWNLOW_ENABLE_ENV } from '@/lib/acquisition/afl-api-brownlow';
 import {
@@ -476,7 +485,7 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-ident
 
   /** `typedProviderIds` are the provider match ids that HAVE a typed
    * `staging.afl_api_match` row; every other id has none. */
-  function makeIdentitySql(typedProviderIds: readonly string[], databaseName = 'afldb_test') {
+  function makeIdentitySql(typedProviderIds: readonly string[], databaseName = ISOLATED_CLI_DATABASE) {
     const state = { writeBoundaryReached: false, queries: 0 };
     const fn = async (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> => {
       state.queries += 1;
@@ -497,7 +506,7 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-ident
       state.writeBoundaryReached = true;
       throw new WriteBoundaryReached('the run was allowed to start');
     };
-    return { sql: Object.assign(fn, { begin }) as unknown as postgres.Sql, state };
+    return { sql: Object.assign(fn, { begin, unsafe: isolatedFacts }) as unknown as postgres.Sql, state };
   }
 
   const REFUSED_MODES: readonly { flags: readonly string[]; mode: 'apply' | 'dry-run' }[] = [
@@ -613,7 +622,7 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-ident
 
   it('the backtest authority does not bypass the identity requirement on afldb_test', async () => {
     const { projectRoot, label } = setupVoteSnapshot(['CD_M_CORROBORATED_1']);
-    const { sql, state } = makeIdentitySql([], 'afldb_test');
+    const { sql, state } = makeIdentitySql([], ISOLATED_CLI_DATABASE);
 
     const error = await runAflApiBrownlowSettleCli(
       ['--label', label, '--apply', '--auto-apply', '--allow-completed-season-backtest'],
@@ -844,7 +853,7 @@ describe('V2-GAP-006 — the seal on historical seasons at the three AFL API set
       boundary.reached = true;
       throw new BacktestWriteBoundary('past the backtest proof');
     };
-    return { sql: Object.assign(fn, { begin }) as unknown as postgres.Sql, boundary };
+    return { sql: Object.assign(fn, { begin, unsafe: isolatedFacts }) as unknown as postgres.Sql, boundary };
   }
 
   it('settle-afl-api-brownlow --allow-completed-season-backtest keeps the afldb_test refusal reason for a sealed season', async () => {
@@ -863,7 +872,7 @@ describe('V2-GAP-006 — the seal on historical seasons at the three AFL API set
 
   it('settle-afl-api-brownlow --allow-completed-season-backtest admits a sealed season ONLY after the afldb_test proof, on a logged basis', async () => {
     const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
-    const { sql, boundary } = makeBacktestSql('afldb_test');
+    const { sql, boundary } = makeBacktestSql(ISOLATED_CLI_DATABASE);
     const lines: string[] = [];
 
     await expect(runAflApiBrownlowSettleCli(
@@ -872,7 +881,7 @@ describe('V2-GAP-006 — the seal on historical seasons at the three AFL API set
     )).rejects.toThrow(BacktestWriteBoundary);
 
     const output = lines.join('\n');
-    expect(output).toContain('database: afldb_test');
+    expect(output).toContain(`database: ${ISOLATED_CLI_DATABASE}`);
     expect(output).toContain("SEALED SEASON 2025 admitted on basis 'test_database_backtest'");
     expect(output).toContain('not an audited correction');
     expect(boundary.reached).toBe(true);

@@ -172,11 +172,11 @@ export { BROWNLOW_ENABLE_ENV, isAflApiBrownlowEnabled } from './afl-api-acquisit
  * any canonical write is attempted.
  * ------------------------------------------------------------------ */
 
-export const BROWNLOW_BACKTEST_DATABASE = 'afldb_test' as const;
+import { checkIsolatedTestDsn, checkIsolatedTestServer, ISOLATED_SERVER_FACTS_SQL } from '@afldb/domain';
 
 export type AflApiBrownlowCompletedSeasonBacktestAuthority = {
   readonly kind: 'allow-completed-season-backtest';
-  readonly verifiedDatabase: typeof BROWNLOW_BACKTEST_DATABASE;
+  readonly verifiedDatabase: string;
 };
 
 /**
@@ -190,14 +190,23 @@ export async function requireAflApiBrownlowBacktestDatabase(
 ): Promise<AflApiBrownlowCompletedSeasonBacktestAuthority> {
   const [row] = await sql<{ name: string }[]>`SELECT current_database() AS name`;
   const connected = row?.name ?? 'unknown';
-  if (connected !== BROWNLOW_BACKTEST_DATABASE) {
-    throw new Error(
-      `--allow-completed-season-backtest refused: connected database is '${connected}', not `
-      + `'${BROWNLOW_BACKTEST_DATABASE}'. The completed-season Brownlow backtest bypass is `
-      + `authorised for '${BROWNLOW_BACKTEST_DATABASE}' only.`,
-    );
+  const dsn = process.env.AFLDB_TEST_DATABASE_URL ?? '';
+  const findings = checkIsolatedTestDsn(dsn, Number(process.env.AFLDB_V2_ISOLATED_PORT));
+  if (process.env.AFLDB_V2_ISOLATED_PG !== '1') findings.push({ check: 'runner', detail: 'isolated runner required' });
+  if (findings.length === 0 && connected !== decodeURIComponent(new URL(dsn).pathname.slice(1))) {
+    findings.push({ check: 'current_database', detail: 'live database differs from the approved DSN' });
   }
-  return { kind: 'allow-completed-season-backtest', verifiedDatabase: BROWNLOW_BACKTEST_DATABASE };
+  if (findings.length === 0) {
+    const [facts] = await sql.unsafe(ISOLATED_SERVER_FACTS_SQL);
+    const database = decodeURIComponent(new URL(dsn).pathname.slice(1));
+    findings.push(...checkIsolatedTestServer(database, {
+      clusterName: facts?.cluster_name ?? null,
+      databaseComment: facts?.database_comment ?? null,
+      currentDatabase: connected,
+    }));
+  }
+  if (findings.length) throw new Error(`--allow-completed-season-backtest refused: connected database is '${connected}'; ${findings.map((f) => f.check).join(', ')}`);
+  return { kind: 'allow-completed-season-backtest', verifiedDatabase: connected };
 }
 
 /**

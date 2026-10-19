@@ -556,7 +556,7 @@ describe('ISSUE-274 §20 — the cleanup gate stops every fixture removal after 
         // The editor-override and deletion assertions are still present.
         expect(matchesOnly).toContain('expect((await matchRow122(f.matchKey))?.homeScore).toBe(112);');
         expect(matchesOnly).toContain('expect(await matchRow122(f.matchKey)).toBeUndefined();');
-        expect(matchesOnly.split('expect(run.counters.canonicalRowsUpdated).toBe(0);').length - 1).toBe(2);
+        expect(matchesOnly.split('expect(run.counters.canonicalRowsUpdated).toBe(0);').length - 1).toBe(3);
       });
     });
 

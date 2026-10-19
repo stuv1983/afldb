@@ -1,4 +1,4 @@
-import './guard';
+import { verifyIsolatedIntegrationDatabase } from './guard';
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -42,8 +42,7 @@ let fixtureAdminId = 0;
 
 beforeAll(async () => {
   ownerSql = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, { max: 1, onnotice: () => {} });
-  const [db] = await ownerSql<{ db: string }[]>`SELECT current_database() AS db`;
-  if (db.db !== 'afldb_test') throw new Error(`REFUSED: connected to ${db.db}, not afldb_test`);
+  await verifyIsolatedIntegrationDatabase(ownerSql);
   // A per-run user, removed (with its audit rows) in afterAll.
   const [created] = await ownerSql<{ id: number }[]>`
     INSERT INTO auth_users (email, role) VALUES (${FIXTURE_EMAIL}, 'super_admin')

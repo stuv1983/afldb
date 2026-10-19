@@ -617,7 +617,8 @@ exporter_targets = exporter_target_labels()
 check("6.16 both target labels are the exporter's own TARGET_DSN_ENV keys, and the exporter "
       "has no PROD target either",
       tool.DEV_TARGET_LABEL == "dev" and tool.TEST_TARGET_LABEL == "afldb_test"
-      and {spec["child_target"] for spec in tool.TARGET_SPECS.values()} == exporter_targets
+      and {spec["child_target"] for spec in tool.TARGET_SPECS.values()} == exporter_targets - {"isolated"}
+      and exporter_targets == {"dev", "afldb_test", "isolated"}
       and "prod" not in exporter_targets and "prod" not in tool.TARGET_SPECS,
       str(sorted(exporter_targets)))
 check("6.16a the dev expectation differs from the test expectation only in the target label "

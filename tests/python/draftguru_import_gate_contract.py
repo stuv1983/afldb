@@ -984,7 +984,7 @@ def exporter_target_labels() -> dict:
 exporter = exporter_target_labels()
 check("8b.5 every target's child_target is one of the exporter's own TARGET_DSN_ENV labels, and "
       "each label's exporter database equals this target's physical database",
-      exporter == {"afldb_test": "afldb_test", "dev": "afldb_dev"}
+      exporter == {"afldb_test": "afldb_test", "dev": "afldb_dev", "isolated": None}
       and all(cfg["child_target"] in exporter
               and exporter[cfg["child_target"]] == cfg["database"]
               for cfg in tool.TARGETS.values())

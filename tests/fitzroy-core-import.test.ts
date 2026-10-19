@@ -1725,8 +1725,7 @@ describe('fitzRoy source row corrections', () => {
     join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
   const rules = contract.source_row_corrections.rules;
   const SNAP = join(root, 'data', 'sources', 'afltables', 'fitzroy_core',
-    'full-history-20260827');
-  const hasSnapshot = existsSync(join(SNAP, 'player_stats_1909.csv'));
+    'full-history-20260902');
 
   const OLDER = 'https://afltables.com/afl/stats/players/J/Jim_Stewart0.html';
   const YOUNGER = 'https://afltables.com/afl/stats/players/J/Jim_Stewart1.html';
@@ -1804,7 +1803,7 @@ describe('fitzRoy source row corrections', () => {
     expect(new Set(urls).size).toBe(2);
   });
 
-  it.skipIf(!hasSnapshot)('leaves exactly the two genuine Round 10 rows', () => {
+  it('leaves exactly the two genuine Round 10 rows', () => {
     const r10 = corrected1909().filter(
       (r) => r.url.includes('Jim_Stewart') && r.Round === '10');
     expect(r10).toHaveLength(2);
@@ -1828,7 +1827,7 @@ describe('fitzRoy source row corrections', () => {
     expect(older.ID).not.toBe(younger.ID);
   });
 
-  it.skipIf(!hasSnapshot)('leaves the younger player\'s other appearances untouched', () => {
+  it('leaves the younger player\'s other appearances untouched', () => {
     const mine = corrected1909().filter((r) => r.url === YOUNGER);
     // R10 (career game 1) and R11 (career game 2) — already correct in the source
     expect(mine.map((r) => r.Round).sort()).toEqual(['10', '11']);
@@ -1836,7 +1835,7 @@ describe('fitzRoy source row corrections', () => {
     for (const row of mine) expect(row.ID).toBe('5685');
   });
 
-  it.skipIf(!hasSnapshot)('corrects exactly two rows and nothing else in 1909', () => {
+  it('corrects exactly two rows and nothing else in 1909', () => {
     const before = readFileSync(join(SNAP, 'player_stats_1909.csv'), 'utf8')
       .split('\n').filter((l) => l.trim()).length - 1;
     expect(before - corrected1909().length).toBe(2);
@@ -2037,10 +2036,9 @@ describe.skipIf(!canSpawn)('blank Player fallback', () => {
   });
 
   const SNAP = join(root, 'data', 'sources', 'afltables', 'fitzroy_core',
-    'full-history-20260827');
-  const hasSnapshot = existsSync(join(SNAP, 'player_stats_2025.csv'));
+    'full-history-20260902');
 
-  it.skipIf(!hasSnapshot)('covers the four real 2025 players, retaining all 79 rows', () => {
+  it('covers the four real 2025 players, retaining all 79 rows', () => {
     const text = readFileSync(join(SNAP, 'player_stats_2025.csv'), 'utf8');
     const lines = text.split('\n').map((l) => l.replace(/\r$/, '')).filter((l) => l.trim());
     const parse = (line: string): string[] => {

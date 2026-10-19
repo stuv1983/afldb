@@ -58,6 +58,7 @@ describe('admin match mutation source contracts', () => {
 
     expect([...writers].sort()).toEqual([
       'src/db/queries/admin-brownlow.ts',
+      'src/db/queries/brownlow-eligibility.ts',
       'src/lib/acquisition/canonical-apply.ts',
     ]);
   });

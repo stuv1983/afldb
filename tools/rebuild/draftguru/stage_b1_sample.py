@@ -647,6 +647,20 @@ def print_summary(payload: dict, *, sample_path: Path, sample_sha: str,
     print(f"sample.json sha256   : {sample_sha}")
 
 
+def portable_sample_bytes(data: bytes, label: str) -> bytes:
+    """Ignore only a checkout prefix on the default residual input locator.
+
+    Every content hash, cohort, selected identity and provenance field is still
+    compared. Custom input locations retain their exact locator contract.
+    """
+    payload = json.loads(data.decode("utf-8"))
+    locator = payload.get("residual_input", {}).get("path", "")
+    suffix = f"{label}/input/residual_player_urls.txt"
+    if locator.replace("\\", "/").endswith("/" + suffix) or locator == suffix:
+        payload["residual_input"]["path"] = suffix
+    return dump_bytes(payload)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--label", required=True,
@@ -700,8 +714,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.validate_only:
             if existing is None:
                 print("VALIDATE-ONLY: sample is internally valid; no sample.json on disk yet")
-            elif existing == data:
-                print("VALIDATE-ONLY: on-disk sample.json is byte-identical to a fresh build")
+            elif portable_sample_bytes(existing, args.label) == portable_sample_bytes(data, args.label):
+                print("VALIDATE-ONLY: on-disk sample.json is byte-identical after checkout-locator normalization")
             else:
                 raise SampleError(
                     f"on-disk sample.json differs from a fresh deterministic build "

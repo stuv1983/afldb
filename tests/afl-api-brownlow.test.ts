@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import type postgres from 'postgres';
 import {
-  beforeEach, describe, expect, it, vi,
+  afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
 import {
@@ -138,30 +138,55 @@ describe('isAflApiBrownlowEnabled (AFLDB-ISSUE-228 §10 "Operational enablement"
 });
 
 describe('requireAflApiBrownlowBacktestDatabase (AFLDB-ISSUE-228 §10 follow-up: completed-season backtest)', () => {
+  afterEach(() => vi.unstubAllEnvs());
   /** A minimal stand-in for `postgres.Sql`: called as a tagged template,
    * returning whatever `SELECT current_database() AS name` would. No real
    * connection is opened — this is exactly item #9 of the backtest test
    * plan ("test the guard/parser/helper directly", not a real non-afldb_test
    * database). */
   function fakeSql(name: string): postgres.Sql {
-    return (async () => [{ name }]) as unknown as postgres.Sql;
+    return Object.assign(async () => [{ name }], {
+      unsafe: async () => [{ cluster_name: 'afldb_v2_isolated', database_comment: 'afldb-v2-isolated-test' }],
+    }) as unknown as postgres.Sql;
   }
 
-  it('grants the authority when the live connection reports afldb_test', async () => {
-    const authority = await requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_test'));
-    expect(authority).toEqual({ kind: 'allow-completed-season-backtest', verifiedDatabase: 'afldb_test' });
+  beforeEach(() => {
+    vi.stubEnv('AFLDB_TEST_DATABASE_URL', 'postgresql://test:test@127.0.0.1:55432/afldb_v2_backtest_test');
+    vi.stubEnv('AFLDB_V2_ISOLATED_PORT', '55432');
+    vi.stubEnv('AFLDB_V2_ISOLATED_PG', '1');
+  });
+
+  it('grants authority only after the isolated DSN and live server proofs', async () => {
+    const authority = await requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_v2_backtest_test'));
+    expect(authority).toEqual({ kind: 'allow-completed-season-backtest', verifiedDatabase: 'afldb_v2_backtest_test' });
+  });
+
+  it.each([
+    'postgresql://test:test@remote.invalid:55432/afldb_v2_backtest_test',
+    'postgresql://test:test@127.0.0.1:5432/afldb_v2_backtest_test',
+    'postgresql://test:test@127.0.0.1:55432/afldb_v2_backtest',
+    'postgresql://test:test@127.0.0.1:55432/afldb_v2_backtest_test?host=remote.invalid',
+  ])('refuses unsafe connection metadata before granting an authority (%s)', async (dsn) => {
+    vi.stubEnv('AFLDB_TEST_DATABASE_URL', dsn);
+    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_v2_backtest_test'))).rejects.toThrow(/refused/);
+  });
+
+  it.each(['cluster_name', 'database_comment'])('refuses an incorrect live %s', async (field) => {
+    const sql = fakeSql('afldb_v2_backtest_test');
+    sql.unsafe = (async () => [{ cluster_name: 'afldb_v2_isolated', database_comment: 'afldb-v2-isolated-test', [field]: 'wrong' }]) as unknown as typeof sql.unsafe;
+    await expect(requireAflApiBrownlowBacktestDatabase(sql)).rejects.toThrow(/refused/);
   });
 
   it('hard refuses for afldb_dev — never trusting anything but the live current_database() read', async () => {
-    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_dev'))).rejects.toThrow(/afldb_dev/);
+    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_dev'))).rejects.toThrow(/current_database/);
   });
 
   it('hard refuses for production', async () => {
-    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_prod'))).rejects.toThrow(/afldb_prod/);
+    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_prod'))).rejects.toThrow(/current_database/);
   });
 
   it('hard refuses for any other database name, never partial-matching "afldb_test"', async () => {
-    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_test_old'))).rejects.toThrow(/afldb_test_old/);
+    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_test_old'))).rejects.toThrow(/current_database/);
   });
 });
 

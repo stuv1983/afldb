@@ -236,6 +236,14 @@ beforeAll(async () => {
 
   identitylessPlayerId = await createPlayer(`${MARKER} No Identity`);
 
+  // The latest registered season may have no played matches. Seed known appearances
+  // for identified fixture players rather than relying on mutable historical coverage.
+  for (const suffix of ['Appearance One', 'Appearance Two']) {
+    const playerId = await createIdentifiedPlayer(suffix);
+    await admin`INSERT INTO player_club_season_stats (player_id, season, club_id, games, goals)
+      VALUES (${playerId}, ${maxYear}, ${clubA.id}, 10, 5)`;
+  }
+
   ambiguousPlayerId = await createPlayer(`${MARKER} Two Identities`);
   for (const n of [1, 2]) {
     await admin`
@@ -310,6 +318,7 @@ afterAll(async () => {
   await clearFixtureAudits();
   await admin`DELETE FROM data_edits WHERE table_name = 'players' AND row_id = ANY(${ids}::bigint[])`;
   await admin`DELETE FROM external_identities WHERE player_id = ANY(${ids}::int[])`;
+  await admin`DELETE FROM player_club_season_stats WHERE player_id = ANY(${ids}::int[])`;
   await admin`DELETE FROM players WHERE id = ANY(${ids}::int[])`;
   if (createdThrowawayAdmin) await admin`DELETE FROM auth_users WHERE id = ${actorId}`;
 

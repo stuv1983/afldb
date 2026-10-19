@@ -7,7 +7,7 @@
  * compiler against either a hand-written equivalent query or a real,
  * dynamically-discovered pair of players -- never a hardcoded name.
  */
-import './guard';
+import { verifyIsolatedIntegrationDatabase } from './guard';
 
 import { performance } from 'node:perf_hooks';
 
@@ -750,7 +750,7 @@ describe('grid solver correctness', () => {
       SELECT current_database() AS database,
              current_setting('statement_timeout') AS "statementTimeout"
     `;
-    expect(environment.database).toBe('afldb_test');
+    expect(environment.database).toBe(await verifyIsolatedIntegrationDatabase(sql));
     expect(environment.statementTimeout).toBe('5s');
 
     const cases: Array<{

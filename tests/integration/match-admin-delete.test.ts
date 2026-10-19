@@ -214,6 +214,9 @@ afterAll(async () => {
   await owner`DELETE FROM sources WHERE key = ${FIXTURE_SOURCE_KEY}`;
   await owner`DELETE FROM matches WHERE venue_raw = ${MARKER}`;
   if (createdThrowawayAdmin) {
+    // Successful deletion audits intentionally outlive the deleted matches.
+    await owner`DELETE FROM data_edits WHERE admin_user_id = ${actorId}
+      AND table_name = 'matches' AND field_group = 'match_deletion' AND note LIKE ${`${MARKER}%`}`;
     await owner`DELETE FROM auth_users WHERE id = ${actorId}`;
   }
   await owner.end({ timeout: 5 });

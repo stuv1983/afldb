@@ -129,3 +129,4 @@ Completion status: **complete** (83/83)
 | 81 | audit | `https://www.draftguru.com.au/players/josh_wooden/1` | offline_strong_audit_row |  | not_applicable | agree |  |
 | 82 | audit | `https://www.draftguru.com.au/players/darcy_tucker/1` | offline_strong_audit_row |  | not_applicable | agree |  |
 | 83 | audit | `https://www.draftguru.com.au/players/tim_taranto/1` | offline_strong_audit_row |  | not_applicable | agree |  |
+

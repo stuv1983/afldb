@@ -17,7 +17,7 @@ import { join } from "node:path";
 const root = process.cwd();
 const contractPath = join(root, "tools", "rebuild", "draftguru", "draftguru-contract.json");
 const parserPath = join(root, "tools", "rebuild", "draftguru", "parse_draft_snapshot.py");
-const adapterPath = join(root, "tools", "rebuild", "draftguru", "acquire_draft.py");
+const adapterPath = join(root, "legacy", "offline", "tools", "rebuild", "draftguru", "acquire_draft.py");
 const fixtureDir = join(root, "tests", "fixtures", "draftguru");
 
 const contract = JSON.parse(readFileSync(contractPath, "utf8"));
@@ -740,7 +740,7 @@ describe("snapshot layout", () => {
 // ===========================================================================
 
 const sampleToolPath = join(root, "tools", "rebuild", "draftguru", "stage_b1_sample.py");
-const personsAdapterPath = join(root, "tools", "rebuild", "draftguru", "acquire_persons.py");
+const personsAdapterPath = join(root, "legacy", "offline", "tools", "rebuild", "draftguru", "acquire_persons.py");
 const profilerPath = join(root, "tools", "rebuild", "draftguru", "profile_person_pages.py");
 const fitzroyPath = join(root, "tools", "migration", "import_fitzroy_core.py");
 
@@ -1750,9 +1750,11 @@ describe("Stage B1 completion and manifest semantics", () => {
 describe("frozen Stage B1 sample (local snapshot)", () => {
   const frozenDir = join(root, "data", "sources", "draftguru", "person-html-20260826");
   const frozenSample = join(frozenDir, "sample.json");
-  const itFrozen = canSpawn && existsSync(frozenSample) ? it : it.skip;
+  const itFrozen = it;
 
   itFrozen("rebuilds byte-identically from the accepted Stage A snapshot", () => {
+    expect(canSpawn, 'Required frozen-sample verification needs AFLDB_PYTHON').toBe(true);
+    expect(existsSync(frozenSample), `Required frozen sample is missing: ${frozenSample}`).toBe(true);
     const run = runSampleTool(["--label", "person-html-20260826", "--validate-only"]);
     expect(run.status).toBe(0);
     expect(run.stdout).toContain("byte-identical");

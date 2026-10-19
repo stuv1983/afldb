@@ -91,3 +91,18 @@ if (process.env.AFLDB_V2_ISOLATED_PG === '1') {
 }
 
 export {};
+
+/** Repeat all isolated proofs on the exact connection a destructive fixture will use. */
+export async function verifyIsolatedIntegrationDatabase(connection: postgres.Sql): Promise<string> {
+  const findings = checkIsolatedTestDsn(testUrl!, Number(process.env.AFLDB_V2_ISOLATED_PORT));
+  if (process.env.AFLDB_V2_ISOLATED_PG !== '1') findings.push({ check: 'runner', detail: 'isolated runner required' });
+  if (!findings.length) {
+    const [facts] = await connection.unsafe(ISOLATED_SERVER_FACTS_SQL);
+    findings.push(...checkIsolatedTestServer(database, {
+      clusterName: facts?.cluster_name ?? null, databaseComment: facts?.database_comment ?? null,
+      currentDatabase: facts?.current_database ?? null,
+    }));
+  }
+  if (findings.length) throw new Error(`Isolated integration target refused: ${findings.map((f) => f.check).join(', ')}`);
+  return database;
+}
