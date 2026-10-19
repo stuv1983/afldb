@@ -1695,7 +1695,7 @@ describe('accepted canonical baseline', () => {
 });
 
 describe('acquisition contract', () => {
-  const acquirer = readFileSync(join(root, 'tools', 'rebuild', 'fitzroy', 'acquire_core.R'),
+  const acquirer = readFileSync(join(root, 'legacy', 'offline', 'tools', 'rebuild', 'fitzroy', 'acquire_core.R'),
     'utf8');
   const contract = JSON.parse(readFileSync(
     join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
@@ -1822,7 +1822,7 @@ describe('stage graph', () => {
                 'awards-honours', 'brownlow-season', 'derived', 'coleman', 'first-kick-goal']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
-      resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
+      resolvePython(), 'legacy/offline/coleman.py', '--groups', 'coleman',
     ]);
   });
 

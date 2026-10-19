@@ -10,6 +10,22 @@ This directory holds tools that AFLDB V2 retired from runtime but kept as diagno
 
 ## What is here
 
+Local release follow-up (2026-10-19): acquisition implementations now also live under
+`legacy/offline/tools/rebuild/{fitzroy,afltables,draftguru}/` and
+`legacy/offline/tools/email_intake/`. Their former entry points refuse execution. These are
+deliberate historical/operator entry points, not permission to contact retired providers.
+Deterministic snapshot parsers and historical replay loaders remain under `tools/` so accepted
+local inputs can still reproduce history. Their provenance adapter identifiers are unchanged.
+
+`coleman.py` is the explicit offline historical bootstrap entry point. It requires the dedicated
+loopback PG16 cluster on port 55432, the V2 `_test` name and database marker, and refuses any
+season already owned by the canonical Coleman publisher. It takes the same per-season lock as
+that publisher. The importer no longer accepts Coleman/rekey writes without the offline flag;
+normal application, worker, package and scheduler paths cannot invoke these loaders.
+
+No timer, service or polkit rule was changed. Production retirement remains the future approved
+operation in `docs/v2/cutover-runbook.md` steps 4/4a.
+
 | Path | What it is | Why it is kept |
 |---|---|---|
 | `tools/current-season/update-current-season.ts` | The Squiggle / Kali current-season refresh CLI | The only reader of the staged Squiggle/Kali observations (`staging.external_current_matches`), kept as diagnostic evidence for AFLDB-ISSUE-122/128. Squiggle and Kali are retired sources. |

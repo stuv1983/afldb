@@ -265,9 +265,9 @@ describe('data/reference/afltables-network.json', () => {
   it('documents every gated path, and the rollover that retires it, in its own comment', () => {
     for (const p of [
       'deploy/afldb-settle-afltables.sh',
-      'tools/rebuild/fitzroy/acquire_core.R',
-      'tools/rebuild/afltables/acquire_club_lists.R',
-      'tools/rebuild/afltables/acquire_coaches.py',
+      'legacy/offline/tools/rebuild/fitzroy/acquire_core.R',
+      'legacy/offline/tools/rebuild/afltables/acquire_club_lists.R',
+      'legacy/offline/tools/rebuild/afltables/acquire_coaches.py',
       'src/lib/acquisition/settle-trigger.ts',
       'tools/db/rollover-season.ts',
       'last_season',
@@ -434,7 +434,7 @@ function run(bin: string, args: string[], cwd: string, env: Record<string, strin
 }
 
 describe.skipIf(!HAVE_RSCRIPT)('acquire_core.R gate (fitzRoy: player stats, results, details, ladder)', () => {
-  const script = path.join(root, 'tools/rebuild/fitzroy/acquire_core.R');
+  const script = path.join(root, 'legacy/offline/tools/rebuild/fitzroy/acquire_core.R');
   const argv = [script, '--acquire', '--in-season', '--label', 'x', '--from', '2026', '--to', '2026'];
   for (const control of REFUSED) {
     it(`${control}: refuses before fitzRoy is loaded`, () => {
@@ -459,7 +459,7 @@ describe.skipIf(!HAVE_RSCRIPT)('acquire_core.R gate (fitzRoy: player stats, resu
 });
 
 describe.skipIf(!HAVE_RSCRIPT)('acquire_club_lists.R gate (httr club pages)', () => {
-  const script = path.join(root, 'tools/rebuild/afltables/acquire_club_lists.R');
+  const script = path.join(root, 'legacy/offline/tools/rebuild/afltables/acquire_club_lists.R');
   for (const control of REFUSED) {
     it(`${control}: refuses before httr is loaded`, () => {
       const r = run('Rscript', [script], tree(control));
@@ -481,7 +481,7 @@ describe.skipIf(!HAVE_RSCRIPT)('acquire_club_lists.R gate (httr club pages)', ()
 });
 
 describe.skipIf(!PYTHON)('acquire_coaches.py gate (urllib coach pages)', () => {
-  const rel = 'tools/rebuild/afltables/acquire_coaches.py';
+  const rel = 'legacy/offline/tools/rebuild/afltables/acquire_coaches.py';
   // The script resolves its repository root from its own path, so it is copied
   // into the temporary tree beside the control rather than run in place.
   const py = (control: Control) => {
@@ -622,8 +622,8 @@ describe('the last_season number contract is the same in every gate', () => {
   });
 
   describe.skipIf(!HAVE_RSCRIPT)('R', () => {
-    const core = path.join(root, 'tools/rebuild/fitzroy/acquire_core.R');
-    const clubs = path.join(root, 'tools/rebuild/afltables/acquire_club_lists.R');
+    const core = path.join(root, 'legacy/offline/tools/rebuild/fitzroy/acquire_core.R');
+    const clubs = path.join(root, 'legacy/offline/tools/rebuild/afltables/acquire_club_lists.R');
     it.each(NUMBER_CONTRACT)('acquire_core.R: $label -> $expected', (c) => {
       const r = run('Rscript', [core, '--probe'], rawTree(c));
       expect(outcomeOf(r.out)).toBe(c.expected);
@@ -637,7 +637,7 @@ describe('the last_season number contract is the same in every gate', () => {
   });
 
   describe.skipIf(!PYTHON)('Python', () => {
-    const rel = 'tools/rebuild/afltables/acquire_coaches.py';
+    const rel = 'legacy/offline/tools/rebuild/afltables/acquire_coaches.py';
     it.each(NUMBER_CONTRACT)('acquire_coaches.py: $label -> $expected', (c) => {
       const dir = rawTree(c, { [rel]: rel });
       const r = run(PYTHON!, ['-I', path.join(dir, rel), '--out-dir', path.join(dir, 'out')], dir);

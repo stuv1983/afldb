@@ -7,7 +7,7 @@ import path from "node:path";
 
 const root = path.resolve(__dirname, "..");
 const contractPath = path.join(root, "tools/rebuild/fitzroy/fitzroy-contract.json");
-const scriptPath = path.join(root, "tools/rebuild/fitzroy/acquire_core.R");
+const scriptPath = path.join(root, "legacy/offline/tools/rebuild/fitzroy/acquire_core.R");
 
 const contract = JSON.parse(readFileSync(contractPath, "utf8"));
 const seasons = JSON.parse(

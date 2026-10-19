@@ -2595,12 +2595,32 @@ def load_person_links(lite) -> dict[int, tuple]:
     }
 
 
+def require_offline_coleman_target(pg, args) -> None:
+    """The historical bootstrap must never compete with the canonical V2 publisher."""
+    if not args.offline_historical:
+        raise RuntimeError("Coleman bootstrap is offline-only: use legacy/offline/coleman.py")
+    if pg.info.host not in ("127.0.0.1", "localhost", "::1") or pg.info.port != 55432:
+        raise RuntimeError("Offline Coleman requires the dedicated loopback cluster on port 55432")
+    with pg.cursor() as cur:
+        cur.execute("""SELECT current_database(), current_setting('cluster_name'),
+            shobj_description(oid, 'pg_database') FROM pg_database WHERE datname=current_database()""")
+        name, cluster, marker = cur.fetchone()
+        if not name.startswith("afldb_v2_") or not name.endswith("_test") or cluster != "afldb_v2_isolated" or marker != "afldb-v2-isolated-test":
+            raise RuntimeError("Offline Coleman requires a marked isolated V2 test database")
+        # Same locks as the canonical publisher, held until this bootstrap transaction ends.
+        cur.execute("SELECT pg_advisory_xact_lock(hashtext('derived_award_results:coleman'), year::int) FROM seasons ORDER BY year")
+        cur.execute("SELECT count(*) FROM derived_award_results WHERE award_slug='coleman'")
+        if cur.fetchone()[0]:
+            raise RuntimeError("Coleman bootstrap refused: canonical publications exist; use the V2 publisher")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Import AFLDB awards and honours.")
     parser.add_argument("--groups", nargs="*", help="subset of groups to run")
     parser.add_argument("--list-groups", action="store_true")
     parser.add_argument("--dry-run", action="store_true",
                         help="report source counts without writing")
+    parser.add_argument("--offline-historical", action="store_true", help="explicit isolated historical Coleman bootstrap only")
     parser.add_argument(
         "--allow-link-loss", action="store_true",
         help="proceed even when a manual player-link decision cannot survive "
@@ -2623,6 +2643,7 @@ def main() -> int:
         rep.step(f"target        : {safe_dsn(dsn)}")
         pg = connect_pg(dsn)
         try:
+            require_offline_coleman_target(pg, args)
             with pg.cursor() as cur:
                 cur.execute("SELECT key, id FROM sources")
                 sources = dict(cur.fetchall())
@@ -2721,6 +2742,8 @@ def main() -> int:
     rep.step(f"target        : {safe_dsn(dsn)}")
     started = time.time()
     pg = connect_pg(dsn)
+    if COLEMAN_GROUP in selected:
+        require_offline_coleman_target(pg, args)
 
     # Declare what this run rebuilds so TRUNCATE ... CASCADE cannot
     # silently empty a table no group here repopulates.

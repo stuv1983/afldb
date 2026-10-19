@@ -766,10 +766,11 @@ const canRunLoader = (() => {
 describe('the offline loader (tools/migration/import_awards.py --groups coleman) agrees with the projection (SYNTHETIC, PostgreSQL)', () => {
   // The loader needs Python with psycopg. Where it is missing this block is skipped and the gap is
   // reported by the suite's runner; it is never counted as passing evidence.
-  const loaderTest = canRunLoader ? it : it.skip;
+  const loaderTest = it;
 
   function runLoader() {
-    return spawnSync(python, [join(root, 'tools', 'migration', 'import_awards.py'), '--groups', 'coleman'], {
+    if (!canRunLoader) throw new Error('Offline Coleman verification requires AFLDB_TEST_PYTHON with psycopg');
+    return spawnSync(python, [join(root, 'legacy', 'offline', 'coleman.py'), '--groups', 'coleman'], {
       cwd: root,
       encoding: 'utf8',
       env: { ...process.env, AFLDB_IMPORT_DATABASE_URL: process.env.AFLDB_TEST_IMPORT_DATABASE_URL ?? process.env.AFLDB_TEST_DATABASE_URL },
@@ -785,7 +786,7 @@ describe('the offline loader (tools/migration/import_awards.py --groups coleman)
     });
   }
 
-  loaderTest('after a projection the loader inserts nothing, deletes nothing and leaves every value of the tuple as it was', async () => {
+  loaderTest('after a canonical publication the offline loader refuses and preserves every tuple', async () => {
     await setGoals('A', 'm1', 1); // a four-way tie: several rows, not just one
     const published = expectPublished(await publish());
     expect(published.projection.counts.inserted).toBe(4);
@@ -793,10 +794,8 @@ describe('the offline loader (tools/migration/import_awards.py --groups coleman)
 
     const run = runLoader();
     const output = `${run.stdout}\n${run.stderr}`;
-    expect(run.status, output).toBe(0);
-    // The loader's `updated` counts every MATCHED row (its UPDATE has no changed-values guard), so the
-    // parity statement is: matched all four, inserted nothing, deleted nothing.
-    expect(output).toMatch(/coleman winners\s+4\s+\(1 seasons, 4 updated, 0 inserted, 0 deleted\)/);
+    expect(run.status, output).not.toBe(0);
+    expect(output).toContain('canonical publications exist; use the V2 publisher');
     expect(await tuples()).toEqual(before);
 
     // And the projection finds nothing to do afterwards.

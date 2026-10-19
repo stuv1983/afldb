@@ -159,7 +159,7 @@ describe('email intake: what is pinned statically', () => {
     // tools/email_intake/fetch_and_stage.py: post_to_intake raises PermanentFailure for 4xx other
     // than 408/429, and main() files that message to the error folder (copy + \Seen, never deleted).
     // This test pins the Python source text only; the poller is not executable in V2.
-    const poller = read('tools/email_intake/fetch_and_stage.py');
+    const poller = read('legacy/offline/tools/email_intake/fetch_and_stage.py');
     expect(poller).toContain('if 400 <= exc.code < 500 and exc.code not in (408, 429):');
     expect(poller).toMatch(/raise PermanentFailure\(f"HTTP \{exc\.code\}: \{detail\}"\) from exc/);
     expect(poller).toMatch(/except PermanentFailure as exc:\n\s+print\(f" {4}REJECTED: \{exc\}"\)\n\s+file_message\(conn, msg_id, error_folder\)/);

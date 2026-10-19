@@ -28,7 +28,7 @@ from email.message import EmailMessage, Message
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
-    "fetch_and_stage", Path(__file__).with_name("fetch_and_stage.py"))
+    "fetch_and_stage", Path(__file__).resolve().parents[2] / "legacy/offline/tools/email_intake/fetch_and_stage.py")
 poller = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(poller)
 

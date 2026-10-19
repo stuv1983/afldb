@@ -9,6 +9,14 @@ was executed against a database, a scheduler or a network.
 
 ## 1. Vocabulary
 
+**2026-10-19 local-release amendment (takes precedence over the historical matrix below):**
+V2-GAP-014 is implemented. The six R/Python acquisition implementations and email poller have
+moved beneath `legacy/offline/tools/`; old paths are refusing shims. Offline deterministic replay
+helpers stay in place for reproducible rebuilds. `legacy/offline/coleman.py` is the guarded
+historical bootstrap, with canonical publication ownership refusal and shared season locks.
+The freshly prepared isolated database completed all 30 rebuild stages and 89 validation checks
+after these moves. See `local-release-review.md` for verification and residual release gates.
+
 - **Disposition** (the launch brief's terms): `retain` (runtime, kept as is); `retain-offline`
   (kept in place as offline tooling, never scheduled or imported by runtime); `quarantine`
   (moved under `legacy/offline/`); `remove-from-runtime` (its runtime entry points must refuse or

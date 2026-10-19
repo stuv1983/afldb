@@ -1593,7 +1593,7 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: 'COLEMAN — leading home-and-away goalkicker, derived',
       kind: 'data',
       run: 'command',
-      argv: [python, 'tools/migration/import_awards.py', '--groups', 'coleman'],
+      argv: [python, 'legacy/offline/coleman.py', '--groups', 'coleman'],
       envOverlay: dataEnv,
     },
     {
@@ -2863,7 +2863,7 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       `Birth-date preflight failed (${BIRTH_DATE_LOADER} --validate-only). The AFL Tables `
       + `contract pins '${afltablesClubListPin().label}', but its acquired bytes are missing, `
       + 'incomplete or do not match the manifest. Re-acquire it with '
-      + 'tools/rebuild/afltables/acquire_club_lists.R. Nothing has been destroyed.\n'
+      + 'legacy/offline/tools/rebuild/afltables/acquire_club_lists.R. Nothing has been destroyed.\n'
       + `${birthDates.stdout}${birthDates.stderr}`);
   }
   // AFLDB-ISSUE-118 §23.27. The coaches stage reads the pinned coach-page snapshot (its
@@ -2877,7 +2877,7 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
         + `pins '${afltablesCoachesPin().label}', but its tracked artefacts, the baseline's `
         + 'player_stats files or a pinned supplement are missing, incomplete or do not match '
         + 'their manifests. Re-acquire the coach pages with '
-        + 'tools/rebuild/afltables/acquire_coaches.py. Nothing has been destroyed.\n'
+        + 'legacy/offline/tools/rebuild/afltables/acquire_coaches.py. Nothing has been destroyed.\n'
         + `${coaches.stdout}${coaches.stderr}`);
     }
   }

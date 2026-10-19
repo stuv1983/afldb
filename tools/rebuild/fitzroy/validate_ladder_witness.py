@@ -182,7 +182,7 @@ def load_witness(label: str, rep: Report, contract_path: Path | None = None,
             f"the tracked manifest for {label!r} exists but its acquired bytes are absent "
             f"from {snapshot_dir}. Raw snapshots are deliberately gitignored (ISSUE-093 "
             f"convention): re-acquire with\n"
-            f"  Rscript tools/rebuild/fitzroy/acquire_core.R --acquire --label {label} "
+            f"  Rscript legacy/offline/tools/rebuild/fitzroy/acquire_core.R --acquire --label {label} "
             f"--datasets ladder --from {cov['first_season']} --to {cov['last_season']}")
 
     print("\n3. raw artefacts (bytes, schema, per-season structure)")
