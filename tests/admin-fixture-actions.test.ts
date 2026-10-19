@@ -148,6 +148,8 @@ function defaultDb(overrides: Record<string, unknown[]> = {}): Responder {
     }
     if (flat.includes('max(year)::int')) return [{ maxYear: 2026 }];
     if (flat.includes('pg_advisory_xact_lock')) return [];
+    // D-229-6 ownership read in editFixture: every row these tests edit is a manual row.
+    if (flat.includes('AS "sourceKey" FROM fixtures f JOIN sources')) return [{ sourceKey: 'manual_admin_edit' }];
     if (flat.includes('FROM clubs c')) return CLUBS;
     if (flat.includes('FROM venues WHERE id')) {
       return [{ id: 55, slug: 'mcg', canonicalName: 'Melbourne Cricket Ground' }];
@@ -652,6 +654,12 @@ describe('reinstating a cancelled fixture whose game was played (AFLDB-ISSUE-289
       { 'END AS "clubId"': [{ clubId: 7 }] },
     ));
     expect(await reinstateFixture(REINSTATE)).toMatchObject({ ok: false, reason: 'club_already_scheduled' });
+    expect(wrote(seen)).toEqual([]);
+  });
+
+  it('refuses every edit of a provider-owned (afl_api) row before any write (AFLDB-ISSUE-229 D-229-6)', async () => {
+    const seen = fakeImportConnection(db({}, { 'AS "sourceKey" FROM fixtures f JOIN sources': [{ sourceKey: 'afl_api' }] }));
+    expect(await reinstateFixture(REINSTATE)).toMatchObject({ ok: false, reason: 'provider_owned' });
     expect(wrote(seen)).toEqual([]);
   });
 

@@ -72,6 +72,14 @@ export const MAX_HOME_AND_AWAY_ROUND = 30;
 /** The most fixtures one round-batch submission may carry (§14). */
 export const MAX_BATCH_ROWS = 20;
 
+/**
+ * The per-season advisory lock namespace every `fixtures` writer takes (`pg_advisory_xact_lock(ns,
+ * season)`): the admin mutation contract (`admin-fixtures.ts` `FIXTURE_LOCK_NAMESPACE`) and the
+ * AFL API fixture writer (AFLDB-ISSUE-229), so the two serialise per season. Lives here because the
+ * importer cannot import the `server-only` admin module.
+ */
+export const FIXTURE_SEASON_LOCK_NAMESPACE = 717275;
+
 export function isFixtureRoundType(value: unknown): value is FixtureRoundType {
   return typeof value === 'string' && (FIXTURE_ROUND_TYPES as readonly string[]).includes(value);
 }

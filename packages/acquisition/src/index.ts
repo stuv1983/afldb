@@ -177,6 +177,31 @@ export {
   type AflApiFixtureRefusalCode,
   type AflApiFixtureStatusClass,
 } from './fixture-contract';
+// AFL API fixture lifecycle and feed staging (AFLDB-ISSUE-229 / V2-GAP-008; pure, the writer is
+// src/lib/acquisition/afl-api-fixture-writer.ts).
+export {
+  AFL_API_FIXTURE_UNOBSERVED_TRANSITIONS,
+  evaluateAflApiFixtureLifecycle,
+  parseAcknowledgedUnobservedStatuses,
+  stageAflApiFixtureFeed,
+  type AflApiFixtureLifecycleEvaluation,
+  type AflApiFixtureLifecycleRefusal,
+  type AflApiFixtureLifecycleRefusalCode,
+  type AflApiFixtureStage,
+  type AflApiFixtureStageRefusal,
+  type AflApiFixtureTransition,
+  type AflApiFixtureTransitionKind,
+} from './fixture-lifecycle';
+export {
+  AFL_API_FIXTURE_SOURCE_KEY,
+  settleAflApiFixtureStage,
+  type AflApiFixtureAction,
+  type AflApiFixtureActionKind,
+  type AflApiFixtureProvenance,
+  type AflApiFixtureSettleOutcome,
+  type AflApiFixtureWriterRefusal,
+  type AflApiFixtureWriterRefusalCode,
+} from './fixture-writer';
 // @v2-stage3:reconciliation-report
 // The machine-readable reconciliation report (pure; types only from the writer modules).
 export {

@@ -112,7 +112,7 @@ type ManifestFile = { file: string; sha256: string; status?: string };
  * accidentally treated as fixtures-only, silently discarding its roster/
  * stats evidence).
  */
-function verifyManifest(snapshotDir: string): { manifest: Record<string, unknown>; files: readonly ManifestFile[] } {
+export function verifyManifest(snapshotDir: string): { manifest: Record<string, unknown>; files: readonly ManifestFile[] } {
   const manifestPath = join(snapshotDir, 'manifest.json');
   if (!existsSync(manifestPath)) {
     throw new Error(`No manifest.json under ${snapshotDir} — the acquisition did not complete (§5.4/§7.1).`);

@@ -12,7 +12,9 @@
  * unobserved status string) to exercise a refusal; none of it is provider evidence, and no
  * POSTPONED / CANCELLED / ABANDONED / TBC payload has ever been observed.
  */
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -20,12 +22,17 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyAflApiFixtureStatus,
   detectAflApiFixtureCollisions,
+  evaluateAflApiFixtureLifecycle,
   evaluateAflApiFixtureProjection,
+  parseAcknowledgedUnobservedStatuses,
   parseSourceFamilyRegistry,
+  stageAflApiFixtureFeed,
   type AflApiFixtureContractContext,
   type AflApiFixtureRefusalCode,
 } from '@afldb/acquisition';
 import { parseAflApiIdentities } from '@/lib/acquisition/afl-api-bundle';
+
+import { parseFixtureScheduleArgs, runFixtureScheduleCli } from '../tools/current-season/settle-afl-api-fixture-schedule';
 
 const root = join(__dirname, '..');
 const readJson = (...parts: string[]): unknown => JSON.parse(readFileSync(join(root, ...parts), 'utf8'));
@@ -275,5 +282,118 @@ describe('fixture-contract module hygiene', () => {
     expect(typeof index.classifyAflApiFixtureStatus).toBe('function');
     expect(typeof index.evaluateAflApiFixtureProjection).toBe('function');
     expect(typeof index.detectAflApiFixtureCollisions).toBe('function');
+  });
+});
+
+describe('evaluateAflApiFixtureLifecycle and stageAflApiFixtureFeed (AFLDB-ISSUE-229 writer staging)', () => {
+  const none = new Set<string>();
+
+  it('with no acknowledgement, every status routes exactly as the contract does', () => {
+    for (const status of ['POSTPONED', 'CANCELLED', 'ABANDONED', 'TBC', 'cancelled']) {
+      const record = mutated(scheduled, (c) => { c.status = status; });
+      const result = evaluateAflApiFixtureLifecycle(record, ctx, none);
+      expect(result.ok, status).toBe(false);
+      if (!result.ok) expect(result.refusals.map((r) => r.code)).toEqual(['status_unsupported']);
+    }
+    expect(evaluateAflApiFixtureLifecycle(scheduled, ctx, none)).toMatchObject({ ok: true, kind: 'scheduled' });
+    expect(evaluateAflApiFixtureLifecycle(seasonFeed.find((m) => m.status === 'CONCLUDED'), ctx, none)).toMatchObject({ ok: true, kind: 'completed' });
+    expect(evaluateAflApiFixtureLifecycle(mutated(scheduled, (c) => { c.status = 'LIVE'; }), ctx, none)).toMatchObject({ ok: true, kind: 'deferred' });
+  });
+
+  it('SYNTHETIC: an acknowledged unobserved status becomes a transition carrying identity only', () => {
+    const ack = parseAcknowledgedUnobservedStatuses(['POSTPONED', 'CANCELLED', 'ABANDONED']);
+    for (const [status, kind] of [['POSTPONED', 'postponed'], ['CANCELLED', 'cancelled'], ['ABANDONED', 'abandoned']] as const) {
+      const record = mutated(scheduled, (c) => { c.status = status; delete c.utcStartTime; });
+      expect(evaluateAflApiFixtureLifecycle(record, ctx, ack)).toEqual({
+        ok: true, kind: 'transition',
+        transition: { kind, providerStatus: status, providerId: 'CD_M20260142901', season: 2026, homeClubHist: 'Fremantle', awayClubHist: 'Brisbane Lions' },
+      });
+    }
+    const unmapped = mutated(scheduled, (c) => { c.status = 'CANCELLED'; c.home.team.providerId = 'CD_T_NONE'; });
+    expect(evaluateAflApiFixtureLifecycle(unmapped, ctx, ack)).toMatchObject({ ok: false, refusals: [{ code: 'team_unmapped' }] });
+  });
+
+  it('accepts only exact acknowledgeable spellings', () => {
+    expect(() => parseAcknowledgedUnobservedStatuses(['postponed'])).toThrow(/not an acknowledgeable status/);
+    expect(() => parseAcknowledgedUnobservedStatuses(['VOID'])).toThrow(/not an acknowledgeable status/);
+    expect(() => parseAcknowledgedUnobservedStatuses(['CANCELLED', 'CANCELLED'])).toThrow(/twice/);
+  });
+
+  it('stages the whole retained 2026 feed: 217 completed, the Grand Final scheduled, nothing refused', () => {
+    const stage = stageAflApiFixtureFeed(seasonFeed, ctx, { season: 2026 });
+    expect(stage.statusCounts).toEqual({ CONCLUDED: 217, SCHEDULED: 1 });
+    expect(stage.completed).toHaveLength(217);
+    expect(stage.scheduled.map((p) => [p.identity.sourceRecordId, p.round.roundCode, p.matchDate, p.matchTime]))
+      .toEqual([['CD_M20260142901', 'GF', '2026-09-26', '14:30']]);
+    expect(stage.refused).toEqual([]);
+    expect(stage.collisions).toEqual([]);
+  });
+
+  it('refuses a record of another competition or season, and every record of a feed collision', () => {
+    const otherSeason = mutated(scheduled, (c) => { c.compSeason.providerId = 'CD_S2025014'; });
+    expect(stageAflApiFixtureFeed([otherSeason], ctx, { season: 2026 }).refused[0].refusals[0].code).toBe('competition_season_mismatch');
+    const twin = mutated(scheduled, (c) => { c.providerId = 'CD_M20260142999'; });
+    const stage = stageAflApiFixtureFeed([scheduled, twin], ctx, { season: 2026 });
+    expect(stage.scheduled).toEqual([]);
+    expect(stage.refused.map((r) => [r.providerId, r.refusals[0].code])).toEqual([
+      ['CD_M20260142901', 'feed_collision'], ['CD_M20260142999', 'feed_collision'],
+    ]);
+    expect(() => stageAflApiFixtureFeed([], ctx, { season: 1999 })).toThrow(/not declared/);
+  });
+});
+
+describe('settle-afl-api-fixture-schedule CLI: immutable snapshot and validation (offline)', () => {
+  function snapshotRoot(mutate?: (dir: string) => void): string {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'v2-fx-cli-'));
+    mkdirSync(join(projectRoot, 'data', 'reference'), { recursive: true });
+    for (const file of ['source-families.json', 'afl-api-identities.json']) {
+      copyFileSync(join(root, 'data', 'reference', file), join(projectRoot, 'data', 'reference', file));
+    }
+    const dir = join(projectRoot, 'data', 'sources', 'afl_api', 'fixtures', 'snap-1');
+    mkdirSync(dir, { recursive: true });
+    const feedBytes = readFileSync(join(root, 'tests', 'fixtures', 'afl_api', 'seasons', '00-season-matches-2026.raw.json'));
+    writeFileSync(join(dir, '00-season-matches.json'), feedBytes);
+    writeFileSync(join(dir, 'manifest.json'), JSON.stringify({
+      source_key: 'afl_api', acquisition_kind: 'afl_api_fixture_snapshot', season: 2026,
+      files: [{ file: '00-season-matches.json', sha256: createHash('sha256').update(feedBytes).digest('hex') }],
+    }));
+    mutate?.(dir);
+    return projectRoot;
+  }
+
+  it('--validate-only stages the hash-verified feed and opens no connection', async () => {
+    const lines: string[] = [];
+    const { stage, outcome } = await runFixtureScheduleCli(['--label', 'snap-1', '--validate-only'], { projectRoot: snapshotRoot(), log: (l) => lines.push(l) });
+    expect(outcome).toBeNull();
+    expect(stage.scheduled).toHaveLength(1);
+    expect(lines.join('\n')).toContain('Observed statuses: CONCLUDED=217, SCHEDULED=1');
+  });
+
+  it('refuses a snapshot whose bytes changed after acquisition', async () => {
+    const projectRoot = snapshotRoot((dir) => writeFileSync(join(dir, '00-season-matches.json'), '{"matches":[]}'));
+    await expect(runFixtureScheduleCli(['--label', 'snap-1', '--validate-only'], { projectRoot, log: () => {} })).rejects.toThrow(/sha256 mismatch/);
+  });
+
+  it('parses only the documented flags, one mode, exact acknowledgements', () => {
+    expect(parseFixtureScheduleArgs(['--label', 's', '--apply', '--acknowledge-unobserved-status', 'POSTPONED,CANCELLED']))
+      .toEqual({ label: 's', mode: 'apply', acknowledged: new Set(['POSTPONED', 'CANCELLED']) });
+    expect(() => parseFixtureScheduleArgs(['--label', 's', '--apply', '--dry-run'])).toThrow(/Exactly one/);
+    expect(() => parseFixtureScheduleArgs(['--label', '../x', '--apply'])).toThrow(/directory name/);
+    expect(() => parseFixtureScheduleArgs(['--label', 's', '--apply', '--force'])).toThrow(/Unknown argument/);
+    expect(() => parseFixtureScheduleArgs(['--label', 's', '--apply', '--acknowledge-unobserved-status', 'VOID'])).toThrow(/acknowledgeable/);
+  });
+
+  it('refuses a sealed season, then the ingestion gate, before any database client exists', async () => {
+    const seasons = JSON.parse(readFileSync(join(root, 'data', 'reference', 'seasons.json'), 'utf8')) as Record<string, unknown>;
+    const run = (registry: Record<string, unknown>) => {
+      const projectRoot = snapshotRoot();
+      writeFileSync(join(projectRoot, 'data', 'reference', 'seasons.json'), JSON.stringify(registry));
+      return runFixtureScheduleCli(['--label', 'snap-1', '--dry-run'], {
+        projectRoot, log: () => {}, ingestionControls: { currentSeasonEnabled: false } as never,
+      });
+    };
+    // SYNTHETIC registry: 2026 no longer in progress, so it is sealed.
+    await expect(run({ ...seasons, last_season: 2026, in_progress_seasons: [] })).rejects.toThrow(/seal/i);
+    await expect(run({ ...seasons, last_season: 2026, in_progress_seasons: [2026] })).rejects.toThrow(/ingestion is disabled/);
   });
 });

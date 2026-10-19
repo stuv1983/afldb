@@ -8,6 +8,7 @@ import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
 import {
   FINALS_ROUND_CODES,
+  FIXTURE_SEASON_LOCK_NAMESPACE,
   MAX_BATCH_ROWS,
   MAX_HOME_AND_AWAY_ROUND,
   isFixtureRoundType,
@@ -110,7 +111,7 @@ export const FIXTURE_SOURCE_KEY = 'manual_admin_edit';
  * are 1897..2100 and the four fixed keys are 1 to 4, so the two schemes cannot
  * collide.
  */
-export const FIXTURE_LOCK_NAMESPACE = 717275;
+export const FIXTURE_LOCK_NAMESPACE = FIXTURE_SEASON_LOCK_NAMESPACE;
 
 /**
  * The enum members, finals codes and bounds §9 defines live in
@@ -356,6 +357,8 @@ export type FixtureRefusalReason =
   | 'played_locked'
   | 'invalid_transition'
   | 'identity_collision'
+  /** AFLDB-ISSUE-229 D-229-6: the row is owned by a provider importer, not by this contract. */
+  | 'provider_owned'
   | 'stale'
   | 'stale_preview'
   | 'batch_invalid'
@@ -1401,6 +1404,19 @@ async function editFixture(input: FixtureEditBase & {
       return await importSql.begin(async (tx) => {
         const row = await lockFixture(tx, input.fixtureKey);
         if (!row) return refuse('not_found', 'That fixture no longer exists.');
+        // AFLDB-ISSUE-229 D-229-6: every one of the eight mutations reaches the row through
+        // here, so this is the single guard point. A provider-owned row (afl_api) is read-only:
+        // its owner is the fixture importer, and an admin edit would create the data_overrides /
+        // data_edits pointers D-229-7 relies on never existing for importer rows.
+        const [owner] = await tx<{ sourceKey: string }[]>`
+          SELECT s.key AS "sourceKey" FROM fixtures f JOIN sources s ON s.id = f.source_id
+           WHERE f.id = ${row.id}
+        `;
+        if (!owner || owner.sourceKey !== FIXTURE_SOURCE_KEY) {
+          return refuse('provider_owned',
+            `This fixture is owned by the '${owner?.sourceKey ?? 'unknown'}' importer and is read-only here. `
+            + 'Correct it at its source; the next fixture settle applies the change.');
+        }
         await lockSeason(tx, row.season);
 
         if (row.updatedAt !== input.expectedUpdatedAt) {

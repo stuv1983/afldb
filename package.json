@@ -45,6 +45,7 @@
     "emit:afl-api": "tsx tools/current-season/emit-afl-api-bundle.ts",
     "settle:afl-api": "tsx tools/current-season/settle-afl-api.ts",
     "settle:afl-api-fixtures": "tsx tools/current-season/settle-afl-api-fixtures.ts",
+    "settle:afl-api-fixture-schedule": "tsx tools/current-season/settle-afl-api-fixture-schedule.ts",
     "emit:afl-api-player-bridge": "tsx tools/current-season/emit-afl-api-player-bridge.ts",
     "emit:afl-api-player-bridge-test": "tsx tools/current-season/emit-afl-api-player-bridge-test.ts",
     "acquire:afl-api-brownlow": "tsx tools/current-season/acquire-afl-api-brownlow.ts",
