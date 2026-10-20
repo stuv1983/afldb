@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -2599,8 +2600,14 @@ def require_offline_coleman_target(pg, args) -> None:
     """The historical bootstrap must never compete with the canonical V2 publisher."""
     if not args.offline_historical:
         raise RuntimeError("Coleman bootstrap is offline-only: use legacy/offline/coleman.py")
-    if pg.info.host not in ("127.0.0.1", "localhost", "::1") or pg.info.port != 55432:
-        raise RuntimeError("Offline Coleman requires the dedicated loopback cluster on port 55432")
+    port_text = os.environ.get("AFLDB_V2_ISOLATED_PORT", "55432")
+    if (not re.fullmatch(r"[0-9]{4,5}", port_text)
+            or not 1024 <= int(port_text) <= 65535
+            or int(port_text) == 5432
+            or (port_text != "55432" and os.environ.get("AFLDB_V2_ISOLATED_PG") != "1")):
+        raise RuntimeError("Offline Coleman requires a valid isolated launcher port")
+    if pg.info.host not in ("127.0.0.1", "localhost", "::1") or pg.info.port != int(port_text):
+        raise RuntimeError("Offline Coleman requires the dedicated loopback cluster on the isolated launcher port")
     with pg.cursor() as cur:
         cur.execute("""SELECT current_database(), current_setting('cluster_name'),
             shobj_description(oid, 'pg_database') FROM pg_database WHERE datname=current_database()""")

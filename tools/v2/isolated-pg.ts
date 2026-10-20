@@ -186,6 +186,8 @@ function init(cfg: IsolatedConfig): void {
     '',
     `${CONFIG_MARKER} (tools/v2/isolated-pg.ts). Loopback only; never a shared or live host.`,
     "listen_addresses = '127.0.0.1'",
+    // TCP-only launcher: distro defaults may require a root-owned Unix socket directory.
+    "unix_socket_directories = ''",
     `port = ${cfg.port}`,
     `cluster_name = '${ISOLATED_CLUSTER_NAME}'`,
     "timezone = 'Etc/UTC'",

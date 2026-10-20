@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — isolated Linux archive rehearsal (2026-10-20)
+
+- Restore the approved production archive once into fresh Ubuntu 24.04 / PostgreSQL 16.15
+  isolation; verify ledger 110 → 115, complete preservation, public projections and scoped
+  Linux contracts. Retain separate baseline, migration-only, functional and rollback copies.
+  Acceptance remains INCOMPLETE because authentic staged Brownlow reconciliation is absent.
+- Record previous/V2 application switching and additive-schema reversal/reapplication;
+  preserve failed attempts, broader settlement-suite failures and production-only gates.
+- Fix isolated cluster startup with distro Unix-socket defaults and allow offline Coleman
+  to use a validated launcher port while preserving its isolation checks (ISSUE-317).
+  Document restored staging default-grant reconciliation and retain unsafe-target tests.
+
 ### AFLDB V2 — separate migration gates and production shadow package (2026-10-20)
 
 - Record D-V2-MIGRATION-SEPARATION: keep backend functionality, migration preservation/query

@@ -51666,3 +51666,27 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Open-issue reassessment (runbook §9):** no open issue is tied solely to AFL Tables; ISSUE-274 and ISSUE-275 keep their code fixes and DEV evidence, and only their proposed "counted AFL Tables nights" PROD route is withdrawn. No criterion was waived and nothing was closed.
 - **Next action:** owner review of the branch; decisions D-316-1..13 (runbook §8, which now holds exact owner wording for D-316-1, D-316-2 and D-316-13; D-316-13 is unavailable until C4 is deployed), first D-316-1 (one final AFL Tables full-history acquisition and the 2026 rollover that retires AFL Tables in the same write) and D-316-2 (install the AFL API units on PROD as inert units); then the cutover procedure, runbook §7 C0–C9 with C4b.
 - **Runbook:** `issues/open/AFLDB-ISSUE-316.md`.
+
+## AFLDB-ISSUE-317 — Isolated rehearsal startup and offline Coleman assume one workstation configuration
+
+- **Status:** Resolved (2026-10-20). **Severity:** Low. **Area:** isolated V2 rehearsal tooling.
+- **Reproduction:** Fresh Ubuntu 24.04 / PostgreSQL 16.15 cluster on owner-approved port 55434
+  failed before restore because the distro socket default requires `/var/run/postgresql` access.
+  After successful restore, three offline Coleman integration cases refused the verified cluster
+  because their Python guard hard-coded 55432, which this rehearsal was explicitly forbidden to use.
+- **Root cause:** TCP-only launcher inherited a distro Unix-socket default; the historical loader
+  did not consume the isolated launcher's port contract.
+- **Fix:** `tools/v2/isolated-pg.ts` disables Unix sockets for fresh dedicated clusters.
+  `tools/migration/import_awards.py` validates the configured isolated port, requires the launcher
+  flag for a nondefault port, and retains loopback/cluster/database-marker checks. Existing
+  `tests/integration/v2-coleman-publication.test.ts` adds seven unsafe-target refusal cases.
+- **Validation:** Real Linux cluster started; archive restored once with exit 0; focused launcher /
+  preservation tests 221/221; Coleman integration 28/28 including the port guard; final TypeScript
+  and changed TypeScript lint exit 0; Python AST parse exit 0. No listener at 55432 was used/changed.
+- **Related restore procedure:** `--no-privileges` also omits migration-014 staging DEFAULT ACLs.
+  Their exact two declarations were reconciled on the mutable rollback copy (43/43 privilege
+  tests), and the rehearsal procedure now calls out this prerequisite. Captured baseline and
+  migration-only copies were retained unchanged; no application grant policy was widened.
+- **Evidence:** `docs/v2/linux-rehearsal-2026-10-20.md`; restricted evidence in the named WSL
+  distribution, `/home/rehearsal/evidence/`. Backend acceptance remains INCOMPLETE for absent
+  authentic staged Brownlow reconciliation. This resolved tooling issue grants no production GO.

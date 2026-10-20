@@ -1,5 +1,10 @@
 # Owner decision: migration acceptance and production shadow package
 
+**Subsequent execution:** [isolated Linux rehearsal, 2026-10-20](linux-rehearsal-2026-10-20.md).
+The approved archive restored successfully, ledger 110 → 115, complete preservation PASS;
+original staged Brownlow comparison remains INCOMPLETE. Backend acceptance is not yet met.
+The backup-unavailable and not-executed statements below are retained preparation-time history.
+
 Decision **D-V2-MIGRATION-SEPARATION**, owner instruction 2026-10-20, starting branch
 `v2/rebuild`, HEAD `12abe77f7f7b65f83b9adb079460ca9392d98cc8`. Actual starting state matched;
 only untracked `.codex/` existed. No other checkout, worktree or remote was changed.

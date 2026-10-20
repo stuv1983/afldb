@@ -767,6 +767,32 @@ describe('the offline loader (tools/migration/import_awards.py --groups coleman)
   // Python with psycopg is required evidence: absence fails explicitly, never skips.
   const loaderTest = it;
 
+  loaderTest('the offline guard rejects invalid launcher ports and non-loopback targets before database reads', () => {
+    const script = `
+import os, sys
+from types import SimpleNamespace
+sys.path.insert(0, 'tools/migration')
+from import_awards import require_offline_coleman_target
+for configured, launched, host, actual in [
+    ('5432', '1', '127.0.0.1', 5432), ('0', '1', '127.0.0.1', 0),
+    ('65536', '1', '127.0.0.1', 65536), ('bad', '1', '127.0.0.1', 55434),
+    ('55434', '', '127.0.0.1', 55434), ('55434', '1', 'remote.invalid', 55434),
+    ('55434', '1', '127.0.0.1', 55435),
+]:
+    os.environ['AFLDB_V2_ISOLATED_PORT'] = configured
+    os.environ['AFLDB_V2_ISOLATED_PG'] = launched
+    pg = SimpleNamespace(info=SimpleNamespace(host=host, port=actual))
+    try:
+        require_offline_coleman_target(pg, SimpleNamespace(offline_historical=True))
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError('unsafe target accepted')
+`;
+    const result = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8' });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+  });
+
   function runLoader() {
     if (!canRunLoader) throw new Error('Offline Coleman verification requires AFLDB_TEST_PYTHON with psycopg');
     return spawnSync(python, [join(root, 'legacy', 'offline', 'coleman.py'), '--groups', 'coleman'], {

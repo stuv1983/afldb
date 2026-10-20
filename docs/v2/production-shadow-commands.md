@@ -1,4 +1,13 @@
-# Production-data shadow: Linux execution package (not executed)
+# Production-data shadow: Linux execution package
+
+Executed in fresh local isolation on 2026-10-20: see
+[the sanitised rehearsal record](linux-rehearsal-2026-10-20.md). Preservation passed;
+overall compatibility remains INCOMPLETE for missing authentic staged Brownlow evidence.
+The environment/backup availability statements below describe preparation-time state.
+When using the actual approved sidecar, read its `archive_sha256`/`archive_bytes` fields.
+Restore with `--no-privileges` also omits staging DEFAULT privileges: reconcile the exact
+two migration-014 declarations as well as existing-table privileges on mutable test copies.
+Do not modify an already captured migration-only copy to repair permission-test prerequisites.
 
 This package supersedes the old shadow runbook's baseline-110-through-112 command examples.
 Use migrations **111 through 115**, subject to the restored ledger. It does not authorise an
