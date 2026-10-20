@@ -1,5 +1,18 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
+**Brownlow migration-evidence decision (2026-10-20, D-V2-BROWNLOW-ALT-1):** the owner accepted
+alternative Brownlow evidence (raw-vote/audit preservation, identical 98-season stored-data
+reports, passing integration and unit/report checks) **solely for archive `a583fc7d…ed11b04` and
+110 → 115**. Result: production migration preservation/query compatibility **PASS, scoped**; backend
+acceptance **PASS, scoped**. The original staged Brownlow comparator remains **INCOMPLETE**.
+Authentic API vote/identity/leaderboard reconciliation is **not established** and stays required for
+Brownlow operational readiness (criterion 7 below is unchanged). Strict Gridley **FAIL (149)** and
+adjudication conformance **FAIL (50 unapproved)** are unchanged; GAP-029 stays open. Production
+operational acceptance stays **INCOMPLETE / NO-GO**: no ingestion, publication, deployment or GO is
+approved, and the archive says nothing about the current live database. Rollback reversal was tested
+only with empty V2 ledgers. [Decision](owner-decision-brownlow-alternative-2026-10-20.md);
+[outstanding requirements](release-requirements-checklist-2026-10-20.md).
+
 **Current migration-policy amendment (2026-10-20):**
 [D-V2-MIGRATION-SEPARATION](migration-acceptance-2026-10-20.md) is approved. Report five separate
 results: backend functional **PASS on retained local evidence**; production migration

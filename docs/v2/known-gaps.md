@@ -48,20 +48,20 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-013 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): the poller refuses in V2; the preflight refuses the release while the email-intake timer runs | approve the release window (step 4, 4a) |
 | V2-GAP-014 | Low | legacy quarantine | no | **CLOSED locally**: acquisition implementations quarantined, refusing old entry points; deterministic rebuild retained and verified | no live retirement authorised |
 | V2-GAP-015 | Medium | Coleman | reconciliation | open, narrowed (Launch F): 46/46 seasons (1980-2025) agree on the locally rebuilt history; production data not compared | approve the shadow Coleman capture on the production dump (§4/§8) |
-| V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed: atomic audited public publication implemented; 98/98 local seasons agree, none unresolved | owner release acceptance and production-dump reconciliation |
+| V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed: atomic audited public publication implemented; 98/98 local seasons agree, none unresolved; archive-scoped migration evidence accepted (D-V2-BROWNLOW-ALT-1: stored-only, identical 98-season before/after) but **authentic API vote/identity/leaderboard reconciliation is not established** | authentic completed-season snapshot reconciliation, owner release acceptance ([checklist](release-requirements-checklist-2026-10-20.md) item 1) |
 | V2-GAP-017 | Medium | Stage 4-5 SQL | no | **CLOSED (Launch F)**: 111-114 applied, privileges run, `privileges` and awards integration suites pass, operations pages rendered (isolated PG16) | none |
 | V2-GAP-018 | Low | curated awards | no | **CLOSED (Launch F)**: `reviseApprovedProposal` (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
 | V2-GAP-020 | Low | curated awards | no | open: winners without a resolved player identity cannot be approved | none |
 | V2-GAP-021 | Medium | Coleman | no | **CLOSED locally**: explicit guarded offline bootstrap refuses publisher-owned seasons; session locks survive batch commits; 27/27 publication tests | production comparison remains gap 015 |
 | V2-GAP-022 | Medium | admin UI | rehearsal | open, narrowed: 26 images technically inspected; four Brownlow replacements recaptured/inspected after material wording/status fixes | owner acceptance per screen |
-| V2-GAP-023 | Low | Brownlow | no | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping | none (V2 follow-up) |
+| V2-GAP-023 | Low | Brownlow | no | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping; the staged comparator is INCOMPLETE and now **blocks authentic Brownlow operational reconciliation** (checklist item 1), not migration | none for migration; needed for operational readiness |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | open: no operations-centre view of AFL API settle refusals | none (V2 follow-up) |
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 local standalone rehearsal passes; raw votes and non-empty proposal/audit history preserved, including after 115 | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
-| V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; currently INCOMPLETE | approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
+| V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived) | approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -590,8 +590,14 @@ award results must be shown reconcilable before production; **no** — not a pro
   relationships, event/registration/participation coverage and public results being preserved;
   functional ingestion/publication, permissions, audit and rollback must hold. New discrepancies
   block migration. 149 strict, 99 approved, 50 unapproved unchanged; no additional approvals.
-  Production compatibility remains INCOMPLETE (no approved local backup). Production NO-GO.
+  Production compatibility was INCOMPLETE (no approved local backup) at that time. Production NO-GO.
   [Decision](migration-acceptance-2026-10-20.md), [commands](production-shadow-commands.md).
+- **Migration acceptance 2026-10-20 (D-V2-BROWNLOW-ALT-1):** the approved archive was rehearsed;
+  preservation PASS and, with the scoped Brownlow alternative, migration compatibility PASS for that
+  archive and 110 → 115 only. This does not resolve, waive or reclassify any Gridley finding: the
+  **50 unapproved findings remain unapproved** (149 strict / 99 approved) and GAP-029 stays OPEN.
+  Newly introduced data loss, coverage regression or an unexplained query difference would still block.
+  [Decision](owner-decision-brownlow-alternative-2026-10-20.md).
 
 - **Current acceptance:** D-GAP029-21 implemented; 149 strict, 99 approved, 50 unapproved. No data match or release waiver. [Readiness](gap-029-readiness.md), [verification](evidence/gap-029-acceptance-verification.json). The seven-file run below predates this bounded follow-up.
 

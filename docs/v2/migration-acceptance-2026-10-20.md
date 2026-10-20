@@ -2,7 +2,12 @@
 
 **Subsequent execution:** [isolated Linux rehearsal, 2026-10-20](linux-rehearsal-2026-10-20.md).
 The approved archive restored successfully, ledger 110 → 115, complete preservation PASS;
-original staged Brownlow comparison remains INCOMPLETE. Backend acceptance is not yet met.
+original staged Brownlow comparison remains INCOMPLETE.
+**Update:** owner decision [D-V2-BROWNLOW-ALT-1](owner-decision-brownlow-alternative-2026-10-20.md)
+accepts alternative Brownlow migration evidence **solely for archive `a583fc7d…ed11b04` and 110 → 115**.
+Migration compatibility and backend acceptance are therefore **PASS, scoped to that decision**; the
+staged comparator stays INCOMPLETE and authentic Brownlow operational reconciliation stays required
+([checklist](release-requirements-checklist-2026-10-20.md)). Gridley and production are unchanged.
 The backup-unavailable and not-executed statements below are retained preparation-time history.
 
 Decision **D-V2-MIGRATION-SEPARATION**, owner instruction 2026-10-20, starting branch
@@ -43,10 +48,11 @@ not a claim that a new Gridley run occurred.
 | Gate | Current result | Evidence/limit |
 |---|---|---|
 | Backend functional verification | PASS, retained local evidence | `migration-functional-evidence.json`; isolated PG16 ingestion, publication, permissions, audit and rollback contracts; Linux operational acceptance remains separate |
-| Migration preservation and public compatibility | **INCOMPLETE** | No approved production archive or production before/after captures |
+| Migration preservation and public compatibility | **PASS, scoped** (preparation-time: INCOMPLETE) | Archive `a583fc7d…ed11b04`, 110 → 115: preservation PASS, 4 of 5 parity checks PASS, staged Brownlow comparator **INCOMPLETE** and accepted only through the alternative in D-V2-BROWNLOW-ALT-1; no other archive or scope |
+| Authentic Brownlow operational reconciliation | **OUTSTANDING** | Required for Brownlow operational/publication readiness; not established by the alternative |
 | Strict Gridley parity | **FAIL: 149** | Existing strict results unchanged |
 | Approved adjudication conformance | **FAIL: 50 unapproved** | 99 approved; all 50 remain unapproved |
-| Production operational acceptance | **INCOMPLETE / NO-GO** | Production compatibility, Linux, host backup/restore/rollback, legacy-writer retirement, ISSUE-316 sequencing and explicit release approval outstanding |
+| Production operational acceptance | **INCOMPLETE / NO-GO** | Production compatibility, Linux, host backup/restore/rollback, legacy-writer retirement, ISSUE-316 sequencing, authentic Brownlow reconciliation and explicit release approval outstanding |
 
 The full workflow remains **13,740 passed / 9 failed / 31 skipped**, not green. No full suite,
 historical rebuild, Gridley investigation or visual capture was repeated for this package.

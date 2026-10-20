@@ -1,5 +1,16 @@
 # AFLDB V2 — final report (close of Launch F, 2026-10-19; first written at Stage 6)
 
+**Migration acceptance (2026-10-20, D-V2-BROWNLOW-ALT-1):** backend migration compatibility and
+acceptance are **PASS, scoped** to production archive `a583fc7d…ed11b04` and the migration-only
+transition 110 → 115, using the owner-approved alternative Brownlow evidence (raw-vote/audit
+preservation, identical 98-season stored reports, 35 integration and 159 unit/report checks). The
+original staged Brownlow comparator remains **INCOMPLETE**; authentic API vote, identity and
+leaderboard reconciliation is **not established** and remains required operationally. Strict Gridley
+(**149**) and conformance (**50 unapproved**) are separate and unchanged; GAP-029 stays open.
+Production is **NO-GO**. Rollback reversal was tested only with empty V2 ledgers.
+[Decision](owner-decision-brownlow-alternative-2026-10-20.md);
+[outstanding requirements](release-requirements-checklist-2026-10-20.md).
+
 **Current bounded acceptance (2026-10-20, D-GAP029-21):** 149 strict findings;
 99 approved (78 deferrals + 21 exact sibling disagreements), **0 data matches**;
 50 unapproved (42 event + eight board-date membership). Both gates remain failed.

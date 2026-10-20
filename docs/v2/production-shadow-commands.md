@@ -2,7 +2,10 @@
 
 Executed in fresh local isolation on 2026-10-20: see
 [the sanitised rehearsal record](linux-rehearsal-2026-10-20.md). Preservation passed;
-overall compatibility remains INCOMPLETE for missing authentic staged Brownlow evidence.
+the staged Brownlow comparator remains INCOMPLETE (no authentic staged evidence). The owner has since
+accepted a scoped alternative for this archive and 110 → 115 only
+([D-V2-BROWNLOW-ALT-1](owner-decision-brownlow-alternative-2026-10-20.md)); `release-gates.ts` takes it
+through `--brownlow-alternative`.
 The environment/backup availability statements below describe preparation-time state.
 When using the actual approved sidecar, read its `archive_sha256`/`archive_bytes` fields.
 Restore with `--no-privileges` also omits staging DEFAULT privileges: reconcile the exact
@@ -156,7 +159,8 @@ shadow node --import tsx --conditions=react-server tools/v2/shadow-award-reports
 
 Do not invent staged inputs or a completed-season report if the backup has none. Raw votes are
 independently preserved by the full-row snapshot. Missing original reconciliation evidence
-still yields INCOMPLETE and needs a scoped owner review, not a synthetic substitute.
+still yields INCOMPLETE and needs a scoped owner review, not a synthetic substitute. The one review
+so far (D-V2-BROWNLOW-ALT-1) is bound to archive `a583fc7d…ed11b04`; another archive needs its own.
 
 ## 4. Offline comparisons and separate release results
 

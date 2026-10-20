@@ -1,8 +1,11 @@
 # Linux rehearsal follow-up — 2026-10-20
 
-**Migration compatibility: INCOMPLETE. Production: NO-GO.** Settlement compatibility is
-now PASS on the full restored dataset. The missing authentic staged Brownlow comparator
-is an absent evidence prerequisite; the acceptance amendment below is proposed, not approved.
+**Migration compatibility: PASS, scoped to owner decision D-V2-BROWNLOW-ALT-1 (recorded after this
+report). Production: NO-GO.** Settlement compatibility is PASS on the full restored dataset. The
+authentic staged Brownlow comparator is an absent evidence prerequisite and **stays INCOMPLETE**; the
+amendment below was approved by the owner as written for that archive and 110 → 115 only — see
+[the decision](owner-decision-brownlow-alternative-2026-10-20.md). The text below is the report as
+delivered; its "not approved" wording is historical.
 
 One agent; starting branch `v2/rebuild`, HEAD
 `ee1ebc40cd24979c4f8259492a2df682bf7eab2d`, matched. Only untracked `.codex/` was present;
@@ -164,7 +167,7 @@ shadow-report unit checks; TypeScript `tsc --noEmit --incremental false` and cha
 both exit 0. No application/runtime/schema/packaging file changed, so the previously passing
 builds were not repeated. No historical rebuild, screenshots or rollback sequence was repeated.
 
-### Proposed owner acceptance amendment — not approved
+### Proposed owner acceptance amendment — APPROVED as D-V2-BROWNLOW-ALT-1 (originally "not approved")
 
 > For the specific production archive SHA-256
 > `a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04` and migrations 111–115,
@@ -177,7 +180,9 @@ builds were not repeated. No historical rebuild, screenshots or rollback sequenc
 > the corresponding API Brownlow operational/publication readiness. This amendment authorises
 > no production connection, data correction, deployment, timer or traffic change.
 
-Owner acceptance is still required; compatibility and backend acceptance remain INCOMPLETE.
+Historical at delivery: owner acceptance was still required and compatibility INCOMPLETE. The owner
+has since approved the amendment for this archive and transition only (D-V2-BROWNLOW-ALT-1); authentic
+Brownlow operational reconciliation remains required.
 The evidence absence is not a demonstrated migration functional failure. Remaining risk is
 real-provider identity, round, vote-set and eligibility disagreement not exercised together by
 the alternative. Existing production gates remain: ISSUE-229 B2/first apply, ISSUE-316 ordered

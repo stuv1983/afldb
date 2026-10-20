@@ -3,7 +3,9 @@
 **Follow-up:** [settlement closure and proposed Brownlow acceptance amendment](linux-rehearsal-followup-2026-10-20.md)
 records the subsequent full restored-copy **73/73** settlement pass, authentic **217/217**
 match correlation and identical **98-season** stored-only Brownlow reports. The original
-results below remain historical evidence. The staged Brownlow criterion still needs owner review.
+results below remain historical evidence. The owner has since approved the scoped Brownlow
+alternative ([D-V2-BROWNLOW-ALT-1](owner-decision-brownlow-alternative-2026-10-20.md)); the staged
+comparator itself stays INCOMPLETE and the INCOMPLETE statements below are historical.
 
 **Backend acceptance: INCOMPLETE. Production: NO-GO.** The authorised rehearsal ran with one
 agent. Preservation and the scoped functional contracts pass; the original Brownlow

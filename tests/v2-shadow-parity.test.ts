@@ -67,8 +67,8 @@ import {
 } from '@afldb/derived';
 
 import { USAGE, defaultDeps, parseCliArgs, runCli, type CliDeps } from '../tools/v2/shadow-parity';
-import { comparePreservation, digest, releaseGates, REQUIRED_PUBLIC_QUERIES, REQUIRED_PRESERVED_TABLES,
-  type PreservationSnapshot } from '../tools/v2/migration-preservation';
+import { APPROVED_BROWNLOW_ALTERNATIVE, comparePreservation, digest, releaseGates, REQUIRED_PUBLIC_QUERIES,
+  REQUIRED_PRESERVED_TABLES, type PreservationSnapshot } from '../tools/v2/migration-preservation';
 import { runReleaseGates } from '../tools/v2/release-gates';
 
 const ROOT = process.cwd();
@@ -159,6 +159,133 @@ describe('owner migration separation: synthetic preservation policy', () => {
       expect(runReleaseGates(['--functional', attestation, '--out', missing])).toBe(2);
       expect(JSON.parse(readFileSync(missing, 'utf8')).backendFunctional).toBe('INCOMPLETE');
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  describe('D-V2-BROWNLOW-ALT-1: scoped alternative to the unavailable staged Brownlow comparator', () => {
+    const approvedSnapshot = (): PreservationSnapshot => {
+      const s = snapshot(); s.scope.backupSha256 = APPROVED_BROWNLOW_ALTERNATIVE.archiveSha256; return s;
+    };
+    // The staged comparator is unavailable (no authentic staged seasons); the other four checks pass.
+    const stagedUnavailable = (): ShadowParityReport => run({ brownlow: { before: [], after: [] } });
+    const sha = digest('complete stored-only Brownlow reports');
+    const part = { result: 'PASS', evidence: ['synthetic contract-test reference'] };
+    const attestation = (): Loose => ({
+      decision: 'D-V2-BROWNLOW-ALT-1', archiveSha256: APPROVED_BROWNLOW_ALTERNATIVE.archiveSha256,
+      migrationScope: { from: 110, to: 115 }, rawVoteAuditPreservation: part,
+      storedReports: { ...part, seasons: 98, beforeSha256: sha, afterSha256: sha },
+      integration: { ...part, passed: 35, total: 35 }, unitReport: { ...part, passed: 159, total: 159 },
+    });
+    const gates = (over: Loose = {}) => releaseGates({ functional, parity: stagedUnavailable(), before: approvedSnapshot(),
+      after: approvedSnapshot(), brownlowAlternative: attestation(), ...over });
+
+    it('accepts migration compatibility for the exact archive and scope while the staged comparator stays INCOMPLETE', () => {
+      const report = gates();
+      expect(stagedUnavailable().verdict).toBe('INCOMPLETE');
+      expect(report.stagedBrownlowComparator).toBe('INCOMPLETE');
+      expect(report.brownlowAlternative.status).toBe('APPLIED');
+      expect(report.migrationCompatibility).toBe('PASS');
+      expect(report.migrationCompatibilityBasis).toBe('APPROVED_BROWNLOW_ALTERNATIVE');
+      expect(report.backendAcceptance).toBe('PASS');
+      expect(report.brownlowAlternative.notEstablished).toMatch(/authentic AFL API vote, identity or leaderboard/);
+      expect(report.brownlowOperationalReconciliation).toMatch(/^OUTSTANDING/);
+      // Gridley stays separate; production, operations and release authority are untouched.
+      expect(report.strictGridley).toEqual({ result: 'FAIL', findings: 149 });
+      expect(report.adjudicationConformance).toEqual({ result: 'FAIL', approved: 99, unapproved: 50 });
+      expect(report.productionOperational).toBe('INCOMPLETE');
+      expect(report.productionDecision).toBe('NO-GO');
+    });
+    it('cannot be satisfied by operational evidence alone: authentic Brownlow reconciliation is a required operational contract', () => {
+      const ops = Object.fromEntries(['productionCompatibility', 'linux', 'hostBackupRestoreRollback', 'legacyWritersRetired',
+        'issue316Sequence', 'explicitReleaseApproval'].map(k => [k, evidence]));
+      expect(gates({ operational: ops }).productionOperational).toBe('INCOMPLETE');
+      expect(gates({ operational: { ...ops, authenticBrownlowReconciliation: evidence } }).productionOperational).toBe('PASS');
+    });
+    it('is not applied without an attestation or when the staged comparator is simply not needed', () => {
+      const none = gates({ brownlowAlternative: undefined });
+      expect(none.brownlowAlternative.status).toBe('NOT_APPLIED');
+      expect(none.migrationCompatibility).toBe('INCOMPLETE');
+      const full = gates({ parity: run() });
+      expect(full.brownlowAlternative.status).toBe('NOT_REQUIRED');
+      expect(full.migrationCompatibilityBasis).toBe('ALL_CHECKS_PASS');
+    });
+    it('rejects any other archive, whether in the attestation or in the preservation snapshots', () => {
+      const other = gates({ before: snapshot(), after: snapshot() });
+      expect(other.brownlowAlternative.status).toBe('NOT_APPLIED');
+      expect(other.migrationCompatibility).toBe('INCOMPLETE');
+      const wrong = gates({ brownlowAlternative: { ...attestation(), archiveSha256: digest('another archive') } });
+      expect(wrong.brownlowAlternative.status).toBe('NOT_APPLIED');
+      expect(wrong.migrationCompatibility).toBe('INCOMPLETE');
+    });
+    it.each([[109, 115], [110, 114], [111, 115], [110, 116]])('rejects migration scope %i -> %i', (from, to) => {
+      const report = gates({ brownlowAlternative: { ...attestation(), migrationScope: { from, to } } });
+      expect(report.brownlowAlternative.status).toBe('NOT_APPLIED');
+      expect(report.migrationCompatibility).toBe('INCOMPLETE');
+    });
+    it('rejects an attestation under another decision identifier', () => {
+      expect(gates({ brownlowAlternative: { ...attestation(), decision: 'D-V2-OTHER' } }).migrationCompatibility).toBe('INCOMPLETE');
+    });
+    it.each(['rawVoteAuditPreservation', 'storedReports', 'integration', 'unitReport'])(
+      'stays INCOMPLETE when %s lacks its evidence', key => {
+        const a = attestation(); a[key] = { ...a[key], evidence: [] };
+        const report = gates({ brownlowAlternative: a });
+        expect(report.brownlowAlternative.status).toBe('NOT_APPLIED');
+        expect(report.migrationCompatibility).toBe('INCOMPLETE');
+      });
+    it.each([
+      ['a failed raw-vote/audit result', (a: Loose) => { a.rawVoteAuditPreservation = { ...part, result: 'FAIL' }; }],
+      ['97 seasons rather than 98', (a: Loose) => { a.storedReports.seasons = 97; }],
+      ['differing before/after report hashes', (a: Loose) => { a.storedReports.afterSha256 = digest('changed report'); }],
+      ['a failing integration check', (a: Loose) => { a.integration.passed = 34; }],
+      ['a failing unit/report check', (a: Loose) => { a.unitReport.passed = 158; }],
+    ])('FAILS migration compatibility for %s', (_name, mutate) => {
+      const a = attestation(); mutate(a);
+      const report = gates({ brownlowAlternative: a });
+      expect(report.brownlowAlternative.status).toBe('FAILED');
+      expect(report.migrationCompatibility).toBe('FAIL');
+      expect(report.backendAcceptance).toBe('FAIL');
+    });
+    it('never masks data loss, a changed public output or an unlike snapshot pair', () => {
+      const lost = approvedSnapshot(); lost.tables['public.brownlow_round_votes'].rows = [];
+      expect(gates({ after: lost }).migrationCompatibility).toBe('FAIL');
+      const changed = approvedSnapshot(); changed.queries.brownlow_raw = digest('different output');
+      expect(gates({ after: changed }).migrationCompatibility).toBe('FAIL');
+      const unlike = approvedSnapshot(); unlike.scope.seal++;
+      const report = gates({ after: unlike });
+      expect(report.migrationCompatibility).toBe('INCOMPLETE');
+      expect(report.brownlowAlternative.status).toBe('NOT_APPLIED');
+    });
+    it('covers only the Brownlow comparator: a failed or incomplete other check is not excused', () => {
+      const coverageMissing = run({ brownlow: { before: [], after: [] }, coverage: { before: null, after: null } });
+      const incomplete = gates({ parity: coverageMissing });
+      expect(incomplete.brownlowAlternative.status).toBe('NOT_APPLIED');
+      expect(incomplete.migrationCompatibility).toBe('INCOMPLETE');
+      const moved = run({ coleman: { before: file('c-b.json', COLEMAN_AGREE), after: file('c-a.json', COLEMAN_AGREE) },
+        brownlow: { before: [file('b.json', B_RECONCILED)], after: [file('a.json', B_TOTALS_MOVED)] } });
+      expect(checkOf(moved, 'brownlow').status).toBe('fail');
+      const failed = gates({ parity: moved });
+      expect(failed.migrationCompatibility).toBe('FAIL');
+      expect(failed.stagedBrownlowComparator).toBe('FAIL');
+      expect(failed.migrationCompatibilityBasis).toBe('NOT_ESTABLISHED');
+    });
+    it('reaches PASS from the committed attestation through the offline CLI, and only with readable evidence', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'v2-brownlow-alt-'));
+      try {
+        const write = (name: string, doc: unknown): string => { const p = join(dir, name); writeFileSync(p, JSON.stringify(doc)); return p; };
+        const inputs = ['--before', write('b.json', approvedSnapshot()), '--after', write('a.json', approvedSnapshot()),
+          '--parity', write('p.json', stagedUnavailable()), '--functional', join(ROOT, 'docs/v2/migration-functional-evidence.json')];
+        const committed = join(ROOT, 'docs/v2/evidence/brownlow-migration-alternative-attestation.json');
+        const pass = join(dir, 'pass.json');
+        expect(runReleaseGates([...inputs, '--brownlow-alternative', committed, '--out', pass])).toBe(0);
+        const report = JSON.parse(readFileSync(pass, 'utf8'));
+        expect(report.brownlowAlternative.status).toBe('APPLIED');
+        expect(report.stagedBrownlowComparator).toBe('INCOMPLETE');
+        expect(report.productionDecision).toBe('NO-GO');
+        const unreadable = attestation(); unreadable.integration.evidence = ['does-not-exist/missing.json: absent proof'];
+        const missing = join(dir, 'missing.json');
+        expect(runReleaseGates([...inputs, '--brownlow-alternative', write('unreadable.json', unreadable), '--out', missing])).toBe(2);
+        expect(JSON.parse(readFileSync(missing, 'utf8')).brownlowAlternative.status).toBe('NOT_APPLIED');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
   });
 });
 // A deliberately loose view of JSON documents, so tests can mutate them freely.

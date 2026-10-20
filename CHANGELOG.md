@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — scoped Brownlow migration-evidence decision (2026-10-20)
+
+- Record owner decision D-V2-BROWNLOW-ALT-1: solely for archive `a583fc7d…ed11b04` and the
+  migration-only transition 110 → 111–115, accept raw-vote/audit preservation, identical
+  98-season stored-data reports and passing Brownlow integration/unit checks as the alternative
+  to the unavailable staged Brownlow comparator. Migration compatibility and backend acceptance
+  are PASS for that scope only. The staged comparator stays INCOMPLETE; authentic AFL API vote,
+  identity and leaderboard reconciliation is not established and stays required operationally.
+- `release-gates.ts --brownlow-alternative` applies the decision only to that exact archive,
+  scope and evidence, never over a failure or another incomplete check, and reports the staged
+  comparator and the operational Brownlow requirement separately. Focused tests added.
+- GAP-029 stays open: 149 strict / 99 approved / 50 unapproved, unchanged. Production remains
+  NO-GO. Add the outstanding release requirements checklist; rollback reversal remains tested
+  only with empty V2 ledgers. No production access, archive, migration or deployment occurred.
+
 ### AFLDB V2 — restored settlement compatibility (2026-10-20)
 
 - Isolate settlement insertion fixtures with namespaced synthetic clubs/organisations instead
@@ -24,8 +39,9 @@ commit.
 - Retain 217/217 authentic concluded-match identity correlations and unchanged canonical hashes
   for representative replay/correction/refusal checks. Brownlow alternative: identical 98-season
   stored-only reports before/after migrations, 35 integration and 159 unit/report checks passing.
-  Authentic staged comparison remains unavailable; the scoped owner amendment is unapproved,
-  migration acceptance INCOMPLETE and production NO-GO. See the Linux follow-up report.
+  Authentic staged comparison remains unavailable; the scoped owner amendment was unapproved
+  at that point (approved later the same day as D-V2-BROWNLOW-ALT-1) and production NO-GO.
+  See the Linux follow-up report.
 
 ### AFLDB V2 — isolated Linux archive rehearsal (2026-10-20)
 

@@ -5,7 +5,9 @@ approves separate backend-migration and strict Gridley criteria. GAP-029 stays O
 quality debt: **149 strict / 99 approved / 50 unapproved**. Its 50 findings remain unapproved.
 It is no longer an automatic backend blocker only if production-data preservation and query
 compatibility prove no newly introduced discrepancy and functional contracts, permissions,
-audit and rollback hold. That evidence is currently **INCOMPLETE**; production remains NO-GO.
+audit and rollback hold. That evidence is now **PASS, scoped** to archive `a583fc7d…ed11b04` and
+110 → 115 ([D-V2-BROWNLOW-ALT-1](owner-decision-brownlow-alternative-2026-10-20.md)); the 50
+unapproved findings stay unapproved and strict Gridley stays FAIL. Production remains NO-GO.
 The recommendation/next-decision section below is historical and superseded by that decision.
 See [the concrete rehearsal commands](production-shadow-commands.md). No approved local backup
 is available; no synthetic result substitutes for production parity.

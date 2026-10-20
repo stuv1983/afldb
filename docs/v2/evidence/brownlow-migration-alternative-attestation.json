@@ -1,0 +1,28 @@
+{
+  "decision": "D-V2-BROWNLOW-ALT-1",
+  "archiveSha256": "a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04",
+  "migrationScope": { "from": 110, "to": 115 },
+  "rawVoteAuditPreservation": {
+    "result": "PASS",
+    "evidence": ["docs/v2/linux-rehearsal-2026-10-20.md: complete row, ID, NULL, relationship and definition preservation PASS with zero findings; raw votes and audit history projections PASS"]
+  },
+  "storedReports": {
+    "result": "PASS",
+    "seasons": 98,
+    "beforeSha256": "fea86e5dcbd74027f9d5951a6eb09405b95c2669acb03c5cc3a83613e0346db2",
+    "afterSha256": "fea86e5dcbd74027f9d5951a6eb09405b95c2669acb03c5cc3a83613e0346db2",
+    "evidence": ["docs/v2/linux-rehearsal-followup-2026-10-20.md: complete stored-only Brownlow reports byte-identical on baseline-110 and migrated-115 clones; 98 seasons reconciled, zero findings"]
+  },
+  "integration": {
+    "result": "PASS",
+    "passed": 35,
+    "total": 35,
+    "evidence": ["docs/v2/linux-rehearsal-followup-2026-10-20.md: 35/35 Brownlow integration checks"]
+  },
+  "unitReport": {
+    "result": "PASS",
+    "passed": 159,
+    "total": 159,
+    "evidence": ["docs/v2/linux-rehearsal-followup-2026-10-20.md: 159/159 reconciliation, eligibility and shadow-report unit checks"]
+  }
+}
