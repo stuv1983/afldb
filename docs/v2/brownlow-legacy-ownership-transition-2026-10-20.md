@@ -3,7 +3,14 @@
 Status: **canonical ingestion verified on a clean isolated target. The legacy-ownership transition is
 implemented and demonstrated on a disposable clone only. Production adoption is an OWNER DECISION and
 is unapplied.** Brownlow is therefore **not** operationally ready: until the owner decides and the
-transition is run, all 207 vote sets of 2025 still refuse `ownership_indeterminate` on production data.
+transition is run, all 207 vote sets of 2025 refuse `ownership_indeterminate` on the archived
+production-shaped data. Current live state has not been accessed.
+
+**Current owner-review package:** [guarded production correction package](brownlow-production-approval-package-2026-10-20.md).
+The new separate entry point keeps the isolated CLI unchanged, requires separately approved migration
+116 for immutable receipts, and binds each apply or inverse to a fresh backup/restore baseline,
+exact target identity, season 2025, `afl_api` source, reviewed plan digest and code revision. New local
+rehearsal evidence supplements the completed evidence below; no production adoption is approved.
 
 ## 1. The blocker
 
@@ -106,6 +113,14 @@ first (not required by the adoption, which accepts NULL or equal); (3) `plan` on
 runner (the CLI is isolated-only, same boundary as the backfill); (5) run during a window with no
 settle; (6) verify; keep the export for reversal until the first API settle has written, after which
 reversal is no longer possible by design.
+
+The guarded package supplies `observe`, `backfill`, `adopt`, `eligibility` and narrowly evidenced
+`resolve` requests. Each needs its own fresh execution plan/approval. `reverse-adopt` also requires
+the original receipt/export and an unchanged complete post-baseline: it is **more conservative** than
+the existing inverse. Subsequent API writes continue to refuse reversal; there is no force flag.
+Issue resolution is limited to named ownership-indeterminate findings with all 621 canonical/staged
+vote values and match IDs equal and all 207 current sets API-owned. It does not claim eligibility or
+whole-season reconciliation, and it does not start a canonical settle.
 
 **Out of scope and still unowned by any decision:** 2024 and earlier (no API snapshot, nothing to
 adopt); 2026 (rows are `afltables`-owned, so ordinary API ingestion would refuse them

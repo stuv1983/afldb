@@ -64,7 +64,12 @@ replay and reversal).
 
 ## 5. Production correction proposal (NOT executed; separately reviewable)
 
-Scope: every production `brownlow_round_votes` row with `match_id IS NULL` (expected: all archived rows).
+**Current review package supersedes the old all-season execution scope:**
+[guarded production approval package](brownlow-production-approval-package-2026-10-20.md).
+The new runner refuses 2026 entirely. Proposed production scope is **1984–2025**, expected **320,861**
+NULL rows (330,383 archive rows less 9,522 in 2026), subject to a fresh target census and reviewed plan.
+The historical 330,383-row apply/reverse evidence above is preserved as completed algorithm evidence.
+Its all-season digest is not approval for this narrower scope or any current live baseline.
 
 1. **Gate.** Owner approves this document and names the maintenance window. No timer, deployment or
    settle runs during it (the module itself takes the settle gate exclusively).
@@ -76,9 +81,14 @@ Scope: every production `brownlow_round_votes` row with `match_id IS NULL` (expe
 5. **Apply** with the signed digest in a transaction against production through a **separately reviewed
    target arrangement**: the CLI is deliberately isolated-only, so a production runner is a new, reviewed
    step (it must reuse `applyRoundVoteMatchBackfill` unchanged; no relaxed pin).
+   The separate entry point is `tools/v2/brownlow-production-correction.ts` (`backfill` request), with
+   separately approved migration 116, fresh backup/restore baseline and exact revision/target-bound
+   execution approval. It never runs migration 094 or removes an isolated-tool restriction.
 6. **Verify**: the section 3 fingerprints (only `mapped_rows` changes), indexes valid, FKs validated,
    a public Brownlow page spot check.
-7. **Rollback**: `reverse` with the same export; the fingerprints must return to the pre-apply values.
+7. **Reversal**: a new `reverse-backfill` plan/approval using the original export and receipt, only
+   while the original post-state is unchanged. The guarded inverse refuses later baseline changes.
+   Vote/provenance fingerprints return to pre-apply values; append-only receipts remain.
 
 Residual risks: a production-only row outside the archive population (would surface as an exclusion at
 step 3, by design); concurrent writers (the table lock and settle gate prevent them during apply).

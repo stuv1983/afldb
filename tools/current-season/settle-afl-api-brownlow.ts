@@ -200,7 +200,7 @@ export type LoadedBrownlowSnapshot = {
   leaderboardStatus: string | null;
 };
 
-function loadSnapshot(projectRoot: string, label: string, registry: SourceFamilyRegistry): LoadedBrownlowSnapshot {
+export function loadSnapshot(projectRoot: string, label: string, registry: SourceFamilyRegistry): LoadedBrownlowSnapshot {
   const snapshotDir = join(snapshotRootOf(projectRoot), label);
   const { manifest } = verifyManifest(snapshotDir);
   const season = manifest.season;

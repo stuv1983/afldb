@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — guarded Brownlow correction approval package (2026-10-20)
+
+- Add a separate refusal-first production correction entry point with exact target/revision/season/
+  source/plan approval, fresh backup/restore baseline evidence, locked all-or-nothing execution and
+  immutable replay receipts. Migration 116 is a separate approval prerequisite; correction commands
+  never install schema. Existing isolated backfill/adoption CLIs retain their guards.
+- Reuse the reviewed backfill/adoption/inverse and audited eligibility services, and constrain
+  observe-only staging and named ownership-issue resolution. Preserve vote values, legacy zero-row
+  provenance and all 2026 rows. Refuse reversal after subsequent writes.
+- Re-read every cited AFL eligibility article and outcome follow-ups: all 12 proposed 2025 ineligible
+  rulings supported, including Neale's confirmed unappealed ban. Document a separate tri-state API-era policy proposal,
+  historical-only 1984–2025 backfill scope and exact owner approval package. No production operation
+  or policy approval is implied.
+
 ### AFLDB V2 — Brownlow readiness: leaderboard staging, match_id backfill, ownership transition (2026-10-20)
 
 - Stage the AFL API Brownlow leaderboard on the observation spine and derive the 18-team provider-team-to-club
