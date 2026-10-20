@@ -421,7 +421,9 @@ def parse_match_votes(raw: Any) -> tuple[list[MatchVoteSet], str | None]:
 class LeaderboardEntry:
     provider_player_id: str
     votes: int
-    eligible: bool
+    # BP-2025-ELIGIBILITY-v1: ``None`` = the provider value was absent, null or not a boolean (UNKNOWN). It
+    # is never read as ineligible or eligible; the resolver below refuses a tallied player carrying it.
+    eligible: bool | None
 
 
 def parse_leaderboard(raw: Any) -> tuple[list[LeaderboardEntry], str | None]:
@@ -444,7 +446,7 @@ def parse_leaderboard(raw: Any) -> tuple[list[LeaderboardEntry], str | None]:
         entries.append(LeaderboardEntry(
             provider_player_id=provider_player_id,
             votes=_require_int_from_number(entry.get("totalVotes"), f"{path}.totalVotes"),
-            eligible=entry.get("eligible") is True,
+            eligible=entry.get("eligible") if isinstance(entry.get("eligible"), bool) else None,
         ))
 
     status = row.get("status")
@@ -689,6 +691,11 @@ def resolve_ineligible_player_ids(
             raise BrownlowArtefactSourceError(
                 f"player {player_id} polled votes but has no leaderboard entry to confirm "
                 "eligibility -- refusing rather than assuming eligible")
+        if eligible_by_provider[provider_player_id] is None:
+            raise BrownlowArtefactSourceError(
+                f"player {player_id} (provider {provider_player_id!r}) has an absent, null or non-boolean "
+                "leaderboard eligibility -- unknown eligibility is neither eligible nor ineligible; "
+                "refusing to build the season artefact (BP-2025-ELIGIBILITY-v1)")
         if not eligible_by_provider[provider_player_id]:
             ineligible.add(player_id)
     return ineligible

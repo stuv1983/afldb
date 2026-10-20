@@ -124,11 +124,20 @@ const STUB_SCHEMA = `
     derivation_version text NOT NULL, input_checksum text NOT NULL, derived_at timestamptz NOT NULL,
     published_at timestamptz NOT NULL, published_by integer NOT NULL, supersedes_id integer, winners jsonb NOT NULL);
   CREATE SCHEMA staging;
+  -- Read by the staged-leaderboard loader (always empty here: these suites stage no leaderboard).
+  CREATE TABLE staging.source_records (
+    source_id smallint NOT NULL, family text NOT NULL, external_record_id text NOT NULL,
+    scope_key text, current_version_seq integer, absent_since timestamptz);
+  CREATE TABLE staging.source_record_versions (
+    source_id smallint NOT NULL, family text NOT NULL, external_record_id text NOT NULL,
+    version_seq integer NOT NULL, payload_hash text);
+  CREATE TABLE staging.source_payloads (
+    source_id smallint NOT NULL, family text NOT NULL, payload_hash text NOT NULL, raw_payload jsonb);
   CREATE TABLE staging.afl_api_brownlow_vote (
     source_id smallint NOT NULL, family text NOT NULL, external_record_id text NOT NULL, version_seq integer NOT NULL,
     provider_match_id text NOT NULL, provider_player_id text NOT NULL, provider_team_id text NOT NULL,
     season smallint NOT NULL, api_round_number smallint NOT NULL, canonical_round_number smallint NOT NULL,
-    votes smallint NOT NULL, eligible boolean NOT NULL,
+    votes smallint NOT NULL, eligible boolean,
     match_id integer, player_id integer, club_id integer,
     PRIMARY KEY (source_id, family, external_record_id, provider_player_id));
   INSERT INTO awards (slug) VALUES ('synthetic-medal'), ('brownlow-medal'), ('coleman');
@@ -419,6 +428,8 @@ describe('Brownlow capture', () => {
       withExecutor: ((work: (e: unknown) => Promise<unknown>) => work(pgliteExecutor(db))) as unknown as OperationsDeps['withExecutor'],
       loadRegistry: () => REGISTRY,
       now: NOW,
+      // The capture tool attempts no provider-team mapping, so neither may this comparison (the stub has no `clubs`).
+      loadProviderTeamIdentities: () => { throw new Error('not attempted by the capture tool'); },
     };
     const stage5 = await reconcileBrownlowSeasonForAdmin(SUPER_USER, { season: 2024, eligibilityRule: 'stored_eligible_rank_one' }, deps);
     expect(stage5.ok).toBe(true);

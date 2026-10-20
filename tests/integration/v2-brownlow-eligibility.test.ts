@@ -2,7 +2,7 @@
  * AFLDB V2 Launch F (stream F-D) - the eligibility-aware Brownlow Medal model against a REAL
  * PostgreSQL (docs/v2/adr/0014-brownlow-eligibility.md; migration 113 `brownlow_eligibility_decisions`).
  *
- * What only a database can prove, and is proved here:
+ * What only a database can prove, and is proved here (the BP-2025-ELIGIBILITY-v1 cases are in their own block):
  *  - a decision writes exactly one audit-complete ledger row (decided_by, decided_at, verdict,
  *    citation, note, basis, and the season seal's correction record for a sealed season);
  *  - the superseding chain and the stale-decision refusal; every refusal writes NO row;
@@ -57,9 +57,9 @@ vi.mock('@/lib/auth/session', () => ({
 const auditMock = vi.mocked(audit);
 
 const MARKER = 'fd-elig-it';
-const SEASONS = { tie: 2086, ambiguous: 2087, open: 2088, sealed: 2089, published: 2085 } as const;
+const SEASONS = { tri: 2084, tie: 2086, ambiguous: 2087, open: 2088, sealed: 2089, published: 2085 } as const;
 /** 2088 is open (in progress); 2085-2087 and 2089 are sealed. */
-const REGISTRY: SeasonRegistry = { first_season: 2085, last_season: 2089, in_progress_seasons: [2088] };
+const REGISTRY: SeasonRegistry = { first_season: 2084, last_season: 2089, in_progress_seasons: [2088] };
 
 const NOTE = 'SYNTHETIC ruling: the tribunal outcome was checked against the club statement.';
 const CITATION = 'https://example.invalid/fd-elig-it/ruling';
@@ -79,6 +79,7 @@ let afltablesSourceId = 0;
 let aflApiSourceId = 0;
 let batchId = 0;
 let matchId = 0;
+let triMatchId = 0;
 
 const deps = (): Partial<OperationsDeps> => ({
   withExecutor: (work) => work(executor),
@@ -132,8 +133,10 @@ async function seedStored(season: number, rows: StoredSeed[]): Promise<void> {
   }
 }
 
-async function seedStaged(season: number, votes: Array<{ tag: string; votes: number; eligible: boolean }>): Promise<void> {
-  const providerMatchId = `${MARKER}-m-${season}`;
+async function seedStaged(
+  season: number, votes: Array<{ tag: string; votes: number; eligible: boolean | null }>, forMatchId: number = matchId, suffix = '', round = 1,
+): Promise<void> {
+  const providerMatchId = `${MARKER}-m-${season}${suffix}`;
   const payloadHash = createHash('sha256').update(providerMatchId).digest('hex');
   await owner`
     INSERT INTO staging.source_payloads (source_id, family, payload_hash, hash_recipe, raw_payload)
@@ -150,8 +153,17 @@ async function seedStaged(season: number, votes: Array<{ tag: string; votes: num
         match_id, player_id, club_id, projected_by_batch_id
       ) VALUES (
         ${aflApiSourceId}, 'brownlow_match_votes', ${providerMatchId}, 1, ${providerMatchId},
-        ${`${MARKER}-${vote.tag}`}, ${`${MARKER}-team`}, ${season}, 1, 1, ${vote.votes}, ${vote.eligible},
-        ${matchId}, ${playerIds[vote.tag]}, ${null}, ${batchId})`;
+        ${`${MARKER}-${vote.tag}`}, ${`${MARKER}-team`}, ${season}, ${round}, ${round}, ${vote.votes}, ${vote.eligible},
+        ${forMatchId}, ${playerIds[vote.tag]}, ${null}, ${batchId})`;
+  }
+}
+
+/** Removes one season's staged fixture rows (the BP-2025 cases re-stage the same season repeatedly). */
+async function clearStaged(season: number): Promise<void> {
+  for (const providerMatchId of [`${MARKER}-m-${season}`, `${MARKER}-m-${season}b`]) {
+    await owner`DELETE FROM staging.afl_api_brownlow_vote WHERE provider_match_id = ${providerMatchId}`;
+    await owner`DELETE FROM staging.source_record_versions WHERE external_record_id = ${providerMatchId}`;
+    await owner`DELETE FROM staging.source_payloads WHERE payload_hash = ${createHash('sha256').update(providerMatchId).digest('hex')}`;
   }
 }
 
@@ -186,13 +198,20 @@ beforeAll(async () => {
             ${clubIds[0]}, ${clubIds[1]}, 82, 76, 'home_win', ${clubIds[0]}, 6, 'not_collected')
     RETURNING id::int AS id`;
   matchId = match.id;
+  const [triMatch] = await owner<{ id: number }[]>`
+    INSERT INTO matches (match_key, season, round_code, round_type, round_number, is_final, match_date, venue_raw,
+                         home_club_id, away_club_id, home_score, away_score, result, winner_club_id, margin, attendance_status)
+    VALUES (${`${MARKER}-match-tri`}, ${SEASONS.tri}::smallint, '1', 'home_and_away', 1, false, '2084-03-01'::date, ${MARKER},
+            ${clubIds[0]}, ${clubIds[1]}, 90, 70, 'home_win', ${clubIds[0]}, 20, 'not_collected')
+    RETURNING id::int AS id`;
+  triMatchId = triMatch.id;
   const [batch] = await owner<{ id: number }[]>`
     INSERT INTO import_batches (source_id, tool, target_table)
     VALUES (${aflApiSourceId}, ${MARKER}, 'staging.afl_api_brownlow_vote') RETURNING id::int AS id`;
   batchId = batch.id;
 
   // Players. F1 has no durable identity, F2 two AFL Tables identities, F3 an identity but no votes.
-  for (const tag of ['a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2', 'c3', 'd1', 'd2', 'e1', 'f3']) await seedPlayer(tag, 1);
+  for (const tag of ['a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2', 'c3', 'd1', 'd2', 'e1', 'f3', 'g1', 'g2', 'g3']) await seedPlayer(tag, 1);
   await seedPlayer('f1', 0);
   await seedPlayer('f2', 2);
 
@@ -533,7 +552,7 @@ describe('sealed season 2089: a missing leader, a decision, a superseding decisi
 });
 
 describe('ambiguous: the AFL API flag disagrees with the stored statement (season 2087, staged votes)', () => {
-  it('requires_review naming the ambiguous leader; the loader reads the staged flag; the provider never decides', async () => {
+  it('requires_review naming the ambiguous leader; the loader reads the staged flag; a provider flag contradicting a recorded statement never decides', async () => {
     const view = await determine(SEASONS.ambiguous);
     expect(view.report).toMatchObject({ seasonState: 'complete', basis: 'api_round_votes' });
     expect(view.determination.status).toBe('requires_review');
@@ -546,7 +565,10 @@ describe('ambiguous: the AFL API flag disagrees with the stored statement (seaso
     expect(evidence.players).toEqual([
       { playerId: playerIds.b1, decision: null, stored: { isIneligible: false, eligibleRank: 1 }, stagedFlags: [false] },
       { playerId: playerIds.b2, decision: null, stored: { isIneligible: false, eligibleRank: 2 }, stagedFlags: [true] },
-    ].sort((x, y) => x.playerId - y.playerId));
+    ].map((player) => ({
+      ...player, stagedUnknown: 0,
+      providerProvenance: { source: 'afl_api', families: ['brownlow_match_votes'], observations: 1, versionSeqs: [1], batchIds: [batchId] },
+    })).sort((x, y) => x.playerId - y.playerId));
   });
 
   it('an OPEN-or-sealed decision resolves it: eligible => the leader is determined (the raw votes untouched)', async () => {
@@ -637,6 +659,197 @@ describe('an OPEN season records an open_season decision with no correction (sea
     expect(row).toMatchObject({ basis: 'open_season', correction: null, verdict: 'eligible', decided_by: superAdmin.id });
     expect(result.determination!.determination.status).toBe('season_incomplete');
     expect(result.determination!.sealed).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * BP-2025-ELIGIBILITY-v1: eligible / ineligible / unknown, end to end (season 2084, staged votes)
+ * ------------------------------------------------------------------ */
+
+describe('BP-2025-ELIGIBILITY-v1 against PostgreSQL (season 2084)', () => {
+  const TRI = SEASONS.tri;
+  const sealed2084 = { from: 2084, through: 2089, open: [2088] };
+  type Flag = boolean | null;
+
+  /** Stored rows are bare defaults (no eligible rank): not a recorded statement. g1 starts as the stale default winner. */
+  async function stage(flags: { g1: Flag; g2: Flag; g3: Flag }): Promise<void> {
+    await owner`DELETE FROM brownlow_eligibility_decisions WHERE season = ${TRI}`;
+    await owner`DELETE FROM brownlow_season_votes WHERE season = ${TRI}`;
+    await clearStaged(TRI);
+    await seedStored(TRI, [
+      { tag: 'g1', votes: 3, rank: null, winner: true, voteRank: 1 },
+      { tag: 'g2', votes: 2, rank: null, voteRank: 2 },
+      { tag: 'g3', votes: 1, rank: null, voteRank: 3 },
+    ]);
+    await seedStaged(TRI, [
+      { tag: 'g1', votes: 3, eligible: flags.g1 },
+      { tag: 'g2', votes: 2, eligible: flags.g2 },
+      { tag: 'g3', votes: 1, eligible: flags.g3 },
+    ], triMatchId);
+  }
+
+  async function storedRows() {
+    return owner<{ is_winner: boolean; is_ineligible: boolean; eligible_rank: number | null }[]>`
+      SELECT b.is_winner, b.is_ineligible, b.eligible_rank::int AS eligible_rank
+        FROM brownlow_season_votes b WHERE b.season = ${TRI} ORDER BY b.vote_rank, b.player_id`;
+  }
+  const shape = async () => (await storedRows()).map((r) => [r.is_winner, r.is_ineligible, r.eligible_rank]);
+  const publicationEdits = async () => (await owner`SELECT count(*)::int AS n FROM data_edits WHERE field_group = 'eligibility_publication'`)[0].n as number;
+
+  const publish = (onUnresolved?: 'withhold' | 'refuse') => importSql.begin((tx) => publishBrownlowEligibilityInTransaction(
+    postgresTransactionExecutor(tx), { season: TRI, registry: REGISTRY, actorId: superAdmin.id, note: NOTE, onUnresolved }));
+
+  it('migration 117 relaxed the staged eligible column: NULL is storable', async () => {
+    const [col] = await owner`SELECT is_nullable FROM information_schema.columns
+      WHERE table_schema = 'staging' AND table_name = 'afl_api_brownlow_vote' AND column_name = 'eligible'`;
+    expect(col.is_nullable).toBe('YES');
+    await stage({ g1: null, g2: true, g3: true });
+    const [nulls] = await owner`SELECT count(*)::int AS n FROM staging.afl_api_brownlow_vote
+      WHERE provider_match_id = ${`${MARKER}-m-${TRI}`} AND eligible IS NULL`;
+    expect(nulls.n).toBe(1);
+  });
+
+  it('explicit true everywhere: eligible via the provider snapshot, provenance retained, ranks published, the audit records the evidence', async () => {
+    await stage({ g1: true, g2: true, g3: true });
+    const raw = await rawVoteFingerprint();
+    const view = await determine(TRI);
+    expect(view.determination.status).toBe('determined');
+    expect(view.determination.winners).toEqual([{ playerId: playerIds.g1, votes: 3 }]);
+    expect(view.determination.rawLeaderboard.map((e) => [e.eligibility.status, e.eligibility.source, e.eligibleRank]))
+      .toEqual([['eligible', 'provider_snapshot', 1], ['eligible', 'provider_snapshot', 2], ['eligible', 'provider_snapshot', 3]]);
+    expect(view.determination.rawLeaderboard[0].eligibility.detail.providerProvenance)
+      .toEqual({ source: 'afl_api', families: ['brownlow_match_votes'], observations: 1, versionSeqs: [1], batchIds: [batchId] });
+    const result = await publish();
+    expect(result.publication).toEqual({ state: 'published', unresolvedPlayerIds: [] });
+    expect(await shape()).toEqual([[true, false, 1], [false, false, 2], [false, false, 3]]);
+    const [edit] = await owner`SELECT new_values FROM data_edits
+      WHERE field_group = 'eligibility_publication' AND row_id = ${TRI} ORDER BY id DESC LIMIT 1`;
+    expect(edit.new_values.eligibilityEvidence[0]).toMatchObject({
+      status: 'eligible', source: 'provider_snapshot', provider: 'eligible', providerProvenance: { batchIds: [batchId] },
+    });
+    expect(await rawVoteFingerprint()).toBe(raw);
+  });
+
+  it('explicit false: ineligible by provider evidence; the runner-up wins and the votes are kept', async () => {
+    await stage({ g1: false, g2: true, g3: true });
+    const view = await determine(TRI);
+    expect(view.determination.winners).toEqual([{ playerId: playerIds.g2, votes: 2 }]);
+    expect(view.determination.excludedIneligible).toEqual([{ playerId: playerIds.g1, votes: 3 }]);
+    await publish();
+    expect(await shape()).toEqual([[false, true, null], [true, false, 1], [false, false, 2]]);
+    expect((await storedRows()).length).toBe(3);
+  });
+
+  it('a NULL leader flag is unknown: no winner, no ranks; publication clears the stale default winner but never rewrites eligibility', async () => {
+    await stage({ g1: null, g2: true, g3: true });
+    const raw = await rawVoteFingerprint();
+    const view = await determine(TRI);
+    expect(view.determination).toMatchObject({ status: 'requires_review', winners: [], rankingDeterminate: false });
+    expect(view.determination.rawLeaderboard[0].eligibility).toMatchObject({ status: 'missing', detail: { provider: 'unknown' } });
+    const result = await publish();
+    expect(result.publication).toEqual({ state: 'partial', unresolvedPlayerIds: [playerIds.g1] });
+    expect(await shape()).toEqual([[false, false, null], [false, false, null], [false, false, null]]);
+    expect(await rawVoteFingerprint()).toBe(raw);
+  });
+
+  it('a NULL flag BELOW the winner leaves the winner determined and the lower ranks unstated', async () => {
+    await stage({ g1: true, g2: null, g3: true });
+    const view = await determine(TRI);
+    expect(view.determination.status).toBe('determined');
+    expect(view.determination.winners).toEqual([{ playerId: playerIds.g1, votes: 3 }]);
+    expect(view.determination.rankingDeterminate).toBe(false);
+    expect(view.determination.rawLeaderboard.map((e) => e.eligibleRank)).toEqual([1, null, null]);
+    const result = await publish();
+    expect(result.publication).toEqual({ state: 'withheld', unresolvedPlayerIds: [playerIds.g2] }); // the stale winner flag already agrees
+    expect(await shape()).toEqual([[true, false, null], [false, false, null], [false, false, null]]);
+  });
+
+  it('publication REFUSAL rolls back: with refuse the transaction aborts and nothing changes', async () => {
+    await stage({ g1: null, g2: true, g3: true });
+    const before = await storedRows();
+    const edits = await publicationEdits();
+    await expect(publish('refuse')).rejects.toThrow(/unknown eligibility/);
+    expect(await storedRows()).toEqual(before);
+    expect(await publicationEdits()).toBe(edits);
+  });
+
+  it('a decision recorded in require mode rolls back with the refused publication; nothing is written', async () => {
+    await stage({ g1: null, g2: true, g3: true });
+    const before = await storedRows();
+    const rows = await ledgerCount();
+    // The ruling is about g2, so g1 stays unknown and the publication must refuse.
+    await expect(recordBrownlowEligibilityDecision(executor, request({
+      season: TRI, tag: 'g2', verdict: 'eligible', sealed: sealed2084, publicationRegistry: REGISTRY, publicationMode: 'require',
+    }))).rejects.toThrow(/unknown eligibility/);
+    expect(await ledgerCount()).toBe(rows);
+    expect(await storedRows()).toEqual(before);
+  });
+
+  it('an audited decision resolves the unknown, then a superseding decision flips it; both are published and nothing is edited', async () => {
+    await stage({ g1: null, g2: true, g3: true });
+    const raw = await rawVoteFingerprint();
+    const first = await recordBrownlowEligibilityDecision(executor, request({
+      season: TRI, tag: 'g1', verdict: 'eligible', sealed: sealed2084, publicationRegistry: REGISTRY, publicationMode: 'require',
+    }));
+    expect(first).toMatchObject({ ok: true, publication: { state: 'published', unresolvedPlayerIds: [] } });
+    if (!first.ok) return;
+    expect(await shape()).toEqual([[true, false, 1], [false, false, 2], [false, false, 3]]);
+    const second = await recordBrownlowEligibilityDecision(executor, request({
+      season: TRI, tag: 'g1', verdict: 'ineligible', sealed: sealed2084, expectedCurrentDecisionId: first.decision.id,
+      publicationRegistry: REGISTRY, publicationMode: 'require', note: `${NOTE} Superseded on review.`,
+    }));
+    expect(second).toMatchObject({ ok: true, supersededId: first.decision.id });
+    expect(await shape()).toEqual([[false, true, null], [true, false, 1], [false, false, 2]]);
+    expect((await ledger(TRI)).map((r) => [r.verdict, r.supersedes_id])).toEqual([['eligible', null], ['ineligible', first.decision.id]]);
+    expect(await rawVoteFingerprint()).toBe(raw);
+  });
+
+  it('an audited decision takes precedence over explicit provider evidence in the opposite direction', async () => {
+    await stage({ g1: true, g2: true, g3: true });
+    const result = await recordBrownlowEligibilityDecision(executor, request({
+      season: TRI, tag: 'g1', verdict: 'ineligible', sealed: sealed2084, publicationRegistry: REGISTRY,
+    }));
+    expect(result.ok).toBe(true);
+    const view = await determine(TRI);
+    expect(view.determination.rawLeaderboard[0].eligibility).toMatchObject({ status: 'ineligible', source: 'admin_decision' });
+    expect(view.determination.winners).toEqual([{ playerId: playerIds.g2, votes: 2 }]);
+  });
+
+  it('joint eligible winners are preserved through publication even with an unknown player below them', async () => {
+    await stage({ g1: true, g2: true, g3: null });
+    // Two matches: g1 3+2 and g2 2+3 both finish on 5; g3 (unknown eligibility) finishes on 2.
+    const [homeClub, awayClub] = await owner<{ id: number }[]>`SELECT id::int AS id FROM clubs WHERE slug LIKE ${`${MARKER}-club-%`} ORDER BY slug`;
+    const [matchB] = await owner<{ id: number }[]>`
+      INSERT INTO matches (match_key, season, round_code, round_type, round_number, is_final, match_date, venue_raw,
+                           home_club_id, away_club_id, home_score, away_score, result, winner_club_id, margin, attendance_status)
+      VALUES (${`${MARKER}-match-tri-b`}, ${TRI}::smallint, '2', 'home_and_away', 2, false, '2084-03-08'::date, ${MARKER},
+              ${awayClub.id}, ${homeClub.id}, 70, 80, 'away_win', ${homeClub.id}, 10, 'not_collected')
+      RETURNING id::int AS id`;
+    try {
+      await owner`DELETE FROM brownlow_season_votes WHERE season = ${TRI}`;
+      await clearStaged(TRI);
+      await seedStored(TRI, [
+        { tag: 'g1', votes: 5, rank: null, winner: true, voteRank: 1 },
+        { tag: 'g2', votes: 5, rank: null, voteRank: 1 },
+        { tag: 'g3', votes: 2, rank: null, voteRank: 3 },
+      ]);
+      await seedStaged(TRI, [
+        { tag: 'g1', votes: 3, eligible: true }, { tag: 'g2', votes: 2, eligible: true }, { tag: 'g3', votes: 1, eligible: null },
+      ], triMatchId);
+      await seedStaged(TRI, [
+        { tag: 'g2', votes: 3, eligible: true }, { tag: 'g1', votes: 2, eligible: true }, { tag: 'g3', votes: 1, eligible: null },
+      ], matchB.id, 'b', 2);
+      const view = await determine(TRI);
+      expect(view.determination.status).toBe('determined');
+      expect(view.determination.tie).toBe(true);
+      expect(view.determination.winners.map((w) => w.playerId).sort((a, b) => a - b)).toEqual([playerIds.g1, playerIds.g2].sort((a, b) => a - b));
+      expect(view.determination.rankingDeterminate).toBe(false);
+      await publish();
+      expect((await storedRows()).filter((r) => r.is_winner).length).toBe(2);
+    } finally {
+      await clearStaged(TRI);
+      await owner`DELETE FROM matches WHERE id = ${matchB.id}`;
+    }
   });
 });
 

@@ -78,13 +78,14 @@ export const MEDAL_STATUS_WORDS: Record<BrownlowMedalStatus, { label: string; te
 const ELIGIBILITY_WORDS: Record<BrownlowEligibilityStatus, string> = {
   eligible: 'eligible',
   ineligible: 'ineligible',
-  missing: 'not recorded',
-  ambiguous: 'ambiguous',
+  missing: 'unknown (not recorded)',
+  ambiguous: 'unknown (ambiguous)',
 };
 
 const SOURCE_WORDS: Record<BrownlowPlayerEligibility['source'], string> = {
   admin_decision: 'Administrator decision',
   stored_season_votes: 'Stored season table',
+  provider_snapshot: 'AFL API snapshot (provider evidence)',
   none: '—',
 };
 
@@ -113,7 +114,8 @@ export type ReviewPlayerView = {
 export function reviewPlayersOf(view: BrownlowDeterminationView): ReviewPlayerView[] {
   const identities = new Map(view.identities.map((identity) => [identity.playerId, identity]));
   const currentByIdentity = new Map(view.decisions.filter((decision) => decision.current).map((decision) => [decision.playerIdentity, decision]));
-  return view.determination.playersRequiringReview.map((player) => {
+  // Every unknown vote-getter needs a decision before ranks can be published, not only the deciding group.
+  return view.determination.unresolvedPlayers.map((player) => {
     const identity = identities.get(player.playerId);
     const current = identity?.identity == null ? undefined : currentByIdentity.get(identity.identity);
     return {
@@ -153,8 +155,10 @@ export function MedalDeterminationSection({
         <h2 id="brownlow-medal-heading">Medal determination (eligibility-aware), season {view.season}</h2>
         <p className="section-note">
           Every player&apos;s raw votes are kept. A player is left out of the winner only when
-          authoritative stored evidence marks them ineligible. If the leader&apos;s eligibility is
-          missing or ambiguous, no winner is invented: the result asks for a review.
+          authoritative evidence (an administrator decision, a recorded stored statement or a consistent
+          explicit AFL API flag) marks them ineligible. Eligibility is eligible, ineligible or unknown;
+          unknown is never treated as either. If an unknown player could change the winner, no winner is
+          invented and the result asks for a review.
         </p>
         <dl className="audit-kv">
           <dt>Status</dt>
@@ -202,6 +206,17 @@ export function MedalDeterminationSection({
         {view.storedFlagCheck.state === 'agrees' && (
           <p className="muted" data-stored-flag-agreement="true">The stored winner flags agree with this determination.</p>
         )}
+        {determination.unresolvedPlayers.length > 0 && (
+          <p className="notice" role="note" data-ranking-indeterminate="true">
+            <strong>Eligible ranks are not stated and nothing is published.</strong>{' '}
+            {determination.unresolvedPlayers.length} vote-getter{determination.unresolvedPlayers.length === 1 ? ' has' : 's have'} unknown
+            eligibility ({determination.unresolvedPlayers.map((player) => `player ${player.playerId}, ${player.votes} votes`).join('; ')}).
+            {determination.status === 'determined'
+              ? ' The winner is unaffected because no unknown player polled as many votes as the winner, but every eligible rank below an unknown player is uncertain.'
+              : ''}
+            {' '}The stored winner flags and eligible ranks are left exactly as they were until each one is resolved by an audited decision.
+          </p>
+        )}
         {determination.excludedIneligible.length > 0 && (
           <p className="section-note" data-medal-excluded="true">
             Excluded as ineligible (their votes are still in the leaderboard):{' '}
@@ -212,7 +227,7 @@ export function MedalDeterminationSection({
 
       <section className="section" id="brownlow-review" aria-labelledby="brownlow-review-heading">
         <h2 id="brownlow-review-heading">Players requiring review</h2>
-        {determination.status !== 'requires_review' && (
+        {determination.unresolvedPlayers.length === 0 && (
           <p className="muted" data-no-review="true">No player needs an eligibility decision for this season right now.</p>
         )}
         {reviewPanel}
@@ -292,6 +307,7 @@ function LeaderboardTable({ rows }: { rows: BrownlowDeterminationView['determina
             <th scope="col" className="num">Rank</th>
             <th scope="col" className="num">Player id</th>
             <th scope="col" className="num">Votes</th>
+            <th scope="col" className="num">Eligible rank</th>
             <th scope="col">Eligibility</th>
             <th scope="col">Source</th>
             <th scope="col">Why</th>
@@ -303,6 +319,9 @@ function LeaderboardTable({ rows }: { rows: BrownlowDeterminationView['determina
               <td className="num">{entry.rank}</td>
               <td className="num">{entry.playerId}</td>
               <td className="num">{entry.votes}</td>
+              <td className="num" data-eligible-rank={entry.eligibleRank ?? 'not-stated'}>
+                {entry.eligibleRank ?? (entry.eligibility.status === 'ineligible' ? '—' : 'not stated')}
+              </td>
               <td>{eligibilityBadge(entry.eligibility.status)}</td>
               <td>{SOURCE_WORDS[entry.eligibility.source]}</td>
               <td style={wrap}>{entry.eligibility.detail.reason}</td>

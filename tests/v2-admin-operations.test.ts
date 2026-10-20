@@ -678,7 +678,7 @@ describe('Brownlow loader (fake executor)', () => {
     expect(input.leaderboard?.entries.map((e) => [e.providerPlayerId, e.playerId, e.totalVotes, e.eligible, e.winner]))
       .toEqual([['P1', 11, 3, true, false], ['P2', null, 3, true, false], ['P3', null, 9, false, true]]);
     expect(staging.leaderboard).toEqual({
-      staged: true, status: 'CONCLUDED', entries: 3, ineligibleEntries: 1, winnerEntries: 1, unresolvedPlayers: 2, absentEntries: 2,
+      staged: true, status: 'CONCLUDED', entries: 3, ineligibleEntries: 1, unknownEligibilityEntries: 0, winnerEntries: 1, unresolvedPlayers: 2, absentEntries: 2,
     });
     const query = executor.calls.find((call) => call.text.includes("r.family = 'brownlow_leaderboard'"));
     expect(query?.params).toEqual([2024, 'afl_api']);

@@ -15,6 +15,30 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — Brownlow eligibility is eligible / ineligible / unknown (BP-2025-ELIGIBILITY-v1) (2026-10-20)
+
+- Implement the approved eligibility policy locally: a current audited decision wins; otherwise a consistent
+  explicit AFL API boolean decides with its provenance retained (`provider_snapshot`); an absent, null,
+  malformed, conflicting or incomplete provider value is **unknown** and is never read as ineligible or eligible.
+  Unknown eligibility that could change the winner refuses a winner, an unknown below the winner leaves the winner
+  determined but the lower eligible ranks unstated, joint eligible winners and raw vote totals are preserved, and
+  `stored_eligible_rank_one` is not selected. The legacy `eligible === true` coercion is removed from the AFL API
+  emitters, the staged-vote loader, reconciliation, the Python season-artefact builder (which now refuses a tallied
+  player with unknown eligibility), publication and the operations view, which now names unknown players, says the
+  stored flags/ranks are left unchanged, and shows "not stated" ranks.
+- Publication writes eligible ranks and ineligibility flags only when every vote-getter's eligibility is known;
+  otherwise only the winner flags follow the determination (`partial`) or nothing changes (`withheld`), and a
+  `refuse` mode rolls the whole transaction (including the decision) back.
+- **New migration `117_brownlow_provider_eligibility_unknown.sql`** (not deployed; needs its own schema approval):
+  drops `NOT NULL` from `staging.afl_api_brownlow_vote.eligible` so NULL can mean unknown. Migration 116 is unchanged.
+- Verified only on disposable copies of the 2025 template: 117 applied from 115/116 with the staged-vote and season-vote
+  fingerprints unchanged and idempotent on re-run; eligibility integration 45/45 (10 new cases); production-correction
+  integration 8/8 on a fresh clone; the authentic 2025 snapshot with the twelve approved rulings applied only in a
+  labelled isolated copy 3/3; typecheck clean; no new lint finding. No production or shared access, correction,
+  deployment, timer change or push. See `docs/v2/brownlow-eligibility-implementation-2026-10-20.md`.
+- Test-suite repairs found on the way: `reference-data.test.ts` now names the pre-existing `brownlow_correction_receipts`
+  table; `v2-shadow-award-reports.test.ts`'s stub schema gained the staged-leaderboard tables its loader reads.
+
 ### AFLDB V2 — Brownlow policy decisions and isolated follow-up (2026-10-20)
 
 - Record D-V2-BROWNLOW-ELIGIBILITY-1, OD-BROWNLOW-OWNERSHIP-1 and

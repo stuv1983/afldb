@@ -129,7 +129,7 @@ export function BrownlowStagingView({ staging }: { staging: BrownlowStagingEvide
         <dt>Leaderboard</dt>
         <dd data-staging-leaderboard={board.staged ? 'staged' : 'not-staged'}>
           {board.staged
-            ? `${board.entries} entries (status ${board.status ?? 'not recorded'}), ${board.ineligibleEntries} marked ineligible by the provider, ${board.winnerEntries} marked winner`
+            ? `${board.entries} entries (status ${board.status ?? 'not recorded'}), ${board.ineligibleEntries} marked ineligible by the provider, ${board.winnerEntries} marked winner${board.unknownEligibilityEntries > 0 ? `, ${board.unknownEligibilityEntries} with unknown eligibility (absent, null or not a boolean; neither eligible nor ineligible)` : ''}`
             : 'not staged'}
         </dd>
         <dt>Unresolved leaderboard players</dt>
@@ -362,7 +362,7 @@ export function BrownlowReportView({
                   <tr key={entry.playerId}>
                     <td className="num">{entry.playerId}</td>
                     <td className="num">{entry.votes}</td>
-                    <td>{entry.eligible ? 'eligible' : 'ineligible'}</td>
+                    <td>{entry.eligible === null ? 'unknown' : entry.eligible ? 'eligible' : 'ineligible'}</td>
                   </tr>
                 ))}
               </tbody>

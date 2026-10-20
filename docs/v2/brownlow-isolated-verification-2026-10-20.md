@@ -172,7 +172,9 @@ schema path first. After the approved schema is installed, acquire a fresh post-
 matching restored/live correction baseline before planning `observe`. An earlier schema-110 backup
 or the current isolated schema-115 template is not silently substituted for that correction baseline.
 
-V2-GAP-016/030/031 remain open for implementation and/or separately approved execution. The approved
+V2-GAP-016/030/031 remain open for implementation and/or separately approved execution. (Update: the V2-GAP-016 runtime was later
+implemented and isolated-verified in a separate change with new migration 117; see the
+[implementation record](brownlow-eligibility-implementation-2026-10-20.md). Production rollout remains pending.) The approved
 eligibility policy's unknown semantics, provider evidence precedence and authoritative ranking
 refusal are not fully implemented by legacy boolean storage/emission or the explicit existing
 season-rule contract. This task changes no runtime code, selects no global stored-rank shortcut and

@@ -14,17 +14,31 @@
  * NEVER reads `report.rawVotes.playerTotals[].eligible` for a status: that boolean folds the
  * provider flags and the stored flags together, so using it would let a provider proposal decide.
  *
- * AUTHORITATIVE ELIGIBILITY EVIDENCE, per (season, player), in precedence order:
+ * AUTHORITATIVE ELIGIBILITY EVIDENCE, per (season, player), in precedence order
+ * (BP-2025-ELIGIBILITY-v1, docs/v2/brownlow-eligibility-ruling-2026-10-20.md section 4a, which
+ * supersedes the earlier "a provider flag never decides" wording of ADR 0014):
  *   1. the CURRENT administrator decision (`brownlow_eligibility_decisions`, source `admin_decision`);
  *   2. else the season's `brownlow_season_votes` row, but ONLY as a RECORDED statement (source
  *      `stored_season_votes`): `is_ineligible = true` => ineligible; `is_ineligible = false` =>
  *      eligible only when the season is admin-published (`brownlow_season_authority`) or the row
  *      carries a non-NULL `eligible_rank`. `is_ineligible` is NOT NULL DEFAULT false, so a bare
- *      `false` is a default, not a statement; without either corroboration it is NOT recorded;
- *   3. the AFL API staged flag is a provider PROPOSAL: it can make a status `ambiguous` (it
- *      disagrees with a recorded stored statement, or a player's own flags disagree, or the
- *      reconciliation reports `eligibility_flag_inconsistent` for the player) but it never decides
- *      one. With no decision and no recorded stored statement the status is `missing`.
+ *      `false` is a default, not a statement; without either corroboration it is NOT recorded. In a
+ *      season that has provider snapshot evidence, a player the snapshot does not carry cannot be
+ *      made eligible by a rank alone: that is the unevaluated legacy default, so it is not recorded;
+ *   3. else a CONSISTENT, EXPLICIT boolean on the current identified AFL API snapshot (source
+ *      `provider_snapshot`, with its source/version/batch provenance retained). It is provider
+ *      evidence, not a tribunal finding. It decides only when no recorded stored statement exists.
+ *
+ * UNKNOWN. A player is `missing` or `ambiguous` (both are the policy's `unknown`, see
+ * {@link brownlowEligibilityState}) and never silently eligible or ineligible when: no evidence
+ * exists; the provider value is absent, null or not a boolean; the provider's own records conflict
+ * or are incomplete; a provider flag disagrees with a recorded stored statement; or the
+ * reconciliation reports `eligibility_flag_inconsistent` for the player. Only an administrator
+ * decision resolves an unreviewed disagreement.
+ *
+ * RANKING. A player's eligible rank is stated only when no unknown player polled strictly more votes
+ * (an unknown player may be ineligible or eligible, and either changes the rank). `rankingDeterminate`
+ * is true only when no vote-getter is unknown; publication of stored ranks depends on it.
  *
  * MEDAL DETERMINATION. Gating first (pass-through `refused_whole_set`, `season_incomplete`,
  * `no_vote_evidence`, and `refused_unreconciled_evidence` for any `discrepancy` finding other than
@@ -54,8 +68,15 @@ export type BrownlowEligibilityVerdict = (typeof BROWNLOW_ELIGIBILITY_VERDICTS)[
 export const BROWNLOW_ELIGIBILITY_STATUSES = ['eligible', 'ineligible', 'missing', 'ambiguous'] as const;
 export type BrownlowEligibilityStatus = (typeof BROWNLOW_ELIGIBILITY_STATUSES)[number];
 
+/** The policy's three states: `missing` and `ambiguous` are the two ways a player is `unknown`. */
+export type BrownlowEligibilityState = 'eligible' | 'ineligible' | 'unknown';
+
+export function brownlowEligibilityState(status: BrownlowEligibilityStatus): BrownlowEligibilityState {
+  return status === 'eligible' || status === 'ineligible' ? status : 'unknown';
+}
+
 /** Where a status came from. `none` = no authoritative evidence decided it (missing, or ambiguous without a stored statement). */
-export const BROWNLOW_ELIGIBILITY_SOURCES = ['admin_decision', 'stored_season_votes', 'none'] as const;
+export const BROWNLOW_ELIGIBILITY_SOURCES = ['admin_decision', 'stored_season_votes', 'provider_snapshot', 'none'] as const;
 export type BrownlowEligibilitySource = (typeof BROWNLOW_ELIGIBILITY_SOURCES)[number];
 
 export const BROWNLOW_MEDAL_STATUSES = [
@@ -88,6 +109,20 @@ export interface BrownlowStoredEligibilityFact {
   eligibleRank: number | null;
 }
 
+/** Where the staged provider flags of one player came from (retained so a provider-decided status can be traced). */
+export interface BrownlowProviderProvenance {
+  /** `sources.key` of the provider source. */
+  source: string;
+  /** Provider families the observations came from (`brownlow_match_votes`, `brownlow_leaderboard`), ascending. */
+  families: readonly string[];
+  /** Staged provider records read for the player (explicit and unknown alike). */
+  observations: number;
+  /** Spine record versions the observations were projected from, ascending. */
+  versionSeqs: readonly number[];
+  /** Import batches that projected them, ascending. */
+  batchIds: readonly number[];
+}
+
 /** Raw eligibility evidence for ONE vote-getter. A vote-getter with no entry here has none of it. */
 export interface BrownlowPlayerEligibilityEvidence {
   playerId: number;
@@ -95,8 +130,12 @@ export interface BrownlowPlayerEligibilityEvidence {
   decision: BrownlowDecisionFact | null;
   /** The season's stored row, or null when the player has none. */
   stored: BrownlowStoredEligibilityFact | null;
-  /** The AFL API staged `eligible` flags seen for the player (any number, repeats allowed); empty = none staged. */
+  /** The EXPLICIT AFL API staged `eligible` flags seen for the player (any number, repeats allowed); empty = none explicit. */
   stagedFlags: readonly boolean[];
+  /** Staged provider records whose eligibility was absent, null or not a boolean (UNKNOWN). Default 0. */
+  stagedUnknown?: number;
+  /** Source/version/batch evidence behind the staged records, or null/absent when none are staged. */
+  providerProvenance?: BrownlowProviderProvenance | null;
 }
 
 export interface BrownlowMedalInput {
@@ -117,8 +156,15 @@ export interface BrownlowEligibilityDetail {
   /** What the stored row amounts to: no row, a default-only `false`, or a recorded statement. */
   stored: 'no_row' | 'not_recorded' | 'recorded_ineligible' | 'recorded_eligible';
   storedEligibleRank: number | null;
-  /** What the staged provider flags say (a proposal only). */
-  provider: 'none' | 'eligible' | 'ineligible' | 'conflicting';
+  /**
+   * What the staged provider records say: nothing staged; one consistent explicit value; their own flags
+   * disagree (`conflicting`); some records carry no usable boolean (`unknown`: none do; `incomplete`: some do).
+   */
+  provider: 'none' | 'eligible' | 'ineligible' | 'conflicting' | 'unknown' | 'incomplete';
+  /** Staged provider records with no usable eligibility boolean. */
+  providerUnknownRecords: number;
+  /** Retained provider provenance, or null when nothing is staged. */
+  providerProvenance: BrownlowProviderProvenance | null;
   /** The reconciliation reported `eligibility_flag_inconsistent` for this player. */
   reportFlagInconsistent: boolean;
   /** One sentence, for people. */
@@ -139,6 +185,13 @@ export interface BrownlowRawLeaderboardEntry {
   /** Competition rank over ALL vote-getters (1, 2, 2, 4 ...). */
   rank: number;
   eligibility: BrownlowPlayerEligibility;
+  /**
+   * Competition rank among eligible players. Null for an ineligible or unknown player, and for an eligible
+   * player whose rank an unknown player with more votes could change (`eligibleRankDeterminate` false).
+   */
+  eligibleRank: number | null;
+  /** False for an unknown player and for an eligible player an unknown player with more votes could outrank. */
+  eligibleRankDeterminate: boolean;
 }
 
 export interface BrownlowMedalWinner {
@@ -177,6 +230,10 @@ export interface BrownlowMedalDetermination {
   excludedIneligible: BrownlowMedalWinner[];
   /** Missing/ambiguous players in the deciding group when `requires_review`; empty otherwise. */
   playersRequiringReview: BrownlowReviewPlayer[];
+  /** EVERY missing/ambiguous vote-getter of the season, wherever they rank (lower-ranked unknowns included). */
+  unresolvedPlayers: BrownlowReviewPlayer[];
+  /** True only when no vote-getter is unknown, so every eligible rank is stated. Publication depends on it. */
+  rankingDeterminate: boolean;
   /** Why the gating refused (`refused_unreconciled_evidence` only); empty otherwise. */
   blockingFindings: BrownlowBlockingFinding[];
   blockingFindingCount: number;
@@ -258,6 +315,19 @@ export function validateBrownlowMedalInput(input: unknown): string[] {
       if (!Array.isArray(player.stagedFlags) || !player.stagedFlags.every((flag: unknown) => typeof flag === 'boolean')) {
         problems.push(`${path}.stagedFlags must be an array of booleans.`);
       }
+      if (player.stagedUnknown !== undefined && !(typeof player.stagedUnknown === 'number' && Number.isSafeInteger(player.stagedUnknown) && player.stagedUnknown >= 0)) {
+        problems.push(`${path}.stagedUnknown must be a non-negative integer when present.`);
+      }
+      const provenance = player.providerProvenance;
+      if (provenance !== undefined && provenance !== null) {
+        if (!isRecord(provenance) || typeof provenance.source !== 'string' || provenance.source.length === 0
+          || !Array.isArray(provenance.families) || !provenance.families.every((family: unknown) => typeof family === 'string')
+          || !(typeof provenance.observations === 'number' && Number.isSafeInteger(provenance.observations) && provenance.observations >= 0)
+          || !Array.isArray(provenance.versionSeqs) || !provenance.versionSeqs.every(isPositiveInt)
+          || !Array.isArray(provenance.batchIds) || !provenance.batchIds.every(isPositiveInt)) {
+          problems.push(`${path}.providerProvenance must be null or { source, families, observations, versionSeqs, batchIds }.`);
+        }
+      }
     });
   }
   return problems;
@@ -271,6 +341,7 @@ export function validateBrownlowMedalInput(input: unknown): string[] {
  * A reconciliation finding that is about ELIGIBILITY EVIDENCE rather than about the vote evidence,
  * and so is handled per player instead of refusing the season:
  *   - `eligibility_flag_inconsistent` becomes that player's `ambiguous` status;
+ *   - `eligibility_provider_unknown` makes that player's provider evidence unknown (`missing` or `ambiguous`);
  *   - `stored_rank_inconsistent` on `eligible_rank` where the STORED rank is NULL reports that the
  *     stored row carries no eligible rank for a non-ineligible player. That is an absent
  *     statement ("not recorded", never a wrong rank), exactly the gap the `missing` status exists
@@ -282,6 +353,8 @@ export function isEligibilityEvidenceFinding(finding: BrownlowFinding): boolean 
   // A superseding decision may deliberately disagree with the old projection.
   if (finding.code === 'stored_winner_flag_inconsistent') return true;
   if (finding.code === 'eligibility_flag_inconsistent') return true;
+  // An absent/null/malformed provider flag is the player's unknown status, not a season-wide evidence failure.
+  if (finding.code === 'eligibility_provider_unknown') return true;
   return finding.code === 'stored_rank_inconsistent'
     && finding.detail.field === 'eligible_rank'
     && finding.detail.stored === null;
@@ -295,29 +368,40 @@ function blockingFindingsOf(report: BrownlowReconciliationReport): BrownlowFindi
  * Per-player eligibility
  * ------------------------------------------------------------------ */
 
-function providerOf(flags: ReadonlySet<boolean>): BrownlowEligibilityDetail['provider'] {
-  if (flags.size === 0) return 'none';
+function providerOf(flags: ReadonlySet<boolean>, unknownRecords: number): BrownlowEligibilityDetail['provider'] {
   if (flags.size > 1) return 'conflicting';
+  if (flags.size === 0) return unknownRecords > 0 ? 'unknown' : 'none';
+  if (unknownRecords > 0) return 'incomplete';
   return flags.has(true) ? 'eligible' : 'ineligible';
 }
 
 /**
  * The eligibility status of one vote-getter from its raw evidence (precedence: decision, recorded
- * stored statement, provider proposal). Pure and total.
+ * stored statement, consistent explicit provider snapshot). Pure and total. `providerSeason` is true
+ * when the season carries any staged provider eligibility evidence (see the module header).
  */
 export function evaluateBrownlowEligibility(
   evidence: Omit<BrownlowPlayerEligibilityEvidence, 'playerId'> | null,
-  context: { seasonAdminPublished: boolean; reportFlagInconsistent: boolean },
+  context: { seasonAdminPublished: boolean; reportFlagInconsistent: boolean; providerSeason?: boolean; reportProviderUnknown?: boolean },
 ): BrownlowPlayerEligibility {
   const decision = evidence === null ? null : evidence.decision;
   const stored = evidence === null ? null : evidence.stored;
-  const provider = providerOf(new Set(evidence === null ? [] : evidence.stagedFlags));
+  // The reconciliation also reports a provider value that is not a usable boolean (for example on the staged
+  // leaderboard); that is the same unknown evidence even when the staged vote records are all explicit.
+  const unknownRecords = Math.max(evidence === null ? 0 : evidence.stagedUnknown ?? 0, context.reportProviderUnknown === true ? 1 : 0);
+  const provenance = evidence === null ? null : evidence.providerProvenance ?? null;
+  const provider = providerOf(new Set(evidence === null ? [] : evidence.stagedFlags), unknownRecords);
+  const providerUsable = provider === 'eligible' || provider === 'ineligible';
 
   let storedState: BrownlowEligibilityDetail['stored'] = 'no_row';
   if (stored !== null) {
     if (stored.isIneligible) storedState = 'recorded_ineligible';
-    else if (context.seasonAdminPublished || stored.eligibleRank !== null) storedState = 'recorded_eligible';
-    else storedState = 'not_recorded';
+    else if (context.seasonAdminPublished) storedState = 'recorded_eligible';
+    else if (stored.eligibleRank !== null) {
+      // A rank alone is the unevaluated legacy default wherever the provider snapshot should have spoken:
+      // the season has provider evidence but this player has no usable provider value.
+      storedState = context.providerSeason === true && !providerUsable ? 'not_recorded' : 'recorded_eligible';
+    } else storedState = 'not_recorded';
   }
   const base = {
     decisionId: decision === null ? null : decision.decisionId,
@@ -325,6 +409,8 @@ export function evaluateBrownlowEligibility(
     stored: storedState,
     storedEligibleRank: stored === null ? null : stored.eligibleRank,
     provider,
+    providerUnknownRecords: unknownRecords,
+    providerProvenance: provenance,
     reportFlagInconsistent: context.reportFlagInconsistent,
   };
 
@@ -339,18 +425,20 @@ export function evaluateBrownlowEligibility(
   const statement: BrownlowEligibilityVerdict | null = storedState === 'recorded_ineligible'
     ? 'ineligible'
     : storedState === 'recorded_eligible' ? 'eligible' : null;
-  const providerDisagrees = statement !== null && (provider === 'eligible' || provider === 'ineligible') && provider !== statement;
+  const providerDisagrees = statement !== null && providerUsable && provider !== statement;
 
-  if (provider === 'conflicting' || providerDisagrees || context.reportFlagInconsistent) {
+  if (provider === 'conflicting' || provider === 'incomplete' || providerDisagrees || context.reportFlagInconsistent) {
     const why = provider === 'conflicting'
       ? 'the provider\'s own eligibility flags for the player disagree with each other'
-      : providerDisagrees
-        ? `the provider flags the player ${provider} but the stored row records ${statement}`
-        : 'the reconciliation reports inconsistent eligibility flags for the player';
+      : provider === 'incomplete'
+        ? 'some of the provider\'s eligibility records for the player carry no usable true/false value'
+        : providerDisagrees
+          ? `the provider flags the player ${provider} but the stored row records ${statement}`
+          : 'the reconciliation reports inconsistent eligibility flags for the player';
     return {
       status: 'ambiguous',
       source: statement === null ? 'none' : 'stored_season_votes',
-      detail: { ...base, reason: `Ambiguous: ${why}. A provider flag never decides eligibility; an administrator decision is needed.` },
+      detail: { ...base, reason: `Ambiguous: ${why}. Eligibility is unknown until an administrator decision resolves it.` },
     };
   }
   if (statement !== null) {
@@ -367,10 +455,23 @@ export function evaluateBrownlowEligibility(
       },
     };
   }
-  const observed = provider === 'none' ? 'no provider flag was staged' : `the provider flags the player ${provider}, which is a proposal only`;
+  if (providerUsable) {
+    return {
+      status: provider as BrownlowEligibilityVerdict,
+      source: 'provider_snapshot',
+      detail: {
+        ...base,
+        reason: `The AFL API snapshot consistently flags the player ${provider} (${provenance === null ? 'provenance not supplied' : `${provenance.observations} staged record${provenance.observations === 1 ? '' : 's'} from ${provenance.source}`}). `
+          + 'This is provider evidence, not a tribunal finding; no administrator decision or recorded stored statement exists.',
+      },
+    };
+  }
+  const observed = provider === 'unknown'
+    ? 'the provider\'s eligibility value is absent, null or not a boolean, which is unknown rather than false'
+    : 'no provider flag was staged';
   const storedWords = storedState === 'no_row'
     ? 'the player has no stored row for the season'
-    : 'the stored row is a bare default (is_ineligible false, no eligible rank, season not administrator-published)';
+    : 'the stored row is a bare default (is_ineligible false, no eligible rank or an unevaluated rank, season not administrator-published)';
   return {
     status: 'missing',
     source: 'none',
@@ -405,21 +506,58 @@ export function determineBrownlowMedal(input: BrownlowMedalInput): BrownlowMedal
   const evidenceById = new Map(input.players.map((player) => [player.playerId, player]));
   const flagInconsistent = new Set<number>();
   for (const finding of report.findings) {
-    if (finding.code === 'eligibility_flag_inconsistent' && finding.playerId !== null) flagInconsistent.add(finding.playerId);
+    // A `stored` finding compares the provider with the stored flag, which is only a statement when it was recorded;
+    // that comparison is made below against the recorded statement, so an unevaluated stored default never counts here.
+    if (finding.code === 'eligibility_flag_inconsistent' && finding.playerId !== null && finding.detail.source !== 'stored') {
+      flagInconsistent.add(finding.playerId);
+    }
   }
+  // A season carries provider snapshot evidence when any of its players has a staged provider record.
+  const providerUnknownByReport = new Set<number>();
+  for (const finding of report.findings) {
+    if (finding.code === 'eligibility_provider_unknown' && finding.playerId !== null) providerUnknownByReport.add(finding.playerId);
+  }
+  const providerSeason = providerUnknownByReport.size > 0
+    || input.players.some((player) => player.stagedFlags.length > 0 || (player.stagedUnknown ?? 0) > 0);
 
   // The raw leaderboard: copied, never mutated, never filtered. Rank is a competition rank.
   const totals = [...report.rawVotes.playerTotals].sort(compareTotals);
-  const rawLeaderboard: BrownlowRawLeaderboardEntry[] = totals.map((total) => ({
-    playerId: total.playerId,
-    votes: total.votes,
-    matchesPolled: total.matchesPolled,
-    rank: 1 + totals.filter((other) => other.votes > total.votes).length,
+  const evaluated = totals.map((total) => ({
+    total,
     eligibility: evaluateBrownlowEligibility(evidenceById.get(total.playerId) ?? null, {
       seasonAdminPublished,
       reportFlagInconsistent: flagInconsistent.has(total.playerId),
+      providerSeason,
+      reportProviderUnknown: providerUnknownByReport.has(total.playerId),
     }),
   }));
+  const isUnknown = (e: BrownlowPlayerEligibility): boolean => brownlowEligibilityState(e.status) === 'unknown';
+  const rawLeaderboard: BrownlowRawLeaderboardEntry[] = evaluated.map(({ total, eligibility }) => {
+    // The eligible rank is stated only when no unknown player with strictly more votes could change it.
+    const outrankable = evaluated.some((other) => isUnknown(other.eligibility) && other.total.votes > total.votes);
+    const determinate = eligibility.status === 'ineligible' || (eligibility.status === 'eligible' && !outrankable);
+    return {
+      playerId: total.playerId,
+      votes: total.votes,
+      matchesPolled: total.matchesPolled,
+      rank: 1 + totals.filter((other) => other.votes > total.votes).length,
+      eligibility,
+      eligibleRank: eligibility.status === 'eligible' && determinate
+        ? 1 + evaluated.filter((other) => other.eligibility.status === 'eligible' && other.total.votes > total.votes).length
+        : null,
+      eligibleRankDeterminate: determinate,
+    };
+  });
+  const unresolvedPlayers: BrownlowReviewPlayer[] = rawLeaderboard
+    .filter((entry) => entry.eligibility.status === 'missing' || entry.eligibility.status === 'ambiguous')
+    .map((entry): BrownlowReviewPlayer => ({
+      playerId: entry.playerId,
+      votes: entry.votes,
+      status: entry.eligibility.status as 'missing' | 'ambiguous',
+      reason: entry.eligibility.detail.reason,
+    }))
+    .sort((a, b) => b.votes - a.votes || a.playerId - b.playerId);
+  const rankingDeterminate = unresolvedPlayers.length === 0;
 
   const blocking = blockingFindingsOf(report);
   const checksum = createHash('sha256').update(canonicalJson({
@@ -443,6 +581,9 @@ export function determineBrownlowMedal(input: BrownlowMedalInput): BrownlowMedal
         decision: evidence === undefined ? null : evidence.decision,
         stored: evidence === undefined ? null : evidence.stored,
         stagedFlags: evidence === undefined ? [] : [...new Set(evidence.stagedFlags)].sort(),
+        // Added only when present so a checksum over evidence without them is unchanged.
+        ...(evidence !== undefined && (evidence.stagedUnknown ?? 0) > 0 ? { stagedUnknown: evidence.stagedUnknown } : {}),
+        ...(evidence !== undefined && evidence.providerProvenance ? { providerProvenance: evidence.providerProvenance } : {}),
       };
     }),
   })).digest('hex');
@@ -463,6 +604,8 @@ export function determineBrownlowMedal(input: BrownlowMedalInput): BrownlowMedal
     tie: parts.tie ?? null,
     excludedIneligible: parts.excludedIneligible ?? [],
     playersRequiringReview: parts.playersRequiringReview ?? [],
+    unresolvedPlayers,
+    rankingDeterminate,
     blockingFindings: status === 'refused_unreconciled_evidence'
       ? blocking.slice(0, BROWNLOW_MEDAL_BLOCKING_FINDINGS_LIMIT).map((finding) => ({ code: finding.code, playerId: finding.playerId }))
       : [],

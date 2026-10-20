@@ -70,7 +70,8 @@ export interface BrownlowVoteInput {
   /** The resolved club id, or null when club identity is not resolved (the settle writes NULL today). */
   clubId: number | null;
   votes: number;
-  eligible: boolean;
+  /** The provider's explicit flag; null = absent, null or not a boolean in the source (UNKNOWN, never false). */
+  eligible: boolean | null;
 }
 
 export interface BrownlowMatchVotesInput {
@@ -89,7 +90,8 @@ export interface BrownlowLeaderboardEntryInput {
   playerId: number | null;
   /** The leaderboard's own season total (the feed's `totalVotes`). */
   totalVotes: number;
-  eligible: boolean;
+  /** The provider's explicit flag; null = absent, null or not a boolean in the source (UNKNOWN, never false). */
+  eligible: boolean | null;
   winner: boolean;
   leader: boolean;
 }
@@ -207,7 +209,7 @@ export function validateBrownlowReconciliationInput(input: unknown): string[] {
           if (!isPositiveIntOrNull(vote.playerId)) problems.push(`${votePath}.playerId must be a positive integer or null.`);
           if (!isPositiveIntOrNull(vote.clubId)) problems.push(`${votePath}.clubId must be a positive integer or null.`);
           if (!isInt(vote.votes)) problems.push(`${votePath}.votes must be an integer.`);
-          if (typeof vote.eligible !== 'boolean') problems.push(`${votePath}.eligible must be a boolean.`);
+          if (vote.eligible !== null && typeof vote.eligible !== 'boolean') problems.push(`${votePath}.eligible must be a boolean or null.`);
         });
       }
     });
@@ -230,9 +232,10 @@ export function validateBrownlowReconciliationInput(input: unknown): string[] {
           if (typeof entry.providerTeamId !== 'string') problems.push(`${path}.providerTeamId must be a string.`);
           if (!isPositiveIntOrNull(entry.playerId)) problems.push(`${path}.playerId must be a positive integer or null.`);
           if (!(isInt(entry.totalVotes) && entry.totalVotes >= 0)) problems.push(`${path}.totalVotes must be a non-negative integer.`);
-          for (const key of ['eligible', 'winner', 'leader'] as const) {
+          for (const key of ['winner', 'leader'] as const) {
             if (typeof entry[key] !== 'boolean') problems.push(`${path}.${key} must be a boolean.`);
           }
+          if (entry.eligible !== null && typeof entry.eligible !== 'boolean') problems.push(`${path}.eligible must be a boolean or null.`);
         });
       }
     }
@@ -311,13 +314,18 @@ const AWARD_NOTES: Record<BrownlowAwardStatus, string> = {
 
 const VALID_VOTE_VALUES: readonly number[] = [3, 2, 1];
 
+/** Total order for a tri-state flag: false < true < unknown (null). */
+function triOrder(flag: boolean | null): number {
+  return flag === null ? 2 : Number(flag);
+}
+
 function compareVotes(a: BrownlowReportVote, b: BrownlowReportVote): number {
   return b.votes - a.votes
     || brownlowCodeUnitCompare(a.providerPlayerId, b.providerPlayerId)
     || brownlowCodeUnitCompare(a.providerTeamId, b.providerTeamId)
     || (a.playerId ?? -1) - (b.playerId ?? -1)
     || (a.clubId ?? -1) - (b.clubId ?? -1)
-    || Number(a.eligible) - Number(b.eligible);
+    || triOrder(a.eligible) - triOrder(b.eligible);
 }
 
 function compareMatches(a: BrownlowReportMatch, b: BrownlowReportMatch): number {
@@ -458,7 +466,7 @@ export function reconcileBrownlowSeason(input: BrownlowReconciliationInput): Bro
       || brownlowCodeUnitCompare(a.providerPlayerId, b.providerPlayerId)
       || a.totalVotes - b.totalVotes
       || brownlowCodeUnitCompare(a.providerTeamId, b.providerTeamId)
-      || Number(a.eligible) - Number(b.eligible)
+      || triOrder(a.eligible) - triOrder(b.eligible)
       || Number(a.winner) - Number(b.winner)
       || Number(a.leader) - Number(b.leader));
   const storedRows = input.storedTotals === null
@@ -594,21 +602,30 @@ export function reconcileBrownlowSeason(input: BrownlowReconciliationInput): Bro
   }
 
   /* ---- 5. Totals from the API round votes, and eligibility evidence. ---- */
-  type ApiTotal = { votes: number; matches: number; flags: Set<boolean> };
+  type ApiTotal = { votes: number; matches: number; flags: Set<boolean>; unknown: number };
   const apiTotals = new Map<number, ApiTotal>();
   for (const match of matches) {
     for (const vote of match.votes) {
       const id = vote.playerId as number;
-      const total = apiTotals.get(id) ?? { votes: 0, matches: 0, flags: new Set<boolean>() };
+      const total = apiTotals.get(id) ?? { votes: 0, matches: 0, flags: new Set<boolean>(), unknown: 0 };
       total.votes += vote.votes;
       total.matches += 1;
-      total.flags.add(vote.eligible);
+      // BP-2025-ELIGIBILITY-v1: a missing/null/malformed provider flag is UNKNOWN. It is counted apart and
+      // never folded into either boolean.
+      if (vote.eligible === null) total.unknown += 1;
+      else total.flags.add(vote.eligible);
       apiTotals.set(id, total);
     }
   }
   const ineligible = new Set<number>();
+  /** Players whose provider eligibility evidence is incomplete: UNKNOWN, neither ineligible nor eligible. */
+  const unknownEligibility = new Set<number>();
   for (const [playerId, total] of apiTotals) {
     if (total.flags.size > 1) add('eligibility_flag_inconsistent', { playerId, detail: { source: 'round_votes' } });
+    if (total.unknown > 0) {
+      add('eligibility_provider_unknown', { playerId, detail: { source: 'round_votes', unknownRecords: total.unknown, explicitRecords: total.matches - total.unknown } });
+      unknownEligibility.add(playerId);
+    }
     if (total.flags.has(false)) ineligible.add(playerId);
   }
 
@@ -622,7 +639,11 @@ export function reconcileBrownlowSeason(input: BrownlowReconciliationInput): Bro
       const id = entry.playerId as number;
       counts.set(id, (counts.get(id) ?? 0) + 1);
       if (!leaderboardById.has(id)) leaderboardById.set(id, entry);
-      if (!entry.eligible) ineligible.add(id);
+      if (entry.eligible === false) ineligible.add(id);
+      else if (entry.eligible === null) {
+        add('eligibility_provider_unknown', { playerId: id, providerPlayerId: entry.providerPlayerId, detail: { source: 'leaderboard', unknownRecords: 1, explicitRecords: 0 } });
+        unknownEligibility.add(id);
+      }
     }
     for (const [playerId, count] of counts) {
       if (count > 1) add('duplicate_leaderboard_entry', { playerId, detail: { entries: count } });
@@ -643,7 +664,7 @@ export function reconcileBrownlowSeason(input: BrownlowReconciliationInput): Bro
           detail: { roundVotesTotal: api.votes, leaderboardTotal: entry.totalVotes, leaderboardConcluded: concluded },
         });
       }
-      if (api.flags.size === 1 && !api.flags.has(entry.eligible)) {
+      if (entry.eligible !== null && api.flags.size === 1 && !api.flags.has(entry.eligible)) {
         add('eligibility_flag_inconsistent', {
           playerId, detail: { source: 'leaderboard', roundVotesEligible: api.flags.has(true), leaderboardEligible: entry.eligible },
         });
@@ -723,21 +744,24 @@ export function reconcileBrownlowSeason(input: BrownlowReconciliationInput): Bro
   }
 
   /* ---- 8. The evidence the raw section reports totals from. ---- */
+  // Unknown provider evidence wins over any boolean: an incomplete record is never read as eligible or ineligible.
+  const foldedEligibility = (playerId: number): boolean | null =>
+    unknownEligibility.has(playerId) ? null : !ineligible.has(playerId);
   let basis: BrownlowEvidenceBasis | null = null;
   let totals: BrownlowPlayerTotal[] = [];
   if (matches.length > 0) {
     basis = 'api_round_votes';
-    totals = [...apiTotals].map(([playerId, t]) => ({ playerId, votes: t.votes, matchesPolled: t.matches, eligible: !ineligible.has(playerId) }));
+    totals = [...apiTotals].map(([playerId, t]) => ({ playerId, votes: t.votes, matchesPolled: t.matches, eligible: foldedEligibility(playerId) }));
   } else if (leaderboardEntries !== null && leaderboardEntries.length > 0) {
     basis = 'api_leaderboard';
     totals = [...leaderboardById]
       .filter(([, e]) => e.totalVotes > 0)
-      .map(([playerId, e]) => ({ playerId, votes: e.totalVotes, matchesPolled: null, eligible: !ineligible.has(playerId) }));
+      .map(([playerId, e]) => ({ playerId, votes: e.totalVotes, matchesPolled: null, eligible: foldedEligibility(playerId) }));
   } else if (storedRows !== null && storedRows.length > 0) {
     basis = 'stored_totals';
     totals = storedRows
       .filter((r) => r.votes > 0)
-      .map((r) => ({ playerId: r.playerId, votes: r.votes, matchesPolled: null, eligible: !ineligible.has(r.playerId) }));
+      .map((r) => ({ playerId: r.playerId, votes: r.votes, matchesPolled: null, eligible: foldedEligibility(r.playerId) }));
   }
   totals.sort(compareBrownlowTotals);
   const topVotes = totals.length > 0 ? totals[0].votes : null;
@@ -753,7 +777,7 @@ export function reconcileBrownlowSeason(input: BrownlowReconciliationInput): Bro
 
   /* ---- 9. The award-result presentation (never reads provider or stored claims). ---- */
   const hasDiscrepancy = findings.some((f) => f.severity === 'discrepancy');
-  const ineligibleVoteGetters = totals.filter((t) => !t.eligible);
+  const ineligibleVoteGetters = totals.filter((t) => t.eligible === false);
   let award: AwardDraft;
   if (seasonState === 'in_progress') {
     award = { status: 'season_incomplete', refusalCode: null, leaders: [], tie: null };
@@ -765,7 +789,7 @@ export function reconcileBrownlowSeason(input: BrownlowReconciliationInput): Bro
   } else if (hasDiscrepancy) {
     award = refusedAward('refused_unreconciled_evidence', 'evidence_unreconciled');
   } else {
-    const candidates = eligibilityRule === 'stored_eligible_rank_one' ? totals.filter((t) => t.eligible) : totals;
+    const candidates = eligibilityRule === 'stored_eligible_rank_one' ? totals.filter((t) => t.eligible === true) : totals;
     const best = candidates.length > 0 ? candidates[0].votes : null;
     if (best === null) award = { status: 'no_vote_evidence', refusalCode: null, leaders: [], tie: null };
     else {

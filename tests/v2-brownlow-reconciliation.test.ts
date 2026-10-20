@@ -54,7 +54,7 @@ interface MVote {
   playerId: number | null;
   clubId: number | null;
   votes: number;
-  eligible: boolean;
+  eligible: boolean | null;
 }
 interface MMatch {
   providerMatchId: string;
@@ -668,6 +668,65 @@ describe('ineligible vote-getters (SYNTHETIC)', () => {
   it('any ineligible vote-getter refuses the determination, even one far from the top total', () => {
     const r = reconcileBrownlowSeason(syntheticSeason(SYN_BASE_VOTES, [1006]));
     expect(r.awardResultPresentation.status).toBe('refused_eligibility_rule_unrecorded');
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Unknown provider eligibility (BP-2025-ELIGIBILITY-v1)
+ * ------------------------------------------------------------------ */
+
+describe('unknown provider eligibility (SYNTHETIC)', () => {
+  it('a null round-vote flag is reported as unknown, never as ineligible or eligible, and refuses any leader', () => {
+    for (const rule of [undefined, 'stored_eligible_rank_one'] as const) {
+      const input = syntheticSeason();
+      input.matchVotes[0].votes[0].eligible = null;
+      if (rule) input.eligibilityRule = rule;
+      const r = reconcileBrownlowSeason(input);
+      const player = input.matchVotes[0].votes[0].playerId as number;
+      expect(findingsOf(r, 'eligibility_provider_unknown')).toMatchObject([
+        { playerId: player, severity: 'discrepancy', detail: { source: 'round_votes', unknownRecords: 1 } },
+      ]);
+      expect(r.rawVotes.playerTotals.find((t) => t.playerId === player)?.eligible).toBeNull();
+      expect(findingsOf(r, 'eligibility_rule_unrecorded')).toEqual([]); // not counted as ineligible
+      expect(r.awardResultPresentation.status).toBe('refused_unreconciled_evidence');
+      expect(r.awardResultPresentation.leaders).toEqual([]);
+      expectValid(r);
+    }
+  });
+
+  it('a null leaderboard flag is unknown too, and an explicit flag elsewhere does not rescue it', () => {
+    const input = syntheticSeason();
+    input.leaderboard!.entries.find((e) => e.playerId === 1001)!.eligible = null;
+    const r = reconcileBrownlowSeason(input);
+    expect(findingsOf(r, 'eligibility_provider_unknown')).toMatchObject([
+      { playerId: 1001, detail: { source: 'leaderboard' } },
+    ]);
+    expect(codesOf(r)).not.toContain('eligibility_flag_inconsistent');
+    expect(r.rawVotes.playerTotals.find((t) => t.playerId === 1001)?.eligible).toBeNull();
+    expect(r.awardResultPresentation.status).toBe('refused_unreconciled_evidence');
+    expectValid(r);
+  });
+
+  it('unknown wins over a mixed explicit false: the player is not folded into the ineligible', () => {
+    const input = syntheticSeason();
+    input.matchVotes[0].votes[0].eligible = null;
+    input.matchVotes[2].votes[0].eligible = false;
+    const r = reconcileBrownlowSeason(input);
+    const player = input.matchVotes[0].votes[0].playerId as number;
+    expect(r.rawVotes.playerTotals.find((t) => t.playerId === player)?.eligible).toBeNull();
+  });
+
+  it('input validation accepts null as unknown and still rejects any other non-boolean', () => {
+    const ok = syntheticSeason();
+    ok.matchVotes[0].votes[0].eligible = null;
+    ok.leaderboard!.entries[0].eligible = null;
+    expect(validateBrownlowReconciliationInput(ok)).toEqual([]);
+    const bad = syntheticSeason();
+    (bad.matchVotes[0].votes[0] as { eligible: unknown }).eligible = 'yes';
+    (bad.leaderboard!.entries[0] as { eligible: unknown }).eligible = 1;
+    const problems = validateBrownlowReconciliationInput(bad).join(' | ');
+    expect(problems).toContain('votes[0].eligible must be a boolean or null');
+    expect(problems).toContain('entries[0].eligible must be a boolean or null');
   });
 });
 

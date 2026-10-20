@@ -15,11 +15,12 @@ All counts below are expectations from preserved archive evidence, not a fresh l
 
 Execution approval **E** means: exact fresh plan digest, target identity, season list, source, full
 code revision, expiry, written owner reference and (for eligibility) every exact ruling record. The
-common gates are verified backup/restore bytes, matching fresh baseline, migration 116 and locks.
+common gates are verified backup/restore bytes, matching fresh baseline, migrations 116 and 117 and locks.
 
 | Exact operation | Season / records | Evidence | Expected writes | Preconditions | Reversal and limits | Exact approval required |
 |---|---|---|---|---|---|---|---|
 | Policy `BP-2025-ELIGIBILITY-v1` (**approved**, D-V2-BROWNLOW-ELIGIBILITY-1) | API-era policy; twelve exact 2025 rulings approved | [Final ruling table](brownlow-eligibility-ruling-2026-10-20.md) | None | Review final sanctions and unknown semantics | Amend policy; no data changed | Policy version plus accepted/deferred rulings; **not E** |
+| Install migration 117 | `staging.afl_api_brownlow_vote.eligible` becomes nullable (NULL = unknown) | [Implementation record](brownlow-eligibility-implementation-2026-10-20.md) §2–§3: before/after fingerprints identical on a fresh isolated copy | One `DROP NOT NULL` and a column comment; no rows, grants or other objects change | Separate schema approval and backup; required before the BP-2025 runtime ingests an unknown provider flag | Re-adding NOT NULL only while no row is NULL; never convert NULL to false | Separate schema/deployment approval for revision and target (**not inherited** from 116 or the 110–115 scope) |
 | Install migration 116 | New receipt ledger | Reviewed SQL and isolated schema checks | Table, function, immutable trigger; no statistics | Separate migration/deployment review, backup, role review | Retain populated ledger; no destructive down migration | Separate schema/deployment approval for revision and target |
 | `observe` | 2025: 207 sets, 188 players | [Authentic snapshot](brownlow-authentic-reconciliation-2026-10-20.md), manifest rehash | Spine, typed staging, batch, receipt; no canonical writes | Common gates; exact snapshot/booleans/identities | Retain observations; supersede, never erase history | **E** for `observe`, `[2025]`, `afl_api` |
 | `backfill` | 1984?2025: expected 320,861 NULL rows | [094-rule rehearsal](brownlow-round-vote-match-backfill-2026-10-20.md) | Reviewed `match_id` mappings and receipt only | Common gates; zero exclusions, exact per-season export | New `reverse-backfill` E; original export/receipt; refuse subsequent drift | D-V2-BROWNLOW-MATCH-BACKFILL-1 (**policy approved**) **plus E** with explicit 1984–2025 season list, `legacy` |
@@ -210,7 +211,7 @@ Synthetic backup/restore attestations used in tests exercise validation, not rea
 restorability. Actual verified fresh backup/restore bytes and matching baseline are still execution
 preconditions. No production/shared connection, SSH, deployment, timer change or push occurred.
 
-Tracking: V2-GAP-016, V2-GAP-030 and V2-GAP-031 remain open for runtime implementation and separately approved execution; the existing
+Tracking: V2-GAP-016's runtime is now implemented and isolated-verified ([record](brownlow-eligibility-implementation-2026-10-20.md)), pending review; V2-GAP-016, V2-GAP-030 and V2-GAP-031 remain open for production rollout and separately approved execution; the existing
 proposals and `known-gaps.md` are updated and the change is recorded under `CHANGELOG.md` Unreleased.
 No new reproducible application defect was found; the authoritative issue ledger, Open Issues table
 and `IssuesIndex.md` retain their existing issue counts. The final commit/HEAD is returned with the

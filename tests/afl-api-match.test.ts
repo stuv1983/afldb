@@ -1950,6 +1950,20 @@ describe('afl-api-bundle (AFLDB-ISSUE-228 S3)', () => {
       }
     });
 
+    it('BP-2025-ELIGIBILITY-v1: eligible is an explicit boolean or null (unknown); null, missing and non-boolean values are never false', () => {
+      const raw = readFixture('brownlow/01-brownlow-season-round.json');
+      raw.matchVotes[0].votes[0].eligible = false;
+      raw.matchVotes[0].votes[1].eligible = null;
+      raw.matchVotes[0].votes[2].eligible = 'true';
+      let { records } = emitAflApiBrownlowMatchVotes(raw, registry);
+      expect(records[0].votes.map((v) => v.eligible)).toEqual([false, null, null]);
+      // A key absent from one record while another record carries it is also unknown (the column gate needs it once).
+      raw.matchVotes[0].votes[2].eligible = true;
+      delete raw.matchVotes[0].votes[1].eligible;
+      ({ records } = emitAflApiBrownlowMatchVotes(raw, registry));
+      expect(records[0].votes.map((v) => v.eligible)).toEqual([false, null, true]);
+    });
+
     it('still refuses a published (non-empty) record missing a required field (fails closed, never fabricated)', () => {
       const raw = readFixture('brownlow/01-brownlow-season-round.json');
       delete raw.matchVotes[0].votes[0].player.playerId;
@@ -1974,6 +1988,15 @@ describe('afl-api-bundle (AFLDB-ISSUE-228 S3)', () => {
       expect(reconcileBrownlowLeaderboard(matchVotes, leaderboard)).toEqual([
         { providerPlayerId: 'CD_I900001', reconstructedTotal: 3, leaderboardTotal: 99 },
       ]);
+    });
+
+    it('BP-2025-ELIGIBILITY-v1: a leaderboard eligible that is not an explicit boolean is unknown (null), never false', () => {
+      const raw = readFixture('brownlow/02-brownlow-leaderboard-sample.json');
+      raw.leaderboard[0].eligible = false;
+      raw.leaderboard[1].eligible = null;
+      raw.leaderboard[2].eligible = 'false';
+      const { records } = emitAflApiBrownlowLeaderboard(raw, registry);
+      expect(records.map((r) => r.eligible)).toEqual([false, null, null]);
     });
 
     // Same §10 pre-count contract as the matchVotes fix above: an empty

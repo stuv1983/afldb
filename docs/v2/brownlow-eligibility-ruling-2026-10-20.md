@@ -106,11 +106,11 @@ Approve policy **BP-2025-ELIGIBILITY-v1**, independently of execution:
    explain the uncertainty. Preserve all tied eligible winners. An unchanged winner does not resolve
    the remaining eligibility cases.
 5. Do not globally select `stored_eligible_rank_one` as a shortcut: it would promote unevaluated
-   defaults into findings. Approving this policy does not implement a new runtime policy or select a
-   season rule. Existing determinations continue to require review where applicable. This package's
-   observation entry point refuses unknown provider flags before the legacy boolean emitter runs.
-   Extending tri-state storage/runtime ingestion for missing provider flags is separate work, requiring
-   its own schema/implementation review; it is not hidden in a correction command.
+   defaults into findings. Approving this policy did not itself select a season rule. The runtime has since been
+   implemented separately (tri-state ingestion and storage via new migration 117, precedence, unknown-aware
+   winner/ranking and publication, operations-view explanation; see the
+   [implementation record](brownlow-eligibility-implementation-2026-10-20.md)). The guarded `observe` entry point still refuses unknown provider flags
+   before loading, so an observation containing one needs separate review.
 
 Execution approval must enumerate the exact approved records. Twelve supported proposals do not
 authorise recording even one ruling. See the [production approval package](brownlow-production-approval-package-2026-10-20.md).

@@ -126,6 +126,7 @@ reviewed clean code revision, verified backup bytes and restored matching baseli
 and ruling/mapping records, self-digested unexpired plan and separate owner execution approval.
 Policy identifiers cannot satisfy the execution-approval structure. No production facts are asserted.
 
-The eligibility runtime gap remains V2-GAP-016: boolean legacy storage/emission and the existing
-explicit season-rule contract do not implement the approved three-state policy. That implementation
-needs its own reviewed change and verification; this task does not select a stored-rank shortcut.
+The eligibility runtime gap (V2-GAP-016) was, at the time of this record, unimplemented: boolean legacy storage/emission and the
+existing explicit season-rule contract did not implement the approved three-state policy. **Update, same day:** the
+three-state runtime is now implemented and isolated-verified in a separate change (new migration 117; no stored-rank
+shortcut is selected); see the [implementation record](brownlow-eligibility-implementation-2026-10-20.md). Production rollout remains pending.

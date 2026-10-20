@@ -80,8 +80,10 @@ async function main(): Promise<void> {
     const root = `data/sources/afl_api/brownlow/${label}`;
     const seasonRaw = JSON.parse(readFileSync(`${root}/01-brownlow-season.raw.json`, 'utf8'));
     const boardRaw = JSON.parse(readFileSync(`${root}/02-brownlow-leaderboard.raw.json`, 'utf8'));
-    // The legacy emitter maps non-true to false. This boundary refuses missing/null/nonboolean
-    // evidence BEFORE calling it; unknown eligibility is never manufactured as ineligible.
+    // BP-2025-ELIGIBILITY-v1: the emitters now keep a null/non-boolean provider value as UNKNOWN (NULL in staging,
+    // migration 117) rather than mapping it to false. This guarded production boundary is stricter on purpose: it
+    // still refuses missing/null/nonboolean evidence BEFORE loading, so an observation containing an unknown needs
+    // separate review and is never recorded as a correction; unknown is never manufactured as ineligible.
     const checkFlags = (v: unknown): void => {
       if (Array.isArray(v)) { v.forEach(checkFlags); return; }
       if (v === null || typeof v !== 'object') return;

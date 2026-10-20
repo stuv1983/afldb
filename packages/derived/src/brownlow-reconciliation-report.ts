@@ -80,6 +80,9 @@ export const BROWNLOW_FINDING_CODES = {
   club_unverifiable: 'info',
   // Eligibility evidence.
   eligibility_flag_inconsistent: 'discrepancy',
+  // BP-2025-ELIGIBILITY-v1: a provider eligibility value that is absent, null or not a boolean is UNKNOWN,
+  // never ineligible and never eligible; it is reported here and resolved per player.
+  eligibility_provider_unknown: 'discrepancy',
   // API round votes versus the API leaderboard.
   duplicate_leaderboard_entry: 'discrepancy',
   leaderboard_total_mismatch: 'discrepancy',
@@ -114,7 +117,8 @@ export interface BrownlowReportVote {
   playerId: number | null;
   clubId: number | null;
   votes: number;
-  eligible: boolean;
+  /** The provider's explicit flag; null = the provider value was absent, null or not a boolean (UNKNOWN). */
+  eligible: boolean | null;
 }
 
 export interface BrownlowReportMatch {
@@ -130,7 +134,11 @@ export interface BrownlowPlayerTotal {
   votes: number;
   /** Matches the player polled in; null when the basis is not round-level. */
   matchesPolled: number | null;
-  eligible: boolean;
+  /**
+   * Folded evidence flag, NOT an eligibility status: false = some evidence marks the player ineligible;
+   * null = provider eligibility evidence is unknown (see `eligibility_provider_unknown`); true otherwise.
+   */
+  eligible: boolean | null;
 }
 
 export interface BrownlowComparisonSummary {
@@ -170,7 +178,7 @@ export interface BrownlowReconciliationReport {
     matches: BrownlowReportMatch[];
     playerTotals: BrownlowPlayerTotal[];
     /** Highest raw totals over ALL vote-getters, ineligible included. Not an award result. */
-    topVoteGetters: { playerId: number; votes: number; eligible: boolean }[];
+    topVoteGetters: { playerId: number; votes: number; eligible: boolean | null }[];
     comparisons: {
       leaderboard: BrownlowComparisonSummary;
       stored: BrownlowComparisonSummary;
@@ -509,7 +517,7 @@ export function validateBrownlowReconciliationReport(value: unknown): string[] {
                   if ('playerId' in vote) checkNullableInt(`${votePath}.playerId`, vote.playerId, problems);
                   if ('clubId' in vote) checkNullableInt(`${votePath}.clubId`, vote.clubId, problems);
                   if ('votes' in vote && !isInt(vote.votes)) problems.push(`${votePath}.votes must be an integer.`);
-                  if ('eligible' in vote && typeof vote.eligible !== 'boolean') problems.push(`${votePath}.eligible must be a boolean.`);
+                  if ('eligible' in vote && vote.eligible !== null && typeof vote.eligible !== 'boolean') problems.push(`${votePath}.eligible must be a boolean or null.`);
                 });
               }
             }
@@ -538,7 +546,7 @@ export function validateBrownlowReconciliationReport(value: unknown): string[] {
             if ('matchesPolled' in total && total.matchesPolled !== null && !isCount(total.matchesPolled)) {
               problems.push(`${path}.matchesPolled must be a non-negative integer or null.`);
             }
-            if ('eligible' in total && typeof total.eligible !== 'boolean') problems.push(`${path}.eligible must be a boolean.`);
+            if ('eligible' in total && total.eligible !== null && typeof total.eligible !== 'boolean') problems.push(`${path}.eligible must be a boolean or null.`);
             if (problems.length > before) shapesOk = false;
           });
           if (shapesOk) {
@@ -564,7 +572,7 @@ export function validateBrownlowReconciliationReport(value: unknown): string[] {
             missing(path, top, required.topVoteGetter, problems);
             if ('playerId' in top && !isInt(top.playerId)) problems.push(`${path}.playerId must be an integer.`);
             if ('votes' in top && !isInt(top.votes)) problems.push(`${path}.votes must be an integer.`);
-            if ('eligible' in top && typeof top.eligible !== 'boolean') problems.push(`${path}.eligible must be a boolean.`);
+            if ('eligible' in top && top.eligible !== null && typeof top.eligible !== 'boolean') problems.push(`${path}.eligible must be a boolean or null.`);
           });
         }
       }
@@ -763,7 +771,7 @@ export const BROWNLOW_RECONCILIATION_REPORT_JSON_SCHEMA = {
                     playerId: NULLABLE_INT,
                     clubId: NULLABLE_INT,
                     votes: INT,
-                    eligible: { type: 'boolean' },
+                    eligible: { type: ['boolean', 'null'] },
                   },
                 },
               },
@@ -780,7 +788,7 @@ export const BROWNLOW_RECONCILIATION_REPORT_JSON_SCHEMA = {
               playerId: INT,
               votes: INT,
               matchesPolled: { type: ['integer', 'null'], minimum: 0 },
-              eligible: { type: 'boolean' },
+              eligible: { type: ['boolean', 'null'] },
             },
           },
         },
@@ -790,7 +798,7 @@ export const BROWNLOW_RECONCILIATION_REPORT_JSON_SCHEMA = {
             type: 'object',
             required: [...BROWNLOW_REPORT_REQUIRED.topVoteGetter],
             additionalProperties: false,
-            properties: { playerId: INT, votes: INT, eligible: { type: 'boolean' } },
+            properties: { playerId: INT, votes: INT, eligible: { type: ['boolean', 'null'] } },
           },
         },
         comparisons: {

@@ -136,6 +136,15 @@ check("leaderboard status carried through", lb_status == "CONCLUDED")
 check("eligible=false carried", entries[1].eligible is False)
 check("eligible defaults true", entries[0].eligible is True)
 
+# BP-2025-ELIGIBILITY-v1: an absent, null or non-boolean value is UNKNOWN (None), never read as false.
+unknown_entries, _ = m.parse_leaderboard(leaderboard_payload("CONCLUDED", [
+    {**leaderboard_entry("CD_I1", 3.0), "eligible": None},
+    {**leaderboard_entry("CD_I2", 2.0), "eligible": "false"},
+    {k: v for k, v in leaderboard_entry("CD_I3", 1.0).items() if k != "eligible"},
+]))
+check("null / non-boolean / absent leaderboard eligibility parses as UNKNOWN (None), not False",
+      [e.eligible for e in unknown_entries] == [None, None, None])
+
 check("duplicate leaderboard player refuses",
       raises(m.BrownlowArtefactSourceError, m.parse_leaderboard,
              leaderboard_payload("CONCLUDED", [leaderboard_entry("CD_I1", 3.0), leaderboard_entry("CD_I1", 1.0)])))
@@ -402,6 +411,16 @@ check("only the leaderboard-ineligible player is flagged", ineligible == {102})
 check("a tallied player missing from the leaderboard refuses",
       raises(m.BrownlowArtefactSourceError, m.resolve_ineligible_player_ids,
              {101, 999}, {**bridge_full, "CD_I9": 999}, lb_mixed))
+
+lb_unknown = m.parse_leaderboard(leaderboard_payload("CONCLUDED", [
+    leaderboard_entry("CD_I1", 3.0, eligible=True),
+    {**leaderboard_entry("CD_I2", 2.0), "eligible": None},
+    leaderboard_entry("CD_I3", 1.0, eligible=True),
+]))[0]
+check("a tallied player with UNKNOWN eligibility refuses rather than being treated as eligible or ineligible",
+      raises(m.BrownlowArtefactSourceError, m.resolve_ineligible_player_ids, {101, 102, 103}, bridge_full, lb_unknown))
+check("an unknown-eligibility entry nobody tallied does not block the build",
+      m.resolve_ineligible_player_ids({101, 103}, bridge_full, lb_unknown) == set())
 
 
 # ---------------------------------------------------------------------------

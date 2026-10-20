@@ -95,6 +95,8 @@ export interface BrownlowStagingEvidence {
     status: string | null;
     entries: number;
     ineligibleEntries: number;
+    /** Entries whose provider eligibility is absent, null or not a boolean (UNKNOWN). */
+    unknownEligibilityEntries: number;
     winnerEntries: number;
     /** Entries whose provider player id resolves to no (or several) canonical players. */
     unresolvedPlayers: number;
@@ -125,7 +127,7 @@ interface VoteRow {
   apiRoundNumber: number | string;
   canonicalRoundNumber: number | string;
   votes: number | string;
-  eligible: boolean;
+  eligible: boolean | null;
   matchId: number | string | null;
   playerId: number | string | null;
   clubId: number | string | null;
@@ -144,7 +146,7 @@ interface LeaderboardRow {
   payload: {
     providerTeamId: string;
     votes: number;
-    eligible: boolean;
+    eligible: boolean | null;
     winner: boolean;
     leader: boolean;
     feedStatus: string | null;
@@ -224,7 +226,7 @@ export async function loadBrownlowReconciliationInput(
 }
 
 /** The staged leaderboard of one season, resolved to canonical players, plus what was absent. */
-async function loadStagedLeaderboard(
+export async function loadStagedLeaderboard(
   executor: SqlExecutor, season: number,
 ): Promise<{ board: BrownlowLeaderboardInput | null; unresolved: number; absent: number }> {
   const rows = await executor.query<LeaderboardRow>(
@@ -274,7 +276,8 @@ async function loadStagedLeaderboard(
       providerTeamId: row.payload.providerTeamId,
       playerId,
       totalVotes: Number(row.payload.votes),
-      eligible: row.payload.eligible === true,
+      // BP-2025-ELIGIBILITY-v1: only an explicit boolean is evidence; anything else is UNKNOWN (null).
+      eligible: typeof row.payload.eligible === 'boolean' ? row.payload.eligible : null,
       winner: row.payload.winner === true,
       leader: row.payload.leader === true,
     };
@@ -435,7 +438,8 @@ export async function loadBrownlowReconciliationInputWithEvidence(
         staged: staged.board !== null,
         status: staged.board?.status ?? null,
         entries: entries.length,
-        ineligibleEntries: entries.filter((entry) => !entry.eligible).length,
+        ineligibleEntries: entries.filter((entry) => entry.eligible === false).length,
+        unknownEligibilityEntries: entries.filter((entry) => entry.eligible === null).length,
         winnerEntries: entries.filter((entry) => entry.winner).length,
         unresolvedPlayers: staged.unresolved,
         absentEntries: staged.absent,

@@ -14,6 +14,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import {
   BROWNLOW_MEDAL_STATUSES,
+  brownlowEligibilityState,
   determineBrownlowMedal,
   evaluateBrownlowEligibility,
   isEligibilityEvidenceFinding,
@@ -23,6 +24,7 @@ import {
   type BrownlowFinding,
   type BrownlowMedalDetermination,
   type BrownlowPlayerEligibilityEvidence,
+  type BrownlowProviderProvenance,
   type BrownlowReconciliationReport,
   type BrownlowSeasonState,
   type BrownlowStoredTotalInput,
@@ -191,11 +193,13 @@ describe('a leader whose eligibility is missing or ambiguous is never named', ()
     expect(result.rawLeaderboard[0].eligibility.source).toBe('none');
   });
 
-  it('a provider flag NEVER decides: with no decision and no recorded stored statement it stays MISSING, and is reported', () => {
+  it('a consistent explicit provider flag decides ONLY when no decision and no recorded stored statement exists (BP-2025-ELIGIBILITY-v1)', () => {
     const result = determine(MISSING, { 1001: { stagedFlags: [true] } });
-    expect(result.status).toBe('requires_review');
-    expect(result.rawLeaderboard[0].eligibility).toMatchObject({ status: 'missing', detail: { provider: 'eligible' } });
-    expect(result.rawLeaderboard[0].eligibility.detail.reason).toContain('proposal only');
+    expect(result.status).toBe('determined');
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({
+      status: 'eligible', source: 'provider_snapshot', detail: { provider: 'eligible', stored: 'not_recorded' },
+    });
+    expect(result.rawLeaderboard[0].eligibility.detail.reason).toContain('not a tribunal finding');
   });
 
   it('a provider flag that AGREES with a recorded stored statement changes nothing', () => {
@@ -236,6 +240,188 @@ describe('a leader whose eligibility is missing or ambiguous is never named', ()
     const result = determine(rows);
     expect(result.status).toBe('determined');
     expect(result.winners).toEqual([{ playerId: 1001, votes: 30 }]);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * BP-2025-ELIGIBILITY-v1: eligible, ineligible and unknown stay distinct
+ * ------------------------------------------------------------------ */
+
+const PROVENANCE: BrownlowProviderProvenance = {
+  source: 'afl_api', families: ['brownlow_leaderboard', 'brownlow_match_votes'], observations: 7, versionSeqs: [1, 2], batchIds: [41],
+};
+/** Stored rows that are bare defaults: not ineligible, no eligible rank, so NOT a recorded statement. */
+const DEFAULTS: Row[] = [{ id: 1001, votes: 30, noRank: true }, { id: 1002, votes: 25, noRank: true }, { id: 1003, votes: 20, noRank: true }];
+const explicit = (flag: boolean): Partial<BrownlowPlayerEligibilityEvidence> => ({ stagedFlags: [flag], providerProvenance: PROVENANCE });
+const unknownFlag: Partial<BrownlowPlayerEligibilityEvidence> = { stagedFlags: [], stagedUnknown: 1, providerProvenance: PROVENANCE };
+
+describe('BP-2025-ELIGIBILITY-v1: explicit provider evidence', () => {
+  it('explicit true: eligible, sourced from the provider snapshot, with its provenance retained and every rank stated', () => {
+    const result = determine(DEFAULTS, { 1001: explicit(true), 1002: explicit(true), 1003: explicit(true) });
+    expect(result.status).toBe('determined');
+    expect(result.rankingDeterminate).toBe(true);
+    expect(result.rawLeaderboard.map((e) => [e.playerId, e.eligibility.status, e.eligibility.source, e.eligibleRank, e.eligibleRankDeterminate]))
+      .toEqual([[1001, 'eligible', 'provider_snapshot', 1, true], [1002, 'eligible', 'provider_snapshot', 2, true], [1003, 'eligible', 'provider_snapshot', 3, true]]);
+    expect(result.rawLeaderboard[0].eligibility.detail.providerProvenance).toEqual(PROVENANCE);
+  });
+
+  it('explicit false: ineligible by provider evidence only; the votes are kept and the runner-up wins', () => {
+    const result = determine(DEFAULTS, { 1001: explicit(false), 1002: explicit(true), 1003: explicit(true) });
+    expect(result.status).toBe('determined');
+    expect(result.winners).toEqual([{ playerId: 1002, votes: 25 }]);
+    expect(result.excludedIneligible).toEqual([{ playerId: 1001, votes: 30 }]);
+    expect(result.rawLeaderboard[0]).toMatchObject({ playerId: 1001, votes: 30, eligibleRank: null, eligibleRankDeterminate: true });
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({ status: 'ineligible', source: 'provider_snapshot' });
+    expect(result.rawLeaderboard.map((e) => e.eligibleRank)).toEqual([null, 1, 2]);
+  });
+
+  it('a provider value that disagrees with a RECORDED stored statement is unresolved, not silently published', () => {
+    const result = determine(CLEAN, { 1001: explicit(false) });
+    expect(result.status).toBe('requires_review');
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({ status: 'ambiguous', source: 'stored_season_votes' });
+    expect(result.rankingDeterminate).toBe(false);
+  });
+
+  it('an audited decision takes precedence over provider evidence in either direction', () => {
+    const asIneligible = determine(DEFAULTS, { 1001: { ...explicit(true), decision: decision(7, 'ineligible') }, 1002: explicit(true), 1003: explicit(true) });
+    expect(asIneligible.rawLeaderboard[0].eligibility).toMatchObject({ status: 'ineligible', source: 'admin_decision' });
+    expect(asIneligible.winners).toEqual([{ playerId: 1002, votes: 25 }]);
+    const asEligible = determine(DEFAULTS, { 1001: { ...explicit(false), decision: decision(8, 'eligible') }, 1002: explicit(true), 1003: explicit(true) });
+    expect(asEligible.rawLeaderboard[0].eligibility).toMatchObject({ status: 'eligible', source: 'admin_decision' });
+    expect(asEligible.winners).toEqual([{ playerId: 1001, votes: 30 }]);
+    const overUnknown = determine(DEFAULTS, { 1001: { ...unknownFlag, decision: decision(9, 'eligible') }, 1002: explicit(true), 1003: explicit(true) });
+    expect(overUnknown.rawLeaderboard[0].eligibility).toMatchObject({ status: 'eligible', source: 'admin_decision' });
+  });
+});
+
+describe('BP-2025-ELIGIBILITY-v1: absent, null, malformed or conflicting provider evidence is unknown', () => {
+  it('an unusable provider value with no other evidence is unknown (missing): neither ineligible nor eligible', () => {
+    const result = determine(DEFAULTS, { 1001: unknownFlag, 1002: explicit(true), 1003: explicit(true) });
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({
+      status: 'missing', source: 'none', detail: { provider: 'unknown', providerUnknownRecords: 1 },
+    });
+    expect(result.rawLeaderboard[0].eligibility.detail.reason).toContain('absent, null or not a boolean');
+    expect(brownlowEligibilityState(result.rawLeaderboard[0].eligibility.status)).toBe('unknown');
+    expect(result.excludedIneligible).toEqual([]);
+  });
+
+  it('some explicit and some unusable records for one player are ambiguous (incomplete), never averaged into a value', () => {
+    const result = determine(DEFAULTS, { 1001: { stagedFlags: [true], stagedUnknown: 2, providerProvenance: PROVENANCE }, 1002: explicit(true), 1003: explicit(true) });
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({ status: 'ambiguous', detail: { provider: 'incomplete', providerUnknownRecords: 2 } });
+  });
+
+  it('conflicting provider records are ambiguous', () => {
+    const result = determine(DEFAULTS, { 1001: { stagedFlags: [true, false], providerProvenance: PROVENANCE }, 1002: explicit(true), 1003: explicit(true) });
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({ status: 'ambiguous', detail: { provider: 'conflicting' } });
+  });
+
+  it('an unevaluated legacy default does not establish eligibility where the provider snapshot should have spoken', () => {
+    // CLEAN rows carry eligible ranks, which in a season WITHOUT provider evidence is a recorded statement ...
+    expect(determine(CLEAN).status).toBe('determined');
+    // ... but in a season that has provider evidence, a player without a usable provider value is NOT made eligible by a rank alone.
+    const absent = determine(CLEAN, { 1002: explicit(true), 1003: explicit(true) });
+    expect(absent.status).toBe('requires_review');
+    expect(absent.rawLeaderboard[0].eligibility).toMatchObject({ status: 'missing', detail: { stored: 'not_recorded', provider: 'none' } });
+    const nullFlag = determine(CLEAN, { 1001: unknownFlag, 1002: explicit(true), 1003: explicit(true) });
+    expect(nullFlag.rawLeaderboard[0].eligibility).toMatchObject({ status: 'missing', detail: { stored: 'not_recorded', provider: 'unknown' } });
+  });
+
+  it('an administrator-published season keeps its recorded statement even when the provider value is unusable', () => {
+    const result = determine(CLEAN, { 1001: unknownFlag, 1002: explicit(true), 1003: explicit(true) }, { seasonAdminPublished: true });
+    expect(result.status).toBe('determined');
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({ status: 'eligible', source: 'stored_season_votes' });
+  });
+
+  it('a recorded stored INELIGIBLE statement stands when the provider value is unusable', () => {
+    const rows: Row[] = [{ id: 1001, votes: 30, ineligible: true }, { id: 1002, votes: 25 }];
+    const result = determine(rows, { 1001: unknownFlag, 1002: explicit(true) });
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({ status: 'ineligible', source: 'stored_season_votes' });
+    expect(result.winners).toEqual([{ playerId: 1002, votes: 25 }]);
+  });
+
+  it('a provider-unknown reconciliation finding (e.g. on the staged leaderboard) makes the player unknown even with explicit vote flags', () => {
+    const report = reportOf(DEFAULTS);
+    const withFinding: BrownlowReconciliationReport = {
+      ...report,
+      findings: [...report.findings, {
+        code: 'eligibility_provider_unknown', severity: 'discrepancy', providerMatchId: null, playerId: 1001, providerPlayerId: null,
+        detail: { source: 'leaderboard', unknownRecords: 1, explicitRecords: 0 },
+      } satisfies BrownlowFinding],
+    };
+    const result = determineBrownlowMedal({ report: withFinding, seasonAdminPublished: false, players: evidenceFor(DEFAULTS, { 1001: explicit(true), 1002: explicit(true), 1003: explicit(true) }) });
+    expect(isEligibilityEvidenceFinding(withFinding.findings[withFinding.findings.length - 1])).toBe(true);
+    expect(result.status).toBe('requires_review');
+    expect(result.rawLeaderboard[0].eligibility).toMatchObject({ status: 'ambiguous', detail: { provider: 'incomplete' } });
+  });
+});
+
+describe('BP-2025-ELIGIBILITY-v1: unknown eligibility, the winner and the ranking', () => {
+  it('unknown eligibility that could change the winner refuses the winner and every rank below it', () => {
+    const result = determine(DEFAULTS, { 1001: unknownFlag, 1002: explicit(true), 1003: explicit(true) });
+    expect(result.status).toBe('requires_review');
+    expect(result.winners).toEqual([]);
+    expect(result.rankingDeterminate).toBe(false);
+    expect(result.rawLeaderboard.map((e) => [e.playerId, e.eligibleRank, e.eligibleRankDeterminate])).toEqual([[1001, null, false], [1002, null, false], [1003, null, false]]);
+    expect(result.playersRequiringReview.map((p) => p.playerId)).toEqual([1001]);
+    expect(result.unresolvedPlayers.map((p) => p.playerId)).toEqual([1001]);
+  });
+
+  it('unknown eligibility below the winner leaves the winner determined but the lower ranks unstated', () => {
+    const result = determine(DEFAULTS, { 1001: explicit(true), 1002: unknownFlag, 1003: explicit(true) });
+    expect(result.status).toBe('determined');
+    expect(result.winners).toEqual([{ playerId: 1001, votes: 30 }]);
+    expect(result.rankingDeterminate).toBe(false);
+    expect(result.playersRequiringReview).toEqual([]);
+    expect(result.unresolvedPlayers.map((p) => p.playerId)).toEqual([1002]);
+    expect(result.rawLeaderboard.map((e) => [e.playerId, e.eligibleRank, e.eligibleRankDeterminate])).toEqual([[1001, 1, true], [1002, null, false], [1003, null, false]]);
+  });
+
+  it('an unknown player with FEWER votes does not disturb a higher rank, and an equal-vote unknown does not outrank', () => {
+    const lower = determine(DEFAULTS, { 1001: explicit(true), 1002: explicit(true), 1003: unknownFlag });
+    expect(lower.rawLeaderboard.map((e) => [e.playerId, e.eligibleRank, e.eligibleRankDeterminate])).toEqual([[1001, 1, true], [1002, 2, true], [1003, null, false]]);
+    const rows: Row[] = [{ id: 1001, votes: 30, noRank: true }, { id: 1002, votes: 30, noRank: true }];
+    const tiedUnknown = determine(rows, { 1001: unknownFlag, 1002: explicit(true) });
+    expect(tiedUnknown.status).toBe('requires_review'); // the unknown tied leader could make a joint winner
+    expect(tiedUnknown.rawLeaderboard[1]).toMatchObject({ playerId: 1002, eligibleRank: 1, eligibleRankDeterminate: true });
+  });
+
+  it('joint eligible winners are preserved, including when an unknown player ranks below them', () => {
+    const rows: Row[] = [{ id: 1001, votes: 30, noRank: true }, { id: 1002, votes: 30, noRank: true }, { id: 1003, votes: 20, noRank: true }];
+    const result = determine(rows, { 1001: explicit(true), 1002: explicit(true), 1003: unknownFlag });
+    expect(result.status).toBe('determined');
+    expect(result.tie).toBe(true);
+    expect(result.winners).toEqual([{ playerId: 1001, votes: 30 }, { playerId: 1002, votes: 30 }]);
+    expect(result.rawLeaderboard.map((e) => e.eligibleRank)).toEqual([1, 1, null]);
+    expect(result.rankingDeterminate).toBe(false);
+  });
+
+  it('raw vote totals are identical whatever the eligibility states are', () => {
+    const states = [explicit(true), explicit(false), unknownFlag];
+    for (const state of states) {
+      const result = determine(DEFAULTS, { 1001: state, 1002: explicit(true), 1003: explicit(true) });
+      expect(result.rawLeaderboard.map((e) => [e.playerId, e.votes])).toEqual([[1001, 30], [1002, 25], [1003, 20]]);
+    }
+  });
+
+  it('the checksum covers unknown-record counts and provenance, and is unchanged when neither is present', () => {
+    const base = determine(DEFAULTS, { 1001: explicit(true), 1002: explicit(true), 1003: explicit(true) }).inputChecksum;
+    const withUnknown = determine(DEFAULTS, { 1001: { ...explicit(true), stagedUnknown: 1 }, 1002: explicit(true), 1003: explicit(true) }).inputChecksum;
+    expect(withUnknown).not.toBe(base);
+    const plain = determine(CLEAN).inputChecksum;
+    expect(determine(CLEAN, { 1001: { stagedUnknown: 0, providerProvenance: null } }).inputChecksum).toBe(plain);
+  });
+
+  it('the three-state mapping folds missing and ambiguous into unknown', () => {
+    expect(['eligible', 'ineligible', 'missing', 'ambiguous'].map((status) => brownlowEligibilityState(status as 'eligible'))).toEqual(['eligible', 'ineligible', 'unknown', 'unknown']);
+  });
+
+  it('rejects malformed unknown counts and provenance', () => {
+    const base = { report: reportOf(CLEAN), seasonAdminPublished: false, players: evidenceFor(CLEAN) };
+    const bad = { ...base, players: [{ ...base.players[0], stagedUnknown: -1, providerProvenance: { source: '', families: [], observations: 1, versionSeqs: [0], batchIds: [] } }, ...base.players.slice(1)] };
+    expect(validateBrownlowMedalInput(bad)).toEqual(expect.arrayContaining([
+      expect.stringContaining('stagedUnknown must be a non-negative integer'),
+      expect.stringContaining('providerProvenance must be null or'),
+    ]));
   });
 });
 
@@ -569,6 +755,31 @@ describe('the determination page markup', () => {
     expect(markup).toContain('data-decision-unavailable="role"');
     expect(markup).not.toContain('<form');
     expect(markup).toContain('Super Admin');
+  });
+
+  it('BP-2025: an unknown eligibility is shown as unknown, never as ineligible; an unknown below the winner leaves a determined winner and says the ranks are unstated', () => {
+    const lower = render(viewOf(determine(DEFAULTS, { 1001: explicit(true), 1002: unknownFlag, 1003: explicit(true) })), true);
+    expect(lower).toContain('data-medal-status="determined"');
+    expect(lower).toContain('data-ranking-indeterminate="true"');
+    expect(lower).toContain('unknown (not recorded)');
+    expect(lower).toContain('data-eligible-rank="not-stated"');
+    expect(lower).toContain('data-eligible-rank="1"');
+    expect(lower).toContain('AFL API snapshot');
+    expect(lower).not.toContain('data-no-review="true"');
+    const row = /<tr[^>]*data-leaderboard-player="1002"[^>]*>[^]*?<\/tr>/.exec(lower)?.[0] ?? '';
+    expect(row).toContain('unknown (not recorded)');
+    expect(row).toContain('data-eligibility="missing"');
+    expect(row).not.toContain('data-eligibility="ineligible"');
+
+    const leader = render(viewOf(determine(DEFAULTS, { 1001: unknownFlag, 1002: explicit(true), 1003: explicit(true) })), true);
+    expect(leader).toContain('data-medal-status="requires_review"');
+    expect(leader).toContain('data-medal-winners="true">none stated');
+    expect(leader).toContain('data-review-player="1001"');
+    expect(leader).toContain('data-ranking-indeterminate="true"');
+
+    const known = render(viewOf(determine(DEFAULTS, { 1001: explicit(true), 1002: explicit(true), 1003: explicit(true) })), true);
+    expect(known).not.toContain('data-ranking-indeterminate');
+    expect(known).toContain('data-no-review="true"');
   });
 
   it('a player with no durable identity cannot be decided: the form is replaced by the reason', () => {

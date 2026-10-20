@@ -1,6 +1,8 @@
 # ADR 0014 — Brownlow: eligibility-aware medal determination and audited eligibility decisions
 
-- Status: Accepted (owner decision); implemented (Launch F, stream F-D)
+- Status: Accepted (owner decision); implemented (Launch F, stream F-D). **Amended 2026-10-20 by BP-2025-ELIGIBILITY-v1**
+  (D-V2-BROWNLOW-ELIGIBILITY-1): a consistent explicit provider boolean now decides when nothing stronger exists; see the
+  amendment note under *Decision* item 3 and the [implementation record](../brownlow-eligibility-implementation-2026-10-20.md).
 - Builds on: ADR 0007 (pure Brownlow reconciliation). Plan decision: `docs/v2/plan.md` §3 D7;
   open owner decision V2-GAP-016 (`docs/v2/known-gaps.md`)
 - Plan and review: `documentation/plans/implementation/launchF-FD-awards-plan.md` §1 and §5 (F-001)
@@ -39,12 +41,15 @@ Per (season, player), in precedence order:
      `eligible_rank`. `is_ineligible` is `NOT NULL DEFAULT false`, so a bare `false` is a column
      default, not a statement (plan-review F-001, HIGH, accepted). Without either corroboration it
      is *not recorded*.
-3. **The AFL API staged flag** (`staging.afl_api_brownlow_vote.eligible`) is a provider **proposal**,
-   never authoritative. It can make a status `ambiguous` (it disagrees with a recorded stored
-   statement; or a player's own staged flags disagree; or the reconciliation reports
-   `eligibility_flag_inconsistent` for the player), but it never decides one.
+3. **The AFL API staged flag** (`staging.afl_api_brownlow_vote.eligible`). *Superseded by BP-2025-ELIGIBILITY-v1
+   (2026-10-20): the original text here said the provider flag "never decides".* Now a consistent explicit boolean
+   from the identified snapshot decides (source `provider_snapshot`, provenance retained) when there is no decision
+   and no recorded stored statement; it is provider evidence, not a tribunal finding. It still makes a status
+   `ambiguous` when it disagrees with a recorded stored statement, when a player's own staged flags conflict or are
+   incomplete (some records unusable), or when the reconciliation reports `eligibility_flag_inconsistent` between
+   provider records. An absent, null or non-boolean provider value is **unknown** (stored as NULL), never false.
 
-No decision and no recorded stored statement => `missing`, with the provider observation reported.
+No decision, no recorded stored statement and no usable provider boolean => `missing` (policy *unknown*), with the provider observation reported.
 So each vote-getter has a status `eligible | ineligible | missing | ambiguous`, a source
 (`admin_decision | stored_season_votes | none`) and the evidence detail behind it.
 
@@ -186,7 +191,7 @@ criterion, then an authorised decision publishes both joint winners without chan
 
 - `tests/v2-brownlow-eligibility.test.ts` — the pure determination: missing leader (default-false
   stored row, NULL rank), ambiguous leader (provider flag disagrees; own flags disagree; reconciliation
-  finding), a provider flag never deciding, ineligible leader excluded with the next group
+  finding), (originally) a provider flag never deciding — replaced by the BP-2025 provider-evidence cases, ineligible leader excluded with the next group
   determined, an administrator decision overriding stored evidence either way, ties (and a tie with
   one player missing), all-ineligible, every gating pass-through, determinism under shuffling, the raw
   leaderboard byte-equal to the input totals (deep-frozen), the folded per-player boolean never read.

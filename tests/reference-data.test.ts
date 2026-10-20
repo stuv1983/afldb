@@ -442,6 +442,10 @@ describe('load_reference_data.py', () => {
         // registry loop would restore UPDATE/DELETE/TRUNCATE on every reconcile.
         'award_proposal_decisions',
         'award_proposals',
+        // 116 (Brownlow correction receipts). Owner-operated, append-only by trigger, with every
+        // app/import/auth privilege revoked, so it can never be import-writable and carries no
+        // foreign key into the reference closure.
+        'brownlow_correction_receipts',
         // 113 (AFLDB V2 Launch F, Brownlow eligibility). The append-only ledger of
         // administrator eligibility decisions. It names its player by the durable identity
         // string and carries NO foreign key into players or seasons (only auth_users and

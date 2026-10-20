@@ -278,6 +278,7 @@ export function syntheticStaging(kind: StagingKind): BrownlowStagingEvidence {
       status: unstaged ? null : 'CONCLUDED',
       entries: unstaged ? 0 : 3,
       ineligibleEntries: unstaged ? 0 : 1,
+      unknownEligibilityEntries: 0,
       winnerEntries: unstaged ? 0 : 1,
       unresolvedPlayers: 0,
       absentEntries: 0,

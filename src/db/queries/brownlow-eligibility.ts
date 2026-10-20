@@ -10,11 +10,14 @@ import {
   determineBrownlowMedal,
   reconcileBrownlowSeason,
   type BrownlowEligibilityVerdict,
+  type BrownlowMedalDetermination,
   type BrownlowPlayerEligibilityEvidence,
+  type BrownlowProviderProvenance,
+  type BrownlowReviewPlayer,
 } from '@afldb/derived';
 import { evaluateSeasonWrite, type AuditedCorrection, type SealedSeasons, type SeasonRegistry } from '@afldb/domain';
 
-import { BROWNLOW_VOTE_SOURCE_KEY, loadBrownlowReconciliationInput } from '@/db/queries/brownlow-reconciliation-inputs';
+import { BROWNLOW_VOTE_SOURCE_KEY, loadBrownlowReconciliationInput, loadStagedLeaderboard } from '@/db/queries/brownlow-reconciliation-inputs';
 import { recordDataEdit } from '@/db/queries/audit-log';
 import { recomputeBrownlowCareerTotals } from '@/db/queries/player-derived';
 import { resolvePlayerIdentity } from '@/db/queries/player-identity';
@@ -231,8 +234,19 @@ async function loadEligibilityInTransaction(
       isIneligible: row.isIneligible,
       eligibleRank: row.eligibleRank === null ? null : Number(row.eligibleRank),
     }]));
-    const stagedRows = await tx.query<{ playerId: number | string; anyEligible: boolean; anyIneligible: boolean }>(
-      `SELECT v.player_id::int AS "playerId", bool_or(v.eligible) AS "anyEligible", bool_or(NOT v.eligible) AS "anyIneligible"
+    // The provider's eligibility, record by record. A NULL (absent, null or non-boolean in the source) is UNKNOWN:
+    // it is counted apart and never folded into either flag. Version/batch ids are kept as provenance.
+    const stagedRows = await tx.query<{
+      playerId: number | string; anyEligible: boolean; anyIneligible: boolean; unknownRecords: number | string;
+      observations: number | string; versionSeqs: Array<number | string>; batchIds: Array<number | string>;
+    }>(
+      `SELECT v.player_id::int AS "playerId",
+              COALESCE(bool_or(v.eligible), false) AS "anyEligible",
+              COALESCE(bool_or(v.eligible IS NOT NULL AND NOT v.eligible), false) AS "anyIneligible",
+              count(*) FILTER (WHERE v.eligible IS NULL)::int AS "unknownRecords",
+              count(*)::int AS observations,
+              array_agg(DISTINCT v.version_seq ORDER BY v.version_seq) AS "versionSeqs",
+              array_agg(DISTINCT v.projected_by_batch_id ORDER BY v.projected_by_batch_id) AS "batchIds"
          FROM staging.afl_api_brownlow_vote v
          JOIN sources s ON s.id = v.source_id
         WHERE s.key = $2
@@ -242,12 +256,41 @@ async function loadEligibilityInTransaction(
         GROUP BY v.player_id`,
       [season, BROWNLOW_VOTE_SOURCE_KEY],
     );
-    const stagedById = new Map(stagedRows.map((row) => {
+    interface StagedProvider { flags: boolean[]; unknown: number; provenance: BrownlowProviderProvenance }
+    const stagedById = new Map<number, StagedProvider>(stagedRows.map((row) => {
       const flags: boolean[] = [];
       if (row.anyEligible) flags.push(true);
       if (row.anyIneligible) flags.push(false);
-      return [Number(row.playerId), flags] as const;
+      return [Number(row.playerId), {
+        flags,
+        unknown: Number(row.unknownRecords),
+        provenance: {
+          source: BROWNLOW_VOTE_SOURCE_KEY,
+          families: ['brownlow_match_votes'],
+          observations: Number(row.observations),
+          versionSeqs: row.versionSeqs.filter((n) => n !== null).map(Number),
+          batchIds: row.batchIds.filter((n) => n !== null).map(Number),
+        },
+      }] as const;
     }));
+    // The staged leaderboard is the second provider record of the same snapshot; fold it in the same way.
+    // Mirrors the reconciliation's stored-only fallback: a season with no staged vote records has no provider snapshot.
+    const leaderboard = stagedRows.length === 0 ? null : (await loadStagedLeaderboard(tx, season)).board;
+    for (const entry of leaderboard?.entries ?? []) {
+      if (entry.playerId === null) continue;
+      const staged = stagedById.get(entry.playerId) ?? {
+        flags: [], unknown: 0,
+        provenance: { source: BROWNLOW_VOTE_SOURCE_KEY, families: [], observations: 0, versionSeqs: [], batchIds: [] },
+      };
+      if (entry.eligible === null) staged.unknown += 1;
+      else if (!staged.flags.includes(entry.eligible)) staged.flags.push(entry.eligible);
+      staged.provenance = {
+        ...staged.provenance,
+        families: [...new Set([...staged.provenance.families, 'brownlow_leaderboard'])].sort(),
+        observations: staged.provenance.observations + 1,
+      };
+      stagedById.set(entry.playerId, staged);
+    }
 
     const identities: BrownlowPlayerIdentityView[] = [];
     const players: BrownlowPlayerEligibilityEvidence[] = [];
@@ -264,7 +307,9 @@ async function loadEligibilityInTransaction(
         playerId,
         decision: current === undefined ? null : { decisionId: current.id, verdict: current.verdict },
         stored: storedById.get(playerId) ?? null,
-        stagedFlags: stagedById.get(playerId) ?? [],
+        stagedFlags: stagedById.get(playerId)?.flags ?? [],
+        stagedUnknown: stagedById.get(playerId)?.unknown ?? 0,
+        providerProvenance: stagedById.get(playerId)?.provenance ?? null,
       });
     }
     return {
@@ -276,14 +321,57 @@ async function loadEligibilityInTransaction(
     };
 }
 
+/**
+ * What a publication attempt did (see {@link publishBrownlowEligibilityInTransaction}): `published` wrote every
+ * eligibility field; `partial` wrote only the winner flags because unknown eligibility prevents stating the ranks;
+ * `withheld` left the stored rows exactly as they were.
+ */
+export interface BrownlowPublicationSummary {
+  state: 'published' | 'unchanged' | 'partial' | 'withheld' | 'no_stored_totals';
+  /** Vote-getters whose eligibility is unknown (the reason a publication is partial or withheld). */
+  unresolvedPlayerIds: number[];
+}
+
+/** Raised, rolling the caller's transaction back, when a publication that must be authoritative cannot be. */
+export class BrownlowPublicationRefusedError extends Error {
+  readonly code = 'publication_refused_unknown_eligibility' as const;
+
+  constructor(readonly unresolved: readonly BrownlowReviewPlayer[]) {
+    super(
+      `Brownlow publication refused: ${unresolved.length} vote-getter(s) have unknown eligibility `
+      + `(players ${unresolved.map((player) => player.playerId).join(', ')}), so the winner and eligible ranks cannot be published.`,
+    );
+    this.name = 'BrownlowPublicationRefusedError';
+  }
+}
+
+export interface BrownlowPublicationRequest {
+  season: number;
+  registry: SeasonRegistry;
+  actorId: number;
+  note: string;
+  /**
+   * What to do when a vote-getter's eligibility is unknown. `withhold` (default) leaves the stored rows exactly
+   * as they were and reports why; `refuse` throws {@link BrownlowPublicationRefusedError} so the caller's
+   * transaction rolls back (for a caller that must publish authoritatively or not at all).
+   */
+  onUnresolved?: 'withhold' | 'refuse';
+}
+
 /** Project medal and eligibility metadata. Raw votes and their provenance remain intact;
  * the required audit retains the previous eligibility source statement.
  * Shared by audited decisions and the explicit reconciliation rehearsal. The caller owns the
- * transaction; audit failure aborts the projection. No schema addition is needed. */
+ * transaction; audit failure aborts the projection. No schema addition is needed.
+ *
+ * BP-2025-ELIGIBILITY-v1: stored eligible ranks and ineligibility flags are authoritative output, so they are
+ * written only when every vote-getter's eligibility is known (`rankingDeterminate`); an unknown is never written
+ * as ineligible or eligible. While any is unknown only the winner flags follow the determination (a winner it
+ * can state, or none, so a stale default winner never survives a leader whose eligibility is in question); the
+ * summary says what was done and why. */
 export async function publishBrownlowEligibilityInTransaction(
   tx: SqlExecutor,
-  request: { season: number; registry: SeasonRegistry; actorId: number; note: string },
-) {
+  request: BrownlowPublicationRequest,
+): Promise<{ determination: BrownlowMedalDetermination; changed: boolean; publication: BrownlowPublicationSummary }> {
   const native = nativeTransactionOf(tx);
   if (!native) throw new BrownlowEligibilityInfrastructureError();
   await tx.query('SELECT pg_advisory_xact_lock(717275, 3)');
@@ -299,12 +387,32 @@ export async function publishBrownlowEligibilityInTransaction(
   const previous = stored.filter((r) => r.isWinner).map((r) => r.playerId).sort((a, b) => a - b);
   // There is no public projection without authoritative season totals. Staged votes alone
   // remain proposals and never replace historical raw totals.
-  if (stored.length === 0) return { determination, changed: false };
+  if (stored.length === 0) return { determination, changed: false, publication: { state: 'no_stored_totals', unresolvedPlayerIds: [] } };
+  if (!determination.rankingDeterminate) {
+    if (request.onUnresolved === 'refuse') throw new BrownlowPublicationRefusedError(determination.unresolvedPlayers);
+    const unresolvedPlayerIds = determination.unresolvedPlayers.map((player) => player.playerId);
+    const staleFlags = stored.filter((row) => row.isWinner !== winners.includes(row.playerId));
+    if (staleFlags.length === 0) return { determination, changed: false, publication: { state: 'withheld', unresolvedPlayerIds } };
+    for (const row of staleFlags) {
+      await tx.query('UPDATE brownlow_season_votes SET is_winner = $3 WHERE season = $1::int AND player_id = $2::int',
+        [request.season, row.playerId, winners.includes(row.playerId)]);
+    }
+    await recomputeBrownlowCareerTotals(native, staleFlags.map((row) => row.playerId));
+    await recordDataEdit(native, {
+      tableName: 'brownlow_season_authority', rowId: request.season, fieldGroup: 'eligibility_publication',
+      oldValues: { winners: previous },
+      newValues: { winners, status: determination.status, inputChecksum: determination.inputChecksum,
+        decisionIds: evidence.decisions.filter((d) => d.current).map((d) => d.id), basis: determination.basis,
+        ranksWithheld: true, unresolvedPlayerIds },
+      adminUserId: request.actorId, note: request.note,
+    });
+    return { determination, changed: true, publication: { state: 'partial', unresolvedPlayerIds } };
+  }
   const metadata = determination.rawLeaderboard.map((row) => ({
     playerId: row.playerId,
     isIneligible: row.eligibility.status === 'ineligible',
-    eligibleRank: row.eligibility.status === 'eligible'
-      ? 1 + determination.rawLeaderboard.filter((other) => other.eligibility.status !== 'ineligible' && other.votes > row.votes).length : null,
+    // Every rank is determinate here (no unknown vote-getter), so this is the exact eligible competition rank.
+    eligibleRank: row.eligibleRank,
     isWinner: winners.includes(row.playerId),
   }));
   for (const row of stored) if (!metadata.some((r) => r.playerId === row.playerId)) {
@@ -327,11 +435,16 @@ export async function publishBrownlowEligibilityInTransaction(
       newValues: { winners, status: determination.status, inputChecksum: determination.inputChecksum,
         decisionIds: evidence.decisions.filter((d) => d.current).map((d) => d.id),
         basis: determination.basis, eligibility: metadata,
+        // Where each player's eligibility came from, with the retained provider provenance.
+        eligibilityEvidence: determination.rawLeaderboard.map((row) => ({
+          playerId: row.playerId, status: row.eligibility.status, source: row.eligibility.source,
+          provider: row.eligibility.detail.provider, providerProvenance: row.eligibility.detail.providerProvenance,
+        })),
         votesTotal: stored.reduce((n, r) => n + r.votes, 0) },
       adminUserId: request.actorId, note: request.note,
     });
   }
-  return { determination, changed };
+  return { determination, changed, publication: { state: changed ? 'published' : 'unchanged', unresolvedPlayerIds: [] } };
 }
 
 /* ------------------------------------------------------------------ *
@@ -377,6 +490,12 @@ export interface BrownlowEligibilityDecisionRequest {
   readonly sealed: SealedSeasons;
   /** The authorised application caller publishes the decision's effect atomically. */
   readonly publicationRegistry?: SeasonRegistry;
+  /**
+   * With `publicationRegistry`: `withhold` (default) records the decision and leaves the stored rows untouched while
+   * any vote-getter's eligibility is still unknown; `require` makes an unknown refuse the publication and roll the
+   * decision back with it (the caller then receives a {@link BrownlowPublicationRefusedError}).
+   */
+  readonly publicationMode?: 'withhold' | 'require';
 }
 
 export type BrownlowEligibilityDecisionOutcome =
@@ -386,6 +505,8 @@ export type BrownlowEligibilityDecisionOutcome =
     readonly decision: BrownlowEligibilityDecisionView;
     /** The decision this one replaced, or null. */
     readonly supersededId: number | null;
+    /** What the atomic publication did; absent when the caller asked for none. */
+    readonly publication?: BrownlowPublicationSummary;
   };
 
 function refuse(
@@ -565,9 +686,12 @@ export async function recordBrownlowEligibilityDecision(
         current,
       ],
     );
-    if (request.publicationRegistry) await publishBrownlowEligibilityInTransaction(tx, {
-      season, registry: request.publicationRegistry, actorId: decidedBy, note,
-    });
-    return { ok: true, decision: decisionViewOf(inserted[0]), supersededId: current };
+    const publication = request.publicationRegistry
+      ? (await publishBrownlowEligibilityInTransaction(tx, {
+        season, registry: request.publicationRegistry, actorId: decidedBy, note,
+        onUnresolved: request.publicationMode === 'require' ? 'refuse' : 'withhold',
+      })).publication
+      : undefined;
+    return { ok: true, decision: decisionViewOf(inserted[0]), supersededId: current, ...(publication ? { publication } : {}) };
   });
 }

@@ -627,7 +627,8 @@ export type AflApiBrownlowVoteUnit = {
   providerTeamId: string;
   playerId: number;
   votes: number;
-  eligible: boolean;
+  /** Explicit provider boolean, or null (UNKNOWN); staged as NULL, never as false. */
+  eligible: boolean | null;
 };
 
 export type AflApiBrownlowMatchSetPlan =
