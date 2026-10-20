@@ -20,7 +20,7 @@ import { loadSeasonRegistry } from '@/lib/seasons/sealed-seasons';
 
 import { loadSnapshot } from '../../tools/current-season/settle-afl-api-brownlow';
 
-const DB = 'afldb_v2_brownlow_package2_test';
+const DB = 'afldb_v2_brownlow_policy_final_test';
 const sql = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1, onnotice: () => {} });
 const executor = postgresExecutor(sql);
 const revision = 'a'.repeat(40); // synthetic approval; NEVER a production execution authority

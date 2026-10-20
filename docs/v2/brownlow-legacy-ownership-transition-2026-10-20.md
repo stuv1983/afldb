@@ -1,5 +1,7 @@
 # Brownlow canonical ingestion and the legacy-ownership transition (2026-10-20)
 
+**Owner policy update, 2026-10-20:** OD-BROWNLOW-OWNERSHIP-1 is approved for season 2025 only: 621 positive-vote rows / 207 sets, preserving 8,901 legacy zero rows and original provenance. Execution remains pending. Historical proposal/rehearsal wording below is retained as reviewed evidence. [Decision, content hashes and owner instruction](brownlow-policy-decisions-2026-10-20.md).
+
 Status: **canonical ingestion verified on a clean isolated target. The legacy-ownership transition is
 implemented and demonstrated on a disposable clone only. Production adoption is an OWNER DECISION and
 is unapplied.** Brownlow is therefore **not** operationally ready: until the owner decides and the

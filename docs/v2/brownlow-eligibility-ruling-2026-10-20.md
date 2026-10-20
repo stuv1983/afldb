@@ -1,5 +1,7 @@
 # Brownlow 2025: the 12 eligibility disagreements — evidence and proposed rulings (2026-10-20)
 
+**Owner policy update, 2026-10-20:** D-V2-BROWNLOW-ELIGIBILITY-1 approves BP-2025-ELIGIBILITY-v1 and all twelve exact 2025 ineligible rulings below at reviewed HEAD `92aa541d91a9b2cfcb43ddda861f573801540ec8`. The historical proposal and sandbox wording below is retained as reviewed evidence. Production recording and runtime implementation remain pending; no stored-rank shortcut is selected. [Decision, content hashes and owner instruction](brownlow-policy-decisions-2026-10-20.md).
+
 Status: **PROPOSAL for owner ruling. Nothing was recorded against production or any shared database.**
 The sandbox demonstration below ran on a disposable clone, is labelled as such, and is excluded from
 every migration-preservation comparison. Part of V2-GAP-016 ([known-gaps](known-gaps.md)).

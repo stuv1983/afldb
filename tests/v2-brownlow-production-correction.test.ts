@@ -31,6 +31,12 @@ describe('Brownlow production correction approval boundary', () => {
     }
   });
   it('accepts a fresh exact execution approval', () => { const { plan, approval } = fixture(); expect(() => check(plan, approval)).not.toThrow(); });
+  it('refuses policy-only decisions as execution authority', () => {
+    const { plan } = fixture();
+    for (const decision of ['D-V2-BROWNLOW-ELIGIBILITY-1', 'OD-BROWNLOW-OWNERSHIP-1', 'D-V2-BROWNLOW-MATCH-BACKFILL-1']) {
+      expect(() => check(plan, { reference: decision } as CorrectionApproval)).toThrow();
+    }
+  });
   it('refuses a missing reference and a mismatched restored baseline even in a self-consistent plan', () => {
     const { plan, approval } = fixture();
     expect(() => check(plan, { ...approval, reference: undefined } as unknown as CorrectionApproval)).toThrow(/approval/);

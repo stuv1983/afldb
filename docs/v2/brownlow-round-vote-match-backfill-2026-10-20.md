@@ -1,5 +1,7 @@
 # `brownlow_round_votes.match_id` backfill — rehearsal and production proposal (2026-10-20)
 
+**Owner policy update, 2026-10-20:** D-V2-BROWNLOW-MATCH-BACKFILL-1 approves the policy for 1984–2025 only, subject to fresh counts, unique supported mappings and exact plan validation. The archived expectation of 320,861 is not a live count. 2026 is excluded; execution remains pending. Historical all-season rehearsal evidence below is unchanged. [Decision, content hashes and owner instruction](brownlow-policy-decisions-2026-10-20.md).
+
 Status: **rehearsed on disposable clones; the production correction is a PROPOSAL and was not
 executed.** All counts are from a clone of the migration-only copy of the archive (inputs identical to
 the archived data; no production database was read). Detailed exports stay outside Git.

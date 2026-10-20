@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — Brownlow policy decisions and isolated follow-up (2026-10-20)
+
+- Record D-V2-BROWNLOW-ELIGIBILITY-1, OD-BROWNLOW-OWNERSHIP-1 and
+  D-V2-BROWNLOW-MATCH-BACKFILL-1 with the owner's instruction and SHA-256 hashes of the reviewed
+  proposals at `92aa541d`. Preserve all twelve exact 2025 rulings, 2025 adoption's 621 positives /
+  207 sets and 8,901 legacy zeros, and the 1984–2025-only backfill policy. Production execution
+  remains pending; 2026 is excluded. Eligibility tri-state runtime work remains an explicit gap.
+- Independently verify migration 116 from schema 115 on fresh isolated Linux copies: existing
+  rows, public Brownlow results, definitions/relationships and privileges preserved; immutable
+  receipt transactions, real app/import/auth denial and normal-runner rerun verified with populated
+  history retained. This does not extend the archive-bound 110–115 acceptance.
+- Add policy-only execution-authority refusal coverage and pin the combined correction integration
+  suite to its new dedicated isolated copy: all 8 PostgreSQL cases pass together, 98/98 focused
+  units pass, and typecheck/changed-file lint pass. Detailed results and the next scoped authority/evidence
+  package: `docs/v2/brownlow-isolated-verification-2026-10-20.md`.
+
 ### AFLDB V2 — guarded Brownlow correction approval package (2026-10-20)
 
 - Add a separate refusal-first production correction entry point with exact target/revision/season/

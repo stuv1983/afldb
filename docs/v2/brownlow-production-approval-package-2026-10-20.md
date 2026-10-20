@@ -1,5 +1,7 @@
 # Brownlow correction package for owner review — 2026-10-20
 
+**Current owner-policy status, 2026-10-20:** [three content-bound decisions](brownlow-policy-decisions-2026-10-20.md) are approved at reviewed HEAD `92aa541d91a9b2cfcb43ddda861f573801540ec8`: D-V2-BROWNLOW-ELIGIBILITY-1 (BP-2025-ELIGIBILITY-v1 and all twelve exact rulings), OD-BROWNLOW-OWNERSHIP-1 (2025 only, 621 positives / 207 sets; preserve 8,901 zeros and original provenance), and D-V2-BROWNLOW-MATCH-BACKFILL-1 (1984–2025 only, fresh unique mappings/counts and exact plan). The archived 320,861 is an expectation. **Execution is pending for every operation; 2026 remains excluded.** No production connection, schema installation, correction, staging, publication, deployment or timer authority follows. The earlier verification/manifest below is historical; the current combined verification is recorded separately below.
+
 **NO production execution is approved or performed. One agent; local changes and dedicated isolated
 copies only.** Entry branch/HEAD verified: `v2/rebuild`, `36a36054818fa0545d81d9eb357cd50b3299c0f0`.
 Existing untracked `.codex/`, recovery archives, worktrees, databases and empty remotes were preserved.
@@ -17,11 +19,11 @@ common gates are verified backup/restore bytes, matching fresh baseline, migrati
 
 | Exact operation | Season / records | Evidence | Expected writes | Preconditions | Reversal and limits | Exact approval required |
 |---|---|---|---|---|---|---|---|
-| Policy `BP-2025-ELIGIBILITY-v1` | API era; twelve 2025 proposals | [Final ruling table](brownlow-eligibility-ruling-2026-10-20.md) | None | Review final sanctions and unknown semantics | Amend policy; no data changed | Policy version plus accepted/deferred rulings; **not E** |
+| Policy `BP-2025-ELIGIBILITY-v1` (**approved**, D-V2-BROWNLOW-ELIGIBILITY-1) | API-era policy; twelve exact 2025 rulings approved | [Final ruling table](brownlow-eligibility-ruling-2026-10-20.md) | None | Review final sanctions and unknown semantics | Amend policy; no data changed | Policy version plus accepted/deferred rulings; **not E** |
 | Install migration 116 | New receipt ledger | Reviewed SQL and isolated schema checks | Table, function, immutable trigger; no statistics | Separate migration/deployment review, backup, role review | Retain populated ledger; no destructive down migration | Separate schema/deployment approval for revision and target |
 | `observe` | 2025: 207 sets, 188 players | [Authentic snapshot](brownlow-authentic-reconciliation-2026-10-20.md), manifest rehash | Spine, typed staging, batch, receipt; no canonical writes | Common gates; exact snapshot/booleans/identities | Retain observations; supersede, never erase history | **E** for `observe`, `[2025]`, `afl_api` |
-| `backfill` | 1984?2025: expected 320,861 NULL rows | [094-rule rehearsal](brownlow-round-vote-match-backfill-2026-10-20.md) | Reviewed `match_id` mappings and receipt only | Common gates; zero exclusions, exact per-season export | New `reverse-backfill` E; original export/receipt; refuse subsequent drift | **E** with explicit 1984?2025 season list, `legacy` |
-| `adopt` | 2025: 621 positives / 207 sets; preserve 8,901 zeros | [Value/identity agreement](brownlow-legacy-ownership-transition-2026-10-20.md) | 621 provenance changes, 621 audit rows, batch, receipt | Common gates; 207 adoptable, no refusals; legacy provenance retained | New `reverse-adopt` E before later writes; API writes block reversal | OD-BROWNLOW-OWNERSHIP-1 **plus E**, `[2025]`, `afl_api` |
+| `backfill` | 1984?2025: expected 320,861 NULL rows | [094-rule rehearsal](brownlow-round-vote-match-backfill-2026-10-20.md) | Reviewed `match_id` mappings and receipt only | Common gates; zero exclusions, exact per-season export | New `reverse-backfill` E; original export/receipt; refuse subsequent drift | D-V2-BROWNLOW-MATCH-BACKFILL-1 (**policy approved**) **plus E** with explicit 1984–2025 season list, `legacy` |
+| `adopt` | 2025: 621 positives / 207 sets; preserve 8,901 zeros | [Value/identity agreement](brownlow-legacy-ownership-transition-2026-10-20.md) | 621 provenance changes, 621 audit rows, batch, receipt | Common gates; 207 adoptable, no refusals; legacy provenance retained | New `reverse-adopt` E before later writes; API writes block reversal | OD-BROWNLOW-OWNERSHIP-1 (**policy approved**) **plus separate E**, `[2025]`, `afl_api` |
 | `eligibility` | Approved subset of twelve 2025 proposals | Final citations and stable identity/service checks | Decision rows, audited metadata/career publication, receipt; raw votes unchanged | Common gates; active Super Admin; exact records/current IDs; sealed season | New audited superseding decisions; no deletion of history | Individual ruling approval **plus E** enumerating every record |
 | `resolve` | Exact named 2025 ownership-issue IDs only | Current 621 values/match IDs equal; 207 sets owned | Named resolution fields and receipt | Common gates; adoption/backfill done; reason/source/head match | Separately reviewed reopening; no automatic inverse | **E** for exact issue list and resolution, `[2025]`, `afl_api` |
 
@@ -144,9 +146,13 @@ only for the old archive's migration-preservation claim. It neither accepts this
 authorises a production connection or correction. Eligibility publication, ownership adoption and
 match-ID changes deliberately alter selected fields, so future before/after evidence must itemise and
 approve those deltas. No whole-season reconciliation or operational-readiness acceptance follows from
-closing selected ownership issues; the eligibility rulings and season policy still need owner decisions.
+closing selected ownership issues; the eligibility rulings and season policy are now policy-approved, with production recording, runtime implementation and operational acceptance still pending.
 
-## Local verification
+## Current isolated follow-up
+
+**Final isolated follow-up: migration 116 preservation/privilege/rerun PASS; eight PostgreSQL cases passed together; 98/98 focused units; typecheck and changed-file lint PASS.** [Migration 116 preservation, combined verification and the next exact authority package](brownlow-isolated-verification-2026-10-20.md) record the new isolated work. Policy approval is not an execution-approval envelope; exact target identity, reviewed revision, verified backup/restored baseline, exact operation/season/source, ruling records or mapping plan, digest/expiry and separate owner execution approval remain mandatory.
+
+## Earlier local verification (historical separate runs)
 
 Verified locally on 2026-10-20:
 
@@ -204,13 +210,13 @@ Synthetic backup/restore attestations used in tests exercise validation, not rea
 restorability. Actual verified fresh backup/restore bytes and matching baseline are still execution
 preconditions. No production/shared connection, SSH, deployment, timer change or push occurred.
 
-Tracking: V2-GAP-016, V2-GAP-030 and V2-GAP-031 remain open for owner decisions/execution; the existing
+Tracking: V2-GAP-016, V2-GAP-030 and V2-GAP-031 remain open for runtime implementation and separately approved execution; the existing
 proposals and `known-gaps.md` are updated and the change is recorded under `CHANGELOG.md` Unreleased.
 No new reproducible application defect was found; the authoritative issue ledger, Open Issues table
 and `IssuesIndex.md` retain their existing issue counts. The final commit/HEAD is returned with the
 package; future execution approvals must name that reviewed execution revision explicitly.
 
-## Complete changed-file manifest
+## Earlier task changed-file manifest (historical)
 
 These are the only repository files changed by this task:
 
