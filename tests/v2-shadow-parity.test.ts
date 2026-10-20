@@ -70,6 +70,7 @@ import { USAGE, defaultDeps, parseCliArgs, runCli, type CliDeps } from '../tools
 import { APPROVED_BROWNLOW_ALTERNATIVE, comparePreservation, digest, releaseGates, REQUIRED_PUBLIC_QUERIES,
   REQUIRED_PRESERVED_TABLES, type PreservationSnapshot } from '../tools/v2/migration-preservation';
 import { runReleaseGates } from '../tools/v2/release-gates';
+import { assessFreshAcceptance, FRESH_ACCEPTANCE, verifyFreshEvidence } from '../tools/v2/fresh-rehearsal-acceptance';
 
 const ROOT = process.cwd();
 const NOW = '2026-10-20T00:00:00Z';
@@ -82,6 +83,60 @@ describe('owner migration separation: synthetic preservation policy', () => {
     queries: Object.fromEntries(REQUIRED_PUBLIC_QUERIES.map(q => [q, digest(q)])) });
   const evidence = { result: 'PASS', evidence: ['synthetic contract-test reference'] };
   const functional = Object.fromEntries(['ingestion', 'publication', 'permissions', 'auditing', 'rollback'].map(k => [k, evidence]));
+  describe('fresh 111–117 acceptance: synthetic boundary contracts', () => {
+    const inputs = () => {
+      const before = snapshot(); before.scope.backupSha256 = FRESH_ACCEPTANCE.archiveSha256;
+      before.tables['staging.afl_api_brownlow_vote'] = { definition: digest('NOT NULL'), rows: [digest('eligible true')] };
+      const after = clone(before);
+      after.tables['staging.afl_api_brownlow_vote'].definition = digest('nullable');
+      after.tables['public.brownlow_correction_receipts'] = { definition: digest('receipt'), rows: [] };
+      after.tables['afldb_meta.schema_migrations'].rows.push(...Object.keys(FRESH_ACCEPTANCE.migrations).map(digest));
+      const parity: Loose = clone(run({ brownlow: { before: [], after: [] } }));
+      const rows: Loose = checkOf(parity as ShadowParityReport, 'table_row_counts');
+      rows.status = 'fail'; rows.counts.fail = 1;
+      rows.findings.push({ code: 'UNEXPECTED_TABLE_ADDED', severity: 'fail', subject: 'public.brownlow_correction_receipts',
+        detail: 'absent before, present after (0 rows), and not a V2-added table' });
+      parity.verdict = 'FAIL'; parity.summary = { pass: 3, fail: 1, incomplete: 1 };
+      return { integrity: 'PASS' as const, before, after, parity, archiveSha256: FRESH_ACCEPTANCE.archiveSha256 as string,
+        sourceRevision: FRESH_ACCEPTANCE.sourceRevision as string, baseline: 110, migrations: Object.keys(FRESH_ACCEPTANCE.migrations) };
+    };
+    it('accepts only the reviewed migration scope and keeps original failures and operational authority separate', () => {
+      const report = assessFreshAcceptance(inputs());
+      expect(report.reasons).toEqual([]);
+      expect(report.migrationCompatibility).toBe('PASS');
+      expect(report.originalStrict.migrationCompatibility).toBe('FAIL');
+      expect(report.originalStrict.preservation.findings).toHaveLength(2);
+      expect(report.stagedBrownlowComparator).toBe('INCOMPLETE');
+      expect(report.productionOperational).toBe('INCOMPLETE');
+      expect(report.productionDecision).toBe('NO-GO');
+      expect(report.productionPrivileges.productionExecutionAuthorized).toBe(false);
+    });
+    it.each(['archive', 'source', 'baseline', 'range', 'file', 'missing', 'hash', 'schema', 'table', 'row', 'added row', 'output', 'brownlow'])('rejects %s outside the approval', kind => {
+      const input = inputs();
+      if (kind === 'archive') input.archiveSha256 = digest('other archive');
+      if (kind === 'source') input.sourceRevision = '0'.repeat(40);
+      if (kind === 'baseline') input.baseline = 109;
+      if (kind === 'range') input.migrations.push('118_unreviewed.sql');
+      if (kind === 'file') input.migrations[0] = '111_changed.sql';
+      if (kind === 'missing') Object.assign(input, { integrity: 'INCOMPLETE' });
+      if (kind === 'hash') Object.assign(input, { integrity: 'FAIL' });
+      if (kind === 'schema') input.after.tables['public.matches'].definition = digest('unreviewed schema');
+      if (kind === 'table') input.after.tables['public.unreviewed'] = { definition: digest('new'), rows: [] };
+      if (kind === 'row') input.after.tables['public.brownlow_round_votes'].rows = [digest('changed vote')];
+      if (kind === 'added row') input.after.tables['public.players'].rows.push(digest('unapproved player'));
+      if (kind === 'output') input.after.queries.brownlow_raw = digest('different result');
+      if (kind === 'brownlow') { (checkOf(input.parity as ShadowParityReport, 'brownlow') as Loose).status = 'fail'; input.parity.summary = { pass: 3, fail: 2, incomplete: 0 }; }
+      expect(assessFreshAcceptance(input).migrationCompatibility).toBe('FAIL');
+    });
+    it('refuses an absent or substituted manifest before any claimed evidence can count', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'fresh-acceptance-'));
+      try {
+        expect(verifyFreshEvidence(dir, ROOT)).toBe('INCOMPLETE');
+        writeFileSync(join(dir, 'evidence-manifest.sha256'), `${digest('made up')}  after.schema.sql\n`);
+        expect(verifyFreshEvidence(dir, ROOT)).toBe('FAIL');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
+  });
   it('accepts identical rows, additive V2 tables and retained existing rows', () => {
     const b = snapshot(), a = clone(b);
     a.tables['public.derived_award_results'] = { definition: digest('new'), rows: [digest('new result')] };

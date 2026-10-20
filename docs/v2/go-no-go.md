@@ -1,5 +1,29 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
+**Current scoped acceptance, 2026-10-21:** [owner decisions and measured result](owner-decision-fresh-rehearsal-2026-10-21.md)
+supersede historical pending-rehearsal statements below for archive `7fefcd9b…6dea6599`, baseline
+110 through exactly 111–117 and reviewed source `a6400e7d…`. Migration compatibility and backend
+acceptance are **PASS**, bound to all 50 verified retained files and seven migration checksums.
+Original strict preservation/compatibility and parity remain **FAIL** (exact receipt addition and
+eligibility definition change; parity 3 pass / 1 fail / 1 incomplete). Staged Brownlow remains
+**INCOMPLETE**; authentic staged API reconciliation is not established for this archive.
+D-V2-FRESH-REHEARSAL-1, D-V2-FRESH-SCHEMA-1 and D-V2-BROWNLOW-ALT-2 grant only scoped migration
+acceptance. D-V2-STAGING-IMPORT-DEFAULT-1 and D-V2-STAGING-APP-DEFAULT-1 approve future staging-table
+policies; both production declarations remain absent/pending and execution is unauthorised.
+Production operational acceptance remains **INCOMPLETE / NO-GO**.
+
+First remaining concrete release prerequisite: owner review/merge reconciliation of imported
+ISSUE-316 work with its source branch, C0 DEV sync and separately owner-authorised C1 retirement
+rehearsal (ISSUE-316 §7 C0/C1). D-316-1/C2 follows, requiring its own coordinated pause/recovery
+authority. No demonstrated archive rehearsal is requested again absent changed conditions.
+Final execution/build artifact identity after merge/C2, live freshness/frozen rollback evidence,
+A-ROLLBACK, A-REL (111–117 plus both privilege writes), A-AFLT retirement, A-GO and writer activation
+are separate pending gates. C3 inert install does not authorise C4b or C5; ISSUE-229 B2 still applies.
+No execution envelope or correction plan digest exists from this task. The
+[ordered release plan](production-release-plan-2026-10-21.md) is the current sequencing record;
+earlier statements below about unperformed production-data rehearsals or missing policy decisions
+are historical only. ISSUE-316/229 remain open; their authorities are unchanged.
+
 **Final local Brownlow regression (2026-10-20): complete, no remaining local blocker for that task.**
 Parent/current comparison proves P2 requires the explicit match-ID correction on a prepared clone and OD-5
 requires the existing rebuild namespace; no guards or assertions were weakened. Complete admin **46/46**,

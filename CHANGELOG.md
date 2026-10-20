@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — scoped fresh rehearsal owner acceptance (2026-10-21)
+
+- Record D-V2-FRESH-REHEARSAL-1, D-V2-FRESH-SCHEMA-1 and D-V2-BROWNLOW-ALT-2 for the exact
+  `7fefcd9b…6dea6599` archive, baseline 110, migrations 111–117 and reviewed a6400e7d runtime.
+  Add a separate offline gate bound to the full 50-file evidence manifest and seven migration
+  checksums; actual retained-evidence migration acceptance PASS. Preserve original strict FAIL
+  and staged Brownlow INCOMPLETE, all strict comparator rules and the old archive-bound decision.
+- Record the two exact staging default-privilege policies separately from pending production
+  execution; reconcile the release checklist and ISSUE-316 prerequisites without repeating
+  completed archive rehearsals. Production operational acceptance remains INCOMPLETE / NO-GO.
+
 ### AFLDB V2 — fresh production archive rehearsal and release plan (2026-10-21)
 
 - Retain sanitised live baseline, verified full-backup/export and isolated restore evidence for

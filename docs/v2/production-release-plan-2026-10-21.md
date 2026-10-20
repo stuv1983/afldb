@@ -1,6 +1,16 @@
 # Production inspection, fresh rehearsal and ordered release plan — 2026-10-21
 
-**Owner review required; production release remains NO-GO.** This task used one agent, no subagents,
+**Scoped owner acceptance recorded; production release remains NO-GO.** The
+[2026-10-21 owner decisions](owner-decision-fresh-rehearsal-2026-10-21.md) accept this exact
+archive/source/110–117 rehearsal (D-V2-FRESH-REHEARSAL-1, D-V2-FRESH-SCHEMA-1,
+D-V2-BROWNLOW-ALT-2) and the two staging default policies (D-V2-STAGING-IMPORT-DEFAULT-1,
+D-V2-STAGING-APP-DEFAULT-1). The [new offline result](evidence/fresh-rehearsal-acceptance-2026-10-21.json)
+is migration compatibility **PASS**, original strict **FAIL**, staged comparator **INCOMPLETE**,
+production operational acceptance **INCOMPLETE / NO-GO**. All 50 restricted inventory files and
+seven migration checksums verified. Privilege installation remains pending and unauthorised.
+No demonstrated rehearsal is requested again absent a specific changed baseline/artifact condition.
+
+The original inspection/rehearsal task used one agent, no subagents,
 pushes, new worktrees or cleanup. Production database contents, roles, services, timers, installed code
 and traffic were not changed. The approved backup and restricted inspection files were the only
 production-host filesystem additions. No execution-approval envelope or production correction plan
@@ -130,7 +140,11 @@ Restricted evidence: `/home/rehearsal/evidence/release117-20261020T194848633969Z
 Source copy: `/home/rehearsal/release117-a6400e7d-20261021/`. Earlier archives/copies/evidence remain.
 Raw rows, row hashes, archives, credentials and the full inventory are outside Git.
 
-## Acceptance request — proposed, not granted
+## Original acceptance request — subsequently approved within scope
+
+The request below is preserved as reviewed. Approval is now recorded in the linked owner-decision
+record; references below to a required decision describe the original request. Approval covers
+migration evidence and future privilege policy only, never production installation or publication.
 
 The owner must review the following **new, narrowly bounded** acceptance for archive
 `7fefcd9b791520ccc939f7f9d0ca1ddacd5fe99d2cca33d53ea1aa9c6dea6599`, baseline **110**, migrations
@@ -153,8 +167,8 @@ only the exact approved delta and retain strict comparison of everything else.
 
 ## Ordered future release plan — do not execute from this record
 
-1. **Owner decisions and artifact lock.** Review the measured acceptance request above; accept the
-   retained rehearsal and known test/lint residuals, visual/merge decisions and host recovery limits.
+1. **Owner decisions and artifact lock.** The measured rehearsal acceptance and two privilege
+   policies above are approved. Remaining: accept known test/lint residuals, visual/merge decisions and host recovery limits.
    Require A-GO, an A-REL explicitly covering **111–117** and both default grants, target/revision-bound
    schema approval for **116 and 117**, A-ROLLBACK and A-AFLT. Existing wording mentioning only
    111–114 is insufficient. Complete ISSUE-316 C0/C1 and approve D-316-1 for C2; decide the explicit
@@ -303,11 +317,18 @@ correction. Freeze-time recovery evidence and ISSUE-316 configuration changes ne
 Known full-workflow residuals (13,740 passed / 9 failed / 31 skipped), lint debt and strict Gridley
 149 findings / 99 approved / 50 unapproved remain; no new adjudication or waiver is granted here.
 
-The next action is owner review of this measured acceptance request and ordered plan. No production
-release command was executed by this task.
+The first remaining concrete prerequisite is owner review/merge reconciliation of the imported
+ISSUE-316 work with its source branch, then C0 DEV sync and C1 retirement rehearsal under the
+explicit owner authorities in ISSUE-316 §7 C0/C1. Those actions are not authorised here. D-316-1
+for C2 is the next production sequencing approval after C0/C1, together with the separate coordinated
+pause/recovery window. Artifact/build identity, live freshness, rollback, A-AFLT retirement and
+new-writer activation remain distinct later gates. No production release command was executed.
 
-Retained repository changes for this task are this plan,
+Retained repository changes for the original inspection/rehearsal task were this plan,
 `docs/v2/evidence/fresh-production-rehearsal-2026-10-21.json`,
 `docs/v2/release-requirements-checklist-2026-10-20.md` and `CHANGELOG.md`. No application/tooling code
 changed; ISSUE-316 and ISSUE-229 remain open with their existing decisions/next actions. No new defect
 was asserted and no issue was resolved, so the open-issue index and detailed issue statuses are unchanged.
+The subsequent owner-acceptance task adds the linked decision record, separate offline gate/result
+and focused boundary tests, and updates this plan, checklist, go/no-go record and changelog. It
+changes no application/schema code or issue status. No restricted raw data or inventory is committed.
