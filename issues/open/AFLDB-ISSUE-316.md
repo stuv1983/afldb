@@ -357,10 +357,12 @@ active, bounded to 2026. `--season 2026 --season-feed tests/fixtures/afl_api/sea
 **V2 reconciliation, 2026-10-21:** all 19 source handoff files match the preserved snapshot and
 were already imported by `c9cca86db2fd60ec42fa777906a2cf2a291d5e4e`; intentional V2 runtime
 refusal/quarantine is preserved. Original C0/C1 below remain the historical contract. The
-[V2 approval package](../../docs/v2/issue316-c0-c1-approval-2026-10-21.md) proposes an explicit
-owner amendment and an exact hashed, filesystem-only DEV shell-refusal artifact. Neither is
-approved or executed on DEV. Full C0/C1 and C2 remain pending; D-316-13 remains unavailable
-before deployed C4. No acquiring DEV control is claimed from local fixture checks.
+[V2 approval package](../../docs/v2/issue316-c0-c1-approval-2026-10-21.md) records the owner's
+2026-10-21 approval of D-V2-316-C0C1-1 (explicit C0/C1 adaptation) and D-DEV-316-C1-REFUSALS-1,
+and the measured DEV result: the hashed filesystem-only shell subset passed 4/4 on `streamanator`
+(runner exit 0). Full C0/C1 remains pending deployed DEV app/audit acceptance, and C2 pending
+its own authority; D-316-13 remains unavailable before deployed C4. No acquiring DEV control ran
+or is claimed.
 
 **Shape: cut over at the season boundary, not mid-season.** 2026 stays `afltables`-owned forever as
 stored history, and 2027 is `afl_api`-owned from its first match. No row is re-owned, so Q1 and Q7

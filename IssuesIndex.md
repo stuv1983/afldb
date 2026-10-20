@@ -470,7 +470,8 @@
   install only; the D1 rehearsal is C4b, run by one command that restores the setting however it ends (`afl-api-c4b-rehearsal.ts`; the tool itself has never run on Linux, PostgreSQL or PROD, its tests have, DB-free, on Windows). D-316-13 is unavailable until C4 is deployed.
   Nothing deployed; the PROD AFL Tables timer is untouched; B1 stays.
 - **V2 reconciliation (2026-10-21):** source/snapshot 19/19 verified; imported in `c9cca86d`; V2 quarantine/refusal intentional. Local focused 669 pass / 2 POSIX-only skip, packaged refusals 4/4, typecheck/lint PASS. No DEV/PROD execution; full C0/C1 and C2 pending.
-- **Runbook:** `issues/open/AFLDB-ISSUE-316.md`. **Next action:** review proposed D-V2-316-C0C1-1 and exact D-DEV-316-C1-REFUSALS-1 in `docs/v2/issue316-c0-c1-approval-2026-10-21.md`; then only the filesystem-only DEV shell subset if approved. Deployed DEV app/audit acceptance and C2 need separate authority. D-316-13 unavailable before deployed C4.
+- **DEV C1 shell subset (2026-10-21):** D-V2-316-C0C1-1 and D-DEV-316-C1-REFUSALS-1 approved; DEV refusal fixtures passed 4/4 (retired exit 0, out-of-bounds exit 1, runner exit 0) on `streamanator`. No active acquisition control, deployed app or audit behaviour verified.
+- **Runbook:** `issues/open/AFLDB-ISSUE-316.md`. **Next action:** separately approved artifact-pinned V2 DEV install + Super Admin stale-action check (`legacy_retired`, one `admin.legacy_retired_refused` row) to complete DEV C1; record in `docs/v2/issue316-c0-c1-approval-2026-10-21.md`. C2 needs separate D-316-1 authority. D-316-13 unavailable before deployed C4.
 
 ### AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 - **Severity:** Medium. **Area:** public site / SEO — `src/app/sitemap.ts`.

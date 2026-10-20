@@ -1,9 +1,89 @@
-# ISSUE-316 local reconciliation and proposed C0/C1 approval — 2026-10-21
+# ISSUE-316 local reconciliation and C0/C1 approval — 2026-10-21
 
-**Local preparation complete; owner amendment and DEV execution pending. Production NO-GO.**
-No host access, acquisition, shared database writes, deployment, rollover, season changes,
-timer/service changes, pushes, subagents or new worktrees occurred. The accepted fresh archive
-rehearsal, Brownlow implementation, builds and rollback exercises were not repeated.
+**Owner approved D-V2-316-C0C1-1 and D-DEV-316-C1-REFUSALS-1 (2026-10-21); the approved DEV
+shell subset ran and PASSED 4/4. Full C0/C1 is NOT complete: deployed DEV app/audit acceptance
+and C2 remain pending. Production NO-GO.**
+The local preparation below involved no host access, acquisition, shared database writes,
+deployment, rollover, season changes, timer/service changes, pushes, subagents or new worktrees.
+The accepted fresh archive rehearsal, Brownlow implementation, builds and rollback exercises were
+not repeated. The only later operation is the filesystem-only DEV shell subset recorded in
+"Owner approvals and DEV results" below.
+
+## Owner approvals and DEV results (2026-10-21)
+
+**Provenance.** The owner explicitly approved both decisions "exactly as specified" in this
+document (owner instruction of 2026-10-21; the wording is the block quotes in the two sections
+below, unchanged). Recorded:
+
+- **D-V2-316-C0C1-1 — approved.** Accurate scope: normal V2 runtime continues refusing legacy
+  acquisition; pinned historical and V2 launcher refusal fixtures replace the acquiring C0
+  control and do not demonstrate active acquisition; active historical acquisition remains a
+  separately authorised C2 prerequisite; full deployed DEV app/audit acceptance remains pending;
+  no API writer, setting, timer, rollover or production operation is approved; D-316-13 remains
+  unavailable before deployed C4.
+- **D-DEV-316-C1-REFUSALS-1 — approved and executed.** This is the C1 shell subset only.
+
+**Target (DEV, measured).** SSH alias `dev` (`~/.ssh/config`: `Host dev streamanator`,
+`arm@10.0.40.100`, port 22) reported hostname `streamanator`, user `arm` (uid 1000), address
+`10.0.40.100`, Linux 6.8.0-147-generic, at 2026-10-21T08:31:58+11:00. The production alias
+`afldb` / 209.38.87.252 was not used. No sudo, no database connection.
+
+**Artifact.** Local and remote (`/home/arm/issue316-c1-refusals-20261021.tar`, copied by `scp`
+once; the first attempt at remote verification was a client-side quoting error, and a second
+was declined by the automatic permission classifier; the archive was not re-uploaded or
+altered): 40,960 bytes, SHA-256
+`99ec19b1c6f4cfbd9f7429211955cba05a7c80783e5e8804f194eb20b2483b00` — matches. Remote `tar -tvf`:
+exactly four ordinary files (`-rw-------`), no links, no unsafe paths: `historical.sh` 12,476 B,
+`v2.sh` 13,170 B, `rehearse.sh` 2,079 B, `checksums.sha256` 230 B. Member hashes equal the table
+below (`sha256sum -c checksums.sha256`: `historical.sh`, `v2.sh`, `rehearse.sh` all OK; local
+extract also matched, `checksums.sha256` itself `c88a41fa…595cd7`).
+
+**Procedure.** Both destinations confirmed absent immediately before creation;
+`mkdir -m 700 /home/arm/issue316-c1-review-20261021`; `tar -xf … -C` that directory; checksums
+verified; then, from that directory, exactly:
+
+```sh
+/usr/bin/env -i PATH=/usr/bin:/bin AFLDB_PYTHON=/usr/bin/python3 \
+  /bin/sh ./rehearse.sh /home/arm/issue316-c1-review-20261021 \
+  /home/arm/issue316-c1-review-20261021/results
+```
+
+Started and finished 2026-10-21T08:35:31+11:00 (same second). **Overall runner exit 0**, printing
+"PASS: four shell refusals; no acquisition tools, R fragment, Node settle or database
+credentials in fixtures." and "Not deployed DEV C1 acceptance; no active historical acquisition
+control was run."
+
+| Case | Fixture | Exit | Marker | `result.log` SHA-256 |
+|---|---|---|---|---|
+| `historical-retired` | `retired`/2026, in progress `[2026]` | **0** (expected 0) | `AFLDB_AFLTABLES_RETIRED` | `161c685c…c355` |
+| `historical-beyond` | `active`/2026, in progress `[2027]` | **1** (expected 1) | `AFLDB_AFLTABLES_OUT_OF_BOUNDS` | `30cee544…a8d6d0` |
+| `v2-retired` | same as historical-retired | **0** | `AFLDB_AFLTABLES_RETIRED` | `161c685c…c355` |
+| `v2-beyond` | same as historical-beyond | **1** | `AFLDB_AFLTABLES_OUT_OF_BOUNDS` | `30cee544…a8d6d0` |
+
+Identical per-case log, exit-code, switch and register hashes between the historical and V2
+launchers (each pair byte-identical). Every log shows only the refusal message: no `[1/3]`, no
+snapshot label, no R/Node/acquisition output. No unexpected exit, marker or write was seen.
+The runner and result files are the only things written, under the new directory.
+
+**Evidence (DEV, retained, no cleanup).** `/home/arm/issue316-c1-refusals-20261021.tar` and
+`/home/arm/issue316-c1-review-20261021/` (mode 700; the four extracted files plus `results/<case>/`
+with `data/reference/{afltables-network,seasons}.json`, `result.log`, `exit-code.txt`).
+
+**Limits — what this does not show.**
+- This is the C1 shell subset only. No active historical acquisition control ran, so the
+  original C0 acquiring criterion is replaced (D-V2-316-C0C1-1), not satisfied.
+- No deployed application or audit behaviour was verified (no `legacy_retired` refusal, no
+  `admin.legacy_retired_refused` audit row).
+- No process, packet or write monitoring beyond the runner's own checks was run; the structural
+  reachability result is not network-capture evidence.
+- No database, service, timer, setting, rollover or production state was changed.
+
+**Exact remaining prerequisite for deployed DEV app/audit acceptance:** a separately approved,
+source/artifact-pinned V2 DEV application installation (DEV identity/schema and recovery
+reviewed first), then one authorised Super Admin stale-action request returning
+`{refused:true, code:'legacy_retired', surface:'admin.afltables_settle_trigger'}` with one
+`admin.legacy_retired_refused` `auth_audit_log` row, per "Remaining DEV C0/C1 and C2
+prerequisites" below. C2 remains separate (D-316-1).
 
 ## Exact source and reconciliation
 
@@ -51,7 +131,7 @@ unreconciled approval contract: original C0 promises active DEV acquisition whil
 The still-required historical maintenance artifact and C2 inputs are prerequisites, not missing V2
 runtime features. Existing deployment/legacy-disposition historical narratives are not acquisition authority.
 
-## Proposed owner amendment D-V2-316-C0C1-1 — NOT APPROVED
+## Owner amendment D-V2-316-C0C1-1 — APPROVED 2026-10-21 (wording as originally proposed)
 
 > For the V2 release only, I approve replacing ISSUE-316 C0's “switch active, bounded to 2026:
 > no behaviour change; DEV unit run still acquires” criterion with: the ISSUE-316 handoff is
@@ -78,7 +158,7 @@ the entire original unit runs. This package authorises none of those effects.
 
 ## Smallest next DEV operation — shell refusal subset only
 
-Proposed decision **D-DEV-316-C1-REFUSALS-1**, only after amendment approval:
+Decision **D-DEV-316-C1-REFUSALS-1** (approved and executed 2026-10-21, after the amendment):
 
 > I authorise transfer of the exact 40,960-byte `issue316-c1-refusals-20261021.tar`, SHA-256
 > `99ec19b1c6f4cfbd9f7429211955cba05a7c80783e5e8804f194eb20b2483b00`, to DEV, extraction

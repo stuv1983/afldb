@@ -21,7 +21,12 @@ commit.
   quarantine/runtime refusal. Add the exact historical/V2 launcher fixture runner and hashed
   approval artifact, with an explicit pending owner adaptation of C0/C1 and separate C2 authority.
 - Add bounded-active V2 shell refusal regression; focused 669 pass / 2 POSIX-only skip, packaged
-  refusal checks 4/4, typecheck/lint PASS. DEV C1 and production execution remain unapproved.
+  refusal checks 4/4, typecheck/lint PASS.
+- Owner approved D-V2-316-C0C1-1 (C0/C1 adaptation) and D-DEV-316-C1-REFUSALS-1. The hashed
+  archive (SHA-256 `99ec19b1…83b00`) ran on DEV (`streamanator`, `arm`): four launcher refusals
+  4/4 (retired exit 0; out-of-bounds exit 1; historical and V2), runner exit 0. This is the C1
+  shell subset only: no acquisition, database, service, timer or production activity. Full C0/C1
+  still needs deployed DEV app/audit acceptance; production execution remains unapproved.
 
 ### AFLDB V2 — scoped fresh rehearsal owner acceptance (2026-10-21)
 

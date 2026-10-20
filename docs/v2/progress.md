@@ -9,8 +9,12 @@ resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 Source/snapshot reconciliation 19/19; prior import `c9cca86d` already includes all handoff work.
 No merge; intentional V2 runtime refusal retained. Focused 669 pass / 2 POSIX-only skip,
 packaged shell refusals 4/4, typecheck/lint PASS. No host/shared DB/acquisition/rollover/build.
-[Exact C0/C1 approval package](issue316-c0-c1-approval-2026-10-21.md): proposed owner amendment
-and hashed filesystem-only DEV shell subset; full deployed DEV app/audit C1 still pending.
+[Exact C0/C1 approval package](issue316-c0-c1-approval-2026-10-21.md): owner approved
+D-V2-316-C0C1-1 and D-DEV-316-C1-REFUSALS-1 (2026-10-21). The hashed filesystem-only DEV shell
+subset ran on `streamanator` as `arm`: four refusals 4/4 (retired exit 0, out-of-bounds exit 1,
+both launchers), runner exit 0; no acquisition, DB, service, timer or production activity. Full
+C0/C1 is NOT complete: deployed DEV app/audit acceptance (a separately approved V2 DEV
+installation and Super Admin stale-action check) is pending.
 C2 and D-316-13 remain separately gated. Source and unrelated `.codex/` preserved; remotes empty.
 
 ## Run discipline (every launch)
