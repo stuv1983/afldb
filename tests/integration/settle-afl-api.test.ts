@@ -17,13 +17,14 @@
  * one field each case is actually about. Every case gets its OWN provider
  * match id (`CD_M2026ISSUE228<n>`), so cases never share canonical rows.
  *
- * `clubs` (Hawthorn, Brisbane Lions) and `venues` (M.C.G.) are READ, never
- * written — real historical identities, exactly as `settle-afltables.test.ts`
- * reads two existing clubs rather than inventing any. `sources` rows for
+ * Insertion contracts use two namespaced synthetic clubs/organisations and a
+ * test-local team map. Real Hawthorn/Brisbane history must not become an
+ * accidental ambiguity candidate. The tracked provider map is never edited.
+ * `venues` (M.C.G.) and `sources` rows for
  * `afl_api` (077) and `afltables` are READ, never written: both should
  * already exist on any correctly migrated `afldb_test`.
  *
- * COMMITTED BY THIS SUITE: one dedicated `players` row and one
+ * COMMITTED BY THIS SUITE: two dedicated clubs/organisations, one `players` row and one
  * `external_identities` bootstrap-bridge row (T1, §6.3) for the ONE player
  * this suite resolves; every settle-produced row (import_batches, the
  * migration-074 spine, the migration-103 typed projections,
@@ -167,8 +168,10 @@ type RawJson = Record<string, any>;
 /** This suite's own namespace. Appears nowhere else in the repository. */
 const NS = 'CD_M2026ISSUE228';
 const SEASON = 2026;
-const HOME_HIST = 'Hawthorn';
-const AWAY_HIST = 'Brisbane Lions';
+// Dedicated insertion identities: changing only dates still collides with a restored PF
+// through the one-component ambiguity guard. These are test clubs, never historical aliases.
+const HOME_HIST = 'ISSUE-228 synthetic home';
+const AWAY_HIST = 'ISSUE-228 synthetic away';
 const BRIDGED_PROVIDER_PLAYER_ID = 'CD_I297354'; // Karl Amon, home side, in the fixture
 /**
  * AFLDB-ISSUE-237: the bridged fixture player's own AFL Tables identity. A real importer row's
@@ -362,12 +365,9 @@ const HA_ROUND_CODE = '2';
  * case its own canonical match (see `unitSourceFor()`'s comment; the provider
  * id is not part of `match_key` at all).
  *
- * Every date is a September 2026 Monday, Tuesday or Wednesday. No AFL match
- * is ever played mid-week in the finals series, so none of these keys can
- * collide with a real fixture that an AFL Tables settle may already have
- * written to `afldb_test` — which matters because `matches.match_key` is
- * UNIQUE and a collision would silently turn a "new match" case into a
- * corroboration against somebody else's row.
+ * Dates distinguish cases' exact keys. Dedicated synthetic clubs provide
+ * isolation from restored history: moving a date alone does NOT prevent
+ * `possible_existing_match` when season, oriented clubs and round agree.
  */
 const CASE_DATES: Readonly<Record<string, string>> = {
   [CASE_IDS.golden]: '2026-09-21',
@@ -817,6 +817,26 @@ beforeAll(async () => {
   identities = parseAflApiIdentities(
     JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'afl-api-identities.json'), 'utf8')),
   );
+  const teams = new Map(identities.teams);
+  teams.set('CD_T80', { ...teams.get('CD_T80')!, hist: HOME_HIST });
+  teams.set('CD_T20', { ...teams.get('CD_T20')!, hist: AWAY_HIST });
+  identities = { ...identities, teams };
+  // Namespaced canonical fixtures belong to this suite. No historical club or match is
+  // renamed/deleted, and the production reference mapping stays unchanged.
+  for (const [hist, slug] of [[HOME_HIST, 'issue228-home'], [AWAY_HIST, 'issue228-away']]) {
+    await sql`
+      INSERT INTO club_organizations (name, slug) VALUES (${hist}, ${slug})
+      ON CONFLICT (name) DO NOTHING
+    `;
+    await sql`
+      INSERT INTO clubs (id, slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+      OVERRIDING SYSTEM VALUE
+      SELECT id, ${slug}, ${hist}, ${hist}, 'I228', id, ${hist},
+             (SELECT id FROM club_organizations WHERE name = ${hist})
+        FROM (SELECT nextval(pg_get_serial_sequence('clubs', 'id'))::int AS id) fixture
+      ON CONFLICT (legacy_club_hist) DO NOTHING
+    `;
+  }
   getSourceFamily(registry, 'afl_api', 'match'); // fails loudly if the registry is somehow not this repo's
 
   const [afl] = await sql<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afl_api'`;
@@ -831,7 +851,7 @@ beforeAll(async () => {
   const [away] = await sql<{ id: number; name: string }[]>`SELECT id, name FROM clubs WHERE legacy_club_hist = ${AWAY_HIST}`;
   const [venue] = await sql<{ id: number }[]>`SELECT id FROM venues WHERE legacy_name = 'M.C.G.'`;
   if (!home || !away || !venue) {
-    throw new Error('Hawthorn, Brisbane Lions and M.C.G. must all exist on afldb_test (real historical identities).');
+    throw new Error('Dedicated ISSUE-228 clubs and M.C.G. must exist on the test database.');
   }
   homeClubId = home.id;
   awayClubId = away.id;
@@ -944,6 +964,9 @@ afterAll(async () => {
   // holding stale season/club rows keyed to fixture matches that no longer
   // exist (see the helper's own doc comment for the full failure mode).
   await recompute2026SeasonDerivedState();
+  await sql`DELETE FROM club_seasons WHERE club_id IN (${homeClubId}, ${awayClubId})`;
+  await sql`DELETE FROM clubs WHERE legacy_club_hist IN (${HOME_HIST}, ${AWAY_HIST})`;
+  await sql`DELETE FROM club_organizations WHERE name IN (${HOME_HIST}, ${AWAY_HIST})`;
   await sql.end({ timeout: 5 });
 }, 30_000);
 

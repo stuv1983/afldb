@@ -51690,3 +51690,30 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Evidence:** `docs/v2/linux-rehearsal-2026-10-20.md`; restricted evidence in the named WSL
   distribution, `/home/rehearsal/evidence/`. Backend acceptance remains INCOMPLETE for absent
   authentic staged Brownlow reconciliation. This resolved tooling issue grants no production GO.
+
+## AFLDB-ISSUE-318 — Settlement insertion fixtures collide with restored historical matches
+
+- **Status:** Resolved (2026-10-20). **Severity:** Low. **Area:** settlement integration harness.
+- **Reproduction:** Full settlement file on the production-archive clone: 46 passed / 27 failed.
+  The retained first-case diagnostic and a fresh restored-copy reproduction refuse synthetic
+  Hawthorn–Brisbane PF insertions as `possible_existing_match`: changing date preserves the
+  same season, oriented clubs and round as the authentic 19 September PF. Twenty-five failing
+  assertions share this prerequisite/candidate collision; none demonstrates a weakened or broken
+  application guard. Detailed assertion-level classification is in the linked report.
+- **Other two dispositions:** Provider-evidence SELECT timeout reproduced before ANALYZE and
+  eliminated by preparing restored application-table statistics, at the unchanged statement
+  limit. OD-5 marker refusal is correct for the old shadow database name; use the existing
+  `afldb_v2_rb_*_test` allowlist rather than broadening the destructive-target guard.
+- **Fix:** `tests/integration/settle-afl-api.test.ts` creates/cleans two namespaced synthetic
+  clubs/organisations and supplies only a test-local provider-team map. Dates still distinguish
+  cases; historical rows and tracked identity maps remain unchanged. No assertion removed,
+  skipped or weakened. No application runtime, schema or packaging change.
+- **Validation:** Linux full restored-data suite 73/73, no filtered/skipped cases; TypeScript and
+  changed-file ESLint exit 0. Separate authentic 2026 feed: 217 concluded matches map uniquely
+  through exact keys and observation fallback; audited observation replay 217 unchanged / zero
+  new versions; rejected/corrective/replay stimuli preserve complete canonical table hashes.
+  Brownlow checks 35 integration / 159 unit-report; real stored-only 98-season before/after
+  reports identical with 98 reconciled, zero findings. The original authentic staged Brownlow
+  comparator remains INCOMPLETE; the proposed acceptance amendment is not approved.
+- **Evidence:** `docs/v2/linux-rehearsal-followup-2026-10-20.md`; detailed reports/scripts remain
+  in the authorised WSL rehearsal's restricted `/home/rehearsal/evidence/`. Production NO-GO.

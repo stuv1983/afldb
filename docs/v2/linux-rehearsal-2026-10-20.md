@@ -1,5 +1,10 @@
 # Isolated Linux production-archive rehearsal — 2026-10-20
 
+**Follow-up:** [settlement closure and proposed Brownlow acceptance amendment](linux-rehearsal-followup-2026-10-20.md)
+records the subsequent full restored-copy **73/73** settlement pass, authentic **217/217**
+match correlation and identical **98-season** stored-only Brownlow reports. The original
+results below remain historical evidence. The staged Brownlow criterion still needs owner review.
+
 **Backend acceptance: INCOMPLETE. Production: NO-GO.** The authorised rehearsal ran with one
 agent. Preservation and the scoped functional contracts pass; the original Brownlow
 reconciliation comparison remains incomplete because this archive has no authentic staged

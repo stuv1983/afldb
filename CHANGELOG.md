@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — restored settlement compatibility (2026-10-20)
+
+- Isolate settlement insertion fixtures with namespaced synthetic clubs/organisations instead
+  of date-only changes that collide with restored history (ISSUE-318). Preserve every assertion,
+  historical row, production mapping and ambiguity/ownership guard. Full restored Linux suite:
+  73/73; restore preparation requires ANALYZE and the existing rebuild-test name allowlist.
+- Retain 217/217 authentic concluded-match identity correlations and unchanged canonical hashes
+  for representative replay/correction/refusal checks. Brownlow alternative: identical 98-season
+  stored-only reports before/after migrations, 35 integration and 159 unit/report checks passing.
+  Authentic staged comparison remains unavailable; the scoped owner amendment is unapproved,
+  migration acceptance INCOMPLETE and production NO-GO. See the Linux follow-up report.
+
 ### AFLDB V2 — isolated Linux archive rehearsal (2026-10-20)
 
 - Restore the approved production archive once into fresh Ubuntu 24.04 / PostgreSQL 16.15
