@@ -4,6 +4,15 @@ The handoff file for every V2 launch. Updated at every commit. Counts are read f
 predicted. Source of authority: `docs/v2/plan.md` (sections 1-6 and the section 7 review
 resolutions) and `docs/v2/owner-instruction-2026-10-19.md`.
 
+## ISSUE-316 local preparation - 2026-10-21
+
+Source/snapshot reconciliation 19/19; prior import `c9cca86d` already includes all handoff work.
+No merge; intentional V2 runtime refusal retained. Focused 669 pass / 2 POSIX-only skip,
+packaged shell refusals 4/4, typecheck/lint PASS. No host/shared DB/acquisition/rollover/build.
+[Exact C0/C1 approval package](issue316-c0-c1-approval-2026-10-21.md): proposed owner amendment
+and hashed filesystem-only DEV shell subset; full deployed DEV app/audit C1 still pending.
+C2 and D-316-13 remain separately gated. Source and unrelated `.codex/` preserved; remotes empty.
+
 ## Run discipline (every launch)
 
 - Work only in `D:\dev\afldbV2`. The source worktree `D:\dev\afldb-afl-api-cutover` is read-only.

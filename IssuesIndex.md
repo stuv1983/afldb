@@ -469,8 +469,8 @@
   round coverage, implemented locally on `opus/afl-api-cutover` (uncommitted; the new suite 421 as last run (419 passed, 2 POSIX-only skipped; seven-suite set 829 passed, 2 skipped, 831), executed 2026-10-19 after the final pre-commit audit (follow-up 8) under proven isolation with `--no-cache --configLoader runner` and redirected `TEMP`/`TMP`; superseded history: 306 and 716 after follow-up 7, 293 and 703 after follow-up 5). The rollover accepts exactly `D-316-1`. C3 is inert
   install only; the D1 rehearsal is C4b, run by one command that restores the setting however it ends (`afl-api-c4b-rehearsal.ts`; the tool itself has never run on Linux, PostgreSQL or PROD, its tests have, DB-free, on Windows). D-316-13 is unavailable until C4 is deployed.
   Nothing deployed; the PROD AFL Tables timer is untouched; B1 stays.
-- **Runbook:** `issues/open/AFLDB-ISSUE-316.md`. **Next action:** owner review of the branch; D-316-1 (one final AFL Tables full-history acquisition and
-  the 2026 rollover that retires AFL Tables in the same write) and D-316-2 (install the AFL API units on PROD as inert units), with exact owner wording in runbook §8; then runbook §7 C0–C9.
+- **V2 reconciliation (2026-10-21):** source/snapshot 19/19 verified; imported in `c9cca86d`; V2 quarantine/refusal intentional. Local focused 669 pass / 2 POSIX-only skip, packaged refusals 4/4, typecheck/lint PASS. No DEV/PROD execution; full C0/C1 and C2 pending.
+- **Runbook:** `issues/open/AFLDB-ISSUE-316.md`. **Next action:** review proposed D-V2-316-C0C1-1 and exact D-DEV-316-C1-REFUSALS-1 in `docs/v2/issue316-c0-c1-approval-2026-10-21.md`; then only the filesystem-only DEV shell subset if approved. Deployed DEV app/audit acceptance and C2 need separate authority. D-316-13 unavailable before deployed C4.
 
 ### AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 - **Severity:** Medium. **Area:** public site / SEO — `src/app/sitemap.ts`.

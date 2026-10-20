@@ -173,7 +173,10 @@ only the exact approved delta and retain strict comparison of everything else.
    schema approval for **116 and 117**, A-ROLLBACK and A-AFLT. Existing wording mentioning only
    111–114 is insufficient. Complete ISSUE-316 C0/C1 and approve D-316-1 for C2; decide the explicit
    A-AFLT route after its final acquisition if C5 is not yet possible. No writer enablement follows.
-   Reconcile the imported ISSUE-316 work with its source branch before owner merge. Record the full
+   ISSUE-316 source reconciliation is complete locally (19/19 snapshot and import matches); no
+   redundant merge is needed. Review the [exact C0/C1 adaptation and DEV shell approval package](issue316-c0-c1-approval-2026-10-21.md);
+   original acquiring C0 and V2 runtime refusal require that explicit owner decision. Full deployed
+   DEV app/audit C1 and separate C2 authority remain pending. Record the full
    resulting execution commit and production-configured build/artifact hashes before installation.
    The present source archive is the measured candidate; no future merge/rollover SHA is invented.
 

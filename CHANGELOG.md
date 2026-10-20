@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - V2 handoff reconciliation and bounded DEV approval package (2026-10-21)
+
+- Verify all 19 preserved handoff files against source and import commit; retain intentional V2
+  quarantine/runtime refusal. Add the exact historical/V2 launcher fixture runner and hashed
+  approval artifact, with an explicit pending owner adaptation of C0/C1 and separate C2 authority.
+- Add bounded-active V2 shell refusal regression; focused 669 pass / 2 POSIX-only skip, packaged
+  refusal checks 4/4, typecheck/lint PASS. DEV C1 and production execution remain unapproved.
+
 ### AFLDB V2 — scoped fresh rehearsal owner acceptance (2026-10-21)
 
 - Record D-V2-FRESH-REHEARSAL-1, D-V2-FRESH-SCHEMA-1 and D-V2-BROWNLOW-ALT-2 for the exact
