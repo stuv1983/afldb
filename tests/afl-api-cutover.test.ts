@@ -538,6 +538,20 @@ describe.skipIf(!HAVE_SH || !PYTHON)('deploy/afldb-settle-afltables.sh gate (tim
     expect(r.out).not.toContain('[1/3]');
     expect(r.status).not.toBe(0);
   });
+  it('V2 active/bounded: refuses even with the R environment present, before acquisition or Node', () => {
+    const dir = tree('active', { [rel]: rel });
+    // Reach V2's independent runtime retirement, rather than stopping on a
+    // missing host fragment. No acquisition implementation exists in this tree.
+    writeFileSync(path.join(dir, 'deploy/afldb-r-env.sh'), 'RSCRIPT=/must-not-run-Rscript\n');
+    const r = run(SH!, [path.join(dir, rel)], dir, {
+      AFLDB_PROJECT_ROOT: dir, AFLDB_PYTHON: PYTHON!, AFLDB_NODE: '/must-not-run-node',
+    });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain('AFLDB_LEGACY_RETIRED_V2');
+    expect(r.out).not.toContain('[1/3]');
+    expect(r.out).not.toContain('[3/3]');
+    expect(existsSync(path.join(dir, 'data/sources'))).toBe(false);
+  });
   it('an interpreter that cannot run fails the unit (not a quiet retired success)', () => {
     const dir = tree('active', { [rel]: rel });
     const r = run(SH!, [path.join(dir, rel)], dir, {

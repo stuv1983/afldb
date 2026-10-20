@@ -1,0 +1,47 @@
+{
+  "platform": "Windows / Git Bash; not DEV C1 or Linux acceptance",
+  "historical_commit": "c9cca86db2fd60ec42fa777906a2cf2a291d5e4e",
+  "historical_launcher_sha256": "737ee74aa6279f30baa1ec61d569efbd659ab21034f6f720115978ef8169062f",
+  "cases": [
+    {
+      "artifact": "historical",
+      "case": "retired",
+      "exit": 0,
+      "output": "AFLDB_AFLTABLES_RETIRED: data/reference/afltables-network.json does not say status \"active\" with an integer last_season; AFL Tables is not fetched. Nothing acquired or settled.",
+      "snapshot_labels": 0,
+      "database_connections": 0,
+      "network_acquisition": false,
+      "basis": "Only JSON controls in fixture; exits before absent R fragment, acquisition implementation and Node settle."
+    },
+    {
+      "artifact": "historical",
+      "case": "beyond",
+      "exit": 1,
+      "output": "AFLDB_AFLTABLES_OUT_OF_BOUNDS: data/reference/afltables-network.json is active, but data/reference/seasons.json has an in-progress season later than its last_season (or is unreadable). AFL Tables must not fetch or own a later season. Refusing; nothing acquired.",
+      "snapshot_labels": 0,
+      "database_connections": 0,
+      "network_acquisition": false,
+      "basis": "Only JSON controls in fixture; exits before absent R fragment, acquisition implementation and Node settle."
+    },
+    {
+      "artifact": "v2",
+      "case": "retired",
+      "exit": 0,
+      "output": "AFLDB_AFLTABLES_RETIRED: data/reference/afltables-network.json does not say status \"active\" with an integer last_season; AFL Tables is not fetched. Nothing acquired or settled.",
+      "snapshot_labels": 0,
+      "database_connections": 0,
+      "network_acquisition": false,
+      "basis": "Only JSON controls in fixture; exits before absent R fragment, acquisition implementation and Node settle."
+    },
+    {
+      "artifact": "v2",
+      "case": "beyond",
+      "exit": 1,
+      "output": "AFLDB_AFLTABLES_OUT_OF_BOUNDS: data/reference/afltables-network.json is active, but data/reference/seasons.json has an in-progress season later than its last_season (or is unreadable). AFL Tables must not fetch or own a later season. Refusing; nothing acquired.",
+      "snapshot_labels": 0,
+      "database_connections": 0,
+      "network_acquisition": false,
+      "basis": "Only JSON controls in fixture; exits before absent R fragment, acquisition implementation and Node settle."
+    }
+  ]
+}

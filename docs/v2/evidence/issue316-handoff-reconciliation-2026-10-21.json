@@ -1,0 +1,184 @@
+{
+  "date": "2026-10-21",
+  "expected_and_actual_initial_v2_head": "23d6f9f54a06a6fa1108043b394def4a54a9d210",
+  "source_head": "ff100dc2b8da8523f550ef45a9eaa3ef96d9d840",
+  "import_commit": "c9cca86db2fd60ec42fa777906a2cf2a291d5e4e",
+  "source_files_match_snapshot": 19,
+  "import_files_match_source_lf": 19,
+  "snapshot_patch_and_untracked_list_hashes_verified": true,
+  "all_eight_preserved_untracked_copies_verified": true,
+  "note": "V2 hashes at reconciliation, before this session documentation changes; cutover test hash includes the new active/bounded V2 guard assertion. No graph tools available; targeted source and commit comparisons used.",
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "snapshot_sha256": "8d185f28ca930aacacaafad6480f2935add551156d479be2a540c6a1f4cbf42b",
+      "source_sha256": "8d185f28ca930aacacaafad6480f2935add551156d479be2a540c6a1f4cbf42b",
+      "import_commit_lf_sha256": "30ca464bf777cd748b909693a5e82d8ee74c8b86ff1b6f1f0e8039da66042cea",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "50db99e4c8adfffdf1ab063970a31c140ac84493b87479db42d47e1807172b0c",
+      "v2_content_unchanged": false
+    },
+    {
+      "path": "IssuesIndex.md",
+      "snapshot_sha256": "24c106e4669873e6963eda7ddab28294054f14dcd0ff3d012d8be9374eba19ae",
+      "source_sha256": "24c106e4669873e6963eda7ddab28294054f14dcd0ff3d012d8be9374eba19ae",
+      "import_commit_lf_sha256": "24c106e4669873e6963eda7ddab28294054f14dcd0ff3d012d8be9374eba19ae",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "8456d9f4678668cf8738dd5ddab820483d5d5144a39710923edb6a91a6c3d3a7",
+      "v2_content_unchanged": false
+    },
+    {
+      "path": "data/reference/afltables-network.json",
+      "snapshot_sha256": "ba81daf3d9a386dab8e219b29f34c587ab18de23409540febc88c6fb75465ab9",
+      "source_sha256": "ba81daf3d9a386dab8e219b29f34c587ab18de23409540febc88c6fb75465ab9",
+      "import_commit_lf_sha256": "ba81daf3d9a386dab8e219b29f34c587ab18de23409540febc88c6fb75465ab9",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "19721801ac4df60e78299b461c97e87d252ad65d5fd394643448be54c3b5c838",
+      "v2_content_unchanged": false
+    },
+    {
+      "path": "deploy/afldb-settle-afltables.sh",
+      "snapshot_sha256": "b26d16b583f3ed8e13ff3668fe8748d558886902ecd371c460cf70a23f32e80d",
+      "source_sha256": "b26d16b583f3ed8e13ff3668fe8748d558886902ecd371c460cf70a23f32e80d",
+      "import_commit_lf_sha256": "737ee74aa6279f30baa1ec61d569efbd659ab21034f6f720115978ef8169062f",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "e84262243b307fb620875ca1c826782ebd385b2f9f673fe1d9f2a3f88f9a48a8",
+      "v2_content_unchanged": false
+    },
+    {
+      "path": "docs/deployment.md",
+      "snapshot_sha256": "b4e6d41040bceac0e42d128a519eed1eab948b1e2e525ec996dea9d03a6e97a7",
+      "source_sha256": "b4e6d41040bceac0e42d128a519eed1eab948b1e2e525ec996dea9d03a6e97a7",
+      "import_commit_lf_sha256": "4849033ec5ed3754bff36c266f944aeb26d816a91914af3e0bd9fad5378fb30f",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "4849033ec5ed3754bff36c266f944aeb26d816a91914af3e0bd9fad5378fb30f",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "issues.md",
+      "snapshot_sha256": "cbb0bcdc4bfd4b324d6062ae8540fd2de0d4b7f7f780773c74d0d88858daf90f",
+      "source_sha256": "cbb0bcdc4bfd4b324d6062ae8540fd2de0d4b7f7f780773c74d0d88858daf90f",
+      "import_commit_lf_sha256": "cbb0bcdc4bfd4b324d6062ae8540fd2de0d4b7f7f780773c74d0d88858daf90f",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "4af5fe759f658441661a551957ad21faebef2d85e9eceabc4767a5468823cb67",
+      "v2_content_unchanged": false
+    },
+    {
+      "path": "issues/closed/AFLDB-ISSUE-232.md",
+      "snapshot_sha256": "75b711aee6b10e2bc502b398127bb124ffb50eec76a66ea3dd0d9179e0dd7663",
+      "source_sha256": "75b711aee6b10e2bc502b398127bb124ffb50eec76a66ea3dd0d9179e0dd7663",
+      "import_commit_lf_sha256": "633a306fefc8faec59b27e49449c0d0b414444f8f02c44169f8d6b3c8129abbd",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "633a306fefc8faec59b27e49449c0d0b414444f8f02c44169f8d6b3c8129abbd",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316.md",
+      "snapshot_sha256": "fecc6f97388c1f3094cdaadc2265b5f7b72e5f7f3b281aa2ff29b9c837a5da0c",
+      "source_sha256": "fecc6f97388c1f3094cdaadc2265b5f7b72e5f7f3b281aa2ff29b9c837a5da0c",
+      "import_commit_lf_sha256": "fecc6f97388c1f3094cdaadc2265b5f7b72e5f7f3b281aa2ff29b9c837a5da0c",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "fecc6f97388c1f3094cdaadc2265b5f7b72e5f7f3b281aa2ff29b9c837a5da0c",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "src/lib/acquisition/afl-api-cutover-readiness.ts",
+      "snapshot_sha256": "1ccd4ee903ca8e6a424c43167223c0b4a89fd4d07801d92d9d5f0169b07160ed",
+      "source_sha256": "1ccd4ee903ca8e6a424c43167223c0b4a89fd4d07801d92d9d5f0169b07160ed",
+      "import_commit_lf_sha256": "1ccd4ee903ca8e6a424c43167223c0b4a89fd4d07801d92d9d5f0169b07160ed",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "1ccd4ee903ca8e6a424c43167223c0b4a89fd4d07801d92d9d5f0169b07160ed",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "src/lib/acquisition/afltables-network.ts",
+      "snapshot_sha256": "c6b6ba54d79291c8c6eb07df8e5845740c3a329e9c45f0958bbae4a74eaec445",
+      "source_sha256": "c6b6ba54d79291c8c6eb07df8e5845740c3a329e9c45f0958bbae4a74eaec445",
+      "import_commit_lf_sha256": "c6b6ba54d79291c8c6eb07df8e5845740c3a329e9c45f0958bbae4a74eaec445",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "c6b6ba54d79291c8c6eb07df8e5845740c3a329e9c45f0958bbae4a74eaec445",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "src/lib/acquisition/settle-trigger.ts",
+      "snapshot_sha256": "161cbe935829dad62537640597700e2f7a1aa7f9555b2ca1ff747ec4b28b3121",
+      "source_sha256": "161cbe935829dad62537640597700e2f7a1aa7f9555b2ca1ff747ec4b28b3121",
+      "import_commit_lf_sha256": "391e28aabfcc8607d87fc76b8983d0a78e538ce3ff356bc88fa2f511660f2362",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "391e28aabfcc8607d87fc76b8983d0a78e538ce3ff356bc88fa2f511660f2362",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "src/lib/rollover/afltables-network-retirement.ts",
+      "snapshot_sha256": "577a1ea87990cf22c798da8721db4d8ae407df994818c8a565eb9d2734a16c1b",
+      "source_sha256": "577a1ea87990cf22c798da8721db4d8ae407df994818c8a565eb9d2734a16c1b",
+      "import_commit_lf_sha256": "577a1ea87990cf22c798da8721db4d8ae407df994818c8a565eb9d2734a16c1b",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "577a1ea87990cf22c798da8721db4d8ae407df994818c8a565eb9d2734a16c1b",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "tests/afl-api-cutover.test.ts",
+      "snapshot_sha256": "271af205d01d6318d00d935e06d3d214ff6827ebf902a5ccdbd71a8715cebfcb",
+      "source_sha256": "271af205d01d6318d00d935e06d3d214ff6827ebf902a5ccdbd71a8715cebfcb",
+      "import_commit_lf_sha256": "271af205d01d6318d00d935e06d3d214ff6827ebf902a5ccdbd71a8715cebfcb",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "97284d527ac2e24bedc1c9589381a8728d69db4dc601d72bb20a38e34a924c90",
+      "v2_content_unchanged": false
+    },
+    {
+      "path": "tools/current-season/afl-api-c4b-rehearsal.ts",
+      "snapshot_sha256": "65550c3f2ce70758bfa8338ed1fdc2e6e52117613c47f26a2f1770e6593a8485",
+      "source_sha256": "65550c3f2ce70758bfa8338ed1fdc2e6e52117613c47f26a2f1770e6593a8485",
+      "import_commit_lf_sha256": "65550c3f2ce70758bfa8338ed1fdc2e6e52117613c47f26a2f1770e6593a8485",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "65550c3f2ce70758bfa8338ed1fdc2e6e52117613c47f26a2f1770e6593a8485",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "tools/current-season/afl-api-cutover-readiness.ts",
+      "snapshot_sha256": "a3942de8905f462e37d5caedfe1a1f5403171b31c1d494575e64d8e781fdafe2",
+      "source_sha256": "a3942de8905f462e37d5caedfe1a1f5403171b31c1d494575e64d8e781fdafe2",
+      "import_commit_lf_sha256": "a3942de8905f462e37d5caedfe1a1f5403171b31c1d494575e64d8e781fdafe2",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "a3942de8905f462e37d5caedfe1a1f5403171b31c1d494575e64d8e781fdafe2",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "tools/db/rollover-season.ts",
+      "snapshot_sha256": "bef19538099c7b79e4a33b13fe0867783c42cd86a28ce26d89decdc14dc563b2",
+      "source_sha256": "bef19538099c7b79e4a33b13fe0867783c42cd86a28ce26d89decdc14dc563b2",
+      "import_commit_lf_sha256": "3f55b0631343d9437f2e0f8c0b8b8e5cc9083c24c62b65a632acc68a067373aa",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "3f55b0631343d9437f2e0f8c0b8b8e5cc9083c24c62b65a632acc68a067373aa",
+      "v2_content_unchanged": true
+    },
+    {
+      "path": "tools/rebuild/afltables/acquire_club_lists.R",
+      "snapshot_sha256": "f80251b57b691f0303b470efbb16fd90b26150e3aad2ba6fb6bac7db56f02448",
+      "source_sha256": "f80251b57b691f0303b470efbb16fd90b26150e3aad2ba6fb6bac7db56f02448",
+      "import_commit_lf_sha256": "741194533ed33af6d1a6e90378df4c1e7accb9ea12549bebd1c5fc9d9247c44a",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "03c7304904918d8c52bcec5814b5f2b2b3b048f43d734c799139063f3c7b7319",
+      "v2_content_unchanged": false
+    },
+    {
+      "path": "tools/rebuild/afltables/acquire_coaches.py",
+      "snapshot_sha256": "521210984c848470d68fc9a0be11076f937da87f21717b56400519f029a385d9",
+      "source_sha256": "521210984c848470d68fc9a0be11076f937da87f21717b56400519f029a385d9",
+      "import_commit_lf_sha256": "6b9bb9251c2649be9cd0d2f9794f4f400fde6fa1d132f69ee593619e5fc9d2f2",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "41f7287adb0815bbb08158620b2594e705d7ad4aa7be55f2144673385f961d79",
+      "v2_content_unchanged": false
+    },
+    {
+      "path": "tools/rebuild/fitzroy/acquire_core.R",
+      "snapshot_sha256": "e31563aacc7f5b2b920963fa2437215e51a7677b65078965c4c5da04067dfc1c",
+      "source_sha256": "e31563aacc7f5b2b920963fa2437215e51a7677b65078965c4c5da04067dfc1c",
+      "import_commit_lf_sha256": "15cc5948f86489c9615f68d7edd33c1aadb0b74b12511ae935f5273563d317cf",
+      "source_matches_import_lf": true,
+      "v2_reconciliation_sha256": "ff0457600f044eb55b6e6c948091e0391f34540ae2a1f9f615af6455ecbbb0b5",
+      "v2_content_unchanged": false
+    }
+  ]
+}
