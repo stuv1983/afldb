@@ -183,6 +183,13 @@ Verified locally on 2026-10-20:
 - No-argument CLI invocation: exit **1**, refusal before a database connection. An initial sandboxed
   Windows `tsx` launch hit `uv_os_get_passwd`/ENOMEM before loading the runner; the normal local
   environment then produced the expected refusal. This was an environment launch limit, not a bypass.
+- The actual committed CLI at `92ccbf790d01e95e79f9022a3a3d6805ae51daa1` also passed `baseline` and
+  `plan` end to end against the verified dedicated isolated copy, from the real checkout. The 2023
+  backfill plan named that exact revision and created only restricted output files; **no apply** was
+  invoked. Synthetic, clearly labelled backup/restore evidence tested file hashing and matching
+  baseline handling. Log: `committed-cli.log`; artifacts under the adjacent `committed-cli-*` directory.
+  Those test files and that isolated plan digest are not production execution authority. The final
+  documentation-only commit records these results; runner code is unchanged from this checked revision.
 
 The first integration attempt caught a fixture timestamp round-trip losing PostgreSQL microseconds;
 the unchanged baseline guard refused it correctly. The fixture now reverses its synthetic timestamp
@@ -202,3 +209,20 @@ proposals and `known-gaps.md` are updated and the change is recorded under `CHAN
 No new reproducible application defect was found; the authoritative issue ledger, Open Issues table
 and `IssuesIndex.md` retain their existing issue counts. The final commit/HEAD is returned with the
 package; future execution approvals must name that reviewed execution revision explicitly.
+
+## Complete changed-file manifest
+
+These are the only repository files changed by this task:
+
+- `CHANGELOG.md`
+- `docs/v2/brownlow-eligibility-ruling-2026-10-20.md`
+- `docs/v2/brownlow-legacy-ownership-transition-2026-10-20.md`
+- `docs/v2/brownlow-round-vote-match-backfill-2026-10-20.md`
+- `docs/v2/brownlow-production-approval-package-2026-10-20.md`
+- `docs/v2/known-gaps.md`
+- `src/db/migrations/116_brownlow_correction_receipts.sql`
+- `src/db/queries/brownlow-production-correction.ts`
+- `tests/integration/v2-brownlow-production-correction.test.ts`
+- `tests/v2-brownlow-production-correction.test.ts`
+- `tools/current-season/settle-afl-api-brownlow.ts`
+- `tools/v2/brownlow-production-correction.ts`
