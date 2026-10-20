@@ -107,7 +107,7 @@ automatically.
 prints what the owner decided; the AFL Tables and AFL API timers are in the state they had before
 the window (V2 never changes them; ISSUE-316 owns them).
 
-## 5. Database reversal of migrations 111-114 (data-loss step)
+## 5. Database reversal of migrations 111-115 (data-loss step)
 
 **Consequence, stated plainly: this DISCARDS every curated-award proposal and decision and every
 published derivation record (Coleman), including their audit history.** Approved curated winners
@@ -116,20 +116,39 @@ are NOT removed: they are ordinary `award_winners` rows with their own `data_ove
 winner back to its proposal, evidence and decision chain is lost once the ledger is dropped.
 `award_winners` is untouched by dropping `derived_award_results` (migration 112, lines 93-94).
 
-Run only after §4 (the previous code is live), only with the owner's approval, as the production
-owner role, from a shell whose DSN comes from the operator's environment file:
+Run only after §4 (the previous code is live, so nothing can write the V2 ledgers between export
+and drop), only with the owner's approval, as the production owner role, from a shell whose DSN
+comes from the operator's environment file. **Do not run step 2 until step 1 has produced a
+non-empty archive whose table-of-contents lists all five `TABLE DATA` entries and five
+`SEQUENCE SET` entries** (`pg_restore --list`); keep the archive and its `sha256sum` in restricted
+storage, never in Git.
 
-```sql
--- 1. Export first (psql client-side \copy writes on the operator's machine/host).
-\copy (SELECT * FROM award_proposals ORDER BY id) TO 'v2-award_proposals-<STAMP>.csv' WITH (FORMAT csv, HEADER)
-\copy (SELECT * FROM award_proposal_decisions ORDER BY id) TO 'v2-award_proposal_decisions-<STAMP>.csv' WITH (FORMAT csv, HEADER)
-\copy (SELECT * FROM derived_award_results ORDER BY id) TO 'v2-derived_award_results-<STAMP>.csv' WITH (FORMAT csv, HEADER)
-copy (SELECT * FROM brownlow_eligibility_decisions ORDER BY id) TO 'v2-brownlow_eligibility_decisions-<STAMP>.csv' WITH (FORMAT csv, HEADER)
-copy (SELECT * FROM derived_award_projections ORDER BY id) TO 'v2-derived_award_projections-<STAMP>.csv' WITH (FORMAT csv, HEADER)
+```sh
+# 1. Export first. One snapshot, data only, carries each identity sequence's state.
+pg_dump --data-only --format=custom --no-owner --no-privileges \
+  --table=public.award_proposals --table=public.award_proposal_decisions \
+  --table=public.derived_award_results --table=public.brownlow_eligibility_decisions \
+  --table=public.derived_award_projections --file=v2-ledgers-<STAMP>.dump
+pg_restore --list v2-ledgers-<STAMP>.dump | grep -c 'TABLE DATA'    # 5
+pg_restore --list v2-ledgers-<STAMP>.dump | grep -c 'SEQUENCE SET'  # 5
+sha256sum v2-ledgers-<STAMP>.dump
 
--- 2. Reverse 111-114 and remove their four ledger rows, in one transaction:
-i docs/v2/rollback-111-114.sql
+# 2. Reverse 115, then 111-114 with their four ledger rows, each in one transaction (both idempotent):
+psql -v ON_ERROR_STOP=1 -f docs/v2/rollback-115.sql
+psql -v ON_ERROR_STOP=1 -f docs/v2/rollback-111-114.sql
 ```
+
+`pg_dump` warns about circular foreign keys (self-references); the restore below succeeds
+regardless because it is one transaction loading each table in id order. Optionally keep a CSV
+copy for human inspection (`\copy (SELECT * FROM award_proposals ORDER BY id) TO '…' WITH
+(FORMAT csv, HEADER)`), but **a CSV export is not a recovery procedure by itself**: `\copy` back
+restores rows but leaves every `GENERATED ALWAYS` identity sequence at its start, so the next
+audited write fails with a duplicate primary key until each sequence is set with
+`SELECT setval('<seq>', <last_value>, <is_called>)` from a recorded value.
+
+**Consequence of the reversal that no export avoids:** while the tables are absent, the links from
+`data_edits` (`curated_proposal_id`), `data_overrides` (`approved_entity_key`) and the Coleman
+projection actions to the dropped ledgers cannot be resolved. They resolve again after recovery.
 
 Then re-run the PREVIOUS release's `tools/maintenance/privileges.sql` (its revoke loop removes
 nothing that still exists; the dropped tables took their grants with them). The repository-side
@@ -146,12 +165,28 @@ SELECT to_regclass('public.award_proposals') AS p,
        to_regclass('public.derived_award_results') AS r,
        to_regclass('public.brownlow_eligibility_decisions') AS b,
        to_regclass('public.derived_award_projections') AS j;       -- all five NULL
-SELECT count(*) FROM afldb_meta.schema_migrations WHERE name ~ '^11[1-4]_';  -- 0
+SELECT count(*) FROM afldb_meta.schema_migrations WHERE name ~ '^11[1-5]_';  -- 0
 ```
 
 and the historical manifest of production taken after the reversal compares
 `sealed-scope-identical` with the §2 manifest (`npx tsx tools/v2/historical-manifest.ts compare`):
 the reversal touched no historical table.
+
+### 5.1 Recovery after a reversal (reapply, then restore)
+
+Only when V2 is to be redeployed with its recorded history. Run the CURRENT release's tools with the same `<target>` and guards the forward migration used
+(`docs/production-promotion.md`; the rehearsal used `--target test` on a disposable database):
+
+```sh
+npx tsx tools/db/migrate.ts --target <target>      # 111-115 re-applied from the ledger
+npx tsx tools/db/privileges.ts --target <target>   # grants
+pg_restore --data-only --single-transaction --exit-on-error --no-owner --no-privileges \
+  v2-ledgers-<STAMP>.dump                          # rows, ids and sequence state, fail-closed
+```
+
+Run once. A second run fails on the first duplicate key and changes nothing (verified). Then compare
+row counts and the largest id per table with the export and run one rolled-back insert to confirm
+the next id is `max(id)+1`.
 
 ## 6. Full restore (last resort, outside V2's design)
 
@@ -179,3 +214,19 @@ The V2 ledgers were empty when reversed, so data-loss exports were exercised onl
 §2 (the production backup), §4 (redeploying `PREV`) and §6 were **not** rehearsed: §4 needs a
 second checkout and a host, and §2 needs production. The production go/no-go therefore still
 treats the application rollback as untested (`docs/v2/go-no-go.md`).
+
+**Populated-ledger rehearsal (2026-10-20), isolated PostgreSQL 16, synthetic identities on an
+archive-derived copy.** `docs/v2/rollback-populated-rehearsal-2026-10-20.md` records it. With
+8 proposals, 21 decisions, 2 results, 4 eligibility decisions and 2 projections:
+- the application rollback (previous, V2, previous, V2 on the additive schema) passed 18/24/18/24
+  checks with ledgers, public pages, permissions and audit unchanged;
+- the §5 reversal and §5.1 recovery with the archive restored every row, id, reference, sequence
+  and public result exactly, the reapplied schema and grants were identical to the first forward
+  state, and a restore rerun failed closed;
+- the CSV-only recovery that this runbook previously described restored the rows but **not** the
+  sequences, so the next audited write failed; `setval` repaired it.
+
+This is a rehearsal on a synthetic populated copy, not on a production dump. §2 (the production
+backup), §4 on a host and §6 remain unrehearsed, and any V2 write between export and drop is lost.
+**The demonstrated rollback route remains the application rollback with the additive schema
+retained**; the database reversal is a last resort needing the owner's approval.

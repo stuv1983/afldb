@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — release gates on real evidence and populated-ledger rollback rehearsal (2026-10-20)
+
+- Run the current `release-gates` CLI against the retained archive-bound captures with an attestation
+  derived by script from the raw artifacts (47 checks): exit 0, migration compatibility PASS (scoped
+  alternative), staged Brownlow comparator INCOMPLETE (unchanged), production operational INCOMPLETE,
+  production NO-GO. Control run without the alternative exits 2. Sanitised record and hashes:
+  `docs/v2/rollback-populated-rehearsal-2026-10-20.md`; derivation script
+  `docs/v2/evidence/derive-brownlow-alternative-attestation.mjs`.
+- Rehearse application rollback (previous, V2, previous, V2) and database reversal/recovery with
+  populated V2 ledgers on isolated copies. Application rollback leaves ledgers, public pages,
+  permissions and audit unchanged. The CSV-only recovery in the old runbook restored rows but not
+  identity sequences; the runbook now uses a data-only `pg_dump -Fc`/`pg_restore` archive, which
+  recovered every row, id, reference, sequence and public result exactly.
+- Add `docs/v2/rollback-115.sql` (idempotent reversal of migration 115) and tools
+  `tools/v2/rollback-populate.ts`, `rollback-fingerprint.ts`, `rollback-public-probe.ts`. Fix the
+  runbook's `copy`/`i` typos.
+
 ### AFLDB V2 — scoped Brownlow migration-evidence decision (2026-10-20)
 
 - Record owner decision D-V2-BROWNLOW-ALT-1: solely for archive `a583fc7d…ed11b04` and the

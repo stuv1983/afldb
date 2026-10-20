@@ -9,8 +9,8 @@ Authentic API vote/identity/leaderboard reconciliation is **not established** an
 Brownlow operational readiness (criterion 7 below is unchanged). Strict Gridley **FAIL (149)** and
 adjudication conformance **FAIL (50 unapproved)** are unchanged; GAP-029 stays open. Production
 operational acceptance stays **INCOMPLETE / NO-GO**: no ingestion, publication, deployment or GO is
-approved, and the archive says nothing about the current live database. Rollback reversal was tested
-only with empty V2 ledgers. [Decision](owner-decision-brownlow-alternative-2026-10-20.md);
+approved, and the archive says nothing about the current live database. Rollback reversal and archive recovery were rehearsed
+with populated synthetic V2 ledgers on an isolated copy (2026-10-20), not on a production dump. [Decision](owner-decision-brownlow-alternative-2026-10-20.md);
 [outstanding requirements](release-requirements-checklist-2026-10-20.md).
 
 **Current migration-policy amendment (2026-10-20):**
@@ -111,7 +111,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | 12 | Admin operations are narrow, permissioned and audited | **met**, isolated PG16 | capability guards and audit rows (Stage 5); `privileges.test.ts` and the awards suites pass on PG16; pages rendered for Admin and Super Admin |
 | 13 | Tests, type checking and linting pass | **NOT GREEN: see final assertion-level evidence** | `local-release-review.md` records the complete workflow and residual test identities. Typecheck and production build pass. Changed-file lint has 0 new findings but inherited errors remain; final repository debt is 234 errors / 131 warnings. No failure-line-count comparison is accepted as a pass. |
 | 14 | Production access is not needed to run the test suite | **met** | ADR 0005: the test setup strips DSNs and refuses any non-`_test` database |
-| 15 | Migration, comparison, rollback and cutover instructions are complete | **met**; DB rollback rehearsed locally, application rollback untested | `cutover-runbook.md` (now with step 4a and 111-114), `rollback-runbook.md` §5 (111-114) and §7 record; V2-GAP-026 |
+| 15 | Migration, comparison, rollback and cutover instructions are complete | **met**; application rollback and populated-ledger DB reversal/recovery rehearsed on an isolated copy (not a production dump) | `cutover-runbook.md` (now with step 4a and 111-114), `rollback-runbook.md` §5 (111-114) and §7 record; V2-GAP-026 |
 | 16 | No secrets are committed | **met** | no `.env*` beyond `.env.example`; DSNs in tests are synthetic placeholders; closure scans at every stage |
 | 17 | No production action has occurred | **met** | V2 has no remote; no production or shared database, ssh, deploy or service command was run in any launch. Launch F's only network use was one read-only GET of the public AFL API compSeasons list |
 
@@ -128,7 +128,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | Admin actions can bypass validation, permissions or auditing | no (code, tests, isolated PG16) | Stage 5 closure; V2-GAP-017 closed |
 | Runtime still depends on legacy ingestion | **yes on the host, blocks**: the code refuses, but the timers remain enabled until the release window | V2-GAP-011, 013; cutover runbook step 4a |
 | Shadow comparison thresholds are undefined | no: policy `v2.parity.1` | `shadow-rehearsal.md` §8 |
-| Rollback is untested or unclear | **application rollback untested: blocks** (the DB reversal was rehearsed locally) | `rollback-runbook.md` §7, V2-GAP-026 |
+| Rollback is untested or unclear | **host and production-dump rollback untested: blocks** (application rollback and populated-ledger reversal/recovery rehearsed on an isolated copy, 2026-10-20) | `rollback-runbook.md` §7, V2-GAP-026 |
 | ISSUE-316 production gates remain unsatisfied | **yes, blocks** | `issues/open/AFLDB-ISSUE-316.md` §7-§8 |
 | D-316-13 not separately approved after the required C4 result | **yes, blocks** | ISSUE-316 §7 C4b |
 

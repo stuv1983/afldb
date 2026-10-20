@@ -58,7 +58,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-023 | Low | Brownlow | no | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping; the staged comparator is INCOMPLETE and now **blocks authentic Brownlow operational reconciliation** (checklist item 1), not migration | none for migration; needed for operational readiness |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | open: no operations-centre view of AFL API settle refusals | none (V2 follow-up) |
-| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 local standalone rehearsal passes; raw votes and non-empty proposal/audit history preserved, including after 115 | approve host backup/rollback and production-dump rehearsal |
+| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 passes on a populated copy (2026-10-20); populated-ledger DB reversal and archive recovery restore everything exactly on a synthetic copy | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
 | V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived) | approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
@@ -523,6 +523,18 @@ award results must be shown reconcilable before production; **no** — not a pro
   Raw vote hashes and ledgers unchanged across phases; three proposals/six decisions retained.
   Evidence `local-rollback-*.json`. This does not demonstrate pre-migration schema 110, host
   systemd/Caddy/TLS/backup, production data or destructive reversal with populated new ledgers.
+
+- **Populated-ledger rollback rehearsal, 2026-10-20** (`docs/v2/rollback-populated-rehearsal-2026-10-20.md`).
+  Synthetic identities on an archive-derived isolated PG16 copy: 8 proposals, 21 decisions, 2
+  derived results, 4 eligibility decisions, 2 projections. Application rollback previous → V2 →
+  previous → V2 (18/24/18/24 checks) left ledgers, public pages, permissions and audit unchanged.
+  Reversal of 111–115 then data-only `pg_dump -Fc` / `pg_restore` recovery restored every row, id,
+  reference, sequence and public result exactly (fail-closed on rerun, schema and grants identical
+  after reapplication). The CSV-only procedure the runbook previously described did NOT restore
+  identity sequences (the next audited write failed); the runbook now uses the archive. Not shown:
+  a production dump, the host backup, systemd/Caddy/TLS, a real previous-release redeploy, and
+  V2 writes between export and drop (lost by design). Application rollback with the additive schema
+  retained stays the demonstrated route.
 
 - **Launch F (2026-10-19).** The mechanics and the DB reversal were rehearsed on isolated PG16 with local data, NOT a production dump (see `rollback-runbook.md` §7 and `docs/v2/evidence/launchF/`). The synthetic shadow copy went through 111-114 pending → applied, and parity returned VERDICT PASS (5/5). For the reversal, the 001-114 → 001-110 schema is identical and re-forward is identical. Still open: the production-dump rehearsal, real-data parity, the application rollback (§4, redeploying `PREV`) and the backup step (§2).
 - **What.** Stage 6 wrote the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`), the
