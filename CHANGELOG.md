@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — fresh production archive rehearsal and release plan (2026-10-21)
+
+- Retain sanitised live baseline, verified full-backup/export and isolated restore evidence for
+  archive `7fefcd9b…6dea6599`; rehearse freshly pending migrations 111–117 with complete existing-row,
+  public-query, sequence and schema/privilege comparisons, runner rerun and focused Linux checks.
+- Preserve the strict gate's exact 116/117 policy findings and unavailable staged Brownlow comparator;
+  request fresh scoped owner acceptance without extending the older archive's decision. Record the
+  source's absent staging default grants and exact future reconciliation separately.
+- Add the ordered production release plan, ISSUE-316/229 writer boundaries, separate Brownlow
+  operations, freshness and recovery requirements. Production remains unchanged and NO-GO.
+
 ### AFLDB V2 — final local Brownlow regression (2026-10-20)
 
 - Publish an audited eligibility correction's winner after rechecking its projected eligibility/ranks in

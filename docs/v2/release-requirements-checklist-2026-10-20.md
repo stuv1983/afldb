@@ -1,5 +1,19 @@
 # Outstanding release requirements — next review package (2026-10-20)
 
+**Fresh production inspection/rehearsal, 2026-10-21:** [ordered release plan and measured acceptance
+request](production-release-plan-2026-10-21.md), [sanitised results](evidence/fresh-production-rehearsal-2026-10-21.json).
+Owner-authorised read-only production inspection, one full fresh backup/export and one isolated restore
+are complete. Actual production ledger is 110; pending 111–117 were rehearsed. All 1,659,904 baseline
+rows and six public projections are preserved; focused Linux checks passed 306 units plus 90 integration
+cases. The unchanged strict gate remains **FAIL** for the exact 116 receipt-table addition and 117
+eligibility definition change; staged Brownlow remains **INCOMPLETE**. A new archive/scope-bound
+acceptance decision is required; the old alternative was not reused. Production itself lacks the two
+staging default grants: future reconciliation is an explicit separately approved privilege change.
+This updates row 5's missing fresh-inspection/backup/rehearsal evidence, but does not close its
+acceptance/freeze-time freshness requirements or row 4's host recovery/routing requirements. No
+production database, role, code, service, timer or traffic change occurred. All execution approvals
+remain pending; the precise future write sequence and stop conditions are in the linked plan.
+
 **Isolated follow-up complete:** [independent migration 116 preservation/privilege/rerun and final combined correction verification](brownlow-isolated-verification-2026-10-20.md): 8/8 PostgreSQL cases together, 98/98 focused units, typecheck/lint PASS. Receipts and protected rows retained. This grants no production connection/schema/execution authority and does not extend D-V2-BROWNLOW-ALT-1.
 
 **2026-10-20 policy update:** [D-V2-BROWNLOW-ELIGIBILITY-1, OD-BROWNLOW-OWNERSHIP-1 and D-V2-BROWNLOW-MATCH-BACKFILL-1](brownlow-policy-decisions-2026-10-20.md) are approved with exact reviewed-content hashes. All twelve 2025 rulings are approved as policy; production ledger recording, production rollout of the tri-state runtime (implemented locally and isolated-verified: [record](brownlow-eligibility-implementation-2026-10-20.md)) with its new migration 117, reconciliation/release acceptance and every execution gate remain pending. The 1984–2025 backfill uses fresh counts (320,861 is archived expectation); 2026 is excluded. Migrations 116 and 117 are outside the accepted 110–115 scope and each requires separate target/revision-bound schema approval.
