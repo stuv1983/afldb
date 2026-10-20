@@ -68,12 +68,17 @@
  *     second time — see `projectAflApiBrownlowVoteSet()`'s own doc comment for
  *     the exact boundary of that dependency and why match/round/player
  *     resolution itself is not re-derived from the projection.
- *   - **Leaderboard reconciliation runs from parsed records, not the spine.**
- *     `brownlow_leaderboard`'s `promotion_policy` is `'never'` and
+ *   - **Leaderboard reconciliation runs from parsed records; the records are
+ *     ALSO staged on the spine (V2-GAP-023).** `brownlow_leaderboard`'s
+ *     `promotion_policy` is not an automatic canonical target and
  *     `reconcileBrownlowLeaderboard()` (`afl-api-bundle.ts`) is a pure,
- *     already-proven comparison; persisting the leaderboard family's own
- *     per-player spine records is deferred for the same reason as the
- *     projection table above.
+ *     already-proven comparison, so the batch gate still runs from the parsed
+ *     records. `stageAflApiBrownlowLeaderboard()` persists each player's record
+ *     as a versioned spine observation in the SAME transaction (also under
+ *     `--observe-only`, whose contract is spine observations only), and stamps
+ *     a player the feed no longer lists absent rather than deleting anything,
+ *     so the operations-centre reconciliation can compare against the leaderboard
+ *     the provider actually published. No typed projection table and no migration.
  *   - **Independently enable/disableable, default OFF (§10 "Operational
  *     enablement").** `isAflApiBrownlowEnabled()` gates both this stage's
  *     CLIs before they touch the network or a database; the guard exists so
@@ -108,7 +113,11 @@ import {
 } from './canonical-apply';
 import { NO_MATCH_REKEY_SCOPE } from './match-rekey';
 import type { JsonValue } from './observations';
-import { persistSourceObservation, type PersistObservationResult } from './observation-store';
+import {
+  markMissingObservationsAbsent,
+  persistSourceObservation,
+  type PersistObservationResult,
+} from './observation-store';
 import { baselineCanonicalHash } from './promotion-review';
 import { recomputeBrownlowCoverage } from '../../db/queries/player-derived';
 import {
@@ -139,6 +148,12 @@ export const SETTLE_ISSUE_TYPE = 'afl_api_brownlow_settle';
 export const SETTLE_ISSUE_OWNER = 'settle-afl-api-brownlow.ts';
 
 const BROWNLOW_MATCH_VOTES_FAMILY = 'brownlow_match_votes';
+/**
+ * V2-GAP-023: the leaderboard family's per-player records are staged on the observation spine
+ * (versioned, absence-tracked, no typed projection and no canonical target). The reconciliation
+ * reads them back; nothing promotes them.
+ */
+export const BROWNLOW_LEADERBOARD_FAMILY = 'brownlow_leaderboard';
 const BROWNLOW_VOTE_TARGET = 'brownlow_round_votes';
 /** AFLDB-ISSUE-244 I244-F007: `match_id` joined `played`/`votes` as a rendered,
  * proposable field once the canonical match resolver's identity started being
@@ -275,6 +290,14 @@ export type AflApiBrownlowSettleCounters = SettleCounters & {
   coverageRecomputeRuns: number;
   leaderboardPlayersCompared: number;
   leaderboardMismatches: number;
+  /** V2-GAP-023: leaderboard player records observed on the spine this run. */
+  leaderboardObservationsSeen: number;
+  /** A leaderboard record whose content changed (or was first seen): a new spine version. */
+  leaderboardVersionsAppended: number;
+  /** A leaderboard record seen unchanged: head refreshed only. */
+  leaderboardObservationsUnchanged: number;
+  /** Leaderboard records the feed no longer lists, stamped absent (never deleted). */
+  leaderboardMarkedAbsent: number;
 };
 
 export function emptyAflApiBrownlowCounters(): AflApiBrownlowSettleCounters {
@@ -291,6 +314,10 @@ export function emptyAflApiBrownlowCounters(): AflApiBrownlowSettleCounters {
     coverageRecomputeRuns: 0,
     leaderboardPlayersCompared: 0,
     leaderboardMismatches: 0,
+    leaderboardObservationsSeen: 0,
+    leaderboardVersionsAppended: 0,
+    leaderboardObservationsUnchanged: 0,
+    leaderboardMarkedAbsent: 0,
   };
 }
 
@@ -1382,6 +1409,56 @@ export function reconcileAflApiBrownlowSeason(
 }
 
 /* ------------------------------------------------------------------ *
+ * V2-GAP-023 — the staged leaderboard
+ * ------------------------------------------------------------------ */
+
+/**
+ * Stage the provider's leaderboard on the observation spine: one versioned record per player
+ * (`brownlow_leaderboard`, external key = the provider player id, scope `season=<year>`), carrying
+ * the parsed entry and the feed status it was published under.
+ *
+ * Idempotent: an unchanged entry refreshes its head only (no payload, no version). A player the
+ * feed no longer lists is stamped `absent_since`, never deleted. The sweep runs only when the feed
+ * listed at least one player (a full unfiltered fetch), so an empty feed never retires a staged
+ * leaderboard. Writes no canonical table and needs no migration: the spine is generic.
+ */
+export async function stageAflApiBrownlowLeaderboard(
+  tx: Tx,
+  input: {
+    registry: SourceFamilyRegistry;
+    sourceId: number;
+    batchId: ImportBatchId;
+    season: number;
+    leaderboard: readonly AflApiBrownlowLeaderboardRecord[];
+    leaderboardStatus: string | null;
+    observedAt: string;
+  },
+  counters: AflApiBrownlowSettleCounters,
+): Promise<void> {
+  const contract = getSourceFamily(input.registry, SETTLE_SOURCE_KEY, BROWNLOW_LEADERBOARD_FAMILY);
+  const scopeKey = `season=${input.season}`;
+  for (const record of input.leaderboard) {
+    const action = await persistSourceObservation(
+      tx,
+      {
+        contract, sourceId: input.sourceId, externalRecordId: record.providerPlayerId, scopeKey,
+        payload: { ...record, feedStatus: input.leaderboardStatus } as unknown as JsonValue,
+      },
+      input.batchId, input.observedAt,
+    );
+    counters.leaderboardObservationsSeen += 1;
+    if (action === 'version_inserted') counters.leaderboardVersionsAppended += 1;
+    else counters.leaderboardObservationsUnchanged += 1;
+  }
+  if (input.leaderboard.length > 0) {
+    counters.leaderboardMarkedAbsent += await markMissingObservationsAbsent(
+      tx, [{ sourceId: input.sourceId, family: BROWNLOW_LEADERBOARD_FAMILY, scopeKey }],
+      input.batchId, input.observedAt,
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * The run
  * ------------------------------------------------------------------ */
 
@@ -1624,6 +1701,13 @@ export async function runSettleAflApiBrownlow(
           }, counters);
         }
       }
+
+      // V2-GAP-023: stage the leaderboard beside the vote sets, in this same transaction (a
+      // dry-run rolls it back with everything else; observe-only still records observations).
+      await stageAflApiBrownlowLeaderboard(tx, {
+        registry: options.registry, sourceId, batchId, season: options.season,
+        leaderboard: options.leaderboard, leaderboardStatus: options.leaderboardStatus, observedAt,
+      }, counters);
 
       // AFLDB-ISSUE-244 I244-F007 §9/§10: part of the SAME transaction as the
       // vote/match_id writes above — a `--dry-run` (`apply: false`) throws

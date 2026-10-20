@@ -6,6 +6,8 @@ import {
   type BrownlowReconciliationReport,
 } from '@afldb/derived';
 
+import type { BrownlowStagingEvidence } from '@/db/queries/brownlow-reconciliation-inputs';
+
 import { formatInstant } from '../format';
 
 /**
@@ -25,7 +27,9 @@ const OUTCOME_LABELS = { reconciled: 'Reconciled', discrepancies: 'Discrepancies
 /** The most findings listed row by row; every finding is still counted. */
 export const FINDINGS_ROW_LIMIT = 100;
 
-export function BrownlowCaveats() {
+export function BrownlowCaveats({ staging = null }: { staging?: BrownlowStagingEvidence | null }) {
+  const staged = staging !== null && staging.leaderboard.staged;
+  const mapped = staging !== null && staging.teamMapping.state === 'derived';
   return (
     <section className="section" id="brownlow-caveats" aria-labelledby="brownlow-caveats-heading">
       <h2 id="brownlow-caveats-heading">Read this first</h2>
@@ -38,13 +42,25 @@ export function BrownlowCaveats() {
         you choose it, and choosing it here decides nothing: the reconciliation writes nothing. The medal
         determination on this page decides eligibility from its own evidence (ADR 0014), not from this rule.
       </p>
-      <p className="notice" data-caveat="leaderboard-not-staged">
-        <strong>The API leaderboard is not staged (F-WB1-005).</strong> There is no staged table for
-        it, so the leaderboard comparison always reads <em>not supplied</em>, and the provider team
-        to club mapping is not committed, so club consistency is reported as unverifiable
-        (informational). A reconciled season is reconciled against the round votes and the stored
-        totals only.
-      </p>
+      {staged || mapped ? (
+        <p className="notice" data-caveat="leaderboard-staged">
+          <strong>{staged ? 'The API leaderboard is staged (V2-GAP-023).' : 'The API leaderboard is not staged for this season.'}</strong>{' '}
+          {staged
+            ? 'The leaderboard comparison below is made against the leaderboard the provider published.'
+            : 'The leaderboard comparison reads not supplied.'}{' '}
+          {mapped
+            ? 'Club consistency is checked through a provider-team-to-club mapping derived from the committed identities and corroborated by the fixtures (below).'
+            : 'The provider-team-to-club mapping was not derived, so club consistency is reported as unverifiable (informational); the reason is shown below.'}
+        </p>
+      ) : (
+        <p className="notice" data-caveat="leaderboard-not-staged">
+          <strong>The API leaderboard is not staged (F-WB1-005).</strong> Until the Brownlow settle
+          stages a leaderboard for the season the leaderboard comparison reads <em>not supplied</em>, and
+          until a provider team to club mapping is derived, club consistency is reported as
+          unverifiable (informational). A reconciled season is reconciled against the round votes and
+          the stored totals only.
+        </p>
+      )}
     </section>
   );
 }
@@ -98,7 +114,96 @@ function detailText(finding: BrownlowFinding): string {
   return entries.length === 0 ? '—' : entries.map(([key, value]) => `${key}=${value === null ? 'null' : String(value)}`).join(', ');
 }
 
-export function BrownlowReportView({ report }: { report: BrownlowReconciliationReport }) {
+export function BrownlowStagingView({ staging }: { staging: BrownlowStagingEvidence }) {
+  const board = staging.leaderboard;
+  const mapping = staging.teamMapping;
+  return (
+    <section className="section" id="brownlow-staging" aria-labelledby="brownlow-staging-heading" data-brownlow-staging="true">
+      <h2 id="brownlow-staging-heading">Staged leaderboard and club mapping</h2>
+      <p className="section-note">
+        Evidence only, read from the observation spine and the fixtures. Nothing here is written, and the
+        club findings are never suppressed: a team the mapping cannot show consistent keeps its{' '}
+        <span className="mono">club_unverifiable</span> finding.
+      </p>
+      <dl className="audit-kv">
+        <dt>Leaderboard</dt>
+        <dd data-staging-leaderboard={board.staged ? 'staged' : 'not-staged'}>
+          {board.staged
+            ? `${board.entries} entries (status ${board.status ?? 'not recorded'}), ${board.ineligibleEntries} marked ineligible by the provider, ${board.winnerEntries} marked winner`
+            : 'not staged'}
+        </dd>
+        <dt>Unresolved leaderboard players</dt>
+        <dd>{board.unresolvedPlayers}</dd>
+        <dt>Players no longer listed</dt>
+        <dd>{board.absentEntries}</dd>
+        <dt>Provider-team mapping</dt>
+        <dd data-staging-mapping={mapping.state}>
+          {mapping.state === 'derived' && `derived: ${mapping.entries.length} teams, corroborated by ${mapping.fixtureMatches} fixtures`}
+          {mapping.state === 'refused' && `refused: ${mapping.refusals.length} problem(s), no mapping applied`}
+          {mapping.state === 'not_attempted' && mapping.reason === 'no_identities_supplied' && 'not attempted: no committed identities supplied'}
+          {mapping.state === 'not_attempted' && mapping.reason === 'no_votes_staged' && 'not attempted: no API votes are staged'}
+          {mapping.state === 'not_attempted' && mapping.reason === 'identities_unavailable' && `not attempted: the committed identities could not be read (${mapping.error})`}
+        </dd>
+      </dl>
+      {mapping.state === 'derived' && (
+        <details>
+          <summary>Inspect the {mapping.entries.length} mapped teams</summary>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Provider team</th>
+                  <th scope="col">Club history name</th>
+                  <th scope="col" className="num">Club id</th>
+                  <th scope="col" className="num">Fixture slots agreeing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mapping.entries.map((entry) => (
+                  <tr key={entry.providerTeamId}>
+                    <td className="mono">{entry.providerTeamId}</td>
+                    <td>{entry.legacyClubHist}</td>
+                    <td className="num">{entry.clubId}</td>
+                    <td className="num">{entry.corroboratingSlots}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {mapping.uncorroborated.length > 0 && (
+            <p className="section-note">No fixture corroborates: {mapping.uncorroborated.join(', ')}.</p>
+          )}
+        </details>
+      )}
+      {mapping.state === 'refused' && (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Provider team</th>
+                <th scope="col">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mapping.refusals.map((refusal, index) => (
+                <tr key={`${refusal.code}-${index}`}>
+                  <td className="mono">{refusal.code}</td>
+                  <td className="mono">{refusal.providerTeamId ?? '\u2014'}</td>
+                  <td className="mono" style={{ overflowWrap: 'anywhere' }}>{refusal.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function BrownlowReportView({
+  report, staging = null,
+}: { report: BrownlowReconciliationReport; staging?: BrownlowStagingEvidence | null }) {
   const presentation = report.awardResultPresentation;
   const evidence = report.source.evidence;
   const bySeverity = BROWNLOW_FINDING_SEVERITIES.map((severity) => (
@@ -188,6 +293,8 @@ export function BrownlowReportView({ report }: { report: BrownlowReconciliationR
           </table>
         </div>
       </section>
+
+      {staging !== null && <BrownlowStagingView staging={staging} />}
 
       <section className="section" id="brownlow-findings" aria-labelledby="brownlow-findings-heading">
         <h2 id="brownlow-findings-heading">Findings by severity</h2>

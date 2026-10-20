@@ -105,6 +105,7 @@ import {
   syntheticOverview,
   syntheticOverviewReadsFailed,
   syntheticProposal,
+  syntheticStaging,
 } from './fixtures/v2/operations-centre/props.synthetic';
 
 /* ---------------------------------------------------------------------------------------------
@@ -873,6 +874,41 @@ describe('Brownlow views', () => {
     expect(refused).toContain('No vote totals could be formed.');
     expect(refused).toContain('none stated');
   });
+
+  it('without staging evidence the caveat and the report keep saying the leaderboard is not supplied', () => {
+    const report = html(createElement(BrownlowReportView, { report: syntheticBrownlowReport('reconciled') }));
+    expect(report).not.toContain('data-brownlow-staging');
+    expect(html(createElement(BrownlowCaveats, { staging: syntheticStaging('unstaged') }))).toContain('data-caveat="leaderboard-not-staged"');
+  });
+
+  it('a staged leaderboard and a derived mapping are shown as evidence and change the caveat', () => {
+    const caveat = html(createElement(BrownlowCaveats, { staging: syntheticStaging('derived') }));
+    expect(caveat).toContain('data-caveat="leaderboard-staged"');
+    expect(caveat).not.toContain('data-caveat="leaderboard-not-staged"');
+    const markup = html(createElement(BrownlowReportView, { report: syntheticBrownlowReport('reconciled'), staging: syntheticStaging('derived') }));
+    expect(markup).toContain('data-brownlow-staging="true"');
+    expect(markup).toContain('data-staging-leaderboard="staged"');
+    expect(markup).toContain('3 entries (status CONCLUDED), 1 marked ineligible by the provider, 1 marked winner');
+    expect(markup).toContain('data-staging-mapping="derived"');
+    expect(markup).toContain('SYN_T1');
+    // The club findings are evidence and stay listed: nothing is suppressed by showing the mapping.
+    expect(markup).toContain('club_unverifiable');
+  });
+
+  it('a refused mapping lists its specific refusal codes and keeps the club check unverifiable', () => {
+    const markup = html(createElement(BrownlowReportView, { report: syntheticBrownlowReport('reconciled'), staging: syntheticStaging('refused') }));
+    expect(markup).toContain('data-staging-mapping="refused"');
+    expect(markup).toContain('fixture_evidence_conflict');
+    expect(markup).toContain('no mapping applied');
+    expect(html(createElement(BrownlowCaveats, { staging: syntheticStaging('refused') }))).toContain('data-caveat="leaderboard-staged"');
+  });
+
+  it('an unreadable identities file is reported as not attempted, with the reason', () => {
+    const staging = { ...syntheticStaging('unstaged'), teamMapping: { state: 'not_attempted' as const, reason: 'identities_unavailable' as const, error: 'The provider team identities could not be read' } };
+    const markup = html(createElement(BrownlowReportView, { report: syntheticBrownlowReport('reconciled'), staging }));
+    expect(markup).toContain('data-staging-mapping="not_attempted"');
+    expect(markup).toContain('could not be read');
+  });
 });
 
 /* =============================================================================================
@@ -988,10 +1024,20 @@ describe('page loaders (fakes)', () => {
   it('the Brownlow loader reads nothing until a season is chosen', async () => {
     expect(await loadBrownlowReport(PLAIN_ADMIN, { season: null, rule: 'unrecorded', seasonError: null }, healthyDeps())).toBeNull();
     expect(opsMocks.reconcileBrownlowSeasonForAdmin).not.toHaveBeenCalled();
-    opsMocks.reconcileBrownlowSeasonForAdmin.mockResolvedValue({ ok: true, report: syntheticBrownlowReport('reconciled') });
+    opsMocks.reconcileBrownlowSeasonForAdmin.mockResolvedValue({ ok: true, report: syntheticBrownlowReport('reconciled'), staging: syntheticStaging('derived') });
     expect(await loadBrownlowReport(PLAIN_ADMIN, { season: 2090, rule: 'stored_eligible_rank_one', seasonError: null }, healthyDeps()))
       .toMatchObject({ ok: true });
     expect(opsMocks.reconcileBrownlowSeasonForAdmin).toHaveBeenCalledWith(PLAIN_ADMIN, { season: 2090, eligibilityRule: 'stored_eligible_rank_one' });
+  });
+
+  it('the Brownlow loader carries the staging evidence through, and tolerates a service that supplies none', async () => {
+    opsMocks.reconcileBrownlowSeasonForAdmin.mockResolvedValue({ ok: true, report: syntheticBrownlowReport('reconciled'), staging: syntheticStaging('derived') });
+    const withStaging = await loadBrownlowReport(PLAIN_ADMIN, { season: 2090, rule: 'unrecorded', seasonError: null }, healthyDeps());
+    expect(withStaging).toMatchObject({ ok: true, value: { staging: { teamMapping: { state: 'derived' } } } });
+    // An older service result with no staging member: the loader must tolerate it.
+    opsMocks.reconcileBrownlowSeasonForAdmin.mockResolvedValue({ ok: true, report: syntheticBrownlowReport('reconciled') } as never);
+    const without = await loadBrownlowReport(PLAIN_ADMIN, { season: 2090, rule: 'unrecorded', seasonError: null }, healthyDeps());
+    expect(without).toMatchObject({ ok: true, value: { staging: null } });
   });
 });
 
@@ -1048,7 +1094,7 @@ function primeHealthyReads(): void {
   opsMocks.listCuratedQueue.mockResolvedValue({ ok: true, proposals: SYNTHETIC_QUEUE });
   opsMocks.readCuratedHistory.mockResolvedValue({ ok: true, history: syntheticHistory(syntheticProposal({ id: 501, status: 'validated' })) });
   opsMocks.listColemanPublicationsForAdmin.mockResolvedValue({ ok: true, publications: [SYNTHETIC_PUBLICATION] });
-  opsMocks.reconcileBrownlowSeasonForAdmin.mockResolvedValue({ ok: true, report: syntheticBrownlowReport('reconciled') });
+  opsMocks.reconcileBrownlowSeasonForAdmin.mockResolvedValue({ ok: true, report: syntheticBrownlowReport('reconciled'), staging: syntheticStaging('derived') });
   // The synthetic statuses carry the structural subset the views read (UnitStatusLike), not every
   // field of the real settle records, so they are cast to the mocked functions' return types.
   settleMocks.readSettleUnitTableStatus.mockResolvedValue(
@@ -1229,7 +1275,8 @@ describe('page modules', () => {
 
     const shown = html(await Page({ searchParams: Promise.resolve({ season: '2090', rule: 'stored_eligible_rank_one' }) } as never));
     expect(shown).toContain('Season 2090: Reconciled');
-    expect(shown).toContain('F-WB1-005');
+    expect(shown).toContain('V2-GAP-023');
+    expect(shown).toContain('data-brownlow-staging="true"');
     expect(opsMocks.reconcileBrownlowSeasonForAdmin).toHaveBeenLastCalledWith(PLAIN_ADMIN, { season: 2090, eligibilityRule: 'stored_eligible_rank_one' });
 
     opsMocks.reconcileBrownlowSeasonForAdmin.mockClear();

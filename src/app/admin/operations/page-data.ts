@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { ProposalHistory, ProposalRecord } from '@afldb/admin';
 import type { BrownlowReconciliationReport } from '@afldb/derived';
+import type { BrownlowStagingEvidence } from '@/db/queries/brownlow-reconciliation-inputs';
 import {
   COVERAGE_REGISTRY,
   isSealedSeason,
@@ -289,18 +290,25 @@ export async function loadColemanPage(
  * /admin/operations/brownlow
  * ------------------------------------------------------------------ */
 
+/** The reconciliation report with what the staged leaderboard and the provider-team mapping contributed. */
+export type BrownlowReportEvidence = {
+  report: BrownlowReconciliationReport;
+  /** `null` when the operations service supplied none. */
+  staging: BrownlowStagingEvidence | null;
+};
+
 /** The reconciliation of the chosen season, or null while no season is chosen. */
 export async function loadBrownlowReport(
   admin: AdminUser,
   query: BrownlowQuery,
   overrides?: Partial<PageDeps>,
-): Promise<Loaded<BrownlowReconciliationReport> | null> {
+): Promise<Loaded<BrownlowReportEvidence> | null> {
   if (query.season === null) return null;
   const deps = resolve(overrides);
   const season = query.season;
   return viaOperations(deps, 'Brownlow reconciliation', async (api) => fromResult(
     await api.reconcileBrownlowSeasonForAdmin(admin, { season, eligibilityRule: query.rule }),
-    (value) => value.report,
+    (value) => ({ report: value.report, staging: value.staging ?? null }),
   ));
 }
 

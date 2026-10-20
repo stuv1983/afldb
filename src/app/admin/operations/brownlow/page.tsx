@@ -33,8 +33,9 @@ export const metadata: Metadata = {
  * the match context and reports agreement, discrepancies and refusals. The reconciliation below
  * writes and audits nothing: the season and eligibility rule come from the query string
  * (`searchParams` is a Promise in Next 16, awaited after the guard). Two caveats are stated up
- * front: no eligibility rule is recorded for API-era seasons (V2-GAP-016) and the API leaderboard is
- * not staged (F-WB1-005).
+ * front: no eligibility rule is recorded for API-era seasons (V2-GAP-016), and what the staged API
+ * leaderboard and the provider-team-to-club mapping contributed (V2-GAP-023; before the settle
+ * stages a leaderboard the page says so, as F-WB1-005 did).
  *
  * LAUNCH F F-D (ADR 0014) adds the eligibility-aware MEDAL DETERMINATION above the reconciliation.
  * Its decision form is the only thing here that writes, and only for `data.brownlow.finalise`
@@ -64,7 +65,7 @@ export default async function BrownlowReconciliationPage(
         </p>
       </div>
 
-      <BrownlowCaveats />
+      <BrownlowCaveats staging={report !== null && report.ok ? report.value.staging : null} />
       <BrownlowSeasonPicker season={query.season} rule={query.rule} seasonError={query.seasonError} />
       {determination !== null && (
         determination.ok ? (
@@ -89,7 +90,7 @@ export default async function BrownlowReconciliationPage(
       ) : !report.ok ? (
         <LoadFailure what={`The ${query.season} reconciliation`} error={report.error} code={report.code} />
       ) : (
-        <BrownlowReportView report={report.value} />
+        <BrownlowReportView report={report.value.report} staging={report.value.staging} />
       )}
     </>
   );

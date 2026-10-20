@@ -73,7 +73,13 @@ import {
   awardWinnerRevisionPort,
   withAwardProposalExecutor,
 } from '@/db/queries/award-proposals';
-import { BrownlowInputError, loadBrownlowReconciliationInput } from '@/db/queries/brownlow-reconciliation-inputs';
+import {
+  BrownlowInputError,
+  loadBrownlowReconciliationInputWithEvidence,
+  type BrownlowStagingEvidence,
+} from '@/db/queries/brownlow-reconciliation-inputs';
+import type { ProviderTeamIdentity } from '@/lib/brownlow/provider-team-club-map';
+import { loadProviderTeamIdentities } from '@/lib/brownlow/provider-team-identities';
 import {
   loadBrownlowEligibilityEvidence,
   recordBrownlowEligibilityDecision,
@@ -195,6 +201,8 @@ export type OperationsDeps = {
   loadRegistry: () => SeasonRegistry;
   /** The Coleman derivation contract. Throws `ColemanContractError`. */
   loadContract: () => ColemanContract;
+  /** The committed provider team identities (V2-GAP-023). Throws `ProviderTeamIdentityError`. */
+  loadProviderTeamIdentities: () => readonly ProviderTeamIdentity[];
   now: () => Date;
 };
 
@@ -206,6 +214,7 @@ function resolveDeps(deps?: Partial<OperationsDeps>): OperationsDeps {
     loadSealed: deps?.loadSealed ?? (() => loadSealedSeasons()),
     loadRegistry: deps?.loadRegistry ?? (() => loadSeasonRegistry()),
     loadContract: deps?.loadContract ?? (() => loadColemanContract()),
+    loadProviderTeamIdentities: deps?.loadProviderTeamIdentities ?? (() => loadProviderTeamIdentities()),
     now: deps?.now ?? (() => new Date()),
   };
 }
@@ -940,7 +949,7 @@ export async function reconcileBrownlowSeasonForAdmin(
   admin: AdminUser,
   input: { season: number; eligibilityRule?: BrownlowEligibilityRule },
   deps?: Partial<OperationsDeps>,
-): Promise<OperationResult<{ report: BrownlowReconciliationReport }>> {
+): Promise<OperationResult<{ report: BrownlowReconciliationReport; staging: BrownlowStagingEvidence }>> {
   const d = resolveDeps(deps);
   return runRead(async () => {
     if (!hasCapability(admin, 'data.brownlow.read')) {
@@ -953,11 +962,33 @@ export async function reconcileBrownlowSeasonForAdmin(
     }
     const registry = d.loadRegistry();
     const generatedAt = d.now().toISOString();
-    const reconciliationInput = await d.withExecutor((executor) => loadBrownlowReconciliationInput(executor, {
+    const identities = readProviderTeamIdentities(d);
+    const { input: reconciliationInput, staging } = await d.withExecutor((executor) => loadBrownlowReconciliationInputWithEvidence(executor, {
       season, registry, generatedAt, eligibilityRule: input.eligibilityRule,
+      providerTeamIdentities: identities.identities,
     }));
-    return { report: reconcileBrownlowSeason(reconciliationInput) };
+    return {
+      report: reconcileBrownlowSeason(reconciliationInput),
+      staging: identities.error === null
+        ? staging
+        : { ...staging, teamMapping: { state: 'not_attempted', reason: 'identities_unavailable', error: identities.error } },
+    };
   });
+}
+
+/**
+ * The committed provider team identities, or the reason they are unavailable. An unreadable file
+ * never fails the reconciliation: the mapping is then reported as not attempted and the club check
+ * stays `club_unverifiable`, with the reason shown.
+ */
+function readProviderTeamIdentities(
+  d: OperationsDeps,
+): { identities: readonly ProviderTeamIdentity[] | undefined; error: string | null } {
+  try {
+    return { identities: d.loadProviderTeamIdentities(), error: null };
+  } catch (error) {
+    return { identities: undefined, error: error instanceof Error ? error.message.split('\n')[0] : 'unknown error' };
+  }
 }
 
 /* Brownlow eligibility (Launch F F-D stream A) */
@@ -1009,7 +1040,9 @@ async function computeBrownlowDetermination(
   registry: SeasonRegistry,
   generatedAt: string,
 ): Promise<BrownlowDeterminationView> {
-  const reconciliationInput = await loadBrownlowReconciliationInput(executor, { season, registry, generatedAt, storedOnlyFallback: true });
+  const { input: reconciliationInput } = await loadBrownlowReconciliationInputWithEvidence(
+    executor, { season, registry, generatedAt, storedOnlyFallback: true },
+  );
   let report = reconcileBrownlowSeason(reconciliationInput);
   const evidence = await loadBrownlowEligibilityEvidence(executor, {
     season,

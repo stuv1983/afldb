@@ -98,8 +98,11 @@ staged AFL API round votes (`staging.afl_api_brownlow_vote`), the stored totals
 (`brownlow_season_votes`) and the match context (`matches`), and shows the outcome, findings by
 severity, comparisons, raw totals, and a leader only when the determination is `determined`.
 Caveats stated on the page: no eligibility rule is recorded for API-era seasons (V2-GAP-016; the
-default rule `unrecorded` refuses a leader when an ineligible player polled votes), the API
-leaderboard is not staged, and provider team ids are not mapped to clubs (V2-GAP-023).
+default rule `unrecorded` refuses a leader when an ineligible player polled votes). The page also
+shows what the staged API leaderboard and the provider-team-to-club mapping contributed (V2-GAP-023):
+the leaderboard summary, the 18-team mapping with its fixture corroboration, or the specific refusal
+codes when the mapping cannot be derived whole; a season whose settle has not staged a leaderboard is
+still labelled "not staged" and its leaderboard comparison reads "not supplied".
 
 **Medal determination (Launch F, ADR 0014).** The page also shows the owner's eligibility-aware determination: the
 raw leaderboard for every vote-getter with each player's eligibility status (eligible, ineligible, missing,

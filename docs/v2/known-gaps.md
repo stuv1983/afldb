@@ -55,7 +55,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-020 | Low | curated awards | no | open: winners without a resolved player identity cannot be approved | none |
 | V2-GAP-021 | Medium | Coleman | no | **CLOSED locally**: explicit guarded offline bootstrap refuses publisher-owned seasons; session locks survive batch commits; 27/27 publication tests | production comparison remains gap 015 |
 | V2-GAP-022 | Medium | admin UI | rehearsal | open, narrowed: 26 images technically inspected; four Brownlow replacements recaptured/inspected after material wording/status fixes | owner acceptance per screen |
-| V2-GAP-023 | Low | Brownlow | no | open: the reconciliation view has no staged API leaderboard and no provider-team-to-club mapping; the staged comparator is INCOMPLETE and **blocks the in-application reconciled leaderboard and club checks** (checklist item 1), not migration. The 2025 evidence run derived both from the data (an 18-team mapping, functional and injective; the staged leaderboard equals the stored totals), so they are derivable; nothing is committed | none for migration; needed for operational readiness |
+| V2-GAP-023 | Low | Brownlow | no | **CLOSED in code, verified on a disposable clone of the authentic 2025 data (2026-10-20)**: the settle stages the API leaderboard on the observation spine and the reconciliation derives the 18-team provider-team-to-club mapping from the committed identities, corroborated by the fixtures; the operations centre shows both. Production staging still needs one operator-run settle with this code (owner action; nothing was run against production) | none for migration; the stage runs when the operator next settles a Brownlow snapshot |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | open: no operations-centre view of AFL API settle refusals | none (V2 follow-up) |
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 passes on a populated copy (2026-10-20); populated-ledger DB reversal and archive recovery restore everything exactly on a synthetic copy | approve host backup/rollback and production-dump rehearsal |
@@ -484,13 +484,40 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-023 — Brownlow reconciliation view: no staged leaderboard, no provider-team mapping
 
-- **What.** `src/db/queries/brownlow-reconciliation-inputs.ts` passes `leaderboard: null` (no staged
-  table holds the API leaderboard; `src/db/migrations/103_afl_api_match_projections.sql:18`) and
-  maps no provider team id to a club (no committed mapping), so the leaderboard comparison is "not
-  supplied". `staging.afl_api_brownlow_vote` is an upsert, so a provider player removed from a
-  match's vote set could leave a stale row; the reconciliation's 3/2/1 vote-set finding would
-  surface it. The page states these caveats; it is read-only.
-- **Close.** Stage the leaderboard and commit a provider-team mapping, then pass both.
+- **CLOSED in code, 2026-10-20; verified on a disposable clone, not on production.**
+- **What was wrong.** `src/db/queries/brownlow-reconciliation-inputs.ts` passed `leaderboard: null`
+  (migration 103 declares no typed leaderboard projection) and mapped no provider team id to a club,
+  so the leaderboard comparison was "not supplied" and every vote set raised `club_unverifiable`
+  (207 for 2025).
+- **What closes it.**
+  - *Staged leaderboard.* `stageAflApiBrownlowLeaderboard`
+    (`src/lib/acquisition/afl-api-brownlow.ts`) persists each leaderboard player as a versioned
+    `brownlow_leaderboard` record on the generic observation spine (scope `season=<year>`, key the
+    provider player id, payload the parsed entry plus the feed status). It runs inside the settle's
+    own transaction, so a dry run rolls it back, an unchanged replay appends nothing, and a player
+    the feed stops listing is stamped `absent_since` (never deleted; an empty feed never retires a
+    staged board). No migration: the family was already declared in `data/reference/source-families.json`.
+  - *Mapping.* `src/lib/brownlow/provider-team-club-map.ts` (pure) derives provider team to club from
+    the committed `data/reference/afl-api-identities.json` teams, resolved through
+    `clubs.legacy_club_hist`, and corroborates each team against the provider's own home/away team ids
+    in the fixtures observation of every voted match. It is all-or-nothing and refuses with a specific
+    code: `provider_team_unmapped`, `provider_team_identity_conflict`, `club_identity_unresolved`,
+    `club_identity_ambiguous`, `provider_teams_share_club`, `fixture_evidence_conflict`,
+    `fixture_team_unmapped`. A refused mapping leaves every vote's club NULL, so `club_unverifiable`
+    is kept, never suppressed.
+  - *Operations centre.* `/admin/operations/brownlow` (existing `data.brownlow.read`) now shows the
+    staged-leaderboard summary and the mapping (or its refusal codes) and no longer states that the
+    leaderboard is not staged when it is.
+- **Evidence (clone of the settled authentic 2025 data, observe-only settle then read-only
+  reconciliation).** 188 leaderboard entries staged (CONCLUDED, 12 ineligible, 1 winner, 0
+  unresolved players); a replay appended 0 and left 188 unchanged. Mapping derived for all 18
+  teams, each corroborated by 23 fixture slots (207 matches x 2 = 414 = 18 x 23). Leaderboard
+  comparison: 188 compared, 0 mismatches. `club_unverifiable`: 207 before, **0 after** (no
+  `vote_club_not_in_match` either). The only remaining findings are the 12 `eligibility_flag_inconsistent`
+  discrepancies and their 12 `eligibility_rule_unrecorded` refusals, which are the subject of
+  `brownlow-eligibility-ruling-2026-10-20.md`.
+- **Not done.** The production database has no staged leaderboard until an operator runs the Brownlow
+  settle once with this code (`--observe-only` is enough). That is an owner/operator action.
 
 ## V2-GAP-024 — Approving a curated award does not refresh the cached public award pages
 

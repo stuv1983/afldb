@@ -23,6 +23,7 @@ import {
 import { COVERAGE_REGISTRY, sealedSeasonsFrom, type SeasonRegistry } from '@afldb/domain';
 
 import type { OperationsActionState } from '@/app/admin/operations/action-state';
+import type { BrownlowStagingEvidence } from '@/db/queries/brownlow-reconciliation-inputs';
 import type { ColemanComparisonView, ColemanPublicationView } from '@/lib/admin/operations-centre';
 
 import type { OperationsOverview } from '@/app/admin/operations/page-data';
@@ -265,6 +266,41 @@ export function syntheticColemanComparison(kind: ColemanKind): ColemanComparison
 /* ------------------------------------------------------------------ *
  * Brownlow
  * ------------------------------------------------------------------ */
+
+type StagingKind = 'derived' | 'refused' | 'unstaged';
+
+/** A hand-written SYNTHETIC staging summary (provider team ids SYN_T*, club ids 9001-9002). */
+export function syntheticStaging(kind: StagingKind): BrownlowStagingEvidence {
+  const unstaged = kind === 'unstaged';
+  return {
+    leaderboard: {
+      staged: !unstaged,
+      status: unstaged ? null : 'CONCLUDED',
+      entries: unstaged ? 0 : 3,
+      ineligibleEntries: unstaged ? 0 : 1,
+      winnerEntries: unstaged ? 0 : 1,
+      unresolvedPlayers: 0,
+      absentEntries: 0,
+    },
+    teamMapping: kind === 'derived'
+      ? {
+        state: 'derived',
+        fixtureMatches: 1,
+        uncorroborated: [],
+        entries: [
+          { providerTeamId: 'SYN_T1', clubId: 9001, legacyClubHist: 'Synthetic Home', corroboratingSlots: 1 },
+          { providerTeamId: 'SYN_T2', clubId: 9002, legacyClubHist: 'Synthetic Away', corroboratingSlots: 1 },
+        ],
+      }
+      : kind === 'refused'
+        ? {
+          state: 'refused',
+          fixtureMatches: 1,
+          refusals: [{ code: 'fixture_evidence_conflict', providerTeamId: 'SYN_T1', detail: '1 fixture slot(s) name a club other than 9001' }],
+        }
+        : { state: 'not_attempted', reason: 'no_votes_staged' },
+  };
+}
 
 type BrownlowKind = 'reconciled' | 'refused';
 

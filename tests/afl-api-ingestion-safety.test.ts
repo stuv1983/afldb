@@ -458,6 +458,13 @@ function makeBatchLifecycleSql(options: BatchStubOptions = {}) {
         if (options.closeError) throw options.closeError;
         return options.closedRows === 0 ? [] : [{ id: '42' }];
       }
+      // V2-GAP-023: the leaderboard is staged on the observation spine (persistSourceObservation:
+      // no stored head, so payload + version + head inserts; then the absence sweep).
+      if (text.startsWith('SELECT v.version_seq AS')) return [];
+      if (text.startsWith('INSERT INTO staging.source_payloads')) return [];
+      if (text.startsWith('INSERT INTO staging.source_record_versions')) return [];
+      if (text.startsWith('INSERT INTO staging.source_records')) return [];
+      if (text.startsWith('UPDATE staging.source_records')) return [];
       throw new Error(`unexpected statement in the batch-lifecycle stub: ${text}`);
     },
     { json: (value: unknown) => ({ jsonValue: value }) },
@@ -598,7 +605,22 @@ describe('AFLDB-ISSUE-244 F008 — runSettleAflApiBrownlow() batch lifecycle', (
     expect(result.applied).toBe(true);
     expect(result.batchId).toBe('42');
     expect(state.outcome).toBe('committed');
-    expect(kinds().slice(-3)).toEqual(['INSERT INTO import_batches', 'SELECT count(*)::int AS', 'UPDATE import_batches SET']);
+    // The batch opens first, the leaderboard is staged on the spine under it (head lookup, payload,
+    // version and head inserts, then the absence sweep), and the batch is closed last (V2-GAP-023).
+    const all = kinds();
+    expect(all.slice(-2)).toEqual(['SELECT count(*)::int AS', 'UPDATE import_batches SET']);
+    expect(all.slice(-8, -2)).toEqual([
+      'INSERT INTO import_batches',
+      'SELECT v.version_seq AS',
+      'INSERT INTO staging.source_payloads',
+      'INSERT INTO staging.source_record_versions',
+      'INSERT INTO staging.source_records',
+      'UPDATE staging.source_records SET',
+    ]);
+    expect(result.counters).toMatchObject({
+      leaderboardObservationsSeen: 1, leaderboardVersionsAppended: 1, leaderboardObservationsUnchanged: 0,
+      leaderboardMarkedAbsent: 0,
+    });
   });
 
   it('the batch validation_result carries the FINAL counters, leaderboard reconciliation included', async () => {

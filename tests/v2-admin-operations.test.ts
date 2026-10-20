@@ -45,7 +45,11 @@ import {
 } from '@/app/admin/operations/awards/actions';
 import { compareColemanSeasonAction, publishColemanSeasonAction } from '@/app/admin/operations/coleman/actions';
 import { parseCreateForm, parseProposalId, parseSeason } from '@/app/admin/operations/form';
-import { BrownlowInputError, loadBrownlowReconciliationInput } from '@/db/queries/brownlow-reconciliation-inputs';
+import {
+  BrownlowInputError,
+  loadBrownlowReconciliationInput,
+  loadBrownlowReconciliationInputWithEvidence,
+} from '@/db/queries/brownlow-reconciliation-inputs';
 import {
   listColemanPublications,
   loadColemanContract,
@@ -188,7 +192,7 @@ const STUB_PREREQUISITES = `
     id integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY, slug text NOT NULL UNIQUE,
     name text NOT NULL, category text NOT NULL);
   CREATE TABLE players (id integer PRIMARY KEY, display_name text NOT NULL);
-  CREATE TABLE clubs (id integer PRIMARY KEY, slug text NOT NULL UNIQUE, name text NOT NULL);
+  CREATE TABLE clubs (id integer PRIMARY KEY, slug text NOT NULL UNIQUE, name text NOT NULL, legacy_club_hist text);
   CREATE TABLE sources (id smallint PRIMARY KEY, key text NOT NULL UNIQUE);
   -- No UNIQUE (source_id, external_id) in the stub, so the AMBIGUOUS-identity case can be staged.
   CREATE TABLE external_identities (
@@ -226,10 +230,22 @@ const STUB_PREREQUISITES = `
     votes smallint NOT NULL, eligible boolean NOT NULL,
     match_id integer, player_id integer, club_id integer,
     PRIMARY KEY (source_id, family, external_record_id, provider_player_id));
+  -- The observation spine (migration 074), reduced to the columns the Brownlow loader reads.
+  CREATE TABLE staging.source_payloads (
+    source_id smallint NOT NULL, family text NOT NULL, payload_hash text NOT NULL, raw_payload jsonb NOT NULL,
+    PRIMARY KEY (source_id, family, payload_hash));
+  CREATE TABLE staging.source_record_versions (
+    source_id smallint NOT NULL, family text NOT NULL, external_record_id text NOT NULL, version_seq integer NOT NULL,
+    payload_hash text NOT NULL, PRIMARY KEY (source_id, family, external_record_id, version_seq));
+  CREATE TABLE staging.source_records (
+    source_id smallint NOT NULL, family text NOT NULL, external_record_id text NOT NULL, scope_key text NOT NULL,
+    current_version_seq integer NOT NULL, absent_since timestamptz,
+    PRIMARY KEY (source_id, family, external_record_id));
 
   -- STUB grants: what the real import-writable registry / staging blanket grants give afldb_import.
   GRANT USAGE ON SCHEMA staging TO afldb_import;
-  GRANT SELECT ON staging.afl_api_brownlow_vote TO afldb_import;
+  GRANT SELECT ON staging.afl_api_brownlow_vote, staging.source_payloads, staging.source_record_versions,
+                  staging.source_records TO afldb_import;
   GRANT SELECT ON auth_users, seasons, awards, players, clubs, sources, external_identities, award_winners,
                   matches, player_match_stats, brownlow_season_votes TO afldb_import;
   GRANT INSERT ON award_winners TO afldb_import;
@@ -242,9 +258,9 @@ const STUB_PREREQUISITES = `
     ('synthetic-medal', 'Synthetic Medal', 'award'),
     ('brownlow-medal', 'Brownlow Medal', 'award'),
     ('coleman', 'Synthetic Coleman', 'award');
-  INSERT INTO clubs (id, slug, name) VALUES
-    (1, 'synthetic-club', 'Synthetic Club A'), (2, 'synthetic-club-b', 'Synthetic Club B'),
-    (3, 'synthetic-club-c', 'Synthetic Club C'), (4, 'synthetic-club-d', 'Synthetic Club D');
+  INSERT INTO clubs (id, slug, name, legacy_club_hist) VALUES
+    (1, 'synthetic-club', 'Synthetic Club A', 'Synthetic Hist A'), (2, 'synthetic-club-b', 'Synthetic Club B', 'Synthetic Hist B'),
+    (3, 'synthetic-club-c', 'Synthetic Club C', NULL), (4, 'synthetic-club-d', 'Synthetic Club D', NULL);
   INSERT INTO sources (id, key) VALUES (1, 'afltables'), (2, 'manual_admin_edit'), (3, 'afl_api');
   INSERT INTO players (id, display_name) VALUES
     (1, 'Synthetic Player One'), (2, 'Synthetic Player Two'), (3, 'Synthetic Player Three'),
@@ -400,7 +416,8 @@ beforeEach(async () => {
   await db.query('RESET ROLE');
   await db.exec(`TRUNCATE award_proposal_decisions, award_proposals, award_winners, derived_award_projections,
                           derived_award_results, brownlow_eligibility_decisions,
-                          player_match_stats, matches, brownlow_season_votes, staging.afl_api_brownlow_vote RESTART IDENTITY CASCADE`);
+                          player_match_stats, matches, brownlow_season_votes, staging.afl_api_brownlow_vote,
+                          staging.source_records, staging.source_record_versions, staging.source_payloads RESTART IDENTITY CASCADE`);
   await db.exec('DELETE FROM external_identities WHERE player_id >= 11');
   session.actor = null;
   auditMock.mockReset();
@@ -587,6 +604,7 @@ describe('Brownlow loader (fake executor)', () => {
 
   it('groups votes by provider match, keeps unresolved ids NULL, and reports leaderboard as not supplied', async () => {
     const executor = fakeExecutor((text) => {
+      if (text.includes('brownlow_leaderboard')) return [];
       if (text.includes('staging.afl_api_brownlow_vote')) {
         return [vote(), vote({ providerPlayerId: 'P2', votes: 2, playerId: null }), vote({ providerMatchId: 'M2', matchId: null, providerPlayerId: 'P3', votes: 1 })];
       }
@@ -617,6 +635,7 @@ describe('Brownlow loader (fake executor)', () => {
 
   it('a season that is not sealed is in_progress; stored totals pass through; the eligibility rule is explicit', async () => {
     const executor = fakeExecutor((text) => {
+      if (text.includes('brownlow_leaderboard')) return [];
       if (text.includes('staging.afl_api_brownlow_vote')) return [];
       if (text.includes('brownlow_season_votes')) {
         return [{ playerId: '11', clubId: null, votes: '9', voteRank: 1, eligibleRank: null, isIneligible: true, isWinner: false }];
@@ -634,6 +653,98 @@ describe('Brownlow loader (fake executor)', () => {
       ? [vote(), vote({ providerPlayerId: 'P2', apiRoundNumber: 2 })]
       : []));
     await expect(loadBrownlowReconciliationInput(executor, baseRequest)).rejects.toThrow(BrownlowInputError);
+  });
+
+  const board = (over: Record<string, unknown> = {}) => ({
+    providerPlayerId: 'P1',
+    payload: { providerTeamId: 'T1', votes: 3, eligible: true, winner: false, leader: false, feedStatus: 'CONCLUDED' },
+    playerIds: [11], ...over,
+  });
+
+  it('V2-GAP-023: the staged leaderboard is read by scope, resolved through unique identities, and unresolved ids stay NULL', async () => {
+    const executor = fakeExecutor((text) => {
+      if (text.includes('count(*)::int AS n')) return [{ n: 2 }];
+      if (text.includes('brownlow_leaderboard')) {
+        return [
+          board(),
+          board({ providerPlayerId: 'P2', playerIds: [12, 13] }), // ambiguous
+          board({ providerPlayerId: 'P3', playerIds: null, payload: { providerTeamId: 'T2', votes: 9, eligible: false, winner: true, leader: false, feedStatus: 'CONCLUDED' } }),
+        ];
+      }
+      return [];
+    });
+    const { input, staging } = await loadBrownlowReconciliationInputWithEvidence(executor, baseRequest);
+    expect(input.leaderboard?.status).toBe('CONCLUDED');
+    expect(input.leaderboard?.entries.map((e) => [e.providerPlayerId, e.playerId, e.totalVotes, e.eligible, e.winner]))
+      .toEqual([['P1', 11, 3, true, false], ['P2', null, 3, true, false], ['P3', null, 9, false, true]]);
+    expect(staging.leaderboard).toEqual({
+      staged: true, status: 'CONCLUDED', entries: 3, ineligibleEntries: 1, winnerEntries: 1, unresolvedPlayers: 2, absentEntries: 2,
+    });
+    const query = executor.calls.find((call) => call.text.includes("r.family = 'brownlow_leaderboard'"));
+    expect(query?.params).toEqual([2024, 'afl_api']);
+    expect(query?.text).toContain('r.absent_since IS NULL');
+    expect(query?.text).toContain("e.status IN ('unique', 'resolved')");
+  });
+
+  it('V2-GAP-023: a staged leaderboard carrying two feed statuses is refused, not merged', async () => {
+    const executor = fakeExecutor((text) => (text.includes('brownlow_leaderboard') && !text.includes('count(*)')
+      ? [board(), board({ providerPlayerId: 'P2', payload: { providerTeamId: 'T1', votes: 1, eligible: true, winner: false, leader: false, feedStatus: 'LIVE' } })]
+      : []));
+    await expect(loadBrownlowReconciliationInputWithEvidence(executor, baseRequest)).rejects.toThrow(/more than one feed status/);
+  });
+
+  describe('provider-team mapping', () => {
+    const identities = [
+      { providerTeamId: 'T1', legacyClubHist: 'Hist A' },
+      { providerTeamId: 'T2', legacyClubHist: 'Hist B' },
+    ];
+    const respond = (over: { clubs?: object[]; fixtures?: object[] } = {}) => (text: string): object[] => {
+      if (text.includes('brownlow_leaderboard')) return [];
+      if (text.includes('legacy_club_hist')) {
+        return over.clubs ?? [{ clubId: 1, legacyClubHist: 'Hist A' }, { clubId: 2, legacyClubHist: 'Hist B' }];
+      }
+      if (text.includes("'{home,team,providerId}'")) {
+        return over.fixtures ?? [{ providerMatchId: 'M1', matchId: 5, providerHomeTeamId: 'T1', providerAwayTeamId: 'T2', homeClubId: 1, awayClubId: 2 }];
+      }
+      if (text.includes('staging.afl_api_brownlow_vote')) return [vote(), vote({ providerPlayerId: 'P2', providerTeamId: 'T2', votes: 2 })];
+      return [];
+    };
+
+    it('is not attempted without committed identities', async () => {
+      const { staging } = await loadBrownlowReconciliationInputWithEvidence(fakeExecutor(respond()), baseRequest);
+      expect(staging.teamMapping).toEqual({ state: 'not_attempted', reason: 'no_identities_supplied' });
+    });
+
+    it('maps every vote to its club only when the whole mapping is derived and corroborated', async () => {
+      const { input, staging } = await loadBrownlowReconciliationInputWithEvidence(
+        fakeExecutor(respond()), { ...baseRequest, providerTeamIdentities: identities });
+      expect(staging.teamMapping).toMatchObject({ state: 'derived', fixtureMatches: 1, uncorroborated: [] });
+      expect(input.matchVotes[0].votes.map((v) => [v.providerTeamId, v.clubId])).toEqual([['T1', 1], ['T2', 2]]);
+    });
+
+    it('refuses the whole mapping on a conflicting fixture and leaves every club NULL', async () => {
+      const { input, staging } = await loadBrownlowReconciliationInputWithEvidence(
+        fakeExecutor(respond({ fixtures: [{ providerMatchId: 'M1', matchId: 5, providerHomeTeamId: 'T2', providerAwayTeamId: 'T1', homeClubId: 1, awayClubId: 2 }] })),
+        { ...baseRequest, providerTeamIdentities: identities });
+      expect(staging.teamMapping.state).toBe('refused');
+      if (staging.teamMapping.state === 'refused') {
+        expect(staging.teamMapping.refusals.map((r) => r.code)).toEqual(['fixture_evidence_conflict', 'fixture_evidence_conflict']);
+      }
+      expect(input.matchVotes[0].votes.map((v) => v.clubId)).toEqual([null, null]);
+    });
+
+    it('refuses a vote team with no committed identity and an unresolved club history', async () => {
+      const missing = await loadBrownlowReconciliationInputWithEvidence(
+        fakeExecutor(respond()), { ...baseRequest, providerTeamIdentities: identities.slice(0, 1) });
+      // The vote names T2 and so does the fixture: both are reported, each with its own code.
+      expect(missing.staging.teamMapping).toMatchObject({ state: 'refused', refusals: [
+        { code: 'provider_team_unmapped', providerTeamId: 'T2' }, { code: 'fixture_team_unmapped', providerTeamId: 'T2' },
+      ] });
+      const noClub = await loadBrownlowReconciliationInputWithEvidence(
+        fakeExecutor(respond({ clubs: [{ clubId: 1, legacyClubHist: 'Hist A' }] })), { ...baseRequest, providerTeamIdentities: identities });
+      expect(noClub.staging.teamMapping).toMatchObject({ state: 'refused', refusals: [{ code: 'club_identity_unresolved', providerTeamId: 'T2' }] });
+      expect(noClub.input.matchVotes[0].votes.every((v) => v.clubId === null)).toBe(true);
+    });
   });
 });
 
@@ -1227,6 +1338,86 @@ describe('Brownlow reconciliation: server caller on PGlite', () => {
     expect(report.awardResultPresentation.providerClaims.leaderboardWinners).toBeNull();
     expect(spies.withExecutor).toHaveBeenCalledTimes(1);
     expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  const SPINE_SOURCE = 3;
+  async function stageFixture(providerMatchId: string, home: string, away: string): Promise<void> {
+    const hash = `fx-${providerMatchId}`;
+    await db.query(`INSERT INTO staging.source_payloads VALUES ($1, 'match', $2, $3::jsonb)`,
+      [SPINE_SOURCE, hash, JSON.stringify({ home: { team: { providerId: home } }, away: { team: { providerId: away } } })]);
+    await db.query(`INSERT INTO staging.source_record_versions VALUES ($1, 'match', $2, 1, $3)`, [SPINE_SOURCE, providerMatchId, hash]);
+    await db.query(`INSERT INTO staging.source_records VALUES ($1, 'match', $2, 'season=2024', 1, NULL)`, [SPINE_SOURCE, providerMatchId]);
+  }
+  async function stageBoardEntry(providerPlayerId: string, entry: Record<string, unknown>, absent = false): Promise<void> {
+    const hash = `lb-${providerPlayerId}`;
+    await db.query(`INSERT INTO staging.source_payloads VALUES ($1, 'brownlow_leaderboard', $2, $3::jsonb)`,
+      [SPINE_SOURCE, hash, JSON.stringify({ providerPlayerId, feedStatus: 'CONCLUDED', ...entry })]);
+    await db.query(`INSERT INTO staging.source_record_versions VALUES ($1, 'brownlow_leaderboard', $2, 1, $3)`, [SPINE_SOURCE, providerPlayerId, hash]);
+    await db.query(`INSERT INTO staging.source_records VALUES ($1, 'brownlow_leaderboard', $2, 'season=2024', 1, $3)`,
+      [SPINE_SOURCE, providerPlayerId, absent ? '2026-10-01T00:00:00Z' : null]);
+  }
+  async function bridgeVoters(): Promise<void> {
+    await db.query(`INSERT INTO external_identities (source_id, external_id, player_id, match_method, status)
+                    VALUES (3, 'SYN_P11', 11, 'synthetic', 'unique'), (3, 'SYN_P12', 12, 'synthetic', 'unique'),
+                           (3, 'SYN_P13', 13, 'synthetic', 'unique')`);
+  }
+  const SYNTHETIC_IDENTITIES = [
+    { providerTeamId: 'SYN_T1', legacyClubHist: 'Synthetic Hist A' },
+    { providerTeamId: 'SYN_T2', legacyClubHist: 'Synthetic Hist B' },
+  ];
+  const codesOf = (result: { ok: true; report: { findings: Array<{ code: string }> } }) => result.report.findings.map((f) => f.code);
+
+  it('V2-GAP-023: without a leaderboard or identities the comparison is not supplied and club_unverifiable stays', async () => {
+    const { deps } = makeDeps({ loadProviderTeamIdentities: () => { throw new Error('identities file unreadable\nsecond line'); } });
+    const result = await reconcileBrownlowSeasonForAdmin(PLAIN_ADMIN, { season: 2024 }, deps);
+    expect(result).toMatchObject({ ok: true, staging: {
+      leaderboard: { staged: false }, teamMapping: { state: 'not_attempted', reason: 'identities_unavailable', error: 'identities file unreadable' },
+    } });
+    if (result.ok) {
+      expect(result.report.rawVotes.comparisons.leaderboard.state).toBe('not_supplied');
+      expect(codesOf(result)).toContain('club_unverifiable');
+    }
+  });
+
+  it('V2-GAP-023: a staged leaderboard and a corroborated mapping replace club_unverifiable and compare the leaderboard', async () => {
+    await bridgeVoters();
+    await stageFixture('SYN_M1', 'SYN_T1', 'SYN_T2');
+    await stageBoardEntry('SYN_P11', { providerTeamId: 'SYN_T1', votes: 3, eligible: true, winner: true, leader: true });
+    await stageBoardEntry('SYN_P12', { providerTeamId: 'SYN_T1', votes: 2, eligible: true, winner: false, leader: false });
+    await stageBoardEntry('SYN_P13', { providerTeamId: 'SYN_T2', votes: 1, eligible: false, winner: false, leader: false });
+    const { deps } = makeDeps({ loadProviderTeamIdentities: () => SYNTHETIC_IDENTITIES });
+    const result = await reconcileBrownlowSeasonForAdmin(PLAIN_ADMIN, { season: 2024 }, deps);
+    expect(result).toMatchObject({ ok: true, staging: {
+      leaderboard: { staged: true, status: 'CONCLUDED', entries: 3, ineligibleEntries: 1, winnerEntries: 1, unresolvedPlayers: 0 },
+      teamMapping: { state: 'derived', fixtureMatches: 1 },
+    } });
+    if (!result.ok) return;
+    expect(result.report.rawVotes.comparisons.leaderboard).toMatchObject({ state: 'compared', compared: 3 });
+    expect(codesOf(result)).not.toContain('club_unverifiable');
+    // The leaderboard says player 13 is ineligible while the stored flag says eligible: reported, not hidden.
+    expect(codesOf(result)).toContain('eligibility_flag_inconsistent');
+  });
+
+  it('V2-GAP-023: a mapping that disagrees with the fixture is refused whole and the unverifiable findings are kept', async () => {
+    await stageFixture('SYN_M1', 'SYN_T2', 'SYN_T1'); // the match is clubs 1 (home) v 2 (away)
+    const { deps } = makeDeps({ loadProviderTeamIdentities: () => SYNTHETIC_IDENTITIES });
+    const result = await reconcileBrownlowSeasonForAdmin(PLAIN_ADMIN, { season: 2024 }, deps);
+    expect(result).toMatchObject({ ok: true, staging: { teamMapping: { state: 'refused' } } });
+    if (!result.ok) return;
+    expect(codesOf(result)).toContain('club_unverifiable');
+  });
+
+  it('V2-GAP-023: an absent leaderboard entry is excluded, and an unbridged one refuses the season', async () => {
+    await bridgeVoters();
+    await stageBoardEntry('SYN_P11', { providerTeamId: 'SYN_T1', votes: 3, eligible: true, winner: true, leader: true });
+    await stageBoardEntry('SYN_P99', { providerTeamId: 'SYN_T1', votes: 7, eligible: true, winner: false, leader: false }, true);
+    const { deps } = makeDeps();
+    const result = await reconcileBrownlowSeasonForAdmin(PLAIN_ADMIN, { season: 2024 }, deps);
+    expect(result).toMatchObject({ ok: true, staging: { leaderboard: { entries: 1, absentEntries: 1 } } });
+    await stageBoardEntry('SYN_P98', { providerTeamId: 'SYN_T1', votes: 1, eligible: true, winner: false, leader: false });
+    const refused = await reconcileBrownlowSeasonForAdmin(PLAIN_ADMIN, { season: 2024 }, deps);
+    expect(refused).toMatchObject({ ok: true, staging: { leaderboard: { unresolvedPlayers: 1 } } });
+    if (refused.ok) expect(codesOf(refused)).toContain('unresolved_player_identity');
   });
 
   it('a season that is not sealed is reported in_progress; a contributor, a bad season and a bad rule are refused', async () => {

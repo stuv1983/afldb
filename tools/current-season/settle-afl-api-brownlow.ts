@@ -239,6 +239,9 @@ function counterLines(counters: AflApiBrownlowSettleCounters): string[] {
   ]);
   group('Data issues', ['dataIssuesOpened', 'dataIssuesRefreshed']);
   group('Leaderboard reconciliation', ['leaderboardPlayersCompared', 'leaderboardMismatches']);
+  group('Leaderboard staging', [
+    'leaderboardObservationsSeen', 'leaderboardVersionsAppended', 'leaderboardObservationsUnchanged', 'leaderboardMarkedAbsent',
+  ]);
   return lines;
 }
 
