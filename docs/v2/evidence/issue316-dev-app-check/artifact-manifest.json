@@ -1,0 +1,14 @@
+{
+  "archive": "afldb-v2-dev-candidate-fffef96f.tar.gz",
+  "archiveBytes": 113830430,
+  "archiveSha256": "c829da087f65a3a8145ad07db8d7d649bb7f93f8b293d66f85547cd375e40b0e",
+  "filesSha256File": "FILES.sha256 (inside the archive; 13209 files; its own sha256 is 50332a2c594d876ccb0ee43a72933ed12df9e5fd25513892a7dea60645fd512a)",
+  "regularFiles": 13209,
+  "tarMembers": 18309,
+  "compression": "gzip -n -6 of a name-sorted, owner 0/0, mtime-pinned (@1792532214) GNU tar",
+  "extractedSizeMiB": { "app": 801, "kit": 14 },
+  "envFilesInside": 0,
+  "localArchivePath": "(scratchpad, not in git) C:\Users\stuar\AppData\Local\Temp\claude\D--dev-afldbV2\77258a0a-3c50-46b6-b25d-0084ebe15f04\scratchpad\candidate\afldb-v2-dev-candidate-fffef96f.tar.gz",
+  "verifiedLocally": ["extract + sha256sum -c FILES.sha256: 13209/13209 OK", "kit/ops copies identical to docs/v2/evidence copies", "tsx + postgres resolve from the packaged kit", "runner refuses without DSN", "relocated run from a different absolute path: /api/health 200 and check.mjs PASS against the isolated clone"],
+  "notVerifiedOnDev": "Node 22.23.2 (DEV) vs 22.21.0 (build/rehearsal); real DEV PostgreSQL roles/ACLs; DEV filesystem; ss/curl behaviour on DEV"
+}

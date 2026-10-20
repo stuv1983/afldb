@@ -1,0 +1,31 @@
+{
+  "artifact": "afldb-v2-dev-candidate-fffef96f",
+  "purpose": "ISSUE-316 DEV candidate: verify the real V2 retired AFL Tables action and audit behaviour (D-DEV-316-C1-APP-1)",
+  "sourceRevision": "fffef96fb079bfa975109fa2fdcf5552b51e5946",
+  "sourceBranch": "v2/rebuild",
+  "sourceArchiveSha256": "c7b755b5dec875eb434b16bcf35e7b42e44ba2ae27892ea88d27a90218ce5cb6",
+  "executableSourceDigest": "fc12b4dd415bdf513ea05a910c35044d6a02adb2bdd2f1f33ca9fc2f5d569f0d",
+  "executableSourceDigestDefinition": "sha256 of 'git ls-tree -r <rev> -- src packages public data deploy tools/build tools/rebuild next.config.ts package.json package-lock.json tsconfig.json' (934 entries); identical at fffef96f and at reviewed a6400e7d",
+  "packageLockSha256": "984b44221f8f72560c7b58f1f8642427cc6ece03d30623a7e2e45d1df23d8e86",
+  "buildId": "WkKKyr7KAoFmMb5QyM4MQ",
+  "next": "16.3.1",
+  "buildNode": "v22.21.0",
+  "buildPlatform": "linux x64 glibc 2.39 (Ubuntu 24.04, WSL2 isolated namespace)",
+  "buildCommand": "next build --webpack && node tools/build/prepare-standalone.mjs",
+  "buildEnvironment": {
+    "AFLDB_ENV": "development",
+    "AFLDB_INDEXING": "off",
+    "AFLDB_BETA_GATE": "off",
+    "AFLDB_BASE_URL": "http://127.0.0.1:3201",
+    "AFLDB_SESSION_SECRET": "build-only placeholder (never a runtime secret)",
+    "AFLDB_BUILD_WORKERS": "2",
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "prerenderDatabase": "isolated rehearsal clone afldb_v2_dev_candidate_build_test (templated from afldb_v2_shadow_fresh117_migration_test); no DEV or production database was used"
+  },
+  "layout": {
+    "app/": "Next.js standalone server (server.js, .next incl. static, node_modules, public, data, deploy, src, tools)",
+    "kit/": "migration + operation kit: tools/db/{migrate,migration-checksum,migration-safety}.ts, tools/maintenance/privileges.sql, src/db/migrations/*.sql (all 117), node_modules (tsx closure + postgres), ops/dev-candidate.sh, ops/check.mjs",
+    "FILES.sha256": "sha256 of every regular file in the package except itself"
+  },
+  "excludes": "no .env*, credentials, database archives, raw acquisition data, issues, docs or test evidence"
+}

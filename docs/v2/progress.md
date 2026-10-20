@@ -16,6 +16,11 @@ both launchers), runner exit 0; no acquisition, DB, service, timer or production
 C0/C1 is NOT complete: deployed DEV app/audit acceptance (a separately approved V2 DEV
 installation and Super Admin stale-action check) is pending.
 C2 and D-316-13 remain separately gated. Source and unrelated `.codex/` preserved; remotes empty.
+DEV app-check plan prepared, nothing executed on DEV: read-only baseline (ledger 110, pending
+111–117, 3201 free), self-contained build `WkKKyr7KAoFmMb5QyM4MQ` of `fffef96f` packaged
+(113,830,430 B, sha256 `c829da08…e40b0e`), local isolated rehearsal PASS. Approval wording
+D-DEV-316-C1-APP-1: [plan](issue316-dev-app-check-plan-2026-10-21.md). D: drive was exhausted
+during the build (disclosed in the plan §10); free space on D: before more WSL work.
 
 ## Run discipline (every launch)
 
