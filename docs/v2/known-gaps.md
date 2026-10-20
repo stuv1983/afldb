@@ -48,7 +48,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-013 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): the poller refuses in V2; the preflight refuses the release while the email-intake timer runs | approve the release window (step 4, 4a) |
 | V2-GAP-014 | Low | legacy quarantine | no | **CLOSED locally**: acquisition implementations quarantined, refusing old entry points; deterministic rebuild retained and verified | no live retirement authorised |
 | V2-GAP-015 | Medium | Coleman | reconciliation | open, narrowed (Launch F): 46/46 seasons (1980-2025) agree on the locally rebuilt history; production data not compared | approve the shadow Coleman capture on the production dump (§4/§8) |
-| V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed: atomic audited public publication implemented; 98/98 local seasons agree, none unresolved; archive-scoped migration evidence accepted (D-V2-BROWNLOW-ALT-1: stored-only, identical 98-season before/after) and an **authentic 2025 API snapshot reconciles** (207/207 matches, 188 players, 621 votes, totals, ranks and winner; [record](brownlow-authentic-reconciliation-2026-10-20.md)) **except 12 players the provider marks ineligible whom the stored table holds eligible (unresolved)** | owner ruling on the 12 and acceptance of the reconciliation ([checklist](release-requirements-checklist-2026-10-20.md) item 1) |
+| V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed: atomic audited public publication implemented; 98/98 local seasons agree, none unresolved; archive-scoped migration evidence accepted (D-V2-BROWNLOW-ALT-1: stored-only, identical 98-season before/after) and an **authentic 2025 API snapshot reconciles** (207/207 matches, 188 players, 621 votes, totals, ranks and winner; [record](brownlow-authentic-reconciliation-2026-10-20.md)) **except 12 players the provider marks ineligible whom the stored table holds eligible (unresolved; per-player proposed rulings with citations prepared, owner decision pending: [ruling](brownlow-eligibility-ruling-2026-10-20.md))** | owner ruling on the 12 and acceptance of the reconciliation ([checklist](release-requirements-checklist-2026-10-20.md) item 1) |
 | V2-GAP-017 | Medium | Stage 4-5 SQL | no | **CLOSED (Launch F)**: 111-114 applied, privileges run, `privileges` and awards integration suites pass, operations pages rendered (isolated PG16) | none |
 | V2-GAP-018 | Low | curated awards | no | **CLOSED (Launch F)**: `reviseApprovedProposal` (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
@@ -62,6 +62,8 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
 | V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived) | approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
+| V2-GAP-030 | Medium | Brownlow data | migration | open, rehearsed: every archived `brownlow_round_votes.match_id` is NULL because migration 094 ran over an empty table; reviewed reversible backfill built and verified on a clone (330,383/330,383 repairable, 0 excluded, idempotent, exact reversal); production correction is a proposal | owner approval and a reviewed production runner ([record](brownlow-round-vote-match-backfill-2026-10-20.md)) |
+| V2-GAP-031 | High | Brownlow ingestion | operational | open: all 207 2025 vote sets refuse `ownership_indeterminate` (source-less legacy rows); canonical ingestion verified on a clean target; reviewed reversible legacy-ownership adoption demonstrated on a clone only (207/207 sets, 621 rows); production adoption unapplied | owner decision OD-BROWNLOW-OWNERSHIP-1 and a reviewed production runner ([record](brownlow-legacy-ownership-transition-2026-10-20.md)) |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -701,3 +703,23 @@ Final strict result: **149 findings / 149 cells = 50 dataset gaps + 78 unsupport
 Launcher authentication on 55432 contacted the documented shared development endpoint through the SSH forward. Local PID/start time, forwarding arguments, SSH configuration and retained failure log support that finding; remote cluster/database identity, authentication method and logs remain unknown. Earlier blanket no-production/shared-contact wording is withdrawn. No new tunnel connection or SSH process change was made. New launcher preflight proves PID/executable/data-directory/loopback ownership before credentials, then retains SQL identity checks. Guard regressions 17/17; positive 55433 and negative 55432 checks pass.
 
 The actual committed `common.py` rookie replay restores 8/8 removed selections on a dedicated rollback-only clone, remains idempotent, preserves eight audits/eight overrides and rolls the fixture back. The baseline and repair clone are unchanged. One targeted recovery pass found partial official event histories/two exact fixtures and dated affiliations for the four 2026 players, but no complete event-label artifact or complete board-date teammate snapshots; no partial dataset was promoted. See `gap-029-targeted-recovery.json`, `gap-029-port-incident.json`, `gap-029-rookie-actual-replay.json`, and latest `gap-029-evidence-verification.json`. Typecheck and changed-file lint pass; full workflow not run.
+
+## V2-GAP-030 — `brownlow_round_votes.match_id` was never backfilled
+
+- **Rehearsed on a clone, 2026-10-20; production unchanged.** Migration 094's ledger row proves only that
+  its statements ran; they ran over an empty table, so all 330,383 archived rows have a NULL `match_id`.
+- Reviewed, digest- and database-pinned, all-or-nothing, reversible backfill
+  (`src/db/queries/brownlow-round-vote-match-backfill.ts`, `tools/v2/brownlow-round-vote-match-backfill.ts`):
+  330,383 repairable, 0 excluded, replay a no-op, fingerprints differ only in `mapped_rows`, exact reversal.
+  Full counts, the rule, and the non-executed production proposal:
+  [brownlow-round-vote-match-backfill-2026-10-20.md](brownlow-round-vote-match-backfill-2026-10-20.md).
+
+## V2-GAP-031 — Brownlow canonical ingestion is blocked by legacy ownership
+
+- **Open.** All 207 2025 vote sets refuse `ownership_indeterminate` on production-shaped data. Ordinary
+  canonical ingestion is verified on a clean isolated target (621 inserts, hash-identical to the legacy
+  positive rows, replay a no-op). The narrowest transition (separate module, two keys, no force flag,
+  ledgered, reversible until the API writes) is demonstrated on a clone only; production adoption needs
+  the owner's decision and a reviewed production runner. The 207 `afl_api_brownlow_settle` data issues are
+  not auto-resolved by a successful settle.
+  [brownlow-legacy-ownership-transition-2026-10-20.md](brownlow-legacy-ownership-transition-2026-10-20.md).

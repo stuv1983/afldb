@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — Brownlow readiness: leaderboard staging, match_id backfill, ownership transition (2026-10-20)
+
+- Stage the AFL API Brownlow leaderboard on the observation spine and derive the 18-team provider-team-to-club
+  mapping from committed identities corroborated by fixtures (V2-GAP-023); the operations centre shows both.
+  On the authentic 2025 clone `club_unverifiable` drops 207 to 0 and the leaderboard comparison is 188/0.
+- Add a reviewed, reversible `brownlow_round_votes.match_id` backfill (V2-GAP-030) and a reviewed, reversible
+  adoption of legacy-owned 2025 round votes by the API source (V2-GAP-031). Both are isolated-database tools
+  with digest and database pins and no force flag; neither was run against production.
+- Record the per-player evidence and proposed rulings for the 12 eligibility disagreements
+  (`docs/v2/brownlow-eligibility-ruling-2026-10-20.md`); nothing recorded against production.
+
 ### AFLDB V2 — authentic 2025 Brownlow reconciliation and operations-centre application check (2026-10-20)
 
 - Acquire the AFL API 2025 Brownlow and fixtures feeds once, read-only, with the existing clients, and
