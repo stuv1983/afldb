@@ -1,5 +1,20 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
+**Final local Brownlow regression (2026-10-20): complete, no remaining local blocker for that task.**
+Parent/current comparison proves P2 requires the explicit match-ID correction on a prepared clone and OD-5
+requires the existing rebuild namespace; no guards or assertions were weakened. Complete admin **46/46**,
+settlement **73/73**, eligibility integration **47/47**, eligibility unit **65/65**, authentic twelve-ruling
+rehearsal **3/3**. Final Linux production build/TypeScript/standalone and actual operations/public browser
+checks pass after fixes to publication ordering and public recorded-flag wording. Raw votes, permission
+gates, audits and cache refresh verified. [Measured implementation and boundaries](brownlow-eligibility-implementation-2026-10-20.md#final-local-regression-2026-10-20).
+This does not resolve unrelated release gates or authorise production. **110 → 115 retains only its original
+archive acceptance; 116 and 117 each have completed isolated verification and each await separate production
+schema approval.** Next: approve those installations with fresh verified backup/restore evidence, the reviewed
+deployment revision/window, then separate exact target/revision/plan-bound execution approvals for
+`observe → backfill → adopt → eligibility` (twelve named rulings, 2026 excluded), followed by production
+reconciliation and the existing host/release acceptance. Production remains **NO-GO** until those authorities
+and gates are satisfied.
+
 **Brownlow migration-evidence decision (2026-10-20, D-V2-BROWNLOW-ALT-1):** the owner accepted
 alternative Brownlow evidence (raw-vote/audit preservation, identical 98-season stored-data
 reports, passing integration and unit/report checks) **solely for archive `a583fc7d…ed11b04` and

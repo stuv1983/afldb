@@ -82,13 +82,95 @@ of the marked 2025 template (`afldb_v2_rb_brownlow2025_test`, schema 115); no ol
 | Typecheck `tsc --noEmit --incremental false` | clean |
 | Changed-file ESLint (`--max-warnings 0`) | no finding in any new or edited code; three pre-existing files still report the same 34 problems (32 errors, 2 warnings: `afl-api-bundle.ts` unused vars, `afl-api-match.test.ts` / `reference-data.test.ts` `any`) — the identical count on a pristine export of the previous HEAD |
 
-Not caused by this change and not run against the previous HEAD, so not claimed as pre-existing: in the same
-disposable environment `admin-brownlow.test.ts` "preflight P2" (the 2025 template holds 330,383 round rows without
-a resolved match, which the migration-094 backfill test expects to be 0) and `settle-afl-api.test.ts` OD-5 (the
-clone name is not an approved rebuild target) fail on environment preconditions. `reference-data.test.ts` was
+The initial run left P2 and OD-5 unclassified because it had not compared the previous HEAD. The final
+regression checks below establish their causes and close those local verification gaps. `reference-data.test.ts` was
 failing on the unregistered pre-existing table `brownlow_correction_receipts` (migration 116); its expected list
 now names it. `v2-shadow-award-reports.test.ts` was failing on its stub schema (missing `staging.source_records`
 tables) and is repaired.
+
+### Final local regression, 2026-10-20
+
+Starting branch/HEAD matched `v2/rebuild`, `99a1165c21ed1b6d3c4177f847725bd91911bfe9`.
+Compared with its parent `4528f41f` using separate plain Git exports in the existing isolated Linux
+namespace. No worktree, shared/production access, push, deployment, timer change or cleanup occurred;
+the untracked `.codex/` state, empty remotes, old databases, Linux copies and evidence were preserved.
+Graph tools were unavailable; inspection used bounded source reads. Restricted raw reports, stimuli and
+screenshots are under `/home/rehearsal/final-regression-20261020/evidence/`, outside Git.
+
+| Check | Measured result |
+|---|---|
+| P2, parent and current code on `afldb_v2_final_unprepared_test` | Both fail identically: 330,383 unresolved `match_id` rows, expected zero. This is the explicit unexecuted correction prerequisite documented in the [backfill record](brownlow-round-vote-match-backfill-2026-10-20.md), not a regression introduced by eligibility. |
+| P2 preparation, **new disposable** `afldb_v2_rb_final_regression_test` | Normal migrations 116+117 and privileges reconciliation; isolated backfill plan: 330,383 repairable / zero excluded; reviewed digest `38f2a9cae4f2d795f60c08536a9d5ba4f8e098fd43c64b4010b1ebcd813aa648`; apply: 330,383, all non-`match_id` columns fingerprint-identical. The untouched template/baseline was not repaired. |
+| P2 scope | This local fixture preparation covers the archived 1984–2026 population because the strict integration assertion includes 2026. It is **not production authority**: the approved production backfill remains 1984–2025, with fresh counts and a separately approved plan. |
+| Exact OD-5 **reinstate** case, parent and current code | Both refuse `afldb_v2_final_unprepared_test` in `assertRebuildTargetName` → `setRebuildMarker`. Parent passes on `afldb_v2_rb_final_regression_test`; current passes in the complete file. The existing permitted rebuild namespace resolves the prerequisite; no guard/assertion was changed. The separate OD-5 committed-recovery observation case already passes outside that namespace. |
+| Complete `tests/integration/admin-brownlow.test.ts` | **46 passed / 0 failed / 0 skipped**, prepared target above; repeated after the publication fix: **46/46**, 2.494 s test-file duration. |
+| Complete `tests/integration/settle-afl-api.test.ts` | **73 passed / 0 failed / 0 skipped**, 18.439 s test-file duration, same prepared target. No historical rebuild ran. |
+| Focused `tests/v2-brownlow-eligibility.test.ts` | **65 passed / 0 failed / 0 skipped** after the public wording correction. |
+| Focused `tests/integration/v2-brownlow-eligibility.test.ts` after the ordering fix | **47 passed / 0 failed / 0 skipped**, including two new regression cases; 0.636 s test-file duration. The new winner-publication case fails against the unfixed publisher: stored winner `false`, expected `true`. The negative case retains refusal of a wrong raw vote rank. |
+
+The conflict browser stimulus exposed an unqualified public `Ineligible` badge for a preserved stored
+flag while operations refused a current determination. The season page now calls it **Recorded ineligible**,
+labels ranks **Vote rank**, and explicitly explains that preserved eligibility flags can await review and
+do not represent a new determination. No statistical value, eligibility rule or grant changed.
+The existing V2-GAP-016 record tracks this bounded correction; no separate architecture work was opened.
+
+The actual browser override also exposed a transaction-order defect, not a cache failure: a current audited
+eligible decision repaired a conflicting stored ineligible flag and its ranks, but winner determination had
+already refused against the old ranks. Publication wrote `is_winner=false` and audited the refusal; the
+post-commit operations read then correctly reported `determined`, disagreeing with the stored/public flags.
+The regression is demonstrated directly against the unfixed publisher (no claim about its introduction date).
+Publication now rechecks inside the same transaction after projecting the audited eligibility change, and
+publishes the resulting winner before career recomputation and the required audit. This retry is restricted
+to eligible-rank-only blockers and an audited decision that actually changes stored ineligibility. Raw vote
+rank and other reconciliation failures retain their strict refusal, and no intermediate state commits.
+
+**Final build and application verification: PASS. Local implementation for this task is complete; no local
+blocker remains.** Final source matches 1,422 tracked runtime/tool/test/config files in the Linux copy
+after canonical LF normalization (only `tools/v2/rollback-fingerprint.ts` has CRLF in the Windows worktree;
+it was not edited). Typecheck and changed-file ESLint exit 0. The final Linux `next build --webpack`
+and standalone preparation exit 0, including TypeScript and 1,517 generated pages. Two earlier successful
+builds are retained as diagnostic stages before the two browser-discovered fixes; the final build includes
+both fixes. Transport headers use the established isolated HTTP rehearsal configuration, not production
+host acceptance. No `.env*` is in the standalone bundle. Dependencies were reused; the approved font-only
+proxy was stopped before runtime, which had no external route.
+
+Final browser target: fresh `afldb_v2_final_verified_test`, migrations 116+117 from the preserved 115
+template. The exact authentic-2025 rehearsal file, changed **only in its labelled isolated copy's target
+constant**, passes **3/3**, 44.358 s, with synthetic execution authority. No production ruling was recorded.
+The production-built application passes all eight recorded checkpoints on operations and public Brownlow
+pages (Chromium, 1280×900):
+
+- Authentic snapshot: 188 vote-getters, twelve unresolved conflicts; winner Matt Rowell, 39 votes. All twelve
+  approved ineligible rulings through the guarded runner resolve the conflicts, preserve that winner and
+  produce twelve audited decisions; replay is idempotent.
+- NULL provider evidence for the leader: unknown, `requires_review`, partial publication clears the winner
+  on both `/brownlow/2025` and `/brownlow`; stored ranks and eligibility flags remain unchanged.
+- Repeating that publication is `withheld`: byte-equivalent stored metadata and no new publication audit.
+- NULL evidence below the leader: winner remains determined; affected eligible ranks say **not stated** in
+  operations; withheld publication preserves records. The public table explicitly shows **Vote rank**.
+- Conflicting provider/stored eligibility: no authoritative winner; public preserved flags are explicitly
+  **Recorded ineligible**, with the explanation that this is not a new eligibility determination. The
+  synthetic stale-rank stimulus also trips the strict rank gate, as expected.
+- A Super Admin resolves the conflict through the real browser form: pending clears, the success notice
+  remains, operations refreshes to `determined` with no player needing review, stored/public winners agree,
+  and the client automatically POSTs the guarded cache-refresh endpoint. Both public pages show the winner.
+- Normal Admin can read evidence but has no ruling form and cannot revalidate; anonymous operations access
+  refuses. Decision/seal ledger, required publication audit and activity audit are present.
+- Raw round votes, raw season totals/ranks/provenance and staged vote facts retain their fingerprints
+  throughout (the deliberately varied provider `eligible` stimulus is excluded from that vote fingerprint).
+  **Zero page errors / zero external browser requests.**
+
+Sanitised machine-readable results: [final-local-regression-2026-10-20.json](evidence/final-local-regression-2026-10-20.json).
+Only the following repository files changed in this final task:
+`src/app/brownlow/[year]/page.tsx`, `src/db/queries/brownlow-eligibility.ts`,
+`tests/integration/v2-brownlow-eligibility.test.ts`, this implementation record,
+`docs/v2/go-no-go.md`, `docs/v2/known-gaps.md`, the sanitised results JSON, and `CHANGELOG.md`.
+The previous whole-suite, historical rebuild and rollback exercises were not repeated.
+
+Migration authorities remain separate: **110 → 115: original archive-scoped acceptance only**;
+**116: isolated verification complete, production schema approval pending**;
+**117: isolated verification complete, production schema approval pending**.
+Neither the policy decision nor the old archive acceptance authorises installation of 116 or 117.
 
 ## 4. Pending production rollout (unchanged authorities)
 

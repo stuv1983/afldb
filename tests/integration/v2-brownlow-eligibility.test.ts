@@ -804,6 +804,47 @@ describe('BP-2025-ELIGIBILITY-v1 against PostgreSQL (season 2084)', () => {
     expect(await rawVoteFingerprint()).toBe(raw);
   });
 
+  it('an audited eligible ruling publishes the winner atomically after correcting conflicting stored eligibility and stale ranks', async () => {
+    await stage({ g1: true, g2: true, g3: true });
+    // Preserved flags/ranks from an earlier partial publication: the stored flag now disagrees
+    // with both the provider and the ranks. The ruling must repair metadata and winner together.
+    await owner`UPDATE brownlow_season_votes SET is_ineligible = true, eligible_rank = 1, is_winner = false
+      WHERE season = ${TRI} AND player_id = ${playerIds.g1}`;
+    await owner`UPDATE brownlow_season_votes SET eligible_rank = CASE player_id
+      WHEN ${playerIds.g2} THEN 2 ELSE 3 END WHERE season = ${TRI} AND player_id <> ${playerIds.g1}`;
+    const raw = await rawVoteFingerprint();
+    expect((await determine(TRI)).determination.status).toBe('refused_unreconciled_evidence');
+    const result = await recordBrownlowEligibilityDecision(executor, request({
+      season: TRI, tag: 'g1', verdict: 'eligible', sealed: sealed2084,
+      publicationRegistry: REGISTRY, publicationMode: 'require',
+    }));
+    expect(result).toMatchObject({ ok: true, publication: { state: 'published', unresolvedPlayerIds: [] } });
+    expect(await shape()).toEqual([[true, false, 1], [false, false, 2], [false, false, 3]]);
+    const view = await determine(TRI);
+    expect(view.determination.status).toBe('determined');
+    expect(view.storedFlagCheck.state).toBe('agrees');
+    const [edit] = await owner`SELECT new_values FROM data_edits
+      WHERE field_group = 'eligibility_publication' AND row_id = ${TRI} ORDER BY id DESC LIMIT 1`;
+    expect(edit.new_values).toMatchObject({ status: 'determined', winners: [playerIds.g1] });
+    expect(await rawVoteFingerprint()).toBe(raw);
+  });
+
+  it('an eligibility correction does not bypass a wrong raw vote rank', async () => {
+    await stage({ g1: true, g2: true, g3: true });
+    await owner`UPDATE brownlow_season_votes SET is_ineligible = true, eligible_rank = 1,
+      vote_rank = 99, is_winner = false WHERE season = ${TRI} AND player_id = ${playerIds.g1}`;
+    const raw = await rawVoteFingerprint();
+    const result = await recordBrownlowEligibilityDecision(executor, request({
+      season: TRI, tag: 'g1', verdict: 'eligible', sealed: sealed2084, publicationRegistry: REGISTRY,
+    }));
+    expect(result.ok).toBe(true);
+    const view = await determine(TRI);
+    expect(view.determination.status).toBe('refused_unreconciled_evidence');
+    expect(view.determination.winners).toEqual([]);
+    expect((await storedRows()).every((row) => !row.is_winner)).toBe(true);
+    expect(await rawVoteFingerprint()).toBe(raw);
+  });
+
   it('an audited decision takes precedence over explicit provider evidence in the opposite direction', async () => {
     await stage({ g1: true, g2: true, g3: true });
     const result = await recordBrownlowEligibilityDecision(executor, request({

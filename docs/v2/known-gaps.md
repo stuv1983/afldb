@@ -365,6 +365,16 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-016 — OWNER DECISION: Brownlow eligibility rule for API-era seasons
 
+- **Final local regression complete, 2026-10-20.** P2/OD-5 causes proved on parent and current code and
+  resolved by explicit isolated-target preparation (strict assertions/guards retained). Complete admin
+  46/46, settlement 73/73, eligibility integration 47/47, unit 65/65 and authentic twelve-ruling rehearsal
+  3/3 pass. Browser-discovered publication-order and public recorded-flag wording defects are fixed;
+  final Linux production build and actual operations/public publication, permission, audit, cache and
+  raw-vote checks pass. No local blocker remains for this task. [Measured record](brownlow-eligibility-implementation-2026-10-20.md#final-local-regression-2026-10-20).
+  **Still open for production:** separate schema approvals for 116 and 117 with fresh backup/restore,
+  deployment authority, exact per-operation execution approvals and reconciliation acceptance. Original
+  archive acceptance covers only 110 → 115; neither later migration inherits it. 2026 remains excluded.
+
 - **Owner policy decisions recorded, 2026-10-20:** [content-bound decisions and provenance](brownlow-policy-decisions-2026-10-20.md). BP-2025-ELIGIBILITY-v1 and all twelve 2025 rulings, 2025 adoption (621 positives / 207 sets; 8,901 zeros preserved), and 1984–2025 match-ID policy are approved. Production execution is pending; 2026 is excluded. Counts require fresh evidence; no live plan or execution approval exists. **Runtime status (distinguished):** *implemented* — eligible/ineligible/unknown are represented distinctly end to end, unknown can block a winner or ranking, and migration 117 makes the staged provider flag nullable; *isolated-verified* — disposable PostgreSQL copies, the authentic 2025 snapshot and the twelve rulings applied only in a labelled isolated copy ([record](brownlow-eligibility-implementation-2026-10-20.md)); *pending production rollout* — schema approval for 116 + 117, deployment, and the separate per-operation execution approvals. V2-GAP-016 stays open for that rollout and for reconciliation acceptance.
 
 - **2026-10-20 owner-review update:** every original official AFL citation was read directly and

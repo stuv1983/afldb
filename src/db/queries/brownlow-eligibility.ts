@@ -8,6 +8,7 @@ import {
 import {
   BROWNLOW_ELIGIBILITY_VERDICTS,
   determineBrownlowMedal,
+  isEligibilityEvidenceFinding,
   reconcileBrownlowSeason,
   type BrownlowEligibilityVerdict,
   type BrownlowMedalDetermination,
@@ -382,8 +383,9 @@ export async function publishBrownlowEligibilityInTransaction(
   const stored = input.storedTotals ?? [];
   const evidence = await loadEligibilityInTransaction(tx, { season: request.season, playerIds: stored.map((r) => r.playerId) });
   if (evidence.seasonAdminPublished) input.seasonState = 'complete';
-  const determination = determineBrownlowMedal({ report: reconcileBrownlowSeason(input), ...evidence });
-  const winners = determination.status === 'determined' ? determination.winners.map((w) => w.playerId) : [];
+  const report = reconcileBrownlowSeason(input);
+  let determination = determineBrownlowMedal({ report, ...evidence });
+  let winners = determination.status === 'determined' ? determination.winners.map((w) => w.playerId) : [];
   const previous = stored.filter((r) => r.isWinner).map((r) => r.playerId).sort((a, b) => a - b);
   // There is no public projection without authoritative season totals. Staged votes alone
   // remain proposals and never replace historical raw totals.
@@ -428,6 +430,37 @@ export async function publishBrownlowEligibilityInTransaction(
       WHERE season = $1::int AND player_id = $2::int
         AND (is_winner, is_ineligible, eligible_rank) IS DISTINCT FROM ($3::boolean, $4::boolean, $5::int)`,
     [request.season, row.playerId, row.isWinner, row.isIneligible, row.eligibleRank]);
+    // A ruling can change the stored eligibility population. Until that metadata is projected,
+    // the old non-NULL eligible ranks can legitimately disagree with the old stored flags and
+    // refuse the winner. Recheck inside this same transaction after projecting the ruling;
+    // otherwise the subsequent read determines a winner that we have just published as false.
+    // Keep every rank/vote check: retry only an eligible-rank-only refusal and only where an
+    // audited decision actually changed a stored ineligibility flag. Arbitrary bad ranks do not
+    // gain a general bypass, and no intermediate state can commit.
+    const decisionChangedEligibility = evidence.players.some((player) => player.decision !== null
+      && stored.some((row) => row.playerId === player.playerId
+        && row.isIneligible !== (player.decision?.verdict === 'ineligible')));
+    const blockers = report.findings.filter((finding) => finding.severity === 'discrepancy'
+      && !isEligibilityEvidenceFinding(finding));
+    if (decisionChangedEligibility && determination.status === 'refused_unreconciled_evidence'
+      && blockers.length > 0 && blockers.every((finding) => finding.code === 'stored_rank_inconsistent'
+        && finding.detail.field === 'eligible_rank')) {
+      const refreshed = await loadBrownlowReconciliationInput(tx, {
+        season: request.season, registry: request.registry, generatedAt: new Date().toISOString(), storedOnlyFallback: true,
+      });
+      const refreshedEvidence = await loadEligibilityInTransaction(tx, {
+        season: request.season, playerIds: stored.map((row) => row.playerId),
+      });
+      if (refreshedEvidence.seasonAdminPublished) refreshed.seasonState = 'complete';
+      determination = determineBrownlowMedal({ report: reconcileBrownlowSeason(refreshed), ...refreshedEvidence });
+      winners = determination.status === 'determined' ? determination.winners.map((winner) => winner.playerId) : [];
+      for (const row of metadata) {
+        row.isWinner = winners.includes(row.playerId);
+        await tx.query(`UPDATE brownlow_season_votes SET is_winner = $3
+          WHERE season = $1::int AND player_id = $2::int AND is_winner IS DISTINCT FROM $3::boolean`,
+        [request.season, row.playerId, row.isWinner]);
+      }
+    }
     await recomputeBrownlowCareerTotals(native, stored.map((r) => r.playerId));
     await recordDataEdit(native, {
       tableName: 'brownlow_season_authority', rowId: request.season, fieldGroup: 'eligibility_publication',

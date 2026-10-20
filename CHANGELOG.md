@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — final local Brownlow regression (2026-10-20)
+
+- Publish an audited eligibility correction's winner after rechecking its projected eligibility/ranks in
+  the same transaction, so operations cannot report a determined winner while public flags remain false.
+  Retry only eligible-rank blockers explained by an audited eligibility change; raw-rank failures still refuse.
+- Public season counts explicitly label raw **Vote rank** and **Recorded ineligible** flags, explaining
+  preserved records awaiting review rather than implying a new eligibility determination.
+- Retain measured local verification: admin 46/46, settlement 73/73, eligibility integration 47/47, unit
+  65/65, authentic twelve-ruling rehearsal 3/3; final Linux production build and actual operations/public
+  browser publication, permissions, audit, cache refresh and unchanged raw votes. P2 and OD-5 causes were
+  compared with the previous implementation and resolved through isolated prerequisites, without relaxing
+  assertions or target guards. [Record](docs/v2/brownlow-eligibility-implementation-2026-10-20.md).
+  Local task complete; 116 and 117 each still need separate production schema approval. The archive-bound
+  110 → 115 acceptance is unchanged. No production execution or deployment occurred.
+
 ### AFLDB V2 — Brownlow eligibility is eligible / ineligible / unknown (BP-2025-ELIGIBILITY-v1) (2026-10-20)
 
 - Implement the approved eligibility policy locally: a current audited decision wins; otherwise a consistent
