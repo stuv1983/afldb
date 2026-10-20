@@ -164,6 +164,6 @@ the whole of A was re-run on a fresh copy (`rev3`). The conclusions above are fr
   lost; the runbook order (previous release live first, §4, then export, then reverse) must hold.
 - Host systemd/Caddy/TLS, the host backup (§2), real redeployment of the previous release and
   production-role privilege differences are not covered.
-- The Brownlow eligibility audit is not exercised through the operations-centre wrapper.
-- This is unchanged: authentic API Brownlow reconciliation, strict Gridley FAIL 149, adjudication
+- This record's Brownlow eligibility path was driven at query level and wrote no `auth_audit_log` rows. The operations-centre wrapper, Server Action boundary, permissions, audit contract and public refresh were exercised afterwards through the real application: [brownlow-authentic-reconciliation-2026-10-20.md](brownlow-authentic-reconciliation-2026-10-20.md) (Part 2, 41/41).
+- Authentic API Brownlow reconciliation has since been done for 2025 (same record; 12 eligibility disagreements unresolved). Unchanged: strict Gridley FAIL 149, adjudication
   50 unapproved, and the production operational acceptance remain outstanding. Production NO-GO.

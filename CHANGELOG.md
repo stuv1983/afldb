@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB V2 — authentic 2025 Brownlow reconciliation and operations-centre application check (2026-10-20)
+
+- Acquire the AFL API 2025 Brownlow and fixtures feeds once, read-only, with the existing clients, and
+  reconcile them on a disposable isolated copy through the established settle, validation and
+  reconciliation pathways. Matches, players, 621 votes, season totals, ranks, winner and replay
+  agree; five corrupted snapshots are refused before any database connection; the canonical apply is
+  refused for the sealed legacy-owned season with no partial write. 12 provider-ineligible players are
+  stored eligible and stay unresolved. Sanitised record, provenance and digests:
+  `docs/v2/brownlow-authentic-reconciliation-2026-10-20.md`.
+- Add `tools/v2/brownlow-operations-check.mts`: drives the real production build through Chromium and
+  replayed Server Action requests with synthetic users (permissions, CSRF/origin, valid, invalid,
+  repeated, revised, concurrent and fault-injected decisions; audit, publication and public refresh).
+  41/41 pass; no application defect found, so no application code changed.
+- Correct the release checklist: the archive rehearsal and the gate regeneration are not requested
+  again, and A-REHEARSAL is acceptance of the existing record.
+
 ### AFLDB V2 — release gates on real evidence and populated-ledger rollback rehearsal (2026-10-20)
 
 - Run the current `release-gates` CLI against the retained archive-bound captures with an attestation
