@@ -354,6 +354,15 @@ active, bounded to 2026. `--season 2026 --season-feed tests/fixtures/afl_api/sea
 
 ## 7. Cutover procedure (smallest concrete path)
 
+**C2 preparation, 2026-10-21 (no execution):** [package v1](../../docs/v2/issue316-c2-preparation-2026-10-21.md)
+pins the complete c9cca86d source archive on C:, records missing runtime/target/successor
+evidence and separates six approval scopes. Next proposed authority is read-only production
+prerequisite inspection only. Completed amended C0/C1 evidence below is reused. The §2 statement
+that 2026 finished is not completion proof: the retained authentic feed has 217 CONCLUDED and
+one SCHEDULED Grand Final, CD_M20260142901, with no scores. Need refreshed authentic completion
+evidence and final full-history/witness validation before acknowledging completion. No D-316-1
+authority, acquisition, census, validator, apply or deployment has been used by this preparation.
+
 **V2 reconciliation, 2026-10-21:** all 19 source handoff files match the preserved snapshot and
 were already imported by `c9cca86db2fd60ec42fa777906a2cf2a291d5e4e`; intentional V2 runtime
 refusal/quarantine is preserved. Original C0/C1 below remain the historical contract. The

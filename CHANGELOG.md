@@ -17,6 +17,11 @@ commit.
 
 ### ISSUE-316 - V2 handoff reconciliation and bounded DEV approval package (2026-10-21)
 
+- Retain C2 preparation package with checksum-pinned historical source archive on C:,
+  prerequisite/effect register and six separate approval scopes. Existing feed still contains
+  a scheduled 2026 Grand Final; completion remains unproved. Next proposed operation is
+  read-only prerequisite inspection; no C2 execution or repeated DEV acceptance work.
+
 - Complete approved deployed DEV candidate C1 acceptance: restore, migrations 111–117 and
   privileges/checksum readback PASS; real Super Admin legacy_retired refusal with exactly one
   correctly attributed audit row, both negative controls zero audit rows. Original DEV preserved
