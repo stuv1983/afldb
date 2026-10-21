@@ -1320,6 +1320,20 @@ separately authorised/supplied. No acquisition approval yet. Runner/source bindi
 hashes/configuration/budget and later authorities remain separate. No dependency downloads,
 AFL requests, production/DEV/DB/validator/service/WSL operation. Polkit limitation unchanged.
 
+### C2 consolidated readiness decision — 2026-10-21 (package v4)
+
+Verdict: **ready to request one approval; not executable-ready.** `docs/v2/issue316-c2-preparation-2026-10-21.md`
+v4 supersedes v3's further-source request with one preparation-and-acquisition approval: DEV
+`streamanator` probe-first runner (R/fitzRoy there never inspected; negative probe stops, no
+installation), existing c9cca86d archive extraction, a stdlib run guard (host/connection/byte/pacing
+limits, behaviourally canaried per R transport) and the unchanged two-command acquisition. Unchanged
+acquisition recommended over optimisation; sizes are measured by a pre-run HEAD and stop above an
+owner ceiling. Gap G1: no existing gate asserts completed-season stats cover every results match
+(gate 2 is circular); compensating offline checks E1/E2/E4 run between acquisition steps, E3
+(16838 + 218 = 17056 matches, equal to matches with player rows) is a Stage 2/3 review criterion;
+a tested validator gate is separate follow-up. No further source download is indispensable.
+Owner inputs K1–K4 outstanding. No network, host, package or database activity; nothing executed.
+
 ## 11. Not done here
 
 - No commit, merge, push, deployment, host contact, timer change or source-ownership change.

@@ -22,6 +22,10 @@ commit.
   repeated full downloads and cache-only failure behaviour; distinguish unresolved R/xml2/readr
   transport policy and installed-source binding from final acquisition authority. No AFL requests
   or package execution; acquisition remains unready for approval.
+- Package v4 consolidates the C2 readiness decision: one proposed preparation-and-acquisition
+  approval (DEV probe-first runner, unchanged acquisition with a measured budget, stdlib run guard),
+  and records that no existing validator gate requires completed-season stats to cover every results
+  match. Documentation only; nothing executed or changed in validators.
 
 - Retain C2 preparation package v2 with offline runtime/endpoint review and C: dependency
   inventory. Existing R 4.3.3 / Node 22.23.2 meet inspected requirements; no upgrade imposed.

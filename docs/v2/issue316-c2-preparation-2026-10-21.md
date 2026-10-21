@@ -1,10 +1,201 @@
-# ISSUE-316 C2 approval package v3 — CRAN source and endpoint review
+# ISSUE-316 C2 approval package v4 — consolidated readiness decision
 
 Prepared 2026-10-21 with one agent. **C2 NOT EXECUTED; execution approval NOT granted.**
-Updated after the completed prerequisite inspection, offline runtime review and approved single
-CRAN source retrieval. **Acquisition is not ready for approval.** Next input is bounded transport
-implementation material identified in v3 below; the old
-inspection wording is retained as history, not a request to repeat production inspection.
+v4 supersedes v3's "next bounded source inputs" with one consolidated approval request (V4
+section below). v3, v2 and v1 sections are retained as evidence history, not as open requests;
+the old inspection wording is not a request to repeat production inspection.
+
+## V4 consolidated readiness decision — 2026-10-21
+
+Baseline `7157be43cbee1501a71cfc1c3e0ce83d20f1f892`, `v2/rebuild`, one agent, documentation
+edits only. Used retained local evidence only: this package, the C0/C1 record, the completed
+inspection `findings.md`, and a read of the current-tree validators
+(`tools/migration/import_fitzroy_core.py`, `tools/rebuild/fitzroy/fitzroy-contract.json`,
+`tools/db/rollover-season.ts`) and the quarantined historical wrapper
+`legacy/offline/tools/rebuild/fitzroy/acquire_core.R`. No network, host, package, database,
+WSL, validator or acquisition activity occurred.
+
+**Verdict: READY TO REQUEST the single approval below; NOT executable-ready.** Four owner
+decisions are needed (K1–K4); two of them supply numbers that cannot honestly be derived from
+retained evidence. No further source download and no further offline audit is required first.
+
+### Remaining concrete blockers (owner decisions, not evidence gaps)
+
+| # | Needed | Why it cannot be inferred |
+|---|---|---|
+| K1 | Confirm the runner: DEV `streamanator` (`arm@10.0.40.100:22`, alias `dev`), new mode-700 root | Only runner with retained non-production evidence, but **R, fitzRoy and outbound reachability on it were never inspected** (all R evidence is the production host's). The approval makes that a read-only first step with a hard stop; installation is excluded. |
+| K2 | Accept the **unchanged** acquisition (no optimisation) | See "Repeated downloads" below. |
+| K3 | Accept authoring and loopback self-testing of a small stdlib run guard (steps P3–P4) | It is the only way to make host, connection, byte and pacing limits enforceable without root. Declining it leaves only OS time/size limits and observation. |
+| K4 | Supply `OWNER_MAX_INGRESS_GIB` (core and ladder) and `ROOT_BYTES_MAX` | Download sizes were never measured; inventing them is refused. Step P5 measures them and stops if the projection exceeds the owner's ceiling. |
+
+### What is and is not a blocker
+
+| Class | Items |
+|---|---|
+| **Genuine blockers** | K1–K4 above. Negative P1 result (R/fitzRoy 1.8.0/jsonlite/digest absent or R < 4.1 on the runner) ends the approval; it is not repaired by installing. |
+| **Bounded by explicit runtime control** | R/xml2/readr redirect, timeout and retry behaviour (outer wall-clock, connection and host limits plus a behavioural canary replace reading three more package sources); installed-code vs reviewed CRAN source (record and compare hashes; the outputs are judged by independent validators, not by code identity); mutable GitHub parquet changing mid-run (pre/post HEAD comparison); CRLF in the extracted wrapper (parse-only check); lost site library path under `--vanilla` (explicit `R_LIBS_SITE`). |
+| **Ordinary implementation detail** | Exact script/ledger formats, the extraction timestamp in the root name, evidence filenames, `du` polling interval, and the stats-completeness script's internals. None needs its own approval cycle. |
+
+### Runner
+
+Established by retained evidence for `streamanator`: SSH alias `dev` resolved to `arm@10.0.40.100:22`
+twice, x86_64, Node v22.23.2, `/usr/bin/python3` used by the passing C1 shell tests, 80,559,512 KiB
+free, mode-700 roots are the precedent, `sudo -n` unavailable, owner already approved
+transfer of a source archive there. **Not established:** R, fitzRoy, the 56-package closure, outbound
+HTTPS to github.com/afltables.com, `timeout`/`curl` presence. The production host has the
+verified R 4.3.3 + fitzRoy 1.8.0 stack but is the live system and is excluded by the "non-production"
+requirement. Windows has only an R 4.6.1 used for refusal tests with no fitzRoy evidence, would need a
+large dependency install, and does not prove Linux behaviour. **Recommendation: DEV, probe-first.**
+If P1 fails, the specific owner choice is between (a) a separately scoped installation of R + the
+pinned closure on DEV (needs privilege; `sudo -n` is unavailable) and (b) a production-host maintenance
+root, which should only be considered with its own writer-pause review. WSL stays stopped; `D:` is
+not used for generated artifacts; evidence returns to a new restricted `C:` directory.
+
+### Repeated downloads (130 parquet, 131 results)
+
+Structure, from the traced source: 130 full GitHub parquet downloads (one per stats call), 131 full
+`bg3.txt` reads (1 core results + 130 ladder), 21 club pages, plus U season-index pages, M match pages
+and H mapping reads **only in the 2026 call** when the cache's max date precedes today. For seasons
+before 2026 the requested end date is below the cache max date, so no live tail is attempted;
+U ≤ 4 and H ≤ 1 are generous bounds, M ≤ 218 (the number of stored 2026 matches). Sizes: unmeasured.
+
+**Recommendation: unchanged acquisition with a measured budget.** Reasons: (1) it is a one-off,
+D-316-1 authorises exactly one final acquisition; (2) it is the only path with proven acceptance
+lineage, the accepted 129-season baseline has the same 131-file shape; (3) any optimisation (a single
+parquet fetch and local-file injection, one shared results read) is new code on the data path that would
+need its own tests and a byte-identity proof against the unchanged path, which itself needs network
+requests; (4) the cost is volume only, and volume is bounded by pacing, connection and byte caps plus an
+owner ceiling. **Fallback:** if the P5-measured projection exceeds the owner ceiling, the run stops and
+a separately scoped, tested optimisation proposal replaces this approval. No code or acceptance
+semantics change now.
+
+### Cache-only and partial results: what detects them
+
+What can produce them (source trace): a failed season-index read is swallowed (becomes NULL) and the
+2026 stats call silently returns cache rows only. Page, mapping, parquet, club and results failures
+propagate to the wrapper, which stops before writing any manifest.
+
+| Check (actual code) | Catches cache-only 2026 stats? |
+|---|---|
+| Wrapper `acquisition_observations` (acquire_core.R:459–467) | **No.** Structural only; it records nothing about live-tail success. |
+| `validate_snapshot` SHA-256, columns, row count, version pin | **No.** A cache-only file is self-consistent. |
+| `enforce_full_history` (season set 1897–2026, non-zero rows, no duplicates, range) | **No.** 2026 would be non-empty. |
+| `measure_identity_coverage` (profile URL shape) | **No.** |
+| Gate 2 `enforce_accepted_fingerprint` | **No.** The successor `measured` block is computed by gate 1 from the same bytes, so gate 2 detects drift between gates, not staleness. |
+| `import_fitzroy_core.py` import-time `incomplete_match_evidence` (line 2207) | Would reject match rows with no player rows, but only at import, which C2 never runs. |
+| Census, `--expected-club-season-rows` | **No.** They concern ownership and ladder rows. |
+
+**Coverage gap (G1):** no automated gate asserts that a completed season's stats cover every results
+match, so `matches` and `matches_with_player_rows` are recorded by gate 1 but never required equal
+(the accepted 2025 baseline has them equal, 16838/16838). Checks are not weakened and no code
+changes. The approval below inserts a mandatory **offline completeness check (E1, E2, E4) between
+the two acquisition steps**; failure stops the run before the ladder and before any Stage 2 hand-off.
+E3 is carried forward to Stage 2/3 review:
+
+- E1 `results.csv` has exactly the stored 2026 count, **218** matches, including the Grand Final scored
+  89 and 96 for Fremantle and Brisbane.
+- E2 distinct 2026 matches in `player_stats_2026.csv` equal E1's count, per round and in total
+  (team-name spelling is informational only).
+- E3 (a Stage 2/3 review criterion, not run by this approval) the gate-1 summary must show `matches` = `matches_with_player_rows`; derived
+  expectation if history is unchanged: 16838 + 218 = **17056** both. This is a comparison, not a tunable
+  pass threshold; any difference needs explained adjudication.
+- E4 captured stdout/stderr contain no warning or error naming an `afltables.com/afl/seas` or
+  match-page read, and the guard ledger shows an `afltables.com` connection with non-zero ingress in
+  the 2026 stats window.
+
+A durable fix is a **separate, tested validator gate** (completed-season coverage equality); it is
+out of scope here and recorded as follow-up, not a precondition.
+
+### Smallest runner and runtime requirements, and how each is enforced
+
+| Requirement | Mechanism | Enforceable? |
+|---|---|---|
+| Wall-clock | `timeout --kill-after=60s N` around the guard | Yes (kernel signals) |
+| Clean environment | `env -i`, explicit `PATH`, `HOME`, `TMPDIR`, `R_LIBS_SITE` (value from P1), empty `R_LIBS_USER`, `Rscript --vanilla`, no `.env` in the root | Yes; `--vanilla` disables Renviron, so the library path must be explicit |
+| Storage | Root, `HOME`, `TMPDIR`, R user cache all inside the new mode-700 root; pre-run free-space floor; per-file `ulimit -f`; guard polls the root size and kills on `ROOT_BYTES_MAX` | Yes for the root; the cap is polled, not a quota |
+| Host allowlist, connection cap, byte cap, AFL Tables pacing | Guard is a local CONNECT/HTTP forward proxy; `http(s)_proxy` set in the child; breach or denied host kills the process group | Yes **only for clients that honour proxy variables**; P4 proves this per transport (below). It sees connections, hosts and bytes, never HTTP method, path or status inside TLS |
+| Redirects | Not configurable in unchanged clients; each hop is a new connection to an allowlisted host and counts toward the cap | Indirect |
+| Retries | None in fitzRoy or the wrapper; any lower-level retry is bounded by the connection and byte caps | Indirect |
+| Logical request count | Wrapper `fetching:` lines plus per-connection ledger | **Observational only, not enforceable** |
+| A denied host cannot become a silent cache-only result | Guard kills the run on any denial instead of returning an error to R | Yes |
+| Installed code | Record `fitzRoy`/`jsonlite`/`digest` DESCRIPTION and lazy-load SHA-256s; compare with the retained production values (fitzRoy DESCRIPTION `62b1c1b3…6444`); the 56-package version list from `offline-review-v2.json` | Recorded; mismatch is reviewed, not a stop (versions must still be exact for fitzRoy) |
+
+### Additional source download
+
+**None is indispensable.** v3's remaining source inputs (R `download.file`/`url`, xml2 1.3.6
+`read_html`, readr 2.1.5 dispatch, then vroom/curl) would only describe default redirect/timeout/retry
+behaviour, which does not change go/no-go once outer limits apply. The P4 canary tests each reachable
+transport behaviourally against a fake host answered by the guard, with no external traffic. **Only if
+P4 shows a transport ignoring the proxy** would a source become necessary: that package's exact CRAN
+source (for example xml2 1.3.6; the CRAN URL form depends on whether it is still current or under
+`src/contrib/Archive/xml2/`, unverified), to decide how that one path can be routed. Not requested now.
+
+### Consolidated next approval (copy-ready; unresolved values marked `‹…›`)
+
+> I authorise one C2 preparation-and-acquisition operation, bounded as follows. **Target:** SSH alias
+> `dev`, conditional on identity `arm@10.0.40.100:22`, hostname `streamanator`, x86_64, and at least
+> 6,291,456 KiB free. **Root:** a new mode-700 `/home/arm/issue316-c2-final-‹UTC stamp›` (refuse if it
+> exists), containing `incoming`, `src`, `guard`, `evidence`, `tmp`, `home`. **Evidence:** a new restricted
+> `C:\tmp\afldb-c2-acquisition-‹UTC stamp›` (inheritance disabled, owner and SYSTEM only). WSL stays
+> stopped; `D:` receives nothing; no sudo, installation, package download, repository checkout,
+> cleanup or service change. Loading the already-installed R packages for P4, A1 and A2 is authorised.
+>
+> **P0** verify identity and space. **P1** read-only runtime probe: `command -v Rscript timeout python3`,
+> versions, effective `.libPaths()`, the 56-package DESCRIPTION versions, the DESCRIPTION and lazy-load
+> SHA-256s for fitzRoy/jsonlite/digest, CA bundle hash. STOP unless R ≥ 4.1, fitzRoy exactly 1.8.0, jsonlite
+> and digest present, no missing closure names, `timeout` present. **P2** transfer the existing C: archive
+> (118,046,720 bytes, SHA-256 `196035d949244f392943224133e71ddf96d62af0846e15811cd63b8221b01f69`)
+> to `incoming`, verify size/hash, extract into `src` without overwrite; then verify
+> `data/reference/afltables-network.json` is `active` with `last_season` 2026,
+> `seasons.json` in-progress is `[2026]`, and `Rscript -e 'invisible(parse("tools/rebuild/fitzroy/acquire_core.R"))'`
+> succeeds (parse-only). **P3** author the stdlib run guard (CONNECT/HTTP forward proxy, ledger, caps,
+> pacing, root-size watch, process-group kill) and the stdlib completeness script (E1–E2) on `C:`,
+> hash them, copy to `guard`, and self-test the guard on loopback with a local fake upstream (allow,
+> deny, connection cap, byte cap, pacing, kill). **P4** canary: with the guard and the exact flags/environment
+> below, call `utils::download.file`, `base::url`+`readr::read_csv`, `xml2::read_html` and
+> `readr::read_fwf` against `canary.invalid`, which only the guard answers. STOP unless all four reach the
+> guard and none connects directly. **P5** measure: one HEAD each for the parquet URL
+> `https://github.com/jimmyday12/fitzroy_data/releases/download/data/afltables_player_stats.parquet` and
+> `https://afltables.com/afl/stats/biglists/bg3.txt`; record Content-Length, ETag and Last-Modified.
+> Projected ingress = 130 × parquet + 131 × bg3; STOP if it exceeds `‹OWNER_MAX_INGRESS_GIB›` (core and
+> ladder separately) or any length is absent.
+>
+> **A1** run, under the guard, from `src`:
+> `/usr/bin/Rscript --vanilla tools/rebuild/fitzroy/acquire_core.R --acquire --label c2-2026-final-core-v1 --from 1897 --to 2026 --datasets player_stats,player_details,results`
+> (Rscript path from P1). **E** then run E1, E2 and E4 offline. **A2**, only if A1 exited 0, its manifest exists and E passed:
+> `... --label c2-2026-final-ladder-v1 --from 1897 --to 2026 --datasets ladder`.
+> Guard limits per command (proposals, judgement not measurement): wall-clock 3 h; connections 700
+> core / 300 ladder (core: 3 per parquet call for redirects + 21 + 1 + U + M ≤ 218 + H); allowlist
+> `github.com`, `*.githubusercontent.com`, `afltables.com`, `www.afltables.com`; AFL Tables pacing ≥ 2 s
+> between connections; ingress ≤ `‹per P5 ceiling›`; root ≤ `‹ROOT_BYTES_MAX›`; per-file `ulimit -f`
+> `‹value›`. **Environment:** `env -i PATH=/usr/bin:/bin HOME=‹root›/home TMPDIR=‹root›/tmp
+> R_LIBS_SITE=‹P1 effective› R_LIBS_USER=‹root›/home/rlib http_proxy/https_proxy/HTTP_PROXY/HTTPS_PROXY=guard no_proxy=`.
+>
+> **Redirects/retries/budget:** no automatic retries. One re-run per command is permitted under the reserved
+> labels `c2-2026-final-core-v1-r2` / `c2-2026-final-ladder-v1-r2` only for a transport failure before a
+> manifest (not a guard denial, cap breach, E failure or validation failure); it counts against the same
+> cumulative ceiling. After the run, repeat the parquet HEAD; a changed ETag or Last-Modified stops
+> hand-off for owner review. **Outputs:** `src/data/sources/afltables/fitzroy_core/c2-2026-final-{core,ladder}-v1/`
+> CSVs and `src/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-{core,ladder}-v1.json`
+> (manifest written last, `completeness: unvalidated`), then copy to the `C:` evidence directory with
+> separate stdout/stderr, ledgers, P1/P4/P5 records, environment digest, file hashes, `OWNER_MAX` values,
+> and one tar with its SHA-256 if `C:` has twice the space.
+>
+> **Stop conditions:** identity/space mismatch; any P-step failure; guard denial or cap breach; non-zero
+> exit; existing label or directory; any warning or error naming a season-index or match-page read; E1, E2
+> or E4 failure; changed parquet ETag/Last-Modified; output outside the root; any request for scope expansion.
+> Preserve everything and return. **Exclusions:** no validator or census run, no database, no Node/psql, no
+> rollover or six-file edit, no deployment or timer/service/polkit change, no production access, no
+> importer, no witness `--compare`, no D-316-1 apply authority. The operation produces *unvalidated*
+> evidence for Stages 2–3; those, the dry run, the apply and deployment remain separately authorised.
+
+### Unresolved values (do not invent)
+
+`‹UTC stamp›`; `‹OWNER_MAX_INGRESS_GIB›` core/ladder; `‹ROOT_BYTES_MAX›`; `ulimit -f` value; the
+runner's `Rscript` path and effective `R_LIBS_SITE` (from P1); parquet and bg3 sizes (from P5); the
+actual 2026 live-tail U/M/H (from the run); DEV's reachability to the two hosts. Successor contract,
+availability, corrections, ladder coverage, census scope, rollover date and expected club-season row
+count remain Stage 2–5 inputs and are not touched by this approval.
 
 ## V3 source review — 2026-10-21
 

@@ -169,16 +169,17 @@ only the exact approved delta and retain strict comparison of everything else.
 
 **C2 preparation update, 2026-10-21:** amended DEV C0/C1 acceptance is complete as recorded
 below; do not repeat its build/restore/migrations/browser/shell fixtures. The
-[C2 package v3](issue316-c2-preparation-2026-10-21.md) pins the c9cca86d historical source
+[C2 package v4](issue316-c2-preparation-2026-10-21.md) (consolidated readiness decision: one
+preparation-and-acquisition approval proposed, nothing executed) pins the c9cca86d historical source
 archive on C: and separates acquisition, census/validation, evidence review, dry run,
 six-file apply/commit and deployment/recovery. Completed inspection now proves 218 stored
 scored 2026 matches and GF Fremantle 89–96 Brisbane; latest retained acquisition remains
 in_season_partial. Offline review finds no required R/Node upgrade: installed versions meet
 inspected constraints. Archive verified, including recorded CRLF-only differences. Approved
 CRAN fitzRoy 1.8.0 source is now safely retained/hashed and its reached paths traced offline:
-GitHub parquet/mapping plus AFL Tables season/match/club pages and bg3.txt. Remaining transport
-source inputs are R 4.3.3 download.file/url, xml2 1.3.6 and readr 2.1.5 URL/connection dispatch;
-no dependency download, repeat production inspection or acquisition approval is implied.
+GitHub parquet/mapping plus AFL Tables season/match/club pages and bg3.txt. v4 replaces the
+further transport source reviews with runtime limits and a canary; no dependency download, repeat
+production inspection or acquisition approval is implied.
 Native/runtime hashes, runner selection, accepted final full-history/witness and successor
 inputs remain prerequisites. Inaccessible polkit content remains a later retirement limitation.
 No C2 decision or production write is granted by these preparation records.
