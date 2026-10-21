@@ -178,9 +178,11 @@ only the exact approved delta and retain strict comparison of everything else.
    original acquiring C0 and V2 runtime refusal require that explicit owner decision. Full deployed
    DEV app/audit C1 and separate C2 authority remain pending. D-DEV-316-C1-APP-1 was approved
    on 2026-10-21, but execution stopped before extraction at the archive gate: the matching-hash
-   artifact contains an esbuild symlink despite the reviewed no-symlinks description. Owner
-   artifact/continuation review is required; existing candidate root/archive retained, no DB/app
-   execution, DEV C1 NOT PASSED. See the linked package's measured execution record. Record the full
+   artifact contains an esbuild symlink despite the reviewed no-symlinks description. At that
+   checkpoint, root/archive were retained without extraction or DB/app execution. The owner
+   subsequently approved the sole-link/retained-root amendment; extraction,
+   hashes, preflight and read-only dump passed. PAUSED at step 7 for owner CREATE DATABASE;
+   DEV C1 acceptance still pending. See the linked package's latest checkpoint. Record the full
    resulting execution commit and production-configured build/artifact hashes before installation.
    The present source archive is the measured candidate; no future merge/rollover SHA is invented.
 

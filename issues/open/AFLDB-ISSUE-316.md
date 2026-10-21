@@ -374,6 +374,16 @@ contains verbatim approval, measured results, C: evidence location and the exact
 artifact/continuation review prerequisite. Passwordless sudo unavailable; eventual CREATE
 DATABASE requires the owner. No authority expanded; ISSUE-316 remains open.
 
+**Amended continuation checkpoint, 2026-10-21:** owner approved the exact sole esbuild link
+and retained-root reuse. Amended membership/target/ancestor safety checks PASS; no-overwrite
+extraction and all 13,209 hashes PASS; original steps 3–6 complete. Read-only source dump
+39,023,717 bytes, hash verified, 1,549 TOC entries, before/after counts identical. Source ledger
+110 with 110/110 checksums, no synthetic users/audit rows. PAUSED original step 7 solely for
+owner CREATE DATABASE using the exact plan statement; candidate DB absent, no pid, port 3201
+free, WSL stopped. Evidence and owner command in the latest C0/C1 package checkpoint. After
+owner confirmation verify DB identity/owner/encoding/emptiness, then continue step 8; no rerun
+of absence-dependent steps. C1 acceptance remains pending; no restore/migration/action yet.
+
 **Shape: cut over at the season boundary, not mid-season.** 2026 stays `afltables`-owned forever as
 stored history, and 2027 is `afl_api`-owned from its first match. No row is re-owned, so Q1 and Q7
 stand, and no ownership-transfer tool is needed for the cutover itself.

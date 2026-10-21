@@ -1,6 +1,12 @@
 # ISSUE-316 DEV application check — approval-ready plan (2026-10-21)
 
-**Status: OWNER APPROVED; EXECUTION STOPPED AT STEP 3 (2026-10-21).**
+**Status: AMENDED CONTINUATION APPROVED; PAUSED AT STEP 7 FOR OWNER DATABASE CREATION (2026-10-21).**
+The owner permitted exactly the documented esbuild link and reuse of the retained root/archive.
+Amended membership checks, extraction, 13,209 hashes, preflight, source guard, secure config
+and fresh read-only dump passed. No database created or candidate started. See the latest
+[C0/C1 checkpoint](issue316-c0-c1-approval-2026-10-21.md#amended-continuation--owner-database-creation-checkpoint-2026-10-21).
+
+**Historical first attempt:**
 **D-DEV-316-C1-APP-1** was explicitly approved exactly as specified in §5 steps 0–15 and §9.
 Steps 0–2 completed; archive inspection found a symlink contradicting §2's no-symlinks
 description. No extraction or packaged execution occurred. See the measured execution record
@@ -236,3 +242,20 @@ alias or host appearing; any output that would expose a secret (stop and discard
 - The two ops scripts (`dev-candidate.sh`, `check.mjs`) are committed under
   `docs/v2/evidence/issue316-dev-app-check/` because the owner is asked to approve the exact
   commands they contain; they are byte-identical to the copies inside the archive.
+
+## 11. Approved continuation amendment and checkpoint (2026-10-21)
+
+The owner's exact amendment and measured result are retained in the C0/C1 package linked above.
+It permits only `kit/node_modules/tsx/node_modules/.bin/esbuild -> ../esbuild/bin/esbuild`,
+after verifying the sole link resolves to an ordinary packaged file inside the package with
+no chain, hard link, unsafe member or pre-existing filesystem redirect. It supersedes only
+the no-symlinks description and absent-root requirement for this retained attempt. No archive
+replacement, re-upload, overwrite, cleanup or other authority is granted.
+
+Amended checks passed; `tar --keep-old-files` extracted into the absent package directory.
+Original steps 3–6 completed. At 2026-10-21T00:47:12Z candidate DB still absent, no pid file,
+port 3201 free. Backup `recovery/afldb_dev-20261021T004611Z.dump` retained and hash rechecked;
+source counts identical before/after, ledger 110 with 110/110 checksums matching and no
+synthetic user/audit rows. Passwordless sudo unavailable: pause at original step 7 for the
+owner's exact CREATE DATABASE statement, then verify identity/encoding/owner/emptiness and
+continue step 8. Do not rerun preflight's database-absence gate after owner creation.

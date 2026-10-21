@@ -17,6 +17,10 @@ commit.
 
 ### ISSUE-316 - V2 handoff reconciliation and bounded DEV approval package (2026-10-21)
 
+- Record owner-approved sole-link/retained-root continuation: amended safety checks, extraction,
+  13,209 file hashes and DEV preflight PASS; fresh read-only backup/hash/TOC retained, source
+  ledger/checksums 110/110 and zero synthetic records verified. Paused at step 7 for owner
+  CREATE DATABASE; candidate never started, port 3201 free, DEV C1 acceptance pending.
 - Retain D-DEV-316-C1-APP-1 owner approval and failed DEV archive gate evidence: exact artifact
   size/hash and host identity passed, but its esbuild symlink contradicts the no-symlinks plan.
   Stopped before extraction or DB/app execution; port 3201 free, root/archive retained. DEV C1

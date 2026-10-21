@@ -22,7 +22,7 @@ DEV app-check preparation (historical baseline): read-only baseline (ledger 110,
 D-DEV-316-C1-APP-1: [plan](issue316-dev-app-check-plan-2026-10-21.md). D: drive was exhausted
 during the build (disclosed in the plan §10); free space on D: before more WSL work.
 
-**Latest execution, 2026-10-21:** D-DEV-316-C1-APP-1 approved exactly; baseline HEAD `e7be8403`.
+**First execution, 2026-10-21:** D-DEV-316-C1-APP-1 approved exactly; baseline HEAD `e7be8403`.
 DEV identity/Node/disk/path/port gates and exact local/remote archive size/hash passed.
 Steps 0–2 created root/incoming and transferred the existing C: archive. STOP at step 3:
 esbuild symlink contradicts the plan's no-symlinks description. No extraction, packaged
@@ -30,6 +30,15 @@ execution, DB connection, dump, migration or app/audit request. Port 3201 free; 
 root/archive and C: evidence retained. DEV C1 NOT PASSED. Owner artifact/continuation review
 must account for the retained existing target; passwordless sudo unavailable. See the
 [measured execution record](issue316-c0-c1-approval-2026-10-21.md#dev-application-attempt--stopped-at-archive-gate-2026-10-21).
+
+**Latest amended continuation:** baseline HEAD `636b74ea`; owner permitted exact sole esbuild
+link and retained-root reuse. Safety checks, no-overwrite extraction, 13,209 hashes, preflight,
+source guard/config and read-only dump PASS. Backup/hash/TOC retained; source ledger/checksums
+110/110, no synthetic users/audit rows, dump counts identical. PAUSED step 7 solely for owner
+CREATE DATABASE; candidate DB absent, no pid, port 3201 free, WSL stopped. Command and evidence:
+[checkpoint](issue316-c0-c1-approval-2026-10-21.md#amended-continuation--owner-database-creation-checkpoint-2026-10-21).
+After owner confirms, verify identity/owner/encoding/emptiness and resume step 8; do not rerun
+absence-dependent steps. C1 acceptance pending; C2 unchanged and separate.
 
 ## Run discipline (every launch)
 

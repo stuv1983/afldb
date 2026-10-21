@@ -1,7 +1,7 @@
 # ISSUE-316 local reconciliation and C0/C1 approval — 2026-10-21
 
-**Latest: D-DEV-316-C1-APP-1 approved; DEV application attempt stopped at step 3's archive
-gate (2026-10-21). No deployed DEV C1 acceptance. See the execution record below.**
+**Latest: amended D-DEV-316-C1-APP-1 continuation approved; steps 3–6 passed. PAUSED at
+step 7 for owner database creation (2026-10-21). No deployed DEV C1 acceptance yet.**
 
 **Owner approved D-V2-316-C0C1-1 and D-DEV-316-C1-REFUSALS-1 (2026-10-21); the approved DEV
 shell subset ran and PASSED 4/4. Full C0/C1 is NOT complete: deployed DEV app/audit acceptance
@@ -11,6 +11,110 @@ deployment, rollover, season changes, timer/service changes, pushes, subagents o
 The accepted fresh archive rehearsal, Brownlow implementation, builds and rollback exercises were
 not repeated. Later operations are the filesystem-only DEV shell subset and the stopped
 DEV application preparation attempt, each recorded below with its limits.
+
+## Amended continuation — owner database creation checkpoint (2026-10-21)
+
+Owner approval and exact amendment, verbatim:
+
+> The owner approves the amended continuation of D-DEV-316-C1-APP-1.
+>
+> Resume the existing DEV attempt using one agent. Do not rebuild or replace the approved archive.
+>
+> The owner permits this one documented symbolic link:
+>
+> kit/node_modules/tsx/node_modules/.bin/esbuild
+> → ../esbuild/bin/esbuild
+>
+> Before extraction, verify that:
+>
+> - It is the only symbolic link.
+> - Its lexical and fully resolved target remain inside the approved package.
+> - Its target exists as an ordinary packaged file.
+> - No link chain, hard link, absolute member path, traversal entry or pre-existing filesystem link can redirect extraction outside the approved directory.
+>
+> Reject any other unexpected link or entry.
+>
+> The owner also permits reuse of the retained candidate root and uploaded archive, without overwriting existing files.
+>
+> All other restrictions and acceptance criteria remain unchanged.
+
+**Baseline:** `v2/rebuild` HEAD `636b74ea190a9f362510f9c3bb74fa5f86a324a6` exactly;
+remotes empty, only pre-existing untracked `.codex/` preserved. One agent, no subagents,
+builds, local suites, package edits, re-upload, installation, cleanup or production access.
+WSL reports no running distributions and was never started.
+
+**Resume checks PASS:** `arm@10.0.40.100:22`, hostname `streamanator`, x86_64,
+Node v22.23.2, 80,559,512 KiB free before extraction. Retained root contained exactly
+`incoming` and the approved ordinary archive, with no extracted package/config/dump/run
+directory. Candidate database absent (read-only catalog query); port 3201 free.
+Local/remote archive 113,830,430 bytes, exact approved SHA-256
+`c829da087f65a3a8145ad07db8d7d649bb7f93f8b293d66f85547cd375e40b0e`.
+
+**Amended membership PASS:** 18,309 members, 13,210 regular files (including the manifest),
+exactly one permitted symbolic link, zero hard links or unexpected/special/absolute/traversal/
+duplicate/environment entries. Every member ancestor is a directory; `/`, `/home`, `/home/arm`,
+root and incoming checked with lstat as ordinary directories, no pre-existing package path.
+Lexical and fully resolved link target:
+`afldb-v2-dev-candidate-fffef96f/kit/node_modules/tsx/node_modules/esbuild/bin/esbuild`.
+Target is an ordinary packaged file, no link chain; resolved path stays inside the approved
+package. Extracted link target reverified. Source metadata pins `fffef96fb079bfa975109fa2fdcf5552b51e5946`,
+source archive SHA `c7b755b5…ce5cb6`, executable-source digest `fc12b4dd…69f0d`,
+build ID `WkKKyr7KAoFmMb5QyM4MQ`. Both ops scripts match reviewed repository hashes.
+
+**Extraction/hash verification PASS:** initial GNU tar invocation rejected incompatible
+`--keep-old-files --no-overwrite-dir` before extraction (exit 2). Confirmed package still
+absent; used supported `--keep-old-files` alone, extraction exit 0. No content overwritten,
+gate relaxed or package altered. Independent `sha256sum -c FILES.sha256` and reviewed
+`dev-candidate.sh verify` both passed **13,209/13,209**. Preflight passed with 77,831 MiB free,
+exact Node/build ID, free port and absent candidate database.
+
+**Steps 4–6 PASS:** source guard at 2026-10-21T00:45:39Z: ledger 110, last
+`110_match_sheet_player_match_stats_authority.sql`; audit 1,073/max id 1,099; refused rows 0;
+users 4; active sessions 0; matches 17,056; players 13,365; player_match_stats 695,499;
+import_batches 62. Created only approved new mode-700 config/evidence/recovery/run dirs;
+generated app.env/ops.env, each mode 600, without exposing values.
+
+Fresh read-only backup as `afldb_backup`:
+`/home/arm/issue316-v2-candidate-20261021/recovery/afldb_dev-20261021T004611Z.dump`,
+**39,023,717 bytes**, SHA-256
+`e271172fd338869c9097cc26c81baf7715887d50947a1e0df35328ae62f58c32`,
+**1,549 TOC entries**. Before/after source count files byte-identical; dump hash rechecked OK.
+Additional read-only source check: contiguous 001–110, **110/110 migration checksums match**
+the packaged files under the runner's existing raw/LF/CRLF policy, zero drift, pending exactly
+111–117; zero refusal rows, zero synthetic users and synthetic actor audit rows, zero source
+default ACLs. No source database/schema write occurred. No aggregate source-count movement
+was observed during the dump; ordinary concurrent V1 traffic need not be inferred.
+
+**Checkpoint 2026-10-21T00:47:12Z:** candidate database absent, no pid file, port 3201 free;
+candidate never started. No restore, migration, privileges, positive action or negative controls
+run yet. **C1 acceptance PENDING. Only current blocker is owner CREATE DATABASE at step 7.**
+
+Owner runs in their own interactive terminal (sudo password, if prompted, stays with owner):
+
+```powershell
+ssh -t dev "sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres"
+```
+
+Then exactly:
+
+```sql
+CREATE DATABASE afldb_dev_v2_candidate_test OWNER afldb_owner TEMPLATE template0
+  ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
+\q
+```
+
+After owner confirms creation, verify database identity, owner, encoding/locale and emptiness,
+then resume original step 8. Do not rerun absence-dependent preflight/layout/envgen/dump.
+Restore/migrations 111–117/privileges/action/audit/negative controls/original preservation/
+shutdown acceptance remain required. C2 and all later authority are unchanged and separate.
+
+**Evidence retained:** DEV root `/home/arm/issue316-v2-candidate-20261021/`, with archive,
+extracted package, secure config, backup/hash, TOC and source counts; new local evidence at
+`C:\Users\stuar\AppData\Local\Temp\claude\D--dev-afldbV2\77258a0a-3c50-46b6-b25d-0084ebe15f04\scratchpad\dev-app-continuation-20261021\`.
+Includes `membership.json`, inspection code, verification/preflight/config-names/dump logs,
+`source-preservation-checkpoint.json`, `handoff-status.txt`, WSL status and `remote-evidence/`
+containing the copied secrets-free source counts/TOC. No config secrets or database dump copied
+to the repository or printed. Earlier stopped-attempt record remains below as history.
 
 ## DEV application attempt — stopped at archive gate (2026-10-21)
 
