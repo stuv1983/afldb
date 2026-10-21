@@ -1,9 +1,26 @@
-# ISSUE-316 C2 approval package v1 — preparation only
+# ISSUE-316 C2 approval package v2 — bounded offline review
 
 Prepared 2026-10-21 with one agent. **C2 NOT EXECUTED; execution approval NOT granted.**
-Next authority requested is production **read-only inspection only**, as worded below.
+Updated after the completed prerequisite inspection and offline source review. **No acquisition
+approval requested.** Next input is the bounded package-source material listed below; the old
+inspection wording is retained as history, not a request to repeat production inspection.
 
-Local baseline verified: `D:\dev\afldbV2`, branch `v2/rebuild`, HEAD
+Review baseline: HEAD `ac7a90892189d7b509f85a7a77d47bff5b83bbfd`, `v2/rebuild`, remotes
+empty, only pre-existing untracked `.codex/`. Subsequent changes preserved. One agent;
+no WSL invocation, host connection, download, installation, database access, acquisition,
+validator, service operation or rollover. New evidence stays in the existing C: preparation
+directory as `offline-review-v2.json`; original archive, manifest and v1 copy remain intact.
+
+Completed inspection reused from
+`C:\tmp\afldb-c2-inspection-resume-20261021T134846389\findings.md`: production identity,
+ledger 110 and inspected ACLs match retained evidence; all 218 stored 2026 matches have scores,
+GF Fremantle 89–96 Brisbane. Latest acquisition remains explicitly `in_season_partial`.
+This supersedes the old scheduled-fixture evidence as a statement of stored completion;
+final external enumeration, owner acknowledgement and accepted full-history/witness remain owed.
+The inaccessible exact polkit rule concerns later writer retirement; it is not a dependency
+review failure and no broader access is requested.
+
+Historical v1 preparation baseline: `D:\dev\afldbV2`, branch `v2/rebuild`, HEAD
 `d67c08f6d8a36c3a471e56b049833905811ed040`. Remotes empty; only pre-existing untracked
 `.codex/`; preserved. No reset, checkout, cleanup, new worktree, subagent, WSL start,
 host contact, dependency installation, acquisition or database connection. The preparation
@@ -17,7 +34,7 @@ Status describes evidence, not permission. The authority remains split into six 
 | Prerequisite | Status and exact remaining evidence |
 |---|---|
 | Applicable C0/C1 | **Demonstrated under amendment.** D-V2-316-C0C1-1 accepted source incorporation and V2 refusal in place of acquiring C0; 19/19 reconciliation, local focused 669 pass/2 POSIX skips, Linux focused evidence and DEV shell refusal 4/4 retained. D-DEV-316-C1-APP-1 plus sole-link/retained-root amendment completed steps 8–15: candidate restore, 111–117, privileges/checksums, exact Super Admin refusal and one attributed audit row 1100/actor 20, negative controls, source guard and shutdown PASS. Port 3201 free at 01:06:32Z. See [completed record](issue316-c0-c1-approval-2026-10-21.md). These amended criteria do not prove active historical acquisition. No repetition requested. |
-| 2026 season actually complete | **Missing.** Runbook §2 says it finished, but retained authentic fixture `tests/fixtures/afl_api/seasons/00-season-matches-2026.raw.json` contains 218 matches: 217 CONCLUDED and one SCHEDULED, id 9028 / `CD_M20260142901`, Fremantle–Brisbane GF, `2026-09-26T04:30:00.000+0000`, no scores. Later retained settlement rehearsal likewise reports 217 concluded. The calendar and expired scheduled date prove nothing. Need current authentic final outcome/whole-season enumeration, no unexplained scheduled/incomplete matches, final full-history results/stats and witness validation, and explicit owner completion acknowledgement. This old fixture is evidence of an unresolved completion prerequisite, not a claim about today's live match status. |
+| 2026 season actually complete | **Stored final-result evidence established by completed inspection:** 218 scored matches, GF Fremantle 89–96 Brisbane. Old fixture's SCHEDULED GF is historical. Still require final external whole-season enumeration, accepted full-history results/stats/witness and owner completion acknowledgement. Latest retained snapshot is `in_season_partial`, never accepted full history. |
 | Final 1897–2026 acquisition and ladder | **Missing.** No final C2 core or witness bytes/manifests exist as accepted evidence in this preparation. Current contract ends at 2025; outgoing baseline label `issue129-t7-20260903`, witness `ladder-20260828`. Old acceptance cannot certify 2026. Final labels proposed below are reserved names, not acquired evidence. |
 | D-233-3 ownership | **Requires refreshed evidence.** Fresh through-2026 census for each database actually affected by rebuild/promotion, including the verified production target if in scope. The list of affected databases must be explicitly agreed; historical tests or “every 2026 match is afltables-owned” prose do not replace census records. Require zero in-scope afl_api-owned canonical matches, scope 1897–2026 and identities/hashes/timestamps. No row re-ownership; a nonzero result is a STOP. |
 | Accepted corrections | **Missing for successor.** Review per acquired row fingerprint, including source-row and profile-continuity rules. Do not inherit outgoing corrections; explicit reviewed empty category arrays if none. An upstream repair/count/identity change requires adjudication, not a relaxed validator. |
@@ -48,36 +65,132 @@ Earlier pending/checkpoint prose in those records is historical; their completed
   installed dependency closure, secrets, or current target proof. Archive membership/safety must
   be reviewed before any later extraction; this preparation has not extracted or run it.
 
-Runtime/dependency requirements, without pretending they are already satisfied:
+### Actual runtime requirements (v2 supersedes v1 reference proposals)
 
-- R **4.6.1** is the historical tested reference; use it as the proposed candidate, subject to
-  target verification. Acquisition enforces **fitzRoy 1.8.0**, requires `jsonlite` and either
-  `digest` or `openssl` for SHA-256. The complete fitzRoy/R transitive package versions,
-  package sources/hashes, native libraries and cache configuration are **not pinned by this
-  repository**. Need an offline reviewed installed-package/source manifest or immutable runtime
-  image, including exact jsonlite/digest or openssl versions. No mismatch flag is approved.
-- Python **3.12.3** is the proposed Linux reference (historical Windows evidence says 3.12).
+- **Acquisition and ladder acquisition:** R plus **fitzRoy exactly 1.8.0**, `jsonlite`, and
+  `digest` (selected branch; `openssl` is the wrapper's fallback). fitzRoy DESCRIPTION enforces
+  **R >=4.1**, rlang >=0.1.2, stringr >=1.3.0, tidyr >=1.0.0. The wrapper has no numerical R
+  minimum of its own. Retained R **4.3.3** meets every Depends/Imports/LinkingTo constraint
+  in the selected 56-package closure; no missing metadata names or version violations.
+  fitzRoy itself records `Built: R 4.3.3`. jsonlite **1.8.8**, digest **0.6.34** and transitive
+  openssl **2.1.1** are installed evidence, not new universal minimums. R **4.6.1** was used
+  for earlier Windows refusal tests and was v1's proposed reference; no upgrade or mismatch
+  waiver follows from that difference. Full exact version/path/DESCRIPTION hash list is in
+  `offline-review-v2.json`; it follows fitzRoy/jsonlite/digest only, excluding unrelated packages
+  and Suggests. Attaching fitzRoy needs its namespace closure even when commands select only
+  AFL Tables functions. Metadata compatibility does not prove native loading or endpoints.
+- Python **3.12.3** is retained installed evidence and compatible with the inspected offline
+  paths (historical Windows evidence says 3.12); no exact patch-version guard or upgrade follows.
   Offline core/witness validation uses Python standard library; `common.py`/psycopg are lazy
   imports beyond the validate-only return. Importing modules can write `__pycache__`; use
   `PYTHONDONTWRITEBYTECODE=1`. Any later database comparison/import needs separately pinned
   psycopg 3 and native dependencies; no DB-import invocation is approved here.
-- Node **22.21.0** is the retained Linux reference, not a measurement of the acquisition target.
-  Historical lock pins `tsx` **4.23.12**, its esbuild **0.28.2** plus platform executable;
-  census needs a local `psql` client, proposed **16.15**, and a securely supplied read-only DSN.
-  Need exact installed runtime/dependency hashes/platform proof before executing historical tools.
-  Use local `node --import tsx`, never `npx` with an implicit download. No install command approved.
+- **Neither Node nor psql is needed for the two R acquisitions or offline Python witness/core
+  validation.** Later census/rollover uses Node and local tsx. Historical lock pins tsx **4.23.12**
+  -> esbuild **0.28.2** -> Linux x64 esbuild **0.28.2**, all declaring **Node >=18**.
+  These locked tsx dependencies do not include get-tsconfig. Node's `--import` facility also
+  must be available; retained **22.23.2** supports this command and satisfies the engine floor.
+  **22.21.0** is earlier reference evidence, not an exact pin or required upgrade/downgrade.
+  Node is absent from noninteractive PATH: use the explicitly pinned executable
+  `/home/arm/.nvm/versions/node/v22.23.2/bin/node` if that runner is later selected.
+  Its retained SHA-256 is `3517c2df0b2f8cd7f422b4b8450ef81c6889f08eb03e281d6de9079b15e6a327`.
+  Census additionally needs psql (observed **16.15**, not a source-enforced numerical minimum)
+  and a separately authorised read-only DSN. No Next/React/app dependency installation needed.
+  `offline-review-v2.json` preserves the lock's exact npm URLs/integrities; those are package
+  provenance, not acquisition destinations. Nested esbuild was found in the completed inspection.
+  Do not install, use implicit-download npx, or infer readiness from only package.json hashes.
 - Missing runtime evidence is a blocker to calling this executable-ready. Do not invoke the
   historical whole settle shell: it chains acquisition, importer and canonical settle, exceeding
   final-acquisition-only authority. Do not copy historical acquisition over any V2 runtime stub.
 
-Network boundary: the R command calls fitzRoy's `fetch_player_stats_afltables`,
-`fetch_player_details_afltables`, `fetch_results_afltables`; the witness calls
-`fetch_ladder_afltables`, which computes from results. AFL Tables (`https://afltables.com/afl/`)
-and fitzRoy's historical cached afldata release are implicated. **The exact transitive URLs,
-release/cache hosts and redirects are not determined from repository wrapper source.**
-Obtain and review fitzRoy 1.8.0 package implementation/cache configuration and hash that source
-before network authority. No blanket Internet permission; no CRAN/GitHub/npm installation.
-No coach/club-list, FootyWire, AFL API or Brownlow acquisition is in these commands.
+### Endpoint trace and request/output scope
+
+Exact historical source references below are c9cca86d, not V2's refusal stub. The R wrapper
+contains no literal HTTP request, retry, sleep, rate-limit or concurrency implementation.
+`try_fetch` (lines 174–179) catches one error and returns it; a failed dataset/season stops
+without a manifest. It does not retry automatically. Package retries, redirects, cache
+freshness, request counts and transport timeouts remain **unknown**, pending implementation.
+The wrapper calls `requireNamespace("fitzRoy")` at startup before its switch guard and argument
+dispatch; even a supposed help/static probe could load package hooks. This review reads source
+bytes only and does not invoke the R wrapper or any package namespace.
+
+| Reachable call | Request scope / purpose | Endpoint evidence / uncertainty | Local outputs |
+|---|---|---|---|
+| `fetch_player_stats_afltables(season=s)` (317) | 130 serial calls, 1897–2026; package may request much broader cached history or many pages per call | AFL Tables plus historical afldata cache implicated by contract's profile-continuity comment (56). Exact cache release URL/provider/redirects and live season/match paths not present in locally retained implementation | 130 `player_stats_YYYY.csv` |
+| `fetch_player_details_afltables()` (335) | One unbounded all-history call; no season filter | Historical companion source `tools/rebuild/afltables/acquire_club_lists.R:4–6` identifies the same 21 `https://afltables.com/afl/stats/alltime/<slug>.html` pages. This corroborates a path family, not a verified full package call chain or exact current slug/request count | `player_details.csv` |
+| `fetch_results_afltables(season=from:to)` (340) | One call with 130 seasons; actual requests unresolved | `afltables.com/afl/` known provider; exact season/result URL templates and any helper providers unresolved | `results.csv` |
+| `fetch_ladder_afltables(season=s)` (369) | 130 serial calls; computes regular-season ladder via `fetch_results_afltables`, per contract and witness source header | Results endpoints therefore reachable again; package cache reuse/multiplicity unproved. Does not establish an independent published-ladder endpoint | 130 `ladder_YYYY.csv` |
+
+Core/witness each write their manifest last under the paths in Stage 1 below: 132 core CSVs
+plus one manifest; 130 witness CSVs plus one manifest. Package caches/temp files and transport
+side effects remain unresolved. Historical wrapper allows overwriting incomplete CSVs if no
+manifest exists (234–238); the proposed operation is deliberately stricter: refuse both existing
+labels/directories and preserve failures. Do not infer restartability from the comment.
+
+Profile URLs matching `https?://afltables.com/afl/stats/players/[A-Za-z]/...html` are identity
+values in the contract, **not proof they are requested**. afldata is an additional data provider
+requiring source review; neither GitHub release host nor redirect/CDN hosts are proven from the
+available package source. No verified exhaustive endpoint allowlist can yet be produced.
+No separate coach/club-list/FootyWire/AFL API/Brownlow acquisition is selected by the wrapper;
+package hooks/helpers may add destinations and have not been reviewed. Brownlow vote columns
+carried by player_stats do not imply a separate Brownlow command.
+
+### Archive verification and isolated maintenance use
+
+Rechecked archive bytes/size/SHA-256 against v1 manifest: PASS. All **1889 regular files** match
+Git tree membership; **2184 members** total, remaining members directories; no links, special
+members, absolute paths or parent traversal. Content comparison: **158** exact Git-blob matches,
+**1731** CRLF-only conversions, **zero unexplained differences**. Thus v1's membership assertion
+holds, but archive bytes are not universally identical to Git blobs. Relevant raw/LF SHA-256
+pairs are retained in `offline-review-v2.json`. Do not silently normalize hash-bound inputs or
+execute archived shell scripts with CRLF shebangs. The two R commands avoid those shell scripts.
+No extraction, normalization, source execution or source-archive replacement was performed.
+
+A separately extracted/pinned maintenance root can use installed R 4.3.3 and its library paths
+without modifying `/home/arm/projects/afldb`, installing dependencies or restoring acquisition
+to V2. The old whole settle shell is outside scope. Source-only feasibility is established;
+**executable readiness remains unestablished**. Production's installed runtime is only a candidate,
+not an approved runner. Pin extracted bytes and explicit executables/library search order before
+execution; never source a production environment file. No credentials, production data or actual
+environment files are added to the artifact (the tracked `.env.example` is only an example).
+
+### Exact missing inputs and smallest next operation
+
+1. **First input:** owner-supplied immutable **fitzRoy 1.8.0 source tarball**, with provenance
+   and SHA-256, including DESCRIPTION/NAMESPACE, all `R/` helpers, startup `.onLoad/.onAttach`
+   code and referenced data/extdata. Needed symbols are the four fetch functions above,
+   `dictionary_afltables`, cache/download/parser/result/ladder helpers and their reachable hooks.
+   No such implementation bundle appears in the pinned archive or the two retained C: packages;
+   inspection retained hashes of `.rdb/.rdx`, not their contents or original source archives.
+   Installed DESCRIPTION hash is
+   `62b1c1b389f8f42dac6fb7cd7cd8c1553978ac63cdd3ea6d645a8564cc096444`;
+   it is **not** the missing source-tarball hash. Do not fabricate that hash or presume version
+   alone binds a tarball to the installed build.
+2. Follow only helpers actually reached by that source. Potential transport implementation
+   inputs, whose versions are already retained, are **httr 1.4.7, httr2 1.0.0, curl 5.2.0**;
+   parsers/cache readers include **rvest 1.0.3, xml2 1.3.6, readr 2.1.5, rappdirs 0.3.3,
+   nanoparquet 0.5.1**. Request their immutable source/hash only when the fitzRoy call chain
+   requires it; this is not authority to download every package. Review cached release selectors,
+   fallback paths, redirect handling, retry/backoff/rate limits and package load hooks offline.
+3. Before a future runnable artifact: installed-file/native-object SHA-256 inventory for the
+   exact 56-package set in the C: JSON and R executable/libR; identify/hash reachable shared
+   libraries and TLS trust inputs. Existing DESCRIPTION and four packages' lazy-database hashes
+   do not establish native closure. Later Node/census needs the full selected tsx/esbuild files
+   and Node/psql binaries pinned; lock integrities alone are not installed-file hashes.
+4. Configuration still missing: approved non-WSL runner/root and runtime paths, R library order,
+   startup/site-profile handling, explicit no-incidental-env policy, proxy/CA/redirect policy,
+   cache and TMP directories/budget, output capacity/log paths and source-to-installed-build
+   binding. Standard user/project R profiles and two cache paths were absent in prior inspection;
+   that is not an exhaustive site/environment/cache check. Use startup suppression only after
+   verifying compatibility, not by silently changing the final command contract.
+
+**Smallest next authorisation:** accept/review the owner-provided fitzRoy source bundle on C:
+offline, with no package loading. If unavailable, separately approve retrieval of **that one
+version's source archive** from an owner-reviewed immutable origin to C:, record its hash and
+stop for offline tracing. Origin/hash must be established first; no download is authorised now.
+No repeat production inspection, R namespace loading, acquisition permission, runtime upgrade,
+general dependency audit or polkit access is requested. This review returns missing source
+inputs, not an acquisition-ready command. Six authorities below remain independent.
 
 The maintenance artifact will run manually from a dedicated extracted directory on an approved
 non-WSL Linux runner, with no systemd/admin/runtime wiring. That runner and extraction path are
@@ -184,7 +297,7 @@ is a distinct record change, not silently added to the six-file retirement commi
 D-316-13 are outside C2. D-316-6 future ownership replay, Brownlow and unrelated corrections
 remain separate. No acquire/settle compatibility stub is reactivated in ordinary V2 runtime.
 
-## Smallest next operation: inspect only
+## Historical v1 operation: completed prerequisite inspection (do not repeat)
 
 **Historical candidate target, not current proof:** SSH alias `afldb` previously resolved to
 `arm@209.38.87.252:22`, host `afldb-prod`; checkout `/home/arm/projects/afldb` at
@@ -271,9 +384,10 @@ write, default is forward-fix; reverting ownership is a new owner decision. D7 r
 validation, final frozen rollback capture/restore, production migrations, routing and writer
 retirement are not authorised by this preparation or the inspection wording.
 
-Preparation repository records only: this package, `IssuesIndex.md`, `issues.md`,
+Historical v1 preparation repository records only: this package, `IssuesIndex.md`, `issues.md`,
 `issues/open/AFLDB-ISSUE-316.md`, `docs/v2/production-release-plan-2026-10-21.md` and `CHANGELOG.md`.
 No six-file rollover target was edited. Local verification: source/branch/status/remotes,
 archive SHA-256 and exact source-tree membership; documentation diff/whitespace review.
 No runtime test is required for these documentation-only changes. Source artifact readiness,
-season completion and live target identity remain expressly unverified.
+season completion and live target identity were unverified at v1 preparation time; the v2
+update above records the completed inspection's narrower positive evidence and remaining gaps.

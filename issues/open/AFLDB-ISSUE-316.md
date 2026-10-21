@@ -1279,6 +1279,29 @@ edited after both Vitest runs.
 - The record queries assume `matches.source_id` and `sources.key` and that `afldb_app` can read both, as
   the ISSUE-232 §7 A query does. A failure there refuses before any write.
 
+## C2 offline review update — 2026-10-21
+
+Current continuation package: `docs/v2/issue316-c2-preparation-2026-10-21.md` v2.
+Completed production inspection is reused, not repeated: identity/ledger 110/inspected ACLs
+match retained evidence; all 218 stored matches scored, GF Fremantle 89–96 Brisbane.
+Latest acquisition remains in_season_partial, not final accepted core/witness.
+
+Offline historical-source review: R 4.3.3 satisfies fitzRoy 1.8.0's R >=4.1 and the selected
+56-package metadata closure; Node 22.23.2 meets later locked tsx/esbuild requirements.
+No upgrade is required merely to match earlier reference versions. C: archive checksum,
+membership and safe member types verified; 158 exact Git blobs and 1731 CRLF-only conversions,
+zero unexplained differences. Keep raw/LF hashes distinct; do not run the old settle shell.
+Separate maintenance-root use of installed runtimes is feasible without changing production
+checkout or V2 quarantine, but source/native/configuration closure is incomplete.
+
+Next input: immutable fitzRoy 1.8.0 source archive/provenance/SHA-256 for offline reachable
+helper/cache/endpoint tracing. No exhaustive endpoint claim from wrapper/metadata alone.
+No further connection, download, acquisition, validator/census, rollover, service or deployment
+performed. Acquisition, witness/census validation, rollover and deployment authorities remain
+separate. Unreadable exact polkit rule remains for later retirement, not this review's failure.
+ISSUE-316 remains OPEN. Full evidence and exact missing inputs in the existing package;
+machine-readable review inventory on C: beside the original v1 archive/manifest.
+
 ## 11. Not done here
 
 - No commit, merge, push, deployment, host contact, timer change or source-ownership change.

@@ -169,11 +169,16 @@ only the exact approved delta and retain strict comparison of everything else.
 
 **C2 preparation update, 2026-10-21:** amended DEV C0/C1 acceptance is complete as recorded
 below; do not repeat its build/restore/migrations/browser/shell fixtures. The
-[C2 package v1](issue316-c2-preparation-2026-10-21.md) pins the c9cca86d historical source
+[C2 package v2](issue316-c2-preparation-2026-10-21.md) pins the c9cca86d historical source
 archive on C: and separates acquisition, census/validation, evidence review, dry run,
-six-file apply/commit and deployment/recovery. The retained feed still has a SCHEDULED
-2026 Grand Final, so completion is not established. Current target/runtime/successor inputs
-remain missing; next proposed authority is read-only prerequisite inspection only.
+six-file apply/commit and deployment/recovery. Completed inspection now proves 218 stored
+scored 2026 matches and GF Fremantle 89–96 Brisbane; latest retained acquisition remains
+in_season_partial. Offline review finds no required R/Node upgrade: installed versions meet
+inspected constraints. Archive verified, including recorded CRLF-only differences. Missing
+fitzRoy 1.8.0 implementation/source hash prevents exhaustive endpoint tracing; next input is
+that immutable source bundle for offline review, not repeat production inspection or acquisition.
+Native/runtime hashes, runner selection, accepted final full-history/witness and successor
+inputs remain prerequisites. Inaccessible polkit content remains a later retirement limitation.
 No C2 decision or production write is granted by these preparation records.
 
 1. **Owner decisions and artifact lock.** The measured rehearsal acceptance and two privilege

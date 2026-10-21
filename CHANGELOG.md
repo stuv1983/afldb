@@ -17,10 +17,12 @@ commit.
 
 ### ISSUE-316 - V2 handoff reconciliation and bounded DEV approval package (2026-10-21)
 
-- Retain C2 preparation package with checksum-pinned historical source archive on C:,
-  prerequisite/effect register and six separate approval scopes. Existing feed still contains
-  a scheduled 2026 Grand Final; completion remains unproved. Next proposed operation is
-  read-only prerequisite inspection; no C2 execution or repeated DEV acceptance work.
+- Retain C2 preparation package v2 with offline runtime/endpoint review and C: dependency
+  inventory. Existing R 4.3.3 / Node 22.23.2 meet inspected requirements; no upgrade imposed.
+  Historical archive checksum/membership verified; CRLF-only differences explicitly pinned.
+  Completed inspection establishes stored 2026 final scores, but final full-history/witness
+  acceptance is still owed. Missing fitzRoy source/hash is the next bounded input; no repeated
+  production inspection, acquisition, validator or rollover execution. Six authorities stay separate.
 
 - Complete approved deployed DEV candidate C1 acceptance: restore, migrations 111–117 and
   privileges/checksum readback PASS; real Super Admin legacy_retired refusal with exactly one
