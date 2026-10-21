@@ -1,4 +1,5 @@
 import 'server-only';
+import { brownlowAcceptedSql } from './brownlow-readiness';
 
 import type { SqlExecutor } from '@afldb/db';
 import { isSealedSeason, sealedSeasonsFrom, type SeasonRegistry } from '@afldb/domain';
@@ -49,8 +50,9 @@ import {
  *    mapping is complete, unambiguous and consistent. Otherwise `clubId` stays NULL and the
  *    reconciliation keeps reporting `club_unverifiable`, with the refusal codes in
  *    {@link BrownlowStagingEvidence}. Without supplied identities the mapping is not attempted.
- *  - season state: `complete` iff the season is SEALED in the registry (plan R-022), else
- *    `in_progress`.
+ *  - award readiness: `complete` only when the season is SEALED in the registry (plan R-022)
+ *    AND existing coverage/publication accepts its Brownlow totals. Otherwise `in_progress`;
+ *    raw evidence remains available but cannot determine an authoritative medal/ranking.
  *
  * PRIVILEGES. `afldb_import` may SELECT every table read here: `staging` carries the importer's
  * blanket grants (tools/maintenance/privileges.sql, the "Staging is the importer's own
@@ -423,7 +425,11 @@ export async function loadBrownlowReconciliationInputWithEvidence(
 
   const input: BrownlowReconciliationInput = {
     season,
-    seasonState: isSealedSeason(sealedSeasonsFrom(request.registry), season) ? 'complete' : 'in_progress',
+    seasonState: isSealedSeason(sealedSeasonsFrom(request.registry), season)
+      && (await executor.query<{ brownlowAccepted: boolean }>(
+        `SELECT ${brownlowAcceptedSql('$1::int')} AS "brownlowAccepted"`, [season],
+      )).some((row) => row.brownlowAccepted === true)
+      ? 'complete' : 'in_progress',
     generatedAt: request.generatedAt,
     matchVotes,
     leaderboard: staged.board,

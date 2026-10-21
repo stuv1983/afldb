@@ -222,6 +222,9 @@ const STUB_PREREQUISITES = `
     votes smallint NOT NULL, vote_rank smallint, eligible_rank smallint,
     is_ineligible boolean NOT NULL DEFAULT false, is_winner boolean NOT NULL DEFAULT false,
     CONSTRAINT brownlow_season_uq UNIQUE (season, player_id));
+  CREATE TABLE stat_availability (stat_key text, season int, coverage text);
+  INSERT INTO stat_availability VALUES ('brownlow_season_total', 2024, 'complete');
+  CREATE TABLE brownlow_season_authority (season int PRIMARY KEY, published_revision int);
   CREATE SCHEMA staging;
   CREATE TABLE staging.afl_api_brownlow_vote (
     source_id smallint NOT NULL, family text NOT NULL, external_record_id text NOT NULL, version_seq integer NOT NULL,
@@ -244,6 +247,7 @@ const STUB_PREREQUISITES = `
 
   -- STUB grants: what the real import-writable registry / staging blanket grants give afldb_import.
   GRANT USAGE ON SCHEMA staging TO afldb_import;
+  GRANT SELECT ON stat_availability, brownlow_season_authority TO afldb_import;
   GRANT SELECT ON staging.afl_api_brownlow_vote, staging.source_payloads, staging.source_record_versions,
                   staging.source_records TO afldb_import;
   GRANT SELECT ON auth_users, seasons, awards, players, clubs, sources, external_identities, award_winners,
@@ -604,6 +608,7 @@ describe('Brownlow loader (fake executor)', () => {
 
   it('groups votes by provider match, keeps unresolved ids NULL, and reports leaderboard as not supplied', async () => {
     const executor = fakeExecutor((text) => {
+      if (text.includes('AS "brownlowAccepted"')) return [{ brownlowAccepted: true }];
       if (text.includes('brownlow_leaderboard')) return [];
       if (text.includes('staging.afl_api_brownlow_vote')) {
         return [vote(), vote({ providerPlayerId: 'P2', votes: 2, playerId: null }), vote({ providerMatchId: 'M2', matchId: null, providerPlayerId: 'P3', votes: 1 })];
@@ -1308,6 +1313,18 @@ describe('Coleman: server callers on PGlite', () => {
  * 6. Brownlow reconciliation through the server caller (PGlite over stub staging)
  * =========================================================================================== */
 describe('Brownlow reconciliation: server caller on PGlite', () => {
+  it('sealed football with pending, unapproved source votes cannot determine the medal', async () => {
+    await db.query("UPDATE stat_availability SET coverage = 'pending' WHERE season = 2024");
+    try {
+      const { deps } = makeDeps();
+      const result = await reconcileBrownlowSeasonForAdmin(PLAIN_ADMIN, { season: 2024 }, deps);
+      expect(result).toMatchObject({ ok: true, report: { source: { seasonState: 'in_progress' },
+        awardResultPresentation: { status: 'season_incomplete' } } });
+      expect(await count('brownlow_season_votes')).toBeGreaterThan(0);
+    } finally {
+      await db.query("UPDATE stat_availability SET coverage = 'complete' WHERE season = 2024");
+    }
+  });
   beforeEach(async () => {
     await seedColeman(); // matches for 2024 (ids 1-5)
     await db.query(

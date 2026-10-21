@@ -531,6 +531,9 @@ describe('the reconciliation\'s gating passes through', () => {
     const result = determine(CLEAN, {}, { state: 'in_progress' });
     expect(result.status).toBe('season_incomplete');
     expect(result.winners).toEqual([]);
+    expect(result.rankingDeterminate).toBe(false);
+    expect(result.rawLeaderboard.every((row) => row.eligibleRank === null && !row.eligibleRankDeterminate)).toBe(true);
+    expect(result.winners).toEqual([]);
     expect(result.rawLeaderboard).toHaveLength(3);
   });
 

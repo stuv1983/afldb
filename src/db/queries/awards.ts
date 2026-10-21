@@ -1,3 +1,4 @@
+import { acceptedBrownlowRowsSql } from './brownlow-readiness';
 import 'server-only';
 
 import { cache } from 'react';
@@ -798,7 +799,7 @@ export async function getClubBrownlowMedallists(
                bsv.club_id,
                CASE WHEN pss.club_count = 1 THEN pss.primary_club_id END
              ) AS attributed_club_id
-        FROM brownlow_season_votes bsv
+        FROM ${sql.unsafe(acceptedBrownlowRowsSql())} bsv
         LEFT JOIN player_season_stats pss
           ON pss.player_id = bsv.player_id AND pss.season = bsv.season
        WHERE bsv.is_winner = true

@@ -146,6 +146,8 @@ describe('AFLDB-ISSUE-254 — rebuild_derived.py equals the targeted recompute',
         await stats(f, m1, a, 2, 1);
         await stats(f, m2, a, null, null);
         await stats(z, m1, b, 3, 0);
+        await tx`INSERT INTO stat_availability (stat_key, season, is_recorded, coverage)
+                 VALUES ('brownlow_season_total', ${SEASON}, true, 'complete')`;
         await tx`INSERT INTO brownlow_season_votes (season, player_id, club_id, votes, source_id)
                  VALUES (${SEASON}, ${z}, ${b}, 4, ${sourceId})`;
 

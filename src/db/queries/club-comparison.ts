@@ -1,3 +1,4 @@
+import { acceptedBrownlowRowsSql } from './brownlow-readiness';
 import 'server-only';
 
 import { sql } from '@/db/client';
@@ -1244,7 +1245,7 @@ function brownlowAttribution() {
            END AS attribution_source,
            pss.club_count,
            pss.primary_club_id AS season_primary_club_id
-      FROM brownlow_season_votes b
+      FROM ${sql.unsafe(acceptedBrownlowRowsSql())} b
       LEFT JOIN player_season_stats pss
         ON pss.player_id = b.player_id AND pss.season = b.season
   `;

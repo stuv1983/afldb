@@ -1,3 +1,4 @@
+import { acceptedBrownlowRowsSql } from './brownlow-readiness';
 import 'server-only';
 
 import { sql } from '@/db/client';
@@ -54,7 +55,7 @@ export async function getBrownlowWinners(filters: {
     SELECT b.season, p.id AS "playerId", p.slug,
            p.display_name AS "displayName", b.votes,
            cl.name AS "clubName", cl.slug AS "clubSlug"
-      FROM brownlow_season_votes b
+      FROM ${sql.unsafe(acceptedBrownlowRowsSql())} b
       JOIN players p ON p.id = b.player_id
       LEFT JOIN player_season_stats ps
         ON ps.player_id = b.player_id AND ps.season = b.season
@@ -145,7 +146,7 @@ export async function getMultipleBrownlowWinners(): Promise<MultipleBrownlowWinn
     SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
            COUNT(b.season)::int AS medals,
            array_agg(b.season ORDER BY b.season) AS seasons
-      FROM brownlow_season_votes b
+      FROM ${sql.unsafe(acceptedBrownlowRowsSql())} b
       JOIN players p ON p.id = b.player_id
      WHERE b.is_winner
      GROUP BY p.id, p.slug, p.display_name, p.sort_name

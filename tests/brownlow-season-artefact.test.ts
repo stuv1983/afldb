@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import { acceptedBrownlowRowsSql, brownlowAcceptedSql, brownlowStatusSql } from '@/db/queries/brownlow-readiness';
 
 const root = process.cwd();
 const loader = resolve(root, 'tools/migration/import_brownlow_season.py');
@@ -29,6 +30,54 @@ const artefactCsv = resolve(root, 'data/brownlow/season-votes.csv');
 const manifestJson = resolve(root, 'data/brownlow/season-votes.manifest.json');
 const identityCsv = resolve(root, 'data/brownlow/player-identity.csv');
 const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
+
+describe('Brownlow readiness is an explicit decision, independent of football completion', () => {
+  const cases = [
+    { name: 'completed, pending, absent votes', football: 'complete', coverage: 'pending', votes: false, published: false, status: 'pending', rows: 0 },
+    { name: 'completed, pending, unapproved winner/rank rows', football: 'complete', coverage: 'pending', votes: true, published: false, status: 'pending', rows: 0 },
+    { name: 'in progress, pending, source rows', football: 'in_progress', coverage: 'pending', votes: true, published: false, status: 'pending', rows: 0 },
+    { name: 'explicit complete source acceptance (historical/2025)', football: 'complete', coverage: 'complete', votes: true, published: false, status: 'complete', rows: 1 },
+    { name: 'explicit admin publication', football: 'complete', coverage: 'pending', votes: true, published: true, status: 'complete', rows: 1 },
+    { name: 'explicit not applicable', football: 'complete', coverage: 'not_applicable', votes: false, published: false, status: 'not_applicable', rows: 0 },
+    { name: 'not applicable cannot expose stray winner rows', football: 'complete', coverage: 'not_applicable', votes: true, published: false, status: 'not_applicable', rows: 0 },
+    { name: 'missing decision is pending', football: 'complete', coverage: null, votes: true, published: false, status: 'pending', rows: 0 },
+  ];
+  it.each(cases)('$name', (fixture) => {
+    const script = `
+import json,sqlite3,sys
+sys.path.insert(0,'tools/migration')
+from brownlow_readiness import accepted_sql,status_sql
+v=json.load(sys.stdin)
+db=sqlite3.connect(':memory:')
+db.executescript('CREATE TABLE seasons(year int,status text); CREATE TABLE stat_availability(stat_key text,season int,coverage text); CREATE TABLE brownlow_season_authority(season int,published_revision int); CREATE TABLE brownlow_season_votes(season int,votes int,is_winner int,eligible_rank int);')
+db.execute('INSERT INTO seasons VALUES(2090,?)',(v['football'],))
+if v['coverage'] is not None: db.execute("INSERT INTO stat_availability VALUES('brownlow_season_total',2090,?)",(v['coverage'],))
+if v['published']: db.execute('INSERT INTO brownlow_season_authority VALUES(2090,1)')
+if v['votes']: db.execute('INSERT INTO brownlow_season_votes VALUES(2090,30,1,1)')
+ts=db.execute('SELECT '+v['statusSql']+' FROM seasons s').fetchone()[0]
+py=db.execute('SELECT '+status_sql('s.year')+' FROM seasons s').fetchone()[0]
+assert ts==py==v['status'],(ts,py,v['status'])
+assert db.execute('SELECT '+v['acceptedSql']+' FROM seasons s').fetchone()==db.execute('SELECT '+accepted_sql('s.year')+' FROM seasons s').fetchone()
+rows=db.execute('SELECT votes,is_winner,eligible_rank FROM '+v['rowsSql']+' b').fetchall()
+assert len(rows)==v['rows'],rows
+assert db.execute('SELECT count(*) FROM brownlow_season_votes').fetchone()[0]==int(v['votes'])
+print(json.dumps(dict(status=ts,authoritativeRows=len(rows),rawPreserved=True)))
+`;
+    const run = spawnSync(python, ['-I', '-B', '-c', script], {
+      cwd: root, encoding: 'utf8', input: JSON.stringify({ ...fixture,
+        statusSql: brownlowStatusSql('s.year'), acceptedSql: brownlowAcceptedSql('s.year'), rowsSql: acceptedBrownlowRowsSql() }),
+    });
+    expect(run.status, run.stderr || run.stdout).toBe(0);
+    expect(JSON.parse(run.stdout)).toEqual({ status: fixture.status, authoritativeRows: fixture.rows, rawPreserved: true });
+  });
+
+  it('pending source match votes cannot become canonical round votes in the importer', () => {
+    const run = spawnSync(python, ['-I', '-B', '-c',
+      "import sys; sys.path.insert(0,'tools/migration'); import import_fitzroy_core as f; s=f.load_round_vote_seasons(); assert 2025 in s and 2026 not in s; m=f.load_vote_seasons('brownlow_match_votes'); r={'Brownlow.Votes':'3'}; assert f.canonical_stat_value(r,'Brownlow.Votes',2026,m) is None; assert f.canonical_stat_value(r,'Brownlow.Votes',2025,m)==3; assert r['Brownlow.Votes']=='3'"],
+    { cwd: root, encoding: 'utf8' });
+    expect(run.status, run.stderr).toBe(0);
+  });
+});
 
 type Row = Record<string, string>;
 

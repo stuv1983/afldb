@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Preserve explicit pending Brownlow readiness (2026-10-21)
+
+- Derive Brownlow readiness from existing availability/publication decisions rather than football
+  completion or mere vote-row presence. Keep pending votes out of authoritative season/career,
+  winner, leaderboard and grid projections; retain raw reconciliation evidence and suppress
+  eligible ranks/medal determination while pending. Accepted historical/2025 eligibility rules
+  are unchanged; no schema, authority metadata or active reference changes.
+- Core imports project pending match votes as NULL and exclude pending canonical round votes,
+  preserving acquired bytes. Focused SQL-parity, public-projection, PGlite caller and existing
+  eligibility/import tests cover completed/in-progress pending, accepted and not-applicable cases.
+
 ### ISSUE-316 - Bounded wildcard-final witness reconciliation (2026-10-21)
 
 - Replace the ladder validator's whole-season wildcard exclusion with exact accepted-source

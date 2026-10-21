@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { brownlowStatusSql, acceptedBrownlowRowsSql } from './brownlow-readiness';
 
 type Tx = postgres.TransactionSql;
 
@@ -152,12 +153,7 @@ export async function recomputePlayerDerivedStats(
            brownlow_votes, brownlow_status, is_premier)
     WITH season_brownlow AS (
       SELECT s.year AS season,
-             CASE
-               WHEN EXISTS (SELECT 1 FROM brownlow_season_votes b WHERE b.season = s.year)
-                 THEN 'complete'
-               WHEN s.status = 'in_progress' THEN 'pending'
-               ELSE 'not_applicable'
-             END::coverage_status AS status
+             (${tx.unsafe(brownlowStatusSql('s.year'))})::coverage_status AS status
       FROM seasons s
       WHERE s.year = ${season}
     ),
@@ -301,7 +297,7 @@ export async function recomputePlayerDerivedStats(
       SELECT player_id,
              sum(votes) AS votes,
              count(*) FILTER (WHERE is_winner) AS medals
-      FROM brownlow_season_votes
+      FROM ${tx.unsafe(acceptedBrownlowRowsSql())} brownlow_season_votes
       WHERE player_id = ANY(${ids})
       GROUP BY player_id
     )
@@ -342,7 +338,7 @@ export async function recomputePlayerDerivedStats(
       SELECT player_id,
              sum(votes) AS votes,
              count(*) FILTER (WHERE is_winner) AS medals
-      FROM brownlow_season_votes
+      FROM ${tx.unsafe(acceptedBrownlowRowsSql())} brownlow_season_votes
       WHERE player_id = ANY(${ids})
       GROUP BY player_id
     ) b ON b.player_id = p.id
@@ -383,13 +379,7 @@ export async function recomputePlayerDerivedStats(
 export async function recomputeSeasonBrownlowStatus(tx: Tx, season: number): Promise<void> {
   await tx`
     WITH coverage AS (
-      SELECT CASE
-               WHEN EXISTS (
-                 SELECT 1 FROM brownlow_season_votes b WHERE b.season = s.year
-               ) THEN 'complete'
-               WHEN s.status = 'in_progress' THEN 'pending'
-               ELSE 'not_applicable'
-             END::coverage_status AS status
+      SELECT (${tx.unsafe(brownlowStatusSql('s.year'))})::coverage_status AS status
         FROM seasons s
        WHERE s.year = ${season}
     )

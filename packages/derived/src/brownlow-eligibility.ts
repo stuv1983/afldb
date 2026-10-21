@@ -535,7 +535,8 @@ export function determineBrownlowMedal(input: BrownlowMedalInput): BrownlowMedal
   const rawLeaderboard: BrownlowRawLeaderboardEntry[] = evaluated.map(({ total, eligibility }) => {
     // The eligible rank is stated only when no unknown player with strictly more votes could change it.
     const outrankable = evaluated.some((other) => isUnknown(other.eligibility) && other.total.votes > total.votes);
-    const determinate = eligibility.status === 'ineligible' || (eligibility.status === 'eligible' && !outrankable);
+    const determinate = report.source.seasonState === 'complete'
+      && (eligibility.status === 'ineligible' || (eligibility.status === 'eligible' && !outrankable));
     return {
       playerId: total.playerId,
       votes: total.votes,
@@ -557,7 +558,7 @@ export function determineBrownlowMedal(input: BrownlowMedalInput): BrownlowMedal
       reason: entry.eligibility.detail.reason,
     }))
     .sort((a, b) => b.votes - a.votes || a.playerId - b.playerId);
-  const rankingDeterminate = unresolvedPlayers.length === 0;
+  const rankingDeterminate = report.source.seasonState === 'complete' && unresolvedPlayers.length === 0;
 
   const blocking = blockingFindingsOf(report);
   const checksum = createHash('sha256').update(canonicalJson({

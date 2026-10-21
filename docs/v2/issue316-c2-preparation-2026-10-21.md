@@ -1,5 +1,67 @@
 # ISSUE-316 C2 package v5 — bounded successor-input approvals and WF comparison
 
+## Pending-Brownlow repair and resumed rehearsal authority — 2026-10-21
+
+Owner authorised the bounded readiness fix, focused tests, one local implementation commit
+and resumption of the disposable DEV rehearsal pinned to that commit. Reviewed and retained
+the four previous uncommitted tracking edits as accurate history. No schema/model expansion:
+use existing stat_availability coverage and brownlow_season_authority publication. Explicit
+not_applicable stays not_applicable; complete source coverage or recorded admin publication
+accepts totals; otherwise pending, regardless of football completion or source-row presence.
+No new authority record or year exception is manufactured. Raw vote evidence remains intact.
+
+The full/targeted derived writers and affected public season/player/winner/career/club/award/grid
+projections share that rule. V2 reconciliation keeps raw totals but cannot determine a medal or
+eligible ranking for pending Brownlow. Pending match votes project as NULL and pending round
+votes are excluded from the core canonical import; raw CSVs/manifests remain immutable.
+Accepted historical/2025 source/eligibility rules and AFL API ownership restrictions unchanged.
+
+Focused local validation: four suites 310 passed / 1 existing skip, plus 2 affected mutation
+contracts passed (15 other tests excluded by the focused name filter). TypeScript exit 0;
+changed-file ESLint exit 0 (four existing unused-variable warnings). Initial failures retained
+on C: include missing grants/tables in the reduced test fixture (corrected), and an unrelated
+pre-existing writer-list assertion missing the V2 ownership/backfill writers (unchanged).
+Evidence: `C:\tmp\afldb-c2-brownlow-fix-20261021\`.
+
+The owner accepts 1,640 solely as the rehearsal club-season expectation, conditional on the
+unchanged canonical inputs and retained independent derivation. Prepare clearly labelled test
+bindings only in the C:/DEV isolated source copy. Production successor acceptance, source
+adoption, active rollover and deployment remain unauthorised. Rehearsal execution/result will
+be recorded separately against the implementation commit; the blocked attempt below is history.
+
+## Bounded DEV rehearsal — 2026-10-21 — BLOCKED before database creation
+
+Owner separately authorised a disposable DEV-only rehearsal at implementation commit
+`4b5e2490c45d075f9042cd9aa857c32ca2e6b745`; no production successor or rollover authority.
+Read-only preflight PASS: streamanator/arm, PostgreSQL 16.15, Python 3.12.3, existing project
+venv psycopg 3.3.4 reusable read-only, 80,545,263,616 bytes free, loopback 55436 bind probe
+successful. No existing database was connected to. No installation or WSL invocation.
+
+Independent expectation **1,640**: real pinned `scan_results`/ClubResolver yields 17,056
+canonical matches; the actual `club_seasons` SQL includes both sides of the 16,327 H&A
+matches, grouped by season/identity and joined to the defined seasons. Distinct pairs:
+1,622 through 2025 + 18 in 2026. No witness count used; this is a rehearsal measurement,
+not production acceptance.
+
+**STOP:** the supported full derived rebuild cannot preserve pending 2026 Brownlow.
+`rebuild_derived.py:118-141` marks a season with a decided GF complete; `:199-207` then
+assigns Brownlow complete when season-vote rows exist, otherwise not_applicable. Pending
+is possible only for an in-progress season. The reference keeps all three 2026 Brownlow
+families pending. No correction/coverage evidence or SQL was changed to bypass this.
+The default core Brownlow group also admits pending seasons for canonical round-vote
+materialisation; its source/authority implications must be resolved before a full import.
+
+Candidate bindings, all three genuine candidate gates, cluster creation, import, full
+derived rebuild and actual D7 are **BLOCKED / NOT RUN**. No DEV rehearsal root, cluster,
+database, credentials or PostgreSQL process was created; no source transferred. No process
+needed stopping. No active reference changes or commits. Full sanitised commands, source
+archive, phase results, pair enumeration and hashes:
+`C:\tmp\afldb-c2-dev-rehearsal-20261021\REPORT.md` and `results.json`.
+
+Next: separately scope a pending-Brownlow preservation/authority fix, or explicitly approve
+a narrower Brownlow-excluded rehearsal. Then authorise one fresh bounded attempt; no automatic
+rerun. Existing production acceptance/census/rollover/release decisions remain separate.
+
 ## V5 owner approvals and local implementation — 2026-10-21
 
 This section supersedes the older readiness/next-action wording below. The acquisition and

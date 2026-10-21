@@ -20,7 +20,7 @@ describe('admin match mutation source contracts', () => {
       expect(mutation).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
       expect(mutation).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_round_votes/i);
     }
-    expect(playerDerived).toContain('FROM brownlow_season_votes');
+    expect(playerDerived).toContain('acceptedBrownlowRowsSql()');
     expect(playerDerived).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
   });
 

@@ -1346,7 +1346,25 @@ reference/season/network switch change; 1,640 not approved; 2026 Brownlow pendin
 Actual disposable rebuilt-DB D7, remaining successor inputs/count/census and rollover authority
 remain outstanding. No acquisition rerun, host/network/database access or WSL invocation here.
 
+### Bounded DEV C2 rehearsal — 2026-10-21 — BLOCKED
+
+Read-only DEV preflight PASS; canonical H&A projection independently measures 1,640
+club-season rows without witness input. Stopped before any candidate binding or cluster:
+full `rebuild_derived.py` sets decided-GF 2026 complete, then Brownlow complete/not_applicable,
+so cannot preserve required pending status. No DB connections/DEV writes; genuine candidate
+gates, import, derived and actual D7 not run. No WSL invocation, installation or commit.
+Full evidence on `C:\tmp\afldb-c2-dev-rehearsal-20261021\`; current detail in C2 package.
+Next: separately scoped pending-Brownlow preservation/authority fix or explicitly narrower
+rehearsal, then new attempt; no automatic rerun or production acceptance.
+
 ## 11. Not done here (historical execution record)
+
+**Current successor note (2026-10-21):** owner authorised pending-Brownlow preservation fix,
+focused local checks, one implementation commit and resumed disposable DEV rehearsal pinned
+to it. Existing availability/publication model suffices; no schema or active reference edit.
+Focused checks 310 passed / 1 existing skip + 2 mutation contracts; typecheck/lint passed.
+1,640 is accepted for this rehearsal only. Full current detail and prior failed-attempt history
+are in the C2 package; no production successor/rollover/release authority is inferred.
 
 - No commit, merge, push, deployment, host contact, timer change or source-ownership change.
 - No final AFL Tables acquisition and no rollover: the switch is still `active` / 2026 and `seasons.json`
