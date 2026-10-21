@@ -17,6 +17,12 @@ commit.
 
 ### ISSUE-316 - V2 handoff reconciliation and bounded DEV approval package (2026-10-21)
 
+- Retain package v3 and provenance for the single approved CRAN fitzRoy 1.8.0 source download,
+  safely extracted/reviewed offline on C:. Trace actual parquet/mapping/AFL Tables endpoints,
+  repeated full downloads and cache-only failure behaviour; distinguish unresolved R/xml2/readr
+  transport policy and installed-source binding from final acquisition authority. No AFL requests
+  or package execution; acquisition remains unready for approval.
+
 - Retain C2 preparation package v2 with offline runtime/endpoint review and C: dependency
   inventory. Existing R 4.3.3 / Node 22.23.2 meet inspected requirements; no upgrade imposed.
   Historical archive checksum/membership verified; CRLF-only differences explicitly pinned.

@@ -1,0 +1,108 @@
+{
+  "requested_url": "https://cran.r-project.org/src/contrib/fitzRoy_1.8.0.tar.gz",
+  "retrieval_started_utc": "2026-10-21T03:30:13.749204+00:00",
+  "method": "GET",
+  "automatic_retries": 0,
+  "redirects": [],
+  "publisher_hash_independently_verified": false,
+  "http_status": 200,
+  "effective_url": "https://cran.r-project.org/src/contrib/fitzRoy_1.8.0.tar.gz",
+  "headers": {
+    "Date": "Wed, 21 Oct 2026 03:30:14 GMT",
+    "Content-Type": "application/x-gzip",
+    "Content-Length": "1222934",
+    "Last-Modified": "Sun, 23 Aug 2026 10:41:07 GMT",
+    "ETag": "\"12a916-659b481d38113\"",
+    "Server": "Apache"
+  },
+  "bytes": 1222934,
+  "sha256": "33ed08177a8301f57644654656221f6e4bd5873018eb11c317d5f2f188d0b54c",
+  "stored_filename": "fitzRoy_1.8.0.tar.gz",
+  "retrieval_finished_utc": "2026-10-21T03:30:16.831125+00:00",
+  "package": "fitzRoy",
+  "version": "1.8.0",
+  "description_sha256": "df4ef20d8a13b51ca969df2427f32baf8ba9adc82ded70d20fab48a036a40158",
+  "archive_membership": "PASS_NO_UNSAFE_PATHS_LINKS_OR_SPECIAL_FILES",
+  "extraction_root": "C:\\tmp\\afldb-c2-cran-source-20261021T143013463-045c8bc3\\source",
+  "extracted_files": 182,
+  "package_code_executed": false,
+  "review_baseline_head": "5af44c4560af9e25e487e26c0a486f6fdc6f745c",
+  "historical_wrapper_revision": "c9cca86db2fd60ec42fa777906a2cf2a291d5e4e",
+  "restricted_directory": "C:\\tmp\\afldb-c2-cran-source-20261021T143013463-045c8bc3",
+  "directory_acl": {
+    "inheritance": false,
+    "full_control": [
+      "Office/stuar",
+      "NT AUTHORITY/SYSTEM"
+    ]
+  },
+  "archive_members": 194,
+  "archive_regular_files": 182,
+  "unsafe_members": [],
+  "reviewed_source_files": [
+    {
+      "filename": "fitzRoy/DESCRIPTION",
+      "bytes": 2567,
+      "sha256": "df4ef20d8a13b51ca969df2427f32baf8ba9adc82ded70d20fab48a036a40158"
+    },
+    {
+      "filename": "fitzRoy/NAMESPACE",
+      "bytes": 1647,
+      "sha256": "ad8e378218d4eb3a348d11345f790c4d52000a83344912ee208eb77868e2c71f"
+    },
+    {
+      "filename": "fitzRoy/R/fetch-player-stats.R",
+      "bytes": 12982,
+      "sha256": "e71f99afb56752c6a1b680d8479845b2d6e3280cb11059b90a13647a84f16520"
+    },
+    {
+      "filename": "fitzRoy/R/fetch-player-details.R",
+      "bytes": 6893,
+      "sha256": "d14614559b9fa6dafd6fef377f5a183f76e21fb2f17ace8ad5cebd873235b46e"
+    },
+    {
+      "filename": "fitzRoy/R/fetch-results.R",
+      "bytes": 7879,
+      "sha256": "33ed9d9980bd93287635e9a65112d8a0f2f2ba9583a96c5d92b45d6b7ddb6615"
+    },
+    {
+      "filename": "fitzRoy/R/fetch-ladder.R",
+      "bytes": 11422,
+      "sha256": "420a5244cb390564603519cdcf64ac0b77ad79b67894ee438244546d5c5f0cca"
+    },
+    {
+      "filename": "fitzRoy/R/helpers-afltables-playerstats.R",
+      "bytes": 21031,
+      "sha256": "2509eb879052ca412ab7365d24a2fe2f0b9d1da31f32097b7917acc1c977343e"
+    },
+    {
+      "filename": "fitzRoy/R/helpers-afltables-playerdetails.R",
+      "bytes": 4016,
+      "sha256": "112641426537e0218fd68ccdd7bfb7e08d76a2e89cf6bc51ea3a06d128ae0d17"
+    },
+    {
+      "filename": "fitzRoy/R/helpers-afltables.R",
+      "bytes": 6347,
+      "sha256": "c4891936e64940ed117494af30f50515f0c5ded8f4716fd91963cbf71bd237e9"
+    },
+    {
+      "filename": "fitzRoy/R/helpers-general.R",
+      "bytes": 11431,
+      "sha256": "54186cbde3bc10300a93ad570008d8e5cf38295ef635eb514c6476b359465fad"
+    },
+    {
+      "filename": "fitzRoy/R/utils-http.R",
+      "bytes": 3367,
+      "sha256": "bfbc75e5488d1ddb3b4b2389e039dc89b749dae9d2dc4c7326c89fd838874cb7"
+    }
+  ],
+  "review_status": "FITZROY_SOURCE_TRACED_TRANSPORT_IMPLEMENTATION_AND_RUNNER_READINESS_OUTSTANDING",
+  "retrieved_source_matches_installed_code": "NOT_PROVEN; installed DESCRIPTION identifies RSPM/Built while retrieved source identifies CRAN; matching package/version alone does not prove code identity",
+  "remaining_transport_material": [
+    "R 4.3.3 utils::download.file/base::url and URL connection backend definitions",
+    "xml2 1.3.6 xml2::read_html URL dispatch",
+    "readr 2.1.5 read_fwf/read_csv remote source and connection dispatch",
+    "Only if delegated by above: vroom 1.6.5, curl 5.2.0 relevant URL transport definitions"
+  ],
+  "publisher_authentication_note": "TLS retrieval from approved CRAN URL; SHA-256 identifies retrieved bytes, not independently verified publisher authentication."
+}

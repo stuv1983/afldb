@@ -1302,6 +1302,24 @@ separate. Unreadable exact polkit rule remains for later retirement, not this re
 ISSUE-316 remains OPEN. Full evidence and exact missing inputs in the existing package;
 machine-readable review inventory on C: beside the original v1 archive/manifest.
 
+### Approved CRAN source continuation — 2026-10-21
+
+Package v3 and `docs/v2/issue316-c2-cran-source-2026-10-21.json` record the exact approved
+CRAN fitzRoy 1.8.0 source download: HTTP 200/no redirect, 1222934 bytes, SHA-256
+`33ed08177a8301f57644654656221f6e4bd5873018eb11c317d5f2f188d0b54c`. Safe 194-member
+inventory, 182 extracted files only beneath restricted C: root; no package code executed.
+Historical wrapper branches now traced: repeated GitHub parquet (130), possible season/match
+tail and GitHub mapping, 21 club pages, bg3.txt (131). fitzRoy source has no explicit transport
+retry/timeout/throttle; R/xml2/readr determine wire/redirect behaviour. Failed index reads can
+return stale cache-only data; final acceptance still outstanding. Source hash does not prove
+publisher authentication or installed RSPM code identity.
+
+Next bounded source inputs: R 4.3.3 download.file/url backend, xml2 1.3.6 read_html URL
+dispatch, readr 2.1.5 remote/connection dispatch; follow vroom/curl only when reached and
+separately authorised/supplied. No acquisition approval yet. Runner/source binding/native
+hashes/configuration/budget and later authorities remain separate. No dependency downloads,
+AFL requests, production/DEV/DB/validator/service/WSL operation. Polkit limitation unchanged.
+
 ## 11. Not done here
 
 - No commit, merge, push, deployment, host contact, timer change or source-ownership change.

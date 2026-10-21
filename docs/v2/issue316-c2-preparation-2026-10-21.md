@@ -1,9 +1,132 @@
-# ISSUE-316 C2 approval package v2 — bounded offline review
+# ISSUE-316 C2 approval package v3 — CRAN source and endpoint review
 
 Prepared 2026-10-21 with one agent. **C2 NOT EXECUTED; execution approval NOT granted.**
-Updated after the completed prerequisite inspection and offline source review. **No acquisition
-approval requested.** Next input is the bounded package-source material listed below; the old
+Updated after the completed prerequisite inspection, offline runtime review and approved single
+CRAN source retrieval. **Acquisition is not ready for approval.** Next input is bounded transport
+implementation material identified in v3 below; the old
 inspection wording is retained as history, not a request to repeat production inspection.
+
+## V3 source review — 2026-10-21
+
+Baseline verified exactly: `5af44c4560af9e25e487e26c0a486f6fdc6f745c`, `v2/rebuild`,
+remotes empty; only pre-existing untracked `.codex/`, preserved. Graph tools unavailable;
+used direct pinned-source inspection. One agent. Owner authorised only the exact CRAN source
+download and offline review. No AFL data request, package installation/loading/execution,
+dependency download, production/DEV connection, database/validator/census/rollover/service,
+WSL invocation, cleanup, push or new worktree. Previous C: evidence remains untouched.
+
+### Source provenance and safe extraction
+
+- Requested **and effective** URL:
+  `https://cran.r-project.org/src/contrib/fitzRoy_1.8.0.tar.gz`.
+- One GET, no retries or redirects; **HTTP 200**. Retrieval UTC:
+  `2026-10-21T03:30:13.749204Z` to `2026-10-21T03:30:16.831125Z`.
+- **1,222,934 bytes**, SHA-256
+  **`33ed08177a8301f57644654656221f6e4bd5873018eb11c317d5f2f188d0b54c`**.
+- Response: Date `Wed, 21 Oct 2026 03:30:14 GMT`, Content-Type `application/x-gzip`,
+  Content-Length `1222934`, Last-Modified `Sun, 23 Aug 2026 10:41:07 GMT`,
+  ETag `"12a916-659b481d38113"`, Server `Apache`. DESCRIPTION: **Package fitzRoy,
+  Version 1.8.0**, R >=4.1; no new runtime upgrade requirement.
+- Restricted root: `C:\tmp\afldb-c2-cran-source-20261021T143013463-045c8bc3`.
+  Inheritance disabled; only current owner `Office\stuar` and SYSTEM have FullControl.
+  Original tarball unchanged. Before extraction: all **194 members** checked, **182 files**,
+  remaining directories, no unsafe paths, links, special files or case-colliding names.
+  Extraction only to `source\fitzRoy` beneath that root; no package code ran.
+- C: `retrieval.json`, `archive-inventory.json`, `source-review-provenance.json` retain evidence.
+  [Small provenance manifest](issue316-c2-cran-source-2026-10-21.json) records per-file hashes;
+  third-party source/archive stay outside Git. Computed hash identifies retrieved bytes;
+  it is **not independently verified publisher authentication**. CRAN source matches package/
+  version, but is not proven byte-identical to installed RSPM build code. Bind the selected
+  installed acquisition functions to this reviewed source before acquisition authority.
+
+### Actual reachable C2 branches
+
+References `R/...:N` below are filenames/lines inside the downloaded `fitzRoy/` source.
+Wrapper references are historical **c9cca86d** `tools/rebuild/fitzroy/acquire_core.R`,
+re-read at 313–378. Direct calls bypass generic source dispatch: no fallthrough to AFL,
+FootyWire, Squiggle or Fryzigg functions. Numeric seasons are 1897–2026 inclusive (130).
+Stats use default `round_number=NULL`, **`rescrape=FALSE`**, `rescrape_start_season=NULL`;
+details use `team=NULL`; results get the whole vector; ladder gets one season per call,
+`round_number=NULL`, `match_results_df=NULL`. No new label or acceptance input selected.
+
+| Reachable source / branch | Exact initial URL or construction | Reads and scope |
+|---|---|---|
+| `R/fetch-player-stats.R:159–198` | `https://github.com/jimmyday12/fitzroy_data/releases/download/data/afltables_player_stats.parquet` | **130 full downloads**, one per stats call; `utils::download.file(..., quiet=TRUE, mode="wb")` into a new tempfile; `nanoparquet::read_parquet`, then unlink on normal path. No persistent cache/reuse in this branch. Mutable release asset is not pinned by package version. |
+| `R/helpers-afltables-playerstats.R:306–377`, when requested end exceeds parquet's global `max(Date)` | `https://afltables.com/afl/seas/<YYYY>.html` for every year from cache max-date year to requested end year | Sequential `purrr::map`; filters linked matches to dates **> cache max date and <= requested end**. Per-call index reads may overlap. End date is year end capped at `Sys.Date()` (`R/helpers-general.R:130–169`). Cache contents/max date were not fetched or assumed. |
+| `R/helpers-afltables-playerstats.R:40–148` for selected match links | `str_replace(href, "..", "https://afltables.com/afl")` from season-page links (370) | One `read_html_fitzroy` call per resulting non-NA link; no deduplication or pagination loop. Match subpath is supplied by HTML, not a fixed code template; the transformation is not an anchored hostname/path allowlist. Tables provide player profile URLs as values; this branch does not request each profile. |
+| `R/helpers-afltables-playerstats.R:266–279`, once per nonempty live-tail scrape | `https://github.com/jimmyday12/fitzRoy_data/raw/main/data-raw/afl_tables_playerstats/player_mapping_afltables.csv` | `base::url` connection passed to `readr::read_csv`; one mapping read per live-tail call, not per player. Additional GitHub source on mutable `main`; no published checksum in this code. |
+| `R/fetch-player-details.R:163–185` -> `R/helpers-afltables-playerdetails.R:76–148` | `https://afltables.com/afl/stats/alltime/<slug>.html` | 21 sequential HTML reads, no year filter or per-player request. Slugs: `adelaide, brisbanel, brisbaneb, carlton, collingwood, essendon, fitzroy, fremantle, gws, geelong, goldcoast, hawthorn, melbourne, kangaroos, padelaide, richmond, stkilda, swans, westcoast, university, bullldogs` (literal three-l spelling retained). |
+| `R/fetch-results.R:118–163` -> `R/utils-http.R:58–76` | `https://afltables.com/afl/stats/biglists/bg3.txt` | Reads the complete fixed-width results file, then filters the requested season range locally. One read for core results. |
+| `R/fetch-ladder.R:177–189,281–317` -> same results path | Same `bg3.txt` | **130 more full reads**, because wrapper supplies no `match_results_df`; no shared results cache. Filters `Round.Type == "Regular"`, computes points/percentage and selects latest round. No published-ladder endpoint. Existing wildcard-final comparability limitation remains; no validator run. |
+
+### Transport, fallbacks and volume limits
+
+`R/utils-http.R:11–32,58–76` temporarily sets/restores `HTTPUserAgent` for HTML/results
+reads, default `fitzRoy R package (https://github.com/jimmyday12/fitzRoy)`, overridable by
+`options(fitzRoy.user_agent=...)`. `xml2::read_html(url)` and `readr::read_fwf(url,...)`
+receive no explicit method, timeout, redirect policy, retry or rate-limit configuration.
+The parquet `download.file` and mapping `url`/`read_csv` do not go through this UA wrapper.
+These are URL reads intended to retrieve content; **actual HTTP method/redirect chains,
+timeout defaults, transport retries and effective hosts are delegated to R/dependencies**.
+No explicit httr/httr2 GET/POST, retry/backoff, throttle/sleep or parallel execution occurs
+in this reached fitzRoy chain. No provider fallback to AFL API/FootyWire is reachable here.
+GitHub release/raw redirects and any CDN hosts cannot be enumerated from fitzRoy code alone;
+none were probed. The CRAN download's zero-redirect observation proves nothing about them.
+
+Fallback is to **cached data**, not a second provider: index-page errors become NULL and are
+discarded (playerstats helper 327–351); all failed indexes warn and return no match URLs,
+making stats return cache-only rows. Partial index failure can silently omit tail matches.
+Parquet, match-page, mapping, club-detail or results failures propagate to wrapper's error
+handler and stop before a manifest. There is no fitzRoy-level automatic retry. With some
+index failures a manifest may still be written; completion/acceptance remains a validator
+decision. Live-tail helper also replaces some NAs within partly populated columns with zero/
+empty string (`helpers-afltables-playerstats.R:450–461`); wrapper preserves what it receives,
+so source pinning does not prove historical NULL semantics without later evidence review.
+
+For both successful candidate commands, count **logical URL read/download invocations** as
+`282 + U + M + H`: 130 parquet + 21 club pages + 131 results; U = index-page reads,
+M = selected match-page reads (duplicates counted), H = mapping reads (0–130, one per
+nonempty live-tail call). U/M depend on the as-yet unread cache and season HTML. No per-player
+network loop. This is not a wire-request upper bound: dependency retries/redirects and
+remote content sizes are unknown; no fixed byte budget or safe total HTTP cap is established.
+Do not replace this with 282 actual HTTP requests or infer 218 current live matches to scrape.
+
+Output contract unchanged: 130 stats CSVs, player_details.csv, results.csv and core manifest;
+130 ladder CSVs and witness manifest, in the existing Stage 1 paths. Manifests written last,
+always initially unvalidated. Wrapper stops at first propagated dataset failure, preserving
+earlier CSVs; it allows same-label CSV replacement without a manifest, while the proposed
+operation still requires fresh labels/directories and preserves failed runs. R temp parquet
+may remain on failures before unlink; dependency temp/cache/connection effects are unresolved.
+No fitzRoy `.onLoad/.onAttach/.onUnload/.First.lib` or `setHook` declarations found in the
+source R files; dependency hooks were not audited or loaded. Dictionary/mapping objects are
+bundled package data and do not themselves introduce another URL in the reached code.
+
+### Readiness and smallest next authorisation
+
+**fitzRoy-level source tracing is complete for these arguments; maintenance acquisition is
+not yet completely specified or ready to request approval.** Existing R 4.3.3 remains a
+compatible version candidate with fitzRoy 1.8.0/jsonlite 1.8.8/digest 0.6.34; no Node needed
+for acquisition. Existing Stage 1 argv below remains a proposal, not approval or selected
+labels. Concrete runnable commands still need approved runtime/root, installed-code binding,
+startup/library/cache/TMP/CA/proxy configuration, redirect/timeout policy and output budget.
+There is no basis to pin unknown final manifests, census, corrections or successor inputs.
+
+**Smallest next source operation:** owner supplies, or separately authorises source-only
+retrieval to C: of **R 4.3.3's `utils::download.file` / `base::url` and URL-backend definitions,
+xml2 1.3.6's `read_html` URL dispatch, and readr 2.1.5's `read_fwf`/`read_csv` remote/connection
+dispatch**, with provenance/hashes. Review only transport method/redirect/retry/timeout/temp
+behaviour. Follow into **vroom 1.6.5 / curl 5.2.0** only if those specific definitions delegate
+there and material is separately supplied/approved. None was downloaded now. Their implementation
+is absent from the retained C: metadata/source bundles, so package-version knowledge does not
+close the gap. httr/httr2 source is not required by the reached transport calls.
+
+This narrowly replaces v2's request for fitzRoy source, which is now fulfilled. It grants no
+AFL acquisition or live endpoint probe and no installed-runtime/host inspection. Runner/native
+hashes and source-to-installed binding remain separate preparation inputs; final acquisition,
+witness/census validation, rollover and deployment retain the six independent authorities.
+Polkit remains only a later writer-retirement limitation; no broader access requested.
+
+## Retained v2 offline review and preparation history
 
 Review baseline: HEAD `ac7a90892189d7b509f85a7a77d47bff5b83bbfd`, `v2/rebuild`, remotes
 empty, only pre-existing untracked `.codex/`. Subsequent changes preserved. One agent;
