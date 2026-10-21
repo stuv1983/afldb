@@ -17,6 +17,10 @@ commit.
 
 ### ISSUE-316 - V2 handoff reconciliation and bounded DEV approval package (2026-10-21)
 
+- Retain D-DEV-316-C1-APP-1 owner approval and failed DEV archive gate evidence: exact artifact
+  size/hash and host identity passed, but its esbuild symlink contradicts the no-symlinks plan.
+  Stopped before extraction or DB/app execution; port 3201 free, root/archive retained. DEV C1
+  acceptance remains pending owner artifact/continuation review; no executable changes.
 - Verify all 19 preserved handoff files against source and import commit; retain intentional V2
   quarantine/runtime refusal. Add the exact historical/V2 launcher fixture runner and hashed
   approval artifact, with an explicit pending owner adaptation of C0/C1 and separate C2 authority.

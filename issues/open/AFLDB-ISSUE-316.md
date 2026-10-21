@@ -364,6 +364,16 @@ and the measured DEV result: the hashed filesystem-only shell subset passed 4/4 
 its own authority; D-316-13 remains unavailable before deployed C4. No acquiring DEV control ran
 or is claimed.
 
+**DEV application attempt, 2026-10-21:** D-DEV-316-C1-APP-1 explicitly approved; steps 0–2
+completed with exact local/remote archive size/hash and DEV identity. STOP at step 3: packaged
+esbuild symlink contradicts the reviewed no-symlinks artifact description. No extraction,
+packaged execution, database connection or application/audit test. Port 3201 free; candidate
+root/archive retained, WSL stopped. DEV C1 NOT PASSED. The
+[C0/C1 execution record](../../docs/v2/issue316-c0-c1-approval-2026-10-21.md#dev-application-attempt--stopped-at-archive-gate-2026-10-21)
+contains verbatim approval, measured results, C: evidence location and the exact remaining
+artifact/continuation review prerequisite. Passwordless sudo unavailable; eventual CREATE
+DATABASE requires the owner. No authority expanded; ISSUE-316 remains open.
+
 **Shape: cut over at the season boundary, not mid-season.** 2026 stays `afltables`-owned forever as
 stored history, and 2027 is `afl_api`-owned from its first match. No row is re-owned, so Q1 and Q7
 stand, and no ownership-transfer tool is needed for the cutover itself.

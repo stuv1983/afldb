@@ -1,13 +1,97 @@
 # ISSUE-316 local reconciliation and C0/C1 approval — 2026-10-21
 
+**Latest: D-DEV-316-C1-APP-1 approved; DEV application attempt stopped at step 3's archive
+gate (2026-10-21). No deployed DEV C1 acceptance. See the execution record below.**
+
 **Owner approved D-V2-316-C0C1-1 and D-DEV-316-C1-REFUSALS-1 (2026-10-21); the approved DEV
 shell subset ran and PASSED 4/4. Full C0/C1 is NOT complete: deployed DEV app/audit acceptance
 and C2 remain pending. Production NO-GO.**
 The local preparation below involved no host access, acquisition, shared database writes,
 deployment, rollover, season changes, timer/service changes, pushes, subagents or new worktrees.
 The accepted fresh archive rehearsal, Brownlow implementation, builds and rollback exercises were
-not repeated. The only later operation is the filesystem-only DEV shell subset recorded in
-"Owner approvals and DEV results" below.
+not repeated. Later operations are the filesystem-only DEV shell subset and the stopped
+DEV application preparation attempt, each recorded below with its limits.
+
+## DEV application attempt — stopped at archive gate (2026-10-21)
+
+Owner approval, verbatim:
+
+> I explicitly approves D-DEV-316-C1-APP-1 exactly as specified in:
+> docs/v2/issue316-dev-app-check-plan-2026-10-21.md §5, steps 0–15, and §9.
+> Use one agent. Execute that approved DEV candidate check and record the result.
+
+The owner additionally required the existing C: archive, WSL stopped, no rebuild/install/
+cleanup, no package substitution or modification, no relaxed gates, no subagents, local
+evidence on C:, retention on failure, and small explicit-path local commits with empty remotes.
+Passwordless sudo was limited to the exact reviewed CREATE DATABASE statement; otherwise
+database creation must be owner-run. The full approved decision wording remains in plan §9.
+
+**Repository baseline:** branch `v2/rebuild`, HEAD
+`e7be840372cebd951d472216a83df4feecbe9da4`, matching the expected HEAD. Remotes empty;
+only pre-existing untracked `.codex/`, preserved. No executable edits or local suites/builds/
+fixtures; no subagents. The sandbox could not resolve `dev` because it could not access the
+user SSH config; elevated execution of the same approved baseline then used existing credentials.
+No automatic classifier rejection occurred. Initial WSL enumeration was sandbox-denied;
+elevated final enumeration reported no running distributions. WSL was never started.
+
+**Measured steps 0–2:** SSH alias `dev` resolved to `arm@10.0.40.100:22`; remote hostname
+`streamanator`, user `arm`, architecture `x86_64`, Node `v22.23.2` at the reviewed nvm path.
+Candidate root absent, port 3201 free, available DEV disk **80,671,028 KiB** (minimum
+6,291,456 KiB). `sudo -n true` unavailable (no interactive password attempted).
+Created only the mode-700 root `/home/arm/issue316-v2-candidate-20261021` and its mode-700
+`incoming` directory, then transferred the existing documented C: archive once.
+Local and remote size **113,830,430 bytes**, SHA-256
+`c829da087f65a3a8145ad07db8d7d649bb7f93f8b293d66f85547cd375e40b0e` — exact match.
+This pins the approved artifact attributed to source `fffef96fb079bfa975109fa2fdcf5552b51e5946`
+and build `WkKKyr7KAoFmMb5QyM4MQ`; internal source/build metadata was not independently
+read back because the membership gate stopped execution first.
+
+**Step 3: STOP.** Read-only tar inspection found **18,309 members, 13,210 regular files,
+and one symlink**:
+
+```text
+afldb-v2-dev-candidate-fffef96f/kit/node_modules/tsx/node_modules/.bin/esbuild
+  -> ../esbuild/bin/esbuild
+```
+
+The initial strict membership predicate also flagged the ordinary top-level directory
+`afldb-v2-dev-candidate-fffef96f` because tarfile omits its trailing slash; that directory is
+not itself a hazard. The actual symlink contradicts plan §2's explicit “no symlinks”
+description. The approved hash matches, so this is an artifact-description contradiction,
+not observed transfer corruption. No claim is made that the relative link escapes the package.
+No gate was relaxed, package altered, extraction attempted, or packaged script executed.
+Full `FILES.sha256` verification was not reached. The 13,210 regular-file count is not
+asserted to be a manifest mismatch (the manifest itself is also a regular file).
+
+**Unreached steps 4–14:** source ledger/checksum and candidate-database absence checks,
+layout/configuration, dump, CREATE DATABASE, restore, migrations, privileges, startup,
+refusal/audit and negative controls were **not run**. No synthetic users/sessions or audit
+writes were made. No database connection was made by this attempt; consequently original
+`afldb_dev` ledger 110 and absence of synthetic records were not independently reverified.
+No original DB/app/unit/timer/Caddy writes occurred. Ordinary concurrent V1 activity was
+neither measured nor attributed to this operation; aggregate host disk movement is not DB
+preservation evidence. DEV disk at final readback was 80,559,336 KiB available.
+
+**Final state, 2026-10-21T00:17:36Z:** read-only checks confirmed no extracted package, no
+candidate config or run directory, and **port 3201 free**. The candidate never started, so
+shutdown was unnecessary. No dump or candidate database was created by this operation.
+The uploaded archive and root/incoming directory are retained; no cleanup.
+
+**Evidence:** raw archive inventory/stop and final DEV readback are retained on C: at
+`C:\Users\stuar\AppData\Local\Temp\claude\D--dev-afldbV2\77258a0a-3c50-46b6-b25d-0084ebe15f04\scratchpad\dev-app-execution-20261021\`
+(`archive-membership-stop.txt`, `final-dev-readonly.txt`, `wsl-running.txt`), with this
+sanitised record in Git. Remote retained archive:
+`/home/arm/issue316-v2-candidate-20261021/incoming/afldb-v2-dev-candidate-fffef96f.tar.gz`.
+
+**Acceptance: NOT PASSED.** Exact next prerequisite: owner review of this matching-hash
+artifact's symlink versus the approved no-symlinks contract, then an explicitly reviewed
+continuation accounting for the now-existing retained root/archive. The original absent-root
+sequence cannot be rerun unchanged. This record does not authorize continuation, replacement,
+rebuild or cleanup. If continuation reaches database creation, passwordless sudo is unavailable;
+the owner must run the exact plan §5 step 7 CREATE DATABASE statement. C0/C1 remains incomplete;
+C2 still separately requires D-316-1, the reviewed historical acquisition artifact and the
+freeze/recovery/ownership/ladder/validator prerequisites recorded below. ISSUE-316 remains open;
+production NO-GO and later writer authorities unchanged.
 
 ## Owner approvals and DEV results (2026-10-21)
 

@@ -1,7 +1,11 @@
 # ISSUE-316 DEV application check — approval-ready plan (2026-10-21)
 
-**Status: PREPARED, NOT APPROVED, NOTHING EXECUTED ON DEV.** Decision requested:
-**D-DEV-316-C1-APP-1**. C2, production, writer activation, timers and `afldb_dev` stay outside it.
+**Status: OWNER APPROVED; EXECUTION STOPPED AT STEP 3 (2026-10-21).**
+**D-DEV-316-C1-APP-1** was explicitly approved exactly as specified in §5 steps 0–15 and §9.
+Steps 0–2 completed; archive inspection found a symlink contradicting §2's no-symlinks
+description. No extraction or packaged execution occurred. See the measured execution record
+in the [C0/C1 package](issue316-c0-c1-approval-2026-10-21.md#dev-application-attempt--stopped-at-archive-gate-2026-10-21).
+C2, production, writer activation, timers and `afldb_dev` stay outside it.
 Production NO-GO unchanged. Related: [C0/C1 approval package](issue316-c0-c1-approval-2026-10-21.md)
 (the shell subset passed 4/4 and is not repeated).
 

@@ -16,11 +16,20 @@ both launchers), runner exit 0; no acquisition, DB, service, timer or production
 C0/C1 is NOT complete: deployed DEV app/audit acceptance (a separately approved V2 DEV
 installation and Super Admin stale-action check) is pending.
 C2 and D-316-13 remain separately gated. Source and unrelated `.codex/` preserved; remotes empty.
-DEV app-check plan prepared, nothing executed on DEV: read-only baseline (ledger 110, pending
+DEV app-check preparation (historical baseline): read-only baseline (ledger 110, pending
 111–117, 3201 free), self-contained build `WkKKyr7KAoFmMb5QyM4MQ` of `fffef96f` packaged
 (113,830,430 B, sha256 `c829da08…e40b0e`), local isolated rehearsal PASS. Approval wording
 D-DEV-316-C1-APP-1: [plan](issue316-dev-app-check-plan-2026-10-21.md). D: drive was exhausted
 during the build (disclosed in the plan §10); free space on D: before more WSL work.
+
+**Latest execution, 2026-10-21:** D-DEV-316-C1-APP-1 approved exactly; baseline HEAD `e7be8403`.
+DEV identity/Node/disk/path/port gates and exact local/remote archive size/hash passed.
+Steps 0–2 created root/incoming and transferred the existing C: archive. STOP at step 3:
+esbuild symlink contradicts the plan's no-symlinks description. No extraction, packaged
+execution, DB connection, dump, migration or app/audit request. Port 3201 free; WSL stopped;
+root/archive and C: evidence retained. DEV C1 NOT PASSED. Owner artifact/continuation review
+must account for the retained existing target; passwordless sudo unavailable. See the
+[measured execution record](issue316-c0-c1-approval-2026-10-21.md#dev-application-attempt--stopped-at-archive-gate-2026-10-21).
 
 ## Run discipline (every launch)
 
