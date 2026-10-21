@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Bounded wildcard-final witness reconciliation (2026-10-21)
+
+- Replace the ladder validator's whole-season wildcard exclusion with exact accepted-source
+  fixture agreement and all-club H&A-plus-WF reconstruction. Remove only evidenced WF integer
+  contributions, recompute percentage/positions across the whole table and strictly compare
+  H&A policy; preserve raw witness bytes and ordinary-season checks. Extend the existing local
+  ladder suite with source-binding, all-club, position-swap and deliberate-failure fixtures.
+- Record the owner's fingerprint-bound successor-input decisions in C2 package v5. No successor
+  acceptance, active reference change, 1,640 rebuild expectation or import/rollover authority.
+
 ### ISSUE-316 - V2 handoff reconciliation and bounded DEV approval package (2026-10-21)
 
 - Retain package v3 and provenance for the single approved CRAN fitzRoy 1.8.0 source download,

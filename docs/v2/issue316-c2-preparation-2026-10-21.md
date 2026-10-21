@@ -1,4 +1,126 @@
-# ISSUE-316 C2 approval package v4 — consolidated readiness decision
+# ISSUE-316 C2 package v5 — bounded successor-input approvals and WF comparison
+
+## V5 owner approvals and local implementation — 2026-10-21
+
+This section supersedes the older readiness/next-action wording below. The acquisition and
+offline analysis already exist; do not rerun acquisition. One agent, current V2 sources only.
+The owner authorises the decisions below, local validator/tests/documentation and one focused
+local commit. **No successor baseline acceptance, import, rollover or deployment is authorised.**
+No accepted successor entry, active contract/season/network-switch edit or 1,640 rebuild
+expectation is approved. Historical sections and original evidence remain unchanged.
+
+### Exact evidence binding
+
+`C:\tmp\afldb-c2-offline-analysis-20261021\REPORT.md` and its `out/` files are the decision
+evidence, together with acquisition `C:\tmp\afldb-c2-final-20261021T041849978` and validation
+`C:\tmp\afldb-c2-validation-20261021T045933581`. Rechecked acquisition: **391/391 SHA-256
+matches**. These approvals apply only while these exact fingerprints and row scopes hold.
+
+| Input | SHA-256 |
+|---|---|
+| Analysis REPORT.md | `7da06978d867a4aa4decf3816e25efbdb2543c535891d0e2418fa2f941c10285` |
+| Validation REPORT.md | `2dd56fe7f6231b8ae1324ed290da9faeb6246328d4a4e25ad45850010c3e0eb5` |
+| Acquisition SHA256SUMS.txt (391 entries) | `d48352dafc644d0c65ddb53c83c94721f3f7474a7590351bd92811c4c6b771d3` |
+| Core manifest | `02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988` |
+| Ladder manifest | `65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34` |
+| results.csv | `73769e3ef608103c6c4e7ac6f58ce82484f85bd8058955ec502a9d64cb834f52` |
+| Raw ladder_2026.csv (unchanged) | `9f0358243a76d11a3db514933981fcbb49000d7ac950cf277bb278a32beb42ff` |
+| out/corrections-evidence.json | `14a1ad38e388a0b845bb39af2681f49faacf05904914b0aae85cea588fd0a43c` |
+| out/core-detail.json | `6d4c5ec880a76793faa4d84259722d57d6e7948a85fa3b147b95f422377c1f52` |
+| out/core-summary.json | `befbe3bdb7eb3fc626323e37429a1b137474ce6aedab7aca5044d480347b4f53` |
+| out/core-run.log | `ddc7a2ab5e580e3d24e7578ad13905f646d5eec030d8c446916eb5d1f61892ed` |
+| out/ladder-detail.json | `f880ffca7e0aa98e910b2504693b82933cf1ccbe5b6f559d19cf028a44a712a5` |
+| out/ladder-summary.json | `1d8c0bb937512ca9acfa6899caaaeeb82e5a49459e327a80f85c966f923de8cc` |
+| out/wf-diagnostic-NOT-WITNESS.json | `02bfa2cdffa72f7941a9ed9db28c99feacb37074d79932f218019917b8588834` |
+| out/wf-diagnostic-NOT-WITNESS.md | `b704692af6f1c60612b9c1bdaa25d6e0982be2b13e961044ef8ab372110dff4c` |
+
+### Approved successor-input decisions (record only; contracts unchanged)
+
+- Carry `1909-r10-jim-stewart-cartesian-a` and `-b` unchanged: exactly one drop each,
+  player_stats_1909.csv lines 1710/1711 in the bound bytes, R10 1909-07-03 St Kilda–Essendon.
+  A: Jim_Stewart0, ID 5230, Age 20.6652977412731, Career.Games 1, Goals 2.
+  B: Jim_Stewart1, ID 5685, Age 25.2135523613963, Career.Games 68, Goals 0.
+  Genuine rows 1709/1712 remain; no widened correction.
+- Carry precisely three source-club rules: Brisbane Lions 1987–1996 -> Brisbane Bears
+  (all datasets; 222 results sides/10 ladder rows/zero stats rows); North Melbourne
+  1999–2007 -> Kangaroos (results only, 209 sides); the separate same-era ladder-only
+  rule (9 rows). **A later authorised successor register must explicitly list the
+  ladder-only rule**, omitted from the predecessor register's accepted_corrections.
+- Carry the display-only blank-Player fallback `First.name + ' ' + Surname` when both
+  exist, for the evidenced four renumbered profiles only (79 rows 2025 + 71 rows 2026).
+- Extend only Cameron3, Graham2, Ross3, Williams3 through 2026: respectively continuing
+  IDs 12277/12576/12712/12962, row counts **52/31/42/25**, contiguous career games
+  230–281/132–162/71–112/30–54. Other bindings unchanged. Billy_Wilson2 remains a separate
+  debutant: 21 rows, career games 1–21, DOB 16-Jun-2005; no continuity rule.
+- Accept the historical comparison finding: all 129 historical stats and 129 historical
+  ladder files unchanged except CRLF -> LF; results' 16,838 ordered records unchanged
+  with 218 appended 2026 rows. Player details: same 16,731 rows/key order; date_accessed
+  changes to 2026-10-21; 190 current players' Games/Wins/Losses/Goals/Last movement and
+  Shai Bolton/Jesse Dattoli jumper changes exactly as the bound report documents.
+  Last was not independently recomputed. This finding does **not** accept every 2026 field.
+- 2026 Brownlow stays **pending**. Structural 3-2-1 patterns establish no authenticity
+  or completeness. AFL API authority and every existing ownership/eligibility restriction
+  remain in force; no 2026 ingestion or ownership approval is inferred.
+
+### Implemented comparison and focused verification
+
+Current V2 `tools/rebuild/fitzroy/validate_ladder_witness.py` replaces the whole-season
+WF exclusion. D7 reads only the tracked accepted core's manifest/hash-bound results.csv,
+using real result club-normalisation rules; zero/multiple accepted entries or hash drift
+refuse. No candidate source override was added. The canonical/source WF multiset must
+agree exactly on season/date/oriented clubs/scores, with no duplicates, canonical is_final
+true and source Round.Type Regular. Source-only and canonical-only WF fixtures fail.
+
+For each WF-bearing season, canonical `NOT is_final OR round_type='wildcard_final'`
+matches reconstruct all five fields for every witness club. Any unrelated round type
+marked non-final fails. Only evidenced source WF points/for/against are removed from a
+copy; exact ratios, 4dp half-up percentages and positions are recomputed for the entire
+table, preserving the existing no-extra-tiebreak policy. Every corrected row is compared
+exactly to club_seasons. No year exemption or new tolerance; original acquired bytes
+are never rewritten. A raw-vs-policy table prints for all clubs after reconstruction.
+
+The existing `tests/python/ladder_identity_contract.py` now includes the local projected
+2026 fixture (`ladder_wildcard_fixture.json`, explicitly not an acceptance input), all four
+affected clubs, 14 unaffected clubs, Carlton/Collingwood 9/10 -> 10/9, ordinary seasons,
+source binding and deliberate fixture/field/classification mismatch failures. D7's SELECT
+adapter uses a fake driver/connection; no database infrastructure is needed.
+
+Verification command: `python -I -B tests/python/ladder_identity_contract.py`, with TEMP/TMP
+and logs on C:. **PASS, exit 0: 106 top-level checks, no skips**, including the existing
+accepted-witness offline validator and exact source-label-universe comparison. Log:
+`C:\tmp\afldb-c2-wf-implementation-20261021\ladder-tests.log`. The genuine D7 database
+run was not executed; its adapter was exercised over local fixtures/fake SELECT results.
+Input hashes: `input-hashes.json` in the same C: evidence directory; final readback verifies
+all 391 acquired files and every recorded analysis/validation input against those hashes.
+`git diff --check` passed. No infrastructure was installed or required by the focused tests.
+No host/network/database access or WSL invocation; no acquisition, census, restore,
+migration, import, rollover, cleanup, push or deployment.
+
+### Exact remaining blockers and next isolated-rehearsal proposal
+
+ISSUE-316 remains OPEN. This local rule is not D7 rebuilt-database evidence. Still required:
+review/acceptance of the remaining 2026 inputs and successor availability/coverage/witness
+bindings; a separately authorised successor acceptance/register entry; independently
+established applicable rebuild club-season expectation (**1,640 is observed only**);
+scoped/fresh D-233-3 ownership census; rollover date, retired status and exact D-316-1
+rollover authority; then actual offline gates/dry-run/apply and rebuilt disposable-DB D7.
+Brownlow 2026 authenticity/completeness remains unresolved and pending, not waived.
+Release/freeze/recovery and deployment authorities remain separate.
+
+**Proposal only, not authority:** prepare a separately reviewed isolated rehearsal contract
+using these exact retained bytes and current V2 code. Pin the isolated Linux cluster/root,
+loopback port, disposable `_test` database, source copy hashes, no-network controls, writer
+isolation, untouched original recovery copy and evidence output. First establish the
+applicable distinct club-season expectation and remaining successor inputs without assuming
+1,640; obtain separate source/register and import/rebuild authority before any mutation.
+Then run the three real offline gates and the bounded import/derived rebuild only in the
+disposable target; run D7 including both WF fixtures, all 18 policy rows and ordinary-season
+checks, retaining raw witness hashes before/after. Stop on any mismatch. WSL stays stopped
+until that separately scoped rehearsal is approved; no new infrastructure is installed here.
+
+---
+
+## Historical package v4 — consolidated readiness decision
 
 Prepared 2026-10-21 with one agent. **C2 NOT EXECUTED; execution approval NOT granted.**
 v4 supersedes v3's "next bounded source inputs" with one consolidated approval request (V4

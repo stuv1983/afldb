@@ -1334,7 +1334,19 @@ owner ceiling. Gap G1: no existing gate asserts completed-season stats cover eve
 a tested validator gate is separate follow-up. No further source download is indispensable.
 Owner inputs K1–K4 outstanding. No network, host, package or database activity; nothing executed.
 
-## 11. Not done here
+### C2 bounded successor-input/local validator update — 2026-10-21 (package v5)
+
+Current state supersedes the v4 acquisition requests above: acquired bytes and offline
+analysis are retained, 391/391 acquisition hashes rechecked. The owner approved only the
+fingerprint-bound corrections, club normalisations, four continuity extensions and historical
+comparison finding, plus local strict WF comparison/tests and one focused commit. Exact scopes,
+full hashes, validation, remaining blockers and the next isolated-rehearsal proposal are in
+`docs/v2/issue316-c2-preparation-2026-10-21.md` §V5. No successor register entry or active
+reference/season/network switch change; 1,640 not approved; 2026 Brownlow pending.
+Actual disposable rebuilt-DB D7, remaining successor inputs/count/census and rollover authority
+remain outstanding. No acquisition rerun, host/network/database access or WSL invocation here.
+
+## 11. Not done here (historical execution record)
 
 - No commit, merge, push, deployment, host contact, timer change or source-ownership change.
 - No final AFL Tables acquisition and no rollover: the switch is still `active` / 2026 and `seasons.json`
