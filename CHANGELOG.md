@@ -17,6 +17,11 @@ commit.
 
 ### ISSUE-316 - V2 handoff reconciliation and bounded DEV approval package (2026-10-21)
 
+- Complete approved deployed DEV candidate C1 acceptance: restore, migrations 111–117 and
+  privileges/checksum readback PASS; real Super Admin legacy_retired refusal with exactly one
+  correctly attributed audit row, both negative controls zero audit rows. Original DEV preserved
+  at ledger/checksums 110/110; candidate stopped/3201 free; all artifacts retained. C2 remains
+  separately gated; no V1 replacement, acquisition, timer or production change.
 - Record owner-approved sole-link/retained-root continuation: amended safety checks, extraction,
   13,209 file hashes and DEV preflight PASS; fresh read-only backup/hash/TOC retained, source
   ledger/checksums 110/110 and zero synthetic records verified. Paused at step 7 for owner

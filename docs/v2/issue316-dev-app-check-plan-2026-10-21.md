@@ -1,6 +1,12 @@
 # ISSUE-316 DEV application check — approval-ready plan (2026-10-21)
 
-**Status: AMENDED CONTINUATION APPROVED; PAUSED AT STEP 7 FOR OWNER DATABASE CREATION (2026-10-21).**
+**Status: COMPLETED — DEPLOYED DEV CANDIDATE C1 APPLICATION ACCEPTANCE PASS (2026-10-21).**
+Owner confirmed database creation; steps 8–15 passed. Single real action returned exact refusal
+and exactly one correctly attributed audit row; both negative controls delta 0. Original DEV
+preserved at ledger/checksums 110/110. Candidate stopped, port 3201 free; all artifacts retained.
+See the [completed record](issue316-c0-c1-approval-2026-10-21.md#completed-dev-candidate-c1-application-check-2026-10-21).
+
+**Historical owner-creation checkpoint:**
 The owner permitted exactly the documented esbuild link and reuse of the retained root/archive.
 Amended membership checks, extraction, 13,209 hashes, preflight, source guard, secure config
 and fresh read-only dump passed. No database created or candidate started. See the latest
@@ -259,3 +265,10 @@ source counts identical before/after, ledger 110 with 110/110 checksums matching
 synthetic user/audit rows. Passwordless sudo unavailable: pause at original step 7 for the
 owner's exact CREATE DATABASE statement, then verify identity/encoding/owner/emptiness and
 continue step 8. Do not rerun preflight's database-absence gate after owner creation.
+
+**Subsequent completion:** owner said “done—resume from step 8”. Database identity/owner/
+encoding/locales/emptiness verified; restore/migrations/privileges/readback passed; checker
+PASS once, audit id 1100, both negative controls zero audit rows. Source preservation and
+candidate shutdown confirmed. Detailed measured result in the completed C0/C1 record above.
+Candidate and source default ACL catalogs both remain empty (the reviewed revocations do not
+create rows when already empty), superseding W10's predicted difference. C2 remains separate.

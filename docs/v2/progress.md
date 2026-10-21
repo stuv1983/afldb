@@ -31,7 +31,7 @@ root/archive and C: evidence retained. DEV C1 NOT PASSED. Owner artifact/continu
 must account for the retained existing target; passwordless sudo unavailable. See the
 [measured execution record](issue316-c0-c1-approval-2026-10-21.md#dev-application-attempt--stopped-at-archive-gate-2026-10-21).
 
-**Latest amended continuation:** baseline HEAD `636b74ea`; owner permitted exact sole esbuild
+**Amended continuation checkpoint:** baseline HEAD `636b74ea`; owner permitted exact sole esbuild
 link and retained-root reuse. Safety checks, no-overwrite extraction, 13,209 hashes, preflight,
 source guard/config and read-only dump PASS. Backup/hash/TOC retained; source ledger/checksums
 110/110, no synthetic users/audit rows, dump counts identical. PAUSED step 7 solely for owner
@@ -39,6 +39,16 @@ CREATE DATABASE; candidate DB absent, no pid, port 3201 free, WSL stopped. Comma
 [checkpoint](issue316-c0-c1-approval-2026-10-21.md#amended-continuation--owner-database-creation-checkpoint-2026-10-21).
 After owner confirms, verify identity/owner/encoding/emptiness and resume step 8; do not rerun
 absence-dependent steps. C1 acceptance pending; C2 unchanged and separate.
+
+**Latest completed DEV candidate C1:** owner confirmed creation; baseline HEAD `4255f43c`.
+Steps 8–15 PASS: empty candidate identity verified, restore source-equal, migrations 111–117,
+privileges/checksums/Nothing to apply. One checker PASS: exact Super Admin refusal + exactly
+one audit row id 1100/actor 20/loopback; N1/N2 audit deltas 0. Cleanup independently verified.
+Original DEV ledger/checksums 110/110 and guard unchanged, no synthetic writes. Candidate
+stopped, PID gone/3201 free; DB/root/backup/evidence retained, C: copies 13/13 hashes match.
+WSL stopped, remotes empty, `.codex/` preserved. Approved candidate acceptance complete; no
+main V1 replacement or production acceptance. Review then separately gated C2 prerequisites:
+[completed record](issue316-c0-c1-approval-2026-10-21.md#completed-dev-candidate-c1-application-check-2026-10-21).
 
 ## Run discipline (every launch)
 

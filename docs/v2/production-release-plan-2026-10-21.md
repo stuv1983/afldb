@@ -181,8 +181,11 @@ only the exact approved delta and retain strict comparison of everything else.
    artifact contains an esbuild symlink despite the reviewed no-symlinks description. At that
    checkpoint, root/archive were retained without extraction or DB/app execution. The owner
    subsequently approved the sole-link/retained-root amendment; extraction,
-   hashes, preflight and read-only dump passed. PAUSED at step 7 for owner CREATE DATABASE;
-   DEV C1 acceptance still pending. See the linked package's latest checkpoint. Record the full
+   hashes, preflight and read-only dump passed. After owner CREATE DATABASE, steps 8–15 passed:
+   candidate restore/migrations/privileges, exact Super Admin refusal + one audit row, negative
+   controls, source preservation and shutdown. Approved deployed DEV candidate C1 acceptance
+   PASS, port 3201 free, artifacts retained. This is not V1 replacement or production acceptance;
+   C2 remains separately gated. See the linked package's completed record. Record the full
    resulting execution commit and production-configured build/artifact hashes before installation.
    The present source archive is the measured candidate; no future merge/rollover SHA is invented.
 

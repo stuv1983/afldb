@@ -1,16 +1,87 @@
 # ISSUE-316 local reconciliation and C0/C1 approval — 2026-10-21
 
-**Latest: amended D-DEV-316-C1-APP-1 continuation approved; steps 3–6 passed. PAUSED at
-step 7 for owner database creation (2026-10-21). No deployed DEV C1 acceptance yet.**
+**Latest: D-DEV-316-C1-APP-1 completed; deployed DEV candidate C1 application acceptance
+PASS (2026-10-21). Candidate stopped, port 3201 free; directory/database/backup/evidence retained.**
 
 **Owner approved D-V2-316-C0C1-1 and D-DEV-316-C1-REFUSALS-1 (2026-10-21); the approved DEV
-shell subset ran and PASSED 4/4. Full C0/C1 is NOT complete: deployed DEV app/audit acceptance
-and C2 remain pending. Production NO-GO.**
+shell subset ran and PASSED 4/4. The separately approved deployed DEV candidate app/audit
+criterion now PASSED as recorded below. C2 remains separately gated. Production NO-GO.**
 The local preparation below involved no host access, acquisition, shared database writes,
 deployment, rollover, season changes, timer/service changes, pushes, subagents or new worktrees.
 The accepted fresh archive rehearsal, Brownlow implementation, builds and rollback exercises were
 not repeated. Later operations are the filesystem-only DEV shell subset and the stopped
 DEV application preparation attempt, each recorded below with its limits.
+
+## Completed DEV candidate C1 application check (2026-10-21)
+
+**Owner handoff, verbatim:** “done—resume from step 8”. Baseline repository HEAD
+`4255f43c0b05964da13229b7043f15afaf757709`; remotes empty, pre-existing `.codex/` preserved.
+No absence-dependent steps repeated. No sudo or database creation performed by the agent.
+Read-only verification confirmed `afldb_dev_v2_candidate_test`, owner `afldb_owner`, UTF8,
+LC_COLLATE/LC_CTYPE `en_US.UTF-8`, zero non-system relations and zero other sessions.
+
+**Steps 8–10 PASS:** retained dump hash verified; single-transaction restore exit 0, restored
+counts identical to source dump (ledger 110, audit 1,073/max 1,099, users 4, active sessions 0,
+matches 17,056, players 13,365, player_match_stats 695,499, import_batches 62, refusal rows 0).
+Exactly migrations 111–117 applied; ledger 117 ending
+`117_brownlow_provider_eligibility_unknown.sql`. Candidate privileges reconciliation exit 0;
+readback runner: 117 applied, **Nothing to apply**, checksum parity. Extensions pg_trgm 1.6,
+unaccent 1.1, plpgsql 1.0. Auth ACLs: afldb_auth SELECT/INSERT on audit and SELECT/INSERT/UPDATE
+on users/sessions; afldb_app/import no access to these tables; backup SELECT only.
+The backup-role membership notice reported unchanged (superuser required); existing membership
+was sufficient for readback. Candidate `pg_default_acl` has **0 rows**, as does the source:
+reviewed default-privilege operations revoke grants and leave this already-empty state empty.
+This measured result supersedes the plan W10 prediction that default ACLs would differ.
+
+**Steps 11–12 PASS, one checker invocation only:** candidate PID 381367, verified Node 22.23.2
+and app cwd, bound only to 127.0.0.1:3201; `/api/health` 200; pinned build
+`WkKKyr7KAoFmMb5QyM4MQ`. Check generated 2026-10-21T01:05:06.059Z, verdict PASS, no failures.
+
+| Case | Actual HTTP/result | Total audit delta | Refusal audit delta |
+|---|---|---|---|
+| N1 anonymous | 307, `/admin/login`, no refusal | 0 | 0 |
+| N2 synthetic admin | 200 Flight, redirect `/admin;push`, no refusal | 0 | 0 |
+| P1 synthetic super_admin | 200, exact refusal below | 1 | 1 |
+
+P1 returned `{refused:true, code:'legacy_retired', surface:'admin.afltables_settle_trigger'}`,
+with non-empty reviewed explanatory error and no filesystem path/DSN/secret. Exactly one audit row:
+**id 1100**, at **2026-10-21T01:05:09.607Z**, actor_user_id **20**,
+actor_label `issue316-superadmin-check@example.invalid`, action `admin.legacy_retired_refused`,
+detail `{export:'startSettleRunAction', surface:'admin.afltables_settle_trigger'}`,
+IP **127.0.0.1/32**. Independent read-only final query verified the exact row/detail/actor/IP
+and exactly one refusal row. Audit 1,073→1,074; no manual audit insert or action retry.
+Synthetic super_admin/admin IDs 20/21; both users disabled and both sessions revoked,
+independently read back. Candidate matches 17,056, import_batches 62 and ledger 117 unchanged
+during the check. No acquisition, API request, original unit action or timer operation.
+
+**Steps 13–14 PASS:** original `afldb_dev` post-guard exactly equals pre-guard excluding
+timestamp: ledger 110, audit 1,073/max 1,099, refused rows 0, users 4, active sessions 0 and
+all recorded data counts unchanged. Independent read-only source verification: 110/110
+checksums, zero drift, zero synthetic users, zero synthetic actor audit rows and default ACLs
+still empty. No source DB/schema/privilege write. Ordinary concurrent V1 traffic was not
+disabled or monitored; no measured count changes require attribution to that traffic.
+Verified candidate stop succeeded; final 2026-10-21T01:06:32Z readback: no pid file, PID 381367
+absent, **no listener on 3201**. WSL reports no running distributions.
+
+**Step 15 / retention:** root `/home/arm/issue316-v2-candidate-20261021/`, candidate database,
+approved archive/extracted package, secure configuration, original dump/hash and all evidence
+retained. No cleanup. New C: evidence:
+`C:\Users\stuar\AppData\Local\Temp\claude\D--dev-afldbV2\77258a0a-3c50-46b6-b25d-0084ebe15f04\scratchpad\dev-app-step8-20261021\`.
+Includes identity/restore/migrate/privilege/readback/start/check/guard/stop/status evidence,
+independent source/candidate readbacks, and `remote-evidence/` (all **13/13 SHA-256 values**
+match DEV originals). Primary result: `remote-evidence/stale-action-check-20261021T010505Z.json`.
+Backup remains `recovery/afldb_dev-20261021T004611Z.dump`, SHA-256
+`e271172fd338869c9097cc26c81baf7715887d50947a1e0df35328ae62f58c32`.
+
+**Acceptance and remaining work:** approved deployed DEV **candidate C1 application/audit
+acceptance PASS**, alongside earlier DEV shell 4/4 and source reconciliation/adaptation evidence.
+No requirement of this approved candidate operation remains. This does not replace the V1
+service or authorize a main-checkout/production installation. ISSUE-316 remains OPEN.
+C2 remains separate: D-316-1 plus reviewed pinned historical acquisition execution artifact,
+coordinated freeze/recovery/A-AFLT authority, final full-history acquisition/ladder witness,
+fresh D-233-3 census, reviewed successor coverage/availability/corrections/count/date inputs,
+all three real validator gates, dry-run review then authorized retirement/rollover apply.
+No C2, writer activation, C4b/D-316-13 or production authority was used. Stop for review.
 
 ## Amended continuation — owner database creation checkpoint (2026-10-21)
 

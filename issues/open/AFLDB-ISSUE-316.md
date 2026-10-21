@@ -384,6 +384,19 @@ free, WSL stopped. Evidence and owner command in the latest C0/C1 package checkp
 owner confirmation verify DB identity/owner/encoding/emptiness, then continue step 8; no rerun
 of absence-dependent steps. C1 acceptance remains pending; no restore/migration/action yet.
 
+**Completed deployed DEV candidate C1, 2026-10-21:** owner confirmed database creation;
+identity/owner/encoding/locale/emptiness verified; steps 8–15 PASS. Restore source-equal,
+migrations 111–117 and privileges applied candidate-only, runner checksum parity/Nothing to
+apply. Real Super Admin stale action exact legacy_retired refusal and exactly one correct
+audit row id 1100/actor 20/loopback; N1/N2 no refusal/audit. Cleanup verified. Original DEV
+guard unchanged, ledger/checksums 110/110, no synthetic users/audit. Candidate stopped, port
+3201 free at 01:06:32Z; DB/root/backup/evidence retained on DEV and C:, copied evidence 13/13
+hashes match. Approved candidate acceptance PASS; no V1 replacement/production acceptance.
+Latest C0/C1 package records all measured evidence and corrects predicted default ACL drift
+(both catalogs remain empty). No candidate-operation requirement remains; review then separately
+gated C2 D-316-1 historical artifact/acquisition/ladder/census/validator/rollover prerequisites.
+ISSUE-316 remains OPEN; no authority expanded.
+
 **Shape: cut over at the season boundary, not mid-season.** 2026 stays `afltables`-owned forever as
 stored history, and 2027 is `afl_api`-owned from its first match. No row is re-owned, so Q1 and Q7
 stand, and no ownership-transfer tool is needed for the cutover itself.
