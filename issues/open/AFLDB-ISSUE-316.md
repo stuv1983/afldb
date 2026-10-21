@@ -1376,3 +1376,121 @@ are in the C2 package; no production successor/rollover/release authority is inf
 - The C4b tool has not been run anywhere, against any database or host.
 - No visual change (the admin panel text is unchanged; a retired refusal reuses the existing
   `unavailable` rendering), so no screenshots are owed.
+
+## 12. Supplement-free runner implementation and next isolated-measurement proposal — 2026-10-21
+
+**Supplement-free implementation (2026-10-21; current):** Owner approved proposal §§3–5 and database-free affected checks, one agent, basis `4a2eea89cccc465f2f017fb06ad55a7d4cb7733d`. Local runner/tests now support explicit `stats_input_mode` (`supplemented_baseline` / `baseline_only`); baseline-only requires explicit `supplements: []` plus a matching selected `baseline_snapshot_label`. Heights/coaches intentionally share these stats inputs. Legacy supplemented argv/order, manifest proofs, measured expectations and all strict final gates remain. Synthetic configuration only; no successor contract installed. Focused runner 38/38; height/coach suites 27/27; nonincremental `tsc --noEmit --incremental false` exit 0. Full runner 700 passed / 4 existing CLI tests failed at tsx startup (`uv_os_get_passwd ENOMEM`), before CLI execution. Changed-file lint: 8 errors / 13 warnings, exactly reproduced on basis blobs (no new findings); `git diff --check` clean. Bounded review 2026-10-22 found no material correctness/gate issue; scoped local commit authorised. Next: separately approve construction of a provenance-bound canonical export from an isolated clone of retained stopped rehearsal state (runbook §12); no execution/binding approval. All unmatched/name_mismatch rows, including four unresolved Collingwood goal discrepancies, stay rejected; jumpers informational; ET unresolved; all three 2026 Brownlow keys pending; production NO-GO.
+
+**Implementation/validation checkpoint (2026-10-21; before this review):**
+
+The owner's implementation instruction supersedes the earlier implementation-approval-pending checkpoint
+and approves exactly proposal §§3–5 plus local database-free affected checks. HEAD was the stated
+basis; the three implementation files initially had no differences from it. Existing tracking,
+preparation/review documents and .codex/ changes were preserved. No historical file replacement,
+Git mutation, commit, network/host/database access, WSL, installation, stage execution, real-input
+gate, acquisition, census, rebuild, rehearsal rerun, accepted binding, active reference or deployment.
+The only code edits are tools/db/rebuild-test.ts, tests/db-test-rebuild.test.ts and
+tests/height-reconciliation.test.ts. No loader/Python, schema, contract or reference-data edit.
+
+Validation paths were inspected before execution: runner effects are injected; its real CLI cases
+exercise early credential/target refusals; height/coach Python subprocesses call pure functions
+with synthetic rows, read tracked fixtures and never call main/connect_pg. The shared setup's .env
+was absent; connection/isolated-target environment variables were removed for commands, with no
+credentials provided. Python bytecode was disabled, Vitest used --no-cache --configLoader runner,
+and TEMP/TMP were isolated outside the checkout. An initial in-checkout temporary root correctly
+triggered the capture-root refusal; no safeguard was changed. One synthetic accepted-register label
+was corrected to match its synthetic binding. No dependency installation or infrastructure repair.
+Full-runner CLI failures are unavailable Windows tsx startup infrastructure, not successful refusal
+coverage; no assertions were skipped or weakened. Lint baseline was checked via Git blobs on stdin,
+without overwriting current files. No broad application suite, build or integration run.
+
+**Exact next proposal — decision/preparation only, no execution authority:**
+
+1. Review this local diff and the unchanged-loader boundaries first. Before requesting execution,
+   bind the exact reviewed implementation and retained candidate baseline/register/stats hashes,
+   core continuity/correction policy, API roster, Wikipedia artifact and coach-page inputs. Prove
+   successor applicability separately for each input; no predecessor counter or approval inheritance.
+2. Specify one fresh disposable Linux/PostgreSQL test target, unused loopback port, owner/marker,
+   lifecycle, report root, allowed commands/stages and stop rules. No existing canonical database,
+   application/production writer, network acquisition or census. Do not start it under this proposal.
+3. First demonstrate an exact provenance-bound successor canonical identity/match/fact export and
+   its clean post-core height/evidence state. Reuse only if proven suitable. If that export is absent,
+   stop for a separately bounded construction proposal; do not rerun the completed core rehearsal.
+4. Request only loader/report measurement on that disposable state, with no supplements for either
+   heights or coaches. Do not install an unmeasured runner contract, seed guessed expectations or
+   add a gate bypass. Retain height source/canonical rejection and occurrence maps, no-canonical
+   cases, planned fills, agreements, internal/existing conflicts and both approved continuity paths.
+   Prove all unmatched/name_mismatch rows, specifically Collingwood Caps 162/182/615/649, contribute
+   no selected identity or height evidence through this register path; jumpers remain informational.
+5. If separately authorised, perform only disposable height/corroboration/coach writes needed to
+   measure persisted evidence provenance/batch lineage, NULL-only fills, evidence links and retained
+   conflicts. Measure all five height final keys (including the three mandatory measured integers)
+   and all eight coach final keys, exact strings/profile/match/club resolution and coverage gaps.
+   Prove API/Wikipedia evidence-only behavior, complete resolution and distinct canonical counts;
+   stop on collisions/unresolved rows. Artifact-only --validate-only is not canonical validation;
+   planned fills are not persisted evidence-link proof.
+6. Retain sanitised reports, exact input/source hashes, before/after invariants and stopped-target
+   proof. Review measured outcomes before any later separately approved contract/binding change;
+   the same run must never automatically accept its observations as expectations. Gates remain exact.
+
+ET applicability remains unresolved. brownlow_match_votes, brownlow_round_votes and
+brownlow_season_total for 2026 remain pending with canonical suppression/publication restrictions.
+Preserve AFL API authority, eligibility and ownership restrictions. 1,640 remains rehearsal-only.
+No production successor acceptance, rollover, freeze/recovery, cleanup, release or deployment GO.
+
+### Bounded pre-commit review — 2026-10-22
+
+One agent reviewed the three implementation files against 4a2eea89cccc465f2f017fb06ad55a7d4cb7733d
+and the approved proposal §§3–5. No material correctness or gate-preservation finding.
+Explicit baseline-only binding, intentionally shared height/coach inputs, legacy supplemented
+argv/order, refusal paths and mandatory measured integers are preserved. Tests exercise actual
+argument builders, stage planning, preflight and final-check consumers; the pure height tests
+call the existing Python reconciliation functions. All five height and eight coach final keys,
+manifest proofs, target/capture safeguards, stage order and preflight before destruction remain.
+No production code edits were needed during review. Reuse the recorded 38 focused runner passes,
+27 height/coach passes, passing nonincremental typecheck and unchanged lint comparison (8 errors /
+13 warnings on both current and basis files). Full runner was NOT passed: 700 passed, four CLI
+cases failed at Windows tsx startup (uv_os_get_passwd ENOMEM), before CLI execution; their refusal
+behavior was not exercised by that run. No rerun or infrastructure repair in this review.
+Only the three implementation files, their CHANGELOG entry and scoped implementation/review
+tracking are selected for one local commit; earlier documentation/tracking and .codex/ edits stay
+outside it. ISSUE-316 remains OPEN. No baseline_only contract or successor expectations installed.
+
+Retain for the next separately authorised measurement:
+
+- C:/tmp/afldb-c2-brownlow-fix-20261021/REPORT.md, run-config.json, SHA256SUMS.txt,
+  source-implementation.tar, candidate-bundle.tar.gz, candidate-prepared.json,
+  candidate-measurements.json, actual-rebuild-summary.json, dev-results.json and dev-logs/
+  (especially source-verification.json, identity-checks.jsonl, core-import.log and
+  final-retention-state.json). These locate/prove the stopped isolated rehearsal, not enrichment.
+- Its REHEARSAL-ONLY-source/SOURCE_SHA256SUMS.json and candidate core manifest
+  docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json, all 130
+  player_stats_1897..2026.csv files and player_details.csv under
+  data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/; rehearsal-only contract/register,
+  availability, clubs.json and core importer/correction/continuity policy. Keep these separate
+  from repository production bindings and from the newly committed runner.
+- Repository tools/rebuild/afl_api/afl-api-contract.json roster pin rosters-20260905,
+  docs/rebuild-manifests/afl_api/rosters-20260905.json and every manifest-listed raw artifact;
+  data/players/height-evidence-wikipedia.csv with revision/provenance columns;
+  tools/rebuild/afltables/afltables-contract.json coaches pin coaches-20260905,
+  docs/rebuild-manifests/afltables_coaches/coaches-20260905.json and every listed index/page/raw
+  artifact plus profile-link corrections. Their successor applicability is still unproved.
+- The height applicability/source-reconciliation/exception/goal reviews and approved supplement-free
+  proposal under docs/v2/, plus this section and the exact local implementation commit.
+
+No suitably provenance-bound canonical identity/match/fact export is present in the retained
+report/source inventories reviewed. Aggregate rehearsal counts and a stopped PGDATA are not that
+export; no database/host inspection was performed to infer otherwise. Smallest next isolated step:
+separately authorise a disposable same-version PostgreSQL clone of the retained stopped rehearsal
+state (preserve the original), prove source/input/target identity and ownership, then read-only
+export the required source/method/status/player links, both continuity paths, player height/evidence
+state, canonical matches/clubs and roster-resolution player-match/club-organisation facts with import
+lineage. Hash/export metadata and sanitised reports go to C:. Confirm no height/corroboration/coach
+stages have run and prove the actual initial state; stop on drift or unsuitable state. No core
+rehearsal rerun, installation, acquisition, census or guessed expectations. Review that export before
+separately authorising height/corroboration/coach measurement on a fresh disposable target.
+
+All unmatched/name_mismatch rows, including Collingwood Caps 162/182/615/649, remain rejected for
+height matching. Jumpers informational; ET unresolved; brownlow_match_votes, brownlow_round_votes
+and brownlow_season_total for 2026 pending. AFL API authority, eligibility and ownership restrictions
+remain; 1,640 is rehearsal-only. Production NO-GO; no execution/binding/rollover/release approval.

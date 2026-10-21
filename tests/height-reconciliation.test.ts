@@ -91,6 +91,42 @@ describe('enrich_heights reconciliation', () => {
     expect(r.candidates).toEqual([]);
   });
 
+  it('rejects differing goals with otherwise identical facts/name, including literal blank register Goals', () => {
+    const stats = [stat(U('Synthetic_Player'), 'Synthetic', 'Player', 'Collingwood', 1900, 4)];
+    const differing = reg('Synthetic Player', 'Collingwood', 1, 3, '1900');
+    const blank = { ...differing, Goals: '' };
+    for (const r of reconcile([differing, blank], stats)) {
+      expect(r).toMatchObject({ status: 'unmatched', url: null, candidates: [] });
+    }
+    // Characterizes refusal only; it does not adjudicate the meaning of a historical blank.
+  });
+
+  it('keeps multiple named candidates ambiguous even if a jumper favors one', () => {
+    const stats = [stat(U('Twin1'), 'Same', 'Name', 'Carlton', 1900, 0, '7'),
+      stat(U('Twin2'), 'Same', 'Name', 'Carlton', 1900, 0, '8')];
+    const [r] = reconcile([reg('Same Name', 'Carlton', 1, 0, '1900', '180cm', '7')], stats);
+    expect(r).toMatchObject({ status: 'ambiguous', url: null, jumper: null });
+    expect(r.candidates).toEqual([U('Twin1'), U('Twin2')]);
+  });
+
+  it('keeps disjoint nonempty jumpers informational for an otherwise mapped identity', () => {
+    const [r] = reconcile([reg('Same Name', 'Carlton', 1, 0, '1900', '180cm', '7')],
+      [stat(U('Same_Name'), 'Same', 'Name', 'Carlton', 1900, 0, '8')]);
+    expect(r).toMatchObject({ status: 'mapped', url: U('Same_Name'), jumper: false });
+  });
+
+  it('never merges split raw URLs to satisfy a combined games/goals/season-set claim', () => {
+    const stats = [stat(U('Split0'), 'Same', 'Name', 'Carlton', 1900, 1),
+      stat(U('Split1'), 'Same', 'Name', 'Carlton', 1901, 2)];
+    const [combined, first, second] = reconcile([
+      reg('Same Name', 'Carlton', 2, 3, '1900-1901'),
+      reg('Same Name', 'Carlton', 1, 1, '1900'),
+      reg('Same Name', 'Carlton', 1, 2, '1901'),
+    ], stats);
+    expect(combined).toMatchObject({ status: 'unmatched', url: null, candidates: [] });
+    expect([first.url, second.url]).toEqual([U('Split0'), U('Split1')]);
+  });
+
   it('keeps an unknown or implausible height as null without affecting identity', () => {
     const stats = [stat(U('A_B'), 'A', 'B', 'Carlton', 2000)];
     const [blank, silly, jumperless] = reconcile([

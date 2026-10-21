@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Explicit shared height/coach stats input modes (2026-10-21)
+
+- Preserve supplemented baseline behavior and add explicit baseline-only validation requiring
+  `supplements: []` and `baseline_snapshot_label` matching the selected baseline. Share the declared
+  stats inputs across height/coach arguments, preflight, stage descriptions and final checks; retain
+  manifest proofs, exact measured expectations and target/destruction safeguards.
+- Extend existing synthetic runner and pure height reconciliation tests for binding refusals,
+  argument parity, final gates and unchanged goals/name/jumper/raw-URL identity boundaries.
+  No successor contract, loader, schema or reference-data change; canonical applicability is pending.
+
 ### ISSUE-316 - Preserve explicit pending Brownlow readiness (2026-10-21)
 
 - Derive Brownlow readiness from existing availability/publication decisions rather than football

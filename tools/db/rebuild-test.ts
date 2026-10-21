@@ -1236,10 +1236,11 @@ export function resolvePython(
  * stages, so ordering and command construction are tested without running anything.
  */
 export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
-                           opts: Options): Stage[] {
+                           opts: Options, readHeightContract?: HeightContractReader): Stage[] {
   const dataEnv = { AFLDB_IMPORT_DATABASE_URL: target.importDsn };
   // One resolution for the whole graph, so no two stages can disagree.
   const python = resolvePython();
+  const statsInputs = heightStatsInputDescription(fitzroy.label, readHeightContract);
 
   // The schema and privilege stages run through package scripts, and each target has its
   // own pair bound to its own DSN variable. A ResolvedTarget only ever carries an
@@ -1326,14 +1327,14 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // AFLDB-ISSUE-118 §23.19. players.height_cm from the accepted baseline's own AFL
       // Tables player_details register, reconciled to the snapshot's per-match rows and
       // joined to players ONLY through the afltables profile-url identities `fitzroy`
-      // registered — so it must follow fitzroy and needs nothing later. The in-season
-      // supplement it reads beside the baseline is pinned in the fitzRoy contract
+      // registered — so it must follow fitzroy and needs nothing later. The configured
+      // stats inputs shared with coaches are pinned in the fitzRoy contract
       // (datasets.player_details.height_enrichment), never chosen here. No network.
       id: 'heights',
-      name: `HEIGHTS — AFL Tables register (${fitzroy.label} + ${heightEnrichmentPins().supplements.map((s) => s.label).join(', ')})`,
+      name: `HEIGHTS — AFL Tables register (${statsInputs})`,
       kind: 'data',
       run: 'command',
-      argv: heightsImportArgv(fitzroy.label, python),
+      argv: heightsImportArgv(fitzroy.label, python, readHeightContract),
       envOverlay: dataEnv,
     },
     {
@@ -1386,10 +1387,10 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // artefacts are the input bytes. Needs matches, clubs and identities: after
       // fitzroy; nothing later reads it. No network.
       id: 'coaches',
-      name: `COACHES — AFL Tables coach pages ${afltablesCoachesPin().label} + ${fitzroy.label} Coach column`,
+      name: `COACHES — AFL Tables coach pages ${afltablesCoachesPin().label} + shared height/coach stats (${statsInputs}) Coach column`,
       kind: 'data',
       run: 'command',
-      argv: coachesImportArgv(fitzroy.label, python),
+      argv: coachesImportArgv(fitzroy.label, python, readHeightContract),
       envOverlay: dataEnv,
     },
     {
@@ -2170,6 +2171,7 @@ export type FinalCheck = { key: string; sql: string; expected: number };
 export function finalValidationChecks(
   register: Record<string, unknown> | null,
   draftguru: { persons: number; picks: number; bridged?: number } = DRAFTGURU_EXPECTED,
+  readHeightContract?: HeightContractReader,
 ): FinalCheck[] {
   const label = selectAcceptedBaseline(register).label;
   const baseline = ((register!.baselines ?? []) as Array<Record<string, unknown>>)
@@ -2250,7 +2252,7 @@ export function finalValidationChecks(
 
   // AFLDB-ISSUE-118 §23.19. Added together with the HEIGHTS stages, for the same
   // §H15.5 reason. The expected values are read from the contracts' pin blocks.
-  for (const check of heightChecks()) checks.push(check);
+  for (const check of heightChecks(label, readHeightContract)) checks.push(check);
 
   // AFLDB-ISSUE-118 §23.24. Added together with the BIRTH DATES stage, for the same
   // §H15.5 reason. The expected values are read from the AFL Tables contract's pin block.
@@ -2258,7 +2260,7 @@ export function finalValidationChecks(
 
   // AFLDB-ISSUE-118 §23.27. Added together with the COACHES stage, for the same §H15.5
   // reason. The expected values are read from the AFL Tables contract's coaches pin.
-  for (const check of coachChecks()) checks.push(check);
+  for (const check of coachChecks(label, readHeightContract)) checks.push(check);
 
   // AFLDB-ISSUE-118 §23.29. Added together with the FATHER–SON stage, for the same §H15.5
   // reason. The expected values are read from the tracked artefact itself.
@@ -2721,7 +2723,8 @@ export function fitzroyValidateArgv(source: FitzroySource): string[] {
  * snapshot this proves and the snapshot the rebuild then imports cannot be different
  * selections. See draftguruValidateArgv().
  */
-export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource): void {
+export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource,
+                             readHeightContract?: HeightContractReader): void {
   // Before anything else. Every stage below this line is a Python child process, and a
   // missing interpreter surfaces on Windows as nothing but "The system cannot find the
   // path specified." — attributed to whichever stage happened to run first, which is how
@@ -2733,6 +2736,8 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
   // worktree is guaranteed to find whatever this run leaves pending.
   resolveCaptureRoot(process.env, REPO_ROOT);
 
+  // Validate shared stats bindings even when no source label was supplied.
+  heightEnrichmentPins(readHeightContract, source?.label);
   const python = resolvePython();
   if (!deps.fileExists(python)) {
     const overridden = (process.env.AFLDB_PYTHON ?? '').trim() !== '';
@@ -2816,19 +2821,18 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + `Nothing has been destroyed.\n${brownlow.stdout}${brownlow.stderr}`);
   }
 
-  // AFLDB-ISSUE-118 §23.19. The height stages read two acquired snapshots beside the
-  // baseline — the pinned in-season supplement and the pinned AFL API roster set —
+  // AFLDB-ISSUE-118 §23.19. Heights read the baseline register/stats, any configured
+  // supplements shared with coaches, and the separately pinned AFL API roster set —
   // whose raw bytes are gitignored. Prove the manifest bindings (done inside the pin
   // readers, which refuse on a missing or mismatched manifest) and every artefact hash
   // offline, before destruction, exactly as the ladder witness is proven.
   if (source) {
-    const heights = deps.runCommand(heightsValidateArgv(source.label), {});
+    const heights = deps.runCommand(heightsValidateArgv(source.label, python, readHeightContract), {});
     if (heights.status !== 0) {
       throw new RebuildRefused(
         `Height preflight failed (${HEIGHT_LOADER} --validate-only). The fitzRoy contract `
-        + 'pins the in-season supplement(s) '
-        + `${heightEnrichmentPins().supplements.map((s) => `'${s.label}'`).join(', ')}, `
-        + 'but the register or a supplement is missing, incomplete or does not match its '
+        + `pins baseline/register and shared height/coach stats (${heightStatsInputDescription(source.label, readHeightContract)}), `
+        + 'but the baseline register/stats or a configured supplement is missing, incomplete or does not match its '
         + 'manifest. Nothing has been destroyed.\n'
         + `${heights.stdout}${heights.stderr}`);
     }
@@ -2867,15 +2871,15 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + `${birthDates.stdout}${birthDates.stderr}`);
   }
   // AFLDB-ISSUE-118 §23.27. The coaches stage reads the pinned coach-page snapshot (its
-  // parsed artefacts tracked, raw bytes gitignored) and the baseline's own player_stats
-  // files: prove the pin binding (inside afltablesCoachesPin) and every hash offline.
+  // parsed artefacts tracked, raw bytes gitignored) and the shared height/coach stats
+  // inputs: prove the pin binding (inside afltablesCoachesPin) and every hash offline.
   if (source) {
-    const coaches = deps.runCommand(coachesValidateArgv(source.label), {});
+    const coaches = deps.runCommand(coachesValidateArgv(source.label, python, readHeightContract), {});
     if (coaches.status !== 0) {
       throw new RebuildRefused(
         `Coaches preflight failed (${COACH_LOADER} --validate-only). The AFL Tables contract `
         + `pins '${afltablesCoachesPin().label}', but its tracked artefacts, the baseline's `
-        + 'player_stats files or a pinned supplement are missing, incomplete or do not match '
+        + `shared height/coach stats (${heightStatsInputDescription(source.label, readHeightContract)}) are missing, incomplete or do not match `
         + 'their manifests. Re-acquire the coach pages with '
         + 'legacy/offline/tools/rebuild/afltables/acquire_coaches.py. Nothing has been destroyed.\n'
         + `${coaches.stdout}${coaches.stderr}`);
@@ -2983,39 +2987,70 @@ function provePin(pin: PinnedManifest, what: string): void {
   }
 }
 
+/** Stats inputs intentionally shared by heights and coaches; measurements never default. */
 export type HeightEnrichmentPins = {
+  statsInputMode: 'supplemented_baseline' | 'baseline_only';
+  baselineSnapshotLabel: string | null;
   supplements: PinnedManifest[];
   measured: { playersWithHeight: number; heightWithoutEvidence: number; heightConflictsOpen: number };
 };
 
+export type HeightContractReader = () => Record<string, unknown> | null;
+
+function readHeightContract(): Record<string, unknown> | null {
+  const path = join(REPO_ROOT, FITZROY_CONTRACT);
+  return existsSync(path)
+    ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+    : null;
+}
+
 /**
- * The in-season supplement(s) and measured outcome the HEIGHTS stage is bound to, read
- * from the fitzRoy contract (datasets.player_details.height_enrichment). Never a
- * default: no pin, no stage. Each supplement's manifest binding is proven on read.
+ * Shared height/coach baseline stats inputs and exact measured height outcomes.
+ * Legacy nonempty supplements retain their behavior. Baseline-only requires an
+ * explicit empty list bound to the selected baseline; every supplement proves its manifest.
  */
 export function heightEnrichmentPins(
-  readContract: () => Record<string, unknown> | null = () => {
-    const path = join(REPO_ROOT, FITZROY_CONTRACT);
-    return existsSync(path)
-      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
-      : null;
-  },
+  readContract: HeightContractReader = readHeightContract,
+  selectedBaselineLabel?: string,
 ): HeightEnrichmentPins {
   const contract = readContract();
   const datasets = contract?.datasets as Record<string, Record<string, unknown>> | undefined;
   const block = datasets?.player_details?.height_enrichment as Record<string, unknown> | undefined;
-  const supplements = block?.supplements as Array<Record<string, unknown>> | undefined;
+  const supplements = block?.supplements;
   const measured = block?.measured as Record<string, unknown> | undefined;
-  if (!block || !Array.isArray(supplements) || supplements.length === 0 || !measured) {
+  if (!block || !Array.isArray(supplements) || !measured) {
     throw new RebuildRefused(
       `${FITZROY_CONTRACT} records no height enrichment binding `
-      + '(datasets.player_details.height_enrichment with supplements and measured). '
-      + 'AFLDB-ISSUE-118 §23.19 binds the in-season supplement explicitly; the rebuild '
-      + 'will not pick one.');
+      + '(datasets.player_details.height_enrichment with explicit supplements and measured). '
+      + 'The rebuild will not guess shared height/coach stats inputs.');
   }
-  const pins: PinnedManifest[] = supplements.map((s) => ({
-    label: String(s.snapshot_label), manifest: String(s.manifest), sha256: String(s.manifest_sha256),
-  }));
+  const mode = Object.hasOwn(block, 'stats_input_mode')
+    ? block.stats_input_mode : 'supplemented_baseline';
+  if (mode !== 'supplemented_baseline' && mode !== 'baseline_only') {
+    throw new RebuildRefused('height_enrichment.stats_input_mode must be supplemented_baseline or baseline_only.');
+  }
+  let baselineSnapshotLabel: string | null = null;
+  if (mode === 'baseline_only') {
+    const label = block.baseline_snapshot_label;
+    if (supplements.length !== 0 || typeof label !== 'string' || label.trim() === ''
+        || !selectedBaselineLabel || label !== selectedBaselineLabel) {
+      throw new RebuildRefused('height_enrichment baseline_only requires explicit supplements: [] and '
+        + 'baseline_snapshot_label matching the selected baseline for both heights and coaches.');
+    }
+    baselineSnapshotLabel = label;
+  } else if (supplements.length === 0) {
+    throw new RebuildRefused('height_enrichment supplemented_baseline requires nonempty supplements; '
+      + 'an empty list requires explicit baseline_only and a selected baseline binding.');
+  }
+  const pins: PinnedManifest[] = supplements.map((value: unknown) => {
+    const s = value as Record<string, unknown> | null;
+    if (!s || typeof s.snapshot_label !== 'string' || !s.snapshot_label.trim()
+        || typeof s.manifest !== 'string' || !s.manifest.trim()
+        || typeof s.manifest_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(s.manifest_sha256)) {
+      throw new RebuildRefused('height_enrichment supplements require snapshot_label, manifest and manifest_sha256.');
+    }
+    return { label: s.snapshot_label, manifest: s.manifest, sha256: s.manifest_sha256 };
+  });
   for (const pin of pins) provePin(pin, 'The fitzRoy contract height_enrichment block');
   const int = (key: string): number => {
     const v = measured[key];
@@ -3025,6 +3060,8 @@ export function heightEnrichmentPins(
     return v;
   };
   return {
+    statsInputMode: mode,
+    baselineSnapshotLabel,
     supplements: pins,
     measured: {
       playersWithHeight: int('players_with_height'),
@@ -3032,6 +3069,11 @@ export function heightEnrichmentPins(
       heightConflictsOpen: int('height_conflicts_open'),
     },
   };
+}
+
+function heightStatsInputDescription(label: string, readContract?: HeightContractReader): string {
+  const pins = heightEnrichmentPins(readContract, label);
+  return [label, ...pins.supplements.map((s) => s.label)].join(' + ');
 }
 
 export type AflApiRosterPin = PinnedManifest & { measured: { playersWithAflApiEvidence: number } };
@@ -3066,18 +3108,20 @@ export function aflApiRosterPin(
   return { ...pin, measured: { playersWithAflApiEvidence: n } };
 }
 
-/** The HEIGHTS data stage: the baseline register plus every pinned supplement. */
+/** The HEIGHTS data stage: baseline register/stats plus configured shared stats supplements. */
 export function heightsImportArgv(fitzroyLabel: string,
-                                  python: string = resolvePython()): string[] {
+                                  python: string = resolvePython(),
+                                  readContract?: HeightContractReader): string[] {
   const argv = [python, HEIGHT_LOADER, '--label', fitzroyLabel];
-  for (const s of heightEnrichmentPins().supplements) argv.push('--supplement-label', s.label);
+  for (const s of heightEnrichmentPins(readContract, fitzroyLabel).supplements) argv.push('--supplement-label', s.label);
   return argv;
 }
 
 /** The same argv plus --validate-only: manifests and artefact hashes, no database. */
 export function heightsValidateArgv(fitzroyLabel: string,
-                                    python: string = resolvePython()): string[] {
-  return [...heightsImportArgv(fitzroyLabel, python), '--validate-only'];
+                                    python: string = resolvePython(),
+                                    readContract?: HeightContractReader): string[] {
+  return [...heightsImportArgv(fitzroyLabel, python, readContract), '--validate-only'];
 }
 
 export function aflApiHeightsArgv(python: string = resolvePython()): string[] {
@@ -3124,8 +3168,8 @@ export function wikipediaHeightRows(
  * produced them, so a rebuild that silently drops the stage (or reproduces fewer
  * identities) fails here rather than being noticed by a Gridley cell weeks later.
  */
-export function heightChecks(): FinalCheck[] {
-  const pins = heightEnrichmentPins();
+export function heightChecks(selectedBaselineLabel?: string, readContract?: HeightContractReader): FinalCheck[] {
+  const pins = heightEnrichmentPins(readContract, selectedBaselineLabel);
   const roster = aflApiRosterPin();
   return [
     { key: 'players_with_height',
@@ -3313,16 +3357,18 @@ export function afltablesCoachesPin(
   };
 }
 
-/** The COACHES data stage: the pinned coach pages, the baseline and every pinned supplement. */
-export function coachesImportArgv(fitzroyLabel: string, python: string = resolvePython()): string[] {
+/** The COACHES data stage: pinned coach pages and the same declared stats inputs as heights. */
+export function coachesImportArgv(fitzroyLabel: string, python: string = resolvePython(),
+                                  readContract?: HeightContractReader): string[] {
   const argv = [python, COACH_LOADER, '--label', afltablesCoachesPin().label, '--fitzroy-label', fitzroyLabel];
-  for (const s of heightEnrichmentPins().supplements) argv.push('--supplement-label', s.label);
+  for (const s of heightEnrichmentPins(readContract, fitzroyLabel).supplements) argv.push('--supplement-label', s.label);
   return argv;
 }
 
 /** The same argv plus --validate-only: manifests and artefact hashes, no database. */
-export function coachesValidateArgv(fitzroyLabel: string, python: string = resolvePython()): string[] {
-  return [...coachesImportArgv(fitzroyLabel, python), '--validate-only'];
+export function coachesValidateArgv(fitzroyLabel: string, python: string = resolvePython(),
+                                    readContract?: HeightContractReader): string[] {
+  return [...coachesImportArgv(fitzroyLabel, python, readContract), '--validate-only'];
 }
 
 /**
@@ -3331,7 +3377,8 @@ export function coachesValidateArgv(fitzroyLabel: string, python: string = resol
  * 'unique' status), the assignment count and the source's own coverage shape. A rebuild
  * that drops the stage, links by name, or loses assignments fails here.
  */
-export function coachChecks(): FinalCheck[] {
+export function coachChecks(selectedBaselineLabel?: string, readContract?: HeightContractReader): FinalCheck[] {
+  heightEnrichmentPins(readContract, selectedBaselineLabel);
   const pin = afltablesCoachesPin();
   const perMatch = 'SELECT m.id, count(mc.match_id) AS n FROM matches m '
     + 'LEFT JOIN match_coaches mc ON mc.match_id = m.id GROUP BY m.id';

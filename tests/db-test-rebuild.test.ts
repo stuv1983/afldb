@@ -86,6 +86,7 @@ import {
   aflApiRosterPin,
   heightChecks,
   heightEnrichmentPins,
+  heightsImportArgv,
   heightsValidateArgv,
   BROWNLOW_SEASON_LOADER,
   BROWNLOW_SEASON_PREFLIGHT_FILES,
@@ -1842,6 +1843,185 @@ describe('stage graph', () => {
       // The preflight argv is DERIVED from the data argv (the §28.4 rule), so the
       // snapshot proven and the snapshot imported cannot differ.
       expect(heightsValidateArgv(fitzroy().label)).toEqual([...heights.argv!, '--validate-only']);
+    });
+
+
+    describe('explicit shared height/coach stats inputs (ISSUE-316)', () => {
+      // In-memory configuration only: these integers are synthetic, never successor expectations.
+      const measured = { players_with_height: 101, height_without_evidence: 0, height_conflicts_open: 2 };
+      const fixturePin = heightEnrichmentPins().supplements[0];
+      const supplement = (label: string) => ({ snapshot_label: label,
+        manifest: fixturePin.manifest, manifest_sha256: fixturePin.sha256 });
+      const binding = (overrides: Record<string, unknown> = {}) => ({
+        datasets: { player_details: { height_enrichment: {
+          stats_input_mode: 'baseline_only', baseline_snapshot_label: FULL_LABEL,
+          supplements: [], measured: { ...measured }, ...overrides,
+        } } },
+      });
+      const accepted = () => {
+        const doc = JSON.parse(readFileSync(join(root, 'data/reference/fitzroy-accepted-baselines.json'), 'utf8'));
+        doc.baselines.find((b: { acceptance_status: string }) => b.acceptance_status === 'accepted').snapshot_label = FULL_LABEL;
+        return doc;
+      };
+      const passing = () => {
+        const fake = fakeDeps();
+        const commands: string[][] = [];
+        const deps: Deps = { ...fake.deps, runCommand: (argv) => {
+          commands.push(argv);
+          return { status: 0, stderr: '', stdout: argv.includes(BROWNLOW_SEASON_LOADER)
+            ? '{"ok": true}' : 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n' };
+        } };
+        return { ...fake, deps, commands };
+      };
+
+      it.each(['baseline_only', 'supplemented_baseline'] as const)(
+        '%s uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates', (mode) => {
+          const supplements = mode === 'baseline_only' ? [] : [supplement('fixture-first'), supplement('fixture-second')];
+          const read = () => binding({ stats_input_mode: mode, supplements });
+          const pins = heightEnrichmentPins(read, FULL_LABEL);
+          expect(pins.statsInputMode).toBe(mode);
+          expect(pins.baselineSnapshotLabel).toBe(mode === 'baseline_only' ? FULL_LABEL : null);
+          const suffix = supplements.flatMap((p) => ['--supplement-label', p.snapshot_label]);
+          const h = [resolvePython(), HEIGHT_LOADER, '--label', FULL_LABEL, ...suffix];
+          const c = [resolvePython(), COACH_LOADER, '--label', afltablesCoachesPin().label,
+            '--fitzroy-label', FULL_LABEL, ...suffix];
+          expect(heightsImportArgv(FULL_LABEL, undefined, read)).toEqual(h);
+          expect(coachesImportArgv(FULL_LABEL, undefined, read)).toEqual(c);
+          expect(heightsValidateArgv(FULL_LABEL, undefined, read)).toEqual([...h, '--validate-only']);
+          expect(coachesValidateArgv(FULL_LABEL, undefined, read)).toEqual([...c, '--validate-only']);
+          const planned = planStages(target(), fitzroy(), OPTS, read);
+          expect(idsOf(planned)).toEqual(idsOf(stages));
+          const description = [FULL_LABEL, ...supplements.map((p) => p.snapshot_label)].join(' + ');
+          for (const [id, argv] of [['heights', h], ['coaches', c]] as const) {
+            const stage = planned.find((s) => s.id === id)!;
+            expect(stage.argv).toEqual(argv);
+            expect(stage.name).toContain('(' + description + ')');
+            expect(stage.name).not.toContain(' + )');
+            expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+          }
+          const run = passing();
+          runPreflight(run.deps, OPTS, fitzroy(), read);
+          expect(run.commands).toContainEqual([...h, '--validate-only']);
+          expect(run.commands).toContainEqual([...c, '--validate-only']);
+          expect(run.sqlRuns).toEqual([]);
+          const height = heightChecks(FULL_LABEL, read);
+          expect(height.map((v) => [v.key, v.expected])).toEqual([
+            ['players_with_height', 101], ['height_without_evidence', 0], ['height_conflicts_open', 2],
+            ['players_with_afl_api_height_evidence', aflApiRosterPin().measured.playersWithAflApiEvidence],
+            ['players_with_wikipedia_height_evidence', wikipediaHeightRows()],
+          ]);
+          const coach = coachChecks(FULL_LABEL, read);
+          const m = afltablesCoachesPin().measured;
+          expect(coach.map((v) => [v.key, v.expected])).toEqual([
+            ['coaches', m.coaches], ['coaches_linked_to_players', m.coachesLinkedToPlayers],
+            ['coaches_unlinked', m.coachesUnlinked], ['coaches_linked_outside_unique', 0],
+            ['match_coaches', m.matchCoaches], ['matches_with_both_coaches', m.matchesWithBothCoaches],
+            ['matches_with_one_coach', m.matchesWithOneCoach], ['matches_without_coach', m.matchesWithoutCoach],
+          ]);
+          const final = finalValidationChecks(accepted(), undefined, read);
+          expect(final).toEqual(expect.arrayContaining([...height, ...coach]));
+        });
+
+      it('preserves legacy supplemented argv, order, manifest proofs and final expectations', () => {
+        const real = JSON.parse(readFileSync(join(root, 'tools/rebuild/fitzroy/fitzroy-contract.json'), 'utf8'));
+        const explicit = structuredClone(real);
+        explicit.datasets.player_details.height_enrichment.stats_input_mode = 'supplemented_baseline';
+        const read = () => explicit;
+        expect(heightsImportArgv(FULL_LABEL, undefined, read)).toEqual(heights.argv);
+        expect(coachesImportArgv(FULL_LABEL, undefined, read)).toEqual(stages.find((s) => s.id === 'coaches')!.argv);
+        expect(heightChecks(FULL_LABEL, read)).toEqual(heightChecks());
+        expect(coachChecks(FULL_LABEL, read)).toEqual(coachChecks());
+      });
+
+      it.each([
+        { baseline_snapshot_label: undefined }, { baseline_snapshot_label: '' },
+        { baseline_snapshot_label: ' ' }, { baseline_snapshot_label: 'another-baseline' },
+        { supplements: undefined }, { supplements: [supplement('contradictory')] },
+        { stats_input_mode: undefined }, { stats_input_mode: null }, { stats_input_mode: 1 },
+        { stats_input_mode: 'unknown' }, { stats_input_mode: 'supplemented_baseline' },
+        { measured: undefined },
+      ])('refuses invalid shared bindings through every consumer: %j', (overrides) => {
+        const read = () => binding(overrides);
+        for (const call of [
+          () => heightsImportArgv(FULL_LABEL, undefined, read),
+          () => heightsValidateArgv(FULL_LABEL, undefined, read),
+          () => coachesImportArgv(FULL_LABEL, undefined, read),
+          () => coachesValidateArgv(FULL_LABEL, undefined, read),
+          () => planStages(target(), fitzroy(), OPTS, read),
+          () => heightChecks(FULL_LABEL, read), () => coachChecks(FULL_LABEL, read),
+          () => finalValidationChecks(accepted(), undefined, read),
+        ]) expect(call).toThrow(RebuildRefused);
+        const run = passing();
+        expect(() => runPreflight(run.deps, OPTS, fitzroy(), read)).toThrow(RebuildRefused);
+        expect(run.commands).toEqual([]);
+        expect(run.sqlRuns).toEqual([]);
+      });
+
+      it('refuses implicit empty supplements and baseline-only use without a selected label', () => {
+        const implicit = binding();
+        delete (implicit.datasets.player_details.height_enrichment as Record<string, unknown>).stats_input_mode;
+        expect(() => heightEnrichmentPins(() => implicit, FULL_LABEL)).toThrow(RebuildRefused);
+        const read = () => binding();
+        expect(() => heightEnrichmentPins(read)).toThrow(RebuildRefused);
+        expect(() => heightsImportArgv('different-selected-baseline', undefined, read)).toThrow(RebuildRefused);
+        expect(() => coachesImportArgv('different-selected-baseline', undefined, read)).toThrow(RebuildRefused);
+        const mismatched = accepted();
+        mismatched.baselines.find((b: { acceptance_status: string }) => b.acceptance_status === 'accepted').snapshot_label = 'different-selected-baseline';
+        expect(() => finalValidationChecks(mismatched, undefined, read)).toThrow(RebuildRefused);
+        expect(() => heightChecks(undefined, read)).toThrow(RebuildRefused);
+        expect(() => coachChecks(undefined, read)).toThrow(RebuildRefused);
+        const run = passing();
+        expect(() => runPreflight(run.deps, OPTS, undefined, read)).toThrow(RebuildRefused);
+        expect(run.commands).toEqual([]);
+      });
+
+      it.each(['players_with_height', 'height_without_evidence', 'height_conflicts_open'])(
+        'requires an explicit integer for %s in either mode', (key) => {
+          for (const mode of ['baseline_only', 'supplemented_baseline']) {
+            for (const invalid of [undefined, null, '1', 1.5, NaN, Infinity]) {
+              const read = () => binding({ stats_input_mode: mode,
+                supplements: mode === 'baseline_only' ? [] : [supplement('fixture')],
+                measured: { ...measured, [key]: invalid } });
+              expect(() => heightChecks(FULL_LABEL, read)).toThrow(/is not an integer/);
+              expect(() => coachesImportArgv(FULL_LABEL, undefined, read)).toThrow(/is not an integer/);
+            }
+          }
+        });
+
+      it.each([null, {}, { snapshot_label: 'x' }, { ...supplement('x'), manifest: 'missing-manifest.json' },
+        { ...supplement('x'), manifest_sha256: '0'.repeat(64) },
+        { ...supplement('x'), manifest_sha256: 'invalid' }])('still proves every configured supplement: %j', (pin) => {
+          const read = () => binding({ stats_input_mode: 'supplemented_baseline', supplements: [pin] });
+          expect(() => heightsImportArgv(FULL_LABEL, undefined, read)).toThrow(RebuildRefused);
+          expect(() => coachesImportArgv(FULL_LABEL, undefined, read)).toThrow(RebuildRefused);
+        });
+
+      it.each(['baseline_only', 'supplemented_baseline'])(
+        '%s stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset', (mode) => {
+          const read = () => binding({ stats_input_mode: mode,
+            supplements: mode === 'baseline_only' ? [] : [supplement('fixture-supplement')] });
+          // The loader owns artifact verification; fake its failure at the real preflight boundary.
+          const failures: Array<[string[], RegExp]> = [
+            [fitzroyValidateArgv(fitzroy()), /fitzRoy preflight failed/],
+            [heightsValidateArgv(FULL_LABEL, undefined, read), /Height preflight failed/],
+            [aflApiHeightsValidateArgv(), /AFL API roster preflight failed/],
+            [wikipediaHeightsValidateArgv(), /Wikipedia height preflight failed/],
+            [coachesValidateArgv(FULL_LABEL, undefined, read), /Coaches preflight failed/],
+          ];
+          for (const [failed, message] of failures) {
+            const run = passing();
+            const deps: Deps = { ...run.deps, runCommand: (argv, env) =>
+              JSON.stringify(argv) === JSON.stringify(failed)
+                ? { status: 1, stdout: '', stderr: 'fixture manifest/hash failure' }
+                : run.deps.runCommand(argv, env) };
+            let error: unknown;
+            try { runPreflight(deps, OPTS, fitzroy(), read); } catch (e) { error = e; }
+            expect(error).toBeInstanceOf(RebuildRefused);
+            expect(String(error)).toMatch(message);
+            expect(String(error)).toContain('Nothing has been destroyed');
+            expect(run.sqlRuns).toEqual([]);
+          }
+        });
     });
 
     it('loads the AFL API roster the contract accepts, as evidence only', () => {
