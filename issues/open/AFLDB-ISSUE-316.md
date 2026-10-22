@@ -2227,7 +2227,7 @@ One agent, no subagents; owner explicitly authorised the **stricter capture-boun
 - Approval-review notes (no action circumvented): the "disable the check" mutation edit was denied and not applied; one package-build call was denied once (reason shown as "Security Test Removal") and the same reviewed, previously-used operation was then run as separate, plainly described copy and build calls and was permitted; one read-only verification command that wrote to `/tmp` was denied and replaced by a scratchpad node verifier.
 - A PASS on a disposable rehearsal grants no production baseline acceptance, successor adoption, rollover, release or deployment authority.
 
-### Rehearsal milestone closure — 2026-10-22 (current)
+### Rehearsal milestone closure — 2026-10-22 (previous; see the evidence-retention section below)
 
 One agent, owner-authorised closure of the attempt-2 record; no host, database, network, test, rehearsal rerun,
 cleanup or implementation change. **Achieved milestone: complete isolated C2 rehearsal PASS at
@@ -2252,8 +2252,21 @@ or recorded only in the producer narrative (P) in the [closure record](../../doc
   decisions N1–N11 and one offline drafting authorisation, in the prompt at the end of the
   [decision package](../../docs/v2/issue316-c2-successor-decision-2026-10-21.md#current-state-and-remaining-decisions--2026-10-22);
   N12–N16 (census targets, rollover, release, harness trust boundary, retention) are listed and deliberately not asked yet.
-- **Retained, not committed:** the 12 evidence documents and `.codex/` (closure §7). The closure commit contains the
+- **Retained, not committed:** the 12 evidence documents and `.codex/` (closure §7). **Update 2026-10-22:** the 12 documents were reviewed and committed (section below); `.codex/` stays uncommitted. The closure commit contains the
   runbook, the decision package, the closure record, `IssuesIndex.md`, `issues.md`, `CHANGELOG.md` and the preparation
   package only.
 
 **Still open (owner decisions, unchanged by this work).** Brownlow 2026 authenticity/completeness/publication (all three keys pending); ET applicability; missing coach raw; whether any of the rehearsal-only candidate values (1,640, the DOB pins, the 2026-inclusive census scope) become a successor/active reference and the rollover/D-316-1 decisions; production applicability of the row expectation; freeze/recovery/release/migration/deployment decisions and a fresh production-side census when those are in scope. 1,640 remains rehearsal-only. Production NO-GO.
+
+### Evidence retention, dependency-lock findings and consolidated successor proposal — 2026-10-22 (current)
+
+One agent, no subagents, owner-authorised: native inspection, hashing, narrowly required local commands, read-only Git, offline validation and one scoped documentation/evidence commit. No host/database/network/WSL, install, acquisition, census, source or active-reference change, package execution, rehearsal rerun, cleanup, push, rollover or deployment.
+
+- **Bounded owner decisions recorded** (full table in the [decision package](../../docs/v2/issue316-c2-successor-decision-2026-10-21.md#consolidated-successor-proposal--2026-10-22)): N1–N3 evidence for proposal drafting only (all 21 ordinary availability keys in scope; Substitute empties, biography exceptions, Last, details Goals-empty, Time.on.Ground meaning and independent authority stay pending); N4 ET unknown, empty never zero; N5 baseline_only with no supplement; N6 all rejections and informational jumpers preserved; N7–N8 frozen rehearsal inputs, missing coach raw not accepted for production, disagreements and attribution unresolved; N9 all three Brownlow keys pending; N11 measured values as proposed expectations, rehearsal-only until separately adopted; N16 retain all, commit the twelve documents, no cleanup. N12–N15 remain unapproved.
+- **Evidence retention:** hashes, links, cited hashes and key figures verified ([closure §8.1](../../docs/v2/issue316-c2-rehearsal-closure-2026-10-22.md#8-retention-review-and-dependency-lock-findings-2026-10-22)); five superseded status headlines annotated with dated notes; corrections C7–C10 recorded (150-row fallback now measured; the packaged overlay contract/register carry cp1252 mojibake and stale BLOCKED text; the 2026 ladder file is an acquired witness member, not locally computed; superseded headlines).
+- **Lockfile discrepancy** ([closure §8.2](../../docs/v2/issue316-c2-rehearsal-closure-2026-10-22.md#8-retention-review-and-dependency-lock-findings-2026-10-22)): DEV lock not retained (only `85809f26`), difference unclassifiable; hash-enforced JS modules byte-equal to the local install except platform binaries; Linux esbuild binary not tied to lock integrity; Python unpinned. PASS stays qualified; four reproducibility steps listed. Nothing installed or altered.
+- **Consolidated successor proposal** ([decision package](../../docs/v2/issue316-c2-successor-decision-2026-10-21.md#consolidated-successor-proposal--2026-10-22)): labelled package `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-NOT-INSTALLED-20261022T091212Z/` (manifest `1d71f4caaa8255a97593bc57c30da11e2ba028feae3bbe22021f5d8fca0927fa`; 52 pure offline checks, 0 failures). Derived from active bytes; compared with, not copied from, the rehearsal overlays. Pre-rollover edits and the expected post-rollover model are kept separate because the planner cannot carry the continuity, height, expectation and measurement edits (B2); the rollover date, executed-gate verdict and production profile name are sentinels (U1–U3). BLOCKED B1–B8 recorded; nothing weakened.
+- **Smallest consolidated owner decisions next:** (1) review the proposed content; (2) the implementation route for B1/B2/B6; (3) the production provenance stance for coaches/Wikipedia/roster captures; (4) rollover inputs and census targets (N12/N13); (5) authorise runtime-reproducibility work (N15). Release/recovery, Brownlow publication and cleanup stay separate approvals.
+- **Commit:** one scoped local documentation/evidence commit (the twelve documents, closure, decision package, this runbook, `IssuesIndex.md`, `issues.md`, `CHANGELOG.md`); `.codex/` and generated data packages excluded; nothing pushed.
+
+ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending; ET unresolved.

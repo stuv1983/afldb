@@ -1,7 +1,7 @@
 # ISSUE-316 C2 successor acceptance decision package — 2026-10-21
 
 **Decision state: NOT ACCEPTED; production NO-GO** (updated 2026-10-22: rehearsal PASS at `5643f5c2`; see "Current
-state and remaining decisions" below). Original 2026-10-21 implementation basis:
+state and remaining decisions" and "Consolidated successor proposal" below). Original 2026-10-21 implementation basis:
 `4a2eea89cccc465f2f017fb06ad55a7d4cb7733d`. One agent; local documentation review only.
 This package proposes the next bounded action; it grants no execution or acceptance authority.
 2026 Brownlow remains pending. AFL API authority, historical eligibility and existing ownership
@@ -51,9 +51,9 @@ are in `docs/v2/` (closure record §7 lists their retained, uncommitted status).
 | N13 (S6) | Rollover date, `retired`, `D-316-1`, seasons boundary | Committed `seasons.json` has 2026 in progress (`[2026]`); the rehearsal overlay has `[]`. Desired boundary: completed through 2026, in-progress `[2027]`, no 2027 writer activation | The date; whether the dry run's six-file diff is accepted | **Supply the real date and choose `retired`**, or **defer** | Bounded dry run after N10 and N12; apply is a later approval |
 | N14 (S7) | Release and recovery requirements | Nothing in the rehearsal establishes freeze, backup / restore, migration and privilege changes, timer / polkit retirement or deployment state; see the [release plan](production-release-plan-2026-10-21.md) | Current host and recovery state | **Schedule** or **defer** each item | Each item is a separate approval |
 | N15 | Whether the rehearsal harness may support any production-adjacent run as it stands | Closure limits L5–L7: dependency lock differs from the repository lock; native libraries are observed, not enforced; capture / reinstate was proven on empty ledger data only | Native closure; a populated-ledger round trip | Not needed now; recorded so it is not dropped | A populated-copy rehearsal would need its own authority |
-| N16 | Retention, cleanup and commit of evidence documents | DEV roots (attempt 1, lifecycle, attempt 2, runtime-proof roots, clones) and C: packages are retained; twelve evidence documents and `.codex/` are uncommitted (closure §7) | Disk and tidy-up policy | **Retain** (default), **authorise named cleanup**, or **commit the documents** | Cleanup and the documentation commit are separate approvals |
+| N16 | Retention, cleanup and commit of evidence documents | **Recorded 2026-10-22:** all evidence retained, no cleanup; the twelve evidence documents were reviewed (closure §7–§8) and are committed in the evidence-retention documentation commit. `.codex/` stays uncommitted. DEV roots and C: packages are retained | Disk and tidy-up policy | Retained; documentation commit done | Any cleanup remains a separate approval |
 
-### Next approval prompt
+### Next approval prompt (superseded 2026-10-22: its N1–N9, N11 decisions were recorded as bounded decisions and N10 drafting produced the consolidated proposal below; kept as history)
 
 Limited to the decisions needed to move from rehearsal PASS to a reviewable production proposal (N1–N11). The
 owner may edit any line; nothing below is recorded until approved.
@@ -83,6 +83,94 @@ owner may edit any line; nothing below is recorded until approved.
 > shell, Git, network, host, database, WSL, install, census, rollover, adoption, acquisition, rehearsal, cleanup,
 > commit, push or deployment. N12–N16 are not decided here. Keep every refusal, ET unresolved, all three 2026
 > Brownlow keys pending, and the authority, eligibility and ownership restrictions unchanged.
+
+## Consolidated successor proposal — 2026-10-22
+
+**Status: PROPOSAL ONLY — nothing installed, nothing accepted.** ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED. No active contract, register, reference, availability, row-expectation, source or test file was changed. 1,640 stays rehearsal-only; 2026 Brownlow stays pending (all three keys); ET stays unresolved; AFL API authority, eligibility and ownership restrictions are unchanged. The five approvals above remain separate: this section is the reviewable content for "Active successor adoption" only, and it is not runnable (see "Unresolved fields").
+
+### Bounded decisions recorded by the owner on 2026-10-22
+
+| Rows | Recorded |
+|---|---|
+| N1–N3 | The observed population, arithmetic, canonical linkage and Q1–Q4 consistency facts are accepted as **evidence for proposal drafting only**; all 21 ordinary availability keys are in the proposed scope. This does not establish independent authenticity or accept unsupported field meanings. `Substitute` empties, biography exceptions, `Last`, details Goals-empty semantics, `Time.on.Ground` meaning and independent-authority questions stay **pending**. |
+| N4 | ET stays unknown; an empty cell never becomes zero. |
+| N5 | Propose `baseline_only` shared height/coach statistics with no supplement; exact baseline binding and all gates preserved. |
+| N6 | All height and identity rejections and the informational jumpers are preserved. |
+| N7–N8 | Historical corroboration and parsed coaches are frozen rehearsal inputs, successor applicability unproven; missing coach raw is not accepted for production provenance; disagreements and coach attribution stay unresolved. |
+| N9 | All three 2026 Brownlow keys stay pending; no publication work. |
+| N11 | Measured values may appear as **proposed successor expectations**, rehearsal-only until separately adopted. |
+| N16 | All evidence retained; the twelve supporting documents committed after bounded review (closure §7–§8); no cleanup. |
+| N10 | Drafting authorised (this section and the package below). N12–N15 remain unapproved operational decisions. |
+
+### Proposal package (labelled, on C:, not in the repository)
+
+`C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-NOT-INSTALLED-20261022T091212Z/` — 54 files; `PROPOSAL_MANIFEST.json` sha256 `1d71f4caaa8255a97593bc57c30da11e2ba028feae3bbe22021f5d8fca0927fa`. It is derived from the **active repository bytes** (HEAD `66acf53b` lineage), never from the rehearsal overlay, which is compared only. Generator and pure offline checks are in its `scripts/`; the check result is `analysis/OFFLINE_CHECKS.json` (**52 checks, 0 failures**; no runner, planner, importer, gate, census, database or network was run).
+
+| Part | Path under the package | sha256 (first 16) |
+|---|---|---|
+| Reviewed planner input: ladder coverage | `proposed/artifacts/rollover/ladder-coverage.json` | `00a4957e08da19b6` |
+| Reviewed planner input: accepted corrections | `proposed/artifacts/rollover/accepted-corrections.json` | `3a938b52b8a26342` |
+| Reviewed planner input: availability (byte-identical to active) | `proposed/artifacts/rollover/stat-availability.json` | `e2900084ebd7e950` |
+| Pre-rollover working tree: fitzroy contract | `proposed/pre-rollover-working-tree/tools/rebuild/fitzroy/fitzroy-contract.json` | `5768f078dc3846a4` |
+| Pre-rollover working tree: afl-api contract | `…/afl_api/afl-api-contract.json` | `1453fffaa50dee67` |
+| Pre-rollover working tree: afltables contract | `…/afltables/afltables-contract.json` | `173a923340764f9e` |
+| Expected after rollover: fitzroy contract | `proposed/expected-after-rollover/tools/rebuild/fitzroy/fitzroy-contract.json` | `a40fcd1508afd0de` |
+| Expected after rollover: accepted register | `…/data/reference/fitzroy-accepted-baselines.json` | `691e03a28ea2f139` |
+| Expected after rollover: seasons | `…/data/reference/seasons.json` | `1368e9b100788fd6` |
+| Expected after rollover: AFL Tables network switch | `…/data/reference/afltables-network.json` | `e27d0fce64ad724c` |
+| New tracked manifest: core (`c2-2026-final-core-v1`) | `proposed/new-tracked-files/docs/rebuild-manifests/afltables_fitzroy_core/` | `02bbcf932ef71d41` |
+| New tracked manifest: ladder (`c2-2026-final-ladder-v1`) | same directory | `65c299072afb35f1` |
+| Row-expectation patch (anchor only) | `…/tools/db/rebuild-test.ts.club-seasons-constant-only.txt` | `910c1f00a79d4028` |
+| Analysis | `analysis/{SEMANTIC_DIFFERENCES,FINGERPRINTS,UNRESOLVED_FIELDS,BLOCKED_BINDINGS,OFFLINE_CHECKS}.json`, `ORDERING_AND_PREREQUISITES.md` | see `PROPOSAL_MANIFEST.json` |
+
+Source fingerprints: core manifest `02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988` (132 files, 729,288 rows, LF); artefact-set digest `817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e` (recomputed); ladder witness manifest `65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34` (130 files, 1,640 rows, LF); all 262 raw artefacts hash to their manifest entries. Active inputs: availability `e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8`; the other active hashes are in `analysis/FINGERPRINTS.json`.
+
+### Exact semantic changes (active → proposed)
+
+**Rollover-planner-generated (predictable by the planner's own dry run; the dry run is the authority):**
+- `seasons.json`: `last_season` 2026 → 2027; `in_progress_seasons` `[2026]` → `[2027]`; the "Season in progress" note moves from 2026 to 2027.
+- `afltables-network.json`: `status` active → `retired`; `decision` null → `D-316-1`; `changed_at` null → **unresolved date**.
+- Contract: `season_range.last_season` 2025 → 2026 (rule text rewritten for 2027); `current_season_excluded.seasons` `[2026]` → `[2027]`; `accepted_witness` re-pointed to `c2-2026-final-ladder-v1` (129 → 130 files, 1,622 → 1,640 rows, acquired 2026-10-21, new manifest sha); `ladder.coverage` 1897–2026 (130 seasons, 1,640 rows, max 18 rows 2012–2026).
+- Register: predecessor `full-history-20260902` `accepted` → `retired` (nothing else changes; the older `full-history-20260827` entry is deep-equal); one new `accepted` entry `c2-2026-final-core-v1` appended (three entries; exactly one accepted). **Not** the rehearsal's single-entry replacement; **no** `rehearsal_not_selected` status.
+
+**Outside the planner (must exist in the working tree before the dry run — see B2):**
+- Continuity expectations: `renumbered_last_season` 2025 → 2026 and `renumbered_rows` 25 / 18 / 23 / 13 → **52 / 31 / 42 / 25** (150 rows, 4 players; `Billy_Wilson2` not folded).
+- Height block (N5): `stats_input_mode: baseline_only`, `baseline_snapshot_label: c2-2026-final-core-v1`, `supplements: []` (the 9,614-row `issue129-t7-20260903` supplement is dropped as redundant), `register_captured_on` 2026-09-02 → 2026-10-21 (every details `date_accessed` is 2026-10-21), `players_with_height` 12,487 → 12,579, `height_without_evidence` 0, `height_conflicts_open` 0 (proposed successor expectations, N11).
+- `ladder.rebuild_expectation` (exactly the runner's eight keys): core `c2-2026-final-core-v1` / `02bbcf93…` / `817d594e…`, witness `c2-2026-final-ladder-v1` / `65c29907…`, `expected_rows` 1,622 → 1,640; `profile` is an **unresolved sentinel** (B1).
+- `current_season_excluded.reason`: year 2026 → 2027 only (wording after AFL Tables retirement not reviewed, U8).
+- `afl-api-contract.json`: `players_with_afl_api_evidence` 1,824 → 1,916. `afltables-contract.json`: `players_with_dob` and `players_with_club_list_birth_evidence` 13,255 → 13,347; `match_coaches` 32,034 → 32,470; `matches_with_both_coaches` 15,817 → 16,035. Predecessor acceptance metadata (`accepted_on`/`accepted_in`) is left as recorded; the comments say these are rehearsal-measured expectations with successor applicability unproven.
+- `rebuild-test.ts` `CLUB_SEASONS_EXPECTED.rows` 1,622 → 1,640 (one anchored match verified; planner-written) — **B1/B6 prevent installing it alone**.
+
+**Reviewed inputs, not file edits:** accepted corrections (same four categories as the outgoing entry; three `source_normalisation` rules including the explicit **ladder-only North Melbourne 1999–2007 → Kangaroos** rule; Jim Stewart's two 1909 drops; display-name fallback and continuity at 150 rows / 4 players); availability **byte-unchanged** (21 keys `complete` through 2026; the three Brownlow keys `pending` for 2026; no fabricated or retracted coverage).
+
+**Differences from the rehearsal overlay (compared, not copied):** the overlay register was a selector fixture (predecessor `rehearsal_not_selected`, entry without `accepted_on`/`issue`/`validation`/`amendments`, `accepted_corrections` categories the planner would refuse); the overlay contract has `_rehearsal_only` markers, no `first_season_source`/`resolved_on`, `excluded: []`, a stale "BLOCKED" text, and 19 mojibake strings (3 in the register). Full lists: `diffs/overlay-to-proposed/`.
+
+### Unresolved fields (sentinels in the package — deliberately not runnable)
+
+U1 rollover date (feeds `accepted_on`, `validated_on`, `resolved_on`, `changed_at`) · U2 register `validation.verdict` (earned only by the executed gates) · U3 production ladder profile name · U4 confirm `retired` · U5 the D-316-1 grant · U6 whether the predecessor gets `retired_on`/`superseded_by` (planner writes neither; not added) · U7 `issue` attribution (planner hard-codes `AFLDB-ISSUE-101`) · U8 post-retirement exclusion-reason wording · U9 coach provenance restatement (no new acceptance date manufactured).
+
+### BLOCKED bindings (none weakened)
+
+B1 no production `LADDER_PAIRS` tuple: the 1,640 tuple is hard-wired to rehearsal provenance and an isolated target · B2 the planner cannot carry the continuity/height/expectation/measurement edits, and the continuity edit makes the predecessor invalid, so it must land atomically or the planner must be extended · B3 planner-copied predecessor comments need reviewed text (drafted) · B4 coach raw HTML absent, Wikipedia file unpinned, 479 provider ids unmapped · B5 no live-target ownership census · B6 tests that pin 1,622 · B7 the two manifests and 262 raw artefacts are not placed on any target · B8 DEV lock/Python reproducibility unproven (closure §8.2). Detail with evidence: `analysis/BLOCKED_BINDINGS.json`.
+
+### Ordering
+
+Adoption content and rollover are separate layers but the planner couples them in one write. Order: owner decisions → implementation (B1, B2, B6) → placement of manifests and raw data → per-target read-only census (scope 1897–2026) → working-tree pre-edits (uncommitted) → rollover **dry run**, compared semantically with the model → apply, post-planner text edit, whole-diff review → one operator commit → rebuild PRECHECK. Release, freeze, recovery, migrations, timer/polkit retirement and deployment are separate approvals. Table: `analysis/ORDERING_AND_PREREQUISITES.md`.
+
+### Ready for owner review versus blocked
+
+- **Ready (content):** continuity expectations, baseline_only height block and measured values, ladder witness/coverage binding, `rebuild_expectation` tuple (all but the profile name), measured afl-api/afltables expectations, register entry (all but three sentinel fields), accepted corrections, byte-unchanged availability, the two verified manifests, the 1,640 constant patch.
+- **Blocked:** everything under B1–B8 and U1–U9. The proposal cannot become runnable until the owner supplies U1, U3–U8 and the gates produce U2.
+
+### Smallest consolidated set of owner decisions needed next
+
+1. **Review the proposed content (N10).** Accept, amend or reject the "Ready" list as the intended successor content. Nothing is installed by this.
+2. **Implementation route (B1/B2/B6).** Authorise one source slice: a production ladder tuple (and its name, U3) with tests, plus either a reviewed planner contract-override input or an explicit atomic working-tree procedure. Without it the 1,640 expectation cannot run outside the isolated rehearsal.
+3. **Provenance stance for production (B4, N7/N8).** Require manifest-matching raw coach HTML, a tracked Wikipedia pin and successor-derived captures, or record that parsed-only/frozen inputs are acceptable for production. Missing raw is not accepted today.
+4. **Rollover inputs (N12/N13, U1/U4–U8).** Target list for the census, the real date, `retired`, D-316-1, the exclusion-reason wording, the `issue` attribution and whether to add `retired_on`/`superseded_by`.
+5. **Runtime reproducibility (N15, B8).** Authorise retaining the DEV lock evidence, verifying the Linux esbuild package, and pinning the Python environment before any populated or production-adjacent run.
+
+Release and recovery (N14), Brownlow publication (N9) and cleanup stay separate approvals.
 
 ## Evidence reviewed and limits — historical checkpoint (2026-10-21, basis `4a2eea89`)
 

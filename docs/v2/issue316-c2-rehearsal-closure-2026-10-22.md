@@ -6,7 +6,7 @@ stays OPEN and production stays NO-GO. No rehearsal value (1,640, the DOB pins, 
 thirteen enrichment expectations, the 2026-inclusive census scope) becomes an active reference through
 this closure. All three 2026 Brownlow keys stay pending, ET stays unresolved, and the AFL API
 authority, eligibility and ownership restrictions are unchanged. The remaining owner decisions are in
-the [successor decision package](issue316-c2-successor-decision-2026-10-21.md#current-state-and-remaining-decisions--2026-10-22).
+the [successor decision package](issue316-c2-successor-decision-2026-10-21.md#current-state-and-remaining-decisions--2026-10-22) and its [consolidated proposal](issue316-c2-successor-decision-2026-10-21.md#consolidated-successor-proposal--2026-10-22).
 
 ## 1. Scope and method
 
@@ -82,24 +82,24 @@ It is not: Brownlow publication, adoption of any successor contract, register or
 
 Retained unchanged: all DEV roots (attempt 1, lifecycle, attempt 2, runtime-proof roots, clones), all C: packages and evidence directories. No cleanup was performed or approved.
 
-Evidence documents retained locally and **not** included in the closure commit (their content was not re-verified here beyond the sections cited by the decision table; SHA-256 prefixes are of the unmodified LF content):
+Twelve evidence documents were retained locally as uncommitted files when this closure was first written. They were reviewed in the 2026-10-22 evidence-retention session (§8) and are committed with it. The first hash column is the SHA-256 prefix of the unmodified LF content recorded when this closure was written; the second is the full SHA-256 of the committed file, which differs only by the dated "Retention review" note inserted under each title (historical text is unmodified).
 
-| File | SHA-256 (first 16) |
-|---|---|
-| `docs/v2/issue316-c2-field-review-2026-10-21.md` | `325d8d3e794a5dad` |
-| `docs/v2/issue316-c2-linkage-review-2026-10-21.md` | `e0aba8ecc47c48af` |
-| `docs/v2/issue316-c2-quarter-review-2026-10-21.md` | `67fe0606cbdba0b2` |
-| `docs/v2/issue316-c2-height-applicability-2026-10-21.md` | `905d1d2596cb38b0` |
-| `docs/v2/issue316-c2-height-source-reconciliation-2026-10-21.md` | `a3f01308975476b4` |
-| `docs/v2/issue316-c2-height-exception-evidence-2026-10-21.md` | `283465423f9743af` |
-| `docs/v2/issue316-c2-height-goal-verification-2026-10-21.md` | `3e6d835b2a5dc95f` |
-| `docs/v2/issue316-c2-supplement-free-proposal-2026-10-21.md` | `0f01480a9f51a565` |
-| `docs/v2/issue316-c2-sequential-measurement-prerequisites-2026-10-22.md` | `998f9f62e824412d` |
-| `docs/v2/issue316-c2-sequential-measurement-review-2026-10-22.md` | `7ecf4635df5b819e` |
-| `docs/v2/issue316-c2-rehearsal-configuration-review-2026-10-22.md` | `2e183a651bdcd70a` |
-| `docs/v2/issue316-c2-ladder-season-scope-proposal-2026-10-22.md` | `68f9663517614422` |
+| File | Original SHA-256 (first 16) | Committed SHA-256 (after note) |
+|---|---|---|
+| `docs/v2/issue316-c2-field-review-2026-10-21.md` | `325d8d3e794a5dad` | `2f29a80a199e4f1e2f8c1e41837d23be56920f299eefaf47b54777c7a23d8d7b` |
+| `docs/v2/issue316-c2-linkage-review-2026-10-21.md` | `e0aba8ecc47c48af` | `3c664d3a905177d4bc0d03a2a35790cdb3a4bf93a654c099ca194de0f2151a77` |
+| `docs/v2/issue316-c2-quarter-review-2026-10-21.md` | `67fe0606cbdba0b2` | `3e907753ca7e9f026cc21cd1d2fca24cb66d9fd661a0adfd9a64ff063a4719d2` |
+| `docs/v2/issue316-c2-height-applicability-2026-10-21.md` | `905d1d2596cb38b0` | `905709af93d60e595ad35a5524053a5fe48f82c9a86da89eeaf837279b92c2fb` |
+| `docs/v2/issue316-c2-height-source-reconciliation-2026-10-21.md` | `a3f01308975476b4` | `c939829e0ac0fd985008825081c2d423ecea7374b872824b3d49707bad766840` |
+| `docs/v2/issue316-c2-height-exception-evidence-2026-10-21.md` | `283465423f9743af` | `0a00585e9b6aedc9ad6f0ad2484128e269bfe11c416982c5b27ff3d0db98f112` |
+| `docs/v2/issue316-c2-height-goal-verification-2026-10-21.md` | `3e6d835b2a5dc95f` | `15f639731057a8bf43f5bc1631001cf04a033825370451cbf7db0da69d2d157a` |
+| `docs/v2/issue316-c2-supplement-free-proposal-2026-10-21.md` | `0f01480a9f51a565` | `2b1c98b1afa0e67e3694398219ce1e3a4eb1c723bcf211b46c5ff87e37d71d95` |
+| `docs/v2/issue316-c2-sequential-measurement-prerequisites-2026-10-22.md` | `998f9f62e824412d` | `fcf964e2637286571d59e0c0db9697df89c1fc443c6fdd2e3ef8b9125d3efd82` |
+| `docs/v2/issue316-c2-sequential-measurement-review-2026-10-22.md` | `7ecf4635df5b819e` | `bf0ebb178706c0cdc9b9de711e89b8737b3c4ef04bf3b441d246607f1358c944` |
+| `docs/v2/issue316-c2-rehearsal-configuration-review-2026-10-22.md` | `2e183a651bdcd70a` | `5aa733cc7a10bd3dc4fc763c41c6498ac3407abd9c241bee7f0ae97fc30b114a` |
+| `docs/v2/issue316-c2-ladder-season-scope-proposal-2026-10-22.md` | `68f9663517614422` | `aa396c18fa2fa1912356aa31c52b42daeeae17838a6971daa8615eb92dc70c9c` |
 
-Links to these files from the committed tracking files resolve only in this working tree until they are committed; committing them is a separate documentation decision (decision package row N16). `.codex/` is untouched and uncommitted.
+Links to these files from the committed tracking files resolve once they are committed (decision package row N16: commit authorised, no cleanup). `.codex/` is untouched and uncommitted.
 
 ### Recomputed hashes of other consumed evidence
 
@@ -127,3 +127,38 @@ Links to these files from the committed tracking files resolve only in this work
 | packaged ladder witness manifest | `65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34` | 54293 |
 | packaged core manifest | `02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988` | 236674 |
 | packaged core `results.csv` | `73769e3ef608103c6c4e7ac6f58ce82484f85bd8058955ec502a9d64cb834f52` | 1646918 |
+
+## 8. Retention review and dependency-lock findings (2026-10-22)
+
+Scope: one agent, no subagents; native inspection, hashing and offline validation only. No install, lockfile edit, runtime-policy change, rehearsal rerun, host/database/network access or cleanup.
+
+### 8.1 Evidence retention
+
+- **Hashes.** All twelve documents' SHA-256 prefixes equal the §7 originals (LF, no CR bytes). Of 194 distinct 64-hex strings cited in them, 190 equal retained files; the other four are composite digests that were recomputed or located (artefact-set digest `817d594e…` recomputed from the manifest; `15ba5dc6…` in the tracked register, contract and runner; `b55f5789…` and `d265e9e9…` in tracked `issues.md`/`IssuesIndex.md`).
+- **Links.** Every link from the committed closure, decision package and `IssuesIndex.md` to an untracked file targets one of the twelve; committing them resolves all of them.
+- **Independent re-measurement from the rehearsal package CSVs** (the figures the documents rely on): 132 core files hash-match the manifest (729,288 rows; artefact-set `817d594e…`); 130 witness files hash-match (1,640 rows, 20 labels, 0 exact points-and-percentage ties, min 4 rows in 1916, max 18 rows in 2012–2026); 2026 stats 10,028 rows / 218 groups of 46, all 21 ordinary keys populated on every row; `Substitute` empty on all 10,028; the six ET columns empty (60,168 cells); quarter cells 240,672 with 0 failures of points = 6×goals + behinds, 0 non-monotone, 0 Q4 ≠ final; results 17,056 rows (218 in 2026); details 16,731 rows, `Goals` unquoted-empty 4,437, `date_accessed` 2026-10-21 on every row; identity scan 695,501 rows, 171 without ID (83 in 2025, 88 in 2026), 0 missing or malformed URL, 13,362 IDs, 13,367 URLs; blank `Player` on exactly 150 rows, all on the four renumbered profiles (52 / 31 / 42 / 25). The rehearsal `rebuild.log` shows the same importer snapshot summary, the continuity application at 52 / 31 / 42 / 25 and the accepted-baseline VERIFIED line (132 artefacts, 729,288 rows).
+- **Corrections to current claims** (history preserved; each affected document carries a dated note):
+  - **C7.** The 150-row display-name-fallback figure rested on arithmetic and the overlay; it is now measured directly from the package (blank `Player` = 150 rows on the four profiles). The rebuild log has no explicit fallback line, so this is a package measurement, not a log fact.
+  - **C8.** The packaged rehearsal `fitzroy-contract.json` and `fitzroy-accepted-baselines.json` contain cp1252 mojibake (19 and 3 damaged strings, for example `â€”` for an em dash; none in semantic fields) and carry stale "Full runner configuration BLOCKED" text. They must not be copied into active files; the successor proposal derives from the active repository bytes.
+  - **C9.** The 2026 ladder file (`ladder_2026.csv`, 18 rows) is an acquired, manifest-declared witness member. The overlay comment "Locally computed validation cross-check only" is accurate only for the D7 reconstruction; the witness itself is not locally computed and its independent authority is not established.
+  - **C10.** The status headlines of five documents (field review, supplement-free proposal, sequential prerequisites, configuration review, ladder-scope proposal) describe states since superseded; each now says so in a note while keeping its text.
+
+### 8.2 Dependency-lock discrepancy — what local evidence supports
+
+**Bottom line: the discrepancy cannot be classified from retained evidence; the reproducibility gap is real but narrow. The rehearsal PASS stays qualified and its acceptance status is not upgraded.**
+
+- **The DEV lock is not retained.** Only an 8-hex prefix (`85809f26`, producer-reported, install at `/home/arm/projects/afldb`) is recorded. Its contents and full hash are in no retained evidence directory or repository path searched. Whether it differs in versions, integrity, platform metadata, resolution or only representation is therefore **unproven**; no compatibility is inferred from matching top-level versions.
+- **What `runtime_record.lockfile_sha256` attests.** The recorded repository lock `984b4422…` (lockfileVersion 3, 553 packages) is byte-identical to `package-lock.json` in the packaged source. The package verifier only checks that the packaged lock hashes to that value (`tools/v2/rehearsal-package.mjs:340`): self-consistency of the package, never an attestation of the DEV install.
+- **What the run actually loaded (measured, enforced by hash).** The Node closure in the runtime record is `tsx` (60 files), `postgres` (37), `server-only` (3), plus nested `tsx/node_modules/esbuild` and `@esbuild/linux-x64`. The repository lock names tsx 4.23.12 (depending only on esbuild), postgres 3.4.9, server-only 0.0.1, esbuild 0.28.2 and @esbuild/linux-x64 0.28.2. The guard refuses any resolved or loaded non-builtin file URL not in the policy with exact sha256 and nlink, so the **JavaScript module bytes that ran are exactly the recorded bytes**.
+- **Comparison against the local Windows install** (whose hidden-lock integrity equals the repository lock for tsx, postgres, server-only and tsx/esbuild): `postgres` 37/37 and `server-only` 3/3 files are byte-equal to the run's recorded hashes; `tsx` 56/56 non-platform files are byte-equal. The four platform-specific files are not comparable: `esbuild/bin/esbuild` differs (Windows binary) and the three `@esbuild/linux-x64` files are absent locally. So the **Linux esbuild native binary (`e1698a3d…`) is not tied to the repository lock's integrity by any retained evidence**; no npm cache tarball exists locally.
+- **Python is unpinned.** The venv at `/home/arm/projects/afldb/.venv` had pip 26.2.1, psycopg 3.3.4, psycopg_binary 3.3.4 and typing_extensions 4.16.0. The repository has no Python requirements, pyproject or lock, so the Python environment (which runs the importer and loaders) has no repository-side pin.
+- **Other recorded runtime components:** node v22.23.2 (`3517c2df…`), python3.12 (`e50d468e…`), `ss` (`31124eb6…`). Native libraries stay observed only (L6).
+- **Not claimed:** that the DEV lock equals the repository lock; that the Linux esbuild package matches lock integrity; that a clean install from the repository lock would reproduce the run; that the Python environment is reproducible.
+
+Evidence classes stay distinct: the **empty-ledger lifecycle** (L7) and the **row-vacuous zero-public-row Brownlow evidence** (L2) are proofs about empty or vacuous state, not populated-state proof, and nothing in this section strengthens them.
+
+**Exact reproducibility work required before the PASS could support more than a rehearsal-only result** (none done here; each is a separate authorisation):
+1. Retain or re-obtain the DEV `package-lock.json` (full SHA-256 and bytes) and `npm ls --all` with integrity fields from the install the run used, then diff it semantically against the repository lock (versions, integrity, resolved URL, os/cpu metadata, representation).
+2. Verify the installed `@esbuild/linux-x64` and `esbuild` packages against the lock's integrity values (or the registry tarball) rather than only recording file hashes.
+3. Pin the Python dependencies (requirements with hashes or equivalent) and add a repository-side record of the interpreter and the psycopg binary wheel.
+4. Decide whether native-library observation is sufficient or must become enforced closure (L6), and prove capture/reinstate on populated ledger data (L7), before any populated or production-adjacent run.

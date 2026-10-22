@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Evidence retention, dependency-lock findings and consolidated successor proposal (2026-10-22)
+
+- Documentation/evidence only; no application, schema, data, runner, contract, register or availability change.
+  Committed the twelve supporting C2 evidence documents after verifying their hashes and cited artefacts against
+  the rehearsal closure, with dated retention notes on the five whose status headlines had been superseded
+  (history preserved). Recorded the dependency-lock findings (DEV lock not retained; difference unproven; modules
+  hash-enforced; Linux esbuild binary and Python environment not repository-pinned; reproducibility work listed)
+  and added one consolidated, not-installed successor proposal and the five remaining owner decisions to the
+  decision package. ISSUE-316 OPEN, production NO-GO, successor not accepted, 1,640 rehearsal-only, Brownlow 2026
+  pending, ET unresolved.
+
 ### ISSUE-316 - Capture-bound pre-recreate live recheck in the isolated rehearsal runner (2026-10-22)
 
 - Fix a lifecycle defect that made every provenance-bound isolated rehearsal refuse before `recreate`: the capture
