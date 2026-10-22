@@ -15,6 +15,37 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-320 - Enforced native-library closure for guarded rehearsal processes (2026-10-23)
+
+- Rehearsal runtime trust: runtime record schema version 3 adds `native_closure`, which is enforced, not observed.
+  - A glibc rtld-audit module (`tools/v2/native-audit/afldb-native-audit.c`) is loaded with `LD_AUDIT` into every
+    guarded process. It refuses any executable or shared object that is not bound by path and sha256, or whose mapped
+    inode is not the hashed one; this includes transitive `DT_NEEDED`, `dlopen`, ambient search candidates and the
+    targets of exec, `posix_spawn`, `system` and `popen`. It also refuses `LD_PRELOAD`/`LD_LIBRARY_PATH` and an
+    altered policy, and it forces itself into children.
+  - The verifier (`tools/v2/rehearsal-package.mjs`) refuses an incomplete or unsafe closure before any spawn. The
+    launcher writes the pinned policy. The Node and Python guards refuse unless enforcement is active in their own
+    process.
+  - Versions 1 and 2 are unchanged.
+  - Per-host derivation: `derive-closure.py`; reproducible build: `build-auditor.sh`.
+- Validation: proven on DEV only (mechanism 33/33, real-launcher integration 10/10, PostgreSQL fixture). A complete
+  rehearsal under v3 has not been run, so the issue stays open.
+
+### ISSUE-316 / ISSUE-319 - Successor readiness E: owner decisions, read-only censuses, source evidence, dated proposal dry run (2026-10-23)
+
+- Validation and audit state only. No application, schema or active-reference change, and nothing applied.
+- **Owner decisions recorded:** rollover date 2026-10-24; D-316-1 granted for preparation; successor approved
+  conditionally on ISSUE-319 and ISSUE-320.
+- **Censuses:** the read-only `afl_api` ownership census for 1897–2026 PASSED (total 0) on `afldb-prod`/`afldb_prod`,
+  `streamanator`/`afldb_dev` and `streamanator`/`afldb_test`.
+- **ISSUE-319 source evidence:**
+  - Coach raw→parsed provenance proven by byte-identical replay.
+  - The eight 2026 coach-season differences resolved by a new labelled publisher capture.
+  - Wikipedia heights 84/84 stated by the cited revisions.
+  - NM 1940 coach attribution and the remaining items are blocked on adjudication.
+- **Package E** (on C:): the genuine rollover planner dry run passed with exit 0. It is not ready while ISSUE-319 and
+  ISSUE-320 are open, and production remains NO-GO.
+
 ### ISSUE-316 - Exact-implementation C2 rehearsal validation at `a5ec6b0c` (2026-10-23)
 
 - Validation state (no application, schema or active-reference change): a fresh complete isolated C2 rehearsal PASSED at `a5ec6b0cbd0977eea77cd655d28b54b108fdb0bc` (packaged code identical to `73116273`) through the production launcher: the four content pins accepted in preflight, 1897–2026 census pass on a fresh database (mechanism and scope only), capture-bound reset/reinstate, 30 stages, strict real D7 (all 1,640 comparable club-seasons), `AFLDB-FINAL-VALIDATION PASSED: 91 checks`, post-rebuild pending-2026 Brownlow and historical projection checks, clean shutdown. The runtime was a clean-install environment with its own measured record (`6c4ea3ea…`); recovered coach raw (387 files) was bound as a hashed bundle and verified by the real coach loader (the package alphabet refuses the space in `Allan_La Fontaine.html`, so the raw pages cannot be package members). Rehearsal-only: the successor tuple table is still empty, `c2-2026-successor` is not activated, 1,640 is not an active reference, production remains NO-GO. Evidence: `C:/tmp/afldb-c2-FINAL-IMPL-VALIDATION-20261023/`.

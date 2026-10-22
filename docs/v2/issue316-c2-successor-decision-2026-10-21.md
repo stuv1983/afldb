@@ -1,6 +1,6 @@
 # ISSUE-316 C2 successor acceptance decision package — 2026-10-21
 
-**Decision state: NOT ACCEPTED; production NO-GO** (updated 2026-10-22: rehearsal PASS at `5643f5c2`; see "Current
+**Decision state (2026-10-23, Revision 6): successor APPROVED CONDITIONALLY on AFLDB-ISSUE-319 and AFLDB-ISSUE-320, NOT ACTIVATED; production NO-GO.** Earlier state: NOT ACCEPTED (updated 2026-10-22: rehearsal PASS at `5643f5c2`; see "Current
 state and remaining decisions" and "Consolidated successor proposal" below). Original 2026-10-21 implementation basis:
 `4a2eea89cccc465f2f017fb06ad55a7d4cb7733d`. One agent; local documentation review only.
 This package proposes the next bounded action; it grants no execution or acceptance authority.
@@ -384,7 +384,9 @@ The single current record is package `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-D-20261
 * **Remaining owner-only decisions:** rollover date and D-316-1; adoption of the tuple and profile; census target confirmation and per-target approval; source coverage limitations and provenance stance; native-library trust policy.
 * **Update 2026-10-23 (Revision 5):** the fresh isolated rehearsal this revision required has been run and passed at `a5ec6b0c`.
 
-## Revision 5 — 2026-10-23 (current: exact-implementation rehearsal at `a5ec6b0c`)
+## Revision 5 — 2026-10-23 (previous: exact-implementation rehearsal at `a5ec6b0c`)
+
+* **Update 2026-10-23 (Revision 6):** the owner has answered the approval form below; see Revision 6.
 
 The single current record is package D's `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-D-20261023T000000Z/EXECUTION_RECORD.md` §7; the full evidence is `C:/tmp/afldb-c2-FINAL-IMPL-VALIDATION-20261023/` (`EXECUTION_RECORD.md`, `HASHES.sha256`). Earlier packages are unchanged. No proposal layer was added; no decision was taken on the owner's behalf.
 
@@ -407,3 +409,44 @@ The single current record is package D's `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-D-2
 | 5 | Native-library trust policy: observation only, or enforced closure; and whether a rebuilt runtime record per environment is acceptable | observation / enforce ; per-environment record: yes / no |
 
 ISSUE-316 OPEN; successor NOT ACCEPTED; production NO-GO; 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved.
+
+## Revision 6 — 2026-10-23 (current: owner decisions recorded, censuses, package E)
+
+* **Records.** The single current execution record is `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/EXECUTION_RECORD.md`. The dated proposal is package E, `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-E-20261023T1045Z/` (`PROPOSAL_E.md`, `REHEARSAL_V3_PROPOSAL.md`, `HASHES.sha256` `2c598adfbae6f0570280666514b070767dd57cd3b73bf750302e320bdb13fe1c`).
+* **Earlier packages.** Packages A–D are unchanged: C 42/42 and D 26/26 re-verified.
+* **Basis.** `041bd5852f166be76c873fbc45d0c10208a3c3b2`.
+
+### Owner decisions (recorded 2026-10-23; the Revision 5 form, answered)
+
+| # | Decision | Owner entry |
+|---|---|---|
+| 1 | Rollover date and D-316-1 | **2026-10-24**; **D-316-1 granted for preparation of that transition** |
+| 2 | Successor tuple `c2-2026-successor` | **Approved conditionally**: the required source-evidence work (AFLDB-ISSUE-319) and the enforced native-library work (AFLDB-ISSUE-320) must pass first. Do not activate prematurely |
+| 3 | Census targets and authority | Completed seasons 1897–2026, no exclusions. Read-only on: 1 `afldb-prod`/`afldb_prod`; 2 `streamanator`/`afldb_dev`; 3 `streamanator`/`afldb_test` |
+| 4 | Source coverage and provenance | **More evidence required before acceptance**; tracked as one issue, AFLDB-ISSUE-319 |
+| 5 | Native-library trust | **Enforced closure required before proceeding**; implementation and proof tracked as one issue, AFLDB-ISSUE-320 |
+| — | Brownlow 2026 | Publication unapproved; all three keys stay pending |
+| — | ET | Applicability unresolved |
+| — | Not authorised | Actual rollover apply, populated-database rebuild or reset, production migrations, deployment, push |
+
+### Results
+* **Censuses: PASS on all three targets.** Each ran read-only (identity verified, one read-only transaction) with the enforcing CLI: scope 1897..2026, total 0, ledger 110.
+  * `afldb_prod`: 2026-10-22T21:57:39Z, evidence `f9cb8fa7…78a4`.
+  * `afldb_dev`: 21:56:37Z, evidence `39b10324…c2e2`.
+  * `afldb_test`: 21:56:38Z, evidence `33832676…0584`.
+  * These are valid for those targets and times only, and freshness must be reassessed near the window.
+* **Enforced native closure: implemented, not yet closed.** Commit `041bd585` (AFLDB-ISSUE-320); DEV proof 33/33, 10/10 and a PostgreSQL fixture. A complete v3 rehearsal is proposed and not run.
+* **Source evidence (AFLDB-ISSUE-319).**
+  * Resolved: coach raw→parsed (byte-identical replay); the eight 2026 coach differences (a new publisher capture now lists exactly the core-only finals); Wikipedia 84/84; roster bytes 15/15.
+  * Blocked: NM 1940 R8–R18; 479 unmapped ids; rejections and height disagreements; roster completeness and raw; the parsed-only policy.
+* **Transition (package E).** The tuple and fingerprints are unchanged from D. U8-B neutral ownership wording; U7 `AFLDB-ISSUE-101` attribution retained.
+  * Change set E (`92879ad0d9b7fa0a87e5b5f583e06a57929136c1e7c33d300a08c356220b3ebc`) differs from D only by two empty prose lines, which the real planner refused in D.
+  * E-pinned: `410b0787c9045df64531dda76a33f7da8f193a88291bbadcccf9cf9019a81991`.
+  * **The genuine planner dry run passed (exit 0)**: three gates executed; three censuses accepted; proposed state accepted `c2-2026-successor` with 1,640 rows and 90 checks; nothing written. The pinned run exited 0, and a tampered pin is refused.
+
+### Why the dry run is not labelled ready, and what remains
+1. AFLDB-ISSUE-319 needs owner adjudication of its runbook §3 items 1–5, or named additional evidence.
+2. AFLDB-ISSUE-320 needs authorisation of `REHEARSAL_V3_PROPOSAL.md` and per-environment records.
+3. Near the window: fresh censuses, then the E-pinned dry run repeated on the applying Linux runtime, then a separate apply authorisation. The tuple is activated only by that apply.
+
+ISSUE-316 OPEN; successor approved conditionally and NOT ACTIVATED; production NO-GO; Brownlow 2026 pending on all three keys; ET unresolved.

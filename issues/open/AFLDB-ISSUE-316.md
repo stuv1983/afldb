@@ -2314,9 +2314,9 @@ Recorded in the [decision package, Revision 4](../../docs/v2/issue316-c2-success
 
 ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved.
 
-## Exact-implementation rehearsal at `a5ec6b0c` (2026-10-23; current)
+## Exact-implementation rehearsal at `a5ec6b0c` (2026-10-23; previous; superseded by "Successor readiness E" below)
 
-Recorded in the [decision package, Revision 5](../../docs/v2/issue316-c2-successor-decision-2026-10-21.md#revision-5--2026-10-23-current-exact-implementation-rehearsal-at-a5ec6b0c) (which holds the owner approval form), [closure §10](../../docs/v2/issue316-c2-rehearsal-closure-2026-10-22.md#10-exact-implementation-re-run-at-a5ec6b0c-2026-10-23) and package D's `EXECUTION_RECORD.md` §7; full evidence and hashes: `C:/tmp/afldb-c2-FINAL-IMPL-VALIDATION-20261023/` (`EXECUTION_RECORD.md`, `HASHES.sha256`).
+Recorded in the [decision package, Revision 5](../../docs/v2/issue316-c2-successor-decision-2026-10-21.md#revision-5--2026-10-23-previous-exact-implementation-rehearsal-at-a5ec6b0c) (which holds the owner approval form), [closure §10](../../docs/v2/issue316-c2-rehearsal-closure-2026-10-22.md#10-exact-implementation-re-run-at-a5ec6b0c-2026-10-23) and package D's `EXECUTION_RECORD.md` §7; full evidence and hashes: `C:/tmp/afldb-c2-FINAL-IMPL-VALIDATION-20261023/` (`EXECUTION_RECORD.md`, `HASHES.sha256`).
 
 - **Scope:** one agent, no subagents; owner-authorised SSH, package transfer and test-only writes on `arm@10.0.40.100` (`streamanator`) only. No repository source change, install into an existing environment, acquisition, WSL, application/scheduler start, existing DEV database/service change, production or live-target access, active successor/reference change, rollover/apply, cleanup, push or deployment. The active tuple table `SUCCESSOR_LADDER_TUPLES_JSON` is `'{}'`.
 - **Implementation:** `a5ec6b0cbd0977eea77cd655d28b54b108fdb0bc` (parent `73116273e818c031deaf84f46a514daaf634c14e`, parent `52b971730dc5e4408f9556c599aab7f41c333bd4`); `git diff --stat 73116273 a5ec6b0c` is 5 documentation files, so the packaged code is `73116273`'s. `tsc --noEmit --incremental false` exit 0; `db-test-rebuild`, `v2-isolated-test-target` and `season-rollover` suites 1,320 passed / 2 skipped (= retained 979/2 + 341).
@@ -2326,6 +2326,49 @@ Recorded in the [decision package, Revision 5](../../docs/v2/issue316-c2-success
 - **Run (PASS):** root `/home/arm/afldb-c2-rehearsal-a5ec6b0c-20261022T2112Z`, cluster system id `7699599293956459996`, `afldb_v2_rb_c2cand4_test`, 127.0.0.1:55751; production launcher 2026-10-22T20:59:12Z–21:30:09Z, exit 0: preflight, census 1897–2026 (`schema_absent`, pass, total 0 — fresh database, mechanism only), capture-bound lifecycle (file `02d4e1a36686e130e6a54d4cf79475fa4a72f6ab3adb41bcd6035b0a7b3608a9`), 30 stages, strict real D7 (all 1,640), `AFLDB-FINAL-VALIDATION PASSED: 91 checks`, `AFLDB-POST PASSED` (2026 pending on all three keys, 0 exposed rows, historical 98 / 79,113 / 112). 0 error lines, no tripwire, peak root 2.30 GiB, shutdown verified, all roots retained.
 - **Incidents kept:** a first local package build failed (GNU tar read `C:` as a host) and is retained as `C:/tmp/afldb-c2-BUILD-FAILED-NOT-USED-a5ec6b0c-20261022T205300Z-tar-host-colon`; one mis-quoted read-only `ssh` listing; one truncated output pipe. No database attempt was repeated or patched.
 - **Limits:** census on a fresh database proves mechanism and scope only (the populated-state proof stands separately); 479 unmapped ids, rejected matches and 761 height disagreements, ten coach-season differences, Wikipedia/roster provenance, native-library observation, Brownlow 2026 pending, ET unresolved — all open. Technical rehearsal validation is complete at this commit; nothing here is a production-decision input beyond the owner form.
-- **Next action:** only the owner approval form in decision package Revision 5 (rollover date and D-316-1; successor tuple/adoption; exact populated census targets and read-only census authority; source coverage/provenance acceptance; native-library trust policy).
+- **Next action (superseded by readiness E below):** only the owner approval form in decision package Revision 5 (rollover date and D-316-1; successor tuple/adoption; exact populated census targets and read-only census authority; source coverage/provenance acceptance; native-library trust policy).
 
 ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved.
+
+## Successor readiness E — owner decisions, censuses, ISSUE-319/320, package E (2026-10-23; current)
+
+Recorded in the [decision package, Revision 6](../../docs/v2/issue316-c2-successor-decision-2026-10-21.md#revision-6--2026-10-23-current-owner-decisions-recorded-censuses-package-e).
+* Single current execution record: `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/EXECUTION_RECORD.md`.
+* Package: `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-E-20261023T1045Z/` (`PROPOSAL_E.md`, `HASHES.sha256` `2c598adfbae6f0570280666514b070767dd57cd3b73bf750302e320bdb13fe1c`).
+
+- **Scope.**
+  - One agent, no subagents.
+  - Authorised: read-only censuses on the three named targets; DEV disposable roots for the native experiments (no application or database connection); a targeted read-only publisher capture; local commands; scoped local commits.
+  - Not done: no apply, rebuild, reset, migration, deployment or push; no existing environment changed; WSL kept stopped.
+  - `.codex/` and unrelated work preserved.
+- **Owner decisions (verbatim summary).**
+  - Rollover 2026-10-24.
+  - D-316-1 granted for preparation of that transition.
+  - Successor baseline approved conditionally on the source-evidence and enforced native-library work passing; not activated early.
+  - Census scope completed seasons 1897–2026, no exclusions; targets `afldb-prod`/`afldb_prod`, `streamanator`/`afldb_dev`, `streamanator`/`afldb_test`.
+  - Source coverage needs more evidence: AFLDB-ISSUE-319.
+  - Enforced native closure required: AFLDB-ISSUE-320.
+  - Brownlow 2026 unapproved, all three keys pending; ET unresolved.
+- **Censuses: PASS ×3.** Package E §5 holds the identity table and hashes. They are time-bound and must be reassessed near the window.
+- **Native closure.** Commit `041bd5852f166be76c873fbc45d0c10208a3c3b2`; see `issues/open/AFLDB-ISSUE-320.md`. The issue stays OPEN until the v3 rehearsal (`REHEARSAL_V3_PROPOSAL.md`, not run) and per-environment records exist.
+- **Source evidence.** See `issues/open/AFLDB-ISSUE-319.md`.
+  - Resolved: coach raw→parsed; the eight 2026 coach differences; Wikipedia 84/84; roster bytes.
+  - Blocked: NM 1940; 479 ids; rejections and height disagreements; roster completeness and raw; the parsed-only policy.
+- **Planner dry run.** The genuine `tools/db/rollover-season.ts`, with no `--apply`, in disposable roots built from `git archive HEAD` plus hash-verified inputs.
+  - Change set E (`92879ad0…3ebc`): exit 0. All three gates executed; the censuses were accepted; proposed state accepted `c2-2026-successor`, 1,640 rows and 90 checks; nothing was written.
+  - E-pinned (`410b0787…1991`): exit 0.
+  - Tampered pin: refused.
+  - Package D's change set was refused by the real planner on two empty prose lines; E removes only those lines.
+  - Windows and local Python: this is not Linux evidence.
+- **Incidents kept, labelled FAILED-NOT-USED:**
+  - a bsdtar package build;
+  - a KeyError in the coach replay;
+  - three Wikipedia capture attempts with CRLF in the revid list;
+  - integration run 1 (a harness pattern);
+  - the first PostgreSQL fixture run (no JIT line);
+  - a dry-run root lost to junction quoting;
+  - dry runs 1–3 (no season acknowledgement, no `.venv`, D's change set refused).
+  - One auto-mode classifier denial of a broad production probe; narrower identity commands then succeeded.
+- **Gate preventing a "ready" dry run:** ISSUE-319 (adjudication) and ISSUE-320 (v3 rehearsal and per-environment records). After those, near the window: fresh censuses, then a Linux re-run of the E-pinned dry run on the applying runtime, then a separate apply authorisation.
+
+ISSUE-316 OPEN; production NO-GO; successor approved conditionally and NOT ACTIVATED (tuple table `'{}'`); 1,640 not yet active; Brownlow 2026 pending on all three keys; ET unresolved.
