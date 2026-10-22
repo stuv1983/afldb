@@ -15,6 +15,64 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Capture-bound pre-recreate live recheck in the isolated rehearsal runner (2026-10-22)
+
+- Fix a lifecycle defect that made every provenance-bound isolated rehearsal refuse before `recreate`: the capture
+  stage replaces the resting database comment with the rebuild marker, but the live recheck before the reset
+  demanded the resting comment. That one recheck now accepts the pending marker only when it is the genuine marker
+  of the capture the runner's own capture stage completed in the same execution (a binding issued only by
+  `bindCompletedCapture`: no pre-existing capture entry, the file validates through the existing capture parser,
+  the digests the stage printed equal the file's, and the live marker's file digest, payload digest and capture
+  time equal the file's, re-derived from the file's current bytes). Cluster and connected-database checks are
+  unchanged; the capture, final and ordinary rechecks still require the resting comment; a capture left by another
+  run is never accepted. A failed bind fails the capture stage before any reset. Recheck refusals now carry a
+  fixed nonsecret reason (no DSN or captured value). Verified by 22 new DB-free cases (including a runner fixture
+  that models the real comment transition), a real PostgreSQL lifecycle driver (16/16) and a full isolated
+  rehearsal (all 30 stages, strict D7, 91-check final validation). Rehearsal-only; no production, schema or
+  active-reference change.
+
+### ISSUE-316 - Rehearsal closure verification and tracking (2026-10-22)
+
+- Verified the retained attempt-2 evidence independently of the producer summary and recorded the milestone
+  "complete isolated C2 rehearsal PASS at `5643f5c22025223916aa66cad6403a369a90c7cb`"
+  (`docs/v2/issue316-c2-rehearsal-closure-2026-10-22.md`): package/launch/runtime hashes recomputed, 30 stages,
+  strict D7, 91 final checks, pending 2026 Brownlow, shutdown/limits, attempt 1 preserved, lifecycle 16/16.
+  Corrected the record (package composition 765 + 5 reviewed overlays; "Stage 18" is stage 22; the 91-check line
+  is in `rebuild.err`). Local test counts remain producer-recorded. Documentation/tracking only: ISSUE-316 OPEN,
+  production NO-GO, rehearsal values (1,640 and others) rehearsal-only, all three 2026 Brownlow keys pending, ET
+  unresolved. One consolidated owner decision table (N1-N16) replaces the superseded S1-S7 matrix.
+
+### ISSUE-316 - Pinned child PATH, Linux-runnable boundary tests and capture-bound recheck (2026-10-22)
+
+- `c6cdb37b`: guarded children receive a bound `PATH` (`rehearsalChildEnv`), fixtures select `python3`, declared
+  hard-link counts are honoured and the real-interpreter boundary tests run on Linux. `5643f5c2`: the pre-recreate
+  live recheck accepts the rebuild marker only as the genuine marker of the capture completed in the same
+  execution (frozen binding); capture, final and ordinary rechecks still require the resting comment. Rehearsal
+  only; no schema or active-reference change.
+
+### ISSUE-316 - Runtime record version 2 for the rehearsal launcher (2026-10-22)
+
+_Corrected 2026-10-22: the "no real runtime record or Linux execution" and "four obsolete assertions not repaired" statements in the last bullet below were superseded by `136e24d0` (real runtime record, test repairs, Linux proof; producer-recorded counts) and `c6cdb37b` (below)._
+
+- Accept a version 2 runtime record that accounts for stdlib/dependency links without trusting them
+  (exact literal-`readlink` ledger, never followed or descended; an unlisted link origin is refused on import), proves absent startup landmarks by
+  `lstat` ENOENT (dangling links refused), binds Node/Python/listener executables individually without
+  trusting their parent directories, and allows only explicitly declared, completely enumerated runtime
+  hard-link groups (exact `nlink`/inode/digest; the Node guard honours the declared count). Version 1
+  records, package/source link and hard-link rules, the name alphabet and ignored directories are unchanged.
+- Refuse an existing or dangling `.zip` on the isolated Python startup path before the guard's first non-frozen
+  import (defence in depth: interpreter start-up imports precede it, so the parent's `lstat` absence proof is the
+  start-up defence). Reduce the
+  guarded launch `PATH` to the cluster client directory and have `isolated-pg.ts` run the listener tool by its
+  bound absolute path, after re-verifying the launch specification against its original pin and the installed
+  policy digest; a guarded process never falls back to a `PATH` lookup. Ordinary behaviour is unchanged;
+  version 1 verification and policy digest are unchanged, but the launcher `PATH`/environment and the Python
+  zip check apply to either version.
+- Synthetic, database-free tests only (marker: 210 passed, 1 skipped, 0 failed; the v2 verifier ran only against an
+  in-memory filesystem); no real runtime record or Linux execution exists. Four obsolete assertions in
+  `tests/db-test-rebuild.test.ts` fail identically at the committed basis `39e80642` and are not repaired. Native
+  dynamic-library closure, Node import closure, zoneinfo data and child-spawn resolution remain unproven.
+
 ### ISSUE-316 - Bound ladder scope and rehearsal package verification (2026-10-22)
 
 - Resolve ladder expectations only for the two reviewed fingerprint tuples (predecessor
@@ -46,7 +104,10 @@ commit.
   Focused database-free Windows checks: 128 passed; nonincremental typecheck passed.
   Guards are import checks, not an application sandbox. Linux/native-extension proof, actual
   package/runtime/target pins, candidate census/Brownlow parity integration, DOB/Coleman evidence,
-  database and rehearsal validation remain outstanding. Production NO-GO; no commit yet.
+  database and rehearsal validation remain outstanding. Local implementation commit
+  `39e80642fa0f9c744de9cb42f23940222a5c55c8`; subsequent read-only Linux preflight blocked
+  before fixtures because the required stdlib root contains links rejected by the current
+  verifier schema. No Linux import/native-extension proof or rehearsal at that checkpoint (superseded by `136e24d0`, `c6cdb37b` and the 2026-10-22 rehearsal PASS). Production NO-GO.
 
 ### ISSUE-316 - Explicit shared height/coach stats input modes (2026-10-21)
 

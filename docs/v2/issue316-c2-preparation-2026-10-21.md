@@ -1,4 +1,97 @@
-# ISSUE-316 C2 package v5 — bounded successor-input approvals and WF comparison
+# ISSUE-316 C2 preparation — retained v5 approvals and completed rehearsal
+
+**Current decision package:** [successor acceptance matrix](issue316-c2-successor-decision-2026-10-21.md).
+**Superseded (2026-10-22):** the rehearsal milestone is closed (PASS at `5643f5c2`, see the [closure record](issue316-c2-rehearsal-closure-2026-10-22.md)); the current next action is the owner decision table and approval prompt in the [successor decision package](issue316-c2-successor-decision-2026-10-21.md#current-state-and-remaining-decisions--2026-10-22). The "next action" statements below are historical checkpoints.
+**Historical next action (2026-10-21):** owner review of the [field/coverage worksheet](issue316-c2-field-review-2026-10-21.md),
+stopped at 47 exact raw match-key nonmatches / 2,162 player rows. Population is measured;
+field/21-key and height applicability decisions remain pending. The [linkage review](issue316-c2-linkage-review-2026-10-21.md)
+explains the gap as club-label representation. Its §11 (later session) reconciled provenance
+(consumed rehearsal `clubs.json`/`import_fitzroy_core.py` byte-identical to commit `4a2eea89…` and
+the retained bundle inventory; the repository and hash-bound rehearsal-only contracts are separate
+artifacts, so the §10 drift is withdrawn) and parsed all 47 keys / 2,162 rows: PASS, each maps to
+one unique canonical fixture with no round/score/venue/orientation/`Team` failure. Correction: 9,
+not 1, empty-`Player` cells lie in those rows (all renumbered-profile rows). No external
+verification or stage rerun here. The subsequent [quarter review](issue316-c2-quarter-review-2026-10-21.md)
+records six verified input hashes and internal consistency PASS for all 218 groups / 10,028 rows,
+including both WF and nine ordinary finals. Repetition, arithmetic, cumulative progression and
+Q4/finals reconcile; all 60,168 ET cells remain unquoted-empty, with applicability unresolved.
+Next: owner review may record explicit results/linkage and quarter-field decisions; this review
+records no acceptance. Remaining field/21-key/height choices stay pending.
+The [height applicability review](issue316-c2-height-applicability-2026-10-21.md) verifies all
+9,614 predecessor supplement rows already occur in the candidate with identical height-join/coach
+fields: redundant coverage, incompatible additive height input. The unchanged runner refuses
+empty supplement pins and shares them with coaches. The [height source reconciliation](issue316-c2-height-source-reconciliation-2026-10-21.md)
+now measures 16,713 mapped / 9 unmatched / 9 name_mismatch / 0 ambiguous register rows,
+15,888 valid HT / 843 empty / 0 invalid, no conflicting raw-URL heights and 9 jumper
+disagreements. STOP on four unexplained Collingwood goal discrepancies. Next bounded proposal:
+documentation-only exception/evidence decision review; no runner or source/policy change.
+Canonical/evidence outcomes and successor stage applicability remain pending.
+The [height exception evidence review](issue316-c2-height-exception-evidence-2026-10-21.md)
+completes the documentation-only review above. All nine name-mismatch categories were previously
+documented and remain rejected; jumper policy was informational, with prior individual rows
+unestablished. No retained per-row explanation/adjudication was established for Collingwood
+Caps 162/182/615/649. Predecessor current-byte binding verification is limited as disclosed.
+The [targeted goal verification](issue316-c2-height-goal-verification-2026-10-21.md)
+now records same-publisher register/profile-season disagreements for all four Caps, with cache
+limits and Victor profile access failure. Causes and historically correct totals remain unresolved;
+the predecessor hash check remains incomplete. Historical goal adjudication remains separate;
+preserve nonmapping refusals and blank versus zero. No correction, identity/policy change or stage execution.
+Historical next action (executed; superseded 2026-10-22): review the [supplement-free implementation proposal](issue316-c2-supplement-free-proposal-2026-10-21.md)
+for the bounded runner/test scope only. Owner permits further candidate assessment retaining every
+unmatched/name_mismatch rejection (including all four Collingwood cases) and informational jumpers.
+No implementation, contract/reference edit or stage execution is approved; canonical/evidence
+measurements and all successor/production applicability decisions remain pending.
+All acceptance/applicability remains pending; no unmatched row becomes an approved exception.
+The exact-commit disposable rehearsal below is complete. Earlier blocked/not-run statements and
+acquisition/rehearsal proposals describe historical checkpoints; they are not current next actions.
+Production successor acceptance remains pending; 1,640 is accepted for rehearsal only.
+
+## Exact-commit disposable DEV rehearsal — PASS — 2026-10-21
+
+Implementation `4a2eea89cccc465f2f017fb06ad55a7d4cb7733d`; one agent. All three genuine
+offline candidate CLI gates passed once. Only clearly labelled rehearsal contract/register
+bindings in the isolated copy selected the candidate; no active repository reference changed.
+Source bundle SHA-256 `73cb5dcdb25b357fb7287b63172bdccd461df1b1dc1d95d240c06b5fb86716bd`.
+
+DEV root `/home/arm/afldb-c2-rehearsal-4a2eea89-f910970e0b`, dedicated cluster
+`afldb_c2_4a2eea89_f910970e0b`, database `afldb_c2_f910970e0b_test`, loopback 55436 only,
+Unix sockets disabled. Random private credentials and unique markers; database/user/address/
+port/data-directory/cluster/marker identity checked before every tool phase. Existing Python
+and locked Node dependencies reused read-only; no installation or existing database connection.
+
+117 genuine migrations, privilege reconciliation, reference load, accepted-test-bound core
+import, approved historical Brownlow season import and full derived rebuild all PASS, no
+automatic phase rerun. Actual counts: 17,056 matches, 695,499 player-match rows, **1,640
+club-seasons** (the owner-approved rehearsal expectation). Canonical round votes 320,861,
+excluding the 9,522 pending 2026 source rows; raw acquired bytes remain intact.
+
+**Real D7 PASS:** exact two-fixture WF set; all 18 raw H&A-plus-WF rows reconstructed; all
+1,640 policy rows agree on every compared field, including 1,622 ordinary historical rows.
+Carlton/Collingwood positions change from raw 9/10 to H&A 10/9; Melbourne/Western Bulldogs
+contributions reconcile exactly. No whole-season exemption or widened tolerance.
+
+**Actual Brownlow preservation PASS:** football 2026 complete; all 669 player-season rows
+Brownlow pending with NULL votes; zero 2026 canonical match-vote values, round/season vote
+rows or publication records. The committed TS public-read predicate executed on the actual
+database returns pending/not accepted, zero exposed 2026 rows. Historical projection remains
+98 seasons / 79,113 votes / 112 winners; all 668 player-season rows for 2025 remain complete.
+The focused local tests also prove pending source winner/rank rows cannot escape the public
+predicate or determine eligible ranks/medals, preserving raw evidence and accepted eligibility.
+
+792 source/input file hashes unchanged after execution. Peak root 1,032,500,998 bytes;
+minimum observed free 79,501,553,664 bytes, within 15 GiB/20 GiB/two-hour limits. New PG process
+stopped with exit 0; final read-only check: pg_ctl status exit 3, PID file absent, port free.
+Files/private recovery credentials retained on DEV; no cleanup. Sanitised logs/results/commands/
+hashes exported to `C:\tmp\afldb-c2-brownlow-fix-20261021\REPORT.md` and `dev-logs/`.
+No WSL invocation, application/scheduler/acquisition writer, production access, source adoption,
+active rollover, push or deployment. Runtime tracking below is a post-commit record, not a
+change to the exact implementation rehearsed.
+
+Remaining: production successor/field/coverage/witness/register acceptance, scoped fresh
+ownership census, production applicability of the row expectation, rollover date/status/
+D-316-1, current freeze/recovery/release/migration/deployment decisions and release checks.
+Brownlow 2026 authenticity/completeness stays pending. Disposable rehearsal PASS grants no
+production baseline acceptance or release GO.
 
 ## Pending-Brownlow repair and resumed rehearsal authority — 2026-10-21
 
@@ -158,7 +251,13 @@ all 391 acquired files and every recorded analysis/validation input against thos
 No host/network/database access or WSL invocation; no acquisition, census, restore,
 migration, import, rollover, cleanup, push or deployment.
 
-### Exact remaining blockers and next isolated-rehearsal proposal
+### Historical pre-rehearsal blockers and proposal — superseded
+
+The following records the checkpoint before the pending-Brownlow repair and exact-commit PASS
+above. The genuine gates, independent rehearsal expectation and rebuilt disposable-DB D7 are
+now complete. Do not repeat this proposal as the next action. The current production decision
+matrix, exact field/coverage scope, binding requirements and bounded offline-review approval
+are in the [successor package](issue316-c2-successor-decision-2026-10-21.md).
 
 ISSUE-316 remains OPEN. This local rule is not D7 rebuilt-database evidence. Still required:
 review/acceptance of the remaining 2026 inputs and successor availability/coverage/witness
