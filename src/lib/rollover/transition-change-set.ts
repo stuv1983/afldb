@@ -19,6 +19,14 @@
  * AFL Tables switch) cannot be supplied as replacements; the contract may only enter as a BASE the
  * planner derives from, and only with the planner's own read/written fields left untouched.
  *
+ * APPLY IS A JOURNALED, RECOVERABLE MULTI-FILE OPERATION, NOT A FILESYSTEM TRANSACTION. Every file is
+ * staged and read back, a journal naming each file's old and new SHA-256 (and the old bytes) is
+ * committed, the staged files are renamed over their targets one by one, each target is read back,
+ * and only then is the journal removed. Each rename is atomic; the sequence is not. An interruption
+ * leaves some files new and some old, and no intermediate combination is promised to be usable: the
+ * journal is the only thing that makes that state visible, so every later rollover invocation and
+ * every rebuild preflight refuses while it exists, and the operator restores the listed files.
+ *
  * Pure: the CLI reads and writes files; this module only judges bytes and builds the journal.
  */
 import { createHash } from 'node:crypto';
@@ -37,6 +45,9 @@ import {
 } from './season-rollover';
 import { AFLTABLES_NETWORK_PATH } from './afltables-network-retirement';
 
+export const AFL_API_CONTRACT_PATH = 'tools/rebuild/afl_api/afl-api-contract.json';
+export const AFLTABLES_CONTRACT_PATH = 'tools/rebuild/afltables/afltables-contract.json';
+
 type Json = Record<string, unknown>;
 
 export const TRANSITION_SCHEMA = 'afldb.rollover.transition_change_set/1';
@@ -51,8 +62,8 @@ export const SENTINEL_MARKER = 'UNRESOLVED:';
 export const TRANSITION_BASE_PATH = CONTRACT_PATH;
 /** Contracts the planner never touches; a change set may replace them whole. Closed list. */
 export const TRANSITION_REPLACEABLE_PATHS: readonly string[] = [
-  'tools/rebuild/afl_api/afl-api-contract.json',
-  'tools/rebuild/afltables/afltables-contract.json',
+  AFL_API_CONTRACT_PATH,
+  AFLTABLES_CONTRACT_PATH,
 ];
 /** Every file the planner itself writes, in the CLI's own order of authority. */
 export const PLANNER_OWNED_WRITES: readonly string[] = [
@@ -433,6 +444,104 @@ export function assertTransitionWriteSet(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Semantic validation of the proposed state, bound to its exact bytes
+// ---------------------------------------------------------------------------
+
+/** The six documents the rebuild reads, keyed as the semantic validator takes them. */
+export const STATE_DOCUMENT_PATHS = {
+  register: REGISTER_PATH,
+  seasons: SEASONS_PATH,
+  contract: CONTRACT_PATH,
+  aflApi: AFL_API_CONTRACT_PATH,
+  afltables: AFLTABLES_CONTRACT_PATH,
+  rebuild: REBUILD_PATH,
+} as const;
+export type StateDocuments = Record<keyof typeof STATE_DOCUMENT_PATHS, string>;
+
+/**
+ * What a successful validation is bound to. `finalSha256` and `oldSha256` cover every file the apply
+ * writes; `readOnlySha256` covers any validated document the apply does NOT write (an AFL API or
+ * AFL Tables contract the change set leaves alone), which was read from the working tree.
+ */
+export type ApplyBinding = {
+  finalSha256: Record<string, string>;
+  oldSha256: Record<string, string>;
+  readOnlySha256: Record<string, string>;
+};
+
+/**
+ * Hand the complete PROPOSED state to a semantic validator and bind the verdict to the bytes it saw.
+ *
+ * Each of the six documents is the write set's content when the apply writes it and the working
+ * tree's current bytes otherwise, so the validator judges exactly the state that would exist after
+ * the apply, without anything being written first. `validate` throws a RolloverRefused to refuse;
+ * a verdict is returned only with the binding that `assertBindingHolds` re-checks before any write.
+ */
+export function validateTransitionState<V>(input: {
+  files: readonly PlannedFile[];
+  readRepo: (path: string) => Buffer | null;
+  validate: (documents: StateDocuments) => V;
+}): { verdict: V; binding: ApplyBinding } {
+  const { files, readRepo } = input;
+  const byPath = new Map(files.map((f) => [f.path, f.content]));
+  const readOnlySha256: Record<string, string> = {};
+  const documents = {} as StateDocuments;
+  for (const [key, path] of Object.entries(STATE_DOCUMENT_PATHS) as Array<[keyof StateDocuments, string]>) {
+    const written = byPath.get(path);
+    if (written !== undefined) {
+      documents[key] = written;
+      continue;
+    }
+    const bytes = readRepo(path);
+    if (bytes === null) refuse(`${path} does not exist, so the proposed state cannot be validated.`);
+    documents[key] = decodeExact(bytes, `current ${path}`);
+    readOnlySha256[path] = sha256Hex(bytes);
+  }
+  const verdict = input.validate(documents);
+
+  const finalSha256: Record<string, string> = {};
+  const oldSha256: Record<string, string> = {};
+  for (const file of files) {
+    const old = readRepo(file.path);
+    if (old === null) refuse(`${file.path} does not exist, so the apply cannot bind to its current bytes.`);
+    finalSha256[file.path] = sha256Hex(file.content);
+    oldSha256[file.path] = sha256Hex(old);
+  }
+  return { verdict, binding: { finalSha256, oldSha256, readOnlySha256 } };
+}
+
+/**
+ * Refuse if anything the validation was bound to has moved: the bytes about to be written, the bytes
+ * they replace, or a validated document the apply leaves alone. Called before anything is staged and
+ * again after staging, so a working-tree edit made after the verdict cannot be journaled as "old".
+ */
+export function assertBindingHolds(
+  binding: ApplyBinding, files: readonly PlannedFile[], readRepo: (path: string) => Buffer | null,
+): void {
+  const paths = files.map((f) => f.path).sort();
+  if (JSON.stringify(paths) !== JSON.stringify(Object.keys(binding.finalSha256).sort())) {
+    refuse('The files to write are not the files the validation was bound to; nothing was written.');
+  }
+  for (const file of files) {
+    if (sha256Hex(file.content) !== binding.finalSha256[file.path]) {
+      refuse(`The bytes to write for ${file.path} are not the bytes that were validated; nothing was written.`);
+    }
+    const now = readRepo(file.path);
+    if (now === null || sha256Hex(now) !== binding.oldSha256[file.path]) {
+      refuse(`${file.path} changed after the proposed state was validated (it no longer holds `
+        + `${binding.oldSha256[file.path]}); nothing was written. Re-run the dry run.`);
+    }
+  }
+  for (const [path, hash] of Object.entries(binding.readOnlySha256)) {
+    const now = readRepo(path);
+    if (now === null || sha256Hex(now) !== hash) {
+      refuse(`${path} was validated as part of the proposed state but changed afterwards; nothing was written. `
+        + 'Re-run the dry run.');
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The concrete diff
 // ---------------------------------------------------------------------------
 
@@ -570,6 +679,15 @@ export function parseTransactionJournal(text: string): TransactionJournal {
   if (o.schema !== TRANSACTION_JOURNAL_SCHEMA || !Array.isArray(o.entries) || !Number.isInteger(o.season)) {
     refuse(`${TRANSACTION_JOURNAL_PATH} is not a ${TRANSACTION_JOURNAL_SCHEMA} journal.`);
   }
+  // A journal is the only recovery evidence, so a malformed entry is a refusal, not a crash.
+  o.entries.forEach((entry, index) => {
+    const e = typeof entry === 'object' && entry !== null ? entry as Json : {};
+    if (typeof e.path !== 'string' || !HEX64.test(String(e.oldSha256)) || !HEX64.test(String(e.newSha256))
+        || typeof e.oldBase64 !== 'string') {
+      refuse(`${TRANSACTION_JOURNAL_PATH} entry ${index} is malformed. An earlier apply was interrupted; `
+        + 'restore the rollover files from Git, then delete it and any *.rollover-tmp files.');
+    }
+  });
   return o as unknown as TransactionJournal;
 }
 
@@ -611,16 +729,26 @@ export function pendingTransactionProblem(io: FileIo): string[] | null {
  * Nothing is renamed until every staged file has been read back; the journal is cleared only
  * after every target has been read back against the plan. A fault after the first rename leaves
  * the journal in place, which is what makes the next invocation refuse and print the steps.
- * There is no cross-file atomicity on a filesystem; this makes the incoherent window as short as
- * the rename sequence and makes it unmistakable if it is ever interrupted.
+ * There is no cross-file atomicity on a filesystem, and no intermediate combination of old and new
+ * files is promised to be usable; this makes the incoherent window as short as the rename sequence
+ * and makes it unmistakable, with the old bytes preserved, if it is ever interrupted.
+ *
+ * With a `binding` (the verdict of validateTransitionState) the apply first refuses if the bytes to
+ * write, the bytes they replace, or any validated read-only document have moved since the verdict.
  */
-export function applyStagedWrites(io: FileIo, season: number, files: readonly PlannedFile[]): void {
+export function applyStagedWrites(
+  io: FileIo, season: number, files: readonly PlannedFile[], binding?: ApplyBinding,
+): void {
   const staged: string[] = [];
+  // Best effort: a failure to clean up must not hide the failure that caused it, and anything left
+  // behind is reported by pendingTransactionProblem as an untouched-tracked-files leftover.
   const unstage = (): void => {
-    for (const path of staged) io.remove(path);
-    io.remove(`${TRANSACTION_JOURNAL_PATH}${STAGING_SUFFIX}`);
+    for (const path of [...staged, `${TRANSACTION_JOURNAL_PATH}${STAGING_SUFFIX}`]) {
+      try { io.remove(path); } catch { /* reported as a leftover on the next invocation */ }
+    }
   };
   try {
+    if (binding) assertBindingHolds(binding, files, (path) => io.read(path));
     for (const file of files) {
       const path = `${file.path}${STAGING_SUFFIX}`;
       io.write(path, file.content);
@@ -630,6 +758,8 @@ export function applyStagedWrites(io: FileIo, season: number, files: readonly Pl
         refuse(`Staging ${file.path} did not read back the planned bytes; nothing was renamed.`);
       }
     }
+    // Re-checked after staging, immediately before the journal records the "old" bytes.
+    if (binding) assertBindingHolds(binding, files, (path) => io.read(path));
     const journal = buildTransactionJournal(season, files, (path) => io.read(path));
     io.write(`${TRANSACTION_JOURNAL_PATH}${STAGING_SUFFIX}`, `${JSON.stringify(journal, null, 2)}\n`);
     io.rename(`${TRANSACTION_JOURNAL_PATH}${STAGING_SUFFIX}`, TRANSACTION_JOURNAL_PATH);

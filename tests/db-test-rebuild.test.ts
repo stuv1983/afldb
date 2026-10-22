@@ -13499,3 +13499,12 @@ describe('V2 Launch F — the isolated rebuild target', () => {
     }
   });
 });
+
+describe('ISSUE-316 a pending rollover apply blocks the rebuild', () => {
+  it('refuses while the rollover journal exists and passes when it does not', async () => {
+    const { assertNoPendingRolloverApply } = await import('../tools/db/rebuild-test');
+    expect(() => assertNoPendingRolloverApply((path) => path === '.rollover-transaction.json'))
+      .toThrow(/an earlier rollover apply did not finish/);
+    expect(() => assertNoPendingRolloverApply(() => false)).not.toThrow();
+  });
+});

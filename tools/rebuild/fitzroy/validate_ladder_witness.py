@@ -314,8 +314,11 @@ def resolve_all(rows: list[dict], rep: Report,
     return by_identity
 
 
-def load_source_wildcards() -> list[dict]:
-    """Read only the accepted core's hash-bound results; never choose a candidate."""
+def load_source_wildcards(contract_path: Path | None = None) -> list[dict]:
+    """Read only the accepted core's hash-bound results; never choose a candidate.
+
+    The contract is read through the same routed path as every other read site (default:
+    the tracked contract), so no site can read a different contract from the others."""
     register = json.loads((ROOT / "data/reference/fitzroy-accepted-baselines.json")
                           .read_text(encoding="utf-8"))
     accepted = [b for b in register["baselines"] if b["acceptance_status"] == "accepted"]
@@ -324,7 +327,7 @@ def load_source_wildcards() -> list[dict]:
     baseline = fz.select_accepted_baseline(register, accepted[0]["snapshot_label"])
     manifest_path = ROOT / baseline["acquisition"]["manifest_path"]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract = json.loads((contract_path or CONTRACT).read_text(encoding="utf-8"))
     fz.verify_accepted_binding(baseline, manifest_path, manifest, contract)
     entries = [f for f in manifest["files"] if f["filename"] == "results.csv"]
     if len(entries) != 1:

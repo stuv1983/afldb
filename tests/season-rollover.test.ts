@@ -60,6 +60,7 @@ import {
   TRANSACTION_JOURNAL_PATH,
   TRANSITION_SCHEMA,
   applyStagedWrites,
+  assertBindingHolds,
   assertNoSentinel,
   assertTransitionWriteSet,
   buildTransactionJournal,
@@ -67,15 +68,19 @@ import {
   describeTransitionDiff,
   formatTransitionDiff,
   parseTransitionChangeSet,
+  parseTransactionJournal,
   pendingTransactionProblem,
   prepareTransition,
   recoveryRequirements,
   sha256Hex,
+  validateTransitionState,
+  type ApplyBinding,
   type FileIo,
   type InputRole,
 } from '../src/lib/rollover/transition-change-set';
 import { censusRecord, type CensusScope } from '../src/lib/rollover/afl-api-ownership-census';
 import { finalValidationChecks } from '../tools/db/rebuild-test';
+import { validateProposedRebuildState, type ProposedDocuments } from '../tools/db/rollover-proposed-state';
 
 const root = process.cwd();
 
@@ -841,7 +846,7 @@ describe('the validator is the authority — a transcript is not', () => {
     const cli = readFileSync(join(root, 'tools', 'db', 'rollover-season.ts'), 'utf8');
     expect(cli).toContain('spawnSync');
     expect(cli.indexOf('assertPreApplyAuthority({'))
-      .toBeLessThan(cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet)'));
+      .toBeLessThan(cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet, binding)'));
     expect(cli.indexOf('planSuccessorContract({'))
       .toBeLessThan(cli.indexOf('runPython(fullHistoryArgv'));
   });
@@ -1105,9 +1110,20 @@ describe('a valid synthetic rollover', () => {
 describe('stage 9 re-points itself — the gate is never edited', () => {
   it('evaluates the accepted-last-season boundary at Y from the successor register', () => {
     const plan = run();
-    const before = finalValidationChecks(baseRegister());
+    // finalValidationChecks() refuses without an explicit ladder expectation (39e80642). The
+    // expectation here is written out from the literal years, NOT read back from the register
+    // under test: the runner cross-checks it against `measured`, so a register whose boundary
+    // did not move would still refuse rather than pass circularly.
+    const expectation = (label: string, lastSeason: number, expectedRows: number) => ({
+      pair: { core_snapshot_label: label },
+      expectedRows, firstSeason: FIRST_SEASON, lastSeason,
+      censusScope: { firstSeason: FIRST_SEASON, lastSeason, excludedSeasons: [] },
+    }) as unknown as Parameters<typeof finalValidationChecks>[3];
+    const before = finalValidationChecks(
+      baseRegister(), undefined, undefined, expectation(RETIRED_LABEL, 2025, ROWS_2025));
     const after = finalValidationChecks(
-      jsonIn(plan, 'data/reference/fitzroy-accepted-baselines.json'));
+      jsonIn(plan, 'data/reference/fitzroy-accepted-baselines.json'),
+      undefined, undefined, expectation(NEW_LABEL, 2026, ROWS_2026));
 
     const gate = (checks: ReturnType<typeof finalValidationChecks>) =>
       checks.find((c) => c.key === 'matches_after_accepted_last_season')!;
@@ -1984,7 +2000,7 @@ describe('the validator path overrides are additive and fail closed', () => {
     expect(cli.indexOf('assertPreApplyAuthority({'))
       .toBeLessThan(cli.indexOf('if (!apply) {'));
     expect(cli.indexOf('if (!apply) {'))
-      .toBeLessThan(cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet)'));
+      .toBeLessThan(cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet, binding)'));
     // The repository filesystem adapter is only handed to the pending check and the one staged
     // apply: nothing calls its mutators directly, and it holds the only rename site.
     expect(cli).not.toMatch(/repoIo\.(write|rename|remove)\(/);
@@ -2689,5 +2705,479 @@ describe('the staged apply, its journal and recovery', () => {
     expect(wording(old)).toContain('Every file still holds the old bytes');
     expect(wording(next)).toContain('Every file already holds the reviewed new bytes');
     expect(wording({ ...old, 'a.json': next['a.json'] })).toContain('Files are mixed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-316 C2 — the PROPOSED state is judged by the rebuild's own validators
+// ---------------------------------------------------------------------------
+//
+// The base is the REAL repository state, so every manifest pin is proven against real bytes. Each
+// case then changes one thing and leaves every hash internally consistent, which is exactly what a
+// hash-only check cannot see. Nothing is written anywhere: the validators take the bytes by injection.
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- the cases mutate loosely typed JSON documents */
+type StateDocs = {
+  register: any; seasons: any; contract: any; aflApi: any; afltables: any; rebuild: string;
+};
+const repoText = (path: string) => readFileSync(join(root, path), 'utf8');
+function realStateDocs(): StateDocs {
+  return {
+    register: JSON.parse(repoText(REGISTER_PATH)),
+    seasons: JSON.parse(repoText(SEASONS_PATH)),
+    contract: JSON.parse(repoText(CONTRACT_PATH)),
+    aflApi: JSON.parse(repoText('tools/rebuild/afl_api/afl-api-contract.json')),
+    afltables: JSON.parse(repoText('tools/rebuild/afltables/afltables-contract.json')),
+    rebuild: repoText(REBUILD_PATH),
+  };
+}
+const asProposed = (d: StateDocs): ProposedDocuments => ({
+  register: JSON.stringify(d.register), seasons: JSON.stringify(d.seasons),
+  contract: JSON.stringify(d.contract), aflApi: JSON.stringify(d.aflApi),
+  afltables: JSON.stringify(d.afltables), rebuild: d.rebuild,
+});
+type Pairs = Parameters<typeof validateProposedRebuildState>[1];
+const validateState = (d: StateDocs, pairs?: Pairs) => validateProposedRebuildState(asProposed(d), pairs);
+const ladderOf = (d: StateDocs) => d.contract.datasets.ladder;
+const acceptedOf = (d: StateDocs) =>
+  d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+
+describe("proposed-state validation — the rebuild's own validators over the proposed bytes", () => {
+  it('accepts the real repository state and names what stays pending', () => {
+    const verdict = validateState(realStateDocs());
+    expect(verdict.ladderProfile).toBe('predecessor-1897-2025');
+    expect(verdict.expectedRows).toBe(1622);
+    expect(verdict.finalChecks.length).toBeGreaterThan(80);
+    expect(verdict.finalChecks.map((c) => c.key)).toEqual(expect.arrayContaining([
+      'club_seasons_rows', 'players_with_height', 'players_with_dob_after_birth_dates', 'match_coaches',
+      'players_with_afl_api_height_evidence', 'completed_scope_missing_or_in_progress',
+    ]));
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/NOT executed/);
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/--compare/);
+  });
+
+  it('judges the bytes it is given, not the working tree', () => {
+    const d = realStateDocs();
+    const before = repoText(CONTRACT_PATH);
+    ladderOf(d).rebuild_expectation.profile = 'edited-in-memory';
+    expect(() => validateState(d)).toThrow(RolloverRefused);
+    expect(repoText(CONTRACT_PATH)).toBe(before);
+    expect(() => validateState(realStateDocs())).not.toThrow();
+  });
+
+  it.each([
+    ['the register', 'register'], ['the seasons reference', 'seasons'], ['the fitzRoy contract', 'contract'],
+    ['the AFL API contract', 'aflApi'], ['the AFL Tables contract', 'afltables'],
+  ] as const)('refuses malformed JSON in %s', (_label, key) => {
+    const docs = asProposed(realStateDocs());
+    docs[key] = '{ not json';
+    expect(() => validateProposedRebuildState(docs)).toThrow(/is not valid JSON/);
+  });
+
+  describe('the ladder selector', () => {
+    it('refuses a profile name outside the closed reviewed table even when every hash is consistent', () => {
+      const d = realStateDocs();
+      ladderOf(d).rebuild_expectation.profile = 'owner-chosen-profile';
+      expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('accepts that name only once a reviewed tuple lists it', () => {
+      const d = realStateDocs();
+      const block = ladderOf(d).rebuild_expectation;
+      block.profile = 'owner-chosen-profile';
+      const pairs = {
+        'owner-chosen-profile': {
+          profile: 'owner-chosen-profile',
+          core_snapshot_label: block.core_snapshot_label,
+          core_manifest_sha256: block.core_manifest_sha256,
+          core_artefact_set_sha256: block.core_artefact_set_sha256,
+          witness_snapshot_label: block.witness_snapshot_label,
+          witness_manifest_sha256: block.witness_manifest_sha256,
+          first_season: 1897, last_season: 2025, expected_rows: block.expected_rows,
+        },
+      } as unknown as Pairs;
+      expect(validateState(d, pairs).ladderProfile).toBe('owner-chosen-profile');
+      // …and the tuple is a fingerprint, not a name: change one bound value and it refuses again.
+      block.core_artefact_set_sha256 = 'f'.repeat(64);
+      expect(() => validateState(d, pairs)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('never treats an inherited object key as a reviewed profile', () => {
+      for (const profile of ['constructor', '__proto__', 'toString']) {
+        const d = realStateDocs();
+        ladderOf(d).rebuild_expectation.profile = profile;
+        expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
+      }
+    });
+
+    it('refuses the rehearsal-only profile as an active profile, whatever it carries', () => {
+      const d = realStateDocs();
+      ladderOf(d).rebuild_expectation.profile = 'c2-2026-rehearsal-only';
+      expect(() => validateState(d)).toThrow(/can never be an active contract profile/);
+    });
+
+    it('refuses an absent or non-object expectation block', () => {
+      for (const block of [undefined, null, [], 'predecessor-1897-2025']) {
+        const d = realStateDocs();
+        if (block === undefined) delete ladderOf(d).rebuild_expectation;
+        else ladderOf(d).rebuild_expectation = block;
+        expect(() => validateState(d)).toThrow(/rebuild's own validators/);
+      }
+    });
+  });
+
+  describe('ladder, range and constant combinations', () => {
+    it('refuses a row count the rebuild constant does not share', () => {
+      const d = realStateDocs();
+      d.rebuild = planClubSeasonsConstantEdit(d.rebuild, 1622, 1640);
+      expect(() => validateState(d)).toThrow(/expects 1640 club_seasons rows/);
+    });
+
+    it('refuses a row count the reviewed tuple does not carry', () => {
+      const d = realStateDocs();
+      ladderOf(d).rebuild_expectation.expected_rows = 1640;
+      d.rebuild = planClubSeasonsConstantEdit(d.rebuild, 1622, 1640);
+      expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('refuses an accepted range the ladder expectation does not cover', () => {
+      const d = realStateDocs();
+      acceptedOf(d).measured.seasons_last = 2026;
+      expect(() => validateState(d)).toThrow(/binding mismatch/);
+    });
+
+    it('refuses a witness fingerprint that does not match the proposed contract witness', () => {
+      const d = realStateDocs();
+      ladderOf(d).accepted_witness.manifest_sha256 = '0'.repeat(64);
+      expect(() => validateState(d)).toThrow(/binding mismatch/);
+    });
+
+    it('refuses an approved source gap the completed scope does not allow', () => {
+      const d = realStateDocs();
+      d.contract.full_history.approved_source_gaps.seasons = [1916];
+      expect(() => validateState(d)).toThrow(/binding mismatch/);
+    });
+
+    it('refuses zero or two accepted baselines', () => {
+      for (const count of [0, 2]) {
+        const d = realStateDocs();
+        const accepted = acceptedOf(d);
+        d.register.baselines = Array.from({ length: count }, () => structuredClone(accepted));
+        expect(() => validateState(d)).toThrow(/rebuild's own validators/);
+      }
+    });
+  });
+
+  describe('the height block', () => {
+    const heights = (d: StateDocs) => d.contract.datasets.player_details.height_enrichment;
+
+    it('refuses baseline_only bound to another baseline', () => {
+      const d = realStateDocs();
+      Object.assign(heights(d), {
+        stats_input_mode: 'baseline_only', supplements: [], baseline_snapshot_label: 'some-other-label',
+      });
+      expect(() => validateState(d)).toThrow(/baseline_only requires explicit supplements/);
+    });
+
+    it('refuses baseline_only that still lists a supplement', () => {
+      const d = realStateDocs();
+      Object.assign(heights(d), {
+        stats_input_mode: 'baseline_only', baseline_snapshot_label: acceptedOf(d).snapshot_label,
+      });
+      expect(heights(d).supplements.length).toBeGreaterThan(0);
+      expect(() => validateState(d)).toThrow(/baseline_only requires explicit supplements/);
+    });
+
+    it('accepts baseline_only exactly when it names the selected baseline with an empty list', () => {
+      const d = realStateDocs();
+      Object.assign(heights(d), {
+        stats_input_mode: 'baseline_only', supplements: [], baseline_snapshot_label: acceptedOf(d).snapshot_label,
+      });
+      expect(() => validateState(d)).not.toThrow();
+    });
+
+    it('refuses an empty supplement list that does not declare baseline_only', () => {
+      const d = realStateDocs();
+      heights(d).supplements = [];
+      expect(() => validateState(d)).toThrow(/requires nonempty supplements/);
+    });
+
+    it('refuses an unknown stats_input_mode', () => {
+      const d = realStateDocs();
+      heights(d).stats_input_mode = 'whatever';
+      expect(() => validateState(d)).toThrow(/stats_input_mode must be/);
+    });
+  });
+
+  describe('measured counts and pins in the contracts', () => {
+    const parentOf = (doc: any, path: readonly string[]) => path.slice(0, -1).reduce((o, k) => o[k], doc);
+    it.each([
+      ['aflApi', ['roster', 'accepted_snapshot', 'measured', 'players_with_afl_api_evidence']],
+      ['afltables', ['club_player_lists', 'accepted_snapshot', 'measured', 'players_with_dob']],
+      ['afltables', ['coaches', 'accepted_snapshot', 'measured', 'match_coaches']],
+      ['contract', ['datasets', 'player_details', 'height_enrichment', 'measured', 'players_with_height']],
+    ] as const)('refuses a non-integer or missing %s count %j', (doc, path) => {
+      for (const bad of ['1916', 1.5, null, undefined]) {
+        const d = realStateDocs();
+        const parent = parentOf(d[doc], path);
+        const key = path[path.length - 1];
+        if (bad === undefined) delete parent[key];
+        else parent[key] = bad;
+        expect(() => validateState(d)).toThrow(/rebuild's own validators/);
+      }
+    });
+
+    it.each([
+      ['aflApi', ['roster', 'accepted_snapshot', 'manifest_sha256']],
+      ['afltables', ['club_player_lists', 'accepted_snapshot', 'manifest_sha256_lf']],
+      ['afltables', ['coaches', 'accepted_snapshot', 'manifest_sha256_lf']],
+    ] as const)('refuses a %s pin that no longer matches the manifest it names %j', (doc, path) => {
+      const d = realStateDocs();
+      parentOf(d[doc], path)[path[path.length - 1]] = '0'.repeat(64);
+      expect(() => validateState(d)).toThrow(/hashes to/);
+    });
+
+    it('accepts changed counts that stay integers, because the count is a claim the database must later test', () => {
+      const d = realStateDocs();
+      d.aflApi.roster.accepted_snapshot.measured.players_with_afl_api_evidence += 92;
+      const verdict = validateState(d);
+      expect(verdict.finalChecks.find((c) => c.key === 'players_with_afl_api_height_evidence')!.expected)
+        .toBe(d.aflApi.roster.accepted_snapshot.measured.players_with_afl_api_evidence);
+      expect(verdict.pendingDatabase[0]).toMatch(/claim until the isolated rebuild measures it/);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Validation is bound to the exact proposed bytes
+// ---------------------------------------------------------------------------
+
+describe('a validation verdict is bound to the exact proposed bytes', () => {
+  function validated(over: { drop?: string[] } = {}) {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { files: all } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    const files = all.filter((f) => !(over.drop ?? []).includes(f.path));
+    const seen: Array<Record<string, string>> = [];
+    const result = validateTransitionState({
+      files, readRepo: bufferOf(s.disk), validate: (documents) => { seen.push({ ...documents }); return 'verdict'; },
+    });
+    return { s, files, seen, ...result };
+  }
+
+  it('hands the validator the proposed bytes for written documents and the current bytes for the rest', () => {
+    const { s, files, seen, verdict, binding } = validated({ drop: [AFLTABLES_PATH] });
+    expect(verdict).toBe('verdict');
+    expect(seen).toHaveLength(1);
+    const docs = seen[0];
+    const written = (path: string) => files.find((f) => f.path === path)!.content;
+    expect(docs.register).toBe(written(REGISTER_PATH));
+    expect(docs.seasons).toBe(written(SEASONS_PATH));
+    expect(docs.contract).toBe(written(CONTRACT_PATH));
+    expect(docs.rebuild).toBe(written(REBUILD_PATH));
+    expect(docs.aflApi).toBe(written(AFL_API_PATH));
+    expect(docs.aflApi).not.toBe(s.disk.get(AFL_API_PATH));
+    expect(docs.afltables).toBe(s.disk.get(AFLTABLES_PATH));
+    expect(Object.keys(binding.readOnlySha256)).toEqual([AFLTABLES_PATH]);
+    for (const f of files) {
+      expect(binding.finalSha256[f.path]).toBe(sha256Hex(f.content));
+      expect(binding.oldSha256[f.path]).toBe(sha256Hex(s.disk.get(f.path)!));
+    }
+  });
+
+  it('propagates a refusal from the validator and returns no binding', () => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    expect(() => validateTransitionState({
+      files, readRepo: bufferOf(s.disk),
+      validate: () => { throw new RolloverRefused('the ladder expectation is not reviewed'); },
+    })).toThrow('the ladder expectation is not reviewed');
+  });
+
+  it('refuses when a validated document is missing from the working tree', () => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    s.disk.delete(AFLTABLES_PATH);
+    expect(() => validateTransitionState({
+      files: files.filter((f) => f.path !== AFLTABLES_PATH), readRepo: bufferOf(s.disk), validate: () => 1,
+    })).toThrow(/does not exist/);
+  });
+
+  it('holds for the state it validated, and refuses each kind of drift afterwards', () => {
+    const { s, files, binding } = validated({ drop: [AFLTABLES_PATH] });
+    expect(() => assertBindingHolds(binding, files, bufferOf(s.disk))).not.toThrow();
+
+    const target = new Map(s.disk).set(REGISTER_PATH, `${s.disk.get(REGISTER_PATH)} `);
+    expect(() => assertBindingHolds(binding, files, bufferOf(target))).toThrow(/changed after the proposed state was validated/);
+
+    const gone = new Map(s.disk); gone.delete(SEASONS_PATH);
+    expect(() => assertBindingHolds(binding, files, bufferOf(gone))).toThrow(/changed after the proposed state was validated/);
+
+    const readOnly = new Map(s.disk).set(AFLTABLES_PATH, serialiseJson({ measured: { players_with_dob: 1 } }));
+    expect(() => assertBindingHolds(binding, files, bufferOf(readOnly))).toThrow(/validated as part of the proposed state but changed/);
+
+    const altered = files.map((f) => (f.path === CONTRACT_PATH ? { ...f, content: `${f.content} ` } : f));
+    expect(() => assertBindingHolds(binding, altered, bufferOf(s.disk))).toThrow(/are not the bytes that were validated/);
+
+    expect(() => assertBindingHolds(binding, files.slice(1), bufferOf(s.disk))).toThrow(/not the files the validation was bound to/);
+    expect(() => assertBindingHolds(binding, [...files, { path: 'extra.json', content: '{}', reformatted: false }], bufferOf(s.disk)))
+      .toThrow(/not the files the validation was bound to/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The apply: bound, journaled, recoverable — and honest about what that is
+// ---------------------------------------------------------------------------
+
+describe('the bound apply and its failure modes', () => {
+  function memoryFs(initial: Map<string, string>) {
+    const fs = new Map(initial);
+    const io: FileIo = {
+      read: (p) => (fs.has(p) ? Buffer.from(fs.get(p)!) : null),
+      write: (p, c) => { fs.set(p, c); },
+      rename: (a, b) => { fs.set(b, fs.get(a)!); fs.delete(a); },
+      remove: (p) => { fs.delete(p); },
+    };
+    return { fs, io };
+  }
+  const names = ['a.json', 'b.json', 'c.json'];
+  const newFiles = () => names.map((path) => ({ path, content: `new ${path}`, reformatted: false }));
+  const oldDisk = () => new Map(names.map((p) => [p, `old ${p}`] as const));
+  const bindingFor = (files: ReturnType<typeof newFiles>, disk: Map<string, string>): ApplyBinding => ({
+    finalSha256: Object.fromEntries(files.map((f) => [f.path, sha256Hex(f.content)])),
+    oldSha256: Object.fromEntries(files.map((f) => [f.path, sha256Hex(disk.get(f.path)!)])),
+    readOnlySha256: {},
+  });
+
+  it('applies when nothing moved since the verdict', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    applyStagedWrites(io, 2026, newFiles(), bindingFor(newFiles(), oldDisk()));
+    expect(names.map((n) => fs.get(n))).toEqual(names.map((n) => `new ${n}`));
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('refuses before staging anything when a target changed after the verdict', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const binding = bindingFor(newFiles(), oldDisk());
+    fs.set('b.json', 'edited by someone else');
+    expect(() => applyStagedWrites(io, 2026, newFiles(), binding)).toThrow(/b\.json changed after the proposed state was validated/);
+    expect([...fs.keys()].sort()).toEqual(names);
+    expect(fs.get('b.json')).toBe('edited by someone else');
+  });
+
+  it('refuses, unstages and does not overwrite when a target is edited between staging and the journal', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const binding = bindingFor(newFiles(), oldDisk());
+    const racing: FileIo = {
+      ...io,
+      write: (p, c) => { io.write(p, c); if (p === 'c.json.rollover-tmp') fs.set('a.json', 'edited mid-apply'); },
+    };
+    expect(() => applyStagedWrites(racing, 2026, newFiles(), binding)).toThrow(/a\.json changed after the proposed state was validated/);
+    expect([...fs.keys()].sort()).toEqual(names);
+    expect(fs.get('a.json')).toBe('edited mid-apply');
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('refuses when the bytes about to be written are not the validated bytes', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const binding = bindingFor(newFiles(), oldDisk());
+    const altered = newFiles(); altered[2].content = 'something else';
+    expect(() => applyStagedWrites(io, 2026, altered, binding)).toThrow(/not the bytes that were validated/);
+    expect([...fs.entries()].sort()).toEqual([...oldDisk().entries()].sort());
+  });
+
+  it('a cleanup failure never hides the failure that caused it', () => {
+    const owned = PLANNER_OWNED_WRITES.slice(0, 3);
+    const { io } = memoryFs(new Map(owned.map((p) => [p, `old ${p}`] as const)));
+    const failing: FileIo = {
+      ...io,
+      write: (p, c) => { if (p.startsWith(owned[2])) throw new Error('disk full'); io.write(p, c); },
+      remove: () => { throw new Error('cannot remove'); },
+    };
+    const files = owned.map((path) => ({ path, content: `new ${path}`, reformatted: false }));
+    expect(() => applyStagedWrites(failing, 2026, files)).toThrow('disk full');
+    // what the failed cleanup left behind is reported, not silently ignored
+    expect(pendingTransactionProblem(io)!.join('\n')).toContain('Staged rollover files from an earlier run remain');
+  });
+
+  it('an interruption before any target rename leaves the journal, every file old, and the old bytes preserved', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    let renames = 0;
+    const crashing: FileIo = {
+      ...io, rename: (a, b) => { renames += 1; if (renames === 2) throw new Error('killed'); io.rename(a, b); },
+    };
+    expect(() => applyStagedWrites(crashing, 2026, newFiles())).toThrow('killed');
+    const problem = pendingTransactionProblem(io)!.join('\n');
+    expect(problem).toContain('Every file still holds the old bytes');
+    expect(fs.has(TRANSACTION_JOURNAL_PATH)).toBe(true);
+    for (const n of names) expect(fs.get(n)).toBe(`old ${n}`);
+  });
+
+  it('the journal alone reconstructs every old file after a mixed interruption', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    let renames = 0;
+    const crashing: FileIo = {
+      ...io, rename: (a, b) => { renames += 1; if (renames === 3) throw new Error('killed'); io.rename(a, b); },
+    };
+    expect(() => applyStagedWrites(crashing, 2026, newFiles())).toThrow('killed');
+    const journal = parseTransactionJournal(fs.get(TRANSACTION_JOURNAL_PATH)!);
+    expect(fs.get('a.json')).toBe('new a.json');
+    for (const entry of journal.entries) {
+      expect(Buffer.from(entry.oldBase64, 'base64').toString()).toBe(`old ${entry.path}`);
+      expect(entry.oldSha256).toBe(sha256Hex(`old ${entry.path}`));
+      expect(entry.newSha256).toBe(sha256Hex(`new ${entry.path}`));
+    }
+    // and while that state exists, no later invocation is allowed to proceed
+    expect(pendingTransactionProblem(io)!.join('\n')).toContain('Files are mixed');
+  });
+
+  it('a post-write verification failure keeps the journal and reports the file as neither old nor new', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const corrupting: FileIo = {
+      ...io, rename: (a, b) => { io.rename(a, b); if (b === 'b.json') fs.set('b.json', 'torn'); },
+    };
+    expect(() => applyStagedWrites(corrupting, 2026, newFiles())).toThrow(/Post-write verification failed for b\.json/);
+    expect(fs.has(TRANSACTION_JOURNAL_PATH)).toBe(true);
+    const problem = pendingTransactionProblem(io)!;
+    expect(problem).toContain('  neither b.json');
+    expect(problem.join('\n')).toContain('Files are mixed');
+  });
+
+  it('a failure removing the journal after a verified apply still blocks, and says every file holds the new bytes', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const stuck: FileIo = {
+      ...io, remove: (p) => { if (p === TRANSACTION_JOURNAL_PATH) throw new Error('journal locked'); io.remove(p); },
+    };
+    expect(() => applyStagedWrites(stuck, 2026, newFiles())).toThrow('journal locked');
+    expect(pendingTransactionProblem(io)!.join('\n')).toContain('Every file already holds the reviewed new bytes');
+    expect(names.map((n) => fs.get(n))).toEqual(names.map((n) => `new ${n}`));
+  });
+
+  it('refuses a malformed journal with recovery steps, never a crash', () => {
+    for (const entries of [[{}], [null], [{ path: 'a.json', oldSha256: 'x', newSha256: 'y', oldBase64: '' }]]) {
+      const text = JSON.stringify({ schema: TRANSACTION_JOURNAL_SCHEMA, season: 2026, entries });
+      expect(() => parseTransactionJournal(text)).toThrow(RolloverRefused);
+      expect(() => parseTransactionJournal(text)).toThrow(/is malformed/);
+      const { io } = memoryFs(new Map([[TRANSACTION_JOURNAL_PATH, text]]));
+      expect(() => pendingTransactionProblem(io)).toThrow(RolloverRefused);
+    }
+  });
+
+  it('keeps the interrupted state visible to Git: the journal and staged names are not ignored', () => {
+    const ignore = repoText('.gitignore');
+    expect(ignore).not.toMatch(/rollover-transaction|rollover-tmp/);
+  });
+
+  it('describes apply as journaled and recoverable, never as a transaction or atomic across files', () => {
+    for (const path of ['src/lib/rollover/transition-change-set.ts', 'tools/db/rollover-season.ts']) {
+      const text = repoText(path);
+      expect(text).toMatch(/NOT a filesystem transaction|NOT a transaction/i);
+      expect(text).not.toMatch(/atomic(ally)? (across|multi)/i);
+    }
   });
 });

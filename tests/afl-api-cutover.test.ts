@@ -796,7 +796,7 @@ describe('rollover: AFL Tables retirement (AFLDB-ISSUE-316 C2)', () => {
     // The switch leads the write set, ahead of every other file, and the set is only written by
     // the one staged apply that follows the authority check and the dry-run return.
     const switchFirst = cli.indexOf('[networkRetirement.file, ...plan.files]');
-    const applyCall = cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet)');
+    const applyCall = cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet, binding)');
     expect(parse).toBeGreaterThan(0);
     expect(parse).toBeLessThan(cli.indexOf('parseJsonFile(args.coreManifest'));
     expect(planned).toBeGreaterThan(cli.indexOf('planSuccessorContract({'));

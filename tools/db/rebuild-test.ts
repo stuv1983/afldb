@@ -1185,6 +1185,8 @@ export function resolveLadderRebuildExpectation(
   source: FitzroySource, target: ResolvedTarget, documents: LadderDocuments = ladderDocuments(),
   provenance?: RehearsalProvenance,
   verify: typeof verifyRehearsalPackage = verifyRehearsalPackage,
+  /** The closed table of reviewed tuples. Only a test or an owner-reviewed code change supplies another. */
+  pairs: Readonly<Record<string, RehearsalPair>> = LADDER_PAIRS,
 ): LadderRebuildExpectation {
   const { register, contract, seasons } = documents;
   const label = selectAcceptedBaseline(register).label;
@@ -1195,7 +1197,8 @@ export function resolveLadderRebuildExpectation(
   const ladder = contract.datasets?.ladder;
   const block = ladder?.rebuild_expectation;
   if (!block || typeof block !== 'object' || Array.isArray(block)) throw new RebuildRefused('Missing explicit ladder rebuild_expectation; no default is authorised.');
-  const supported = LADDER_PAIRS[block.profile];
+  const supported = typeof block.profile === 'string' && Object.hasOwn(pairs, block.profile)
+    ? pairs[block.profile] : undefined;
   const keys = ['profile', 'core_snapshot_label', 'core_manifest_sha256', 'core_artefact_set_sha256', 'witness_snapshot_label', 'witness_manifest_sha256', 'expected_rows', 'evidence_ref'];
   if (!supported || Object.keys(block).length !== keys.length || keys.some((k) => !(k in block))
       || typeof block.evidence_ref !== 'string' || !block.evidence_ref.trim()
@@ -2366,12 +2369,23 @@ const MEASURED_NOT_DB_GATED: Record<string, string> = {
 
 export type FinalCheck = { key: string; sql: string; expected: number };
 
+/**
+ * Where the AFL API and AFL Tables source contracts are read from. Absent means the working
+ * tree, exactly as before. The rollover supplies readers over PROPOSED bytes so the real
+ * check builders judge a successor state without it being written anywhere first.
+ */
+export type SourceContractReaders = {
+  aflApi?: () => Record<string, unknown> | null;
+  afltables?: () => Record<string, unknown> | null;
+};
+
 /** Build the check list from the tracked register. Refuses rather than guessing. */
 export function finalValidationChecks(
   register: Record<string, unknown> | null,
   draftguru: { persons: number; picks: number; bridged?: number } = DRAFTGURU_EXPECTED,
   readHeightContract?: HeightContractReader,
   ladder?: LadderRebuildExpectation,
+  readers: SourceContractReaders = {},
 ): FinalCheck[] {
   const label = selectAcceptedBaseline(register).label;
   const baseline = ((register!.baselines ?? []) as Array<Record<string, unknown>>)
@@ -2456,15 +2470,15 @@ export function finalValidationChecks(
 
   // AFLDB-ISSUE-118 §23.19. Added together with the HEIGHTS stages, for the same
   // §H15.5 reason. The expected values are read from the contracts' pin blocks.
-  for (const check of heightChecks(label, readHeightContract)) checks.push(check);
+  for (const check of heightChecks(label, readHeightContract, readers.aflApi)) checks.push(check);
 
   // AFLDB-ISSUE-118 §23.24. Added together with the BIRTH DATES stage, for the same
   // §H15.5 reason. The expected values are read from the AFL Tables contract's pin block.
-  for (const check of birthDateChecks()) checks.push(check);
+  for (const check of birthDateChecks(readers.afltables)) checks.push(check);
 
   // AFLDB-ISSUE-118 §23.27. Added together with the COACHES stage, for the same §H15.5
   // reason. The expected values are read from the AFL Tables contract's coaches pin.
-  for (const check of coachChecks(label, readHeightContract)) checks.push(check);
+  for (const check of coachChecks(label, readHeightContract, readers.afltables)) checks.push(check);
 
   // AFLDB-ISSUE-118 §23.29. Added together with the FATHER–SON stage, for the same §H15.5
   // reason. The expected values are read from the tracked artefact itself.
@@ -2984,6 +2998,21 @@ export function fitzroyValidateArgv(source: FitzroySource): string[] {
 }
 
 /**
+ * An interrupted rollover apply leaves the tracked reference files a mixed old/new set and a journal
+ * naming them. The rollover CLI refuses on it; so must the rebuild, which reads every one of those
+ * files as its authority. `exists` is injectable so the refusal is testable without touching the tree.
+ */
+export function assertNoPendingRolloverApply(
+  exists: (path: string) => boolean = (path) => existsSync(join(REPO_ROOT, path)),
+): void {
+  if (exists('.rollover-transaction.json')) {
+    throw new RebuildRefused('.rollover-transaction.json exists: an earlier rollover apply did not finish, so '
+      + 'the tracked reference files may be a mixed old/new set. Run `npx tsx tools/db/rollover-season.ts` (any '
+      + 'arguments) to print the per-file state and recovery steps; the rebuild will not read them until it is resolved.');
+  }
+}
+
+/**
  * The preflight stage's own work, kept separate so it is testable in isolation.
  *
  * It takes the SAME `Options` object planStages() builds the data stages from, so the
@@ -2992,6 +3021,7 @@ export function fitzroyValidateArgv(source: FitzroySource): string[] {
  */
 export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource,
                              readHeightContract?: HeightContractReader, binding?: RebuildBinding): void {
+  assertNoPendingRolloverApply();
   const candidateConfigured = ladderDocuments().contract.datasets?.ladder?.rebuild_expectation?.profile === 'c2-2026-rehearsal-only';
   if ((candidateConfigured || source?.label === 'c2-2026-final-core-v1' || opts.rehearsalLaunchSpec) && !binding?.provenance) {
     throw new RebuildRefused('Candidate preflight requires external rehearsal provenance.');
@@ -3463,9 +3493,10 @@ export function wikipediaHeightRows(
  * produced them, so a rebuild that silently drops the stage (or reproduces fewer
  * identities) fails here rather than being noticed by a Gridley cell weeks later.
  */
-export function heightChecks(selectedBaselineLabel?: string, readContract?: HeightContractReader): FinalCheck[] {
+export function heightChecks(selectedBaselineLabel?: string, readContract?: HeightContractReader,
+                             readAflApi?: SourceContractReaders['aflApi']): FinalCheck[] {
   const pins = heightEnrichmentPins(readContract, selectedBaselineLabel);
-  const roster = aflApiRosterPin();
+  const roster = aflApiRosterPin(readAflApi);
   return [
     { key: 'players_with_height',
       sql: 'SELECT count(*) FROM players WHERE height_cm IS NOT NULL',
@@ -3563,8 +3594,8 @@ export function birthDatesValidateArgv(python: string = resolvePython()): string
  * produced them. A rebuild that silently drops the stage, resolves fewer identities, or
  * starts overwriting fitzRoy dates fails here.
  */
-export function birthDateChecks(): FinalCheck[] {
-  const pin = afltablesClubListPin();
+export function birthDateChecks(readAfltables?: SourceContractReaders['afltables']): FinalCheck[] {
+  const pin = afltablesClubListPin(readAfltables);
   const clubListEvidence = "player_birth_evidence e JOIN sources s ON s.id = e.source_id "
     + "WHERE s.key = 'afltables' AND e.evidence_type = 'afltables_club_list'";
   return [
@@ -3672,9 +3703,10 @@ export function coachesValidateArgv(fitzroyLabel: string, python: string = resol
  * 'unique' status), the assignment count and the source's own coverage shape. A rebuild
  * that drops the stage, links by name, or loses assignments fails here.
  */
-export function coachChecks(selectedBaselineLabel?: string, readContract?: HeightContractReader): FinalCheck[] {
+export function coachChecks(selectedBaselineLabel?: string, readContract?: HeightContractReader,
+                            readAfltables?: SourceContractReaders['afltables']): FinalCheck[] {
   heightEnrichmentPins(readContract, selectedBaselineLabel);
-  const pin = afltablesCoachesPin();
+  const pin = afltablesCoachesPin(readAfltables);
   const perMatch = 'SELECT m.id, count(mc.match_id) AS n FROM matches m '
     + 'LEFT JOIN match_coaches mc ON mc.match_id = m.id GROUP BY m.id';
   return [

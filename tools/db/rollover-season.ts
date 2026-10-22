@@ -64,11 +64,14 @@
  * the staged files over their targets, (4) re-reads every target against the
  * plan, and only then (5) removes the journal. No file is ever observed
  * half-written, but a rename sequence across files is NOT a transaction: there
- * is no such thing for the filesystem here. If the process dies between two
+ * is no such thing for the filesystem here, and no intermediate combination of
+ * old and new files is promised to be usable. If the process dies between two
  * renames some files are new and some old; the journal (or a leftover
- * `*.rollover-tmp`) makes every later invocation, dry run included, refuse and
- * print the per-file state and the exact recovery steps. Git remains the
- * recovery boundary for the old bytes.
+ * `*.rollover-tmp`) makes every later invocation, dry run included, and the
+ * rebuild preflight refuse, printing the per-file state and the exact recovery
+ * steps. The journal holds the old bytes, and Git remains the recovery boundary
+ * for them. Apply is refused if the bytes to write, the bytes they replace, or
+ * any validated document moved after the proposed state was validated.
  *
  * THE COMPLETE TRANSITION AS ONE CHANGE SET. `--transition-change-set <file>`
  * (optional) carries the contract edits the planner cannot compute, and the
@@ -79,7 +82,13 @@
  * every byte to be written before `--apply` is accepted, and refusal of any
  * change set, proposed file or planned output carrying the proposal sentinel
  * UNRESOLVED:. No gate is relaxed and nothing is written until all of it has
- * been validated together.
+ * been validated together. With a change set, the complete PROPOSED state (the
+ * register, seasons, fitzRoy contract, both source contracts and the stage-9
+ * constant, exactly as they would be written) is also handed to the rebuild's
+ * own validators in memory (`tools/db/rollover-proposed-state.ts`): the ladder
+ * selector and tuple, the height block, and the check lists built from the
+ * source contracts' measured counts. That needs no database and writes nothing;
+ * what only a database can prove is printed as PENDING, never as passed.
  *
  * Usage (dry run):
  *
@@ -144,6 +153,7 @@ import {
 import type { PlannedFile } from '../../src/lib/rollover/season-rollover';
 import {
   TRANSITION_FLAG,
+  type ApplyBinding,
   applyStagedWrites,
   assertTransitionWriteSet,
   describeTransitionDiff,
@@ -152,11 +162,13 @@ import {
   pendingTransactionProblem,
   prepareTransition,
   sha256Hex,
+  validateTransitionState,
   type FileIo,
   type InputRole,
   type PreparedTransition,
 } from '../../src/lib/rollover/transition-change-set';
 import { resolvePython } from './rebuild-test';
+import { validateProposedRebuildState } from './rollover-proposed-state';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
@@ -509,9 +521,36 @@ function main(argv: string[]): number {
     // never fetching the next season), then whole-file replacements, then the planner's files.
     // Without a change set it is exactly the planner's own files, as before.
     let writeSet: PlannedFile[] = [networkRetirement.file, ...plan.files];
-    if (prepared !== null) {
+    let binding: ApplyBinding;
+    if (prepared === null) {
+      // No change set: the planner's own output, as before, but still bound to the bytes judged so
+      // a working-tree edit between the gates and the write is refused rather than journaled.
+      binding = validateTransitionState({
+        files: writeSet, readRepo: readRepoBytes, validate: () => null,
+      }).binding;
+    } else {
       const judged = assertTransitionWriteSet({ prepared, planned: writeSet, apply });
       writeSet = judged.files;
+
+      // The complete PROPOSED state, judged by the rebuild's own validators before anything is
+      // written and before any hash is offered for pinning. Nothing is written to the working tree.
+      const validated = validateTransitionState({
+        files: writeSet,
+        readRepo: readRepoBytes,
+        validate: (documents) => validateProposedRebuildState(documents),
+      });
+      binding = validated.binding;
+      console.log('\nPROPOSED-STATE VALIDATION - the rebuild\'s own validators over the proposed bytes '
+        + '(nothing written; no database)');
+      console.log(`  accepted baseline          ${validated.verdict.acceptedLabel}`);
+      console.log(`  ladder profile (selector)  ${validated.verdict.ladderProfile}`);
+      console.log(`  club_seasons expected      ${validated.verdict.expectedRows}`);
+      console.log(`  final-validation checks    ${validated.verdict.finalChecks.length} built from the proposal`);
+      console.log('  PENDING - needs the isolated database phase; not proven here:');
+      for (const line of validated.verdict.pendingDatabase) console.log(`    - ${line}`);
+      console.log('  Continuity and the ladder witness were judged by the executed gates above, '
+        + 'against these same contract bytes.');
+
       console.log('\ntransition change set (every file, old -> new bytes; validated together)');
       for (const note of prepared.notes) console.log(`  - ${note}`);
       for (const line of formatTransitionDiff(describeTransitionDiff(writeSet, readRepoBytes))) {
@@ -536,7 +575,7 @@ function main(argv: string[]): number {
 
     // Every check has passed. Only now does anything reach the filesystem: staged, journaled,
     // renamed, then read back against the plan.
-    applyStagedWrites(repoIo, args.season, writeSet);
+    applyStagedWrites(repoIo, args.season, writeSet, binding);
 
     console.log(`\nWROTE ${writeSet.length} files.`);
     console.log('Review the diff before anything else. Git is the recovery boundary for the old '
