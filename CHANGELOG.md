@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Inactive successor ladder tuple capability, content pins and Python archive pins (2026-10-23)
+
+- Rollover/rebuild: a fingerprint-bound successor ladder tuple capability (`src/lib/rollover/ladder-successor.ts`, `tools/db/ladder-successor.ts` re-export; resolver, planner `ladder_successor_tuple` change-set field and proposed-state validator support). The repository table `SUCCESSOR_LADDER_TUPLES_JSON` is empty, so no successor profile is accepted until an explicit owner-reviewed adoption; active contracts, registers, seasons and switches are unchanged and the predecessor and rehearsal-only profiles keep their restrictions. The package verifier's required closure lists the two new modules.
+- Rebuild preflight: `REVIEWED_INPUT_PINS` refuses, before anything is destroyed, unless the tracked Wikipedia height set, father–son selections, sibling relationships and after-siren events hash to their reviewed LF-normalised sha256 (bytes only; not authenticity or completeness).
+- Reproducibility: `tools/rebuild/python-runtime.requirements.txt` pins pip 26.2.1, psycopg 3.3.4, psycopg-binary 3.3.4 and typing-extensions 4.16.0 by wheel sha256 (PyPI digest = downloaded file = previously cached wheel). System native libraries remain observation, not enforced closure.
+- Tests: 63 new successor-tuple tests in `tests/season-rollover.test.ts`; pin and requirements assertions in `tests/db-test-rebuild.test.ts`.
+
 ### ISSUE-316 - Brownlow regression classified and populated rehearsal proof (2026-10-23)
 
 - Tests: `tests/integration/v2-brownlow-eligibility.test.ts` fixtures now seed explicit Brownlow acceptance (`stat_availability('brownlow_season_total', season, true, 'complete')`, removed in `afterAll`) for every fixture season except the open one, because a sealed season has been `complete` only when accepted since `4a2eea89`; expectations unchanged. New gated `tests/integration/brownlow-pending-populated.test.ts` (`AFLDB_POPULATED_REHEARSAL_STATE=1`, disposable copy of a completed rehearsal only) plants unaccepted votes on real 2026 players and proves totals, winners, ranks, eligibility and projections stay suppressed and fully restore. Validated on a clone of a fresh complete C2 rehearsal (30 stages, strict D7, 91 checks): four Brownlow suites 122/122, planted-vote proof 4/4. `v2-brownlow-production-correction` still needs the production pre-correction state (2 passed / 6 failed); the four retired-settle tests remain baseline limitations. No product code changed. ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED.

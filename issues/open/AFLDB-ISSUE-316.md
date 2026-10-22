@@ -2299,3 +2299,17 @@ ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; 
 - **Next action:** only the six owner decisions (decision package Revision 3).
 
 ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending; ET unresolved.
+
+## Successor capability, source evidence, reproducibility and package D (2026-10-23)
+
+Recorded in the [decision package, Revision 4](../../docs/v2/issue316-c2-successor-decision-2026-10-21.md#revision-4--2026-10-23-current-successor-ladder-capability-source-evidence-reproducibility-package-d); the single current execution record is `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-D-20261023T000000Z/EXECUTION_RECORD.md`.
+
+- **Commits:** `52b97173` (fingerprint-bound successor ladder tuple capability, inactive; the repository tuple table is empty) and `73116273` (content pins for the Wikipedia-derived tracked inputs; hash-pinned Python requirements). Nothing pushed.
+- **Validation:** `tsc --noEmit --incremental false` clean; `tests/season-rollover.test.ts` 341 passed; `tests/db-test-rebuild.test.ts` + `tests/v2-isolated-test-target.test.ts` 979 passed / 2 skipped. Package D: the genuine profile `c2-2026-successor` is ACCEPTED by the proposed-state validators (1,640 rows, 91 checks built, database items pending); 10/10 negative controls refuse.
+- **Source evidence:** coach raw pages recovered (387/387 hashes equal the tracked manifest; the earlier "absent everywhere" statement is withdrawn); raw Totals equal parsed counts 386/386; 10 coach-season differences remain unresolved. Content pins prove bytes only. 479 unmapped roster ids, rejected identity/height matches and coach attribution stay open and are not waived.
+- **Reproducibility:** clean disposable-root installs from the exact locks; the recorded runtime is reproduced only when esbuild's reviewed postinstall runs; the resolution guard accepts the clean install and refuses tampered or ignore-scripts variants; Python archives pinned and reproduced (source and native bytes; `RECORD` and `.pyc` are environment-bound). System native libraries are still observation, not enforced closure. Evidence: `C:/tmp/afldb-c2-CLEAN-INSTALL-EVIDENCE-20261023/REPORT.md`.
+- **Census targets:** inventory only (`afldb_prod`, `afldb_dev`, `afldb_test` identities from tracked records); no census, no live-target contact.
+- **Not done / not claimed:** no rollover, adoption, deployment, database access or new rehearsal. A fresh isolated rehearsal is required for the changed `rebuild-test.ts` before any production-adjacent claim.
+- **Next action:** only the owner decisions: rollover date and D-316-1; adopt or decline the tuple/profile; confirm census targets; source coverage limitations; native-library trust policy.
+
+ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved.
