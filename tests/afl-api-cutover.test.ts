@@ -793,15 +793,17 @@ describe('rollover: AFL Tables retirement (AFLDB-ISSUE-316 C2)', () => {
     const parse = cli.indexOf('parseAfltablesRetirementDecision(argv)');
     const planned = cli.indexOf('planAfltablesNetworkRetirement({');
     const firstGate = cli.indexOf('runPython(fullHistoryArgv');
-    const switchWrite = cli.indexOf('writeAtomicish(networkRetirement.file.path');
-    const otherWrites = cli.indexOf('for (const file of plan.files) writeAtomicish');
+    // The switch leads the write set, ahead of every other file, and the set is only written by
+    // the one staged apply that follows the authority check and the dry-run return.
+    const switchFirst = cli.indexOf('[networkRetirement.file, ...plan.files]');
+    const applyCall = cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet)');
     expect(parse).toBeGreaterThan(0);
     expect(parse).toBeLessThan(cli.indexOf('parseJsonFile(args.coreManifest'));
     expect(planned).toBeGreaterThan(cli.indexOf('planSuccessorContract({'));
     expect(planned).toBeLessThan(firstGate);
-    expect(switchWrite).toBeGreaterThan(cli.indexOf('assertPreApplyAuthority({'));
-    expect(switchWrite).toBeGreaterThan(cli.indexOf('if (!apply)'));
-    expect(switchWrite).toBeLessThan(otherWrites);
+    expect(switchFirst).toBeGreaterThan(cli.indexOf('assertPreApplyAuthority({'));
+    expect(applyCall).toBeGreaterThan(switchFirst);
+    expect(applyCall).toBeGreaterThan(cli.indexOf('if (!apply)'));
   });
 });
 

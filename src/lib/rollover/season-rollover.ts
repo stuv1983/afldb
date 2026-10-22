@@ -1258,6 +1258,127 @@ export type RolloverEvidence = SuccessorEvidence & {
 export type PlannedFile = { path: string; content: string; reformatted: boolean };
 
 /**
+ * A reviewed change-set transition (`transition-change-set.ts`), already validated against the
+ * bytes on disk. The planner stays the only author of the successor: it derives from `contractBase`
+ * instead of the current contract bytes (so contract edits the planner cannot compute land in the
+ * SAME validated change set rather than in a working tree the predecessor would fail against), and
+ * it applies `registerPatches` to the new register entry before any gate sees it.
+ */
+export type TransitionInput = {
+  contractBase?: Json;
+  registerPatches?: RegisterPatch[];
+};
+
+/** A `$comment`-only edit of the NEW register entry, pointer relative to that entry. */
+export type RegisterPatch = { pointer: string; old: unknown; new: unknown };
+
+const FORBIDDEN_POINTER_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export function parseJsonPointer(pointer: string): string[] {
+  if (typeof pointer !== 'string' || !pointer.startsWith('/') || pointer.length < 2) {
+    refuse(`${JSON.stringify(pointer)} is not a JSON pointer (it must start with '/').`);
+  }
+  const segments = pointer.slice(1).split('/').map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+  for (const segment of segments) {
+    if (segment === '' || FORBIDDEN_POINTER_SEGMENTS.has(segment)) {
+      refuse(`${JSON.stringify(pointer)} has an empty or forbidden segment.`);
+    }
+  }
+  return segments;
+}
+
+/**
+ * Apply reviewed `$comment` edits to a deep copy of the new register entry.
+ *
+ * Only comment prose may be edited here: every value a validator or the importer reads (labels,
+ * digests, measured counts, verdict, corrections) is derived from the executed gate or the
+ * reviewed acquisition, never from a patch. Each patch states the value it expects to replace, so
+ * a patch written against a different planner output refuses instead of silently landing.
+ */
+export function applyRegisterPatches(entry: Json, patches: readonly RegisterPatch[]): Json {
+  const next = JSON.parse(JSON.stringify(entry)) as Json;
+  const seen = new Set<string>();
+  for (const patch of patches) {
+    const segments = parseJsonPointer(patch.pointer);
+    if (segments[segments.length - 1] !== CORRECTIONS_COMMENT) {
+      refuse(`Register patch ${patch.pointer} does not end in /$comment. Only comment prose may be `
+        + 'patched; measured values, digests, labels, verdicts and corrections come from the '
+        + 'executed gates and reviewed inputs, never from a patch.');
+    }
+    if (seen.has(patch.pointer)) refuse(`Register patch ${patch.pointer} is given twice.`);
+    seen.add(patch.pointer);
+    const isProse = typeof patch.new === 'string'
+      || (Array.isArray(patch.new) && patch.new.length > 0
+        && patch.new.every((v) => typeof v === 'string' && v.length > 0));
+    if (!isProse) {
+      refuse(`Register patch ${patch.pointer} must replace the comment with a string or a non-empty `
+        + 'array of strings.');
+    }
+    let cursor: unknown = next;
+    for (const segment of segments.slice(0, -1)) {
+      if (typeof cursor !== 'object' || cursor === null || Array.isArray(cursor)
+          || !Object.hasOwn(cursor, segment)) {
+        refuse(`Register patch ${patch.pointer} does not resolve in the new register entry.`);
+      }
+      cursor = (cursor as Json)[segment];
+    }
+    if (typeof cursor !== 'object' || cursor === null || Array.isArray(cursor)
+        || !Object.hasOwn(cursor, CORRECTIONS_COMMENT)) {
+      refuse(`Register patch ${patch.pointer} does not resolve in the new register entry.`);
+    }
+    if (!jsonEqual((cursor as Json)[CORRECTIONS_COMMENT], patch.old)) {
+      refuse(`Register patch ${patch.pointer} expects a different current comment from the one the `
+        + 'planner derived (the reviewed text was written against another planner output). '
+        + 'Nothing is patched.');
+    }
+    if (jsonEqual(patch.old, patch.new)) {
+      refuse(`Register patch ${patch.pointer} replaces the comment with identical text.`);
+    }
+    (cursor as Json)[CORRECTIONS_COMMENT] = patch.new;
+  }
+  return next;
+}
+
+/**
+ * The successor register must keep every predecessor and older baseline exactly as it was,
+ * except that the retired baseline's status changes to the declared retirement status, and carry
+ * exactly one new entry that is the single accepted baseline.
+ */
+export function assertRegisterHistoryPreserved(
+  before: Json, after: Json, retiredLabel: string, retirementStatus: string,
+): void {
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  keys.delete('baselines');
+  for (const key of keys) {
+    if (!jsonEqual(before[key], after[key])) {
+      refuse(`The successor register changes top-level field ${JSON.stringify(key)}. The rollover `
+        + 'may only retire the outgoing baseline and append the new one.');
+    }
+  }
+  const was = arr(before.baselines, 'register.baselines');
+  const now = arr(after.baselines, 'successor register.baselines');
+  if (now.length !== was.length + 1) {
+    refuse(`The successor register carries ${now.length} baselines, but exactly ${was.length + 1} `
+      + `(the ${was.length} existing plus the new one) are allowed. No baseline may be dropped.`);
+  }
+  was.forEach((entry, index) => {
+    const old = obj(entry, `register.baselines[${index}]`);
+    const expected = old.snapshot_label === retiredLabel
+      ? { ...old, acceptance_status: retirementStatus }
+      : old;
+    if (!jsonEqual(expected, now[index])) {
+      refuse(`The successor register changed history: baseline ${String(old.snapshot_label)} `
+        + 'differs from its predecessor entry in more than the outgoing baseline\'s status.');
+    }
+  });
+  const added = obj(now[was.length], 'the new register entry');
+  if (added.acceptance_status !== 'accepted'
+      || now.filter((b) => obj(b, 'baseline').acceptance_status === 'accepted').length !== 1) {
+    refuse('The successor register must end with exactly one accepted baseline: the new entry.');
+  }
+}
+
+/**
  * The successor state that does not depend on any validator run.
  *
  * `planSeasonRollover` recomputes this from the same inputs, so the contract
@@ -1311,11 +1432,11 @@ export type RolloverPlan = {
   };
 };
 
-const REGISTER_PATH = 'data/reference/fitzroy-accepted-baselines.json';
-const SEASONS_PATH = 'data/reference/seasons.json';
-const CONTRACT_PATH = 'tools/rebuild/fitzroy/fitzroy-contract.json';
-const STAT_AVAILABILITY_PATH = 'data/reference/stat-availability.json';
-const REBUILD_PATH = 'tools/db/rebuild-test.ts';
+export const REGISTER_PATH = 'data/reference/fitzroy-accepted-baselines.json';
+export const SEASONS_PATH = 'data/reference/seasons.json';
+export const CONTRACT_PATH = 'tools/rebuild/fitzroy/fitzroy-contract.json';
+export const STAT_AVAILABILITY_PATH = 'data/reference/stat-availability.json';
+export const REBUILD_PATH = 'tools/db/rebuild-test.ts';
 
 /**
  * The line ending the existing document uses, so a rewrite does not silently
@@ -1370,6 +1491,7 @@ export function planSuccessorContract(input: {
   currentSources: { register: string; seasons: string; contract: string;
                     statAvailability: string; rebuild: string };
   evidence: SuccessorEvidence;
+  transition?: TransitionInput;
 }): SuccessorState {
   const { request, current, currentSources, evidence } = input;
   const notes: string[] = [];
@@ -1611,7 +1733,10 @@ export function planSuccessorContract(input: {
   notes.push(`seasons.json: season_notes for ${Y} removed and carried verbatim to `
     + `${newInProgress} (${JSON.stringify(carried)}).`);
 
-  const contractNext = JSON.parse(JSON.stringify(current.contract)) as Json;
+  // A reviewed transition derives from its own validated base contract (planner-owned fields
+  // already proven equal to the current contract); otherwise from the current bytes, as always.
+  const contractNext = JSON.parse(JSON.stringify(input.transition?.contractBase
+    ?? current.contract)) as Json;
   const fhNext = obj(contractNext.full_history, 'full_history');
   const rangeNext = obj(fhNext.season_range, 'season_range');
   rangeNext.last_season = Y;
@@ -1677,6 +1802,7 @@ export function planSeasonRollover(input: {
   currentSources: { register: string; seasons: string; contract: string;
                     statAvailability: string; rebuild: string };
   evidence: RolloverEvidence;
+  transition?: TransitionInput;
 }): RolloverPlan {
   const { request, current, currentSources, evidence } = input;
   const successor = planSuccessorContract(input);
@@ -1742,7 +1868,7 @@ export function planSeasonRollover(input: {
   const bindingNow = obj(accepted.contract_binding ?? {}, 'accepted.contract_binding');
   const validationNow = obj(accepted.validation ?? {}, 'accepted.validation');
 
-  const newBaseline: Json = {
+  const derivedBaseline: Json = {
     snapshot_label: newLabel,
     acceptance_status: 'accepted',
     accepted_on: request.rolloverDate,
@@ -1789,8 +1915,13 @@ export function planSeasonRollover(input: {
     },
     accepted_corrections: evidence.acceptedCorrections,
   };
+  // Reviewed `$comment` replacements land here, before the register is serialised for any gate,
+  // so the bytes the gates adjudicate are the bytes that would be written.
+  const newBaseline = applyRegisterPatches(derivedBaseline, input.transition?.registerPatches ?? []);
   baselinesNext.push(newBaseline);
   registerNext.baselines = baselinesNext;
+  assertRegisterHistoryPreserved(current.register, registerNext, retiredLabel,
+    request.retirementStatus);
   notes.push(`acceptance register: accepted_corrections were REVIEWED for `
     + `${newLabel} — ${successor.corrections.entryCount} entr`
     + `${successor.corrections.entryCount === 1 ? 'y' : 'ies'} across `

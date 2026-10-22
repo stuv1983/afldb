@@ -20,15 +20,22 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  CONTRACT_PATH,
   IDENTITY_SCAN_SOURCE_NOTE,
   IMPORTER,
   LADDER_VALIDATOR,
+  REBUILD_PATH,
+  REGISTER_PATH,
   RolloverRefused,
+  SEASONS_PATH,
+  STAT_AVAILABILITY_PATH,
   artefactSetDigest,
   assertCoherent,
   assertIdentityScanMeasured,
   assertLadderValidatorRun,
   assertPreApplyAuthority,
+  applyRegisterPatches,
+  assertRegisterHistoryPreserved,
   assertValidatorRun,
   lineEndingOf,
   manifestRowTotal,
@@ -43,7 +50,30 @@ import {
   retirementVocabulary,
   selectAccepted,
   type RolloverRequest,
+  type TransitionInput,
 } from '../src/lib/rollover/season-rollover';
+import { planAfltablesNetworkRetirement } from '../src/lib/rollover/afltables-network-retirement';
+import {
+  PLANNER_OWNED_WRITES,
+  SENTINEL_MARKER,
+  TRANSACTION_JOURNAL_SCHEMA,
+  TRANSACTION_JOURNAL_PATH,
+  TRANSITION_SCHEMA,
+  applyStagedWrites,
+  assertNoSentinel,
+  assertTransitionWriteSet,
+  buildTransactionJournal,
+  classifyTransaction,
+  describeTransitionDiff,
+  formatTransitionDiff,
+  parseTransitionChangeSet,
+  pendingTransactionProblem,
+  prepareTransition,
+  recoveryRequirements,
+  sha256Hex,
+  type FileIo,
+  type InputRole,
+} from '../src/lib/rollover/transition-change-set';
 import { censusRecord, type CensusScope } from '../src/lib/rollover/afl-api-ownership-census';
 import { finalValidationChecks } from '../tools/db/rebuild-test';
 
@@ -463,6 +493,7 @@ type Overrides = {
   rebuildSource?: string;
   clubSeasonsExpectedRows?: number;
   aflApiOwnershipCensuses?: Array<{ path: string; sha256: string; record: unknown }>;
+  transition?: TransitionInput;
 };
 
 /**
@@ -536,6 +567,7 @@ function stageOneInput(over: Overrides = {}) {
         : reviewedCorrections(),
       aflApiOwnershipCensuses: over.aflApiOwnershipCensuses ?? [censusEvidence()],
     },
+    transition: over.transition,
   };
 }
 
@@ -809,7 +841,7 @@ describe('the validator is the authority — a transcript is not', () => {
     const cli = readFileSync(join(root, 'tools', 'db', 'rollover-season.ts'), 'utf8');
     expect(cli).toContain('spawnSync');
     expect(cli.indexOf('assertPreApplyAuthority({'))
-      .toBeLessThan(cli.indexOf('for (const file of plan.files) writeAtomicish'));
+      .toBeLessThan(cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet)'));
     expect(cli.indexOf('planSuccessorContract({'))
       .toBeLessThan(cli.indexOf('runPython(fullHistoryArgv'));
   });
@@ -1948,11 +1980,17 @@ describe('the validator path overrides are additive and fail closed', () => {
   it('writes nothing tracked until every gate has been adjudicated', () => {
     const cli = readFileSync(join(root, 'tools', 'db', 'rollover-season.ts'), 'utf8');
     // One write site, and it is after the authority check and after the dry-run return.
-    expect((cli.match(/writeAtomicish\(file\.path/g) ?? []).length).toBe(1);
+    expect((cli.match(/applyStagedWrites\(repoIo, args\.season/g) ?? []).length).toBe(1);
     expect(cli.indexOf('assertPreApplyAuthority({'))
       .toBeLessThan(cli.indexOf('if (!apply) {'));
     expect(cli.indexOf('if (!apply) {'))
-      .toBeLessThan(cli.indexOf('for (const file of plan.files) writeAtomicish'));
+      .toBeLessThan(cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet)'));
+    // The repository filesystem adapter is only handed to the pending check and the one staged
+    // apply: nothing calls its mutators directly, and it holds the only rename site.
+    expect(cli).not.toMatch(/repoIo\.(write|rename|remove)\(/);
+    expect((cli.match(/renameSync\(/g) ?? []).length).toBe(1);
+    // materialise() in the temporary directory, and the adapter's own write.
+    expect((cli.match(/writeFileSync\(/g) ?? []).length).toBe(2);
     // The temporary successor state never lands inside the repository.
     expect(cli).toContain('mkdtempSync(join(tmpdir()');
     expect(cli).toContain("rmSync(temporary, { recursive: true, force: true })");
@@ -1986,5 +2024,670 @@ describe('planning writes nothing', () => {
       .toBe(2025);
     expect(seasons.last_season).toBe(2026);
     expect(seasons.in_progress_seasons).toEqual([2026]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-316 C2 — the complete transition as ONE validated change set
+// ---------------------------------------------------------------------------
+//
+// Synthetic documents only. No production 1,640 profile, no real predecessor/successor bytes,
+// no proposal file: the real proposal carries `UNRESOLVED:` sentinels precisely so that
+// none of this can be satisfied by it.
+
+const AFL_API_PATH = 'tools/rebuild/afl_api/afl-api-contract.json';
+const AFLTABLES_PATH = 'tools/rebuild/afltables/afltables-contract.json';
+const BASE_PROPOSED = 'artifacts/rollover/fitzroy-contract.base.json';
+const AFL_API_PROPOSED = 'artifacts/rollover/afl-api-contract.json';
+const AFLTABLES_PROPOSED = 'artifacts/rollover/afltables-contract.json';
+const NETWORK_SOURCE = serialiseJson({
+  $comment: 'switch', status: 'active', last_season: COMPLETING, decision: null, changed_at: null,
+});
+
+const TRANSITION_INPUTS: Record<InputRole, { path: string; sha256: string }> = {
+  core_manifest: { path: CORE_MANIFEST_PATH, sha256: sha256Hex('core manifest bytes') },
+  ladder_manifest: { path: LADDER_MANIFEST_PATH, sha256: sha256Hex('ladder manifest bytes') },
+  ladder_coverage: { path: 'artifacts/rollover/ladder-coverage.json', sha256: sha256Hex('coverage') },
+  stat_availability: { path: REVIEWED_STAT_PATH, sha256: sha256Hex('stat availability') },
+  accepted_corrections: { path: 'artifacts/rollover/accepted-corrections.json', sha256: sha256Hex('corrections') },
+};
+
+/** The contract the planner cannot compute: ladder expectation, height block, reason text. */
+function proposedBaseContract(): Record<string, unknown> {
+  const contract = baseContract();
+  nested(contract, 'full_history').current_season_excluded = {
+    seasons: [COMPLETING], reason: 'reviewed successor reason',
+  };
+  nested(nested(nested(contract, 'datasets'), 'ladder'), 'accepted_witness').$comment =
+    'durability binding, restated for the successor';
+  nested(nested(contract, 'datasets'), 'ladder').rebuild_expectation = {
+    profile: 'synthetic-profile', expected_rows: ROWS_2026,
+  };
+  contract.player_details = { height_enrichment: { stage: 'heights', supplements: [] } };
+  return contract;
+}
+
+const NEW_BASELINE_PATCHES = [{
+  pointer: '/acquisition/$comment',
+  old: ['carried acquisition comment'],
+  new: ['reviewed successor acquisition comment'],
+}];
+
+type Scenario = {
+  disk: Map<string, string>;
+  proposed: Map<string, string>;
+  changeSet: Record<string, unknown>;
+};
+
+function scenario(): Scenario {
+  const disk = new Map<string, string>([
+    [REGISTER_PATH, serialiseJson(baseRegister())],
+    [SEASONS_PATH, serialiseJson(baseSeasons())],
+    [CONTRACT_PATH, serialiseJson(baseContract())],
+    [STAT_AVAILABILITY_PATH, serialiseJson(baseStatAvailability())],
+    [REBUILD_PATH, REBUILD_STUB],
+    ['data/reference/afltables-network.json', NETWORK_SOURCE],
+    [AFL_API_PATH, serialiseJson({ measured: { players_with_afl_api_evidence: 1824 } })],
+    [AFLTABLES_PATH, serialiseJson({ measured: { players_with_dob: 13255 } })],
+  ]);
+  const proposed = new Map<string, string>([
+    [BASE_PROPOSED, serialiseJson(proposedBaseContract())],
+    [AFL_API_PROPOSED, serialiseJson({ measured: { players_with_afl_api_evidence: 1916 } })],
+    [AFLTABLES_PROPOSED, serialiseJson({ measured: { players_with_dob: 13347 } })],
+  ]);
+  const ref = (path: string, proposedPath: string) => ({
+    path, old_sha256: sha256Hex(disk.get(path)!), proposed: proposedPath,
+    proposed_sha256: sha256Hex(proposed.get(proposedPath)!),
+  });
+  return {
+    disk, proposed,
+    changeSet: {
+      schema: TRANSITION_SCHEMA,
+      season: COMPLETING,
+      inputs: (Object.keys(TRANSITION_INPUTS) as InputRole[]).map((role) => ({
+        role, path: TRANSITION_INPUTS[role].path, sha256: TRANSITION_INPUTS[role].sha256,
+      })),
+      base: ref(CONTRACT_PATH, BASE_PROPOSED),
+      replace: [ref(AFL_API_PATH, AFL_API_PROPOSED), ref(AFLTABLES_PATH, AFLTABLES_PROPOSED)],
+      register_patches: JSON.parse(JSON.stringify(NEW_BASELINE_PATCHES)),
+      write_set: [...PLANNER_OWNED_WRITES, AFL_API_PATH, AFLTABLES_PATH],
+    },
+  };
+}
+
+const bufferOf = (m: Map<string, string>) => (path: string) =>
+  m.has(path) ? Buffer.from(m.get(path)!) : null;
+
+function prepare(s: Scenario, over: {
+  inputs?: Partial<typeof TRANSITION_INPUTS>; season?: number; text?: string;
+} = {}) {
+  return prepareTransition({
+    changeSet: parseTransitionChangeSet(over.text ?? JSON.stringify(s.changeSet)),
+    season: over.season ?? COMPLETING,
+    currentContract: JSON.parse(s.disk.get(CONTRACT_PATH)!),
+    readRepo: bufferOf(s.disk),
+    readProposed: bufferOf(s.proposed),
+    inputs: { ...TRANSITION_INPUTS, ...over.inputs },
+  });
+}
+
+/** The planner's complete output for a prepared transition, as the CLI assembles it. */
+function planWith(prepared: ReturnType<typeof prepare>) {
+  const plan = run({ transition: prepared.transition });
+  const network = planAfltablesNetworkRetirement({
+    completedSeason: COMPLETING, rolloverDate: DATE, decision: 'D-316-1',
+    currentSource: NETWORK_SOURCE, currentSeasons: { in_progress_seasons: [COMPLETING] },
+  });
+  return { plan, planned: [network.file, ...plan.files] };
+}
+
+describe('transition change set — parsing is strict', () => {
+  it('accepts a complete change set', () => {
+    const parsed = parseTransitionChangeSet(JSON.stringify(scenario().changeSet));
+    expect(parsed.replace).toHaveLength(2);
+    expect(parsed.finalSha256).toBeNull();
+  });
+
+  it.each([
+    ['an unknown top-level field', (c: Record<string, unknown>) => { c.extra = 1; }, /unknown field "extra"/],
+    ['another schema', (c: Record<string, unknown>) => { c.schema = 'x/2'; }, /schema is "x\/2"/],
+    ['a fractional season', (c: Record<string, unknown>) => { c.season = 2026.5; }, /season must be an integer/],
+    ['a missing role', (c: Record<string, unknown>) => { (c.inputs as unknown[]).pop(); }, /each of/],
+    ['a repeated role', (c: Record<string, unknown>) => {
+      (c.inputs as unknown[]).push((c.inputs as unknown[])[0]);
+    }, /each of/],
+    ['a non-hex hash', (c: Record<string, unknown>) => {
+      ((c.inputs as Record<string, unknown>[])[0]).sha256 = 'ABC';
+    }, /lower-case SHA-256/],
+    ['a backslash path', (c: Record<string, unknown>) => {
+      (c.write_set as string[]).push('a\\b.json');
+    }, /normalised repository-relative path/],
+    ['a parent-escaping path', (c: Record<string, unknown>) => {
+      (c.write_set as string[]).push('../x.json');
+    }, /normalised repository-relative path/],
+    ['an empty write_set', (c: Record<string, unknown>) => { c.write_set = []; }, /every file the apply writes/],
+    ['a repeated write_set path', (c: Record<string, unknown>) => {
+      (c.write_set as string[]).push((c.write_set as string[])[0]);
+    }, /twice/],
+    ['an unknown file-ref field', (c: Record<string, unknown>) => {
+      (c.base as Record<string, unknown>).note = 'x';
+    }, /unknown field "note"/],
+  ])('refuses %s', (_label, mutate, message) => {
+    const s = scenario();
+    mutate(s.changeSet);
+    expect(() => parseTransitionChangeSet(JSON.stringify(s.changeSet))).toThrow(RolloverRefused);
+    expect(() => parseTransitionChangeSet(JSON.stringify(s.changeSet))).toThrow(message);
+  });
+
+  it('refuses text that is not JSON', () => {
+    expect(() => parseTransitionChangeSet('{ nope')).toThrow(/not valid JSON/);
+  });
+});
+
+describe('transition change set — a sentinel is never a value', () => {
+  it('names the marker, the line and the reason', () => {
+    expect(() => assertNoSentinel('{\n "a": "UNRESOLVED:OWNER-ROLLOVER-DATE"\n}', 'The file'))
+      .toThrow(/line 2/);
+    expect(() => assertNoSentinel('{\n "a": "UNRESOLVED:OWNER-ROLLOVER-DATE"\n}', 'The file'))
+      .toThrow(/never read as authority or as a value/);
+    expect(() => assertNoSentinel('{"a":"resolved"}', 'The file')).not.toThrow();
+  });
+
+  it('refuses a change set that carries one anywhere, before parsing it', () => {
+    const s = scenario();
+    (s.changeSet.register_patches as Record<string, unknown>[])[0].new = ['UNRESOLVED:OWNER-ROLLOVER-DATE'];
+    expect(() => parseTransitionChangeSet(JSON.stringify(s.changeSet)))
+      .toThrow(new RegExp(SENTINEL_MARKER));
+  });
+
+  it.each([
+    ['the proposed base contract', BASE_PROPOSED],
+    ['a proposed replacement', AFL_API_PROPOSED],
+  ])('refuses %s carrying one, even with a correct hash', (_label, proposedPath) => {
+    const s = scenario();
+    const doc = JSON.parse(s.proposed.get(proposedPath)!);
+    doc.profile = 'UNRESOLVED:PRODUCTION-LADDER-PROFILE-NAME';
+    s.proposed.set(proposedPath, serialiseJson(doc));
+    const refs = [s.changeSet.base, ...(s.changeSet.replace as unknown[])] as Record<string, string>[];
+    const ref = refs.find((r) => r.proposed === proposedPath)!;
+    ref.proposed_sha256 = sha256Hex(s.proposed.get(proposedPath)!);
+    expect(() => prepare(s)).toThrow(/unresolved-proposal marker/);
+  });
+
+  it('refuses a planned output carrying one, so a sentinel can never be written', () => {
+    const s = scenario();
+    const prepared = prepare(s);
+    const { planned } = planWith(prepared);
+    const poisoned = planned.map((f) => f.path === SEASONS_PATH
+      ? { ...f, content: f.content.replace('"2027"', '"UNRESOLVED:OWNER-ROLLOVER-DATE"') } : f);
+    expect(() => assertTransitionWriteSet({ prepared, planned: poisoned, apply: false }))
+      .toThrow(/The planned data\/reference\/seasons\.json still contains/);
+  });
+});
+
+describe('transition change set — stale, substituted and partial inputs refuse', () => {
+  it('accepts the reviewed set and reads, but never writes, the working tree', () => {
+    const s = scenario();
+    const before = new Map(s.disk);
+    const prepared = prepare(s);
+    expect(prepared.transition.contractBase).toEqual(proposedBaseContract());
+    expect(prepared.replacements.map((f) => f.path)).toEqual([AFL_API_PATH, AFLTABLES_PATH]);
+    expect(s.disk).toEqual(before);
+  });
+
+  it.each([
+    ['the base contract', CONTRACT_PATH],
+    ['a replaced contract', AFLTABLES_PATH],
+  ])('refuses when %s moved since review (stale old hash)', (_label, path) => {
+    const s = scenario();
+    s.disk.set(path, `${s.disk.get(path)!} `);
+    expect(() => prepare(s)).toThrow(/is stale — the change set was written against bytes with SHA-256/);
+  });
+
+  it('refuses a proposed file that is not the reviewed document', () => {
+    const s = scenario();
+    s.proposed.set(AFL_API_PROPOSED, serialiseJson({ measured: { players_with_afl_api_evidence: 9999 } }));
+    expect(() => prepare(s)).toThrow(/is not the reviewed document/);
+  });
+
+  it('refuses a missing proposed file and a missing target', () => {
+    const a = scenario();
+    a.proposed.delete(BASE_PROPOSED);
+    expect(() => prepare(a)).toThrow(/proposed file .* does not exist/);
+    const b = scenario();
+    b.disk.delete(AFL_API_PATH);
+    expect(() => prepare(b)).toThrow(/does not exist in the working tree/);
+  });
+
+  it('refuses a no-op replacement and invalid proposed JSON', () => {
+    const a = scenario();
+    a.proposed.set(AFL_API_PROPOSED, a.disk.get(AFL_API_PATH)!);
+    const ref = (a.changeSet.replace as Record<string, string>[])[0];
+    ref.proposed_sha256 = ref.old_sha256;
+    expect(() => prepare(a)).toThrow(/equal the current bytes/);
+    const b = scenario();
+    b.proposed.set(AFL_API_PROPOSED, '{ nope');
+    (b.changeSet.replace as Record<string, string>[])[0].proposed_sha256 = sha256Hex('{ nope');
+    expect(() => prepare(b)).toThrow(/is not valid JSON/);
+  });
+
+  it.each(Object.keys(TRANSITION_INPUTS) as InputRole[])(
+    'refuses a substituted %s input (path or bytes differ from the one reviewed)',
+    (role) => {
+      const s = scenario();
+      expect(() => prepare(s, { inputs: { [role]: { ...TRANSITION_INPUTS[role], sha256: sha256Hex('other') } } }))
+        .toThrow(new RegExp(`Input ${role} is stale or substituted`));
+      expect(() => prepare(s, { inputs: { [role]: { ...TRANSITION_INPUTS[role], path: 'elsewhere.json' } } }))
+        .toThrow(/stale or substituted/);
+    },
+  );
+
+  it('refuses a change set for another season', () => {
+    expect(() => prepare(scenario(), { season: 2027 })).toThrow(/is for season 2026, but --season is 2027/);
+  });
+
+  it.each(PLANNER_OWNED_WRITES)('refuses to replace %s, which the planner writes itself', (path) => {
+    const s = scenario();
+    (s.changeSet.replace as Record<string, unknown>[]).push({
+      path, old_sha256: sha256Hex('x'), proposed: BASE_PROPOSED, proposed_sha256: sha256Hex('y'),
+    });
+    expect(() => prepare(s)).toThrow(/which the rollover planner writes itself/);
+  });
+
+  it('refuses a replacement outside the closed list, a repeat, and a non-contract base', () => {
+    const a = scenario();
+    (a.changeSet.replace as Record<string, unknown>[])[0].path = 'package.json';
+    expect(() => prepare(a)).toThrow(/not one of the replaceable contracts/);
+    const b = scenario();
+    (b.changeSet.replace as unknown[]).push((b.changeSet.replace as unknown[])[0]);
+    expect(() => prepare(b)).toThrow(/names tools\/rebuild\/afl_api\/afl-api-contract\.json twice/);
+    const c = scenario();
+    (c.changeSet.base as Record<string, unknown>).path = AFL_API_PATH;
+    expect(() => prepare(c)).toThrow(/base may only be tools\/rebuild\/fitzroy\/fitzroy-contract\.json/);
+  });
+
+  it.each([
+    ['a planner file', (w: string[]) => w.filter((p) => p !== REGISTER_PATH), /Missing: data\/reference\/fitzroy-accepted-baselines\.json/],
+    ['the AFL Tables switch', (w: string[]) => w.filter((p) => !p.endsWith('afltables-network.json')), /Missing: data\/reference\/afltables-network\.json/],
+    ['a replaced contract', (w: string[]) => w.filter((p) => p !== AFLTABLES_PATH), /Missing: tools\/rebuild\/afltables\/afltables-contract\.json/],
+    ['an unrelated extra', (w: string[]) => [...w, 'package.json'], /Not written by this transition: package\.json/],
+  ])('refuses a write_set that is not the complete membership (%s)', (_label, change, message) => {
+    const s = scenario();
+    s.changeSet.write_set = change(s.changeSet.write_set as string[]);
+    expect(() => prepare(s)).toThrow(RolloverRefused);
+    expect(() => prepare(s)).toThrow(message);
+  });
+});
+
+describe('transition change set — the base may not edit what the planner owns', () => {
+  const edits: Array<[string, (c: Record<string, unknown>) => void]> = [
+    ['/pinned_version', (c) => { c.pinned_version = '9.9.9'; }],
+    ['/full_history/required_datasets', (c) => { nested(c, 'full_history').required_datasets = ['player_stats']; }],
+    ['/full_history/season_range/resolved_on', (c) => {
+      nested(nested(c, 'full_history'), 'season_range').resolved_on = '2026-11-03';
+    }],
+    ['/full_history/season_range/last_season', (c) => {
+      nested(nested(c, 'full_history'), 'season_range').last_season = 2026;
+    }],
+    ['/full_history/current_season_excluded/seasons', (c) => {
+      nested(nested(c, 'full_history'), 'current_season_excluded').seasons = [2027];
+    }],
+    ['/datasets/ladder/accepted_witness/rows', (c) => {
+      nested(nested(nested(c, 'datasets'), 'ladder'), 'accepted_witness').rows = ROWS_2026;
+    }],
+    ['/datasets/ladder/coverage', (c) => {
+      nested(nested(nested(c, 'datasets'), 'ladder'), 'coverage').club_season_rows = ROWS_2026;
+    }],
+  ];
+
+  it.each(edits)('refuses a base that edits %s', (pointer, edit) => {
+    const s = scenario();
+    const doc = JSON.parse(s.proposed.get(BASE_PROPOSED)!);
+    edit(doc);
+    s.proposed.set(BASE_PROPOSED, serialiseJson(doc));
+    (s.changeSet.base as Record<string, string>).proposed_sha256 = sha256Hex(s.proposed.get(BASE_PROPOSED)!);
+    expect(() => prepare(s)).toThrow(new RegExp(`base edits ${pointer.replace(/\//g, '\\/')}`));
+  });
+
+  it('allows a reordered coverage block (not an edit) and unbound fields such as the witness comment', () => {
+    const s = scenario();
+    const doc = JSON.parse(s.proposed.get(BASE_PROPOSED)!);
+    const coverage = nested(nested(nested(doc, 'datasets'), 'ladder'), 'coverage');
+    nested(nested(doc, 'datasets'), 'ladder').coverage = Object.fromEntries(Object.entries(coverage).reverse());
+    s.proposed.set(BASE_PROPOSED, serialiseJson(doc));
+    (s.changeSet.base as Record<string, string>).proposed_sha256 = sha256Hex(s.proposed.get(BASE_PROPOSED)!);
+    expect(() => prepare(s)).not.toThrow();
+  });
+});
+
+describe('planner with a prepared transition — one change set, validated together', () => {
+  it('derives the successor from the reviewed base and still applies every planner edit', () => {
+    const { plan } = planWith(prepare(scenario()));
+    const contract = jsonIn(plan, CONTRACT_PATH);
+    const fh = nested(contract, 'full_history');
+    // the edits only the base can carry
+    expect(nested(nested(contract, 'datasets'), 'ladder').rebuild_expectation)
+      .toEqual({ profile: 'synthetic-profile', expected_rows: ROWS_2026 });
+    expect(nested(fh, 'current_season_excluded').reason).toBe('reviewed successor reason');
+    expect(contract.player_details).toEqual({ height_enrichment: { stage: 'heights', supplements: [] } });
+    // the edits only the planner makes
+    expect(nested(fh, 'season_range').last_season).toBe(2026);
+    expect(nested(fh, 'season_range').resolved_on).toBe(DATE);
+    expect(nested(fh, 'current_season_excluded').seasons).toEqual([2027]);
+    expect(nested(nested(nested(contract, 'datasets'), 'ladder'), 'accepted_witness').snapshot_label)
+      .toBe(NEW_WITNESS);
+    expect(nested(nested(nested(contract, 'datasets'), 'ladder'), 'coverage').club_season_rows)
+      .toBe(ROWS_2026);
+  });
+
+  it('feeds the very same bytes to the gates it later writes (pre-apply authority passes)', () => {
+    const { plan } = planWith(prepare(scenario()));
+    expect(() => proveAuthority(plan)).not.toThrow();
+    expect(plan.authority.successorContractContent).toBe(fileIn(plan, CONTRACT_PATH).content);
+    expect(plan.authority.successorRegisterContent)
+      .toContain('reviewed successor acquisition comment');
+  });
+
+  it('is exactly the unextended plan when no transition is supplied', () => {
+    const plain = run();
+    expect(run({ transition: {} }).files).toEqual(plain.files);
+    expect(run({ transition: { registerPatches: [] } }).files).toEqual(plain.files);
+  });
+
+  it('leaves the predecessor coherent on disk at every step (nothing pre-edits the working tree)', () => {
+    const s = scenario();
+    const current = () => ({
+      register: JSON.parse(s.disk.get(REGISTER_PATH)!), seasons: JSON.parse(s.disk.get(SEASONS_PATH)!),
+      contract: JSON.parse(s.disk.get(CONTRACT_PATH)!), statAvailability: JSON.parse(s.disk.get(STAT_AVAILABILITY_PATH)!),
+      clubSeasonsExpectedRows: readClubSeasonsExpectedRows(s.disk.get(REBUILD_PATH)!),
+    });
+    assertCoherent(current(), 'before');
+    const prepared = prepare(s);
+    assertCoherent(current(), 'after prepare');
+    const { plan } = planWith(prepared);
+    assertCoherent(current(), 'after planning');
+    // the successor is held to the same rules
+    assertCoherent({
+      register: jsonIn(plan, REGISTER_PATH), seasons: jsonIn(plan, SEASONS_PATH),
+      contract: jsonIn(plan, CONTRACT_PATH), statAvailability: jsonIn(plan, STAT_AVAILABILITY_PATH),
+      clubSeasonsExpectedRows: readClubSeasonsExpectedRows(fileIn(plan, REBUILD_PATH).content),
+    }, 'successor');
+  });
+
+  it('keeps the existing gates: a wrong date, status or expectation still refuses with a transition', () => {
+    const prepared = prepare(scenario());
+    const withT = (request: Partial<RolloverRequest>) => () => run({ transition: prepared.transition, request });
+    expect(withT({ rolloverDate: 'UNRESOLVED:OWNER-ROLLOVER-DATE' })).toThrow(/explicit YYYY-MM-DD/);
+    expect(withT({ retirementStatus: 'obsolete' })).toThrow(/not one of the register's declared retired statuses/);
+    expect(withT({ expectedClubSeasonRows: ROWS_2026 + 1 })).toThrow(/disagrees with/);
+    expect(() => run({ transition: prepared.transition, aflApiOwnershipCensuses: [] })).toThrow(/census/i);
+  });
+});
+
+describe('register patches are comment prose only, against an explicit old value', () => {
+  const patch = (over: Partial<{ pointer: string; old: unknown; new: unknown }> = {}) => ({
+    ...NEW_BASELINE_PATCHES[0], ...over,
+  });
+  const planPatches = (patches: unknown[]) =>
+    () => run({ transition: { registerPatches: patches as never } });
+
+  it('applies a reviewed patch to the new entry only and keeps every older entry byte-equal', () => {
+    const plan = run({ transition: { registerPatches: [patch()] } });
+    const baselines = jsonIn(plan, REGISTER_PATH).baselines as Record<string, unknown>[];
+    expect(nested(baselines[1], 'acquisition').$comment).toEqual(['reviewed successor acquisition comment']);
+    expect(nested(baselines[0], 'acquisition').$comment).toEqual(['carried acquisition comment']);
+  });
+
+  it.each([
+    ['a different expected old value', patch({ old: ['something else'] }), /expects a different current comment/],
+    ['a value-bearing field', patch({ pointer: '/measured/matches', old: 17000, new: 1 }), /does not end in \/\$comment/],
+    ['a pointer that does not resolve', patch({ pointer: '/nope/$comment' }), /does not resolve/],
+    ['a number as the new comment', patch({ new: 5 }), /string or a non-empty array of strings/],
+    ['an empty array as the new comment', patch({ new: [] }), /string or a non-empty array of strings/],
+    ['identical text', patch({ new: ['carried acquisition comment'] }), /identical text/],
+    ['a forbidden segment', patch({ pointer: '/__proto__/$comment' }), /forbidden segment/],
+    ['a relative pointer', patch({ pointer: 'acquisition/$comment' }), /not a JSON pointer/],
+  ])('refuses %s', (_label, bad, message) => {
+    expect(planPatches([bad])).toThrow(RolloverRefused);
+    expect(planPatches([bad])).toThrow(message);
+  });
+
+  it('refuses the same pointer twice', () => {
+    expect(planPatches([patch(), patch({ new: ['another'] })])).toThrow(/given twice/);
+  });
+
+  it('does not mutate the entry it patches', () => {
+    const entry = { acquisition: { $comment: ['a'] } };
+    const copy = JSON.parse(JSON.stringify(entry));
+    applyRegisterPatches(entry, [{ pointer: '/acquisition/$comment', old: ['a'], new: ['b'] }]);
+    expect(entry).toEqual(copy);
+  });
+});
+
+describe('the successor register preserves predecessor and older history', () => {
+  const retired = RETIRED_LABEL;
+  const before = () => {
+    const r = baseRegister();
+    const older = { ...(r.baselines as Record<string, unknown>[])[0], snapshot_label: 'older-baseline', acceptance_status: 'retired' };
+    r.baselines = [older, ...(r.baselines as unknown[])];
+    return r;
+  };
+  const advance = (r: Record<string, unknown>) => {
+    const next = JSON.parse(JSON.stringify(r));
+    next.baselines = (next.baselines as Record<string, unknown>[]).map((b) => b.snapshot_label === retired
+      ? { ...b, acceptance_status: 'retired' } : b);
+    next.baselines.push({ snapshot_label: NEW_LABEL, acceptance_status: 'accepted' });
+    return next;
+  };
+
+  it('accepts retirement of the outgoing baseline plus one appended entry', () => {
+    const r = before();
+    expect(() => assertRegisterHistoryPreserved(r, advance(r), retired, 'retired')).not.toThrow();
+  });
+
+  it('is satisfied by every real planner run', () => {
+    expect(() => run()).not.toThrow();
+  });
+
+  it.each([
+    ['an older baseline edited', (n: Record<string, unknown>) => { (n.baselines as Record<string, unknown>[])[0].issue = 'X'; }, /changed history: baseline older-baseline/],
+    ['the predecessor edited beyond its status', (n: Record<string, unknown>) => { (n.baselines as Record<string, unknown>[])[1].accepted_on = '2030-01-01'; }, /changed history: baseline full-history-20250101/],
+    ['a baseline dropped', (n: Record<string, unknown>) => { (n.baselines as unknown[]).splice(0, 1); }, /carries 2 baselines, but exactly 3/],
+    ['a second appended entry', (n: Record<string, unknown>) => { (n.baselines as unknown[]).push({ snapshot_label: 'x', acceptance_status: 'retired' }); }, /carries 4 baselines/],
+    ['a top-level field changed', (n: Record<string, unknown>) => { (n.selection_policy as Record<string, unknown>).retired_statuses = ['retired', 'x']; }, /changes top-level field "selection_policy"/],
+    ['the predecessor left accepted', (n: Record<string, unknown>) => { (n.baselines as Record<string, unknown>[])[1].acceptance_status = 'accepted'; }, /changed history|exactly one accepted/],
+    ['the new entry not accepted', (n: Record<string, unknown>) => { ((n.baselines as Record<string, unknown>[])[2]).acceptance_status = 'candidate'; }, /exactly one accepted baseline/],
+  ])('refuses %s', (_label, mutate, message) => {
+    const r = before();
+    const n = advance(r);
+    mutate(n);
+    expect(() => assertRegisterHistoryPreserved(r, n, retired, 'retired')).toThrow(message);
+  });
+});
+
+describe('the write set is judged whole, ordered, and pinned before apply', () => {
+  const prepared = () => prepare(scenario());
+
+  it('puts the AFL Tables switch first, then replacements, then the planner files', () => {
+    const p = prepared();
+    const { planned } = planWith(p);
+    const { files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    expect(files.map((f) => f.path)).toEqual([
+      'data/reference/afltables-network.json', AFL_API_PATH, AFLTABLES_PATH,
+      REGISTER_PATH, SEASONS_PATH, CONTRACT_PATH, STAT_AVAILABILITY_PATH, REBUILD_PATH,
+    ]);
+  });
+
+  it('a dry run needs no pins and reports every hash to pin', () => {
+    const p = prepared();
+    const { planned } = planWith(p);
+    const { finalHashes, files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    expect(Object.keys(finalHashes).sort()).toEqual([...p.changeSet.writeSet].sort());
+    for (const f of files) expect(finalHashes[f.path]).toBe(sha256Hex(f.content));
+  });
+
+  it('apply without pins refuses; with matching pins for every file it passes', () => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    expect(() => assertTransitionWriteSet({ prepared: p, planned, apply: true }))
+      .toThrow(/--apply needs final_sha256/);
+    const { finalHashes } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    s.changeSet.final_sha256 = finalHashes;
+    const pinned = prepare(s);
+    const result = assertTransitionWriteSet({ prepared: pinned, planned: planWith(pinned).planned, apply: true });
+    expect(result.files).toHaveLength(8);
+  });
+
+  it.each([
+    ['a pin for different bytes', (h: Record<string, string>) => { h[REGISTER_PATH] = sha256Hex('other'); }, /Different bytes: data\/reference\/fitzroy-accepted-baselines\.json/],
+    ['a missing pin', (h: Record<string, string>) => { delete h[REBUILD_PATH]; }, /Unpinned: tools\/db\/rebuild-test\.ts/],
+    ['a pin for a file that is not written', (h: Record<string, string>) => { h['package.json'] = sha256Hex('x'); }, /Pinned but not written: package\.json/],
+  ])('refuses %s', (_label, mutate, message) => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { finalHashes } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    const hashes = { ...finalHashes };
+    mutate(hashes);
+    s.changeSet.final_sha256 = hashes;
+    const pinned = prepare(s);
+    for (const apply of [false, true]) {
+      expect(() => assertTransitionWriteSet({ prepared: pinned, planned: planWith(pinned).planned, apply }))
+        .toThrow(message);
+    }
+  });
+
+  it('refuses a planner that does not produce exactly the owned files', () => {
+    const p = prepared();
+    const { planned } = planWith(p);
+    expect(() => assertTransitionWriteSet({ prepared: p, planned: planned.slice(1), apply: false }))
+      .toThrow(/The planner produced/);
+  });
+
+  it('shows a concrete per-file diff, and register history is untouched in it', () => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    const diffs = describeTransitionDiff(files, bufferOf(s.disk));
+    const by = (path: string) => diffs.find((d) => d.path === path)!;
+
+    expect(by(AFL_API_PATH).changes).toEqual([
+      { where: '/measured/players_with_afl_api_evidence', kind: 'change', before: '1824', after: '1916' },
+    ]);
+    expect(by('data/reference/afltables-network.json').changes.map((c) => c.where).sort())
+      .toEqual(['/changed_at', '/decision', '/status']);
+    expect(by(CONTRACT_PATH).changes.some((c) => c.where === '/datasets/ladder/rebuild_expectation' && c.kind === 'add')).toBe(true);
+    expect(by(REBUILD_PATH).changes).toEqual([
+      { where: expect.stringMatching(/^line \d+$/), kind: 'remove', before: JSON.stringify(`  rows: ${ROWS_2025},`) },
+      { where: expect.stringMatching(/^line \d+$/), kind: 'add', after: JSON.stringify(`  rows: ${ROWS_2026},`) },
+    ]);
+    // Older register history never appears in the diff: only the predecessor's status and the append.
+    const where = by(REGISTER_PATH).changes.map((c) => c.where);
+    expect(where).toContain('/baselines/0/acceptance_status');
+    expect(where.every((w) => w === '/baselines/0/acceptance_status' || w.startsWith('/baselines/1'))).toBe(true);
+    for (const d of diffs) {
+      expect(d.oldSha256).toBe(sha256Hex(s.disk.get(d.path)!));
+      expect(d.newSha256).not.toBe(d.oldSha256);
+    }
+    const text = formatTransitionDiff(diffs).join('\n');
+    expect(text).toContain(`${by(AFL_API_PATH).oldSha256} (`);
+    expect(text).toContain('/measured/players_with_afl_api_evidence');
+  });
+});
+
+describe('the staged apply, its journal and recovery', () => {
+  /** An in-memory filesystem with an optional fault on the Nth rename or on a staged write. */
+  function memoryIo(initial: Map<string, string>, fault: { renameAt?: number; writeOf?: string } = {}) {
+    const fs = new Map(initial);
+    let renames = 0;
+    const io: FileIo = {
+      read: (p) => (fs.has(p) ? Buffer.from(fs.get(p)!) : null),
+      write: (p, c) => {
+        if (fault.writeOf !== undefined && p.startsWith(fault.writeOf)) throw new Error('disk full');
+        fs.set(p, c);
+      },
+      rename: (a, b) => {
+        renames += 1;
+        if (fault.renameAt === renames) throw new Error('rename failed');
+        fs.set(b, fs.get(a)!); fs.delete(a);
+      },
+      remove: (p) => { fs.delete(p); },
+    };
+    return { fs, io };
+  }
+  const files = (): Array<{ path: string; content: string; reformatted: boolean }> =>
+    ['a.json', 'b.json', 'c.json'].map((path) => ({ path, content: `new ${path}`, reformatted: false }));
+  const disk = () => new Map([['a.json', 'old a.json'], ['b.json', 'old b.json'], ['c.json', 'old c.json']]);
+
+  it('a clean apply leaves new bytes, no journal and no staged file', () => {
+    const { fs, io } = memoryIo(disk());
+    applyStagedWrites(io, 2026, files());
+    expect([...fs.entries()].sort()).toEqual([['a.json', 'new a.json'], ['b.json', 'new b.json'], ['c.json', 'new c.json']]);
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('stages and reads back every file before the first rename, and journals before it', () => {
+    const order: string[] = [];
+    const { io } = memoryIo(disk());
+    const traced: FileIo = {
+      ...io,
+      write: (p, c) => { order.push(`write ${p}`); io.write(p, c); },
+      rename: (a, b) => { order.push(`rename ${b}`); io.rename(a, b); },
+    };
+    applyStagedWrites(traced, 2026, files());
+    const firstRename = order.findIndex((o) => o.startsWith('rename'));
+    expect(order.slice(0, firstRename).filter((o) => o.startsWith('write')).length).toBe(4);   // 3 files + journal
+    expect(order[firstRename]).toBe(`rename ${TRANSACTION_JOURNAL_PATH}`);
+    expect(order.slice(firstRename + 1)).toEqual(['rename a.json', 'rename b.json', 'rename c.json']);
+  });
+
+  it('an interrupted rename sequence leaves the journal, so the next invocation refuses with the per-file state', () => {
+    const { fs, io } = memoryIo(disk(), { renameAt: 3 });   // journal=1, a=2, b fails
+    expect(() => applyStagedWrites(io, 2026, files())).toThrow('rename failed');
+    expect(fs.has(TRANSACTION_JOURNAL_PATH)).toBe(true);
+    const problem = pendingTransactionProblem(io)!;
+    expect(problem.join('\n')).toContain('did not finish');
+    expect(problem).toContain('  new     a.json');
+    expect(problem).toContain('  old     b.json');
+    expect(problem.join('\n')).toContain('Files are mixed. Restore EVERY listed file to its old bytes');
+    // every old byte is recoverable from the journal itself
+    const journal = JSON.parse(fs.get(TRANSACTION_JOURNAL_PATH)!);
+    expect(journal.schema).toBe(TRANSACTION_JOURNAL_SCHEMA);
+    expect(Buffer.from(journal.entries[0].oldBase64, 'base64').toString()).toBe('old a.json');
+  });
+
+  it('a failure while staging removes what was staged and renames nothing', () => {
+    const { fs, io } = memoryIo(disk(), { writeOf: 'c.json' });
+    expect(() => applyStagedWrites(io, 2026, files())).toThrow('disk full');
+    expect([...fs.keys()].sort()).toEqual(['a.json', 'b.json', 'c.json']);
+    expect(fs.get('a.json')).toBe('old a.json');
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('a failure writing the journal removes the staged files and leaves the tracked bytes alone', () => {
+    const { fs, io } = memoryIo(disk(), { writeOf: TRANSACTION_JOURNAL_PATH });
+    expect(() => applyStagedWrites(io, 2026, files())).toThrow('disk full');
+    expect([...fs.entries()].sort()).toEqual([['a.json', 'old a.json'], ['b.json', 'old b.json'], ['c.json', 'old c.json']]);
+  });
+
+  it('leftover staged files alone are reported as untouched tracked files', () => {
+    const { io } = memoryIo(new Map([[`${PLANNER_OWNED_WRITES[0]}.rollover-tmp`, 'x']]));
+    expect(pendingTransactionProblem(io)!.join('\n')).toContain('tracked files are untouched');
+  });
+
+  it('classifies old / new / neither / absent and words the recovery for each overall state', () => {
+    const journal = buildTransactionJournal(2026, files(), (p) => Buffer.from(disk().get(p)!));
+    const sha = (m: Record<string, string | null>) => (p: string) => m[p] ?? null;
+    const old = { 'a.json': sha256Hex('old a.json'), 'b.json': sha256Hex('old b.json'), 'c.json': sha256Hex('old c.json') };
+    const next = { 'a.json': sha256Hex('new a.json'), 'b.json': sha256Hex('new b.json'), 'c.json': sha256Hex('new c.json') };
+    expect(classifyTransaction(journal, sha({ ...old, 'a.json': next['a.json'], 'b.json': sha256Hex('weird'), 'c.json': null })))
+      .toEqual([{ path: 'a.json', state: 'new' }, { path: 'b.json', state: 'neither' }, { path: 'c.json', state: 'absent' }]);
+    const wording = (m: Record<string, string>) =>
+      recoveryRequirements(journal, classifyTransaction(journal, sha(m))).join('\n');
+    expect(wording(old)).toContain('Every file still holds the old bytes');
+    expect(wording(next)).toContain('Every file already holds the reviewed new bytes');
+    expect(wording({ ...old, 'a.json': next['a.json'] })).toContain('Files are mixed');
   });
 });
