@@ -15,6 +15,39 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Bound ladder scope and rehearsal package verification (2026-10-22)
+
+- Resolve ladder expectations only for the two reviewed fingerprint tuples (predecessor
+  1,622; isolated C2 rehearsal-only 1,640), with explicit contract configuration and exact
+  completed-range/census agreement. Final football status and latest decided GF checks
+  remain independent of Brownlow readiness; preserve every existing ladder/D7 gate.
+- Add a built-in-only external verifier/fixed launcher, strict raw-byte inventory and
+  selected-input membership, reviewed external specification pins, declared runtime-root
+  content checks, safe/disjoint paths and repeated runner checks before preflight children,
+  every stage, capture/reset/final validation and terminal success. Preserve genuine validators,
+  enforcing target census and independent live-isolation checks.
+- Extend existing synthetic suites for initial substitution, later drift, runtime/target/path
+  binding and full-stage ordering/refusals. Active contracts, references, registers and input
+  bytes initially remained unchanged: a missing expectation block refuses, with no fallback.
+  No package, real launch pins, database execution or production authority is supplied.
+  The subsequent dependency-resolution repair installs a mandatory hash-bound Node preload
+  around tsx registration in the main thread and loader worker, and a Python isolated/no-site
+  bootstrap with ongoing import membership/hash checks and source-only bytecode handling.
+  Both use a pinned policy derived from verified file hashes; fixed launcher and runner child
+  wiring share this enforcement. Runtime records require explicit bound search locations and
+  an esbuild native-helper pin; root hashing/environment scrubbing alone is not closure proof.
+  Database-free Windows interpreter fixtures demonstrate bound loads and refusal of ambient
+  ancestor/import-path/loader substitutions and changed bytes before sentinel execution.
+  Bounded one-agent re-review found no material defect within the stated trust boundaries.
+  Add only the approved predecessor expectation block (full-history-20260902 / ladder-20260828,
+  exact reviewed fingerprints, independent results/H&A population 1,622); preserve every other
+  contract field, selector, range, exclusion and measurement. Extend the existing suite to prove
+  actual-contract resolution/planning and absent/invalid/candidate-on-ordinary-target refusals.
+  Focused database-free Windows checks: 128 passed; nonincremental typecheck passed.
+  Guards are import checks, not an application sandbox. Linux/native-extension proof, actual
+  package/runtime/target pins, candidate census/Brownlow parity integration, DOB/Coleman evidence,
+  database and rehearsal validation remain outstanding. Production NO-GO; no commit yet.
+
 ### ISSUE-316 - Explicit shared height/coach stats input modes (2026-10-21)
 
 - Preserve supplemented baseline behavior and add explicit baseline-only validation requiring

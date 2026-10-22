@@ -356,6 +356,16 @@
         "validator": "tools/rebuild/fitzroy/validate_ladder_witness.py --label ladder-20260828",
         "not_validated_by": "import_fitzroy_core.py --require-full-history is the CORE snapshot adjudicator and must never be pointed at a witness-only acquisition; doing so manufactures a false failure over datasets the witness never claimed."
       },
+      "rebuild_expectation": {
+        "profile": "predecessor-1897-2025",
+        "core_snapshot_label": "full-history-20260902",
+        "core_manifest_sha256": "2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1",
+        "core_artefact_set_sha256": "15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c",
+        "witness_snapshot_label": "ladder-20260828",
+        "witness_manifest_sha256": "604a8a162543e19060f426bd189222d32d07726a0b134bdf4f910175cb7a8d3f",
+        "expected_rows": 1622,
+        "evidence_ref": "tools/db/rebuild-test.ts CLUB_SEASONS_EXPECTED rationale and this contract's source_club_normalisation: independent results/H&A club-season identity-pair derivation, 1897-2025, 1622; docs/v2/issue316-c2-ladder-season-scope-proposal-2026-10-22.md section 1. Predecessor only; 1640 remains isolated C2 rehearsal-only."
+      },
       "coverage": {
         "$comment": "Exhaustive read-only probe, 1897-2025, run 2026-08-28. Zero call errors, zero zero-row seasons, zero schema drift, zero wrong-Season echoes, zero blank Team, zero duplicate-team seasons, zero missing or duplicated ladder positions, zero NA Season.Points.",
         "first_season": 1897,

@@ -1,5 +1,205 @@
 # AFLDB-ISSUE-316 — AFL API cutover: retire AFL Tables network acquisition
 
+**2026-10-22 bounded re-review and predecessor-only transition (current):**
+One agent reviewed the actual uncommitted helper/declaration, resolution guard, runner
+startup/child wiring, focused tests and retained results against the approved inventory
+addendum and basis `b8ea28550a291b766bf7ad9f3b63621e9f9efa81` (HEAD matches).
+No material correctness or gate-preservation defect found within the stated trust boundaries.
+The external built-in-only verifier precedes package/tsx execution on the fixed launch route;
+main-thread synchronous and loader-worker async hooks surround tsx registration. Resolved
+ESM/CJS/workspace files require policy membership/raw hashes. Python's isolated/no-site
+bootstrap checks exact startup paths, then module origins/hashes and source-only loading.
+Launcher arguments install enforcement in both Node children; runner child dispatch adds the
+same Node/Python startup boundary, pins executables and refuses unknown commands. Candidate
+plan/preflight/execution checkpoints require matching preload identity, so direct runner entry
+without it cannot proceed to preflight/stages. Policies derive from the originally pinned
+inventory/runtime; fresh checkpoints and terminal readback cannot adopt replacement pins.
+Failure paths retain refusal/original child failure and use noncredential provenance diagnostics.
+Existing focused fixtures exercise real positive ESM/CJS/TS/workspace/Python execution and
+refusal through the production startup builder/preload; the full launcher/runner orchestration
+is mocked for ordering, not executed. No claim of a real launch or target proof.
+
+**Exact configuration delta:** only `datasets.ladder.rebuild_expectation` added to
+`tools/rebuild/fitzroy/fitzroy-contract.json`: profile `predecessor-1897-2025`, core
+`full-history-20260902`, manifest SHA-256
+`2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1`, artifact-set SHA-256
+`15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c`, witness
+`ladder-20260828`, manifest SHA-256
+`604a8a162543e19060f426bd189222d32d07726a0b134bdf4f910175cb7a8d3f`, `expected_rows: 1622`,
+and `evidence_ref` identifying the retained independent results/H&A identity-pair rationale
+(`CLUB_SEASONS_EXPECTED`, contract `source_club_normalisation`, approved proposal §1).
+No new count derived from the witness or rebuilding DB. Actual manifest bytes and recomputed
+manifest artifact-set digest match these exact pins. Removing the new block leaves all other
+contract fields equal to the basis: no selector/range/exclusion/measurement, season metadata,
+candidate block or accepted successor change. This removes the predecessor missing-block
+configuration refusal only; genuine preflight, capture/destruction, census and final gates remain.
+
+**Validation:** existing runner suite now tests actual active-contract resolution and planning
+without injected expectations, exact manifest/set fingerprints, absent/invalid block refusals
+and coherent candidate-on-ordinary-target refusal before verification/effects. Database-free
+command: `node node_modules/vitest/vitest.mjs run tests/db-test-rebuild.test.ts
+tests/reference-data.test.ts -t 'ISSUE-316 ladder-season-scope' --no-cache --configLoader runner
+--reporter=json --outputFile=C:/Users/stuar/AppData/Local/Temp/issue316-predecessor-focused-unrestricted.json`.
+**128 passed / 0 failed** (122 runner, 6 reference; 755 unrelated tests filtered, not executed),
+including the existing 18 real interpreter cases. TEMP/TMP routed to C:. Initial restricted run
+hit the known tsx `uv_os_get_passwd ENOMEM` sandbox failure and one new test's incorrect event
+baseline assertion; assertion corrected, then automatic review allowed the same harmless
+focused run outside the sandbox. No runtime/infrastructure repair or installation. Prior
+149/283 results remain historical broader-filter evidence, not repeated or added to this count.
+`node node_modules/typescript/bin/tsc --noEmit --incremental false` passed, exit 0; empty
+`C:/Users/stuar/AppData/Local/Temp/issue316-predecessor-typecheck.txt`. Read-only
+`git diff --check` passed; JSON comparison to basis proved the contract-only delta above.
+
+**Limits:** Windows Node 22.21.0/tsx 4.23.12/Python 3.12.10 fixture proof only. Missing
+synchronous hooks, existing Python zip imports and unbound resolved module files refuse.
+Native extension files are origin/hash checked, but transitive native-library loading remains
+within the explicitly trusted reviewed interpreter/OS/native-loader boundary; Linux and a real
+native-extension dependency arrangement are unexecuted and not certified supported by these
+fixtures. Any proposed unsupported/unbound arrangement must remain a launch blocker, not an
+inferred pass. Guards are import checks, not an application sandbox or protection from
+deliberately malicious reviewed code; controlled read-only inputs/no concurrent writer remain
+required. Real package/runtime/target pins, candidate census/Brownlow parity integration and
+DOB/Coleman evidence remain separate blockers. No integration, host/DB/network/WSL, package
+construction, stage/rebuild/rehearsal/rollover/cleanup or Git mutation; unrelated changes and
+`.codex/` preserved. ISSUE-316 OPEN; Brownlow 2026 pending, ET unresolved, 1,640 rehearsal-only,
+all authority/eligibility/ownership restrictions unchanged; production NO-GO.
+**One bounded next proposal:** separately authorise Linux database-free validation of this
+exact import-boundary wiring using a reviewed existing runtime, including native-extension
+positive/refusal cases, before any package or database execution. No commit yet.
+
+**2026-10-22 bounded dependency-resolution repair (historical; re-reviewed above):**
+One agent repaired the review STOP below, preserving basis
+`b8ea28550a291b766bf7ad9f3b63621e9f9efa81` and the existing uncommitted implementation.
+`rehearsal-package.mjs` now derives a per-file resolution policy from the original verified
+package/runtime hashes, writes it exclusively to the reviewed external temp root and pins
+its raw SHA-256 for each interpreter startup. It contains paths/hashes, no credentials, and
+is retained without cleanup. The new built-in-only `rehearsal-resolution-guard.mjs` is a
+mandatory inventoried source member: its bytes are bound by the externally pinned package
+inventory, not trusted merely because the helper names itself.
+
+The fixed launcher installs this preload in both Node children before isolated-pg/runner
+imports. The runner uses the same startup builder for every Node/TS/Python validator or
+stage child; fixed script mappings, target isolation, genuine validators, credentials,
+checkpoints and terminal readback remain. Candidate checkpoints also require the installed
+preload's matching policy identity. Node synchronous resolution hooks cover CJS and ESM;
+async resolve/load hooks cover the separate loader worker. Guards surround actual tsx
+registration, check resolved file membership/raw bytes and reject non-file/non-built-in URLs.
+Normal workspace resolution remains; only explicit bound anchors may supply missing bare
+dependencies. A resolvable unbound ancestor is refused, not replaced. esbuild's native helper
+is separately inventoried/pinned and selected explicitly; tsx caches are disabled.
+
+Runtime-record v1 now additionally requires `node_search_roots`, `esbuild_binary`,
+`python_stdlib` (the exact isolated startup sys.path, including nonexistent zip landmarks)
+and `python_dependencies`. Search locations must lie in fully enumerated/hash-bound runtime
+roots; existing Python zip libraries are unsupported/refused. Runtime-only inventory names
+allow scoped Node directories (`@`, `+`); source inventory rules remain unchanged. No actual
+runtime record/package/spec or candidate configuration was constructed.
+
+Python runs with `-I -S -B`: check the exact reviewed startup path before importing bootstrap
+helpers, then install a meta-path guard before executing the script. It checks loaded/bootstrap
+module origins and every subsequent import's file membership/hash, including namespace
+locations and extension modules. Source loaders compile checked source directly; unbound
+bytecode cannot replace it. Sourceless bytecode refuses. PYTHONPATH/user site cannot supply
+code; later sys.path injection still cannot authorise unbound files.
+
+**Validation:** focused database-free ISSUE-316 runner/reference tests: **149 passed, 0 failed**,
+including **18 real-process cases** using Node **22.21.0**, installed tsx **4.23.12** and Python
+**3.12.10**. Covers valid ESM/CJS/TS and runner-style CJS TS, workspace aliases, changed bytes,
+otherwise-resolvable ancestor imports, unbound loader bytes, bound Python imports, ambient
+imports and explicit sys.path injection; refusal sentinels never execute. The tests invoke
+the production startup argument builder/preload; the full fixed launch route remains mocked
+for ordering and policy/hash propagation, never run against an isolated cluster.
+Evidence: `C:/Users/stuar/AppData/Local/Temp/issue316-resolution-focused.json` and harmless
+retained `issue316-resolution-*` trees under the same C: temp directory. Earlier failed
+iterations exposed Windows file-URL/CJS-hook issues and were corrected, not counted as proof.
+The sandbox blocks tsx's `os.userInfo()`; automatic review allowed the same harmless focused
+tests outside it. No runtime installation or dependency change.
+Nonincremental affected TypeScript check (`tsc --noEmit --incremental false`) passed,
+exit 0, empty `C:/Users/stuar/AppData/Local/Temp/issue316-resolution-typecheck.txt`.
+Read-only `git diff --check` passed. No Git mutation or predecessor configuration edit.
+
+**Limits / next bounded re-review:** inspect this local verifier/helper/schema/runner/test
+delta and the C: results, especially both Node hook chains, Python bootstrap/bytecode rules,
+policy propagation and fixed command/credential handling. Supported Linux runtime validation
+is still outstanding; these Windows fixtures do not prove Linux/DB/rehearsal behavior. The
+runtime must provide Node's synchronous hook API; unsupported hooks/zip imports refuse.
+These checks constrain imports of reviewed application/loader code, not malicious bound code
+using vm/exec, unregistering hooks or loading arbitrary native code. Reviewed interpreter/OS
+and native dynamic-loader trust, read-only bound inputs and no malicious concurrent writer
+remain prerequisites; this is not an OS sandbox or a race-free filesystem guarantee.
+Do not transition the predecessor contract or commit until re-review. Candidate integration,
+real package/runtime/target pins and DOB/Coleman evidence remain unsupported; full rehearsal
+BLOCKED; ISSUE-316 OPEN; 1,640 rehearsal-only; Brownlow 2026 pending; ET unresolved;
+authority/eligibility/ownership restrictions unchanged; production NO-GO.
+
+**2026-10-22 bounded review STOP (historical finding; repaired locally, awaiting re-review):**
+Read-only Git confirmed HEAD `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`; inspected the
+local ladder/census/runner/test diff, new verifier/declaration and approved proposal/addendum.
+Material gate defect: `tools/v2/rehearsal-package.mjs:177–191` enumerates/hashes declared
+runtime roots and checks executable membership, but does not bind actual module/library
+resolution to those roots. Its launch at lines 234–245 supplies an absolute tsx loader and
+sanitised environment without constraining Node ancestor `node_modules` resolution or Python
+interpreter/site-package resolution. `tools/v2/isolated-pg.ts:39` imports bare `postgres`
+before its target probe; `tools/db/migrate.ts:22` also imports it, and
+`tools/migration/common.py:29` imports `psycopg`. Such imports can resolve outside every
+hashed runtime root (or simply be unavailable) while the verifier passes. Hashing an unrelated
+listed dependency file and the lockfile cannot prove the actual dependency closure. This
+contradicts addendum §A's unknown/unbound-resolution refusal, before package execution.
+The synthetic fixture at `tests/db-test-rebuild.test.ts:262–275` uses placeholder loader and
+dependency bytes; the positive launch test mocks spawn. It cannot detect this production-path
+gap. Prior 104/283 passing counts and typecheck remain historical database-free results,
+not runtime/census/rehearsal proof; no tests were rerun for this source-proven STOP.
+
+No implementation fix, test extension or configuration change was made. Exact configuration
+delta: none; the predecessor expectation remains absent and strict refusal remains in force.
+Next bounded proposal: repair/prove actual Node/tsx and Python dependency-resolution closure
+against reviewed content roots, including refusal of an ancestor/unlisted module and an
+unbound Python library, using database-free production-boundary tests; rerun affected checks
+and review before a separately scoped predecessor-only transition/commit. No commit now.
+Later rollback-only candidate ownership-census and football/pending-Brownlow integration proof
+still require separate supported Linux/test-DB authority. Real package/runtime/target pins and
+DOB/Coleman evidence remain unsupported. No package/host/DB/network/WSL/stage/rehearsal work.
+ISSUE-316 OPEN; full rehearsal BLOCKED; 1,640 rehearsal-only; all three 2026 Brownlow keys
+pending; ET unresolved; authority/eligibility/ownership restrictions unchanged; production NO-GO.
+
+**2026-10-22 bounded implementation (current; supersedes design-only/STOP checkpoints below):**
+Owner approved the original ladder/season proposal and addendum §§C/E/F at basis
+`b8ea28550a291b766bf7ad9f3b63621e9f9efa81`. One agent implemented the closed two-pair
+resolver, shared completed-range/census refusal, independent final football checks, external
+verifier/declaration/fixed launcher and runner checkpoints. The launcher trusts the reviewed
+external spec digest, never a digest generated from the package; full membership/raw hashes,
+selected core/witness artifact paths, actual dependency content, fixed executable/loader paths,
+source/cwd/module, pair/target and disjoint writable roots are rechecked. Candidate direct calls
+require provenance; altered/shortened plans refuse before effects. Genuine validators, target
+census and repeated live isolation remain independent. No edit to isolated-pg.ts or Python.
+
+**Validation:** database-free focused ISSUE-316 runner/reference cases 104 passed; expanded affected
+runner/reference/promotion census set 283 passed / 0 failed (includes predecessor ladder/D7 and
+D-233-3). Evidence: `C:/Users/stuar/AppData/Local/Temp/afldb-issue316-ladder-season-scope-tests.json`
+and `afldb-issue316-affected-tests.json` in the same directory. Nonincremental `tsc --noEmit
+--incremental false` exit 0; empty diagnostic log `afldb-issue316-typecheck.txt` in the same C:
+directory. Read-only Git confirms HEAD equals the stated basis; `git diff --check` clean.
+Mock executor/census/target adapters prove ordering/refusals only; no real census or rehearsal.
+Rollback-only candidate ownership-2026 and football-complete/pending-Brownlow database parity
+remain unexecuted and require separate Linux/test-database authority.
+
+**Configuration transition still required:** active contract/register/reference/input bytes are
+unchanged. The active contract has no `datasets.ladder.rebuild_expectation`; the new resolver
+refuses it and the current active full runner is **not runnable**. Separately review/install the
+explicit predecessor block before ordinary predecessor use. Candidate metadata/expectations
+exist only in synthetic fixtures. A new separately authorised source package and complete reviewed
+closure/inventory, successor implementation identity, external spec/instruction/launcher pins,
+actual runtime record/content and exact isolated target/capture/output/temp/cluster values remain
+absent. Nothing was fabricated or constructed. DOB/Coleman evidence remains unsupported.
+
+**Next bounded proposal:** review this local code/test diff and verifier schemas/trust boundaries;
+then scope the predecessor configuration transition and, separately, the still-unexecuted
+rollback-only integration proof. Package preparation and execution remain separate decisions.
+No commit, active-reference rollover, cleanup or deployment. Preserve existing unrelated changes
+and `.codex/`. ISSUE-316 OPEN; full rehearsal BLOCKED; 1,640 rehearsal-only; all three 2026
+Brownlow keys pending, ET unresolved, authority/eligibility/ownership restrictions unchanged;
+production NO-GO.
+
 **Status:** Open (2026-10-18). Preparation only. Local, reversible implementation on branch
 `opus/afl-api-cutover` (worktree `D:\dev\afldb-afl-api-cutover`, base `ff100dc2`), uncommitted.
 Nothing has been deployed, committed, merged or pushed, and no host was contacted.

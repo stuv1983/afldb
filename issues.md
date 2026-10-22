@@ -28,7 +28,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-275 | A settle can insert period scores under a match it refused because a foreign owner created it concurrently | Medium | Acquisition / canonical ownership / provenance — `src/lib/acquisition/canonical-apply.ts` (`applyCanonicalUnit`) | Open (2026-10-08); review F-010, code-proven mechanism, interleaving not executed; imported 2026-10-10; **implemented 2026-10-13 on `opus/issue-275` (revision 2 the same day: every genuine `matches` refusal withholds, `manual_authority_*` included); committed as `24ca412b`, on `origin/main` (verified 2026-10-14), **installed on DEV 2026-10-14 13:52 AEDT (runbook §30; acceptance NOT met)**; DB-free validation passed; focused `afldb_test` validation PASSED 2026-10-13 (3 selected tests passed, exit 0, `CENSUS IDENTICAL`; same-transaction planted-row witness, not two-session concurrency; no DEV/PROD/State B evidence); full-diff review: no CRIT/HIGH/MED finding; DEV install was held until the observation window closed (now closed, D-OBS-274276-20261014)**; runbook `issues/open/AFLDB-ISSUE-275.md` §26-§28 | Merged, pushed and installed on DEV; open: first attributable nightly (independent continuity evidence), State B, PROD read-only split-ownership census (§15; the DEV census is DONE 2026-10-14 14:09 AEDT, runbook §31: 0 rows with both sources set and different, 0 mixed matches; 134,704 NULL-source legacy rows = unattributed, not proof of authorship) |
 | AFLDB-ISSUE-276 | AFL API period scores that contradict the final score are written | Medium | Acquisition / AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts` | Open (2026-10-08); review F-011, code-proven; implemented 2026-10-12, committed as `5b0ab6dc`, merged to `main` as `3ec76f28`; **installed on DEV 13 October 2026, 06:26:00-06:28:27 AEDT** (operator-verified; installation checks exit 0; BUILD_ID `5sDQtjtkxAIUBO5bVn6mY`; MainPID 2609207); focused `afldb_test` acceptance supported 2026-10-12 (4/4 passed on the second run; first run 3 passed, 1 failed on a test-reader type mismatch); no whole-suite, restricted-role, live-provider, real-data DEV or PROD acceptance; names reviewed and kept; runbook `issues/open/AFLDB-ISSUE-276.md` §17.7, §17.8 | The 14 October nightly (batch 122) was graded PASS, no regression, as the combined observation; the window is CLOSED (D-OBS-274276-20261014, runbook §17.10; guard branch NOT OBSERVED on DEV); PROD installation and acceptance remain |
 | AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | DEV sitemap check in a build-time settings window (combined procedure §6); fix merged and installed on DEV |
-| AFLDB-ISSUE-316 | AFL API cutover: retire AFL Tables network acquisition | Medium | Data acquisition / source retirement | Open; supplement-free runner implementation reviewed; recorded focused checks passed, full runner limited by four tsx startup failures | Next: separately authorise provenance-bound canonical export construction; no successor contract/expectations or stage approval. Runbook §12; 1,640 rehearsal-only; production NO-GO |
+| AFLDB-ISSUE-316 | AFL API cutover: retire AFL Tables network acquisition | Medium | Data acquisition / source retirement | Open; bounded re-review clean within stated trust limits; predecessor-only 1,622 block installed; 128 focused tests pass including 18 Windows real-process cases; typecheck passed; full rehearsal blocked; 1,640 rehearsal-only; production NO-GO | Separately authorise Linux database-free import-boundary/native-extension proof. Candidate census/Brownlow parity integration, package/runtime/target pins and DOB/Coleman evidence remain blockers; ET unresolved; 2026 Brownlow pending; authority/eligibility/ownership restrictions unchanged. No commit yet. |
 
 **AFLDB-ISSUE-303 resolved 2026-10-15, DEV-scoped** (implementation `50f9345b`, merged and pushed; installed on DEV by the gated deployment of `f07c2a74` at 16:30 AEDT; owner-signed-in browser acceptance C-303-1..5 PASS with six screenshots and URL records; post-browser journal check PASS). `/admin/upload` now posts to `POST /admin/upload/stage` and takes the documented 5 MB file. On DEV behind Caddy: a 1,500,359-byte `match_attendance` CSV staged as submission 75 and the browser landed on `/admin/submissions/75`; a 5,244,473-byte file was refused with `The file exceeds the 5 MB limit.` (HTTP 413) with no new submission; the audit trail shows exactly one `upload.staged` row (submission 75) and none for the refusal; submission 75 was rejected through the UI (`submission.rejected`), never validated, approved or promoted. **Not done / limits:** optional C-303-6 (session-ended path) not run; PROD installation and acceptance pending (the PROD Caddy has no body cap on this path); submission 75 stays in the list as REJECTED history. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entry in this file and `issues/closed/AFLDB-ISSUE-303.md` §21–§22.
 
@@ -51651,6 +51651,99 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   `player_match_stats` / `player_*` rows `cleanup122()` removes by player are covered by `players` (`slug LIKE 'issue122-%'`) being 0.
 
 ## AFLDB-ISSUE-316 — AFL API cutover: retire AFL Tables network acquisition
+
+- **Bounded re-review / predecessor transition (2026-10-22; current):** One-agent review of
+  the actual uncommitted verifier/declaration/guard/runner/tests and approved inventory addendum
+  at basis `b8ea28550a291b766bf7ad9f3b63621e9f9efa81` found no material defect within the
+  reviewed-code/interpreter/OS/native-loader and no-concurrent-writer trust boundaries.
+  Import guards are not an application sandbox. Added only the approved predecessor
+  `datasets.ladder.rebuild_expectation` block: full-history-20260902 / ladder-20260828,
+  exact reviewed manifest/set hashes and independent results/H&A expectation **1,622**.
+  Manifest bytes/set digest verified; all other contract fields equal basis after removing
+  that block. No candidate block/season metadata/accepted successor change. Actual-contract
+  positive planning/resolution and absent/invalid/candidate-on-ordinary-target regressions
+  added to the existing suite. Focused database-free Windows checks **128 passed / 0 failed**,
+  including 18 real interpreter cases; 755 unrelated tests filtered. C: evidence
+  `issue316-predecessor-focused-unrestricted.json`; nonincremental typecheck exit 0 with empty
+  `issue316-predecessor-typecheck.txt`, same retained temp directory. Initial restricted
+  sandbox tsx ENOMEM and corrected new assertion are disclosed in the runbook, not passes.
+  Contract-only semantic comparison and `git diff --check` passed. Previous broader results
+  reused, not repeated. No implementation expansion, package/DB/stage/rehearsal or commit.
+  Next bounded proposal: separately authorised Linux database-free import-boundary/native-
+  extension validation against reviewed existing runtime. Linux/native-extension proof,
+  candidate census/Brownlow parity integration, real package/runtime/target pins and DOB/Coleman
+  remain blockers. ISSUE-316 OPEN; Brownlow 2026 pending, ET unresolved, 1,640 rehearsal-only;
+  authority/eligibility/ownership unchanged; production NO-GO. Exact delta/limits: runbook's
+  current re-review entry.
+
+- **Bounded dependency-resolution repair (2026-10-22; historical; re-reviewed above):**
+  One agent added inventoried `tools/v2/rehearsal-resolution-guard.mjs`, pinned per-file
+  resolution policies and shared launcher/runner interpreter startup wiring. Node main-thread
+  synchronous resolution and loader-worker async resolve/load hooks surround real tsx
+  registration; resolved module files must match inventoried package/separately bound runtime
+  hashes. Python uses isolated/no-site startup with exact reviewed stdlib paths and ongoing
+  origin/hash checks, rejecting unbound imports even after sys.path injection and refusing
+  sourceless bytecode. Runtime v1 records additionally require explicit Node/Python search
+  locations and a bound esbuild native helper; no environment-only or probe-only closure claim.
+  Fixed commands, genuine validators, credential routing, isolation/checkpoints unchanged.
+  Focused ISSUE-316 runner/reference tests: **149 passed / 0 failed**, including **18 real
+  local interpreter cases** (Node 22.21.0, tsx 4.23.12, Python 3.12.10); harmless C: fixtures
+  only, no real rehearsal/DB. Evidence: C: temp `issue316-resolution-focused.json`.
+  Affected nonincremental typecheck passed (exit 0; C: temp `issue316-resolution-typecheck.txt`).
+  Details, mechanism/hash binding and trust limits are in the runbook's current repair entry. Windows results
+  do not establish Linux/native-loader/DB proof. Next: bounded re-review of this exact local
+  helper/verifier/schema/runner/test delta before any predecessor transition or commit.
+  Existing uncommitted/unrelated changes and .codex/ preserved; predecessor contract untouched,
+  missing-block refusal retained. No candidate config/package/runtime/spec prepared. Real pins
+  and DOB/Coleman evidence unsupported; ISSUE-316 OPEN; full rehearsal BLOCKED; 1,640
+  rehearsal-only; Brownlow 2026 pending; ET unresolved; authority/eligibility/ownership unchanged;
+  production NO-GO.
+
+- **Bounded review STOP (2026-10-22; historical finding; local repair awaiting re-review):** HEAD matches basis
+  `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`. Material gate defect:
+  `tools/v2/rehearsal-package.mjs:177–191` hashes declared runtime roots but does not prove
+  actual Node/Python library resolution stays within them; launch lines 234–245 use an
+  absolute loader/sanitised environment without closing ancestor `node_modules` or Python
+  library resolution. Bare `postgres` is imported at `tools/v2/isolated-pg.ts:39` before its
+  probe and `tools/db/migrate.ts:22`; `tools/migration/common.py:29` imports `psycopg`.
+  An unlisted resolved dependency can therefore execute despite package verification.
+  Synthetic placeholder loader/dependency bytes and mocked spawn do not exercise that path.
+  See runbook's current review STOP for evidence/limits. No fix/configuration/test edits;
+  predecessor block withheld and missing-block refusal preserved. Prior 104/283 tests and
+  typecheck are reused historical synthetic results, not runtime/census/rehearsal proof;
+  no rerun for this source-proven STOP. Next: bounded dependency-resolution repair/refusal
+  tests and re-review before predecessor-only transition/commit; separate later rollback-only
+  ownership-census and football/pending-Brownlow integration proof. Real package/runtime/target
+  pins and DOB/Coleman evidence unsupported; ISSUE-316 OPEN; 1,640 rehearsal-only; Brownlow
+  2026 pending, ET unresolved; authority/eligibility/ownership unchanged; production NO-GO.
+
+- **Bounded implementation (2026-10-22; current; supersedes design-only/STOP checkpoints below):**
+  Owner approved the original ladder/season-scope proposal and inventory addendum §§C/E/F at
+  `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`. One agent implemented the closed two-pair
+  resolver, completed-range/census consistency refusal, football-only status/decided-GF checks,
+  `tools/v2/rehearsal-package.mjs`/`.d.mts`, fixed external launcher and runner checkpoints before
+  preflight children/every stage/capture/reset/final/terminal success. Reviewed external spec
+  digest anchors trust; exact raw-byte membership, selected manifest/artifact membership and
+  actual runtime/dependency content are rechecked. Genuine validators/live isolation/census
+  remain independent. Fixed options and altered/shortened plans refuse; capture/markers are
+  retained after drift. Active contract/register/reference/input bytes and isolated-pg.ts/Python
+  unchanged; configuration changes exist only in synthetic fixtures.
+  **Active full runner is not runnable: missing explicit ladder expectation refuses without fallback.**
+  Predecessor block installation remains a separately reviewed configuration transition.
+  Candidate package/spec/launcher/runtime/content/target/path pins remain absent; none fabricated.
+  Focused database-free cases **104 passed**; expanded affected runner/reference/promotion-census
+  set **283 passed / 0 failed**, including predecessor ladder/D7 and D-233-3. C: JSON evidence:
+  `C:/Users/stuar/AppData/Local/Temp/afldb-issue316-ladder-season-scope-tests.json` and
+  `afldb-issue316-affected-tests.json` in the same directory. Nonincremental `tsc --noEmit
+  --incremental false` exit 0 (`afldb-issue316-typecheck.txt`, same C: directory); HEAD equals
+  the stated basis; `git diff --check` clean.
+  No integration/census/stage/package execution. Later rollback-only candidate-2026 ownership
+  and football-complete/pending-Brownlow parity require separate supported Linux/test-DB authority.
+  Next bounded proposal: local diff/verifier-schema/trust-boundary review, then separately scope
+  predecessor transition and integration proof; no package preparation or rehearsal authority.
+  CHANGELOG updated; no commit. ISSUE-316 OPEN; full rehearsal BLOCKED; DOB/Coleman unsupported;
+  1,640 rehearsal-only; all three 2026 Brownlow keys pending, ET unresolved and all
+  authority/eligibility/ownership restrictions unchanged; production NO-GO.
 
 - **Status:** Open (2026-10-18). **Severity:** Medium. **Area:** data acquisition / source retirement.
 - **Origin:** owner change of direction, 2026-10-18: stop AFL Tables acceptance work; remove AFL Tables network calls and use the AFL API for game and Brownlow data. PROD's AFL Tables timer keeps running until the replacement is ready; B1 (ISSUE-265 D-PROD-3) stays in force. ISSUE-238 had already recorded this destination as unallocated.
