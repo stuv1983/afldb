@@ -50,6 +50,9 @@ import {
   AflApiOwnershipCensusError, censusTotal, describeAffected, describeScope, readCensusRecord,
   refusalMessage, rolloverCensusScope,
 } from './afl-api-ownership-census';
+import {
+  LadderSuccessorRefused, planSuccessorTuplesEdit, type SuccessorLadderTuple,
+} from './ladder-successor';
 
 /** A refusal. Never carries a DSN, a secret or a path outside the repository. */
 export class RolloverRefused extends Error {
@@ -1267,6 +1270,8 @@ export type PlannedFile = { path: string; content: string; reformatted: boolean 
 export type TransitionInput = {
   contractBase?: Json;
   registerPatches?: RegisterPatch[];
+  /** A reviewed successor ladder tuple appended to `SUCCESSOR_LADDER_TUPLES_JSON` in tools/db/rebuild-test.ts. */
+  successorLadderTuple?: SuccessorLadderTuple;
 };
 
 /** A `$comment`-only edit of the NEW register entry, pointer relative to that entry. */
@@ -1928,9 +1933,17 @@ export function planSeasonRollover(input: {
     + `[${successor.corrections.categories.join(', ')}]. Nothing was inherited from `
     + `${retiredLabel}; its entries were not read.`);
 
-  const rebuildNext = planClubSeasonsConstantEdit(
+  let rebuildNext = planClubSeasonsConstantEdit(
     currentSources.rebuild, current.clubSeasonsExpectedRows, witnessRows,
   );
+  if (input.transition?.successorLadderTuple) {
+    try {
+      rebuildNext = planSuccessorTuplesEdit(rebuildNext, input.transition.successorLadderTuple);
+    } catch (error) {
+      if (error instanceof LadderSuccessorRefused) refuse(error.message);
+      throw error;
+    }
+  }
 
   // --- the successor must satisfy exactly the rules the predecessor did -----
   assertCoherent({

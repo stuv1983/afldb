@@ -79,7 +79,13 @@ import {
   type InputRole,
 } from '../src/lib/rollover/transition-change-set';
 import { censusRecord, type CensusScope } from '../src/lib/rollover/afl-api-ownership-census';
-import { finalValidationChecks } from '../tools/db/rebuild-test';
+import {
+  LadderSuccessorRefused, assertSuccessorLadderTuple, deriveLadderWitnessRows, parseSuccessorLadderTuples,
+  planSuccessorTuplesEdit, readSuccessorLadderTuplesJson, type SuccessorLadderTuple,
+} from '../src/lib/rollover/ladder-successor';
+import {
+  SUCCESSOR_LADDER_TUPLES, SUCCESSOR_LADDER_TUPLES_JSON, finalValidationChecks, resolveLadderRebuildExpectation,
+} from '../tools/db/rebuild-test';
 import { validateProposedRebuildState, type ProposedDocuments } from '../tools/db/rollover-proposed-state';
 
 const root = process.cwd();
@@ -3179,5 +3185,403 @@ describe('the bound apply and its failure modes', () => {
       expect(text).toMatch(/NOT a filesystem transaction|NOT a transaction/i);
       expect(text).not.toMatch(/atomic(ally)? (across|multi)/i);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-316 C2 — the successor ladder tuple (mechanism A), synthetic configurations only
+// ---------------------------------------------------------------------------
+//
+// Every value below is synthetic: the profile name, the labels, the fingerprints and the witness manifest
+// exist only in this file. The shipped table is EMPTY, so nothing here activates a successor or accepts a
+// row count. Each negative case changes one thing in an otherwise coherent successor transition.
+
+const SYNTHETIC_SUCCESSOR = 'c2-2026-successor';
+const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
+/** The reviewed predecessor tuple, read from the real documents it is bound to. */
+const PREDECESSOR_PAIR = (() => {
+  const d = realStateDocs();
+  const b = acceptedOf(d);
+  const w = ladderOf(d).accepted_witness;
+  return {
+    profile: 'predecessor-1897-2025', core_snapshot_label: b.snapshot_label,
+    core_manifest_sha256: b.acquisition.manifest_sha256, core_artefact_set_sha256: b.raw_artefacts.artefact_set_sha256,
+    witness_snapshot_label: w.snapshot_label, witness_manifest_sha256: w.manifest_sha256,
+    first_season: 1897, last_season: 2025, expected_rows: 1622,
+  };
+})();
+
+type SuccessorFixtureOptions = { claimedRows?: number; manifestRows?: number; last?: number };
+
+function successorFixture(opts: SuccessorFixtureOptions = {}) {
+  const last = opts.last ?? 2026;
+  const claimedRows = opts.claimedRows ?? 1640;
+  const manifestRows = opts.manifestRows ?? 1640;
+  const seasonsCovered = last - 1897 + 1;
+  const files = Array.from({ length: seasonsCovered }, (_, i) => ({
+    dataset: 'ladder', filename: `ladder_${1897 + i}.csv`,
+    row_count: Math.floor(manifestRows / seasonsCovered) + (i < manifestRows % seasonsCovered ? 1 : 0),
+  }));
+  const manifest = { snapshot_label: 'synthetic-ladder-successor', files };
+  const witnessText = JSON.stringify(manifest, null, 2) + '\n';
+  const tuple: SuccessorLadderTuple = {
+    profile: SYNTHETIC_SUCCESSOR, supersedes: 'predecessor-1897-2025',
+    core_snapshot_label: 'synthetic-core-successor',
+    core_manifest_sha256: 'a1'.repeat(32), core_artefact_set_sha256: 'b2'.repeat(32),
+    witness_snapshot_label: manifest.snapshot_label, witness_manifest_sha256: sha(witnessText),
+    first_season: 1897, last_season: last, expected_rows: claimedRows,
+  };
+
+  const d = realStateDocs();
+  const predecessor = acceptedOf(d);
+  const next = structuredClone(predecessor);
+  predecessor.acceptance_status = 'retired';
+  next.snapshot_label = tuple.core_snapshot_label;
+  next.acceptance_status = 'accepted';
+  next.acquisition.manifest_sha256 = tuple.core_manifest_sha256;
+  next.raw_artefacts.artefact_set_sha256 = tuple.core_artefact_set_sha256;
+  next.measured.seasons_last = last;
+  next.contract_binding.required_range.last_season = last;
+  d.register.baselines.push(next);
+
+  d.contract.full_history.season_range.last_season = last;
+  d.contract.full_history.current_season_excluded.seasons = [last + 1];
+  const ladder = ladderOf(d);
+  ladder.accepted_witness = {
+    ...ladder.accepted_witness, snapshot_label: tuple.witness_snapshot_label,
+    manifest: 'docs/rebuild-manifests/afltables_fitzroy_core/synthetic-ladder-successor.json',
+    manifest_sha256: tuple.witness_manifest_sha256, files: seasonsCovered, rows: claimedRows,
+  };
+  ladder.coverage.last_season = last;
+  ladder.rebuild_expectation = {
+    profile: SYNTHETIC_SUCCESSOR, core_snapshot_label: tuple.core_snapshot_label,
+    core_manifest_sha256: tuple.core_manifest_sha256, core_artefact_set_sha256: tuple.core_artefact_set_sha256,
+    witness_snapshot_label: tuple.witness_snapshot_label, witness_manifest_sha256: tuple.witness_manifest_sha256,
+    expected_rows: claimedRows, evidence_ref: 'synthetic successor evidence',
+  };
+  d.seasons.last_season = last + 1;
+  d.seasons.in_progress_seasons = [last + 1];
+  const constantOnly = planClubSeasonsConstantEdit(d.rebuild, 1622, claimedRows);
+  d.rebuild = planSuccessorTuplesEdit(constantOnly, tuple);
+  return { d, tuple, witnessText, constantOnly };
+}
+
+type SuccessorFixture = ReturnType<typeof successorFixture>;
+const judge = (
+  f: SuccessorFixture,
+  over: { witnessText?: string | null; successors?: Record<string, SuccessorLadderTuple>; pairs?: Pairs } = {},
+) => {
+  const docs = asProposed(f.d);
+  const witnessManifest = over.witnessText === null ? undefined : (over.witnessText ?? f.witnessText);
+  return validateProposedRebuildState({ ...docs, witnessManifest }, over.pairs, over.successors);
+};
+
+describe('successor ladder tuple — the pure module', () => {
+  const tuple = () => successorFixture().tuple;
+
+  it('ships an EMPTY closed table, so no successor profile is accepted until an owner-reviewed adoption', () => {
+    expect(SUCCESSOR_LADDER_TUPLES_JSON).toBe('{}');
+    expect(SUCCESSOR_LADDER_TUPLES).toEqual({});
+    expect(Object.isFrozen(SUCCESSOR_LADDER_TUPLES)).toBe(true);
+    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe('{}');
+  });
+
+  it('appends exactly one tuple, keeps earlier entries byte-identical and round-trips', () => {
+    const base = repoText(REBUILD_PATH);
+    const once = planSuccessorTuplesEdit(base, tuple());
+    const parsed = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(once));
+    expect(Object.keys(parsed)).toEqual([SYNTHETIC_SUCCESSOR]);
+    expect(parsed[SYNTHETIC_SUCCESSOR]).toEqual(tuple());
+    expect(once.replace(readSuccessorLadderTuplesJson(once), '{}')).toBe(base);
+    const second: SuccessorLadderTuple = { ...tuple(), profile: 'c2-2027-successor', supersedes: SYNTHETIC_SUCCESSOR };
+    const twice = planSuccessorTuplesEdit(once, second);
+    const both = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(twice));
+    expect(Object.keys(both)).toEqual([SYNTHETIC_SUCCESSOR, 'c2-2027-successor']);
+    expect(JSON.stringify(both[SYNTHETIC_SUCCESSOR])).toBe(JSON.stringify(tuple()));
+  });
+
+  it('refuses a duplicate, a missing literal and a second literal', () => {
+    const once = planSuccessorTuplesEdit(repoText(REBUILD_PATH), tuple());
+    expect(() => planSuccessorTuplesEdit(once, tuple())).toThrow(/already lists/);
+    expect(() => planSuccessorTuplesEdit('const x = 1;', tuple())).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
+    const doubled = `${repoText(REBUILD_PATH)}\nexport const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
+    expect(() => planSuccessorTuplesEdit(doubled, tuple())).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
+    const broken = repoText(REBUILD_PATH).replace("SUCCESSOR_LADDER_TUPLES_JSON = '{}'", "SUCCESSOR_LADDER_TUPLES_JSON = '{nope'");
+    expect(() => planSuccessorTuplesEdit(broken, tuple())).toThrow(/not valid JSON/);
+  });
+
+  it.each([
+    ['a rehearsal name', (t: Record<string, unknown>) => { t.profile = 'c2-2026-rehearsal-only'; }, /names a rehearsal|must be the same/],
+    ['a key that is not the profile', (t: Record<string, unknown>) => { t.profile = 'c2-2026-other'; }, /must be the same/],
+    ['a rehearsal predecessor', (t: Record<string, unknown>) => { t.supersedes = 'c2-2026-rehearsal-only'; }, /different, non-rehearsal/],
+    ['a self-superseding tuple', (t: Record<string, unknown>) => { t.supersedes = SYNTHETIC_SUCCESSOR; }, /different, non-rehearsal/],
+    ['an unknown field', (t: Record<string, unknown>) => { t.note = 'x'; }, /unknown field "note"/],
+    ['a missing field', (t: Record<string, unknown>) => { delete t.witness_manifest_sha256; }, /missing "witness_manifest_sha256"/],
+    ['a non-hex fingerprint', (t: Record<string, unknown>) => { t.core_manifest_sha256 = 'ABC'; }, /lower-case SHA-256/],
+    ['a fractional row count', (t: Record<string, unknown>) => { t.expected_rows = 1640.5; }, /positive integer/],
+    ['an empty range', (t: Record<string, unknown>) => { t.last_season = 1800; }, /not a season year|empty/],
+  ])('refuses %s', (_label, mutate, message) => {
+    const t = structuredClone(tuple()) as unknown as Record<string, unknown>;
+    mutate(t);
+    expect(() => assertSuccessorLadderTuple(t, SYNTHETIC_SUCCESSOR)).toThrow(LadderSuccessorRefused);
+    expect(() => assertSuccessorLadderTuple(t, SYNTHETIC_SUCCESSOR)).toThrow(message);
+  });
+
+  it('refuses a rehearsal-named tuple filed under its own name', () => {
+    const t = { ...tuple(), profile: 'c2-2026-rehearsal-only' };
+    expect(() => assertSuccessorLadderTuple(t, 'c2-2026-rehearsal-only')).toThrow(/names a rehearsal/);
+  });
+
+  it('derives the witness row total from the manifest alone and refuses every malformed shape', () => {
+    const { witnessText } = successorFixture();
+    expect(deriveLadderWitnessRows(witnessText, 1897, 2026, 'synthetic-ladder-successor')).toEqual({ files: 130, rows: 1640 });
+    const m = () => JSON.parse(witnessText);
+    const text = (x: unknown) => JSON.stringify(x);
+    const dup = m(); dup.files[1].filename = 'ladder_1897.csv';
+    const gap = m(); gap.files.pop();
+    const outside = m(); outside.files[0].filename = 'ladder_1896.csv';
+    const other = m(); other.files[0].dataset = 'results';
+    const empty = m(); empty.files[0].row_count = 0;
+    expect(() => deriveLadderWitnessRows(text(dup), 1897, 2026)).toThrow(/twice/);
+    expect(() => deriveLadderWitnessRows(text(gap), 1897, 2026)).toThrow(/129 season files, not the 130/);
+    expect(() => deriveLadderWitnessRows(text(outside), 1897, 2026)).toThrow(/outside 1897..2026/);
+    expect(() => deriveLadderWitnessRows(text(other), 1897, 2026)).toThrow(/not a ladder_<season>.csv ladder file/);
+    expect(() => deriveLadderWitnessRows(text(empty), 1897, 2026)).toThrow(/positive integer row_count/);
+    expect(() => deriveLadderWitnessRows(witnessText, 1897, 2026, 'another-label')).toThrow(/labelled/);
+    expect(() => deriveLadderWitnessRows('{ nope', 1897, 2026)).toThrow(/not valid JSON/);
+  });
+
+  it('accepts a change set carrying one reviewed tuple and refuses a malformed one', () => {
+    const s = scenario();
+    (s.changeSet as Record<string, unknown>).ladder_successor_tuple = structuredClone(tuple());
+    expect(parseTransitionChangeSet(JSON.stringify(s.changeSet)).successorLadderTuple).toEqual(tuple());
+    expect(parseTransitionChangeSet(JSON.stringify(scenario().changeSet)).successorLadderTuple).toBeNull();
+    for (const bad of [{ ...tuple(), profile: 'c2-2026-rehearsal-only' }, { ...tuple(), extra: 1 }, 'x', []]) {
+      const t = scenario();
+      (t.changeSet as Record<string, unknown>).ladder_successor_tuple = bad;
+      expect(() => parseTransitionChangeSet(JSON.stringify(t.changeSet))).toThrow(RolloverRefused);
+    }
+  });
+
+  it('writes the tuple through the planner into the rebuild source, and only when one is supplied', () => {
+    const stub = `${REBUILD_STUB}export const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
+    const plain = run({ rebuildSource: stub });
+    expect(fileIn(plain, REBUILD_PATH).content).toContain("SUCCESSOR_LADDER_TUPLES_JSON = '{}'");
+    const withTuple = run({ rebuildSource: stub, transition: { successorLadderTuple: tuple() } });
+    const out = fileIn(withTuple, REBUILD_PATH).content;
+    expect(parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(out))[SYNTHETIC_SUCCESSOR]).toEqual(tuple());
+    expect(readClubSeasonsExpectedRows(out)).toBe(ROWS_2026);
+    expect(() => run({ transition: { successorLadderTuple: tuple() } })).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
+  });
+});
+
+describe("successor ladder tuple — a coherent synthetic transition is judged by the rebuild's own validators", () => {
+  it('accepts the whole proposed state when the tuple comes from the proposed rebuild text', () => {
+    const verdict = judge(successorFixture());
+    expect(verdict.ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
+    expect(verdict.expectedRows).toBe(1640);
+    expect(verdict.finalChecks.length).toBeGreaterThan(80);
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/NOT executed/);
+  });
+
+  it('accepts the same state with the table injected, and refuses it under the empty shipped table', () => {
+    const f = successorFixture();
+    expect(judge(f, { successors: { [SYNTHETIC_SUCCESSOR]: f.tuple } }).ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
+    const unadopted = { ...f, d: { ...f.d, rebuild: f.constantOnly } };
+    expect(() => judge(unadopted)).toThrow(/Unsupported ladder expectation/);
+  });
+
+  it('judges the bytes it is given: the working-tree rebuild-test.ts is never consulted for the tuple', () => {
+    const f = successorFixture();
+    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe('{}');
+    expect(judge(f).ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
+    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe('{}');
+  });
+
+  it('needs the proposed witness manifest and never reads the working tree instead', () => {
+    expect(() => judge(successorFixture(), { witnessText: null })).toThrow(/needs the proposed witness manifest/);
+  });
+
+  describe('wrong fingerprints refuse even when every other value is consistent', () => {
+    it.each([
+      'core_manifest_sha256', 'core_artefact_set_sha256', 'witness_manifest_sha256',
+      'core_snapshot_label', 'witness_snapshot_label',
+    ])('the contract block disagrees with the tuple on %s', (field) => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation[field] = field.endsWith('label') ? 'another-label' : 'c3'.repeat(32);
+      expect(() => judge(f)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it.each(['core_manifest_sha256', 'core_artefact_set_sha256', 'witness_manifest_sha256'])(
+      'the register or contract disagrees with the tuple on %s', (field) => {
+        const f = successorFixture();
+        const entry = f.d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+        if (field === 'core_manifest_sha256') entry.acquisition.manifest_sha256 = 'c3'.repeat(32);
+        if (field === 'core_artefact_set_sha256') entry.raw_artefacts.artefact_set_sha256 = 'c3'.repeat(32);
+        if (field === 'witness_manifest_sha256') ladderOf(f.d).accepted_witness.manifest_sha256 = 'c3'.repeat(32);
+        expect(() => judge(f)).toThrow(/binding mismatch/);
+      });
+
+    it('the witness manifest bytes are not the manifest the tuple pins', () => {
+      const f = successorFixture();
+      const altered = JSON.parse(f.witnessText);
+      altered.files[0].row_count += 1;
+      expect(() => judge(f, { witnessText: JSON.stringify(altered, null, 2) + '\n' })).toThrow(/not the manifest the tuple pins/);
+    });
+  });
+
+  describe('wrong counts refuse', () => {
+    it('a contract row count the tuple does not carry', () => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation.expected_rows = 1639;
+      expect(() => judge(f)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('a rebuild constant the tuple does not share', () => {
+      const f = successorFixture();
+      f.d.rebuild = planClubSeasonsConstantEdit(f.d.rebuild, 1640, 1622);
+      expect(() => judge(f)).toThrow(/expects 1622 club_seasons rows/);
+    });
+
+    it('a tuple, contract and constant that agree with each other but not with the witness manifest', () => {
+      const f = successorFixture({ claimedRows: 1641, manifestRows: 1640 });
+      expect(() => judge(f)).toThrow(/derives 1640 rows, not the tuple's 1641/);
+    });
+
+    it('a contract witness record that still describes the predecessor', () => {
+      const f = successorFixture();
+      Object.assign(ladderOf(f.d).accepted_witness, { files: 129, rows: 1622 });
+      expect(() => judge(f)).toThrow(/accepted_witness records 129 files \/ 1622 rows, not 130 \/ 1640/);
+    });
+
+    it('a tuple that does not exceed its predecessor', () => {
+      const f = successorFixture({ claimedRows: 1622, manifestRows: 1622 });
+      expect(() => judge(f)).toThrow(/does not exceed the predecessor's 1622/);
+    });
+  });
+
+  describe('a stale predecessor or an incomplete transition refuses', () => {
+    const predecessorEntry = (f: SuccessorFixture) =>
+      f.d.register.baselines.find((b: any) => b.snapshot_label === 'full-history-20260902');
+
+    it('the predecessor is still accepted (two accepted entries)', () => {
+      const f = successorFixture();
+      predecessorEntry(f).acceptance_status = 'accepted';
+      expect(() => judge(f)).toThrow(/baselines are marked accepted/);
+    });
+
+    it.each([
+      ['removed', (f: SuccessorFixture) => { f.d.register.baselines = f.d.register.baselines.filter((b: any) => b.snapshot_label !== 'full-history-20260902'); }],
+      ['not retired', (f: SuccessorFixture) => { predecessorEntry(f).acceptance_status = 'rehearsal_not_selected'; }],
+      ['re-fingerprinted', (f: SuccessorFixture) => { predecessorEntry(f).acquisition.manifest_sha256 = 'c3'.repeat(32); }],
+      ['re-set', (f: SuccessorFixture) => { predecessorEntry(f).raw_artefacts.artefact_set_sha256 = 'c3'.repeat(32); }],
+    ])('the retired predecessor entry is %s', (_label, mutate) => {
+      const f = successorFixture();
+      mutate(f);
+      expect(() => judge(f)).toThrow(/does not retain the predecessor/);
+    });
+
+    it.each([
+      ['seasons.json last_season not advanced', (f: SuccessorFixture) => { f.d.seasons.last_season = 2026; }, /seasons.json must declare last_season 2027/],
+      ['no season in progress', (f: SuccessorFixture) => { f.d.seasons.in_progress_seasons = []; }, /seasons.json must declare last_season 2027/],
+      ['the completed season still in progress', (f: SuccessorFixture) => { f.d.seasons.in_progress_seasons = [2026]; }, /intersects excluded\/in-progress seasons: 2026/],
+      ['two seasons in progress', (f: SuccessorFixture) => { f.d.seasons.in_progress_seasons = [2027, 2028]; }, /seasons.json must declare last_season 2027/],
+      ['the contract exclusion still names the completed season', (f: SuccessorFixture) => { f.d.contract.full_history.current_season_excluded.seasons = [2026]; }, /intersects excluded\/in-progress seasons: 2026/],
+      ['the contract exclusion is empty', (f: SuccessorFixture) => { f.d.contract.full_history.current_season_excluded.seasons = []; }, /current_season_excluded.seasons must be \[2027\]/],
+      ['the contract range not advanced', (f: SuccessorFixture) => { f.d.contract.full_history.season_range.last_season = 2025; }, /binding mismatch/],
+      ['the witness coverage not advanced', (f: SuccessorFixture) => { ladderOf(f.d).coverage.last_season = 2025; }, /binding mismatch/],
+      ['the selected baseline range not advanced', (f: SuccessorFixture) => { acceptedOf(f.d).contract_binding.required_range.last_season = 2025; }, /binding mismatch/],
+    ])('%s', (_label, mutate, message) => {
+      const f = successorFixture();
+      mutate(f);
+      expect(() => judge(f)).toThrow(message);
+    });
+  });
+
+  describe('unknown or crossed tuples refuse', () => {
+    it('an unknown profile name even with consistent fingerprints', () => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation.profile = 'c2-2026-unreviewed';
+      expect(() => judge(f)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('a successor that supersedes a profile the reviewed table does not hold', () => {
+      const f = successorFixture();
+      const crossed = { ...f.tuple, supersedes: 'some-other-1897-2025' };
+      expect(() => judge(f, { successors: { [SYNTHETIC_SUCCESSOR]: crossed } })).toThrow(/not a reviewed predecessor tuple/);
+    });
+
+    it.each([
+      'core_manifest_sha256', 'core_artefact_set_sha256', 'witness_snapshot_label', 'witness_manifest_sha256',
+    ] as const)('a successor that reuses the predecessor %s', (field) => {
+      const f = successorFixture();
+      const crossed = { ...f.tuple, [field]: PREDECESSOR_PAIR[field] };
+      // every document agrees with the crossed tuple, so only the crossing itself can refuse
+      const entry = f.d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+      if (field === 'core_manifest_sha256') entry.acquisition.manifest_sha256 = PREDECESSOR_PAIR[field];
+      if (field === 'core_artefact_set_sha256') entry.raw_artefacts.artefact_set_sha256 = PREDECESSOR_PAIR[field];
+      if (field === 'witness_snapshot_label') ladderOf(f.d).accepted_witness.snapshot_label = PREDECESSOR_PAIR[field];
+      if (field === 'witness_manifest_sha256') ladderOf(f.d).accepted_witness.manifest_sha256 = PREDECESSOR_PAIR[field];
+      ladderOf(f.d).rebuild_expectation[field] = PREDECESSOR_PAIR[field];
+      expect(() => judge(f, { successors: { [SYNTHETIC_SUCCESSOR]: crossed } }))
+        .toThrow(new RegExp(`reuses the predecessor's ${field}`));
+    });
+
+    it('a range that is not exactly one completed season past the predecessor', () => {
+      const f = successorFixture({ last: 2027 });
+      expect(() => judge(f)).toThrow(/does not extend the predecessor's 1897..2025 by exactly one completed season/);
+    });
+
+    it('the same name listed as both a reviewed pair and a successor tuple', () => {
+      const f = successorFixture();
+      const both = { 'predecessor-1897-2025': PREDECESSOR_PAIR, [SYNTHETIC_SUCCESSOR]: { ...PREDECESSOR_PAIR, profile: SYNTHETIC_SUCCESSOR } };
+      expect(() => judge(f, { pairs: both as unknown as Pairs })).toThrow(/both a reviewed pair and a successor tuple/);
+    });
+
+    it('a rehearsal profile smuggled into an injected successor table', () => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation.profile = 'c2-2026-rehearsal-only';
+      expect(() => judge(f, { successors: { 'c2-2026-rehearsal-only': { ...f.tuple, profile: 'c2-2026-rehearsal-only' } } })).toThrow();
+    });
+  });
+
+  describe('the rehearsal restrictions and the other authorities are unchanged', () => {
+    const resolveDirect = (f: SuccessorFixture, provenance?: { specPath: string; specSha256: string }, injected = true) => {
+      const source = { label: f.tuple.core_snapshot_label, accepted: true, fullHistory: true, acknowledgedPartial: false, selection: 'accepted-baseline' as const };
+      const target = { database: 'afldb_test', adminDsn: '', importDsn: '', importIsOwnerSubstitution: false };
+      const docs = { register: f.d.register, contract: f.d.contract, seasons: f.d.seasons } as never;
+      return resolveLadderRebuildExpectation(source, target, docs, provenance, undefined, undefined,
+        injected ? { [SYNTHETIC_SUCCESSOR]: f.tuple } : undefined, f.witnessText);
+    };
+
+    it('still refuses the rehearsal-only profile as an active profile', () => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation.profile = 'c2-2026-rehearsal-only';
+      expect(() => judge(f)).toThrow(/can never be an active contract profile/);
+    });
+
+    it('resolves a coherent successor to a frozen pair without the supersedes link and a complete census scope', () => {
+      const ladder = resolveDirect(successorFixture());
+      expect(ladder.expectedRows).toBe(1640);
+      expect(ladder.censusScope).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
+      expect(Object.isFrozen(ladder.pair)).toBe(true);
+      expect('supersedes' in ladder.pair).toBe(false);
+    });
+
+    it('a successor profile cannot claim rehearsal provenance', () => {
+      expect(() => resolveDirect(successorFixture(), { specPath: '/spec', specSha256: 'a'.repeat(64) }))
+        .toThrow(/cannot claim candidate rehearsal purpose/);
+    });
+
+    it('the shipped empty table refuses the same state: the name alone grants nothing', () => {
+      expect(() => resolveDirect(successorFixture(), undefined, false)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('still accepts the real predecessor state and refuses the unreviewed successor name', () => {
+      expect(validateState(realStateDocs()).ladderProfile).toBe('predecessor-1897-2025');
+      const d = realStateDocs();
+      ladderOf(d).rebuild_expectation.profile = 'c2-2026-successor';
+      expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
+    });
   });
 });

@@ -537,7 +537,7 @@ function main(argv: string[]): number {
       const validated = validateTransitionState({
         files: writeSet,
         readRepo: readRepoBytes,
-        validate: (documents) => validateProposedRebuildState(documents),
+        validate: (documents) => validateProposedRebuildState({ ...documents, witnessManifest: witness.text }),
       });
       binding = validated.binding;
       console.log('\nPROPOSED-STATE VALIDATION - the rebuild\'s own validators over the proposed bytes '

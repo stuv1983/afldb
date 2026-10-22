@@ -23,6 +23,10 @@
  * valid only inside an isolated, provenance-bound rehearsal and can never be an active profile.
  */
 import { RolloverRefused, readClubSeasonsExpectedRows } from '../../src/lib/rollover/season-rollover';
+import {
+  LadderSuccessorRefused, parseSuccessorLadderTuples, readSuccessorLadderTuplesJson,
+  type SuccessorLadderTuple,
+} from '../../src/lib/rollover/ladder-successor';
 import type { RehearsalPair } from '../v2/rehearsal-package.mjs';
 import {
   RebuildRefused,
@@ -39,8 +43,13 @@ export type ProposedDocuments = {
   contract: string;
   aflApi: string;
   afltables: string;
-  /** `tools/db/rebuild-test.ts`: only the CLUB_SEASONS_EXPECTED constant is read from it. */
+  /**
+   * `tools/db/rebuild-test.ts`: the CLUB_SEASONS_EXPECTED constant and the SUCCESSOR_LADDER_TUPLES_JSON
+   * literal are read from it, so a successor profile is judged against the table the PROPOSED code would carry.
+   */
   rebuild: string;
+  /** The proposed ladder witness manifest, for a successor's independent row derivation. */
+  witnessManifest?: string;
 };
 
 export type ProposedStateVerdict = {
@@ -76,11 +85,14 @@ const ACTIVE_TARGET: ResolvedTarget = {
 /**
  * Judge a proposed successor state with the rebuild's own validators. Refuses with a
  * `RolloverRefused` naming the failing rule; returns what was judged and what is still pending.
- * `pairs` is the closed table of reviewed ladder tuples; only a test supplies another.
+ * `pairs` is the closed table of reviewed ladder tuples; only a test supplies another. `successors` is the
+ * closed table of reviewed successor tuples; by default it is the one the PROPOSED `rebuild` text carries, never
+ * the running module's, so an unadopted tuple cannot be judged against code that does not contain it.
  */
 export function validateProposedRebuildState(
   docs: ProposedDocuments,
   pairs?: Readonly<Record<string, RehearsalPair>>,
+  successors?: Readonly<Record<string, SuccessorLadderTuple>>,
 ): ProposedStateVerdict {
   const register = parse(docs.register, 'acceptance register');
   const seasons = parse(docs.seasons, 'seasons reference');
@@ -106,10 +118,25 @@ export function validateProposedRebuildState(
 
     // Selector, fingerprint tuple, row count, completed range and census scope, from the
     // proposed documents. An absent or unreviewed profile name is refused here.
+    let proposedSuccessors = successors;
+    if (proposedSuccessors === undefined) {
+      try {
+        proposedSuccessors = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(docs.rebuild));
+      } catch (error) {
+        if (error instanceof LadderSuccessorRefused) throw new RebuildRefused(error.message);
+        throw error;
+      }
+    }
+    if (typeof profile === 'string' && Object.hasOwn(proposedSuccessors, profile)
+        && docs.witnessManifest === undefined) {
+      throw new RebuildRefused(
+        `The proposed ladder profile ${JSON.stringify(profile)} is a successor tuple, which needs the proposed `
+        + 'witness manifest bytes for its independent row derivation; the working tree is never read instead.');
+    }
     const ladder = resolveLadderRebuildExpectation(
       source, ACTIVE_TARGET,
       { register, contract, seasons } as Parameters<typeof resolveLadderRebuildExpectation>[2],
-      undefined, undefined, pairs,
+      undefined, undefined, pairs, proposedSuccessors, docs.witnessManifest,
     );
 
     const constantRows = readClubSeasonsExpectedRows(docs.rebuild);

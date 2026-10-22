@@ -44,6 +44,9 @@ import {
   type TransitionInput,
 } from './season-rollover';
 import { AFLTABLES_NETWORK_PATH } from './afltables-network-retirement';
+import {
+  LadderSuccessorRefused, assertSuccessorLadderTuple, type SuccessorLadderTuple,
+} from './ladder-successor';
 
 export const AFL_API_CONTRACT_PATH = 'tools/rebuild/afl_api/afl-api-contract.json';
 export const AFLTABLES_CONTRACT_PATH = 'tools/rebuild/afltables/afltables-contract.json';
@@ -154,6 +157,8 @@ export type TransitionChangeSet = {
   base: TransitionFileRef | null;
   replace: TransitionFileRef[];
   registerPatches: RegisterPatch[];
+  /** A reviewed successor ladder tuple, appended to the rebuild's closed table by the planner. */
+  successorLadderTuple: SuccessorLadderTuple | null;
   writeSet: string[];
   finalSha256: Record<string, string> | null;
 };
@@ -179,7 +184,7 @@ export function parseTransitionChangeSet(text: string): TransitionChangeSet {
   }
   const o = asObject(doc, 'The transition change set');
   exactKeys(o, ['schema', 'season', 'inputs', 'replace', 'register_patches', 'write_set'],
-    'The transition change set', ['base', 'final_sha256']);
+    'The transition change set', ['base', 'final_sha256', 'ladder_successor_tuple']);
   if (o.schema !== TRANSITION_SCHEMA) {
     refuse(`The transition change set schema is ${JSON.stringify(o.schema)}, not ${TRANSITION_SCHEMA}.`);
   }
@@ -218,6 +223,17 @@ export function parseTransitionChangeSet(text: string): TransitionChangeSet {
   const writeSet = o.write_set.map((p, index) => repoPath(p, `write_set[${index}]`));
   if (new Set(writeSet).size !== writeSet.length) refuse('write_set lists a path twice.');
 
+  let successorLadderTuple: SuccessorLadderTuple | null = null;
+  if (o.ladder_successor_tuple !== undefined && o.ladder_successor_tuple !== null) {
+    const raw = asObject(o.ladder_successor_tuple, 'ladder_successor_tuple');
+    try {
+      successorLadderTuple = assertSuccessorLadderTuple(raw, String(raw.profile));
+    } catch (error) {
+      if (error instanceof LadderSuccessorRefused) refuse(error.message);
+      throw error;
+    }
+  }
+
   let finalSha256: Record<string, string> | null = null;
   if (o.final_sha256 !== undefined && o.final_sha256 !== null) {
     const f = asObject(o.final_sha256, 'final_sha256');
@@ -233,6 +249,7 @@ export function parseTransitionChangeSet(text: string): TransitionChangeSet {
     base: o.base === undefined || o.base === null ? null : fileRef(o.base, 'base'),
     replace,
     registerPatches,
+    successorLadderTuple,
     writeSet,
     finalSha256,
   };
@@ -384,7 +401,10 @@ export function prepareTransition(input: {
 
   return {
     changeSet,
-    transition: { contractBase, registerPatches: changeSet.registerPatches },
+    transition: {
+      contractBase, registerPatches: changeSet.registerPatches,
+      ...(changeSet.successorLadderTuple ? { successorLadderTuple: changeSet.successorLadderTuple } : {}),
+    },
     replacements,
     notes,
   };

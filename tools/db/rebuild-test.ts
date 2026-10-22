@@ -91,6 +91,10 @@ import {
   SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
 } from '../records/first-kick-goal-source';
 import {
+  LadderSuccessorRefused, assertSuccessorTransition, parseSuccessorLadderTuples,
+  type SuccessorLadderTuple,
+} from './ladder-successor';
+import {
   PsqlCredentialRefused, psqlConnection, redact, runPsql, withoutLibpqRouting, type SpawnSyncLike,
 } from './psql';
 import {
@@ -1169,6 +1173,16 @@ const LADDER_PAIRS: Readonly<Record<string, RehearsalPair>> = freezeBinding({
     first_season: 1897, last_season: 2026, expected_rows: 1640,
   },
 });
+/**
+ * The closed table of reviewed SUCCESSOR ladder tuples (AFLDB-ISSUE-316 C2, mechanism A), as a JSON literal so
+ * the rollover planner can read and edit it without executing this module. EMPTY until an owner-reviewed
+ * adoption supplies a tuple: an empty table accepts no successor profile, so nothing here activates 1,640 or
+ * any other count. A tuple is judged only together with the register, contract, witness and `seasons.json`
+ * it must agree with (`assertSuccessorTransition`); its name alone grants nothing.
+ */
+export const SUCCESSOR_LADDER_TUPLES_JSON = '{}';
+export const SUCCESSOR_LADDER_TUPLES: Readonly<Record<string, SuccessorLadderTuple>> =
+  freezeBinding(parseSuccessorLadderTuples(SUCCESSOR_LADDER_TUPLES_JSON));
 export type LadderRebuildExpectation = Readonly<{
   pair: RehearsalPair; expectedRows: number; firstSeason: number; lastSeason: number;
   censusScope: CensusScope;
@@ -1180,6 +1194,21 @@ function ladderDocuments(): LadderDocuments {
 }
 export type RehearsalProvenance = Readonly<{ specPath: string; specSha256: string }>;
 
+function successorPair(t: SuccessorLadderTuple): RehearsalPair {
+  return {
+    profile: t.profile, core_snapshot_label: t.core_snapshot_label, core_manifest_sha256: t.core_manifest_sha256,
+    core_artefact_set_sha256: t.core_artefact_set_sha256, witness_snapshot_label: t.witness_snapshot_label,
+    witness_manifest_sha256: t.witness_manifest_sha256, first_season: t.first_season, last_season: t.last_season,
+    expected_rows: t.expected_rows,
+  };
+}
+/** A successor's witness manifest from the tracked path, LF-normalised exactly as its pin is computed; undefined when unreadable. */
+function readTrackedWitnessManifest(path: unknown): string | undefined {
+  if (typeof path !== 'string' || isAbsolute(path) || path.split(/[\\/]/).some((p) => !p || p === '..' || p === '.')) return undefined;
+  const full = join(REPO_ROOT, path);
+  return existsSync(full) ? readFileSync(full).toString('utf8').replace(/\r\n/g, '\n') : undefined;
+}
+
 /** Closed reviewed tuples. Counts, labels and metadata alone confer no new authority. */
 export function resolveLadderRebuildExpectation(
   source: FitzroySource, target: ResolvedTarget, documents: LadderDocuments = ladderDocuments(),
@@ -1187,6 +1216,10 @@ export function resolveLadderRebuildExpectation(
   verify: typeof verifyRehearsalPackage = verifyRehearsalPackage,
   /** The closed table of reviewed tuples. Only a test or an owner-reviewed code change supplies another. */
   pairs: Readonly<Record<string, RehearsalPair>> = LADDER_PAIRS,
+  /** The closed table of reviewed successor tuples; empty in the repository until an owner-reviewed adoption. */
+  successors: Readonly<Record<string, SuccessorLadderTuple>> = SUCCESSOR_LADDER_TUPLES,
+  /** Witness manifest bytes for a successor's independent row derivation; read from the tracked path when absent. */
+  witnessManifestText?: string,
 ): LadderRebuildExpectation {
   const { register, contract, seasons } = documents;
   const label = selectAcceptedBaseline(register).label;
@@ -1197,8 +1230,14 @@ export function resolveLadderRebuildExpectation(
   const ladder = contract.datasets?.ladder;
   const block = ladder?.rebuild_expectation;
   if (!block || typeof block !== 'object' || Array.isArray(block)) throw new RebuildRefused('Missing explicit ladder rebuild_expectation; no default is authorised.');
-  const supported = typeof block.profile === 'string' && Object.hasOwn(pairs, block.profile)
-    ? pairs[block.profile] : undefined;
+  const successor = typeof block.profile === 'string' && Object.hasOwn(successors, block.profile)
+    ? successors[block.profile] : undefined;
+  if (successor && Object.hasOwn(pairs, successor.profile)) {
+    throw new RebuildRefused('Ladder profile is listed as both a reviewed pair and a successor tuple.');
+  }
+  const supported: RehearsalPair | undefined = successor
+    ? successorPair(successor)
+    : typeof block.profile === 'string' && Object.hasOwn(pairs, block.profile) ? pairs[block.profile] : undefined;
   const keys = ['profile', 'core_snapshot_label', 'core_manifest_sha256', 'core_artefact_set_sha256', 'witness_snapshot_label', 'witness_manifest_sha256', 'expected_rows', 'evidence_ref'];
   if (!supported || Object.keys(block).length !== keys.length || keys.some((k) => !(k in block))
       || typeof block.evidence_ref !== 'string' || !block.evidence_ref.trim()
@@ -1216,6 +1255,19 @@ export function resolveLadderRebuildExpectation(
       || !Array.isArray(contract.full_history?.approved_source_gaps?.seasons)
       || contract.full_history.approved_source_gaps.seasons.length) {
     throw new RebuildRefused('Ladder core/witness/completed range/census binding mismatch.');
+  }
+  if (successor) {
+    if (provenance) throw new RebuildRefused('A successor profile cannot claim candidate rehearsal purpose.');
+    try {
+      assertSuccessorTransition({
+        successor, predecessor: Object.hasOwn(pairs, successor.supersedes) ? pairs[successor.supersedes] : undefined,
+        register, contract, seasons,
+        witnessManifestText: witnessManifestText ?? readTrackedWitnessManifest(ladder.accepted_witness?.manifest),
+      });
+    } catch (error) {
+      if (error instanceof LadderSuccessorRefused) throw new RebuildRefused(`Successor ladder transition refused: ${error.message}`);
+      throw error;
+    }
   }
   const result = freezeBinding({ pair: { ...supported }, expectedRows: block.expected_rows,
     firstSeason: supported.first_season, lastSeason: supported.last_season, censusScope: scope });

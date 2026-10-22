@@ -226,7 +226,7 @@ export function verifyRehearsalPackage(request, io = fs) {
   if (!equal(enumerate(spec.package_root, true).filter((n) => n !== 'SHA256SUMS.txt'), entries.map((e) => e.path))) refuse('package membership');
   const required = ['REHEARSAL_BINDINGS.json', 'source/tools/v2/rehearsal-package.mjs', 'source/tools/v2/rehearsal-package.d.mts',
     'source/tools/v2/rehearsal-resolution-guard.mjs', 'source/tools/v2/isolated-pg.ts', 'source/tools/db/rebuild-test.ts', 'source/tools/db/afl-api-ownership-census.ts',
-    'source/src/lib/rollover/afl-api-ownership-census.ts', 'source/package.json', 'source/package-lock.json', 'source/tsconfig.json',
+    'source/src/lib/rollover/afl-api-ownership-census.ts', 'source/tools/db/ladder-successor.ts', 'source/src/lib/rollover/ladder-successor.ts', 'source/package.json', 'source/package-lock.json', 'source/tsconfig.json',
     'source/tools/rebuild/fitzroy/fitzroy-contract.json', 'source/data/reference/fitzroy-accepted-baselines.json', 'source/data/reference/seasons.json'];
   if (!Array.isArray(spec.required_files) || required.some((p) => !spec.required_files.includes(p))
       || spec.required_files.some((p) => !entries.some((e) => e.path === p))) refuse('required closure membership');

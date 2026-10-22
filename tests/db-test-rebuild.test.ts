@@ -518,6 +518,7 @@ describe('ISSUE-316 ladder-season-scope', () => {
       const binding = { schema_version: 1, purpose: 'issue316-c2-rehearsal-only', implementation_basis: 'a'.repeat(40), source_subdir: 'source', pair, target };
       const required = ['tools/v2/rehearsal-package.mjs', 'tools/v2/rehearsal-package.d.mts', 'tools/v2/rehearsal-resolution-guard.mjs', 'tools/v2/isolated-pg.ts',
         'tools/db/rebuild-test.ts', 'tools/db/afl-api-ownership-census.ts', 'src/lib/rollover/afl-api-ownership-census.ts',
+        'tools/db/ladder-successor.ts', 'src/lib/rollover/ladder-successor.ts',
         'package.json', 'package-lock.json', 'tsconfig.json', 'tools/rebuild/fitzroy/fitzroy-contract.json',
         'data/reference/fitzroy-accepted-baselines.json', 'data/reference/seasons.json', 'data/synthetic-input.csv'];
       for (const p of required) put(join(src, p), `synthetic ${p}\n`);
