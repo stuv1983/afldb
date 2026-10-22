@@ -252,7 +252,7 @@ describe('AFLDB-ISSUE-316 L2: unaccepted pending-Brownlow source votes reach no 
       { id: first, votes: 20, isWinner: true }, { id: second, votes: 18, isWinner: false },
       { id: third, votes: 12, isWinner: false },
     ]);
-    expect(p.playerRows).toEqual([{ season: SEASON, votes: 20, voteRank: 1, isWinner: true }]);
+    expect(p.playerRows).toEqual([{ season: SEASON, votes: 20, voteRank: 1, isWinner: true, isIneligible: false }]);
     expect(p.medallists).toEqual([first]);
     expect(p.medallistAxis).toBe(true);
     expect(p.careerMinAxis).toBe(true);
@@ -268,7 +268,7 @@ describe('AFLDB-ISSUE-316 L2: unaccepted pending-Brownlow source votes reach no 
     await setAuthority('published');
     const p = await project();
     expect(p.winners).toEqual([fixture.playerIds[0]]);
-    expect(p.playerRows).toEqual([{ season: SEASON, votes: 20, voteRank: 1, isWinner: true }]);
+    expect(p.playerRows).toEqual([{ season: SEASON, votes: 20, voteRank: 1, isWinner: true, isIneligible: false }]);
     expect(p.seasonStatus.map((r) => r.status)).toEqual(['complete', 'complete', 'complete']);
     expect(p.career[0]).toEqual({ votes: 20, medals: 1 });
   });

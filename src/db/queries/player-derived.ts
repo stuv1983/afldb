@@ -587,8 +587,10 @@ export async function recomputeSeasonMetadata(tx: Tx, season: number): Promise<v
  * above, restricted to the affected players and kept in lockstep with it
  * and with `REBUILDS["player_career_stats"]` in
  * tools/migration/rebuild_derived.py: votes are the sum over
- * brownlow_season_votes, medals the count of winning seasons, and a
- * player with no season rows at all falls to 0/0 rather than keeping a
+ * brownlow_season_votes over ACCEPTED seasons only (`acceptedBrownlowRowsSql`;
+ * AFLDB-ISSUE-316: a season whose Brownlow is still pending must not reach a
+ * career total), medals the count of winning seasons, and a
+ * player with no accepted season rows at all falls to 0/0 rather than keeping a
  * stale total. That last case is why this is an UPDATE over the supplied
  * ids rather than over the rows a join finds: the set of affected players
  * includes those whose LAST season row a re-derivation just removed.
@@ -609,10 +611,10 @@ export async function recomputeBrownlowCareerTotals(
       FROM (
         SELECT selected.player_id,
                (SELECT sum(bsv.votes)
-                  FROM brownlow_season_votes bsv
+                  FROM ${tx.unsafe(acceptedBrownlowRowsSql())} bsv
                  WHERE bsv.player_id = selected.player_id)   AS votes,
                (SELECT count(*)
-                  FROM brownlow_season_votes bsv
+                  FROM ${tx.unsafe(acceptedBrownlowRowsSql())} bsv
                  WHERE bsv.player_id = selected.player_id
                    AND bsv.is_winner)                        AS medals
           FROM player_career_stats selected

@@ -1396,6 +1396,13 @@ export async function publishBrownlowSeason(input: {
          WHERE season = ${input.season}
       `;
 
+      // The season only becomes ACCEPTED (and so visible to the accepted-only
+      // projections) with the authority update above, after `writeSeasonRows`
+      // has already run its own recomputes. Run them again now that it is, so
+      // the career totals and season status never lag acceptance (AFLDB-ISSUE-316).
+      await recomputeSeasonBrownlowStatus(tx, input.season);
+      await recomputeBrownlowCareerTotals(tx, summary.affectedPlayerIds);
+
       const publication = await publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
         season: input.season, actorId: input.actorId, note: input.note ?? 'Authorised completed-season publication',
         registry: { first_season: input.season, last_season: input.season, in_progress_seasons: [] },
