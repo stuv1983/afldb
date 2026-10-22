@@ -15,6 +15,10 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Exact-implementation C2 rehearsal validation at `a5ec6b0c` (2026-10-23)
+
+- Validation state (no application, schema or active-reference change): a fresh complete isolated C2 rehearsal PASSED at `a5ec6b0cbd0977eea77cd655d28b54b108fdb0bc` (packaged code identical to `73116273`) through the production launcher: the four content pins accepted in preflight, 1897–2026 census pass on a fresh database (mechanism and scope only), capture-bound reset/reinstate, 30 stages, strict real D7 (all 1,640 comparable club-seasons), `AFLDB-FINAL-VALIDATION PASSED: 91 checks`, post-rebuild pending-2026 Brownlow and historical projection checks, clean shutdown. The runtime was a clean-install environment with its own measured record (`6c4ea3ea…`); recovered coach raw (387 files) was bound as a hashed bundle and verified by the real coach loader (the package alphabet refuses the space in `Allan_La Fontaine.html`, so the raw pages cannot be package members). Rehearsal-only: the successor tuple table is still empty, `c2-2026-successor` is not activated, 1,640 is not an active reference, production remains NO-GO. Evidence: `C:/tmp/afldb-c2-FINAL-IMPL-VALIDATION-20261023/`.
+
 ### ISSUE-316 - Inactive successor ladder tuple capability, content pins and Python archive pins (2026-10-23)
 
 - Rollover/rebuild: a fingerprint-bound successor ladder tuple capability (`src/lib/rollover/ladder-successor.ts`, `tools/db/ladder-successor.ts` re-export; resolver, planner `ladder_successor_tuple` change-set field and proposed-state validator support). The repository table `SUCCESSOR_LADDER_TUPLES_JSON` is empty, so no successor profile is accepted until an explicit owner-reviewed adoption; active contracts, registers, seasons and switches are unchanged and the predecessor and rehearsal-only profiles keep their restrictions. The package verifier's required closure lists the two new modules.

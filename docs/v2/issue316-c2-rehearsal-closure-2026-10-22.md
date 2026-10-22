@@ -196,3 +196,16 @@ Synthetic data only; fresh mode-700 roots, dedicated unprivileged PostgreSQL 16 
 ## 9. Re-run at `dedba57f` and Brownlow regression closure (2026-10-23)
 
 A second complete rehearsal from the same frozen inputs, pinned to `dedba57f3650c156ad012ebdec48d6d62f5a7070` in a new root, cluster, port and database, passed through the production launcher (exit 0, 30 stages, strict real D7, 91 checks, post-rebuild checks, clean shutdown). It does not remove L1 (the census again ran on a new database with the schema absent) or L2 (zero exposed rows at row level is still proven by the synthetic planted-vote test, now re-run on a clone of this rehearsal); the §4 limits L1–L4 otherwise stand. The 40 empty-database Brownlow failures are classified in the runbook; the eligibility fixtures were repaired (`dedba57f`) and the populated planted-vote test added (`96e0922a`). Evidence: `C:/tmp/afldb-c2-FINAL-TECHNICAL-VALIDATION-20261023-20261022T122727Z/`.
+
+## 10. Exact-implementation re-run at `a5ec6b0c` (2026-10-23)
+
+A third complete rehearsal, pinned to `a5ec6b0cbd0977eea77cd655d28b54b108fdb0bc` (packaged code identical to `73116273e818c031deaf84f46a514daaf634c14e`, which carries the inactive successor-tuple capability `52b971730dc5e4408f9556c599aab7f41c333bd4` and the content pins), in a new package (1,142 files), a new mode-700 root, a new dedicated cluster and a new database, through the production launcher: exit 0, 30 stages, strict real D7 (all 1,640), `PASSED: 91 checks`, post-rebuild pending-Brownlow and projection checks, clean shutdown. It supersedes the §9 run as the rehearsal of the CURRENT source; the §9 PASS is not re-claimed for it.
+
+Changes to the PASS basis, and qualifiers that bind it:
+- **Runtime (L5).** The runtime was a clean-install environment recorded independently (`6c4ea3ea…`); the DEV-versus-repository lock discrepancy no longer applies to this run (the installed lock is the repository lock `984b4422…`). Native libraries are still observation, not enforced closure; the Python `.pyc` and `RECORD` bytes are environment-bound.
+- **Content pins.** The four Wikipedia-derived inputs were accepted by the preflight pins. A pin proves bytes, not authenticity or completeness.
+- **Coach raw.** Bound as a hashed bundle (the package alphabet refuses a space in a member name) and verified by the real loader (387 files, three refusing controls); the stage itself ran parsed-only. The ten coach-season differences remain unresolved.
+- **L1 (ownership) and L2 (zero exposed rows) are unchanged:** the census ran on a fresh database with the schema absent (mechanism and scope only), the capture moved 0 ledger rows, and zero exposed 2026 Brownlow rows is evidenced by `accepted=false`/`pending`, with the row-level case proven by the synthetic planted-vote tests.
+- The successor tuple table is still empty; nothing was adopted or activated; 1,640 stays rehearsal-only; production stays NO-GO.
+
+Evidence and hashes: `C:/tmp/afldb-c2-FINAL-IMPL-VALIDATION-20261023/` (`EXECUTION_RECORD.md`, `HASHES.sha256`).
