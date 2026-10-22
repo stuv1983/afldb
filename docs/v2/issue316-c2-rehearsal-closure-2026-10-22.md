@@ -56,13 +56,13 @@ No other discrepancy was found between the runbook's attempt 2 statements and th
 
 ## 4. Limits that the PASS does not remove
 
-- **L1.** The census ran on a fresh database whose schema was absent (`schema_absent`, total 0). It is real in scope and stage order, but it cannot show ownership of a populated target. No production, DEV or other live target census exists.
-- **L2.** The 2026 public projection has zero exposed rows partly because there are no 2026 `brownlow_season_votes` or round-vote rows at all (counts 0). The substantive evidence is `accepted=false`, `status=pending`, the three pending availability keys and no publication record; the row count alone is vacuous.
+- **L1.** *(Update 2026-10-22, §8.4: planted-match refusal now proven under the candidate scope.)* The census ran on a fresh database whose schema was absent (`schema_absent`, total 0). It is real in scope and stage order, but it cannot show ownership of a populated target. No production, DEV or other live target census exists.
+- **L2.** *(Update 2026-10-22, §8.4: row-level pending-Brownlow projection proof now exists, and it found and fixed a career-total leak.)* The 2026 public projection has zero exposed rows partly because there are no 2026 `brownlow_season_votes` or round-vote rows at all (counts 0). The substantive evidence is `accepted=false`, `status=pending`, the three pending availability keys and no publication record; the row count alone is vacuous.
 - **L3.** The 91 final checks, the DOB pins (13347 / 0 / 13347 / 0 / 2), the Coleman 47 and the thirteen enrichment expectations are rehearsal-only and conditional on the frozen inputs. The DOB derivation reuses the importer's own offline scan and fold rules. Coleman's 47 rows matched the independent derivation in count; the (season, key) pairs were not re-compared in this run.
 - **L4.** The ladder expectation 1,640 holds only for the packaged core/witness pair and the rehearsal `seasons.json` overlay (`in_progress_seasons: []`, 2026 complete). The committed `data/reference/seasons.json` still lists 2026 as in progress.
 - **L5.** The DEV dependency install carries a lock (`85809f26…`, producer-reported) that differs from the repository lock (`984b4422…`) in the record. Only `tsx`, `postgres`, `server-only` and `esbuild` are used, bound by measured file content.
 - **L6.** The guard enforces module imports. Native-library files (libc, libssl, libpq inside `psycopg_binary.libs`, locale and `ld.so.cache` files and so on) were observed by the producer under `strace` (sha and package owner recorded in DEV logs that are not in the retained evidence directory), and they are OS and native-loader trust, not enforced closure. Nothing in attempt 2 upgrades an observation to enforcement.
-- **L7.** The reinstate stage restored zero rows (no ledger table before migration 104; zero adjudications, importer identities, registrations). The capture/reinstate machinery was proven with real PostgreSQL on empty data; a populated ledger has not been round-tripped.
+- **L7.** *(Update 2026-10-22, §8.4: populated synthetic round trip now proven on isolated DEV targets.)* The reinstate stage restored zero rows (no ledger table before migration 104; zero adjudications, importer identities, registrations). The capture/reinstate machinery was proven with real PostgreSQL on empty data; a populated ledger has not been round-tripped.
 - **L8.** Coach raw HTML was absent from the consumed tree (parsed artefacts only). The ten coach-page total differences, the 737 AFL API and 24 Wikipedia height disagreements, the 479 unmapped AFL API providers, the 18 height rejections (including Collingwood Caps 162/182/615/649) and the jumper disagreements were reproduced by counts only and remain unadjudicated.
 - **L9.** The `--recover-afl-api-adjudications` relaunch under rehearsal provenance still cannot proceed after a refused run, by design.
 
@@ -183,3 +183,12 @@ Scope: one agent, no subagents; read-only SSH to `arm@10.0.40.100` (host `stream
 3. **Native-library closure enforcement.** An owner decision (enforce or only observe).
 4. **A clean `npm ci` from the repository lock** was not run (installing is out of scope), so reproduction from the lock alone is not demonstrated.
 5. **Populated-ledger capture/reinstate (L7)** and row-level Brownlow evidence (L2) are unchanged by anything here.
+
+### 8.4 Populated-state proof on isolated DEV targets (2026-10-22, later still)
+
+Synthetic data only; fresh mode-700 roots, dedicated unprivileged PostgreSQL 16 clusters on loopback, unique `_test` databases; pinned to local commits `93b21a18` (attempt 1) and `9b854f9c` (attempt 2); both clusters stopped and verified shut down; all roots retained. Results, hashes and the failed attempt are in package C (`EXECUTION_RECORD.md` §3).
+
+- **L7 (populated ledger):** the real capture, reset, migrations, privileges, reference-data, registration-replay, reinstate and bijection stages round-trip 4 ledger rows, 1 importer row and 3 manual registrations under different `players.id`, exact by stable identity; six classes of wrong, forged, changed or mismatched capture/marker state refuse and lose nothing (17/17).
+- **L1 (ownership):** the enforcing census block refuses a planted `afl_api` 2026 match under the candidate scope and the predecessor scope does not; a planted 2025 match is refused under both; an afltables-owned 2026 match is never counted.
+- **L2 (row-level Brownlow):** with unaccepted source votes planted, no real projection exposes an authoritative total, winner, rank or publication. Attempt 1 was RED: `recomputeBrownlowCareerTotals` summed raw votes. Repaired in `81117391`; attempt 2 passed. This closes the synthetic case only; it says nothing about real 2026 data, which stays pending.
+- **Unchanged:** L3–L6 and L8 (including the 479 unmapped provider ids and the ten coach-page differences, not re-measured).
