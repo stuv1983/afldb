@@ -176,6 +176,16 @@ beforeAll(async () => {
   for (const season of Object.values(SEASONS)) {
     await owner`INSERT INTO seasons (year, league, status) VALUES (${season}, 'AFL', 'complete'::season_status)`;
   }
+  // A sealed season is only `complete` for the determination once its Brownlow total is ACCEPTED
+  // (brownlowAcceptedSql: stat_availability `complete`, or a published authority; AFLDB-ISSUE-316 pending
+  // suppression). Acceptance is explicit here; the open season stays unaccepted.
+  for (const season of Object.values(SEASONS)) {
+    if (season === SEASONS.open) continue;
+    await owner`
+      INSERT INTO stat_availability (stat_key, season, is_recorded, coverage)
+      VALUES ('brownlow_season_total', ${season}, true, 'complete'::coverage_status)
+      ON CONFLICT (stat_key, season) DO UPDATE SET is_recorded = true, coverage = 'complete'::coverage_status`;
+  }
 
   // Two clubs and one 2087 match, so the staged AFL API votes have a canonical match to resolve to.
   const clubIds: number[] = [];
@@ -269,6 +279,7 @@ afterAll(async () => {
   await step(() => owner`DELETE FROM external_identities WHERE player_id = ANY(${players})`);
   await step(() => owner`DELETE FROM players WHERE id = ANY(${players})`);
   await step(() => owner`DELETE FROM clubs WHERE slug LIKE ${`${MARKER}%`}`);
+  await step(() => owner`DELETE FROM stat_availability WHERE season = ANY(${seasons})`);
   await step(() => owner`DELETE FROM seasons WHERE year = ANY(${seasons})`);
   if (createdSources.length > 0) await step(() => owner`DELETE FROM sources WHERE key = ANY(${createdSources})`);
   await step(() => owner`DELETE FROM auth_users WHERE id = ANY(${createdUsers})`);
