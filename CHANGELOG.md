@@ -15,6 +15,10 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Brownlow regression classified and populated rehearsal proof (2026-10-23)
+
+- Tests: `tests/integration/v2-brownlow-eligibility.test.ts` fixtures now seed explicit Brownlow acceptance (`stat_availability('brownlow_season_total', season, true, 'complete')`, removed in `afterAll`) for every fixture season except the open one, because a sealed season has been `complete` only when accepted since `4a2eea89`; expectations unchanged. New gated `tests/integration/brownlow-pending-populated.test.ts` (`AFLDB_POPULATED_REHEARSAL_STATE=1`, disposable copy of a completed rehearsal only) plants unaccepted votes on real 2026 players and proves totals, winners, ranks, eligibility and projections stay suppressed and fully restore. Validated on a clone of a fresh complete C2 rehearsal (30 stages, strict D7, 91 checks): four Brownlow suites 122/122, planted-vote proof 4/4. `v2-brownlow-production-correction` still needs the production pre-correction state (2 passed / 6 failed); the four retired-settle tests remain baseline limitations. No product code changed. ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED.
+
 ### ISSUE-316 - Populated-state proof, proposed-state validation and Brownlow career-total repair (2026-10-22)
 
 - Brownlow: `recomputeBrownlowCareerTotals` (`src/db/queries/player-derived.ts`) summed raw `brownlow_season_votes`, so a season whose Brownlow is pending reached `player_career_stats` and the career-minimum grid axis, contradicting its own contract and `tools/migration/rebuild_derived.py`. It now reads only accepted seasons (`acceptedBrownlowRowsSql()`), and `publishBrownlowSeason` re-runs the season-status and career-total recomputes once the authority update accepts the season, so a first publication's totals do not lag acceptance. Found by the new pending-Brownlow projection proof on an isolated DEV target; no data was changed anywhere and Brownlow 2026 stays pending.
