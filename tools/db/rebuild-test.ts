@@ -1234,6 +1234,19 @@ export function checkRebuildBinding(binding: RebuildBinding, checkpoint: string)
   if (JSON.stringify(fresh) !== JSON.stringify(binding.ladder)) throw new RebuildRefused('Frozen ladder/scope drift.');
 }
 
+/**
+ * The environment of every guarded child. PATH is the bound cluster-client directory ONLY, set here rather than
+ * inherited, so a bare `psql` inside a guarded tool (privileges, census, reset proof) can never resolve
+ * through an ambient directory; ambient module/Python/loader search overrides are dropped.
+ */
+export function rehearsalChildEnv(inherited: Record<string, string | undefined> | undefined, enforcement: Record<string, string>, pgBin: string): NodeJS.ProcessEnv {
+  const env = { ...inherited, ...enforcement } as NodeJS.ProcessEnv;
+  for (const key of ['NODE_OPTIONS', 'NODE_PATH', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONUSERBASE', 'ESBUILD_BINARY_PATH', 'TSX_TSCONFIG_PATH']) delete env[key];
+  for (const key of Object.keys(env)) if (key.toUpperCase() === 'PATH') delete env[key];
+  env.PATH = pgBin;
+  return env;
+}
+
 /** Preserve genuine commands but remove PATH/shim/shell resolution for the candidate. */
 function rehearsalSpawn(spawn: typeof import('node:child_process').spawnSync, binding: RebuildBinding): typeof spawn {
   return ((command: string, args: string[], options: Record<string, any>) => {
@@ -1256,8 +1269,7 @@ function rehearsalSpawn(spawn: typeof import('node:child_process').spawnSync, bi
       if (!argv.length || argv[0].startsWith('-')) throw new RebuildRefused('Unbound Python invocation.');
       argv = [...enforcement.pythonArgs, ...argv];
     } else throw new RebuildRefused('Unbound child executable.');
-    const env = { ...options.env, ...enforcement.env };
-    for (const key of ['NODE_OPTIONS', 'NODE_PATH', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONUSERBASE', 'ESBUILD_BINARY_PATH', 'TSX_TSCONFIG_PATH']) delete env[key];
+    const env = rehearsalChildEnv(options.env, enforcement.env, r.pg_bin);
     const result = spawn(executable, argv, { ...options, env, cwd: REPO_ROOT, shell: false });
     try { checkRebuildBinding(binding, 'after-subprocess'); }
     catch (error) {

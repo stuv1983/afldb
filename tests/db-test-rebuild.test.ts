@@ -109,6 +109,7 @@ import {
   type LadderRebuildExpectation,
   type RebuildBinding,
   resolveFitzroySource,
+  rehearsalChildEnv,
   resolveTarget,
   runPreflight,
   type Deps,
@@ -251,10 +252,31 @@ describe('ISSUE-316 ladder-season-scope', () => {
 
   /* eslint-disable @typescript-eslint/no-explicit-any -- the package/runtime fixtures mutate loosely typed JSON records and a fake file system */
   describe('package-provenance', () => {
+    describe('guarded child environment', () => {
+      it('sets PATH to the bound cluster-client directory only, whatever the parent carried', () => {
+        const env = rehearsalChildEnv({ PATH: '/usr/bin:/bin', Path: 'C:\Windows', HOME: '/h', NODE_OPTIONS: '--require x', NODE_PATH: '/n', PYTHONPATH: '/p', PYTHONHOME: '/q',
+          PYTHONUSERBASE: '/u', ESBUILD_BINARY_PATH: '/e', TSX_TSCONFIG_PATH: '/t' }, { AFLDB_RESOLUTION_POLICY: '/policy', PATH: '/hijack' }, '/opt/pg/bin');
+        expect(env.PATH).toBe('/opt/pg/bin');
+        expect(Object.keys(env).filter((k) => k.toUpperCase() === 'PATH')).toEqual(['PATH']);
+        expect(env.AFLDB_RESOLUTION_POLICY).toBe('/policy');
+        expect(env.HOME).toBe('/h');
+        for (const k of ['NODE_OPTIONS', 'NODE_PATH', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONUSERBASE', 'ESBUILD_BINARY_PATH', 'TSX_TSCONFIG_PATH']) expect(env[k]).toBeUndefined();
+      });
+      it('supplies PATH even when the parent had none', () => {
+        expect(rehearsalChildEnv(undefined, {}, '/opt/pg/bin')).toEqual({ PATH: '/opt/pg/bin' });
+      });
+      it('is the only environment construction in the rehearsal spawn wrapper', () => {
+        const text = readFileSync(join(process.cwd(), 'tools/db/rebuild-test.ts'), 'utf8');
+        const body = text.slice(text.indexOf('function rehearsalSpawn('), text.indexOf('Resolve the fitzRoy source for this rebuild'));
+        expect(body).toContain('rehearsalChildEnv(options.env, enforcement.env, r.pg_bin)');
+        expect(body).not.toMatch(/\.\.\.options\.env/);
+      });
+    });
     const digest = (b: string | Buffer) => createHash('sha256').update(b).digest('hex');
     describe('real interpreter resolution boundary (DB-free, retained C: fixtures)', () => {
       let base: string, loader: string, binary: string, python: string, stdlib: string[];
       let runtimeFiles: Record<string, string>;
+      let runtimeLinkCounts: Record<string, number>; // installed files with nlink > 1 (npm hard-links tsx's esbuild binary on Linux)
       const put = (p: string, bytes: string | Buffer) => { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, bytes); };
       beforeAll(() => {
         base = nativeFs.realpathSync(mkdtempSync(join(tmpdir(), 'issue316-resolution-')));
@@ -264,15 +286,21 @@ describe('ISSUE-316 ladder-season-scope', () => {
         const tsxRequire = createRequire(loader);
         binary = tsxRequire.resolve(`@esbuild/${process.platform}-${process.arch}/${process.platform === 'win32' ? 'esbuild.exe' : 'bin/esbuild'}`);
         runtimeFiles = {};
+        runtimeLinkCounts = {};
         function bind(dir: string) {
           for (const e of readdirSync(dir, { withFileTypes: true })) {
             if (e.name === 'site-packages' || e.name === '__pycache__') continue;
             const p = join(dir, e.name);
-            if (e.isDirectory()) bind(p); else if (e.isFile()) runtimeFiles[p] = digest(readFileSync(p));
+            if (e.isDirectory()) bind(p); else if (e.isFile()) {
+              runtimeFiles[p] = digest(readFileSync(p));
+              const links = nativeFs.statSync(p).nlink;
+              if (links > 1) runtimeLinkCounts[p] = links;
+            }
           }
         }
         bind(resolve(loader, '..', '..')); // actual installed tsx, esbuild and native helper
-        const py = spawnSync('python', ['-I', '-S', '-c', 'import sys,json; print(json.dumps([sys.executable,sys.path]))'], { encoding: 'utf8', shell: false });
+        // Windows installs the interpreter as `python`; Debian/Ubuntu ship only `python3` (no `python`).
+        const py = spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['-I', '-S', '-c', 'import sys,json; print(json.dumps([sys.executable,sys.path]))'], { encoding: 'utf8', shell: false });
         expect(py.status, `Required local Python unavailable: ${py.error?.message ?? py.stderr}`).toBe(0);
         [python, stdlib] = JSON.parse(py.stdout.trim());
         for (const p of stdlib) if (existsSync(p) && nativeFs.statSync(p).isDirectory()) bind(p);
@@ -289,7 +317,7 @@ describe('ISSUE-316 ladder-season-scope', () => {
         const ambient = join(root, 'node_modules/ambient/index.cjs');
         put(ambient, `require('node:fs').writeFileSync(${JSON.stringify(sentinel)}, 'BAD'); module.exports=9;`);
         put(join(dirname(ambient), 'package.json'), '{"main":"index.cjs"}');
-        const policy = { files: { ...runtimeFiles }, node_search_roots: [join(root, 'deps')], tsx_loader: loader,
+        const policy: Record<string, any> = { files: { ...runtimeFiles }, ...(Object.keys(runtimeLinkCounts).length ? { hardlink_counts: { ...runtimeLinkCounts } } : {}), node_search_roots: [join(root, 'deps')], tsx_loader: loader,
           esbuild_binary: binary, python_stdlib: stdlib, python_dependencies: [join(root, 'pydeps')], source_root: src };
         const bind = (p: string) => { policy.files[p] = digest(readFileSync(p)); };
         for (const p of [guard, join(src, 'package.json'), dependency, join(dirname(dependency), 'package.json')]) bind(p);
@@ -454,13 +482,14 @@ describe('ISSUE-316 ladder-season-scope', () => {
         f.put(a, 'export default 42;\n'); nativeFs.linkSync(a, b); f.bind(a); f.bind(b);
         expect(nativeFs.lstatSync(a).nlink).toBe(2);
         const policy = f.policy as any, imports = (name: string) => `import value from './${name}'; console.log(value);`;
+        const installed = { ...policy.hardlink_counts }; // real installed links (e.g. tsx's esbuild) stay declared so only the fixture's own pair varies
         const refused = f.run(imports('native-a.mjs'));
         expect(refused.status).not.toBe(0); expect(refused.stderr).toContain('Rehearsal resolution refused');
         for (const counts of [{ [a]: 3, [b]: 3 }, { [b]: 2 }, { [a]: 1 }]) {
-          policy.hardlink_counts = counts; const wrong = f.run(imports('native-a.mjs'));
+          policy.hardlink_counts = { ...installed, ...counts }; const wrong = f.run(imports('native-a.mjs'));
           expect(wrong.status).not.toBe(0); expect(wrong.stderr).toContain('Rehearsal resolution refused');
         }
-        policy.hardlink_counts = { [a]: 2, [b]: 2 };
+        policy.hardlink_counts = { ...installed, [a]: 2, [b]: 2 };
         for (const name of ['native-a.mjs', 'native-b.mjs']) {
           const loaded = f.run(imports(name)); expect(loaded.status, loaded.stderr).toBe(0); expect(loaded.stdout.trim()).toBe('42');
         }
