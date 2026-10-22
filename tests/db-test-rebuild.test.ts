@@ -600,6 +600,12 @@ describe('ISSUE-316 ladder-season-scope', () => {
       return { files, put, spec, request, io, pkg, src, pair, target, runtime, runtimePath, launcher, inventory, altered, specPath,
         base, links, nlinks, modes, inodes, inodeOf, touched, extraDirs };
     }
+    const runnerCaptureRoots: string[] = [];
+    const savedCaptureRoot = process.env.AFLDB_REBUILD_CAPTURE_ROOT;
+    afterEach(() => {
+      if (savedCaptureRoot === undefined) delete process.env.AFLDB_REBUILD_CAPTURE_ROOT; else process.env.AFLDB_REBUILD_CAPTURE_ROOT = savedCaptureRoot;
+      for (const root of runnerCaptureRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+    });
     function runnerFixture() {
       const f = fixture(), documents = predecessorDocuments();
       const b = documents.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
@@ -627,6 +633,22 @@ describe('ISSUE-316 ladder-season-scope', () => {
       const opts = { ...OPTS, target: 'isolated', acknowledgeDestroy: t.database,
         rehearsalLaunchSpec: provenance.specPath, rehearsalLaunchSpecSha256: provenance.specSha256 };
       const events: string[] = [];
+      // The real capture-stage transition, modelled end to end: the stage writes the real capture
+      // file under the capture root and swaps the database comment for the rebuild marker; the
+      // reinstate stage restores the resting comment. Not a constant comment.
+      const captureRoot = mkdtempSync(join(tmpdir(), 'issue316-capture-'));
+      runnerCaptureRoots.push(captureRoot);
+      process.env.AFLDB_REBUILD_CAPTURE_ROOT = captureRoot;
+      const world = { comment: f.target.database_marker as string | null, captureDir: join(captureRoot, t.database) };
+      const captureCommand = (capturedAt = '2026-10-22T07:00:00.000Z') => {
+        const capture = buildCombinedCapture({ database: t.database, capturedAt, ledgerTablePresent: false,
+          ledgerRows: [], importerRows: [], registrations: [] });
+        const written = writePendingCapture(world.captureDir, capture);
+        world.comment = JSON.stringify({ format: CAPTURE_FORMAT, version: CAPTURE_VERSION, kind: 'set',
+          payloadSha256: capture.payloadSha256, fileSha256: written.sha256, capturedAt: capture.capturedAt });
+        return { capture, written, stdout: `    captured 0 adjudication row(s), 0 importer identity row(s) and 0 manual player registration(s) (no ledger table yet: migration 104 not applied)\n`
+          + `    file    : x/${PENDING_CAPTURE_FILE}\n    sha256  : ${written.sha256}\n    payload : ${capture.payloadSha256}\n    marker  : set\n` };
+      };
       const check = (v: RebuildBinding, name: string) => {
         events.push(`check:${name}`);
         verify({ ...provenance, checkpoint: name, pair: v.ladder.pair, target: v.target });
@@ -637,12 +659,17 @@ describe('ISSUE-316 ladder-season-scope', () => {
       const deps: Deps = {
         ...fakeDeps().deps, checkBinding: check,
         isolatedServerFacts: () => { events.push('live'); return { currentDatabase: t.database,
-          clusterName: f.target.cluster_name, databaseComment: f.target.database_marker }; },
-        runCommand: (argv) => { events.push(argv.includes('capture') ? 'capture' : 'command'); return { status: 0, stdout: 'persons    : 5057\npicks      : 6810\n', stderr: '' }; },
+          clusterName: f.target.cluster_name, databaseComment: world.comment }; },
+        runCommand: (argv) => {
+          events.push(argv.includes('capture') ? 'capture' : 'command');
+          if (argv.includes('capture')) return { status: 0, stdout: captureCommand().stdout, stderr: '' };
+          if (argv.includes('reinstate')) world.comment = f.target.database_marker;
+          return { status: 0, stdout: 'persons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
         runSql: () => { events.push('reset'); },
         runValidation: (_dsn, sql) => { events.push(sql.includes(CENSUS_MARKER) ? 'census' : 'final'); },
       };
-      return { ...f, documents, binding, t, source: src, opts, stages, deps, events, verify };
+      return { ...f, documents, binding, t, source: src, opts, stages, deps, events, verify, world, captureCommand };
     }
     it('resolves the isolated candidate to 1640 with all 2026 included and preserves full stage order', () => {
       const f = runnerFixture();
@@ -748,6 +775,143 @@ describe('ISSUE-316 ladder-season-scope', () => {
       };
       expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding })).toThrow();
       expect(f.events).toContain('reset'); expect(f.events).toContain('final');
+    });
+    describe('capture-bound pending-marker recheck before recreate (ISSUE-316 attempt 1 defect)', () => {
+      type RunnerFixture = ReturnType<typeof runnerFixture>;
+      const mutateAfterBind = (f: RunnerFixture, mutate: () => void) => {
+        const original = f.deps.checkBinding!;
+        f.deps.checkBinding = (b, name) => { if (name === 'before:recreate') mutate(); original(b, name); };
+      };
+      const captureFile = (f: RunnerFixture) => join(f.world.captureDir, PENDING_CAPTURE_FILE);
+      const refusedBeforeRecreate = (f: RunnerFixture, reason: RegExp) => {
+        expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding }))
+          .toThrow(new RegExp(`Live isolated-target recheck refused before recreate: .*${reason.source}`));
+        expect(f.events).toContain('capture');
+        expect(f.events).not.toContain('reset');
+      };
+
+      it('a real capture swaps the comment for the marker and the capture-bound check passes before the reset', () => {
+        const f = runnerFixture(); const seen: (string | null)[] = [];
+        const facts = f.deps.isolatedServerFacts!;
+        f.deps.isolatedServerFacts = (dsn) => { const r = facts(dsn); seen.push(r.databaseComment); return r; };
+        const logs: string[] = []; f.deps.log = (line) => { logs.push(line); };
+        const result = executeRebuild(f.stages, f.t, f.deps, { binding: f.binding });
+        expect(result.ok).toBe(true);
+        // initial and capture rechecks rest; recreate sees the pending marker; the final recheck rests again
+        expect(seen).toHaveLength(4);
+        expect(seen[0]).toBe(f.target.database_marker); expect(seen[1]).toBe(f.target.database_marker);
+        expect(seen[3]).toBe(f.target.database_marker);
+        const marker = parseRebuildMarker(seen[2]!);
+        const onDisk = readPendingCaptureWithHash(f.world.captureDir, f.t.database)!;
+        expect(marker.fileSha256).toBe(onDisk.fileSha256);
+        expect(marker.payloadSha256).toBe(onDisk.capture.payloadSha256);
+        expect(logs.some((l) => /capture bound: file sha256 [0-9a-f]{64}/.test(l))).toBe(true);
+        expect(logs.some((l) => l.includes('capture-bound rebuild marker'))).toBe(true);
+        expect(logs.join('\n')).not.toMatch(/postgres:\/\/|pw@/);
+        expect(f.events.indexOf('reset')).toBeGreaterThan(f.events.indexOf('capture'));
+      });
+
+      it.each([
+        ['wrong file digest in the marker', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ ...JSON.parse(f.world.comment!), fileSha256: 'c'.repeat(64) }); }, /the marker names a different capture file/],
+        ['wrong payload digest in the marker', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ ...JSON.parse(f.world.comment!), payloadSha256: 'd'.repeat(64) }); }, /the marker names a different capture payload/],
+        ['stale capture time in the marker', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ ...JSON.parse(f.world.comment!), capturedAt: '2026-10-21T00:00:00.000Z' }); }, /the marker names a different capture time/],
+        ['a well-formed marker of arbitrary digests', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ format: CAPTURE_FORMAT, version: CAPTURE_VERSION, capturedAt: '2026-10-22T07:00:00.000Z', payloadSha256: 'a'.repeat(64), fileSha256: 'b'.repeat(64) }); }, /the marker names a different capture file/],
+        ['arbitrary JSON', (f: RunnerFixture) => { f.world.comment = '{"ok":true}'; }, /not a valid rebuild marker/],
+        ['a foreign comment', (f: RunnerFixture) => { f.world.comment = 'something else'; }, /not a valid rebuild marker/],
+        ['a pre-v3 marker', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ ...JSON.parse(f.world.comment!), version: 2 }); }, /not a valid rebuild marker/],
+        ['the resting comment (the capture marker never set)', (f: RunnerFixture) => { f.world.comment = f.target.database_marker; }, /resting isolated-test comment/],
+        ['no comment at all', (f: RunnerFixture) => { f.world.comment = null; }, /no rebuild marker/],
+        ['capture file bytes altered after the stage', (f: RunnerFixture) => { writeFileSync(captureFile(f), `${readFileSync(captureFile(f), 'utf8')}\n`); }, /bytes changed since the capture stage/],
+        ['capture payload altered', (f: RunnerFixture) => { writeFileSync(captureFile(f), readFileSync(captureFile(f), 'utf8').replace('"capturedAt": "2026-10-22T07:00:00.000Z"', '"capturedAt": "2026-10-22T07:00:00.001Z"')); }, /capture file no longer validates/],
+        ['capture file replaced by an unrelated valid capture', (f: RunnerFixture) => { writePendingCapture(f.world.captureDir, buildCombinedCapture({ database: f.t.database, capturedAt: '2026-10-20T00:00:00.000Z', ledgerTablePresent: false, ledgerRows: [], importerRows: [], registrations: [] })); }, /bytes changed since the capture stage/],
+        ['capture file taken from another database', (f: RunnerFixture) => { writeFileSync(captureFile(f), readFileSync(captureFile(f), 'utf8').replace(f.t.database, 'afldb_v2_other_test')); }, /capture file no longer validates/],
+        ['capture file removed', (f: RunnerFixture) => { rmSync(captureFile(f)); }, /capture file is missing/],
+      ])('refuses before the reset when the marker or the capture is %s', (_label, mutate, reason) => {
+        const f = runnerFixture();
+        let commentAfterMutation: string | null | undefined;
+        mutateAfterBind(f, () => { mutate(f); commentAfterMutation = f.world.comment; });
+        refusedBeforeRecreate(f, reason);
+        // nothing was cleared: the marker is exactly what the mutation left, and recovery state remains
+        expect(f.world.comment).toBe(commentAfterMutation);
+        if (!/removed/.test(_label)) expect(existsSync(captureFile(f))).toBe(true);
+        expect(f.events).not.toContain('final');
+      });
+
+      it('a wrong cluster or connected database still refuses even with the genuine marker', () => {
+        for (const [label, patch] of [['cluster', { clusterName: 'main' }], ['database', { currentDatabase: 'afldb_v2_other_test' }]] as const) {
+          const f = runnerFixture(); const original = f.deps.isolatedServerFacts!;
+          f.deps.isolatedServerFacts = (dsn) => { const r = original(dsn); return f.world.comment !== f.target.database_marker ? { ...r, ...patch } : r; };
+          refusedBeforeRecreate(f, label === 'cluster' ? /cluster_name/ : /current_database/);
+        }
+      });
+
+      it('only a binding the capture stage issued is accepted: not a boolean, a copied literal or another database', () => {
+        const f = runnerFixture();
+        const { stdout } = f.captureCommand();
+        const real = bindCompletedCapture({ dir: f.world.captureDir, database: f.t.database, absentBeforeCapture: true, captureStdout: stdout });
+        const check = (bound: unknown, database = f.t.database) =>
+          captureBoundMarkerProblems({ bound: bound as never, database, comment: f.world.comment });
+        expect(check(real)).toEqual([]);
+        expect(check(true)).toEqual(['the capture binding was not issued by a completed capture stage']);
+        expect(check({ ...real })).toEqual(['the capture binding was not issued by a completed capture stage']);
+        expect(check(structuredClone(real))).toEqual(['the capture binding was not issued by a completed capture stage']);
+        expect(check(real, 'afldb_v2_other_test')).toEqual(['the completed capture belongs to a different database']);
+        expect(() => assertIsolatedTargetLive(f.t, f.deps, { ...real })).toThrow(/not issued by a completed capture stage/);
+        expect(() => assertIsolatedTargetLive(f.t, f.deps, real)).not.toThrow();
+        expect(Object.isFrozen(real)).toBe(true);
+      });
+
+      it('refuses to bind a capture that pre-existed, is not the one reported, or is not valid', () => {
+        const f = runnerFixture();
+        const { stdout, written, capture } = f.captureCommand();
+        const bind = (patch: object = {}) => bindCompletedCapture({
+          dir: f.world.captureDir, database: f.t.database, absentBeforeCapture: true, captureStdout: stdout, ...patch });
+        expect(() => bind({ absentBeforeCapture: false })).toThrow(/already existed before the capture stage/);
+        expect(() => bind({ captureStdout: '' })).toThrow(/digests the capture stage reported/);
+        expect(() => bind({ captureStdout: stdout.replace(written.sha256, 'e'.repeat(64)) })).toThrow(/digests the capture stage reported/);
+        expect(() => bind({ captureStdout: stdout.replace(capture.payloadSha256, 'e'.repeat(64)) })).toThrow(/digests the capture stage reported/);
+        expect(() => bind({ captureStdout: `${stdout}${stdout}` })).toThrow(/digests the capture stage reported/);
+        expect(() => bind({ database: 'afldb_v2_other_test' })).toThrow(/does not validate/);
+        expect(() => bind({ dir: join(f.world.captureDir, 'missing') })).toThrow(/no regular capture file/);
+        expect(pendingCaptureAbsent(join(f.world.captureDir, 'missing'))).toBe(true);
+        expect(pendingCaptureAbsent(f.world.captureDir)).toBe(false);
+      });
+
+      it.each([
+        ['writes no capture file', (f: RunnerFixture) => { f.deps.runCommand = (argv) => ({ status: 0, stdout: argv.includes('capture') ? 'sha256  : x\n' : '', stderr: '' }); }, /no regular capture file/],
+        ['reports digests that are not the file\'s', (f: RunnerFixture) => { const o = f.deps.runCommand; f.deps.runCommand = (a, e) => { const r = o(a, e); return a.includes('capture') ? { ...r, stdout: r.stdout.replace(/sha256  : [0-9a-f]{64}/, `sha256  : ${'f'.repeat(64)}`) } : r; }; }, /digests the capture stage reported/],
+        ['finds another run\'s capture already in place', (f: RunnerFixture) => { writePendingCapture(f.world.captureDir, buildCombinedCapture({ database: f.t.database, capturedAt: '2026-10-19T00:00:00.000Z', ledgerTablePresent: false, ledgerRows: [], importerRows: [], registrations: [] })); }, /already existed before the capture stage/],
+      ])('fails the capture stage and never resets when it %s', (_label, setup, why) => {
+        const f = runnerFixture(); const logs: string[] = []; f.deps.log = (line) => { logs.push(line); };
+        setup(f);
+        const result = executeRebuild(f.stages, f.t, f.deps, { binding: f.binding });
+        expect(result.ok).toBe(false);
+        expect(result.failedStage).toBe('afl-api-adjudications-capture');
+        expect(result.executed.at(-1)).toBe('afl-api-adjudications-capture');
+        expect(f.events).not.toContain('reset');
+        expect(logs.find((l) => l.includes('exited 0 but'))).toMatch(why);
+      });
+
+      it('the ordinary and final checks still reject a pending marker, and the capture recheck still needs the resting one', () => {
+        const f = runnerFixture(); const { stdout } = f.captureCommand();
+        const real = bindCompletedCapture({ dir: f.world.captureDir, database: f.t.database, absentBeforeCapture: true, captureStdout: stdout });
+        expect(() => assertIsolatedTargetLive(f.t, f.deps)).toThrow(/database_marker/);
+        expect(() => assertIsolatedTargetLive(f.t, f.deps, real)).not.toThrow();
+        // a marker already pending when the run starts (another run's) is refused before the capture and the reset
+        const pending = runnerFixture(); pending.captureCommand();
+        expect(() => executeRebuild(pending.stages, pending.t, pending.deps, { binding: pending.binding })).toThrow(/database_marker/);
+        expect(pending.events).not.toContain('capture'); expect(pending.events).not.toContain('reset');
+        // a marker that is still pending at final validation (the reinstate stage did not restore it) is refused
+        const last = runnerFixture(); const original = last.deps.runCommand;
+        last.deps.runCommand = (argv, env) => {
+          const r = original(argv, env);
+          if (argv.includes('reinstate')) last.world.comment = JSON.stringify({ format: CAPTURE_FORMAT, version: CAPTURE_VERSION, capturedAt: 'x', payloadSha256: 'a'.repeat(64), fileSha256: 'b'.repeat(64) });
+          return r;
+        };
+        expect(() => executeRebuild(last.stages, last.t, last.deps, { binding: last.binding }))
+          .toThrow(/Live isolated-target recheck refused before fingerprints: .*database_marker/);
+        expect(last.events).toContain('reset'); expect(last.events).not.toContain('final');
+      });
     });
     it('verifies and deeply freezes fixed synthetic bindings and launches only the reviewed route', () => {
       const f = fixture();
@@ -1407,7 +1571,9 @@ import {
   archivePendingCapture,
   archivedCaptureName,
   assertSequenceAboveLedger,
+  bindCompletedCapture,
   buildCombinedCapture,
+  captureBoundMarkerProblems,
   captureDirectory,
   capturePayloadSha256,
   capturedLedgerContractProblems,
@@ -1419,6 +1585,8 @@ import {
   nextIdentityValue,
   observeCaptureState,
   parseCombinedCapture,
+  parseRebuildMarker,
+  pendingCaptureAbsent,
   planActorRemap,
   planLedgerReinstatement,
   readPendingCapture,

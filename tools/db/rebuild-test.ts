@@ -91,8 +91,12 @@ import {
   SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
 } from '../records/first-kick-goal-source';
 import {
-  PsqlCredentialRefused, psqlConnection, runPsql, withoutLibpqRouting, type SpawnSyncLike,
+  PsqlCredentialRefused, psqlConnection, redact, runPsql, withoutLibpqRouting, type SpawnSyncLike,
 } from './psql';
+import {
+  bindCompletedCapture, captureBoundMarkerProblems, captureDirectory, pendingCaptureAbsent,
+  type CompletedCapture,
+} from '../migration/rebuild_afl_api_adjudications';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -994,7 +998,9 @@ function isolatedNameEnv(target: ResolvedTarget): Record<string, string | undefi
  * re-proves both DSNs (a ResolvedTarget can be built by hand) and asks the live server who it
  * is. Any doubt is a refusal; nothing has run when it throws.
  */
-export function assertIsolatedTargetLive(target: ResolvedTarget, deps: Deps): void {
+export function assertIsolatedTargetLive(
+  target: ResolvedTarget, deps: Deps, completedCapture?: CompletedCapture,
+): void {
   if (!target.isolated) {
     throw new RebuildRefused(
       `'${target.database}' is an isolated-cluster name but the target was not resolved by `
@@ -1027,13 +1033,36 @@ export function assertIsolatedTargetLive(target: ResolvedTarget, deps: Deps): vo
       `Could not read the isolated server facts: ${(error as Error).message}. Nothing has been run.`);
   }
   const findings = checkIsolatedTestServer(target.database, facts);
-  if (findings.length) {
+  if (completedCapture === undefined) {
+    if (findings.length) {
+      throw new RebuildRefused(
+        `The server behind '${target.database}' is not the isolated cluster: ${describeFindings(findings)}. `
+        + 'Nothing has been run.');
+    }
+    deps.log(`    isolated server verified: cluster ${facts.clusterName}, marker present, `
+      + `current_database ${facts.currentDatabase}`);
+    return;
+  }
+  // Between the capture and the reset the comment is the rebuild marker, not the resting marker.
+  // Only that one finding is set aside, and only for a binding the capture stage itself issued:
+  // the cluster and current_database checks stand, and the comment must be the genuine pending
+  // marker of exactly the capture just completed (digests, time, target and the file's bytes).
+  const identity = findings.filter((finding) => finding.check !== 'database_marker');
+  if (identity.length) {
     throw new RebuildRefused(
-      `The server behind '${target.database}' is not the isolated cluster: ${describeFindings(findings)}. `
+      `The server behind '${target.database}' is not the isolated cluster: ${describeFindings(identity)}. `
       + 'Nothing has been run.');
   }
-  deps.log(`    isolated server verified: cluster ${facts.clusterName}, marker present, `
-    + `current_database ${facts.currentDatabase}`);
+  const problems = captureBoundMarkerProblems({
+    bound: completedCapture, database: target.database, comment: facts.databaseComment,
+  });
+  if (problems.length) {
+    throw new RebuildRefused(
+      `The pending rebuild marker on '${target.database}' is not the one this execution's capture stage produced: `
+      + `${problems.join('; ')}. Nothing has been run.`);
+  }
+  deps.log(`    isolated server verified: cluster ${facts.clusterName}, capture-bound rebuild marker `
+    + `(file sha256 ${completedCapture.fileSha256.slice(0, 12)}…), current_database ${facts.currentDatabase}`);
 }
 
 /**
@@ -2863,11 +2892,21 @@ export function executeRebuild(
     }
   }
 
+  // Set only by the capture stage's own success in THIS execution (never a parameter), and used
+  // only for the recreate recheck that directly follows it.
+  let completedCapture: CompletedCapture | undefined;
   for (const stage of stages) {
     checkpoint(`before:${stage.id}`);
     if (binding?.provenance && ['afl-api-adjudications-capture', 'recreate', 'fingerprints'].includes(stage.id)) {
-      try { assertIsolatedTargetLive(target, deps); }
-      catch { throw new RebuildRefused(`Live isolated-target recheck refused before ${stage.id}. Prior completed stages remain applied; capture/marker state has not been cleared.`); }
+      const captureBound = stage.id === 'recreate' && executed[executed.length - 1] === 'afl-api-adjudications-capture'
+        ? completedCapture : undefined;
+      try { assertIsolatedTargetLive(target, deps, captureBound); }
+      catch (error) {
+        // A fixed, nonsecret reason (check names, digests' mismatch phrases); never a DSN or a captured value.
+        const reason = error instanceof RebuildRefused
+          ? redact(error.message.replace(/\s*Nothing has been run\.$/, '')) : 'unexpected failure';
+        throw new RebuildRefused(`Live isolated-target recheck refused before ${stage.id}: ${reason}. Prior completed stages remain applied; capture/marker state has not been cleared.`);
+      }
       checkpoint(`after-live:${stage.id}`);
     }
     deps.log(`==> ${stage.name}`);
@@ -2897,10 +2936,30 @@ export function executeRebuild(
     }
 
     if (stage.run === 'command') {
+      const bindsCapture = Boolean(binding?.provenance) && stage.id === 'afl-api-adjudications-capture';
+      let captureDir = '';
+      let absentBeforeCapture = false;
+      if (bindsCapture) {
+        captureDir = captureDirectory(resolveCaptureRoot(process.env, REPO_ROOT), target.database);
+        absentBeforeCapture = pendingCaptureAbsent(captureDir);
+      }
       const result = deps.runCommand(stage.argv!, { ...(stage.envOverlay ?? {}) });
       if (result.status !== 0) {
         deps.log(`    FAILED: ${stage.id} exited ${result.status}`);
         return { executed, failedStage: stage.id, ok: false };
+      }
+      if (bindsCapture) {
+        try {
+          completedCapture = bindCompletedCapture({
+            dir: captureDir, database: target.database, absentBeforeCapture, captureStdout: result.stdout,
+          });
+        } catch (error) {
+          deps.log(`    FAILED: ${stage.id} exited 0 but ${redact((error as Error).message)}`);
+          return { executed, failedStage: stage.id, ok: false };
+        }
+        deps.log(`    capture bound: file sha256 ${completedCapture.fileSha256}, payload ${completedCapture.payloadSha256} `
+          + `(${completedCapture.ledgerRows} ledger, ${completedCapture.importerRows} importer, `
+          + `${completedCapture.registrations} registration row(s))`);
       }
       continue;
     }
