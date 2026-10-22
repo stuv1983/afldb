@@ -138,11 +138,16 @@ describe('AFLDB-ISSUE-129 — finals-series semantics are defined once', () => {
 
   it('preserves the ladder witness rather than loosening it', () => {
     // §8.4 item 10: fitzRoy labels a WF row Round.Type="Regular" and counts it
-    // on its ladder. Those seasons are declared uncomparable by name; the check
-    // itself is not relaxed for any other season.
+    // on its ladder. Since 4b5e2490 (AFLDB-ISSUE-316) no season is exempted by
+    // name: the exact WF fixture set must agree with the source, only the
+    // evidenced WF tallies are removed from a copy, and every club-season is
+    // then compared field by field. A failed fixture check is retained, never
+    // exempted.
     const witness = source('tools', 'rebuild', 'fitzroy', 'validate_ladder_witness.py');
-    expect(witness).toContain("WHERE round_type = 'wildcard_final'");
-    expect(witness).toContain('wildcard_seasons');
+    expect(witness).toContain('def wildcard_policy(');
+    expect(witness).toContain('exact canonical/source WF fixture set');
+    expect(witness).toContain('failure retained; never a season exemption');
+    expect(witness).not.toContain('wildcard_seasons');
     expect(witness).toContain('comparable club-seasons agree on every compared field');
   });
 });

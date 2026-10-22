@@ -46,6 +46,50 @@ function reown(season: number, limit: number, sourceKey = 'afl_api'): string {
 
 const rollback = `DO $s$ BEGIN RAISE EXCEPTION '${SENTINEL}'; END $s$;`;
 
+/** Synthetic throwaway clubs and the seasons the census cases use (existing seasons are left alone). */
+const PLANT_CLUBS = `
+SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED;
+INSERT INTO club_organizations (name, slug)
+SELECT 'ISSUE-316 census plant org ' || upper(x), 'issue316-census-org-' || x FROM (VALUES ('a'), ('b')) v(x);
+INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+SELECT 'issue316-census-club-' || x, 'ISSUE-316 census plant club ' || upper(x), 'Plant ' || upper(x),
+       'PL' || upper(x), -1, 'issue316-census-club-' || x, o.id
+  FROM (VALUES ('a'), ('b')) v(x) JOIN club_organizations o ON o.slug = 'issue316-census-org-' || x;
+UPDATE clubs SET current_identity_id = id WHERE slug LIKE 'issue316-census-club-%';
+INSERT INTO seasons (year, league, status)
+SELECT y, 'AFL', st::season_status FROM (VALUES (2023, 'complete'), (2024, 'complete'), (2025, 'complete'), (2026, 'in_progress')) v(y, st)
+ON CONFLICT (year) DO NOTHING;`;
+
+/** One synthetic home-and-away match owned by `sourceKey`. */
+function plantMatch(season: number, key: string, sourceKey: string): string {
+  return `
+INSERT INTO matches (match_key, season, round_code, round_number, round_type, is_final, match_date, venue_raw,
+                   home_club_id, away_club_id, home_score, away_score, result, winner_club_id, margin,
+                   attendance, attendance_status, source_id)
+SELECT 'issue316-census-${key}', ${season}, '1', 1, 'home_and_away'::round_type, false, DATE '${season}-03-20',
+       'ISSUE-316 census plant oval', a.id, b.id, 100, 80, 'home_win'::match_result, a.id, 20, NULL,
+       'not_collected'::coverage_status, s.id
+  FROM clubs a, clubs b, sources s
+ WHERE a.slug = 'issue316-census-club-a' AND b.slug = 'issue316-census-club-b' AND s.key = '${sourceKey}';`;
+}
+
+/**
+ * `n` extra synthetic home-and-away matches owned by `sourceKey` (default: not `afl_api`), so the
+ * re-own cases below hold on an empty isolated database as well as on one that carries real matches.
+ */
+function plantMatches(season: number, n: number, sourceKey = 'afltables'): string {
+  return `
+INSERT INTO matches (match_key, season, round_code, round_number, round_type, is_final, match_date, venue_raw,
+                     home_club_id, away_club_id, home_score, away_score, result, winner_club_id, margin,
+                     attendance, attendance_status, source_id)
+  SELECT 'issue316-census-fill-${season}-' || g, ${season}, g::text, g, 'home_and_away'::round_type, false,
+         DATE '${season}-03-20' + g, 'ISSUE-316 census plant oval', a.id, b.id, 100, 80, 'home_win'::match_result,
+         a.id, 20, NULL, 'not_collected'::coverage_status, s.id
+    FROM generate_series(1, ${n}) g, clubs a, clubs b, sources s
+   WHERE a.slug = 'issue316-census-club-a' AND b.slug = 'issue316-census-club-b' AND s.key = '${sourceKey}';`;
+}
+
+
 function count(result: CensusResult, season: number, where: 'inScope' | 'outsideScope'): number {
   return result[where].find((c) => c.season === season)?.aflApiMatches ?? 0;
 }
@@ -65,7 +109,8 @@ describe('AFLDB-ISSUE-233 D-233-3 census SQL (rollback-only)', () => {
 
   it('counts afl_api-owned matches per completed season, exactly, and nothing else', () => {
     const before = baseline();
-    const run = psql([reown(2024, 3), reown(2025, 1), reown(2023, 2, 'afltables'),
+    const run = psql([PLANT_CLUBS, plantMatches(2024, 3), plantMatches(2025, 1), plantMatches(2023, 2),
+      reown(2024, 3), reown(2025, 1), reown(2023, 2, 'afltables'),
       aflApiOwnershipCensusBlock(SCOPE, 'report'), rollback].join('\n'));
     expect(run.output).toContain(SENTINEL);
     const after = parseCensusOutput(run.output, SCOPE);
@@ -80,7 +125,8 @@ describe('AFLDB-ISSUE-233 D-233-3 census SQL (rollback-only)', () => {
   it('never treats an excluded (in-progress) season as completed', () => {
     const scope: CensusScope = { firstSeason: 1897, lastSeason: 2024, excludedSeasons: [2025] };
     const before = baseline(scope);
-    const run = psql([reown(2025, 2), aflApiOwnershipCensusBlock(scope, 'report'), rollback].join('\n'));
+    const run = psql([PLANT_CLUBS, plantMatches(2025, 2), reown(2025, 2),
+      aflApiOwnershipCensusBlock(scope, 'report'), rollback].join('\n'));
     const after = parseCensusOutput(run.output, scope);
     expect(count(after, 2025, 'inScope')).toBe(0);
     expect(count(after, 2025, 'outsideScope') - count(before, 2025, 'outsideScope')).toBe(2);
@@ -88,7 +134,7 @@ describe('AFLDB-ISSUE-233 D-233-3 census SQL (rollback-only)', () => {
 
   it('the ENFORCING form raises, naming every affected season and count, before the sentinel', () => {
     const before = baseline();
-    const run = psql([reown(2024, 3), reown(2025, 1),
+    const run = psql([PLANT_CLUBS, plantMatches(2024, 3), plantMatches(2025, 1), reown(2024, 3), reown(2025, 1),
       aflApiOwnershipCensusBlock(SCOPE, 'enforce'), rollback].join('\n'));
     expect(run.status).not.toBe(0);
     expect(run.output).toContain(`${CENSUS_MARKER} REFUSED`);
@@ -123,32 +169,6 @@ describe('AFLDB-ISSUE-233 D-233-3 census SQL (rollback-only)', () => {
 describe('AFLDB-ISSUE-316 L1: candidate-2026 ownership enforcement against a planted afl_api match', () => {
   const CANDIDATE = rolloverCensusScope(1897, 2026, [2026]);
   const PREDECESSOR: CensusScope = { firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] };
-
-  const PLANT_CLUBS = `
-SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED;
-INSERT INTO club_organizations (name, slug)
-  SELECT 'ISSUE-316 census plant org ' || upper(x), 'issue316-census-org-' || x FROM (VALUES ('a'), ('b')) v(x);
-INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
-  SELECT 'issue316-census-club-' || x, 'ISSUE-316 census plant club ' || upper(x), 'Plant ' || upper(x),
-         'PL' || upper(x), -1, 'issue316-census-club-' || x, o.id
-    FROM (VALUES ('a'), ('b')) v(x) JOIN club_organizations o ON o.slug = 'issue316-census-org-' || x;
-UPDATE clubs SET current_identity_id = id WHERE slug LIKE 'issue316-census-club-%';
-INSERT INTO seasons (year, league, status)
-  SELECT y, 'AFL', st::season_status FROM (VALUES (2025, 'complete'), (2026, 'in_progress')) v(y, st)
-  ON CONFLICT (year) DO NOTHING;`;
-
-  /** One synthetic home-and-away match owned by `sourceKey`. */
-  function plantMatch(season: number, key: string, sourceKey: string): string {
-    return `
-INSERT INTO matches (match_key, season, round_code, round_number, round_type, is_final, match_date, venue_raw,
-                     home_club_id, away_club_id, home_score, away_score, result, winner_club_id, margin,
-                     attendance, attendance_status, source_id)
-  SELECT 'issue316-census-${key}', ${season}, '1', 1, 'home_and_away'::round_type, false, DATE '${season}-03-20',
-         'ISSUE-316 census plant oval', a.id, b.id, 100, 80, 'home_win'::match_result, a.id, 20, NULL,
-         'not_collected'::coverage_status, s.id
-    FROM clubs a, clubs b, sources s
-   WHERE a.slug = 'issue316-census-club-a' AND b.slug = 'issue316-census-club-b' AND s.key = '${sourceKey}';`;
-  }
 
   it('the candidate scope is the one the rebuild itself derives from the successor documents', () => {
     const contract = { full_history: { season_range: { first_season: 1897, last_season: 2026 } } };
