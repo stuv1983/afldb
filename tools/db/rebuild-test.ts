@@ -3219,6 +3219,7 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource,
       `Wikipedia height preflight: required tracked input is missing: ${WIKIPEDIA_HEIGHT_CSV}. `
       + 'Nothing has been destroyed.');
   }
+  assertReviewedInputPins();
   const wikipedia = deps.runCommand(wikipediaHeightsValidateArgv(), {});
   if (wikipedia.status !== 0) {
     throw new RebuildRefused(
@@ -3344,6 +3345,41 @@ function manifestSha256(path: string): string | null {
   if (!existsSync(path)) return null;
   const bytes = readFileSync(path).toString('utf8').replace(/\r\n/g, '\n');
   return createHash('sha256').update(bytes, 'utf8').digest('hex');
+}
+
+/**
+ * ISSUE-316 source-evidence prerequisite. The tracked, Wikipedia-derived artefacts the rebuild
+ * loads had no byte pin: their loaders check shape, not content. These pins are LF-normalised
+ * sha256 of the reviewed bytes. A pin proves the bytes are the reviewed ones; it does NOT prove
+ * the artefact's authenticity or completeness. Changing a pinned file is a deliberate, reviewed
+ * edit of this table.
+ */
+export const REVIEWED_INPUT_PINS: Readonly<Record<string, string>> = Object.freeze({
+  [WIKIPEDIA_HEIGHT_CSV]: '3d809e60afe996b8d939ae6348d26386ccc2b844954bfcef0ae7d9ada115a13b',
+  [FATHER_SON_CSV]: 'dbba21cb64d74e943d431d696d9e435632cb3dfa4030c49f0a84f309fe833d27',
+  [SIBLINGS_CSV]: 'dc8d618015125103c42b66acd243962277185e703c7ecca3c428042b0c650bab',
+  [AFTER_SIREN_CSV]: 'f3fd67e23e65c552db3976b212dc3422acf9cb20b72da4ca40ba0f1502365527',
+});
+
+export function assertReviewedInputPins(
+  pins: Readonly<Record<string, string>> = REVIEWED_INPUT_PINS,
+  readText: (path: string) => string | null = (path) => {
+    const abs = join(REPO_ROOT, path);
+    return existsSync(abs) ? readFileSync(abs).toString('utf8') : null;
+  },
+): void {
+  for (const [path, expected] of Object.entries(pins)) {
+    const text = readText(path);
+    if (text === null) {
+      throw new RebuildRefused(`Reviewed input pin: ${path} is not in this checkout. Nothing has been destroyed.`);
+    }
+    const actual = createHash('sha256').update(text.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+    if (actual !== expected) {
+      throw new RebuildRefused(
+        `Reviewed input pin: ${path} sha256 ${actual.slice(0, 12)}… does not match the reviewed pin `
+        + `${expected.slice(0, 12)}…. Nothing has been destroyed.`);
+    }
+  }
 }
 
 export type PinnedManifest = { label: string; manifest: string; sha256: string };

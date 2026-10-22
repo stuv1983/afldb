@@ -84,6 +84,8 @@ import {
   HEIGHT_LOADER,
   WIKIPEDIA_HEIGHT_CSV,
   WIKIPEDIA_HEIGHT_LOADER,
+  REVIEWED_INPUT_PINS,
+  assertReviewedInputPins,
   wikipediaHeightRows,
   wikipediaHeightsValidateArgv,
   aflApiHeightsValidateArgv,
@@ -3400,6 +3402,21 @@ describe('stage graph', () => {
       expect(wikipediaHeightsValidateArgv()).toEqual([...wikipedia.argv!, '--validate-only']);
       expect(wikipediaHeightRows()).toBeGreaterThan(0);
       expect(() => wikipediaHeightRows(() => 'afltables_profile,player\n')).toThrow(/no data rows/);
+      // ISSUE-316: the Wikipedia-derived tracked artefacts are byte-pinned, not just shape-checked.
+      expect(Object.keys(REVIEWED_INPUT_PINS)).toContain(WIKIPEDIA_HEIGHT_CSV);
+      expect(() => assertReviewedInputPins()).not.toThrow();
+      const real = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
+      expect(() => assertReviewedInputPins(REVIEWED_INPUT_PINS, (p) => real(p).replace(/\n/g, '\r\n'))).not.toThrow();
+      expect(() => assertReviewedInputPins(REVIEWED_INPUT_PINS, (p) => (p === WIKIPEDIA_HEIGHT_CSV ? real(p) + 'x\n' : real(p))))
+        .toThrow(/Reviewed input pin: .*height-evidence-wikipedia\.csv sha256 .* does not match the reviewed pin/);
+      expect(() => assertReviewedInputPins(REVIEWED_INPUT_PINS, (p) => (p === WIKIPEDIA_HEIGHT_CSV ? null : real(p))))
+        .toThrow(/Reviewed input pin: .*height-evidence-wikipedia\.csv is not in this checkout/);
+      // ISSUE-316: the Python runtime is archive-hash pinned; every requirement carries exactly one sha256.
+      const requirements = readFileSync(join(process.cwd(), 'tools', 'rebuild', 'python-runtime.requirements.txt'), 'utf8')
+        .replace(/\r\n/g, '\n').replace(/\s*\\\n\s+/g, ' ').split('\n').filter((l) => l.trim() !== '' && !l.startsWith('#'));
+      expect(requirements.map((l) => l.split(' ')[0]).sort()).toEqual(
+        ['pip==26.2.1', 'psycopg-binary==3.3.4', 'psycopg==3.3.4', 'typing-extensions==4.16.0']);
+      for (const line of requirements) expect(line).toMatch(/^[a-z-]+==\d+(\.\d+)+ --hash=sha256:[0-9a-f]{64}$/);
       for (const stage of [heights, aflApi, wikipedia]) {
         expect(stage.kind).toBe('data');
         expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire/i);
