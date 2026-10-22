@@ -4,10 +4,10 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { delimiter, isAbsolute, join } from 'node:path';
 import * as nativeFs from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { inventoryEntries, strictJson, verifyRehearsalPackage, launchRehearsal, resolutionLaunch, assertRehearsalResolution } from '../tools/v2/rehearsal-package.mjs';
+import { inventoryEntries, strictJson, verifyRehearsalPackage, launchRehearsal, resolutionLaunch, assertRehearsalResolution, guardedListenerTool, pythonStartupLandmarks } from '../tools/v2/rehearsal-package.mjs';
 
 import {
   CLUB_SEASONS_EXPECTED,
@@ -249,6 +249,7 @@ describe('ISSUE-316 ladder-season-scope', () => {
     expect(() => parseRebuildArgs(['--ladder-expected-rows', '1640'])).toThrow(/Unknown/);
   });
 
+  /* eslint-disable @typescript-eslint/no-explicit-any -- the package/runtime fixtures mutate loosely typed JSON records and a fake file system */
   describe('package-provenance', () => {
     const digest = (b: string | Buffer) => createHash('sha256').update(b).digest('hex');
     describe('real interpreter resolution boundary (DB-free, retained C: fixtures)', () => {
@@ -385,6 +386,89 @@ describe('ISSUE-316 ladder-season-scope', () => {
         expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal Python resolution refused');
         expect(existsSync(f.sentinel)).toBe(false);
       });
+      // Real links need no privilege on Linux but may on Windows; when unavailable the case is skipped, never faked.
+      const linkSupport = (() => {
+        const d = mkdtempSync(join(tmpdir(), 'issue316-linkprobe-')); const out = { symlink: false, hardlink: false };
+        try { nativeFs.symlinkSync(join(d, 'absent-target'), join(d, 'symlink')); out.symlink = true; } catch { /* unsupported here */ }
+        try { writeFileSync(join(d, 'a'), 'x'); nativeFs.linkSync(join(d, 'a'), join(d, 'b')); out.hardlink = nativeFs.lstatSync(join(d, 'a')).nlink === 2; } catch { /* unsupported here */ }
+        rmSync(d, { recursive: true, force: true }); return out;
+      })();
+      // Python consults a zip on sys.path before any later import, so the guard must refuse it first.
+      const zipWithJson = (dir: string, name: string, sentinel: string) => {
+        const zip = join(dir, name);
+        const made = spawnSync(python, ['-I', '-S', '-c', 'import zipfile, sys\nz = zipfile.ZipFile(sys.argv[1], "w")\nz.writestr("json.py", sys.argv[2])\nz.close()',
+          zip, `open(${JSON.stringify(sentinel.replaceAll('\\', '/'))}, 'w').write('BAD')\n`], { encoding: 'utf8', shell: false });
+        expect(made.status, made.stderr).toBe(0);
+        return zip;
+      };
+      // JSON string syntax is valid Python string syntax, so the path is inserted exactly as the policy lists it.
+      const zipFirst = (zip: string, code: string) => `import sys\nsys.path.insert(0, ${JSON.stringify(zip)})\n${code}`;
+      // The real guard source and policy, with only the startup zip placed first on sys.path beforehand.
+      function guardedWithStartupZip(f: ReturnType<typeof realFixture>, zip: string) {
+        f.put(f.entry, 'print("application")\n'); f.bind(f.entry);
+        f.policy.python_stdlib = [zip, ...stdlib];
+        const args = f.launch().pythonArgs; // ['-I', '-S', '-B', '-c', guard, policyPath, pin]
+        return spawnSync(python, [...args.slice(0, 4), zipFirst(zip, args[4]), args[5], args[6], f.entry], {
+          cwd: f.src, encoding: 'utf8', timeout: 20_000, shell: false, env: { NODE_ENV: process.env.NODE_ENV, SystemRoot: process.env.SystemRoot } });
+      }
+      it('refuses a present startup zip before any module in it can run, where a bare interpreter would run it', () => {
+        const f = realFixture('py'), zip = zipWithJson(f.root, 'startup.zip', f.sentinel);
+        const control = spawnSync(python, ['-I', '-S', '-c', zipFirst(zip, 'import json\n')], { encoding: 'utf8', shell: false });
+        expect(control.status, control.stderr).toBe(0); expect(existsSync(f.sentinel)).toBe(true); // the zip really would execute
+        rmSync(f.sentinel);
+        const result = guardedWithStartupZip(f, zip);
+        expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal Python resolution refused');
+        expect(result.stdout).not.toContain('application'); expect(existsSync(f.sentinel)).toBe(false);
+      });
+      it.skipIf(!linkSupport.symlink)('refuses a dangling symlink named like the startup zip (exists() is false, lexists() is true)', () => {
+        const f = realFixture('py'), dangling = join(f.root, 'dangling.zip');
+        nativeFs.symlinkSync(join(f.root, 'nowhere.zip'), dangling);
+        expect(existsSync(dangling)).toBe(false);
+        const result = guardedWithStartupZip(f, dangling);
+        expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal Python resolution refused');
+        expect(result.stdout).not.toContain('application');
+      });
+      it('leaves a startup path whose zip is absent, as Python lists it on Debian, working', () => {
+        const f = realFixture('py'), absent = join(f.root, 'absent.zip');
+        f.put(f.entry, 'print("application")\n'); f.bind(f.entry);
+        f.policy.python_stdlib = [absent, ...stdlib];
+        const a = f.launch().pythonArgs;
+        const result = spawnSync(python, [...a.slice(0, 4), zipFirst(absent, a[4]), a[5], a[6], f.entry],
+          { cwd: f.src, encoding: 'utf8', timeout: 20_000, shell: false, env: { NODE_ENV: process.env.NODE_ENV, SystemRoot: process.env.SystemRoot } });
+        expect(result.status, result.stderr).toBe(0); expect(result.stdout.trim()).toBe('application');
+      });
+      it('checks every startup zip with the built-in file-system module before the guard imports os or anything path-based', () => {
+        const f = realFixture('py'), guard = f.launch().pythonArgs[4];
+        const firstCheck = guard.indexOf('_fs.lstat('), firstOs = guard.indexOf('import json, os');
+        expect(firstCheck).toBeGreaterThan(-1); expect(firstCheck).toBeLessThan(firstOs);
+        // Before the zip loop the only import statement is the interpreter's own `sys`; the file-system
+        // module is chosen by builtin name, so a zip on sys.path cannot supply it.
+        const beforeCheck = guard.slice(0, firstCheck);
+        expect((beforeCheck.match(/^\s*import\s.*$/gm) ?? []).map((l) => l.trim())).toEqual(['import sys']);
+        expect(beforeCheck).toContain("__import__('nt' if 'nt' in sys.builtin_module_names else 'posix')");
+        expect(guard).not.toContain('os.path.lexists');
+      });
+      // Node: a real hard-linked module pair loads only under an exactly declared count.
+      it.skipIf(!linkSupport.hardlink)('loads a real hard-linked module only when the policy declares that exact link count', () => {
+        const f = realFixture('mjs'), a = join(f.src, 'native-a.mjs'), b = join(f.src, 'native-b.mjs');
+        f.put(a, 'export default 42;\n'); nativeFs.linkSync(a, b); f.bind(a); f.bind(b);
+        expect(nativeFs.lstatSync(a).nlink).toBe(2);
+        const policy = f.policy as any, imports = (name: string) => `import value from './${name}'; console.log(value);`;
+        const refused = f.run(imports('native-a.mjs'));
+        expect(refused.status).not.toBe(0); expect(refused.stderr).toContain('Rehearsal resolution refused');
+        for (const counts of [{ [a]: 3, [b]: 3 }, { [b]: 2 }, { [a]: 1 }]) {
+          policy.hardlink_counts = counts; const wrong = f.run(imports('native-a.mjs'));
+          expect(wrong.status).not.toBe(0); expect(wrong.stderr).toContain('Rehearsal resolution refused');
+        }
+        policy.hardlink_counts = { [a]: 2, [b]: 2 };
+        for (const name of ['native-a.mjs', 'native-b.mjs']) {
+          const loaded = f.run(imports(name)); expect(loaded.status, loaded.stderr).toBe(0); expect(loaded.stdout.trim()).toBe('42');
+        }
+        // An ordinary bound module still needs nlink 1, whatever else the policy declares.
+        f.put(join(f.src, 'solo.mjs'), 'export default 7;\n'); f.bind(join(f.src, 'solo.mjs'));
+        const third = join(f.root, 'solo-extra-link.mjs'); nativeFs.linkSync(join(f.src, 'solo.mjs'), third);
+        const solo = f.run(imports('solo.mjs')); expect(solo.status).not.toBe(0); expect(solo.stderr).toContain('Rehearsal resolution refused');
+      });
     });
     // Entirely in memory. These bytes are synthetic; no launch/package/target exists.
     function fixture() {
@@ -445,25 +529,47 @@ describe('ISSUE-316 ladder-season-scope', () => {
         launcher_sha256: digest(files.get(launcher)!), required_files: ['REHEARSAL_BINDINGS.json', ...required.map((p) => `source/${p}`)] };
       const specPath = join(base, 'launch.json'); put(specPath, JSON.stringify(spec));
       const request = { specPath, specSha256: digest(files.get(specPath)!), checkpoint: 'synthetic', launcherPath: launcher };
+      // Symbolic links (path -> literal link text), made directories, and per-path stat facts. Additive:
+      // nothing here is consulted unless a case registers it.
+      const links = new Map<string, string>(), extraDirs = new Set<string>();
+      const nlinks = new Map<string, number>(), modes = new Map<string, number>(), inodes = new Map<string, number>();
+      let nextInode = 1000;
+      const inodeOf = (s: string) => { if (!inodes.has(s)) inodes.set(s, nextInode++); return inodes.get(s)!; };
       let directoryCache = new Set<string>(), directorySize = -1;
       const directories = () => {
-        if (directorySize === files.size) return directoryCache;
+        const size = files.size + links.size + extraDirs.size;
+        if (directorySize === size) return directoryCache;
         const dirs = new Set<string>();
-        for (const p of files.keys()) { let d = dirname(p); for (;;) { dirs.add(d); if (dirname(d) === d) break; d = dirname(d); } }
-        directorySize = files.size; directoryCache = dirs; return dirs;
+        for (const p of [...files.keys(), ...links.keys(), ...extraDirs]) { let d = dirname(p); for (;;) { dirs.add(d); if (dirname(d) === d) break; d = dirname(d); } }
+        for (const p of extraDirs) dirs.add(p);
+        directorySize = size; directoryCache = dirs; return dirs;
       };
+      const targetOf = (s: string) => isAbsolute(links.get(s)!) ? links.get(s)! : join(dirname(s), links.get(s)!);
+      const missing = () => Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+      // Every call is recorded so a case can prove which paths the verifier touched.
+      const touched: string[] = [];
+      const track = <A extends unknown[], R>(name: string, fn: (...a: A) => R) => (...a: A): R => { touched.push(`${name}:${String(a[0])}`); return fn(...a); };
       const io = { ...nativeFs,
-        mkdirSync: () => undefined,
+        mkdirSync: (p: any) => { extraDirs.add(String(p)); },
         writeFileSync: (p: any, b: any) => { put(String(p), b); },
-        existsSync: (p: any) => files.has(String(p)) || directories().has(String(p)),
-        readFileSync: (p: any) => { if (!files.has(String(p))) throw new Error('missing synthetic file'); return files.get(String(p))!; },
-        lstatSync: (p: any) => ({ isFile: () => files.has(String(p)) && altered.get(String(p)) !== 'special',
-          isDirectory: () => directories().has(String(p)), isSymbolicLink: () => altered.get(String(p)) === 'symlink',
-          nlink: altered.get(String(p)) === 'hardlink' ? 2 : 1 }),
-        realpathSync: (p: any) => altered.get(String(p)) === 'redirect' ? join(base, 'redirect') : String(p),
-        readdirSync: (p: any) => [...new Set([...files.keys(), ...directories()].filter((f) => dirname(f) === String(p) && f !== String(p)).map((f) => f.slice(String(p).length + 1)))],
+        existsSync: track('exists', (p: any) => links.has(String(p)) ? files.has(targetOf(String(p))) || directories().has(targetOf(String(p)))
+          : files.has(String(p)) || directories().has(String(p))),
+        readFileSync: track('read', (p: any) => { if (!files.has(String(p))) throw new Error('missing synthetic file'); return files.get(String(p))!; }),
+        statSync: track('stat', () => { throw new Error('unexpected stat'); }),
+        readlinkSync: track('readlink', (p: any) => { if (!links.has(String(p))) throw Object.assign(new Error('EINVAL'), { code: 'EINVAL' }); return links.get(String(p))!; }),
+        lstatSync: track('lstat', (p: any) => {
+          const s = String(p);
+          if (links.has(s)) return { isFile: () => false, isDirectory: () => false, isSymbolicLink: () => true, nlink: 1, mode: 0o120777, dev: 1, ino: inodeOf(s) };
+          if (!files.has(s) && !directories().has(s)) throw missing();
+          return { isFile: () => files.has(s) && altered.get(s) !== 'special',
+            isDirectory: () => directories().has(s), isSymbolicLink: () => altered.get(s) === 'symlink',
+            nlink: altered.get(s) === 'hardlink' ? 2 : nlinks.get(s) ?? 1, mode: modes.get(s) ?? 0o644, dev: 1, ino: inodeOf(s) };
+        }),
+        realpathSync: track('realpath', (p: any) => altered.get(String(p)) === 'redirect' ? join(base, 'redirect') : String(p)),
+        readdirSync: track('readdir', (p: any) => [...new Set([...files.keys(), ...links.keys(), ...directories()].filter((f) => dirname(f) === String(p) && f !== String(p)).map((f) => f.slice(String(p).length + 1)))]),
       } as unknown as typeof nativeFs;
-      return { files, put, spec, request, io, pkg, src, pair, target, runtime, runtimePath, launcher, inventory, altered, specPath };
+      return { files, put, spec, request, io, pkg, src, pair, target, runtime, runtimePath, launcher, inventory, altered, specPath,
+        base, links, nlinks, modes, inodes, inodeOf, touched, extraDirs };
     }
     function runnerFixture() {
       const f = fixture(), documents = predecessorDocuments();
@@ -732,7 +838,434 @@ describe('ISSUE-316 ladder-season-scope', () => {
         expect(error).toContain('refused'); expect(error).not.toContain('SECRET'); expect(error).not.toContain('postgres://');
       }
     });
+
+    // All synthetic and in memory: these prove the verifier's rules, not Linux execution, and nothing
+    // here measures dynamic-library closure, the Node import closure, zoneinfo data or child spawns.
+    describe('runtime record version 2: inert links, absent landmarks, bound executables, hard-link groups', () => {
+      const win = process.platform === 'win32';
+      const norm = (p: string) => p.replaceAll('\\', '/');
+      const byPath = (a: { path: string }, b: { path: string }) => (a.path < b.path ? -1 : 1);
+      function v2Fixture() {
+        const f = fixture();
+        const rt = f.runtime as any;
+        const runtimeRoot = dirname(f.runtime.tsx_loader), exeDir = join(f.base, 'executables'), node = process.execPath;
+        const python = join(exeDir, 'python3.12');
+        const listener = win ? join(exeDir, 'Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : join(exeDir, 'ss');
+        const zip = join(f.base, 'python312.zip');
+        for (const p of [f.runtime.python, f.runtime.listener_tool]) f.files.delete(p);
+        f.put(python, 'synthetic python executable'); f.put(listener, 'synthetic listener executable');
+        const inRoot = (p: string) => p.startsWith(runtimeRoot + '/') || p.startsWith(runtimeRoot + '\\');
+        const rel = (p: string) => norm(p.slice(runtimeRoot.length + 1));
+        // Rebuild the record's evidence from the synthetic world as it stands.
+        const sync = () => {
+          rt.roots = [{ path: runtimeRoot, hardlinks: rt.roots?.[0]?.hardlinks ?? [],
+            files: [...f.files.keys()].filter(inRoot).map((p) => ({ path: rel(p), sha256: digest(f.files.get(p)!) })).sort(byPath),
+            links: [...f.links].filter(([p]) => inRoot(p)).map(([p, readlink]) => ({ path: rel(p), readlink })).sort(byPath) }];
+          rt.executables = [node, python, listener].map((p) => ({ path: p, sha256: digest(f.files.get(p)!) })).sort(byPath);
+        };
+        const commit = () => {
+          f.put(f.runtimePath, JSON.stringify(rt)); f.spec.runtime_record_sha256 = digest(f.files.get(f.runtimePath)!);
+          f.put(f.specPath, JSON.stringify(f.spec)); f.request.specSha256 = digest(f.files.get(f.specPath)!);
+        };
+        Object.assign(rt, { schema_version: 2, python, listener_tool: listener, python_stdlib: [zip, runtimeRoot], python_absent_landmarks: [zip, ...pythonStartupLandmarks(python)] });
+        const build = () => { sync(); commit(); };
+        build();
+        const verify = () => verifyRehearsalPackage(f.request, f.io);
+        // A hard-linked pair inside the runtime root: one inode, `nlink` names, one declared group.
+        const hardlinked = (names: string[], nlink = names.length, inode = 7777) => {
+          for (const n of names) {
+            const p = join(runtimeRoot, n);
+            f.put(p, 'synthetic hard-linked native helper'); f.nlinks.set(p, nlink); f.inodes.set(p, inode);
+          }
+        };
+        return { ...f, rt, runtimeRoot, exeDir, node, python, listener, zip, sync, commit, build, verify, hardlinked, rel };
+      }
+      type V2 = ReturnType<typeof v2Fixture>;
+      const withRecord = (v: V2, edit: (rt: any) => void, pattern?: RegExp) => {
+        edit(v.rt); v.commit();
+        if (pattern) expect(() => v.verify()).toThrow(pattern); else expect(() => v.verify()).toThrow();
+      };
+
+      it('verifies a version 2 record, binds the three executables by file and keeps version 1 exactly as it was', () => {
+        const v = v2Fixture(), bound = v.verify();
+        expect(bound.runtime.schema_version).toBe(2);
+        expect(Object.keys(bound.resolution.executables!).sort()).toEqual([v.node, v.python, v.listener].sort());
+        for (const p of [v.node, v.python, v.listener]) expect(bound.resolution.files[p]).toBeUndefined();
+        expect(bound.resolution.hardlink_counts).toEqual({});
+        // The unmodified version 1 fixture still verifies and carries none of the new policy fields.
+        const legacy = fixture(), old = verifyRehearsalPackage(legacy.request, legacy.io);
+        expect(Object.keys(old.resolution).sort()).toEqual(['esbuild_binary', 'files', 'node_search_roots', 'python_dependencies', 'python_stdlib', 'source_root', 'tsx_loader']);
+      });
+
+      describe('record versions are strict', () => {
+        it('refuses version 1 carrying any version 2 field, version 2 missing one, and an unknown version', () => {
+          const v1 = fixture();
+          for (const edit of [(r: any) => { r.executables = []; }, (r: any) => { r.python_absent_landmarks = []; },
+            (r: any) => { r.roots[0].links = []; }, (r: any) => { r.roots[0].hardlinks = []; }]) {
+            const f = fixture(), r = f.runtime as any; edit(r);
+            f.put(f.runtimePath, JSON.stringify(r)); f.spec.runtime_record_sha256 = digest(f.files.get(f.runtimePath)!);
+            f.put(f.specPath, JSON.stringify(f.spec)); f.request.specSha256 = digest(f.files.get(f.specPath)!);
+            expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow(/invalid runtime/);
+          }
+          expect(() => verifyRehearsalPackage(v1.request, v1.io)).not.toThrow();
+          for (const key of ['executables', 'python_absent_landmarks']) withRecord(v2Fixture(), (r) => { delete r[key]; }, /invalid runtime record fields/);
+          for (const key of ['links', 'hardlinks']) withRecord(v2Fixture(), (r) => { delete r.roots[0][key]; }, /invalid runtime root fields/);
+          withRecord(v2Fixture(), (r) => { r.schema_version = 3; }, /runtime schema/);
+        });
+      });
+
+      describe('inert-link ledger', () => {
+        const alias = (v: V2) => join(v.runtimeRoot, 'library/alias.js');
+        const outside = (v: V2) => join(v.base, 'outside-target', 'sitecustomize.py');
+        it('accepts a relative same-directory link and an absolute outside-root link without ever following either', () => {
+          const v = v2Fixture();
+          v.links.set(alias(v), 'dependency.js'); v.links.set(join(v.runtimeRoot, 'library/sitecustomize.py'), norm(outside(v)));
+          v.links.set(join(v.runtimeRoot, 'library/dirlink'), '../bin');
+          v.build(); v.touched.length = 0;
+          const bound = v.verify();
+          for (const l of ['library/alias.js', 'library/sitecustomize.py', 'library/dirlink']) expect(bound.resolution.files[join(v.runtimeRoot, l)]).toBeUndefined();
+          expect(v.rt.roots[0].links.map((l: any) => l.path)).toEqual(['library/alias.js', 'library/dirlink', 'library/sitecustomize.py']);
+          const followed = ['library/alias.js', 'library/sitecustomize.py', 'library/dirlink'].map((l) => join(v.runtimeRoot, l));
+          for (const entry of v.touched) {
+            const [call, where] = [entry.slice(0, entry.indexOf(':')), entry.slice(entry.indexOf(':') + 1)];
+            if (followed.some((l) => where === l)) expect(['lstat', 'readlink']).toContain(call);
+            expect(followed.some((l) => where.startsWith(l + '/') || where.startsWith(l + '\\'))).toBe(false); // no descent
+            expect(where).not.toContain('outside-target');
+          }
+          expect(v.touched.filter((t) => t.startsWith('stat:'))).toEqual([]);
+        });
+        it.each([
+          ['an unledgered link', (v: V2) => { v.links.set(alias(v), 'dependency.js'); }],
+          ['a recorded link that is absent', (v: V2) => { v.links.set(alias(v), 'dependency.js'); v.build(); v.links.delete(alias(v)); }],
+          ['a link retargeted to an absolute path', (v: V2) => { v.links.set(alias(v), 'dependency.js'); v.build(); v.links.set(alias(v), norm(outside(v))); }],
+          ['a link retargeted to a relative path', (v: V2) => { v.links.set(alias(v), norm(outside(v))); v.build(); v.links.set(alias(v), 'dependency.js'); }],
+          ['a link replaced by a regular file', (v: V2) => { v.links.set(alias(v), 'dependency.js'); v.build(); v.links.delete(alias(v)); v.put(alias(v), 'file'); }],
+          ['a listed file replaced by a link', (v: V2) => { v.files.delete(join(v.runtimeRoot, 'library/dependency.js')); v.links.set(join(v.runtimeRoot, 'library/dependency.js'), 'x'); }],
+          ['an unledgered directory link', (v: V2) => { v.links.set(join(v.runtimeRoot, 'library/dirlink'), '../bin'); }],
+        ])('refuses %s before any package import or child spawn', (_name, change) => {
+          const v = v2Fixture(); change(v);
+          const spawn = vi.fn();
+          // The first two lines of `change` may rebuild the record; whatever the world now is, the record is stale or absent.
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(/runtime (link ledger|membership)|pinned bytes|linked/);
+          expect(spawn).not.toHaveBeenCalled();
+          expect(v.touched.filter((t) => t.startsWith('readdir:') && /dirlink/.test(t))).toEqual([]); // never descended
+        });
+        it.each([
+          ['duplicate entries', (l: any[]) => [l[0], l[0]]],
+          ['unsorted entries', (l: any[]) => [l[1], l[0]]],
+          ['a parent-directory path', (l: any[]) => [{ ...l[0], path: 'library/../x' }]],
+          ['an absolute path', (l: any[]) => [{ ...l[0], path: '/etc/x' }]],
+          ['a backslash path', (l: any[]) => [{ ...l[0], path: 'library\\x' }]],
+          ['an empty path', (l: any[]) => [{ ...l[0], path: '' }]],
+          ['an empty link text', (l: any[]) => [{ ...l[0], readlink: '' }]],
+          ['a control character in link text', (l: any[]) => [{ ...l[0], readlink: 'a\u0001b' }]],
+          ['non-ASCII link text', (l: any[]) => [{ ...l[0], readlink: 'café' }]],
+          ['over-long link text', (l: any[]) => [{ ...l[0], readlink: 'a'.repeat(4097) }]],
+          ['a case-fold collision', (l: any[]) => [l[0], { ...l[0], path: l[0].path.toUpperCase() }]],
+          ['an unknown entry field', (l: any[]) => [{ ...l[0], target: 'x' }]],
+        ])('refuses a malformed ledger: %s', (_name, mutate) => {
+          const v = v2Fixture();
+          v.links.set(alias(v), 'dependency.js'); v.links.set(join(v.runtimeRoot, 'library/b-link.js'), 'dependency.js'); v.build();
+          withRecord(v, (r) => { r.roots[0].links = mutate(r.roots[0].links); }, /invalid runtime link fields|runtime link entry|unsafe.duplicate.unsorted|malformed sums/);
+        });
+        it('refuses the same relative link in the package tree, whatever the ledger says', () => {
+          const v = v2Fixture(), spawn = vi.fn();
+          v.links.set(join(v.src, 'data/linked.csv'), 'synthetic-input.csv');
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow();
+          v.links.delete(join(v.src, 'data/linked.csv'));
+          v.links.set(join(v.pkg, 'dangling-link'), 'nowhere');
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow();
+          expect(spawn).not.toHaveBeenCalled();
+        });
+        it('refuses a link retargeted between the first verification and terminal readback', () => {
+          const v = v2Fixture();
+          v.links.set(alias(v), 'dependency.js'); v.build();
+          const spawn = vi.fn(() => { v.links.set(alias(v), 'other.js'); return { status: 0 }; });
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(/link ledger/);
+          expect(spawn).toHaveBeenCalledOnce();
+        });
+        it('refuses an import path that equals or lies beneath a ledgered link', () => {
+          const v = v2Fixture(), dep = join(v.runtimeRoot, 'library/dep');
+          v.links.set(dep, '../bin'); v.build();
+          withRecord(v, (r) => { r.python_dependencies = [dep]; }, /linked, redirected or special/);
+          const w = v2Fixture(); w.links.set(dep, '../bin'); w.build();
+          withRecord(w, (r) => { r.node_search_roots = [join(dep, 'nested')]; }, /linked, redirected or special/);
+        });
+      });
+
+      describe('absent Python startup landmarks', () => {
+        it('accepts a zip that is provably absent and that python_stdlib lists', () => {
+          const v = v2Fixture(); v.touched.length = 0;
+          expect(() => v.verify()).not.toThrow();
+          expect(v.touched).toContain(`lstat:${v.zip}`);
+        });
+        it.each([
+          ['a regular file', (v: V2) => { v.put(v.zip, 'zip'); }],
+          ['a directory', (v: V2) => { v.extraDirs.add(v.zip); }],
+          ['a valid symlink', (v: V2) => { v.put(join(v.base, 'real.zip'), 'zip'); v.links.set(v.zip, 'real.zip'); }],
+          ['a dangling symlink (existsSync is false, lstat succeeds)', (v: V2) => { v.links.set(v.zip, 'nowhere.zip'); }],
+        ])('refuses a startup zip that is %s', (_name, change) => {
+          const v = v2Fixture(); change(v);
+          expect(() => v.verify()).toThrow(/absent landmark exists|unsupported|membership|linked|package membership/);
+        });
+        it('proves a dangling link is invisible to existsSync and is therefore decided by lstat alone', () => {
+          const v = v2Fixture(); v.links.set(v.zip, 'nowhere.zip');
+          expect(v.io.existsSync(v.zip)).toBe(false);
+          expect(() => v.io.lstatSync(v.zip)).not.toThrow();
+          expect(() => v.verify()).toThrow(/Python absent landmark exists/);
+        });
+        it('refuses anything but ENOENT as proof of absence', () => {
+          const v = v2Fixture();
+          const denied = { ...v.io, lstatSync: (p: any) => { if (p === v.zip) throw Object.assign(new Error('denied'), { code: 'EACCES' }); return v.io.lstatSync(p); } } as any;
+          expect(() => verifyRehearsalPackage(v.request, denied)).toThrow(/absence unprovable/);
+        });
+        it.each([
+          ['a landmark missing from python_stdlib', (r: any) => { r.python_stdlib = [r.roots[0].path]; }, /Python absent landmark/],
+          ['a zip in python_stdlib that is not declared absent', (r: any) => { r.python_absent_landmarks = []; }, /undeclared Python zip/],
+          ['a landmark that is not a zip', (r: any) => { r.python_stdlib = [r.roots[0].path]; r.python_absent_landmarks = [r.roots[0].path]; }, /Python absent landmark/],
+          ['a relative landmark', (r: any) => { r.python_stdlib = ['python312.zip', r.roots[0].path]; r.python_absent_landmarks = ['python312.zip']; }, /Python absent landmark/],
+          ['a duplicate landmark', (r: any) => { r.python_absent_landmarks = [r.python_absent_landmarks[0], r.python_absent_landmarks[0]]; }, /Python absent landmarks/],
+        ])('refuses %s', (_name, edit, pattern) => { withRecord(v2Fixture(), edit, pattern); });
+        it('refuses a symlinked ancestor of the landmark', () => {
+          const v = v2Fixture(); v.altered.set(v.base, 'symlink');
+          expect(() => v.verify()).toThrow(/linked, redirected or special/);
+        });
+        describe('reviewed start-up layout landmarks (prefix, venv, build and ._pth selection)', () => {
+          it.skipIf(win)('derives exactly the reviewed set for an interpreter at /usr/bin/python3.12', () => {
+            expect(pythonStartupLandmarks('/usr/bin/python3.12')).toEqual([
+              '/usr/bin/pyvenv.cfg', '/usr/pyvenv.cfg', '/usr/bin/pybuilddir.txt', '/usr/bin/python3.12._pth', '/usr/bin/python3._pth',
+              '/usr/bin/Modules/Setup.local', '/usr/Modules/Setup.local', '/Modules/Setup.local']);
+          });
+          it('refuses a non-canonical or relative interpreter path', () => {
+            for (const bad of ['python3.12', './python3.12', '', undefined as any]) expect(() => pythonStartupLandmarks(bad)).toThrow(/canonical interpreter/);
+          });
+          it('proves each one absent by lstat, and every one is declared', () => {
+            const v = v2Fixture(); v.touched.length = 0; v.verify();
+            const marks = pythonStartupLandmarks(v.python);
+            expect(marks.length).toBeGreaterThanOrEqual(5);
+            for (const m of marks) { expect(v.rt.python_absent_landmarks).toContain(m); expect(v.touched).toContain(`lstat:${m}`); }
+          });
+          it.each([
+            ['pyvenv.cfg beside the interpreter', (v: V2) => join(v.exeDir, 'pyvenv.cfg')],
+            ['pyvenv.cfg in the interpreter\'s parent', (v: V2) => join(dirname(v.exeDir), 'pyvenv.cfg')],
+            ['pybuilddir.txt beside the interpreter', (v: V2) => join(v.exeDir, 'pybuilddir.txt')],
+            ['a ._pth named for the interpreter', (v: V2) => join(v.exeDir, 'python3.12._pth')],
+            ['a ._pth named for the interpreter stem', (v: V2) => join(v.exeDir, 'python3._pth')],
+            ['the build landmark in the interpreter directory', (v: V2) => join(v.exeDir, 'Modules', 'Setup.local')],
+            ['the build landmark in an ancestor', (v: V2) => join(dirname(v.exeDir), 'Modules', 'Setup.local')],
+          ])('refuses %s as a regular file, and as a dangling link', (_name, where) => {
+            const file = v2Fixture(); file.put(where(file), 'x');
+            expect(() => file.verify()).toThrow(/absent landmark exists/);
+            const link = v2Fixture(); link.links.set(where(link), 'nowhere');
+            expect(() => link.verify()).toThrow(/absent landmark exists/);
+          });
+          it('refuses when any one derived landmark is not declared', () => {
+            for (const m of pythonStartupLandmarks(v2Fixture().python)) {
+              withRecord(v2Fixture(), (r) => { r.python_absent_landmarks = r.python_absent_landmarks.filter((x: string) => x !== m); }, /undeclared Python startup landmark/);
+            }
+          });
+          it('refuses a declared landmark outside the reviewed set, even one that is genuinely absent', () => {
+            withRecord(v2Fixture(), (r) => { r.python_absent_landmarks.push(join(dirname(r.python), 'sitecustomize.py')); }, /Python absent landmark/);
+            withRecord(v2Fixture(), (r) => { r.python_absent_landmarks.push(join(r.roots[0].path, 'anything.cfg')); }, /Python absent landmark/);
+          });
+          it('refuses when the deepest existing ancestor of an absent landmark is a link, or its state is unprovable', () => {
+            const linked = v2Fixture(); linked.altered.set(linked.exeDir, 'symlink');
+            expect(() => linked.verify()).toThrow(/linked, redirected or special/);
+            const v = v2Fixture(), target = join(v.exeDir, 'Modules', 'Setup.local');
+            const denied = { ...v.io, lstatSync: (p: any) => { if (p === target) throw Object.assign(new Error('denied'), { code: 'EACCES' }); return v.io.lstatSync(p); } } as any;
+            expect(() => verifyRehearsalPackage(v.request, denied)).toThrow(/absence unprovable/);
+          });
+          it('refuses a landmark that appears after the first verification, at terminal readback', () => {
+            const v = v2Fixture(), spawn = vi.fn(() => { v.put(join(v.exeDir, 'pyvenv.cfg'), 'home = /elsewhere'); return { status: 0 }; });
+            expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(/absent landmark exists/);
+            expect(spawn).toHaveBeenCalledOnce();
+          });
+        });
+        it('refuses a zip that appears after the first verification, at terminal readback', () => {
+          const v = v2Fixture(), spawn = vi.fn(() => { v.put(v.zip, 'late zip'); return { status: 0 }; });
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(/absent landmark exists/);
+          expect(spawn).toHaveBeenCalledOnce();
+        });
+      });
+
+      describe('file-bound executables', () => {
+        it('never reads, lists or lstats the executables\' parent directory or its siblings', () => {
+          const v = v2Fixture();
+          v.put(join(v.exeDir, 'unrelated-sibling'), 'unreviewed sibling'); v.links.set(join(v.exeDir, 'sibling-link'), '/anywhere');
+          v.build(); v.touched.length = 0; v.verify();
+          expect(v.touched.filter((t) => /unrelated-sibling|sibling-link/.test(t))).toEqual([]);
+          expect(v.touched.filter((t) => t === `readdir:${v.exeDir}`)).toEqual([]);
+          for (const p of [v.node, v.python, v.listener]) expect(v.touched).toContain(`read:${p}`);
+        });
+        it.each([
+          ['python is a symlink (venv-style)', (v: V2) => { v.altered.set(v.python, 'symlink'); }, /linked, redirected or special/],
+          ['the listener is a symlink', (v: V2) => { v.altered.set(v.listener, 'symlink'); }, /linked, redirected or special/],
+          ['node is a symlink', (v: V2) => { v.altered.set(v.node, 'symlink'); }, /linked, redirected or special/],
+          ['python is hard-linked', (v: V2) => { v.nlinks.set(v.python, 2); }, /linked, redirected or special/],
+          ['the listener is a special file', (v: V2) => { v.altered.set(v.listener, 'special'); }, /linked, redirected or special/],
+          ['python has the setuid bit', (v: V2) => { v.modes.set(v.python, 0o4755); }, /executable mode/],
+          ['the listener has the setgid bit', (v: V2) => { v.modes.set(v.listener, 0o2755); }, /executable mode/],
+          ['python bytes changed', (v: V2) => { v.put(v.python, 'substituted interpreter'); }, /pinned bytes changed/],
+          ['the listener bytes changed', (v: V2) => { v.put(v.listener, 'substituted listener'); }, /pinned bytes changed/],
+          ['the parent directory is a link', (v: V2) => { v.altered.set(v.exeDir, 'symlink'); }, /linked, redirected or special/],
+        ])('refuses when %s', (_name, change, pattern) => {
+          const v = v2Fixture(), spawn = vi.fn(); change(v);
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(pattern);
+          expect(spawn).not.toHaveBeenCalled();
+        });
+        it('refuses an executable that a tree root also owns, or whose parent is the child PATH directory', () => {
+          const v = v2Fixture();
+          withRecord(v, (r) => { r.roots.push({ path: v.exeDir, links: [], hardlinks: [],
+            files: [...v.files.keys()].filter((p) => p.startsWith(v.exeDir)).map((p) => ({ path: norm(p.slice(v.exeDir.length + 1)), sha256: digest(v.files.get(p)!) })).sort(byPath) }); });
+          withRecord(v2Fixture(), (r) => { r.pg_bin = v.exeDir; });
+        });
+        it.each([
+          ['node absent from the bound list', (r: any) => { r.executables = r.executables.filter((e: any) => e.path !== r.node); }, /runtime executables/],
+          ['an extra bound executable', (r: any) => { r.executables = [...r.executables, { path: join(dirname(r.python), 'extra'), sha256: '0'.repeat(64) }]; }, /runtime executables/],
+          ['python and the listener naming one file', (r: any) => { r.listener_tool = r.python; }, /runtime executables/],
+          ['an unknown executable field', (r: any) => { r.executables[0].mode = 755; }, /invalid runtime executable fields/],
+          ['a malformed digest', (r: any) => { r.executables[0].sha256 = 'x'; }, /invalid digest/],
+        ])('refuses %s', (_name, edit, pattern) => { withRecord(v2Fixture(), edit, pattern); });
+        it('keeps the venv interpreter, PATH-resolved names and package-tree copies out of the accepted set', () => {
+          const v = v2Fixture();
+          withRecord(v, (r) => { r.python = 'python3'; }, /runtime executables|canonical interpreter/);
+          const w = v2Fixture();
+          withRecord(w, (r) => { r.listener_tool = 'ss'; }, /runtime executables/);
+        });
+      });
+
+      describe('hard-link groups', () => {
+        const groupOf = (names: string[]) => ({ paths: [...names].sort(), nlink: names.length });
+        const pair = ['library/native-a', 'library/native-b'];
+        const withPair = (v: V2, nlink = 2) => { v.hardlinked(pair, nlink); v.build(); v.rt.roots[0].hardlinks = [groupOf(pair)]; v.commit(); };
+        it('accepts one declared group with complete membership, equal content, one inode and exact link counts', () => {
+          const v = v2Fixture(); withPair(v);
+          const bound = v.verify();
+          expect(bound.resolution.hardlink_counts).toEqual({ [join(v.runtimeRoot, pair[0])]: 2, [join(v.runtimeRoot, pair[1])]: 2 });
+          for (const p of pair) expect(bound.resolution.files[join(v.runtimeRoot, p)]).toMatch(/^[a-f0-9]{64}$/);
+        });
+        it('carries the counts into the pinned policy file the launcher writes', () => {
+          const v = v2Fixture(); withPair(v);
+          const spawn = vi.fn(() => ({ status: 0 }));
+          expect(launchRehearsal(v.request, spawn as any, v.io)).toBe(0);
+          const policy = JSON.parse(v.files.get((spawn.mock.calls[0] as any)[2].env.AFLDB_RESOLUTION_POLICY)!.toString());
+          expect(policy.hardlink_counts).toEqual({ [join(v.runtimeRoot, pair[0])]: 2, [join(v.runtimeRoot, pair[1])]: 2 });
+          expect(Object.keys(policy.executables)).toHaveLength(3);
+        });
+        it.each([
+          ['an unlisted third link (nlink above the group size)', (v: V2) => { v.nlinks.set(join(v.runtimeRoot, pair[0]), 3); v.nlinks.set(join(v.runtimeRoot, pair[1]), 3); }, /linked, redirected or special/],
+          ['nlink below the group size', (v: V2) => { v.nlinks.set(join(v.runtimeRoot, pair[1]), 1); }, /linked, redirected or special/],
+          ['differing content', (v: V2) => { v.put(join(v.runtimeRoot, pair[1]), 'different bytes'); v.sync(); v.rt.roots[0].hardlinks = [groupOf(pair)]; v.commit(); }, /hard-link group evidence/],
+          ['different inodes', (v: V2) => { v.inodes.set(join(v.runtimeRoot, pair[1]), 8888); }, /hard-link group evidence/],
+        ])('refuses a declared group with %s', (_name, change, pattern) => {
+          const v = v2Fixture(); withPair(v); change(v);
+          expect(() => v.verify()).toThrow(pattern);
+        });
+        it('refuses a lone nlink-2 file that no group declares', () => {
+          const v = v2Fixture(); v.hardlinked(['library/native-a'], 2); v.build();
+          expect(() => v.verify()).toThrow(/linked, redirected or special/);
+        });
+        it.each([
+          ['a member that is not a listed file of this root', (g: any) => { g.paths = [g.paths[0], 'library/missing']; }],
+          ['a member taken from another root', (g: any) => { g.paths = [g.paths[0], '../other-root/file']; }],
+          ['one path repeated', (g: any) => { g.paths = [g.paths[0], g.paths[0]]; }],
+          ['a single member', (g: any) => { g.paths = [g.paths[0]]; g.nlink = 1; }],
+          ['nlink not equal to the member count', (g: any) => { g.nlink = 3; }],
+          ['an unknown field', (g: any) => { g.inode = 7777; }],
+        ])('refuses a malformed group with %s', (_name, edit) => {
+          const v = v2Fixture(); withPair(v);
+          withRecord(v, (r) => edit(r.roots[0].hardlinks[0]), /runtime hard-link group|unsafe.duplicate.unsorted|hard-link group member|invalid runtime hard-link group fields/);
+        });
+        it('refuses a path claimed by two groups and groups that are not in sorted order', () => {
+          const v = v2Fixture(); v.hardlinked(pair); v.hardlinked(['library/native-c', 'library/native-d'], 2, 9999);
+          v.build();
+          withRecord(v, (r) => { r.roots[0].hardlinks = [groupOf(pair), { paths: [pair[1], 'library/native-c'], nlink: 2 }]; }, /unclaimed listed file/);
+          withRecord(v, (r) => { r.roots[0].hardlinks = [groupOf(['library/native-c', 'library/native-d']), groupOf(pair)]; }, /hard-link groups unsorted/);
+        });
+        it('refuses two groups on one inode', () => {
+          const v = v2Fixture(); v.hardlinked(pair); v.hardlinked(['library/native-c', 'library/native-d']); v.build();
+          v.rt.roots[0].hardlinks = [groupOf(pair), groupOf(['library/native-c', 'library/native-d'])]; v.commit();
+          expect(() => v.verify()).toThrow(/hard-link group evidence/);
+        });
+        it('refuses the same pair in the package tree, which keeps the exact nlink === 1 rule', () => {
+          const v = v2Fixture(); withPair(v);
+          for (const n of ['data/synthetic-input.csv', 'package.json']) { v.nlinks.set(join(v.src, n), 2); v.inodes.set(join(v.src, n), 5555); }
+          expect(() => v.verify()).toThrow(/linked, redirected or special/);
+        });
+        it('refuses a version 1 record, which has no group syntax, whose file has nlink 2', () => {
+          const f = fixture(), p = join(dirname(f.runtime.tsx_loader), 'library/dependency.js');
+          f.nlinks.set(p, 2);
+          expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow(/linked, redirected or special/);
+        });
+      });
+
+      describe('launch environment and the absolute listener tool', () => {
+        it('launches with PATH reduced to the cluster client directory and the bound listener supplied absolutely', () => {
+          const v = v2Fixture(), spawn = vi.fn(() => ({ status: 0 }));
+          expect(launchRehearsal(v.request, spawn as any, v.io)).toBe(0);
+          const [, , options] = spawn.mock.calls[0] as any, env = options.env;
+          expect(env.PATH).toBe(v.rt.pg_bin);
+          for (const p of [v.node, v.python, v.listener]) expect(env.PATH.split(delimiter)).not.toContain(dirname(p));
+          expect(env.AFLDB_PYTHON).toBe(v.python);
+          expect(env.AFLDB_REHEARSAL_LISTENER_TOOL).toBe(v.listener);
+          expect(env.AFLDB_REHEARSAL_LAUNCH_SPEC).toBe(v.request.specPath);
+          expect(env.AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256).toBe(v.request.specSha256);
+          expect(options.shell).toBe(false);
+        });
+        const listenerEnv = (v: V2) => ({ AFLDB_REHEARSAL_LISTENER_TOOL: v.listener, AFLDB_REHEARSAL_LAUNCH_SPEC: v.request.specPath,
+          AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: v.request.specSha256 });
+        const anchorOf = (v: V2) => digest(JSON.stringify(v.verify().resolution));
+        const tool = (v: V2, env: Record<string, string | undefined>, anchor: unknown, execArgv: string[] = []) =>
+          guardedListenerTool(env, v.io, (r, io) => verifyRehearsalPackage(r, io), { anchor, execArgv });
+        it('leaves an ordinary process alone: no guard, no rehearsal environment, no verification', () => {
+          const v = v2Fixture(), verify = vi.fn();
+          expect(guardedListenerTool({}, v.io, verify as any, { anchor: undefined, execArgv: [] })).toBeUndefined();
+          expect(verify).not.toHaveBeenCalled();
+        });
+        it('returns the bound absolute listener only after full verification reproduces the installed policy', () => {
+          const v = v2Fixture(), verify = vi.fn((r: any, io: any) => verifyRehearsalPackage(r, io));
+          const answer = guardedListenerTool(listenerEnv(v), v.io, verify as any, { anchor: anchorOf(v), execArgv: [] });
+          expect(answer).toBe(v.listener);
+          expect(verify).toHaveBeenCalledOnce();
+          expect(verify.mock.calls[0][0]).toMatchObject({ specPath: v.request.specPath, specSha256: v.request.specSha256 });
+        });
+        it('also verifies a version 1 record, where the listener is a hashed tree member', () => {
+          const f = fixture(), bound = verifyRehearsalPackage(f.request, f.io);
+          const env = { AFLDB_REHEARSAL_LISTENER_TOOL: f.runtime.listener_tool, AFLDB_REHEARSAL_LAUNCH_SPEC: f.request.specPath, AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: f.request.specSha256 };
+          expect(guardedListenerTool(env, f.io, (r, io) => verifyRehearsalPackage(r, io), { anchor: digest(JSON.stringify(bound.resolution)), execArgv: [] })).toBe(f.runtime.listener_tool);
+        });
+        it('treats an environment variable alone, or a launcher-set value without the installed preload, as no authority', () => {
+          const v = v2Fixture(), env = listenerEnv(v);
+          expect(() => tool(v, { AFLDB_REHEARSAL_LISTENER_TOOL: v.listener }, anchorOf(v))).toThrow(/listener provenance missing/);
+          expect(() => tool(v, env, undefined)).toThrow(/resolution preload missing/);
+          expect(() => tool(v, env, 'not-a-digest')).toThrow(/resolution preload missing/);
+          expect(() => tool(v, env, '0'.repeat(64))).toThrow(/resolution policy mismatch/);
+          expect(() => tool(v, { ...env, AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: '0'.repeat(64) }, anchorOf(v))).toThrow(/pinned bytes/);
+          expect(() => tool(v, { ...env, AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: undefined }, anchorOf(v))).toThrow(/listener provenance missing/);
+          // The preload alone, with every environment value deleted, is still guarded and still refuses.
+          expect(() => tool(v, {}, anchorOf(v))).toThrow(/listener provenance missing/);
+          expect(() => tool(v, {}, undefined, ['file:///x/tools/v2/rehearsal-resolution-guard.mjs'])).toThrow(/listener provenance missing/);
+        });
+        it.each([
+          ['a bare name', (v: V2) => ({ ...listenerEnv(v), AFLDB_REHEARSAL_LISTENER_TOOL: 'ss' }), /unbound listener tool/],
+          ['another absolute file', (v: V2) => ({ ...listenerEnv(v), AFLDB_REHEARSAL_LISTENER_TOOL: v.python }), /unbound listener tool/],
+        ])('refuses %s even with valid provenance', (_name, makeEnv, pattern) => {
+          const v = v2Fixture(), anchor = anchorOf(v);
+          expect(() => tool(v, makeEnv(v), anchor)).toThrow(pattern);
+        });
+        it.each([
+          ['replaced bytes', (v: V2) => { v.put(v.listener, 'substituted listener'); }],
+          ['a symlink in its place', (v: V2) => { v.altered.set(v.listener, 'symlink'); }],
+          ['a hard link', (v: V2) => { v.nlinks.set(v.listener, 2); }],
+          ['a setuid bit', (v: V2) => { v.modes.set(v.listener, 0o4755); }],
+        ])('refuses a substituted listener executable: %s', (_name, change) => {
+          const v = v2Fixture(), env = listenerEnv(v), anchor = anchorOf(v); change(v);
+          expect(() => tool(v, env, anchor)).toThrow(/Rehearsal package refused/);
+        });
+      });
+    });
   });
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 });
 import {
   FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE, trackedExpectedIds,
@@ -3594,7 +4127,16 @@ describe('Python interpreter resolution', () => {
     const source = readFileSync(join(root, 'tools', 'db', 'rebuild-test.ts'), 'utf8');
     expect(source).not.toMatch(/\.\.[/\\]\.\.[/\\]/);
     expect(source).not.toContain('D:\\dev\\afldb');
-    expect(source).not.toMatch(/readdirSync|process\.env\.PATH/);
+    // The rehearsal-mode .env refusal elsewhere in the file lists the checkout root, so the
+    // search ban is asserted on resolvePython's own text and behaviour, not on the whole file.
+    const start = source.indexOf('export function resolvePython(');
+    const end = source.indexOf('\n}\n', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const body = source.slice(start, end);
+    expect(body).not.toMatch(/readdirSync|readdir|existsSync|statSync|accessSync|spawn|exec|which|process\.env\.PATH|PATH/);
+    // Behaviour: no ambient search input changes the answer.
+    expect(resolvePython({ PATH: '/somewhere/else', PYTHONHOME: '/x', VIRTUAL_ENV: '/y' })).toBe(DEFAULT_VENV_PYTHON);
   });
 
   describe('with AFLDB_PYTHON set', () => {
@@ -4207,7 +4749,7 @@ describe('DraftGuru preflight validates the label the data stage will import', (
     // acknowledgement and executeRebuild, so no RESET can precede this refusal.
     const runner = readFileSync(join(root, 'tools', 'db', 'rebuild-test.ts'), 'utf8');
     expect(runner).toMatch(
-      /runPreflight\(deps, opts, fitzroy\);[\s\S]*assertDestructiveAcknowledgement[\s\S]*executeRebuild\(/);
+      /runPreflight\(deps, opts, fitzroy, undefined, binding\);[\s\S]*checkRebuildBinding\(binding, 'after-preflight'\);[\s\S]*assertDestructiveAcknowledgement[\s\S]*executeRebuild\(/);
   });
 });
 
@@ -8545,7 +9087,10 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
       // A `.json` spec is data, not code: it can hold no `import`/`export` statement of its own,
       // so it can never itself reach `server-only` or `@/db/*` and is resolved as a leaf.
       if (base.endsWith('.json') && existsSync(base)) return base;
-      for (const candidate of [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts')]) {
+      // An explicit source extension (the rehearsal verifier is imported as '.mjs') is a real
+      // module in the graph, never a leaf: it is read and its own imports are walked below.
+      if (/\.(?:mjs|mts|cjs|js)$/.test(base) && existsSync(base)) return base;
+      for (const candidate of [`${base}.ts`, `${base}.tsx`, `${base}.mts`, `${base}.mjs`, join(base, 'index.ts')]) {
         if (existsSync(candidate)) return candidate;
       }
       throw new Error(`unresolved import '${spec}' from ${from}`);
@@ -8575,6 +9120,13 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
       for (const [file, specs] of graph) {
         expect(specs, file).not.toContain('server-only');
         expect(specs.filter((s) => s.startsWith('@/db/')), file).toEqual([]);
+      }
+      // Not an opaque leaf: where the runner is reachable, its .mjs verifier was read and walked,
+      // and every import it makes resolved (an unresolved one throws in reachable()).
+      const verifier = [...graph.keys()].find((f) => f.endsWith(join('tools', 'v2', 'rehearsal-package.mjs')));
+      if ([...graph.keys()].some((f) => f.endsWith(join('tools', 'db', 'rebuild-test.ts')))) {
+        expect(verifier, entry).toBeDefined();
+        expect(graph.get(verifier!), entry).toContain('node:fs');
       }
     }
     // Not vacuous: the seeding fixtures module DOES reach server-only, which is why teardown must not load it.
@@ -10161,10 +10713,14 @@ describe('AFLDB-ISSUE-237 L2 — deterministic rehearsal halt (--rehearsal-stop-
 
   it('keeps the destructive acknowledgement and the capture root: both run, unconditionally, before execution', () => {
     // no branch of main() skips either when the flag is present
-    const preflight = mainSource.indexOf('\n  runPreflight(deps, opts, fitzroy);');
+    const preflight = mainSource.indexOf('\n  runPreflight(deps, opts, fitzroy, undefined, binding);');
+    const afterBinding = mainSource.indexOf("\n  checkRebuildBinding(binding, 'after-preflight');");
     const ack = mainSource.indexOf('\n  assertDestructiveAcknowledgement(target, opts.acknowledgeDestroy);');
-    const execute = mainSource.indexOf('executeRebuild(stages, target, deps, { rehearsalStopAfter: opts.rehearsalStopAfter })');
+    const execute = mainSource.indexOf('executeRebuild(stages, target, deps, { rehearsalStopAfter: opts.rehearsalStopAfter, binding })');
     expect(preflight).toBeGreaterThan(-1);
+    // the frozen provenance is re-proven after preflight and before the acknowledgement is consumed
+    expect(afterBinding).toBeGreaterThan(preflight);
+    expect(afterBinding).toBeLessThan(ack);
     expect(preflight).toBeLessThan(ack);
     expect(ack).toBeLessThan(execute);
     expect(refusal(() => assertDestructiveAcknowledgement(codeTarget(), undefined))).toMatch(/--acknowledge-destroy code_test_db/);

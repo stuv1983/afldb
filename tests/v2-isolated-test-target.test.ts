@@ -12,7 +12,7 @@ import {
   isolatedDatabaseOf,
 } from '@afldb/domain';
 
-import { assertCreatableName, checkListenerOwnership, environmentFor, resolveConfig, verifyTarget } from '../tools/v2/isolated-pg';
+import { assertCreatableName, assertLocalListener, checkListenerOwnership, environmentFor, resolveConfig, verifyTarget } from '../tools/v2/isolated-pg';
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
 vi.mock('node:fs', async (original) => ({ ...await original<typeof import('node:fs')>(), readFileSync: vi.fn() }));
@@ -141,5 +141,60 @@ describe('isolated launcher: local process ownership before authentication', () 
     await expect(verifyTarget(cfg, 'afldb_v2_listener_test')).rejects.toThrow(/cannot prove ownership/);
     expect(postgres).not.toHaveBeenCalled();
     expect(readFileSync).not.toHaveBeenCalled();
+  });
+});
+
+// ISSUE-316 ladder-season-scope: the rehearsal listener tool is invoked by its bound absolute path.
+describe('isolated launcher: listener tool resolution under the rehearsal guard', () => {
+  const cfg = resolveConfig({ AFLDB_V2_PG_ROOT: '../afldb-v2-listener-absolute', AFLDB_V2_PG_PORT: '55434' });
+  const data = join(cfg.root, 'data');
+  const postgresExe = join(cfg.bin, process.platform === 'win32' ? 'postgres.exe' : 'postgres');
+  const ssOutput = 'LISTEN 0      200    127.0.0.1:55434    0.0.0.0:*    users:(("postgres",pid=4242,fd=7))\n';
+  const result = (stdout: string) => ({ status: 0, stdout, stderr: '', pid: 1, output: [], signal: null });
+  // A Linux listener table, process list and postmaster file, entirely in memory.
+  const linux = (spawn: unknown, guardedTool: () => string | undefined) => ({
+    platform: 'linux' as const, spawn: spawn as never, guardedTool,
+    readlink: (() => postgresExe) as never,
+    readFile: ((path: string) => String(path).endsWith('cmdline') ? `${postgresExe}\0-D\0${data}\0` : `4242\n${data}\n1\n55434\n`) as never,
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('invokes the verified absolute tool, never the bare name, and still checks postmaster ownership', () => {
+    const spawn = vi.fn(() => result(ssOutput));
+    expect(() => assertLocalListener(cfg, linux(spawn, () => '/opt/reviewed/ss'))).not.toThrow();
+    expect(spawn).toHaveBeenCalledOnce();
+    expect((spawn.mock.calls as unknown[][])[0]).toEqual(['/opt/reviewed/ss', ['-H', '-ltnp', 'sport = :55434'], expect.objectContaining({ timeout: 10_000 })]);
+  });
+
+  it('keeps the bare-name lookup for an ordinary process, where no guard or rehearsal environment exists', () => {
+    const spawn = vi.fn(() => result(ssOutput));
+    expect(() => assertLocalListener(cfg, linux(spawn, () => undefined))).not.toThrow();
+    expect((spawn.mock.calls as unknown[][])[0][0]).toBe('ss');
+  });
+
+  it('refuses, with no process spawned, when the guarded tool cannot be proven; there is no PATH fallback', () => {
+    const spawn = vi.fn(() => result(ssOutput));
+    expect(() => assertLocalListener(cfg, linux(spawn, () => { throw new Error('Rehearsal package refused: unbound listener tool'); })))
+      .toThrow(/cannot prove ownership.*no database credentials sent/);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['only the launcher-set tool variable', { AFLDB_REHEARSAL_LISTENER_TOOL: 'ss' }],
+    ['only a resolution policy variable', { AFLDB_RESOLUTION_POLICY: '/tmp/policy.json' }],
+    ['the tool variable and a spec path without its pin', { AFLDB_REHEARSAL_LISTENER_TOOL: '/usr/bin/ss', AFLDB_REHEARSAL_LAUNCH_SPEC: '/spec.json' }],
+    ['every variable but no installed resolution preload', { AFLDB_REHEARSAL_LISTENER_TOOL: '/usr/bin/ss', AFLDB_REHEARSAL_LAUNCH_SPEC: '/spec.json', AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: 'a'.repeat(64) }],
+  ])('the real guard refuses %s as authority and spawns nothing', (_name, env) => {
+    for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+    const spawn = vi.fn(() => result(ssOutput));
+    expect(() => assertLocalListener(cfg, { platform: 'linux', spawn: spawn as never })).toThrow(/cannot prove ownership/);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('uses the verified tool on the Windows inspection path as well, instead of a SystemRoot lookup', () => {
+    const spawn = vi.fn(() => result('[]'));
+    expect(() => assertLocalListener(cfg, { platform: 'win32', spawn: spawn as never, guardedTool: () => 'C:\\reviewed\\powershell.exe',
+      readFile: (() => '') as never })).toThrow(/cannot prove ownership/); // no owners, but the tool was already chosen
+    expect((spawn.mock.calls as unknown[][])[0][0]).toBe('C:\\reviewed\\powershell.exe');
   });
 });

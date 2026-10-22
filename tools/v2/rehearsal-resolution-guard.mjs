@@ -18,7 +18,8 @@ function checked(url) {
   const p = fileURLToPath(url);
   const expected = policy.files[p];
   const st = fs.lstatSync(p);
-  if (!expected || !st.isFile() || st.nlink !== 1 || fs.realpathSync(p) !== p
+  // Only an explicitly declared, fully enumerated runtime hard-link group (policy version 2) may exceed 1.
+  if (!expected || !st.isFile() || st.nlink !== (policy.hardlink_counts?.[p] ?? 1) || fs.realpathSync(p) !== p
       || digest(fs.readFileSync(p)) !== expected) refuse();
 }
 function bare(s) { return !s.startsWith('.') && !s.startsWith('/') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(s) && !s.startsWith('#'); }

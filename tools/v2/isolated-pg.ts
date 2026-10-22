@@ -38,6 +38,7 @@ import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
 
+import { guardedListenerTool } from './rehearsal-package.mjs';
 import {
   ISOLATED_CLUSTER_NAME,
   ISOLATED_DATABASE_MARKER,
@@ -103,31 +104,45 @@ export function checkListenerOwnership(cfg: IsolatedConfig, postmaster: string, 
   if (!valid) throw new Error(`refused: local listener on port ${cfg.port} is not this isolated postmaster; no database credentials sent`);
 }
 
-export function assertLocalListener(cfg: IsolatedConfig): void {
+/** Process facts behind the listener check; the defaults are the real process. Overridable for tests only. */
+export interface ListenerProbe {
+  platform: NodeJS.Platform;
+  spawn: typeof spawnSync;
+  readlink: typeof readlinkSync;
+  readFile: typeof readFileSync;
+  /** Absolute listener tool of a rehearsal-guarded process (verified against launch provenance), else undefined. */
+  guardedTool: () => string | undefined;
+}
+
+export function assertLocalListener(cfg: IsolatedConfig, override: Partial<ListenerProbe> = {}): void {
   if (!Number.isInteger(cfg.port) || cfg.port < 1024 || cfg.port > 65535) throw new Error('refused: invalid isolated listener port');
+  const probe: ListenerProbe = { platform: process.platform, spawn: spawnSync, readlink: readlinkSync, readFile: readFileSync,
+    guardedTool: () => guardedListenerTool(), ...override };
   let owners: ListenerOwner[];
   try {
-    if (process.platform === 'win32') {
+    // Guarded rehearsal: the verified, content-bound absolute tool or a refusal, never a PATH lookup.
+    const guardedTool = probe.guardedTool();
+    if (probe.platform === 'win32') {
       const script = `$ErrorActionPreference='Stop'; $owners=@(Get-NetTCPConnection -LocalPort ${cfg.port} -State Listen | ForEach-Object { `
         + `$p=Get-CimInstance Win32_Process -Filter ("ProcessId="+$_.OwningProcess); `
         + `[pscustomobject]@{address=$_.LocalAddress;pid=[int]$p.ProcessId;executablePath=$p.ExecutablePath;commandLine=$p.CommandLine} }); `
         + `ConvertTo-Json -InputObject $owners -Compress`;
-      const result = spawnSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+      const result = probe.spawn(guardedTool ?? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
         ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 10_000 });
       if (result.status !== 0) throw new Error('listener inspection failed');
-      owners = JSON.parse(result.stdout.trim()) as ListenerOwner[];
-    } else if (process.platform === 'linux') {
-      const result = spawnSync('ss', ['-H', '-ltnp', `sport = :${cfg.port}`], { encoding: 'utf8', timeout: 10_000 });
+      owners = JSON.parse(String(result.stdout).trim()) as ListenerOwner[];
+    } else if (probe.platform === 'linux') {
+      const result = probe.spawn(guardedTool ?? 'ss', ['-H', '-ltnp', `sport = :${cfg.port}`], { encoding: 'utf8', timeout: 10_000 });
       if (result.status !== 0) throw new Error('listener inspection failed');
-      owners = result.stdout.trim().split('\n').filter(Boolean).flatMap((line) => {
+      owners = String(result.stdout).trim().split('\n').filter(Boolean).flatMap((line) => {
         const address = line.trim().split(/\s+/)[3]?.replace(/:\d+$/, '');
         const pids = [...line.matchAll(/pid=(\d+)/g)].map((match) => Number(match[1]));
         if (!address || pids.length === 0) throw new Error('listener owner unavailable');
-        return pids.map((pid) => ({ address, pid, executablePath: readlinkSync(`/proc/${pid}/exe`),
-          commandLine: readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean).map((arg) => `"${arg}"`).join(' ') }));
+        return pids.map((pid) => ({ address, pid, executablePath: probe.readlink(`/proc/${pid}/exe`),
+          commandLine: String(probe.readFile(`/proc/${pid}/cmdline`, 'utf8')).split('\0').filter(Boolean).map((arg) => `"${arg}"`).join(' ') }));
       });
     } else throw new Error('unsupported OS');
-    checkListenerOwnership(cfg, readFileSync(join(dataDir(cfg), 'postmaster.pid'), 'utf8'), owners);
+    checkListenerOwnership(cfg, String(probe.readFile(join(dataDir(cfg), 'postmaster.pid'), 'utf8')), owners);
   } catch {
     // Never include captured process arguments: an unexpected process may hold secrets.
     throw new Error(`refused: cannot prove ownership of local port ${cfg.port} by this isolated postmaster; no database credentials sent`);

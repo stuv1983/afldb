@@ -78,10 +78,32 @@ export function inventoryEntries(bytes, runtime = false) {
 }
 const PAIR_FIELDS = 'profile core_snapshot_label core_manifest_sha256 core_artefact_set_sha256 witness_snapshot_label witness_manifest_sha256 first_season last_season expected_rows';
 const TARGET_FIELDS = 'database host port cluster_name database_marker';
+const RUNTIME_FIELDS_V1 = 'schema_version roots node tsx_loader node_search_roots esbuild_binary python python_stdlib python_dependencies pg_bin listener_tool lockfile_sha256';
+// Version 2 adds file-bound executables, absent startup landmarks, and per-root inert-link and
+// hard-link evidence. Each new field exists only in version 2; version 1 stays strictly as it was.
+const RUNTIME_FIELDS_V2 = `${RUNTIME_FIELDS_V1} executables python_absent_landmarks`;
+const RUNTIME_ALPHABET = /^[a-zA-Z0-9_@+./-]+$/;
+const overlaps = (a, b) => { const r = path.relative(a, b); return r === '' || (!r.startsWith('..' + path.sep) && r !== '..' && !path.isAbsolute(r)); };
+/** The exact files whose presence would change which prefix, venv or build layout CPython selects at
+ * start-up for this interpreter (getpath: pyvenv.cfg beside or above the executable, pybuilddir.txt,
+ * the `Modules/Setup.local` build landmark searched upward from the executable directory, and a
+ * `._pth` file named for the executable). Version 2 records prove every one absent; each is a reviewed,
+ * exact path, never a pattern. Throws on anything but a canonical absolute path. */
+export function pythonStartupLandmarks(python) {
+  if (typeof python !== 'string' || !path.isAbsolute(python) || path.resolve(python) !== python) refuse('Python startup landmarks need a canonical interpreter path');
+  const dir = path.dirname(python), base = path.basename(python), dot = base.lastIndexOf('.');
+  const out = [path.join(dir, 'pyvenv.cfg'), path.join(path.dirname(dir), 'pyvenv.cfg'), path.join(dir, 'pybuilddir.txt'),
+    path.join(dir, `${base}._pth`), path.join(dir, `${dot > 0 ? base.slice(0, dot) : base}._pth`)];
+  for (let d = dir; ; d = path.dirname(d)) { out.push(path.join(d, 'Modules', 'Setup.local')); if (path.dirname(d) === d) break; }
+  return [...new Set(out)];
+}
 export function verifyRehearsalPackage(request, io = fs) {
   // Only request.specSha256 (from the reviewed launch instruction) establishes initial trust.
   if (!HEX.test(request.specSha256 ?? '')) refuse('missing external specification pin');
   const checkedPaths = new Set(); // One complete traversal per call, never across checkpoints.
+  // Runtime-only: absolute path -> exact link count of a declared hard-link group member.
+  // The package/source tree never registers here, so it keeps the exact nlink === 1 rule.
+  const hardlinkCounts = new Map();
   function canonical(p, missing = false) {
     if (typeof p !== 'string' || !path.isAbsolute(p) || path.resolve(p) !== p || /[\x00-\x1f]/.test(p)) refuse('noncanonical absolute location');
     if (checkedPaths.has(p)) return p;
@@ -92,7 +114,7 @@ export function verifyRehearsalPackage(request, io = fs) {
       refuse('missing required location');
     }
     const st = io.lstatSync(p);
-    if (st.isSymbolicLink() || (!st.isFile() && !st.isDirectory()) || (st.isFile() && st.nlink !== 1)
+    if (st.isSymbolicLink() || (!st.isFile() && !st.isDirectory()) || (st.isFile() && st.nlink !== (hardlinkCounts.get(p) ?? 1))
         || io.realpathSync(p) !== p) refuse('linked, redirected or special location');
     checkedPaths.add(p);
     return p;
@@ -103,6 +125,66 @@ export function verifyRehearsalPackage(request, io = fs) {
     const bytes = io.readFileSync(p);
     if (hash(bytes) !== digest) refuse('pinned bytes changed');
     return bytes;
+  }
+  // ---- runtime record version 2 evidence (never reachable for the package/source tree) ----
+  // Inert links: path + literal readlink only. A link is accounted for, never followed or trusted.
+  function linkLedger(root) {
+    if (!Array.isArray(root.links)) refuse('runtime link ledger');
+    if (!root.links.length) return [];
+    const text = root.links.map((l) => {
+      fields(l, 'path readlink', 'runtime link');
+      if (typeof l.path !== 'string' || !RUNTIME_ALPHABET.test(l.path)
+          || typeof l.readlink !== 'string' || l.readlink.length > 4096 || !/^[\x20-\x7e]+$/.test(l.readlink)) refuse('runtime link entry');
+      return `${'0'.repeat(64)}  ${l.path}\n`;
+    }).join('');
+    inventoryEntries(Buffer.from(text), true); // alphabet, components, case folding, sorted and unique
+    return root.links;
+  }
+  // Hard-link groups: complete membership inside one root. Evidence is checked after hashing.
+  function hardlinkGroups(root, listed) {
+    if (!Array.isArray(root.hardlinks)) refuse('runtime hard-link groups');
+    const members = new Set(listed.map((e) => e.path)), claimed = new Set();
+    let previous = '';
+    return root.hardlinks.map((g) => {
+      fields(g, 'paths nlink', 'runtime hard-link group');
+      if (!Array.isArray(g.paths) || g.paths.length < 2 || g.nlink !== g.paths.length
+          || g.paths.some((p) => typeof p !== 'string' || !RUNTIME_ALPHABET.test(p))) refuse('runtime hard-link group');
+      inventoryEntries(Buffer.from(g.paths.map((p) => `${'0'.repeat(64)}  ${p}\n`).join('')), true);
+      if (g.paths[0] <= previous) refuse('runtime hard-link groups unsorted');
+      previous = g.paths[0];
+      for (const p of g.paths) {
+        if (!members.has(p) || claimed.has(p)) refuse('hard-link group member not an unclaimed listed file of this root');
+        claimed.add(p);
+      }
+      return g;
+    });
+  }
+  function verifyGroups(root, groups, listed) {
+    const digests = new Map(listed.map((e) => [e.path, e.sha256])), inodes = new Set();
+    for (const g of groups) {
+      const stats = g.paths.map((p) => io.lstatSync(path.join(root.path, p)));
+      const key = `${stats[0].dev}:${stats[0].ino}`;
+      if (stats.some((st) => !st.isFile() || st.nlink !== g.nlink || `${st.dev}:${st.ino}` !== key
+            || (typeof st.ino !== 'number' && typeof st.ino !== 'bigint'))
+          || new Set(g.paths.map((p) => digests.get(p))).size !== 1 || inodes.has(key)) refuse('hard-link group evidence');
+      inodes.add(key);
+    }
+  }
+  // Interpreters and the listener tool are bound as files. Their parent directories are not
+  // enumerated, trusted or searched, so exactly these three are accepted.
+  function verifyExecutables() {
+    const list = runtime.executables;
+    if (!Array.isArray(list)) refuse('runtime executables');
+    for (const e of list) fields(e, 'path sha256', 'runtime executable');
+    const declared = [runtime.node, runtime.python, runtime.listener_tool];
+    if (new Set(declared).size !== declared.length || list.length !== declared.length
+        || !equal(list.map((e) => e.path).sort(), [...declared].sort())) refuse('runtime executables');
+    for (const e of list) {
+      pinned(e.path, e.sha256); // non-link ancestors, realpath identity, regular file, nlink 1, exact bytes
+      const st = io.lstatSync(e.path);
+      if (!st.isFile() || (Number(st.mode) & 0o6000)) refuse('executable mode');
+      if (runtime.roots.some((r) => overlaps(r.path, e.path)) || path.dirname(e.path) === runtime.pg_bin) refuse('executable parent is trusted or searched');
+    }
   }
   const spec = strictJson(pinned(request.specPath, request.specSha256));
   fields(spec, 'schema_version purpose implementation_basis pair target package_root source_root inventory_relative_path expected_inventory_sha256 runtime_record runtime_record_sha256 capture_root output_root temp_root cluster_root runner_options launcher_path launcher_sha256 required_files', 'launch specification');
@@ -123,7 +205,10 @@ export function verifyRehearsalPackage(request, io = fs) {
   if (spec.source_root !== path.join(spec.package_root, 'source') || spec.inventory_relative_path !== 'SHA256SUMS.txt') refuse('source/inventory identity');
   const sums = pinned(path.join(spec.package_root, 'SHA256SUMS.txt'), spec.expected_inventory_sha256);
   const entries = inventoryEntries(sums);
-  function enumerate(root, packageTree = false) {
+  // `links` is supplied only for a version 2 runtime tree root. A symbolic link there is recorded
+  // (its own lstat and literal readlink only) and is never followed, descended into or listed;
+  // everywhere else, including the package tree, a link reaches canonical() and refuses.
+  function enumerate(root, packageTree = false, links = null) {
     const found = [];
     function walk(dir, prefix) {
       canonical(dir);
@@ -131,6 +216,7 @@ export function verifyRehearsalPackage(request, io = fs) {
         if (packageTree && /^(?:\.env(?:\..*)?|\.git|\.codex|node_modules|__pycache__|\.next|site-packages)$/.test(name)) refuse('excluded package member');
         if (!(packageTree ? /^[a-zA-Z0-9_.-]+$/ : /^[a-zA-Z0-9_@+.-]+$/).test(name) || name === '.' || name === '..') refuse('unsupported file name');
         const rel = prefix + name, abs = path.join(dir, name);
+        if (links && io.lstatSync(abs).isSymbolicLink()) { links.push({ path: rel, readlink: io.readlinkSync(abs) }); continue; }
         canonical(abs);
         if (io.lstatSync(abs).isDirectory()) walk(abs, rel + '/'); else found.push(rel);
       }
@@ -175,45 +261,103 @@ export function verifyRehearsalPackage(request, io = fs) {
     for (const file of manifest.files) sourceMember(`${manifest.working_directory}/${file.filename}`);
   }
   const runtime = strictJson(pinned(spec.runtime_record, spec.runtime_record_sha256));
-  fields(runtime, 'schema_version roots node tsx_loader node_search_roots esbuild_binary python python_stdlib python_dependencies pg_bin listener_tool lockfile_sha256', 'runtime record');
-  if (runtime.schema_version !== 1 || !Array.isArray(runtime.roots) || !runtime.roots.length) refuse('runtime schema');
+  const version = runtime && typeof runtime === 'object' && !Array.isArray(runtime) ? runtime.schema_version : undefined;
+  const v2 = version === 2;
+  if (version !== 1 && !v2) refuse('runtime schema');
+  fields(runtime, v2 ? RUNTIME_FIELDS_V2 : RUNTIME_FIELDS_V1, 'runtime record');
+  if (!Array.isArray(runtime.roots) || !runtime.roots.length) refuse('runtime schema');
   const runtimeFiles = new Set();
+  const ledgered = []; // absolute paths of accounted-for, never-trusted links
   for (const root of runtime.roots) {
-    fields(root, 'path files', 'runtime root'); canonical(root.path);
+    fields(root, v2 ? 'path files links hardlinks' : 'path files', 'runtime root'); canonical(root.path);
     if (!Array.isArray(root.files) || !root.files.length) refuse('empty runtime content evidence');
     const encoded = root.files.map((e) => { fields(e, 'path sha256', 'runtime file'); return `${e.sha256}  ${e.path}\n`; }).join('');
     const listed = inventoryEntries(Buffer.from(encoded), true);
-    if (!equal(enumerate(root.path), listed.map((e) => e.path))) refuse('runtime membership');
+    const ledger = v2 ? linkLedger(root) : null, groups = v2 ? hardlinkGroups(root, listed) : [];
+    for (const g of groups) for (const member of g.paths) hardlinkCounts.set(path.join(root.path, member), g.nlink);
+    const discovered = v2 ? [] : null;
+    if (!equal(enumerate(root.path, false, discovered), listed.map((e) => e.path))) refuse('runtime membership');
+    if (v2) {
+      // Listed links are accounted for in both directions, exactly, and nothing more.
+      discovered.sort((x, y) => (x.path < y.path ? -1 : 1));
+      if (!equal(discovered, ledger)) refuse('runtime link ledger');
+      for (const l of ledger) ledgered.push(path.join(root.path, l.path));
+    }
     for (const e of listed) { const p = path.join(root.path, e.path); pinned(p, e.sha256); runtimeFiles.add(p); }
+    if (v2) verifyGroups(root, groups, listed);
   }
   // Explicit search locations are not authority by themselves: every existing byte
   // beneath them was enumerated and pinned above. No site initialisation is allowed.
+  const landmarks = v2 ? runtime.python_absent_landmarks : [];
+  if (!Array.isArray(landmarks) || new Set(landmarks).size !== landmarks.length) refuse('Python absent landmarks');
   for (const key of ['node_search_roots', 'python_stdlib', 'python_dependencies']) {
     if (!Array.isArray(runtime[key]) || (key !== 'python_dependencies' && !runtime[key].length)
         || new Set(runtime[key]).size !== runtime[key].length) refuse('runtime search locations');
     for (const p of runtime[key]) {
+      if (v2 && key === 'python_stdlib' && typeof p === 'string' && p.endsWith('.zip')) {
+        // The startup path always lists the zip; it must be declared and proven absent below.
+        if (!landmarks.includes(p)) refuse('undeclared Python zip location');
+        continue;
+      }
       canonical(p, key === 'python_stdlib' && p.endsWith('.zip'));
       if (!runtime.roots.some((root) => p === root.path || p.startsWith(root.path + path.sep))) refuse('unbound runtime search location');
       // zip imports cannot be checked as individual on-disk module files.
       if (p.endsWith('.zip') && io.existsSync(p)) refuse('unsupported Python zip runtime');
     }
   }
-  if (![runtime.node, runtime.tsx_loader, runtime.esbuild_binary, runtime.python, runtime.listener_tool].every((p) => runtimeFiles.has(p))
+  // existsSync() reports a dangling link as missing, so absence is proven with lstat alone.
+  // Declared landmarks are exactly: each zip python_stdlib lists, plus the reviewed start-up landmarks
+  // that decide which prefix/venv/build layout the interpreter selects. Nothing broader is accepted.
+  const startup = v2 ? pythonStartupLandmarks(runtime.python) : [];
+  const provenAbsent = (p, zip) => {
+    if (zip) canonical(path.dirname(p));
+    else {
+      // The deepest existing ancestor must be a plain directory; below it the path cannot exist.
+      let dir = path.dirname(p);
+      for (;;) {
+        try { io.lstatSync(dir); break; } catch (error) {
+          if (error?.code !== 'ENOENT' || dir === path.dirname(dir)) refuse('Python landmark absence unprovable');
+          dir = path.dirname(dir);
+        }
+      }
+      canonical(dir);
+    }
+    let present = true;
+    try { io.lstatSync(p); } catch (error) { if (error?.code === 'ENOENT') present = false; else refuse('Python landmark absence unprovable'); }
+    if (present) refuse('Python absent landmark exists');
+  };
+  for (const p of landmarks) {
+    if (typeof p !== 'string' || !path.isAbsolute(p) || path.resolve(p) !== p || /[\x00-\x1f]/.test(p)) refuse('Python absent landmark');
+    if (p.endsWith('.zip') ? !runtime.python_stdlib.includes(p) : !startup.includes(p)) refuse('Python absent landmark');
+  }
+  for (const p of startup) if (!landmarks.includes(p)) refuse('undeclared Python startup landmark');
+  for (const p of landmarks) provenAbsent(p, p.endsWith('.zip'));
+  if (v2) verifyExecutables();
+  const bound = v2 ? [runtime.tsx_loader, runtime.esbuild_binary]
+    : [runtime.node, runtime.tsx_loader, runtime.esbuild_binary, runtime.python, runtime.listener_tool];
+  if (!bound.every((p) => runtimeFiles.has(p))
       || !['psql', 'pg_dump', 'pg_restore'].every((n) => runtimeFiles.has(path.join(runtime.pg_bin, process.platform === 'win32' ? `${n}.exe` : n)))
       || hash(io.readFileSync(path.join(spec.source_root, 'package-lock.json'))) !== runtime.lockfile_sha256) refuse('unbound executable/loader/lockfile');
   const listenerName = process.platform === 'win32' ? 'powershell.exe' : 'ss';
   if (path.basename(runtime.listener_tool) !== listenerName) refuse('unbound live-isolation listener tool');
   const systemRoot = process.platform === 'win32' ? path.resolve(runtime.listener_tool, '..', '..', '..', '..') : undefined;
   if (systemRoot && path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') !== runtime.listener_tool) refuse('listener tool resolution');
-  const protectedRoots = [spec.package_root, request.specPath, spec.launcher_path, spec.runtime_record, ...runtime.roots.map((r) => r.path)];
+  if (v2) {
+    // No runtime path may be, or lie beneath, a link that was merely accounted for.
+    const used = [runtime.node, runtime.tsx_loader, runtime.esbuild_binary, runtime.python, runtime.listener_tool, runtime.pg_bin,
+      ...runtime.node_search_roots, ...runtime.python_stdlib, ...runtime.python_dependencies];
+    if (ledgered.some((l) => used.some((p) => overlaps(l, p)))) refuse('runtime path through an inert link');
+  }
+  const executables = v2 ? runtime.executables : [];
+  const protectedRoots = [spec.package_root, request.specPath, spec.launcher_path, spec.runtime_record, ...runtime.roots.map((r) => r.path),
+    ...executables.map((e) => e.path)];
   const writes = [spec.capture_root, spec.output_root, spec.temp_root, spec.cluster_root];
-  const overlaps = (a, b) => { const r = path.relative(a, b); return r === '' || (!r.startsWith('..' + path.sep) && r !== '..' && !path.isAbsolute(r)); };
   for (const p of writes) canonical(p, true);
   for (const a of writes) for (const b of [...protectedRoots, ...writes.filter((p) => p !== a)]) {
     if (overlaps(a, b) || overlaps(b, a)) refuse('writable root overlap');
   }
   if (new Set(writes).size !== writes.length) refuse('writable root overlap');
-  for (const p of [request.specPath, spec.launcher_path, spec.runtime_record, ...runtime.roots.map((r) => r.path)]) {
+  for (const p of [request.specPath, spec.launcher_path, spec.runtime_record, ...runtime.roots.map((r) => r.path), ...executables.map((e) => e.path)]) {
     if (overlaps(spec.package_root, p) || overlaps(p, spec.package_root)) refuse('external trust material overlaps package');
   }
   pinned(spec.launcher_path, spec.launcher_sha256);
@@ -237,7 +381,9 @@ export function verifyRehearsalPackage(request, io = fs) {
     ...entries.map((e) => [path.join(spec.package_root, e.path), e.sha256]),
     ...runtime.roots.flatMap((root) => root.files.map((e) => [path.join(root.path, e.path), e.sha256])),
   ]), node_search_roots: runtime.node_search_roots, tsx_loader: runtime.tsx_loader, esbuild_binary: runtime.esbuild_binary,
-  python_stdlib: runtime.python_stdlib, python_dependencies: runtime.python_dependencies, source_root: spec.source_root };
+  python_stdlib: runtime.python_stdlib, python_dependencies: runtime.python_dependencies, source_root: spec.source_root,
+  // Version 2 only, so a version 1 policy (and its digest) is exactly what it was.
+  ...(v2 ? { executables: Object.fromEntries(executables.map((e) => [e.path, e.sha256])), hardlink_counts: Object.fromEntries(hardlinkCounts) } : {}) };
   return freezeBinding({ ...binding, spec, runtime, resolution });
 }
 
@@ -247,6 +393,18 @@ export function verifyRehearsalPackage(request, io = fs) {
 // the package checkpoints, this assumes no malicious concurrent filesystem writer.
 const PYTHON_GUARD = String.raw`
 import sys
+# A zip on the startup path would be consulted before any other import below runs. Python lists
+# its zip whether or not it exists, so only a present entry refuses. Nothing path-based may run
+# first: the file-system module is the interpreter's own built-in (never searched for on sys.path),
+# and lstat sees a dangling link as present. Only ENOENT is absence; any other error refuses.
+# Limit: interpreter start-up imports (encodings, the frozen os) precede every line here, so the
+# parent's pre-launch proof of absence stays the defence for the start-up path itself.
+_fs = __import__('nt' if 'nt' in sys.builtin_module_names else 'posix')
+for _location in sys.path:
+    if not _location.endswith('.zip'): continue
+    try: _fs.lstat(_location)
+    except FileNotFoundError: continue
+    raise RuntimeError('Rehearsal Python resolution refused')
 if sys.path != __STDLIB__: raise RuntimeError('Rehearsal Python startup path refused')
 import json, os, hashlib, importlib.machinery, runpy
 policy_path, pin, script = sys.argv[1:4]
@@ -320,6 +478,30 @@ export function assertRehearsalResolution(verified) {
   }
 }
 
+const LISTENER_ENV = ['AFLDB_RESOLUTION_POLICY', 'AFLDB_REHEARSAL_LISTENER_TOOL', 'AFLDB_REHEARSAL_LAUNCH_SPEC', 'AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256'];
+/** The live-isolation listener tool for a process that runs under the rehearsal resolution guard.
+ * Returns undefined only for an ordinary process (no guard preload, no rehearsal environment), where
+ * the caller keeps its existing behaviour. In a guarded process the answer is never a bare name and
+ * never an environment value alone: the launch specification is verified again, in full, against the
+ * original reviewed pin; that verification must reproduce the exact policy the preload installed; and
+ * the environment path must be the listener its runtime record binds by content.
+ * `context` and `verify` are API test seams, not a CLI or environment switch.
+ */
+export function guardedListenerTool(env = process.env, io = fs, verify = verifyRehearsalPackage,
+  context = { anchor: globalThis[Symbol.for('afldb.rehearsal.resolution')], execArgv: process.execArgv }) {
+  const guarded = context.anchor !== undefined || LISTENER_ENV.some((key) => env[key] !== undefined)
+    || context.execArgv.some((arg) => /rehearsal-resolution-guard\.mjs$/.test(arg));
+  if (!guarded) return undefined;
+  const { AFLDB_REHEARSAL_LISTENER_TOOL: tool, AFLDB_REHEARSAL_LAUNCH_SPEC: specPath, AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: specSha256 } = env;
+  if (typeof tool !== 'string' || typeof specPath !== 'string' || !HEX.test(specSha256 ?? '')) refuse('listener provenance missing');
+  if (typeof context.anchor !== 'string' || !HEX.test(context.anchor)) refuse('resolution preload missing');
+  const verified = verify({ specPath, specSha256, checkpoint: 'listener-tool' }, io);
+  if (hash(Buffer.from(JSON.stringify(verified.resolution))) !== context.anchor) refuse('resolution policy mismatch');
+  const listener = verified.runtime.listener_tool;
+  if (tool !== listener || !HEX.test(verified.resolution.executables?.[listener] ?? verified.resolution.files[listener] ?? '')) refuse('unbound listener tool');
+  return listener;
+}
+
 /** Fixed launcher; injection is an API test seam, never a CLI bypass. */
 export function launchRehearsal(request, spawn = spawnSync, io = fs) {
   request = freezeBinding(structuredClone(request)); // Keep the original reviewed pins through terminal readback.
@@ -331,9 +513,12 @@ export function launchRehearsal(request, spawn = spawnSync, io = fs) {
   const args = [...enforcement.nodeArgs, path.join(s.source_root, 'tools/v2/isolated-pg.ts'), 'run', s.target.database, '--',
     r.node, ...enforcement.nodeArgs, path.join(s.source_root, 'tools/db/rebuild-test.ts'), ...options];
   // No ambient module/loader/Python/R search paths, executable shims, or inherited overrides.
+  // PATH is the cluster client directory only: the listener tool and both interpreters are invoked by
+  // their bound absolute paths, so neither /usr/bin nor any executable's parent directory is searched.
   const env = {
     ...enforcement.env,
-    PATH: [r.pg_bin, path.dirname(r.listener_tool)].join(path.delimiter), AFLDB_PYTHON: r.python,
+    PATH: r.pg_bin, AFLDB_PYTHON: r.python,
+    AFLDB_REHEARSAL_LISTENER_TOOL: r.listener_tool, AFLDB_REHEARSAL_LAUNCH_SPEC: request.specPath, AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: request.specSha256,
     AFLDB_V2_PG_ROOT: s.cluster_root, AFLDB_V2_PG_BIN: r.pg_bin, AFLDB_V2_PG_PORT: String(s.target.port),
     AFLDB_REBUILD_CAPTURE_ROOT: s.capture_root, PYTHONDONTWRITEBYTECODE: '1', PYTHONNOUSERSITE: '1',
     TMP: s.temp_root, TEMP: s.temp_root, TMPDIR: s.temp_root, XDG_CACHE_HOME: s.temp_root,
