@@ -82,6 +82,17 @@ const RUNTIME_FIELDS_V1 = 'schema_version roots node tsx_loader node_search_root
 // Version 2 adds file-bound executables, absent startup landmarks, and per-root inert-link and
 // hard-link evidence. Each new field exists only in version 2; version 1 stays strictly as it was.
 const RUNTIME_FIELDS_V2 = `${RUNTIME_FIELDS_V1} executables python_absent_landmarks`;
+// Version 3 (AFLDB-ISSUE-320) adds the enforced native closure: every executable and shared object any
+// guarded process may map or exec, bound by canonical path and content, plus the rtld-audit module that
+// enforces it in every guarded process (tools/v2/native-audit/afldb-native-audit.c).
+const RUNTIME_FIELDS_V3 = `${RUNTIME_FIELDS_V2} native_closure`;
+// Printable ASCII, no leading/trailing blank; the auditor's own path also may not hold the LD_AUDIT separators.
+const NATIVE_PATH = /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/, AUDITOR_PATH = /^[\x21-\x39\x3b-\x7e]+$/;
+/** The exact policy text the auditor reads; derived only from a verified version 3 record. */
+export function nativePolicyText(closure) {
+  return `afldb-native-closure-policy 1\nauditor ${closure.auditor.sha256} ${closure.auditor.path}\n`
+    + closure.objects.map((o) => `object ${o.sha256} ${o.path}\n`).join('');
+}
 const RUNTIME_ALPHABET = /^[a-zA-Z0-9_@+./-]+$/;
 const overlaps = (a, b) => { const r = path.relative(a, b); return r === '' || (!r.startsWith('..' + path.sep) && r !== '..' && !path.isAbsolute(r)); };
 /** The exact files whose presence would change which prefix, venv or build layout CPython selects at
@@ -262,11 +273,12 @@ export function verifyRehearsalPackage(request, io = fs) {
   }
   const runtime = strictJson(pinned(spec.runtime_record, spec.runtime_record_sha256));
   const version = runtime && typeof runtime === 'object' && !Array.isArray(runtime) ? runtime.schema_version : undefined;
-  const v2 = version === 2;
+  const v3 = version === 3, v2 = version === 2 || v3;
   if (version !== 1 && !v2) refuse('runtime schema');
-  fields(runtime, v2 ? RUNTIME_FIELDS_V2 : RUNTIME_FIELDS_V1, 'runtime record');
+  fields(runtime, v3 ? RUNTIME_FIELDS_V3 : v2 ? RUNTIME_FIELDS_V2 : RUNTIME_FIELDS_V1, 'runtime record');
   if (!Array.isArray(runtime.roots) || !runtime.roots.length) refuse('runtime schema');
   const runtimeFiles = new Set();
+  const runtimeDigests = new Map(), elfFiles = new Set(); // version 3: ELF members of the bound roots
   const ledgered = []; // absolute paths of accounted-for, never-trusted links
   for (const root of runtime.roots) {
     fields(root, v2 ? 'path files links hardlinks' : 'path files', 'runtime root'); canonical(root.path);
@@ -283,7 +295,11 @@ export function verifyRehearsalPackage(request, io = fs) {
       if (!equal(discovered, ledger)) refuse('runtime link ledger');
       for (const l of ledger) ledgered.push(path.join(root.path, l.path));
     }
-    for (const e of listed) { const p = path.join(root.path, e.path); pinned(p, e.sha256); runtimeFiles.add(p); }
+    for (const e of listed) {
+      const p = path.join(root.path, e.path), bytes = pinned(p, e.sha256);
+      runtimeFiles.add(p);
+      if (v3) { runtimeDigests.set(p, e.sha256); if (bytes.length >= 4 && bytes.readUInt32BE(0) === 0x7f454c46) elfFiles.add(p); }
+    }
     if (v2) verifyGroups(root, groups, listed);
   }
   // Explicit search locations are not authority by themselves: every existing byte
@@ -333,6 +349,39 @@ export function verifyRehearsalPackage(request, io = fs) {
   for (const p of startup) if (!landmarks.includes(p)) refuse('undeclared Python startup landmark');
   for (const p of landmarks) provenAbsent(p, p.endsWith('.zip'));
   if (v2) verifyExecutables();
+  // ---- runtime record version 3: the enforced native closure ----
+  // Every object is hashed here, before any spawn, so drift refuses before protected activity; the
+  // auditor then enforces the same set inside every guarded process (search candidates, dlopen, the
+  // main executable, every executable mapping, and exec targets including static ones).
+  function verifyNativeClosure() {
+    const n = runtime.native_closure;
+    fields(n, 'schema_version loader auditor objects', 'native closure');
+    if (n.schema_version !== 1 || !Array.isArray(n.objects) || !n.objects.length) refuse('native closure');
+    fields(n.auditor, 'path sha256', 'native auditor');
+    const bound = new Map();
+    let previous = '';
+    for (const o of n.objects) {
+      fields(o, 'path sha256', 'native object');
+      if (typeof o.path !== 'string' || !NATIVE_PATH.test(o.path) || !path.isAbsolute(o.path) || path.resolve(o.path) !== o.path
+          || !HEX.test(o.sha256 ?? '') || o.path <= previous) refuse('native object entry');
+      previous = o.path;
+      bound.set(o.path, o.sha256);
+    }
+    for (const [p, digest] of bound) {
+      pinned(p, digest); // non-link ancestors, realpath identity, regular file, exact link count, exact bytes
+      if (Number(io.lstatSync(p).mode) & 0o6000) refuse('native object mode');
+      if (runtimeDigests.has(p) && runtimeDigests.get(p) !== digest) refuse('native object differs from its runtime root binding');
+    }
+    const member = (p, digest) => bound.get(p) === digest;
+    if (typeof n.loader !== 'string' || !bound.has(n.loader) || !member(n.auditor.path, n.auditor.sha256)
+        || (process.platform !== 'win32' && !AUDITOR_PATH.test(n.auditor.path))) refuse('native loader/auditor unbound');
+    for (const e of runtime.executables) if (!member(e.path, e.sha256)) refuse('bound executable outside the native closure');
+    // Every ELF member of a bound root (esbuild, the cluster client tools, compiled extensions).
+    for (const p of elfFiles) if (!member(p, runtimeDigests.get(p))) refuse('runtime ELF file outside the native closure');
+    const text = nativePolicyText(n);
+    return { native_auditor: n.auditor.path, native_auditor_sha256: n.auditor.sha256, native_policy_sha256: hash(Buffer.from(text)) };
+  }
+  const native = v3 ? verifyNativeClosure() : null;
   const bound = v2 ? [runtime.tsx_loader, runtime.esbuild_binary]
     : [runtime.node, runtime.tsx_loader, runtime.esbuild_binary, runtime.python, runtime.listener_tool];
   if (!bound.every((p) => runtimeFiles.has(p))
@@ -350,7 +399,7 @@ export function verifyRehearsalPackage(request, io = fs) {
   }
   const executables = v2 ? runtime.executables : [];
   const protectedRoots = [spec.package_root, request.specPath, spec.launcher_path, spec.runtime_record, ...runtime.roots.map((r) => r.path),
-    ...executables.map((e) => e.path)];
+    ...executables.map((e) => e.path), ...(v3 ? runtime.native_closure.objects.map((o) => o.path) : [])];
   const writes = [spec.capture_root, spec.output_root, spec.temp_root, spec.cluster_root];
   for (const p of writes) canonical(p, true);
   for (const a of writes) for (const b of [...protectedRoots, ...writes.filter((p) => p !== a)]) {
@@ -383,7 +432,9 @@ export function verifyRehearsalPackage(request, io = fs) {
   ]), node_search_roots: runtime.node_search_roots, tsx_loader: runtime.tsx_loader, esbuild_binary: runtime.esbuild_binary,
   python_stdlib: runtime.python_stdlib, python_dependencies: runtime.python_dependencies, source_root: spec.source_root,
   // Version 2 only, so a version 1 policy (and its digest) is exactly what it was.
-  ...(v2 ? { executables: Object.fromEntries(executables.map((e) => [e.path, e.sha256])), hardlink_counts: Object.fromEntries(hardlinkCounts) } : {}) };
+  ...(v2 ? { executables: Object.fromEntries(executables.map((e) => [e.path, e.sha256])), hardlink_counts: Object.fromEntries(hardlinkCounts) } : {}),
+  // Version 3 only: which auditor every guarded process must have mapped, and the pinned policy it enforces.
+  ...(native ?? {}) };
   return freezeBinding({ ...binding, spec, runtime, resolution });
 }
 
@@ -411,6 +462,16 @@ policy_path, pin, script = sys.argv[1:4]
 with open(policy_path, 'rb') as f: raw = f.read()
 if hashlib.sha256(raw).hexdigest() != pin: raise RuntimeError('Rehearsal Python policy refused')
 p = json.loads(raw)
+# Version 3: refuse to run unless the bound native-closure auditor is enforcing in this process.
+if 'native_auditor' in p:
+    _a = p['native_auditor']
+    if os.environ.get('LD_AUDIT') != _a or os.environ.get('AFLDB_NATIVE_POLICY_SHA256') != p['native_policy_sha256']:
+        raise RuntimeError('Rehearsal native closure refused')
+    with open(_a, 'rb') as f:
+        if hashlib.sha256(f.read()).hexdigest() != p['native_auditor_sha256']: raise RuntimeError('Rehearsal native closure refused')
+    _ino = os.stat(_a).st_ino
+    with open('/proc/self/maps') as f: _maps = [l.split(None, 5) for l in f.read().splitlines()]
+    if not any(len(m) == 6 and m[5] == _a and int(m[4]) == _ino for m in _maps): raise RuntimeError('Rehearsal native closure refused')
 def check(spec):
     if spec is None: return
     origin = spec.origin
@@ -464,10 +525,19 @@ export function resolutionLaunch(verified, io = fs) {
   const location = path.join(s.temp_root, `resolution-${process.pid}-${cryptoNonce()}.json`);
   io.writeFileSync(location, bytes, { flag: 'wx', mode: 0o600 });
   const guard = path.join(s.source_root, 'tools/v2/rehearsal-resolution-guard.mjs');
+  // Version 3: the auditor's policy, from the verified record only, pinned by the digest verification derived.
+  let native = {};
+  if (policy.native_auditor !== undefined) {
+    const text = Buffer.from(nativePolicyText(verified.runtime.native_closure));
+    if (hash(text) !== policy.native_policy_sha256) refuse('native policy derivation');
+    const nativeLocation = path.join(s.temp_root, `native-policy-${process.pid}-${cryptoNonce()}.txt`);
+    io.writeFileSync(nativeLocation, text, { flag: 'wx', mode: 0o400 });
+    native = { LD_AUDIT: policy.native_auditor, AFLDB_NATIVE_POLICY: nativeLocation, AFLDB_NATIVE_POLICY_SHA256: policy.native_policy_sha256 };
+  }
   return {
     nodeArgs: ['--import', pathToFileURL(guard).href],
     pythonArgs: ['-I', '-S', '-B', '-c', PYTHON_GUARD.replace('__STDLIB__', JSON.stringify(policy.python_stdlib)), location, pin],
-    env: { AFLDB_RESOLUTION_POLICY: location, AFLDB_RESOLUTION_POLICY_SHA256: pin, TSX_DISABLE_CACHE: '1' },
+    env: { AFLDB_RESOLUTION_POLICY: location, AFLDB_RESOLUTION_POLICY_SHA256: pin, TSX_DISABLE_CACHE: '1', ...native },
   };
 }
 function cryptoNonce() { return randomBytes(12).toString('hex'); }

@@ -48,6 +48,22 @@ function syncResolve(s, c, next) {
   if (policy.node_search_roots.some((p) => c.parentURL === pathToFileURL(path.join(p, '__rehearsal_resolve__.mjs')).href)) error.code = 'MODULE_NOT_FOUND';
   throw error;
 }
+/** Policy version 3 (AFLDB-ISSUE-320): the bound rtld-audit module must be enforcing in this very
+ * process — named by LD_AUDIT, carrying the pinned policy digest, mapped from the bound inode and
+ * holding the bound bytes. The auditor itself refuses unbound native code; this refuses a guarded
+ * process that was started without it. `io` is a test seam. */
+export function assertNativeEnforcement(data, env = process.env, io = fs) {
+  if (data.native_auditor === undefined) return;
+  const a = data.native_auditor;
+  if (env.LD_AUDIT !== a || env.AFLDB_NATIVE_POLICY_SHA256 !== data.native_policy_sha256
+      || digest(io.readFileSync(a)) !== data.native_auditor_sha256) refuse();
+  const ino = Number(io.statSync(a).ino);
+  const mapped = String(io.readFileSync('/proc/self/maps', 'utf8')).split('\n').some((line) => {
+    const m = line.trim().split(/\s+/);
+    return m.length >= 6 && m.slice(5).join(' ') === a && Number(m[4]) === ino;
+  });
+  if (!mapped) refuse();
+}
 export function initialize(data) { policy = data; }
 export async function resolve(s, c, next) {
   for (const context of contexts(s, c)) {
@@ -60,6 +76,7 @@ export async function resolve(s, c, next) {
 export async function load(url, c, next) { checked(url); return next(url, c); }
 export async function installResolutionGuard(data) {
   if (typeof registerHooks !== 'function') refuse(); // No version-only/probe fallback.
+  assertNativeEnforcement(data);
   policy = data;
   checked(pathToFileURL(data.esbuild_binary).href);
   process.env.ESBUILD_BINARY_PATH = data.esbuild_binary;

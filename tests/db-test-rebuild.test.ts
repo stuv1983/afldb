@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join } from 'node:path';
 import * as nativeFs from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { inventoryEntries, strictJson, verifyRehearsalPackage, launchRehearsal, resolutionLaunch, assertRehearsalResolution, guardedListenerTool, pythonStartupLandmarks } from '../tools/v2/rehearsal-package.mjs';
+import { inventoryEntries, strictJson, verifyRehearsalPackage, launchRehearsal, resolutionLaunch, assertRehearsalResolution, guardedListenerTool, pythonStartupLandmarks, nativePolicyText } from '../tools/v2/rehearsal-package.mjs';
+import { assertNativeEnforcement } from '../tools/v2/rehearsal-resolution-guard.mjs';
 
 import {
   CLUB_SEASONS_EXPECTED,
@@ -1106,7 +1107,9 @@ describe('ISSUE-316 ladder-season-scope', () => {
           expect(() => verifyRehearsalPackage(v1.request, v1.io)).not.toThrow();
           for (const key of ['executables', 'python_absent_landmarks']) withRecord(v2Fixture(), (r) => { delete r[key]; }, /invalid runtime record fields/);
           for (const key of ['links', 'hardlinks']) withRecord(v2Fixture(), (r) => { delete r.roots[0][key]; }, /invalid runtime root fields/);
-          withRecord(v2Fixture(), (r) => { r.schema_version = 3; }, /runtime schema/);
+          withRecord(v2Fixture(), (r) => { r.schema_version = 4; }, /runtime schema/);
+          // Version 3 (AFLDB-ISSUE-320) requires its native closure; a version 2 body under that number refuses.
+          withRecord(v2Fixture(), (r) => { r.schema_version = 3; }, /invalid runtime record fields/);
         });
       });
 
@@ -1457,6 +1460,123 @@ describe('ISSUE-316 ladder-season-scope', () => {
         ])('refuses a substituted listener executable: %s', (_name, change) => {
           const v = v2Fixture(), env = listenerEnv(v), anchor = anchorOf(v); change(v);
           expect(() => tool(v, env, anchor)).toThrow(/Rehearsal package refused/);
+        });
+      });
+
+      // AFLDB-ISSUE-320. Synthetic and in memory, like version 2: these prove the verifier, the policy the
+      // launcher derives and the guard self-check. The auditor's own enforcement is proven on Linux only,
+      // in the retained disposable-root experiments (tools/v2/native-audit).
+      describe('runtime record version 3: the enforced native closure', () => {
+        const ELF = Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.from(' synthetic native module')]);
+        function v3Fixture() {
+          const v = v2Fixture();
+          const nativeDir = join(v.base, 'native'), auditor = join(nativeDir, 'afldb-native-audit.so'), loader = join(nativeDir, 'ld-linux-x86-64.so.2');
+          const module = join(v.runtimeRoot, 'library/native.node');
+          v.put(auditor, 'synthetic auditor'); v.put(loader, 'synthetic loader'); v.files.set(module, ELF);
+          const closure = (extra: string[] = []) => ({ schema_version: 1, loader, auditor: { path: auditor, sha256: digest(v.files.get(auditor)!) },
+            objects: [...v.rt.executables.map((e: any) => e.path), auditor, loader, module, ...extra].sort()
+              .map((path) => ({ path, sha256: digest(v.files.get(path)!) })) });
+          const rebind = (extra: string[] = []) => { v.sync(); v.rt.schema_version = 3; v.rt.native_closure = closure(extra); v.commit(); };
+          rebind();
+          return { ...v, nativeDir, auditor, loader, module, rebind };
+        }
+        type V3 = ReturnType<typeof v3Fixture>;
+        const policyOf = (v: V3) => nativePolicyText(v.rt.native_closure);
+
+        it('verifies a version 3 record and derives the pinned auditor policy; version 2 carries none of it', () => {
+          const v = v3Fixture(), bound = v.verify();
+          expect(bound.runtime.schema_version).toBe(3);
+          expect(bound.resolution.native_auditor).toBe(v.auditor);
+          expect(bound.resolution.native_auditor_sha256).toBe(digest('synthetic auditor'));
+          expect(bound.resolution.native_policy_sha256).toBe(digest(policyOf(v)));
+          expect(policyOf(v).split('\n').slice(0, 2)).toEqual(['afldb-native-closure-policy 1', `auditor ${digest('synthetic auditor')} ${v.auditor}`]);
+          const v2 = v2Fixture().verify().resolution;
+          for (const key of ['native_auditor', 'native_auditor_sha256', 'native_policy_sha256']) expect(key in v2).toBe(false);
+        });
+        it('launches every guarded child with the bound auditor, the derived policy file and its pin', () => {
+          const v = v3Fixture(), spawn = vi.fn(() => ({ status: 0 }));
+          expect(launchRehearsal(v.request, spawn as any, v.io)).toBe(0);
+          const env = (spawn.mock.calls[0] as any)[2].env;
+          expect(env.LD_AUDIT).toBe(v.auditor);
+          expect(dirname(env.AFLDB_NATIVE_POLICY)).toBe(v.spec.temp_root);
+          expect(v.files.get(env.AFLDB_NATIVE_POLICY)!.toString()).toBe(policyOf(v));
+          expect(env.AFLDB_NATIVE_POLICY_SHA256).toBe(digest(policyOf(v)));
+          expect(env.LD_PRELOAD).toBeUndefined(); expect(env.LD_LIBRARY_PATH).toBeUndefined();
+          const policy = JSON.parse(v.files.get(env.AFLDB_RESOLUTION_POLICY)!.toString());
+          expect(policy.native_auditor).toBe(v.auditor);
+          // The same enforcement reaches every runner child through the reviewed child environment.
+          const child = rehearsalChildEnv({ LD_AUDIT: '/elsewhere.so', HOME: '/h' }, resolutionLaunch(v.verify(), v.io).env, v.rt.pg_bin);
+          expect(child.LD_AUDIT).toBe(v.auditor); expect(child.AFLDB_NATIVE_POLICY_SHA256).toBe(digest(policyOf(v)));
+          expect(resolutionLaunch(v.verify(), v.io).pythonArgs[4]).toContain("'native_auditor' in p");
+        });
+        it.each([
+          ['a version 2 record carrying a native closure', (r: any) => { r.schema_version = 2; }, /invalid runtime record fields/],
+          ['a version 3 record without one', (r: any) => { delete r.native_closure; }, /invalid runtime record fields/],
+          ['an unknown closure field', (r: any) => { r.native_closure.extra = 1; }, /invalid native closure fields/],
+          ['an unknown closure version', (r: any) => { r.native_closure.schema_version = 2; }, /native closure/],
+          ['an empty object list', (r: any) => { r.native_closure.objects = []; }, /native closure/],
+          ['unsorted objects', (r: any) => { r.native_closure.objects.reverse(); }, /native object entry/],
+          ['a repeated object', (r: any) => { r.native_closure.objects.push(r.native_closure.objects.at(-1)); }, /native object entry/],
+          ['a relative object path', (r: any) => { r.native_closure.objects[0].path = 'lib/x.so'; }, /native object entry/],
+          ['a malformed digest', (r: any) => { r.native_closure.objects[0].sha256 = 'x'; }, /native object entry/],
+          ['an unknown object field', (r: any) => { r.native_closure.objects[0].mode = 1; }, /invalid native object fields/],
+          ['an executable missing from the closure', (r: any) => { r.native_closure.objects = r.native_closure.objects.filter((o: any) => o.path !== r.python); }, /bound executable outside the native closure/],
+          ['the auditor missing from the closure', (r: any) => { r.native_closure.objects = r.native_closure.objects.filter((o: any) => o.path !== r.native_closure.auditor.path); }, /native loader\/auditor unbound/],
+          ['the loader missing from the closure', (r: any) => { r.native_closure.objects = r.native_closure.objects.filter((o: any) => o.path !== r.native_closure.loader); }, /native loader\/auditor unbound/],
+          ['an auditor digest that is not the bound object', (r: any) => { r.native_closure.auditor.sha256 = '0'.repeat(64); }, /native loader\/auditor unbound/],
+          ['an object digest that is not its bytes', (r: any) => { r.native_closure.objects[0].sha256 = '0'.repeat(64); }, /pinned bytes changed/],
+        ])('refuses %s', (_name, edit, pattern) => { withRecord(v3Fixture() as unknown as V2, edit, pattern); });
+        it('refuses an ELF member of a bound root that the closure leaves out, or binds with other bytes', () => {
+          const v = v3Fixture();
+          withRecord(v as unknown as V2, (r) => { r.native_closure.objects = r.native_closure.objects.filter((o: any) => o.path !== v.module); }, /runtime ELF file outside the native closure/);
+          withRecord(v3Fixture() as unknown as V2, (r) => { r.native_closure.objects.find((o: any) => o.path.endsWith('native.node')).sha256 = digest('other'); }, /pinned bytes changed/);
+          // A further bound object outside every root is accepted when it is listed and pinned.
+          const w = v3Fixture(), other = join(w.nativeDir, 'libextra.so.1');
+          w.put(other, 'extra'); w.rebind([other]);
+          expect(() => w.verify()).not.toThrow();
+        });
+        it.each([
+          ['substituted library bytes', (v: V3) => { v.put(v.loader, 'substituted loader'); }, /pinned bytes changed/],
+          ['changed auditor bytes', (v: V3) => { v.put(v.auditor, 'changed auditor'); }, /pinned bytes changed/],
+          ['a symlinked object', (v: V3) => { v.altered.set(v.loader, 'symlink'); }, /linked, redirected or special/],
+          ['a hard-linked object', (v: V3) => { v.nlinks.set(v.auditor, 2); }, /linked, redirected or special/],
+          ['a redirected object directory', (v: V3) => { v.altered.set(v.nativeDir, 'redirect'); }, /linked, redirected or special/],
+          ['a setuid object', (v: V3) => { v.modes.set(v.loader, 0o4755); }, /native object mode/],
+        ])('refuses before any spawn on %s', (_name, change, pattern) => {
+          const v = v3Fixture(), spawn = vi.fn(); change(v);
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(pattern);
+          expect(spawn).not.toHaveBeenCalled();
+        });
+        it('refuses a writable root over a bound object and drift of an object during the run', () => {
+          const v = v3Fixture(); v.spec.capture_root = v.nativeDir; v.commit();
+          expect(() => v.verify()).toThrow(/writable root overlap/);
+          const w = v3Fixture(), spawn = vi.fn(() => { w.put(w.loader, 'drift'); return { status: 0 }; });
+          expect(() => launchRehearsal(w.request, spawn as any, w.io)).toThrow(/pinned bytes changed/); expect(spawn).toHaveBeenCalledOnce();
+        });
+
+        describe('guard self-check: the auditor must be enforcing in the guarded process', () => {
+          const auditor = '/opt/afldb/native/afldb-native-audit.so', bytes = Buffer.from('synthetic auditor');
+          const data = { native_auditor: auditor, native_auditor_sha256: digest(bytes), native_policy_sha256: 'a'.repeat(64) };
+          const env = { LD_AUDIT: auditor, AFLDB_NATIVE_POLICY_SHA256: 'a'.repeat(64) };
+          const maps = (path = auditor, inode = 4242) => `7f00-7f10 r-xp 00000000 fd:01 ${inode}                    ${path}\n7f20-7f30 r--p 00000000 00:00 0 \n`;
+          const io = (o: { maps?: string; bytes?: Buffer; ino?: number } = {}) => ({
+            readFileSync: (p: any) => p === '/proc/self/maps' ? (o.maps ?? maps()) : o.bytes ?? bytes,
+            statSync: () => ({ ino: o.ino ?? 4242 }),
+          }) as any;
+          it('passes only when named, pinned, mapped from the bound inode and holding the bound bytes', () => {
+            expect(() => assertNativeEnforcement(data, env, io())).not.toThrow();
+            expect(() => assertNativeEnforcement({}, {}, io())).not.toThrow(); // version 1/2 policy: nothing to check
+          });
+          it.each([
+            ['LD_AUDIT absent', {}, io()],
+            ['another auditor named', { ...env, LD_AUDIT: '/tmp/other.so' }, io()],
+            ['the policy pin differs', { ...env, AFLDB_NATIVE_POLICY_SHA256: 'b'.repeat(64) }, io()],
+            ['the auditor is not mapped', env, io({ maps: maps('/tmp/other.so') })],
+            ['the mapping is another inode', env, io({ ino: 9999 })],
+            ['the auditor bytes changed', env, io({ bytes: Buffer.from('changed') })],
+          ])('refuses when %s', (_name, e, fsio) => {
+            expect(() => assertNativeEnforcement(data, e as any, fsio)).toThrow(/Rehearsal resolution refused/);
+          });
         });
       });
     });

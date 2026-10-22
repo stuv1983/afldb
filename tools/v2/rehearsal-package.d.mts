@@ -17,12 +17,18 @@ export type VerifiedRehearsal = Readonly<{
   target: Readonly<{ database: string; host: string; port: number; cluster_name: string; database_marker: string }>;
   spec: Readonly<{ source_root: string; capture_root: string; output_root: string; temp_root: string;
     cluster_root: string; runner_options: readonly string[]; [key: string]: unknown }>;
-  runtime: Readonly<{ schema_version: 1 | 2; node: string; tsx_loader: string; python: string; pg_bin: string; listener_tool: string; [key: string]: unknown }>;
+  runtime: Readonly<{ schema_version: 1 | 2 | 3; node: string; tsx_loader: string; python: string; pg_bin: string; listener_tool: string; [key: string]: unknown }>;
   resolution: Readonly<{ files: Readonly<Record<string, string>>; node_search_roots: readonly string[];
     tsx_loader: string; esbuild_binary: string; python_stdlib: readonly string[]; python_dependencies: readonly string[]; source_root: string;
     /** Runtime record version 2 only: individually hashed executables and exact hard-link counts. */
-    executables?: Readonly<Record<string, string>>; hardlink_counts?: Readonly<Record<string, number>> }>;
+    executables?: Readonly<Record<string, string>>; hardlink_counts?: Readonly<Record<string, number>>;
+    /** Runtime record version 3 only: the enforcing rtld-audit module and its pinned closure policy. */
+    native_auditor?: string; native_auditor_sha256?: string; native_policy_sha256?: string }>;
 }>;
+export type NativeClosure = Readonly<{ schema_version: 1; loader: string; auditor: Readonly<{ path: string; sha256: string }>;
+  objects: readonly Readonly<{ path: string; sha256: string }>[] }>;
+/** The exact policy text the auditor enforces, derived from a verified version 3 record. */
+export function nativePolicyText(closure: NativeClosure): string;
 export function resolutionLaunch(verified: VerifiedRehearsal, io?: typeof fs): {
   nodeArgs: string[]; pythonArgs: string[]; env: Record<string, string>;
 };
