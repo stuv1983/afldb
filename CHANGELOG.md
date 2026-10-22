@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - One-change-set rollover transition and runtime reproducibility evidence (2026-10-22)
+
+- Rollover tooling (`tools/db/rollover-season.ts`, `src/lib/rollover/season-rollover.ts`, new `src/lib/rollover/transition-change-set.ts`): optional `--transition-change-set` carries the complete successor transition as one validated change set (explicit old and proposed SHA-256 per file, role-bound inputs, `$comment`-only register patches, complete write set, `final_sha256` pins required before `--apply`); any `UNRESOLVED:` sentinel, stale or partial input, or register-history change refuses; apply is staged, journaled (`.rollover-transaction.json`) and read back, and any unfinished earlier apply makes every later invocation refuse with recovery steps. Without the flag the planner output is unchanged. No gate relaxed, no production profile added, nothing adopted.
+- Runtime evidence retained on C: (DEV lock, installed tree, tarball and wheel hashes, run-record comparison); findings in the rehearsal closure record §8.3. ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED.
+
 ### ISSUE-316 - Evidence retention, dependency-lock findings and consolidated successor proposal (2026-10-22)
 
 - Documentation/evidence only; no application, schema, data, runner, contract, register or availability change.

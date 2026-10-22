@@ -172,6 +172,31 @@ Adoption content and rollover are separate layers but the planner couples them i
 
 Release and recovery (N14), Brownlow publication (N9) and cleanup stay separate approvals.
 
+## Revision 1 — 2026-10-22 (planner change set, runtime evidence, revised drafts)
+
+**Status: PROPOSAL ONLY — nothing installed, nothing accepted.** ISSUE-316 OPEN; successor NOT ACCEPTED; production NO-GO; 1,640 rehearsal-only; Brownlow 2026 pending (all three keys); ET unresolved; authority, eligibility and ownership restrictions unchanged. This section consolidates into the package above rather than starting another proposal chain; the original 54-file package is unchanged (`PROPOSAL_MANIFEST.json` `1d71f4ca…927fa`, 54/54 entries re-hashed, 0 mismatches).
+
+**What changed.**
+- **B2 is technically ready (commit `5a09f3e5`).** `tools/db/rollover-season.ts` takes an optional `--transition-change-set`. The change set binds, by explicit old SHA-256 and proposed SHA-256: the base fitzroy contract (the edits the planner cannot compute), whole-file replacements for the two measured-count contracts, five role-bound inputs (core manifest, ladder manifest, coverage, availability, corrections), `$comment`-only register patches with an explicit expected old value, the complete `write_set`, and `final_sha256` pins that `--apply` requires. Planner-owned contract fields in the base must equal the current contract. No working-tree pre-edit exists, so the predecessor stays coherent until the single staged apply; the original "pre-rollover working tree" and "post-planner text edit" steps disappear. Any `UNRESOLVED:` sentinel in the change set, a proposed file or a planned output refuses. The successor register must keep the predecessor and older entries byte-for-byte except the outgoing status. Apply stages and reads back every file, writes `.rollover-transaction.json`, renames (AFL Tables switch first), verifies, then removes the journal; an interrupted apply makes every later invocation refuse and print per-file recovery steps. A concrete per-field dry-run diff and the `final_sha256` list are printed.
+- **Tests** (database-free, in the existing suites): `tests/season-rollover.test.ts` 230 passed / 2 failed (232) and `tests/afl-api-cutover.test.ts` all passed; nonincremental `tsc` clean. The two failures in `tests/season-rollover.test.ts` (`finalValidationChecks` needing a ladder argument; a Python-source assertion on `CONTRACT.read_text`) reproduce on the committed test file at HEAD and are not caused by this work; not repaired.
+- **B3 is carried** as three register `$comment` patches. **B8 is partly closed** (§8.3 of the [closure record](issue316-c2-rehearsal-closure-2026-10-22.md#83-read-only-dev-runtime-inspection--what-it-closed-and-what-it-did-not-2026-10-22-later-the-same-day)): lock retained and classified, Linux esbuild tied to lock integrity, 2,445/2,445 run-record files equal; Python archive integrity, run-time lock bytes, native enforcement and a clean `npm ci` remain unproven.
+- **U4 resolved mechanically** (`retired` is the only vocabulary value). **U8 found stale:** the reason text names a quarantined CLI and a refusing npm script, independent of AFL Tables. U5–U7 and U9 stay owner choices with stated consequences.
+
+**Revised package (not in the repository):** `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-REVISED-20261022T100918Z/` (`HASHES.sha256` lists every file). Draft change set `7678593f5e322145…`; `analysis/DRY_RUN_OF_DRAFT.txt`: the real tool **refuses the draft on the single remaining sentinel** (`UNRESOLVED:PRODUCTION-LADDER-PROFILE-NAME`, base contract line 501), and with that one value set aside in memory every other check passes against the real repository bytes and the real proposal files (diagnostic only; the stand-in is not a candidate value and is not written anywhere).
+
+**Limits.** The gates run on a temporary successor state holding the planner's files; the two replaced contracts are validated (hash, JSON, sentinel, allow-list) but not exercised by a gate. No real-proposal planner run is possible: the ownership census (B5) does not exist and sentinels remain. A rename sequence across files is not a transaction; the journal makes interruption detectable and recoverable.
+
+### Final decision table
+
+| Item | State | What it needs |
+|---|---|---|
+| Continuity 52/31/42/25, `baseline_only` height block, c2 ladder witness/coverage, measured counts, register entry, corrections, availability (byte-unchanged), two manifests, 1,640 constant patch | Technically ready as proposed content (rehearsal-measured, applicability unproven) | Owner review (N10) |
+| Atomic transition mechanism (B2) and register comments (B3) | Technically ready, committed `5a09f3e5`, not adopted | Nothing further; adopted only with the owner decisions below |
+| Runtime reproducibility (B8) | Partly closed | Missing: Python requirements with hashes / PyPI digests; run-time lock bytes; native-closure decision; a clean `npm ci` (all need separate authority) |
+| New isolated verification | Required before any populated or production-adjacent run | A real-proposal dry run needs B5 census targets and the owner values; populated-ledger round trip (L7); the isolated loader measurement for the 479 unmapped provider ids and 10 coach-page mismatches (prerequisites §9) |
+| Owner-only decisions | U1 date · U3/B1 production ladder profile mechanism (+B6 tests) · U5 D-316-1 grant · U7 `issue` attribution (keep 101, or allow a reviewed `/issue` patch) · U8 reason wording (A year-only is stale; B neutral AFL API ownership) · B4 provenance stance for coaches, Wikipedia pin and rosters · N12 census targets · native-closure policy | Alternatives and consequences: `analysis/OWNER_ALTERNATIVES.md` in the revised package |
+| Derived, no owner choice | U4 `retired`; U2 verdict (earned by the executed gates); U6 omit `retired_on`/`superseded_by` unless the owner asks | — |
+
 ## Evidence reviewed and limits — historical checkpoint (2026-10-21, basis `4a2eea89`)
 
 Reused `C:\tmp\afldb-c2-brownlow-fix-20261021\REPORT.md`, `repository-files.json`,
