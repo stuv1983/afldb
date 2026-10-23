@@ -81,7 +81,7 @@ import { createHash } from 'node:crypto';
 // `listDirectorySync` is readdirSync under another name: the ISSUE-324 tsx-entry walk (not a label selection) uses it,
 // and a source pin in tests/db-test-rebuild.test.ts forbids the plain name between selectAcceptedBaseline and the stage graph.
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readdirSync as listDirectorySync, readlinkSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freezeBinding, verifyRehearsalPackage, resolutionLaunch, assertRehearsalResolution, type RehearsalPair, type RehearsalRequest } from '../v2/rehearsal-package.mjs';
 
@@ -1392,9 +1392,11 @@ export function rehearsalChildEnv(inherited: Record<string, string | undefined> 
 // walked. Exactly two lexical paths -- tsx's own esbuild native binaries, ORDINARY_ESBUILD_LINKS -- MAY instead be
 // absolute symlinks, and then only to the exact policy-bound real path fixed here, whose bytes must hash to
 // ORDINARY_ESBUILD_SHA256 before every execution. The table is keyed by lexical path, never by target; no package
-// directory, tsx file or other binary receives it. An npm `.bin/<name>` link is admitted only when its real file is
-// inside the checkout's own node_modules (it claims no exception). No environment variable selects an executable or
-// module location: ORDINARY_FORBIDDEN_ENV is refused, never stripped.
+// directory, tsx file or other binary receives it. An npm `.bin/<name>` link is admitted only when EVERY hop of its
+// chain -- each directory the resolution passes through and each link it reads -- stays within the checkout's own
+// real node_modules and the chain ends in a regular file there (it claims no exception; a chain that leaves and
+// returns refuses). No environment variable selects an executable or module location: ORDINARY_FORBIDDEN_ENV is
+// refused, never stripped.
 
 /** The `tsx` argument lists (everything after `npx tsx`) the ordinary plan issues. A new step fails to compile. */
 export function ordinaryTsxArgv(): string[][] {
@@ -1424,7 +1426,7 @@ export function ordinaryNpmScriptBodies(): Record<string, string> {
  * The esbuild native-binary exception (see the header). Constants, not derived from the native policy: the policy
  * reaches this process only through the harness environment, so deriving from it would let the caller choose the
  * target. These are reviewed in the diff, pinned with this file, and independently re-bound (path + digest) by the
- * reviewed native policy `30199b6a…` lines 21-22. A moved install or an esbuild bump refuses until re-reviewed.
+ * host's reviewed native policy (two `object` lines). A moved install or an esbuild bump refuses until re-reviewed.
  */
 export const ORDINARY_ESBUILD_SHA256 = 'e1698a3d5c6c0798fee4fd3b5cc816651f460c63d390a7a26ea4beb0b1884100';
 const ORDINARY_ESBUILD_INSTALL = '/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed';
@@ -1522,7 +1524,7 @@ function defaultOrdinaryIo(): OrdinaryIo {
  * RESOLVE (real path, not just lexical path) inside that checkout; no symbolic link or junction lies on the
  * `node_modules` -> `tsx` -> `dist` chain or anywhere under `dist`; the installed tsx is the version and `bin`
  * `package-lock.json` pins; the two npm scripts have exactly the fixed bodies; and every entry of the whole
- * `node_modules` tree is a regular file or directory, an in-checkout `.bin` link, or one of the two esbuild
+ * `node_modules` tree is a regular file or directory, a `.bin` link whose every hop stays in-checkout, or one of the two esbuild
  * native-binary exception links exactly as fixed (target, real path, sha256, lock version). A checkout-local link to
  * a shared installation fails these on purpose. Returns the verified `cli.mjs` path; refuses on any failure.
  */
@@ -1620,8 +1622,64 @@ export function verifyOrdinaryTsxEntry(io: OrdinaryIo = defaultOrdinaryIo()): st
 
   // (f) ALL package code is physically inside the checkout: walk the whole of node_modules. A link is admitted only
   // as (1) one of the two esbuild native-binary exception entries, exactly as fixed, or (2) an npm `.bin/<name>`
-  // link whose real file is inside this checkout's real node_modules. Anything else refuses.
+  // link whose WHOLE chain stays inside this checkout's real node_modules (binChain). Anything else refuses.
   const realNodeModules = attempt('node_modules cannot be resolved', () => io.realpathSync(nodeModules));
+  // An npm `.bin/<name>` chain (owner ruling, ISSUE-316 J2, F-J01): every hop is checked, not only the final real
+  // path. Resolution is emulated component by component as the kernel performs it, from the link's own directory:
+  // every directory the walk stands in (`..` included) must lie within the real node_modules (equality allowed);
+  // every link read is therefore inside it; an absolute link text is admitted only when it names a path under the
+  // canonical real node_modules component by component (so no component outside is consulted); the chain must end in
+  // a regular file. A chain that leaves and later returns refuses at its first step outside. The kernel's own answer
+  // (realpath) must then agree with the walk. `tree` refuses every other link, so a hop can only be a `.bin` entry or
+  // an esbuild exception link, whose absolute outside target refuses here (the exception is the two binaries alone).
+  const MAX_BIN_HOPS = 40;
+  const within = (base: string, path: string): boolean => relative(base, path) === '' || strictlyInside(base, path);
+  const components = (text: string): string[] => text.split(sep === '\\' ? /[\\/]/ : '/');
+  const binChain = (lexical: string, child: string): void => {
+    const leaves = (): never => refuse(`${child} link chain leaves the checkout's node_modules`);
+    let dir = join(realNodeModules, relative(nodeModules, dirname(lexical)));
+    if (!within(realNodeModules, dir)) leaves();
+    const pending = [basename(lexical)];
+    const onlyDots = (): boolean => pending.every((part) => part === '' || part === '.');
+    let hops = 0;
+    let final: string | undefined;
+    while (pending.length && final === undefined) {
+      const name = pending.shift() as string;
+      if (name === '' || name === '.') continue;
+      if (name === '..') {
+        dir = dirname(dir);
+        if (!within(realNodeModules, dir)) leaves();
+        continue;
+      }
+      const at = join(dir, name);
+      const stat = attempt(`${child} link chain cannot be inspected`, () => io.lstatSync(at));
+      if (stat.isSymbolicLink()) {
+        if (++hops > MAX_BIN_HOPS) refuse(`${child} link chain has too many links`);
+        const text = attempt(`${child} link chain cannot be read`, () => io.readlinkSync(at));
+        const parts = components(text);
+        if (isAbsolute(text)) {
+          const base = components(realNodeModules);
+          if (parts.length < base.length || base.some((part, index) => parts[index] !== part)) leaves();
+          dir = realNodeModules;
+          pending.unshift(...parts.slice(base.length));
+        } else {
+          pending.unshift(...parts);
+        }
+      } else if (stat.isDirectory()) {
+        if (onlyDots()) refuse(`${child} does not resolve to a regular file`);
+        dir = at;
+      } else if (stat.isFile()) {
+        if (pending.length) refuse(`${child} link chain passes through a regular file`);
+        final = at;
+      } else {
+        refuse(`${child} link chain reaches a special file`);
+      }
+    }
+    if (final === undefined) return refuse(`${child} does not resolve to a regular file`);
+    const real = attempt(`${child} cannot be resolved`, () => io.realpathSync(lexical));
+    if (!strictlyInside(realNodeModules, real)) refuse(`${child} resolves outside the checkout's node_modules`);
+    if (relative(final, real) !== '') refuse(`${child} resolution disagrees with its link chain`);
+  };
   const exceptions = new Map(ORDINARY_ESBUILD_LINKS.map((entry) => [entry.path, entry]));
   const esbuildLink = (entry: (typeof ORDINARY_ESBUILD_LINKS)[number], lexical: string): void => {
     const label = `${entry.path} (esbuild native-binary exception)`;
@@ -1649,10 +1707,7 @@ export function verifyOrdinaryTsxEntry(io: OrdinaryIo = defaultOrdinaryIo()): st
         else if (!stat.isFile()) refuse(`${child} is not a regular file`);
       } else if (stat.isSymbolicLink()) {
         if (!/\/\.bin\/[^/]+$/.test(child)) refuse(`${child} is a symbolic link or junction outside the esbuild native-binary exception`);
-        const real = attempt(`${child} cannot be resolved`, () => io.realpathSync(path));
-        if (!strictlyInside(realNodeModules, real)) refuse(`${child} resolves outside the checkout's node_modules`);
-        const target = attempt(`${child} target cannot be inspected`, () => io.lstatSync(real));
-        if (!target.isFile()) refuse(`${child} does not resolve to a regular file`);
+        binChain(path, child);
       } else if (stat.isDirectory()) tree(path, child);
       else if (!stat.isFile()) refuse(`${child} is not a regular file`);
     }

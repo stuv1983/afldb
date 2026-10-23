@@ -3059,9 +3059,116 @@ describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm 
       const L = esbuildLayout();
       mkdirSync(join(L.root, 'node_modules', '.bin'));
       const outside = virtual(L, [{ rel: 'node_modules/.bin/esbuild', text: WRAPPER.target }], goodTargets());
-      expect(() => verifyOrdinaryTsxEntry(outside)).toThrow(/\.bin\/esbuild resolves outside the checkout's node_modules/);
+      expect(() => verifyOrdinaryTsxEntry(outside)).toThrow(/\.bin\/esbuild link chain leaves the checkout's node_modules/);
       const dir = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx', real: L.tsx }]);
       expect(() => verifyOrdinaryTsxEntry(dir)).toThrow(/\.bin\/tsx does not resolve to a regular file/);
+    });
+
+    /*
+     * Owner ruling set 4 (ISSUE-316 J2, finding F-J01): EVERY hop of a `.bin` chain is checked, not only the final
+     * real path. The leave-and-return cases below give a final real path INSIDE the checkout, which the earlier
+     * final-realpath-only rule admitted; they must now refuse at the first step outside node_modules.
+     */
+    describe('npm .bin link chains: every hop stays inside the checkout node_modules (F-J01)', () => {
+      const binLayout = () => {
+        const L = esbuildLayout();
+        mkdirSync(join(L.root, 'node_modules', '.bin'));
+        return L;
+      };
+      const LEAVES = /link chain leaves the checkout's node_modules.*Nothing was run/s;
+
+      it('admits an ordinary in-checkout .bin link (one relative hop)', () => {
+        const L = binLayout();
+        expect(verifyOrdinaryTsxEntry(virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx/dist/cli.mjs', real: L.cli }]))).toBe(L.cli);
+      });
+
+      it('admits a multi-hop chain entirely inside node_modules (.bin/a -> b -> ../tsx/dist/cli.mjs)', () => {
+        const L = binLayout();
+        const io = virtual(L, [
+          { rel: 'node_modules/.bin/a', text: 'b', real: L.cli },
+          { rel: 'node_modules/.bin/b', text: '../tsx/dist/cli.mjs', real: L.cli },
+        ]);
+        expect(verifyOrdinaryTsxEntry(io)).toBe(L.cli);
+      });
+
+      it('admits a nested package .bin link and an absolute hop naming a path under the real node_modules', () => {
+        const L = binLayout();
+        for (const entry of ORDINARY_ESBUILD_LINKS) write(join(L.root, ...entry.path.split('/')), 'ELF fixture');
+        mkdirSync(join(L.root, 'node_modules', 'tsx', 'node_modules', '.bin'));
+        const nested = join(L.root, ...WRAPPER.path.split('/'));
+        const io = virtual(L, [
+          { rel: 'node_modules/tsx/node_modules/.bin/esbuild', text: '../esbuild/bin/esbuild', real: nested },
+          { rel: 'node_modules/.bin/tsx', text: L.cli, real: L.cli },
+        ]);
+        expect(verifyOrdinaryTsxEntry(io)).toBe(L.cli);
+      });
+
+      it.each([
+        ['an absolute first hop outside the checkout', [{ rel: 'node_modules/.bin/tsx', text: '/srv/elsewhere/hop' }]],
+        ['a .. excursion above node_modules that comes back in', [{ rel: 'node_modules/.bin/tsx', text: '../../node_modules/tsx/dist/cli.mjs' }]],
+        ['a second hop that leaves', [
+          { rel: 'node_modules/.bin/tsx', text: 'hop' },
+          { rel: 'node_modules/.bin/hop', text: '/srv/elsewhere/cli.mjs' },
+        ]],
+      ] as [string, Link[]][])('refuses a chain that leaves and returns: %s (final real path inside)', (_label, links) => {
+        const L = binLayout();
+        const io = virtual(L, links.map((link) => ({ ...link, real: L.cli })));
+        expect(() => verifyOrdinaryTsxEntry(io)).toThrow(LEAVES);
+      });
+
+      it.each([
+        ['absolute', '/srv/elsewhere/cli.mjs'],
+        ['relative', '../../../../../../../../srv/elsewhere/cli.mjs'],
+      ])('refuses an external final target (%s link text)', (_label, text) => {
+        const L = binLayout();
+        expect(() => verifyOrdinaryTsxEntry(virtual(L, [{ rel: 'node_modules/.bin/tsx', text, real: '/srv/elsewhere/cli.mjs' }]))).toThrow(LEAVES);
+      });
+
+      it('still admits the two authorised esbuild external targets, alongside an in-checkout .bin chain', () => {
+        const L = binLayout();
+        const io = virtual(L, [...exactLinks(), { rel: 'node_modules/.bin/tsx', text: '../tsx/dist/cli.mjs', real: L.cli }], goodTargets());
+        expect(verifyOrdinaryTsxEntry(io)).toBe(L.cli);
+      });
+
+      it('refuses any other external target: a .bin chain into an esbuild exception link gets no exception', () => {
+        const L = binLayout();
+        mkdirSync(join(L.root, 'node_modules', 'tsx', 'node_modules', '.bin'));
+        const links = [...exactLinks(), { rel: 'node_modules/tsx/node_modules/.bin/esbuild', text: '../esbuild/bin/esbuild', real: WRAPPER.target }];
+        expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/tsx\/node_modules\/\.bin\/esbuild link chain leaves the checkout's node_modules/);
+      });
+
+      it('refuses a link loop, a dangling hop with its code, and a chain through a regular file', () => {
+        const L = binLayout();
+        const loop = virtual(L, [{ rel: 'node_modules/.bin/a', text: 'b', real: L.cli }, { rel: 'node_modules/.bin/b', text: 'a', real: L.cli }]);
+        expect(() => verifyOrdinaryTsxEntry(loop)).toThrow(/\.bin\/a link chain has too many links/);
+        const dangling = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../missing/cli.mjs', real: L.cli }]);
+        expect(() => verifyOrdinaryTsxEntry(dangling)).toThrow(/\.bin\/tsx link chain cannot be inspected \(ENOENT\)/);
+        const throughFile = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx/package.json/cli.mjs', real: L.cli }]);
+        expect(() => verifyOrdinaryTsxEntry(throughFile)).toThrow(/\.bin\/tsx link chain passes through a regular file/);
+      });
+
+      it('refuses when the kernel answer (realpath) disagrees with the emulated chain', () => {
+        const L = binLayout();
+        const io = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx/dist/cli.mjs', real: join(L.tsx, 'dist', 'esm', 'index.mjs') }]);
+        expect(() => verifyOrdinaryTsxEntry(io)).toThrow(/\.bin\/tsx resolution disagrees with its link chain/);
+      });
+
+      it('real symbolic links: an inside chain is admitted, a leave-and-return chain refuses (skipped only where file links cannot be created)', ({ skip }) => {
+        const L = binLayout();
+        const bin = join(L.root, 'node_modules', '.bin');
+        try {
+          nativeFs.symlinkSync('b', join(bin, 'a'), 'file');
+          nativeFs.symlinkSync(join('..', 'tsx', 'dist', 'cli.mjs'), join(bin, 'b'), 'file');
+        } catch (error) {
+          skip(`file symbolic link creation is not permitted here: ${(error as Error).message}`);
+        }
+        expect(verifyOrdinaryTsxEntry(L.io)).toBe(L.cli);
+        const outside = tempDir('bin-hop');
+        nativeFs.symlinkSync(L.cli, join(outside, 'hop'), 'file');
+        nativeFs.symlinkSync(join(outside, 'hop'), join(bin, 'c'), 'file');
+        expect(nativeFs.realpathSync(join(bin, 'c'))).toBe(L.cli);
+        expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/\.bin\/c link chain leaves the checkout's node_modules/);
+      });
     });
 
     describe('no environment variable may select an executable or a module location (refused, never stripped)', () => {
