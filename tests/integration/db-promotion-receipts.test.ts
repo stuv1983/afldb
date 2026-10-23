@@ -128,7 +128,7 @@ async function insertReceipts(name: string, count: number): Promise<void> {
   }
 }
 const setMarker = (name: string, value: string) => db(name)`
-  INSERT INTO site_settings (key, value) VALUES ('issue322.which', ${JSON.stringify(value)}::jsonb)`;
+  INSERT INTO site_settings (key, value) VALUES ('issue322.which', to_jsonb(${value}::text))`;   // one JSON string, never double-encoded
 
 /** Run a promotion transaction that MUST be refused; leave the connection usable and return the refusal. */
 async function refusal(name: string, text: string): Promise<string> {
