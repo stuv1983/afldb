@@ -17,7 +17,8 @@
  * What makes it isolated, each an independent guard (policy: @afldb/domain isolated-test-target):
  *   - the cluster listens on 127.0.0.1 only, accepts SCRAM passwords over loopback TCP only,
  *     and is named `afldb_v2_isolated`;
- *   - roles and passwords are generated here and stored only under `<root>/secrets/`;
+ *   - roles and passwords are generated here and stored only under `<root>/secrets/`; a root marked
+ *     `secrets/CREDENTIALS-EXPOSED` refuses everything but `stop` and `status`;
  *   - a database is created here only under an `afldb_v2_*_test` name and is marked with a
  *     database comment; `drop-db` refuses an unmarked database, so nothing this tool did not
  *     create can be destroyed by it;
@@ -79,6 +80,25 @@ export function resolveConfig(env: Readonly<Record<string, string | undefined>>)
 const exe = (cfg: IsolatedConfig, name: string) => join(cfg.bin, process.platform === 'win32' ? `${name}.exe` : name);
 const dataDir = (cfg: IsolatedConfig) => join(cfg.root, 'data');
 const secretsDir = (cfg: IsolatedConfig) => join(cfg.root, 'secrets');
+
+/**
+ * AFLDB-ISSUE-316 credential incident (2026-10-23): a cluster whose role passwords were exposed carries this
+ * nonsecret marker in `secrets/`. Those passwords are unusable for any future run: every command that could start
+ * the cluster, authenticate with them or hand them to a child refuses. Only `stop` and `status`, which use no
+ * credential, still run. Only the operator removes the marker, after an explicitly authorised OFFLINE rotation has
+ * given the cluster fresh private credentials before it next listens (`rotate-credentials` needs the old password
+ * over a live listener, so it is refused too).
+ */
+export const EXPOSED_CREDENTIALS_MARKER = 'CREDENTIALS-EXPOSED';
+
+export function assertCredentialsNotExposed(cfg: IsolatedConfig, mode: string | undefined): void {
+  if (mode === 'stop' || mode === 'status') return;
+  if (existsSync(join(secretsDir(cfg), EXPOSED_CREDENTIALS_MARKER))) {
+    throw new Error(`refused: ${mode ?? '(no command)'}: this cluster's credentials are marked exposed `
+      + `(secrets/${EXPOSED_CREDENTIALS_MARKER}) and stay unusable until an authorised offline rotation replaces them; `
+      + 'nothing was started, read or run');
+  }
+}
 
 export interface ListenerOwner {
   address: string;
@@ -430,6 +450,7 @@ async function runCommand(cfg: IsolatedConfig, name: string, command: readonly s
 export async function main(argv: readonly string[]): Promise<number> {
   const cfg = resolveConfig(process.env);
   const [mode, ...rest] = argv;
+  assertCredentialsNotExposed(cfg, mode);
   if (['roles', 'rotate-credentials', 'create-db', 'drop-db', 'list', 'verify', 'run'].includes(mode)) assertLocalListener(cfg);
   const opt = (flag: string): string | null => {
     const i = rest.indexOf(flag);

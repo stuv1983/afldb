@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import postgres from 'postgres';
@@ -12,7 +13,10 @@ import {
   isolatedDatabaseOf,
 } from '@afldb/domain';
 
-import { assertCreatableName, assertLocalListener, checkListenerOwnership, environmentFor, resolveConfig, verifyTarget } from '../tools/v2/isolated-pg';
+import {
+  EXPOSED_CREDENTIALS_MARKER, assertCreatableName, assertCredentialsNotExposed, assertLocalListener, checkListenerOwnership,
+  environmentFor, main, resolveConfig, verifyTarget,
+} from '../tools/v2/isolated-pg';
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
 vi.mock('node:fs', async (original) => ({ ...await original<typeof import('node:fs')>(), readFileSync: vi.fn() }));
@@ -102,6 +106,38 @@ describe('tools/v2/isolated-pg.ts pure helpers', () => {
     expect(env.AFLDB_V2_ISOLATED_PG).toBe('1');
     expect(new URL(env.DATABASE_URL).username).toBe('afldb_app');
     expect(new URL(env.AFLDB_TEST_DATABASE_URL).username).toBe('afldb_owner');
+  });
+});
+
+describe('isolated cluster: exposed credentials are unusable (ISSUE-316 credential incident)', () => {
+  const markedRoot = () => {
+    const root = mkdtempSync(join(tmpdir(), 'afldb-exposed-'));
+    mkdirSync(join(root, 'secrets'));
+    writeFileSync(join(root, 'secrets', EXPOSED_CREDENTIALS_MARKER), 'nonsecret marker\n');
+    return root;
+  };
+  const credentialModes = ['init', 'start', 'roles', 'rotate-credentials', 'create-db', 'drop-db', 'list', 'verify', 'run', undefined];
+
+  it('refuses every command that could start, authenticate or hand the passwords on; stop and status still run', () => {
+    const cfg = { root: markedRoot(), bin: '/nonexistent', port: PORT };
+    for (const mode of credentialModes) expect(() => assertCredentialsNotExposed(cfg, mode)).toThrow(/marked exposed/);
+    for (const mode of ['stop', 'status']) expect(() => assertCredentialsNotExposed(cfg, mode)).not.toThrow();
+    const unmarked = { root: mkdtempSync(join(tmpdir(), 'afldb-unmarked-')), bin: '/nonexistent', port: PORT };
+    for (const mode of credentialModes) expect(() => assertCredentialsNotExposed(unmarked, mode)).not.toThrow();
+  });
+
+  it('refuses in main before any process, listener check or secret read', async () => {
+    vi.stubEnv('AFLDB_V2_PG_ROOT', markedRoot());
+    try {
+      for (const argv of [['start'], ['run', 'afldb_v2_x_test', '--', 'psql'], ['rotate-credentials']]) {
+        await expect(main(argv)).rejects.toThrow(/marked exposed/);
+      }
+      expect(spawnSync).not.toHaveBeenCalled();
+      expect(readFileSync).not.toHaveBeenCalled();
+      expect(postgres).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 
