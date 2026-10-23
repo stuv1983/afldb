@@ -1,6 +1,8 @@
 # AFLDB-ISSUE-320 — Enforced native-library closure for guarded rehearsal/rebuild processes
 
-**Status:** OPEN, registered 2026-10-23. Implemented in local commit `041bd5852f166be76c873fbc45d0c10208a3c3b2` and proven on DEV, but not yet proven end to end.
+**Status:** OPEN, registered 2026-10-23. Implemented in local commit `041bd5852f166be76c873fbc45d0c10208a3c3b2`. The launcher image binding was added in `15e435620571910d522f12b933f89de917daeca0`.
+* **2026-10-23:** a complete isolated rehearsal ran under v3 enforcement at `15e43562` and PASSED (§7).
+* Still open: v3 records for every other environment, and the owner's acknowledgement of §3.
 **Severity:** High, as an ISSUE-316 successor gate. **Area:** V2 rehearsal/rebuild runtime trust boundary.
 **Linked:** AFLDB-ISSUE-316 (gate G2 of successor package E).
 
@@ -86,9 +88,92 @@ The vDSO and JIT code are not files.
 * **Evidence.** `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/native/` (`EXECUTION_RECORD.md` at the parent).
 
 ## 5. Not yet proven (why this issue stays OPEN)
-1. **A complete isolated rehearsal under v3 enforcement.** All 30 stages under the auditor have never run. The bounded proposal is `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-E-20261023T1045Z/REHEARSAL_V3_PROPOSAL.md`. It is NOT run and needs owner authorisation.
-2. **Records for other environments.** Only DEV records were derived. Every other environment that runs a guarded protected step needs its own derived, reviewed v3 record. The binding is per host because absolute paths and system libraries differ.
-3. **Owner acknowledgement of the §3 boundary.** Owner acknowledgement is needed for the post-startup `PROT_EXEC`/syscall limit and for the static-child pre-exec-only binding.
+1. ~~**A complete isolated rehearsal under v3 enforcement.**~~
+   * DONE 2026-10-23 at `15e43562`; see §7. It ran under the bounded proposal `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-E-20261023T1045Z/REHEARSAL_V3_PROPOSAL.md`, owner-authorised.
+2. **Records for other environments (per-machine gaps).**
+   * The only derived, reviewed v3 record is for DEV `streamanator` with the clean-install runtime `/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/`. That record is `b4a24773…c539`: 250 objects, policy `0c24b431…7fa6`.
+   * The binding is per host. It names absolute paths and the bytes of the system libraries.
+   * Every other machine that would run a guarded protected step has no record. That includes the applying runtime and whichever host runs the post-rollover rebuild.
+   * Each such machine needs its own derivation, review and enforced proof.
+   * On DEV, any OS package update to a closure object changes the bytes. The record then refuses until it is re-derived. e9 found 0 of 250 objects changed after this run.
+   * The mechanism is a glibc rtld-audit module, and the launcher's maps check is Linux-only (§2). A Windows run therefore carries no native enforcement. It is not enforced evidence.
+3. **Owner acknowledgement of the §3 boundary.** Owner acknowledgement is needed for:
+   * the post-startup `PROT_EXEC`/syscall limit;
+   * the static-child pre-exec-only binding: esbuild, 22 processes in §7;
+   * the verifying launcher, which is unenforced by design and self-checked (§2).
 
 ## 6. Next action
-Owner authorisation of the §5.1 rehearsal proposal. Then derive a record for each environment that will run the post-rollover rebuild, and acknowledge §3.
+* The owner names the environments that will run guarded protected steps.
+* Derive, review and prove a v3 record for each of them.
+* The owner acknowledges §3.
+* No rollover, adoption or production write follows from §7.
+
+## 7. Complete isolated rehearsal under v3 enforcement at `15e43562` (2026-10-23) — PASS
+Evidence is in `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/`, with `EXECUTION_RECORD.md` and `HASHES.sha256`.
+* The tar `collected/v3-rehearsal-evidence.tar` has sha256 `2707020576e255bb272aff6eae7a7893cf1e56f859d8767bbacbd90639f9987c`.
+* The DEV root `/home/arm/afldb-c2-rehearsal-v3-15e43562-20261023T0026Z` is retained, cluster data included.
+* No subagents. Isolated only.
+
+**Basis.**
+* HEAD is `15e43562`, parent `b084273e`. `tsc` exit 0. vitest: 3 files, 1,360 passed / 2 skipped (Windows, local).
+* New package: 1,146 files, inventory `e07bcfe1…6472`, bindings `aab9c386…803d`. All 1,146 were hash-verified before and after the run.
+
+**Runtime.**
+* The clean-install v2 record was re-measured equal to `6c4ea3ea…1add3`, before and after the run.
+* The auditor was built from the packaged source byte-equal to `32d5f6fe…956a`.
+* The v3 record was derived with the packaged `derive-closure.py`: `b4a24773…c539`, 250 objects, 385,089,521 B.
+* Launch spec: `6727d97e…04a4`.
+
+**Target.**
+* A new mode-700 root.
+* A cluster started through the guard, so the postmaster carries the auditor: system id `7699653836114564799`, 127.0.0.1:55773.
+* A new database, `afldb_v2_rb_c2cand5_test`.
+
+**Pre-launch controls** (`local/e3-negative.log`, `nc-auditor-removed.log`). Nothing was written under the writable roots.
+* Refused at the launcher, exit 2:
+  * nc1: an unbound `.so` in a runtime root (runtime membership);
+  * nc1b: a runtime ELF file outside the closure;
+  * nc2: loader/auditor unbound;
+  * nc4: a loader override.
+* nc3, the v3 record with one object removed:
+  * It was refused at the **verifier** (exit 2, "verifying process maps native code outside the closure").
+  * The harness had expected 127 and printed `AT LEAST ONE UNEXPECTED RESULT`.
+  * The proposal §4 accepts a refusal at either the auditor or the verifier, so this is a recorded difference, not a pass by the harness.
+  * A separate auditor-level control with the same kind of removal (libstdc++) refused with 127: "unbound loader search candidate".
+* Auditor level: a tampered pin, changed policy bytes, LD_PRELOAD and LD_LIBRARY_PATH each refused with 127.
+* Smokes:
+  * The first psql smoke used `bash`, and the auditor refused it (`unbound executable: /usr/bin/bash`; this is the only REFUSED line under `logs/`).
+  * The `/bin/sh` replacement `post-inner.sh` (late-staged, hashes recorded) had 0 refusals.
+  * The psycopg smoke and the JIT smoke (5 JIT functions) passed.
+
+**Run.**
+* The verified production launcher ran from 2026-10-23T00:34:56Z to 01:17:50Z. `runner.exit` 0.
+* The original deadline, 02:34:54Z, was untouched. No tripwire fired. Peak root sample was 2.11 GB; minimum free was 30.7 GB.
+* All 30 stages completed:
+  * census 1897–2026 `verdict=pass total=0` (`schema_absent`, fresh database: mechanism only);
+  * strict real D7, all 1,640;
+  * `AFLDB-FINAL-VALIDATION PASSED: 91 checks`;
+  * `AFLDB-POST PASSED` (2026 pending on all three keys, 0 exposed, historical 98 / 79,113 / 112).
+
+**Enforced coverage** (the claim):
+* The run's logs carry 0 `AFLDB native closure REFUSED` lines.
+* The server and collector logs carry 0 ERROR/FATAL/PANIC lines.
+* After the run, all 250 closure objects were re-hashed equal to the record.
+
+**Observed (not the claim).**
+* The read-only sampler (1 s interval, 2,951 samples) saw 140 protected processes with 0 anomalies. The auditor was mapped from the bound inode in each of these:
+  * node 25/25;
+  * python3.12 30/30;
+  * postgres 37/37, client backends included;
+  * psql 7/7;
+  * dash 4/4;
+  * initdb 1/1;
+  * pg_ctl 1/1.
+* esbuild 22/22 carried the env auditor and pin. Those processes are bound pre-exec only.
+* SAMPLED `/proc/<pid>/maps` (5 bound-inode maps each): the postmaster, the logger, two guarded node children and one Python stage.
+* The verifying launcher node had 0 maps, by design.
+
+**Shutdown** (through the guard).
+* `iso-v3 stop` exit 0. `postmaster.pid` absent; `shut down`; ports 55770–55779 free; old postmaster gone.
+* The watchdog and sampler finished (`WATCHDOG_DONE`, `ENFORCEMENT_DONE`). Nothing references the root.
+* The system postgres was untouched.

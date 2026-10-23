@@ -547,13 +547,16 @@
 ### AFLDB-ISSUE-320 — Enforced native-library closure for guarded rehearsal/rebuild processes
 - **Severity:** High (ISSUE-316 successor gate G2). **Area:** V2 rehearsal/rebuild runtime trust boundary.
 - **State:** Open (2026-10-23). Implemented in local commit `041bd585`: LD_AUDIT auditor, runtime record v3, guard
-  self-checks. DEV proof: mechanism 33/33, real-launcher integration 10/10, PostgreSQL fixture. Not yet proven: a
-  complete isolated rehearsal under v3, and v3 records for environments other than DEV.
+  self-checks. DEV proof: mechanism 33/33, real-launcher integration 10/10, PostgreSQL fixture.
+  - **Complete isolated rehearsal under v3 PASSED at `15e43562` (2026-10-23):** exit 0, 30 stages, strict D7 1,640,
+    91 checks, post-rebuild checks; 0 REFUSED in the run; 250/250 closure objects unchanged; sampler 0 anomalies.
+    Rehearsal-only. Evidence: `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/`.
+  - Not yet proven: v3 records for any environment other than DEV `streamanator` (the binding is per host; Windows has
+    no enforcement); owner acknowledgement of the §3 boundary.
 - **Key files:** `tools/v2/native-audit/`, `tools/v2/rehearsal-package.mjs`, `tools/v2/rehearsal-resolution-guard.mjs`,
   `tests/db-test-rebuild.test.ts`; runbook `issues/open/AFLDB-ISSUE-320.md`.
-- **Next:** authorise the bounded proposal
-  `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-E-20261023T1045Z/REHEARSAL_V3_PROPOSAL.md`; derive a record for each environment;
-  owner acknowledgement of the boundary.
+- **Next:** the owner names the environments that run guarded steps; derive, review and prove a record for each;
+  owner acknowledgement of the §3 boundary.
 
 ### AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 - **Severity:** Medium. **Area:** public site / SEO — `src/app/sitemap.ts`.
