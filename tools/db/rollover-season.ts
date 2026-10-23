@@ -140,7 +140,7 @@ import {
   parseRolloverArgv,
   planSeasonRollover,
   planSuccessorContract,
-  readClubSeasonsExpectedRows,
+  readStageNineExpectedRows,
   type RolloverPlan,
   type ValidatorOverride,
   type ValidatorRun,
@@ -356,7 +356,7 @@ function main(argv: string[]): number {
     seasons: JSON.parse(sources.seasons) as Record<string, unknown>,
     contract: JSON.parse(sources.contract) as Record<string, unknown>,
     statAvailability: JSON.parse(sources.statAvailability) as Record<string, unknown>,
-    clubSeasonsExpectedRows: readClubSeasonsExpectedRows(sources.rebuild),
+    clubSeasonsExpectedRows: readStageNineExpectedRows(sources.rebuild, JSON.parse(sources.contract)),
   };
   const request = {
     season: args.season,
@@ -537,7 +537,9 @@ function main(argv: string[]): number {
       const validated = validateTransitionState({
         files: writeSet,
         readRepo: readRepoBytes,
-        validate: (documents) => validateProposedRebuildState({ ...documents, witnessManifest: witness.text }),
+        validate: (documents) => validateProposedRebuildState({
+          ...documents, witnessManifest: witness.text, baseRebuild: sources.rebuild,
+        }),
       });
       binding = validated.binding;
       console.log('\nPROPOSED-STATE VALIDATION - the rebuild\'s own validators over the proposed bytes '

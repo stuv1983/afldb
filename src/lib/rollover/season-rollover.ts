@@ -51,7 +51,8 @@ import {
   refusalMessage, rolloverCensusScope,
 } from './afl-api-ownership-census';
 import {
-  LadderSuccessorRefused, planSuccessorTuplesEdit, type SuccessorLadderTuple,
+  LadderSuccessorRefused, parseSuccessorLadderTuples, planSuccessorTuplesEdit, readSuccessorLadderTuplesJson,
+  type SuccessorLadderTuple,
 } from './ladder-successor';
 
 /** A refusal. Never carries a DSN, a secret or a path outside the repository. */
@@ -205,6 +206,13 @@ export const IDENTITY_SCAN_SOURCE_NOTE =
   + 'computed successor contract in a temporary directory before any tracked file is '
   + 'written. It is never an operator input.';
 
+/**
+ * AFLDB-ISSUE-136: the count of players carrying a folded renumbered AFL Tables profile. The importer
+ * prints it in its summary and an acceptance record that declares it is compared on it; older records
+ * (and validator output from before ISSUE-136) simply do not carry it.
+ */
+export const RENUMBERED_PROFILE_KEY = 'players_with_renumbered_profile';
+
 /** Summary keys copied straight through as integers. */
 const SUMMARY_INT_KEYS = [
   'matches', 'matches_with_player_rows', 'venues', 'attendance_known',
@@ -229,7 +237,9 @@ export function parseValidatorEvidence(output: string): ValidatorEvidence {
       continue;
     }
     if (section === 'none') continue;
-    const match = /^ {2}(\S+)\s{2,}(.*)$/.exec(raw);
+    // The importer prints `f"  {k:<28} {v}"`: a key of 28 characters or more (ISSUE-136's
+    // players_with_renumbered_profile is 31) is followed by ONE space, so any run separates.
+    const match = /^ {2}(\S+)\s+(.*)$/.exec(raw);
     if (!match) continue;
     (section === 'summary' ? summary : coverage).set(match[1], match[2].trim());
   }
@@ -279,6 +289,12 @@ export function parseValidatorEvidence(output: string): ValidatorEvidence {
     attendance_known: number(summary, 'attendance_known'),
     club_identities: clubIdentities,
     players: number(summary, 'players'),
+    // AFLDB-ISSUE-136: carried whenever the validator prints it, in the register's own key order.
+    // Leaving it out would silently drop the folded-renumbered-profile gate from the successor's
+    // acceptance drift check and final validation; planSeasonRollover refuses a successor that
+    // loses it while the outgoing baseline pins it.
+    ...(summary.has(RENUMBERED_PROFILE_KEY)
+      ? { [RENUMBERED_PROFILE_KEY]: number(summary, RENUMBERED_PROFILE_KEY) } : {}),
     players_with_dob: number(summary, 'players_with_dob'),
     players_with_dob_conflict: number(summary, 'players_with_dob_conflict'),
     player_match_rows: number(summary, 'player_match_rows'),
@@ -976,6 +992,10 @@ const CLUB_SEASONS_ROWS_ANCHOR =
  * requires the operator to state the number and REFUSES unless it equals the
  * witness's own row total.
  *
+ * AFLDB-ISSUE-316: a transition that adds a reviewed SUCCESSOR ladder tuple does not call this.
+ * The tuple's expected_rows is then stage 9's separate reviewed number (fingerprint-bound and
+ * re-derived from the witness manifest), and the constant keeps the predecessor's count.
+ *
  * Pure: takes source text, returns source text. Refuses on anything but
  * exactly one anchored match, so a refactor of that constant cannot be
  * silently mis-edited.
@@ -1004,6 +1024,29 @@ export function readClubSeasonsExpectedRows(source: string): number {
     refuse('tools/db/rebuild-test.ts declares no CLUB_SEASONS_EXPECTED.rows value.');
   }
   return Number(match[2]);
+}
+
+/**
+ * The club_seasons row count stage 9 gates for a state, read without executing the module. When the
+ * contract's ladder profile is a reviewed successor tuple in SUCCESSOR_LADDER_TUPLES_JSON, that tuple's
+ * expected_rows is the count (the rebuild reads it from the tuple); otherwise the profile is the
+ * predecessor line and the count is CLUB_SEASONS_EXPECTED.rows. A source without the successor table
+ * cannot select a successor.
+ */
+export function readStageNineExpectedRows(source: string, contract: Json): number {
+  const ladder = obj(obj(contract.datasets ?? {}, 'contract.datasets').ladder ?? {}, 'contract.datasets.ladder');
+  const profile = (ladder.rebuild_expectation as Json | undefined)?.profile;
+  if (typeof profile === 'string' && source.includes('export const SUCCESSOR_LADDER_TUPLES_JSON = ')) {
+    let tuples: Record<string, SuccessorLadderTuple>;
+    try {
+      tuples = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(source));
+    } catch (error) {
+      if (error instanceof LadderSuccessorRefused) refuse(error.message);
+      throw error;
+    }
+    if (Object.hasOwn(tuples, profile)) return tuples[profile].expected_rows;
+  }
+  return readClubSeasonsExpectedRows(source);
 }
 
 // ---------------------------------------------------------------------------
@@ -1855,6 +1898,11 @@ export function planSeasonRollover(input: {
       + `currently accepted ${measuredNow.matches}. Adding a completed season cannot `
       + 'reduce or preserve the match count.');
   }
+  if (RENUMBERED_PROFILE_KEY in measuredNow && !(RENUMBERED_PROFILE_KEY in measured)) {
+    refuse(`The currently accepted baseline pins ${RENUMBERED_PROFILE_KEY} (AFLDB-ISSUE-136), but `
+      + 'the validator output records none, so the successor fingerprint would silently drop that '
+      + 'identity gate. Refusing to construct a weaker acceptance record.');
+  }
 
   const seasonsNext = successor.seasonsDocument;
   const contractNext = successor.contractDocument;
@@ -1933,16 +1981,28 @@ export function planSeasonRollover(input: {
     + `[${successor.corrections.categories.join(', ')}]. Nothing was inherited from `
     + `${retiredLabel}; its entries were not read.`);
 
-  let rebuildNext = planClubSeasonsConstantEdit(
-    currentSources.rebuild, current.clubSeasonsExpectedRows, witnessRows,
-  );
-  if (input.transition?.successorLadderTuple) {
+  // A successor ladder tuple carries its own reviewed, fingerprint-bound row count, and stage 9
+  // reads it from there (`resolveLadderRebuildExpectation`). CLUB_SEASONS_EXPECTED.rows then stays
+  // what its declaration says it is, the superseded predecessor's 1897-Y-1 universe, so a successor
+  // transition never rewrites it: a second copy of the successor's number would gate nothing and
+  // would falsify the predecessor's. Without a tuple the ISSUE-101 constant edit is unchanged.
+  const successorTuple = input.transition?.successorLadderTuple;
+  let rebuildNext: string;
+  if (successorTuple) {
+    if (successorTuple.expected_rows !== witnessRows) {
+      refuse(`The successor ladder tuple ${JSON.stringify(successorTuple.profile)} carries expected_rows `
+        + `${successorTuple.expected_rows}, but the ladder witness carries ${witnessRows} rows.`);
+    }
     try {
-      rebuildNext = planSuccessorTuplesEdit(rebuildNext, input.transition.successorLadderTuple);
+      rebuildNext = planSuccessorTuplesEdit(currentSources.rebuild, successorTuple);
     } catch (error) {
       if (error instanceof LadderSuccessorRefused) refuse(error.message);
       throw error;
     }
+  } else {
+    rebuildNext = planClubSeasonsConstantEdit(
+      currentSources.rebuild, current.clubSeasonsExpectedRows, witnessRows,
+    );
   }
 
   // --- the successor must satisfy exactly the rules the predecessor did -----

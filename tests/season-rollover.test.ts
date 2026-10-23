@@ -47,6 +47,7 @@ import {
   planSeasonRollover,
   planSuccessorContract,
   readClubSeasonsExpectedRows,
+  readStageNineExpectedRows,
   retirementVocabulary,
   selectAccepted,
   type RolloverRequest,
@@ -701,6 +702,64 @@ describe('validator evidence', () => {
   it('refuses an unparsable season span', () => {
     expect(() => parseValidatorEvidence(gateOutput({ seasons: '2026' })))
       .toThrow(/not a FIRST-LAST range/);
+  });
+
+  it('carries the ISSUE-136 renumbered-profile count, in the register key order, whenever the validator prints it', () => {
+    const { measured } = parseValidatorEvidence(gateOutput({ players_with_renumbered_profile: 4 }));
+    expect(measured.players_with_renumbered_profile).toBe(4);
+    const keys = Object.keys(measured);
+    expect(keys.indexOf('players_with_renumbered_profile')).toBe(keys.indexOf('players') + 1);
+    expect(parseValidatorEvidence(gateOutput())).not.toHaveProperty('measured.players_with_renumbered_profile');
+    expect(() => parseValidatorEvidence(gateOutput({ players_with_renumbered_profile: 'four' })))
+      .toThrow(/'players_with_renumbered_profile' is "four", which is not a count/);
+  });
+});
+
+describe('the ISSUE-136 renumbered-profile pin survives the rollover', () => {
+  const pinned = () => {
+    const register = baseRegister();
+    ((register.baselines as Array<Record<string, unknown>>)[0].measured as Record<string, unknown>)
+      .players_with_renumbered_profile = 4;
+    return register;
+  };
+  const successorMeasured = (plan: ReturnType<typeof run>) =>
+    (jsonIn(plan, REGISTER_PATH).baselines as Array<Record<string, unknown>>)
+      .find((b) => b.acceptance_status === 'accepted')!.measured as Record<string, unknown>;
+
+  it('refuses a successor fingerprint that would silently drop a pin the outgoing baseline declares', () => {
+    expect(() => run({ register: pinned() }))
+      .toThrow(/pins players_with_renumbered_profile \(AFLDB-ISSUE-136\), but the validator output records none/);
+  });
+
+  it('writes the measured count into the successor record when the validator prints it', () => {
+    const plan = run({ register: pinned(), validatorOutput: gateOutput({ players_with_renumbered_profile: 4 }) });
+    expect(successorMeasured(plan).players_with_renumbered_profile).toBe(4);
+  });
+
+  it('adds nothing for an outgoing record that never pinned it and output that does not print it', () => {
+    expect(successorMeasured(run())).not.toHaveProperty('players_with_renumbered_profile');
+  });
+});
+
+describe('stage 9 club_seasons rows of a state (read without executing the rebuild module)', () => {
+  const contractWith = (profile: unknown) => ({ datasets: { ladder: { rebuild_expectation: { profile } } } });
+  const withTable = (json: string) => `${REBUILD_STUB}export const SUCCESSOR_LADDER_TUPLES_JSON = '${json}';\n`;
+  const tuple = { ...successorFixture().tuple, expected_rows: 1640 };
+
+  it('is CLUB_SEASONS_EXPECTED.rows for the predecessor line, with or without a successor table', () => {
+    expect(readStageNineExpectedRows(REBUILD_STUB, contractWith('predecessor-1897-2025'))).toBe(ROWS_2025);
+    expect(readStageNineExpectedRows(withTable('{}'), contractWith('predecessor-1897-2025'))).toBe(ROWS_2025);
+  });
+
+  it("is the successor tuple's own expected_rows when the contract selects that tuple", () => {
+    const source = planSuccessorTuplesEdit(withTable('{}'), tuple);
+    expect(readStageNineExpectedRows(source, contractWith(tuple.profile))).toBe(1640);
+    expect(readClubSeasonsExpectedRows(source)).toBe(ROWS_2025);
+    expect(readStageNineExpectedRows(source, contractWith('predecessor-1897-2025'))).toBe(ROWS_2025);
+  });
+
+  it('refuses a malformed successor table rather than falling back to the constant', () => {
+    expect(() => readStageNineExpectedRows(withTable('{ nope'), contractWith(tuple.profile))).toThrow(RolloverRefused);
   });
 });
 
@@ -3261,19 +3320,23 @@ function successorFixture(opts: SuccessorFixtureOptions = {}) {
   };
   d.seasons.last_season = last + 1;
   d.seasons.in_progress_seasons = [last + 1];
-  const constantOnly = planClubSeasonsConstantEdit(d.rebuild, 1622, claimedRows);
-  d.rebuild = planSuccessorTuplesEdit(constantOnly, tuple);
-  return { d, tuple, witnessText, constantOnly };
+  // A successor transition adds only the tuple: CLUB_SEASONS_EXPECTED keeps the predecessor's 1622.
+  const base = d.rebuild;
+  d.rebuild = planSuccessorTuplesEdit(base, tuple);
+  return { d, tuple, witnessText, base };
 }
 
 type SuccessorFixture = ReturnType<typeof successorFixture>;
 const judge = (
   f: SuccessorFixture,
-  over: { witnessText?: string | null; successors?: Record<string, SuccessorLadderTuple>; pairs?: Pairs } = {},
+  over: {
+    witnessText?: string | null; baseRebuild?: string | null; successors?: Record<string, SuccessorLadderTuple>; pairs?: Pairs;
+  } = {},
 ) => {
   const docs = asProposed(f.d);
   const witnessManifest = over.witnessText === null ? undefined : (over.witnessText ?? f.witnessText);
-  return validateProposedRebuildState({ ...docs, witnessManifest }, over.pairs, over.successors);
+  const baseRebuild = over.baseRebuild === null ? undefined : (over.baseRebuild ?? f.base);
+  return validateProposedRebuildState({ ...docs, witnessManifest, baseRebuild }, over.pairs, over.successors);
 };
 
 describe('successor ladder tuple — the pure module', () => {
@@ -3367,11 +3430,17 @@ describe('successor ladder tuple — the pure module', () => {
     const stub = `${REBUILD_STUB}export const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
     const plain = run({ rebuildSource: stub });
     expect(fileIn(plain, REBUILD_PATH).content).toContain("SUCCESSOR_LADDER_TUPLES_JSON = '{}'");
-    const withTuple = run({ rebuildSource: stub, transition: { successorLadderTuple: tuple() } });
+    // This scenario's synthetic witness carries ROWS_2026; the tuple must carry the same count.
+    const scenarioTuple = { ...tuple(), expected_rows: ROWS_2026 };
+    const withTuple = run({ rebuildSource: stub, transition: { successorLadderTuple: scenarioTuple } });
     const out = fileIn(withTuple, REBUILD_PATH).content;
-    expect(parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(out))[SYNTHETIC_SUCCESSOR]).toEqual(tuple());
-    expect(readClubSeasonsExpectedRows(out)).toBe(ROWS_2026);
-    expect(() => run({ transition: { successorLadderTuple: tuple() } })).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
+    expect(parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(out))[SYNTHETIC_SUCCESSOR]).toEqual(scenarioTuple);
+    // Stage 9 reads the successor's count from the tuple; the constant keeps the predecessor's.
+    expect(readClubSeasonsExpectedRows(out)).toBe(ROWS_2025);
+    expect(readClubSeasonsExpectedRows(fileIn(plain, REBUILD_PATH).content)).toBe(ROWS_2026);
+    expect(() => run({ rebuildSource: stub, transition: { successorLadderTuple: { ...tuple(), expected_rows: ROWS_2026 + 1 } } }))
+      .toThrow(/carries expected_rows .* but the ladder witness carries/);
+    expect(() => run({ transition: { successorLadderTuple: scenarioTuple } })).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
   });
 });
 
@@ -3387,7 +3456,7 @@ describe("successor ladder tuple — a coherent synthetic transition is judged b
   it('accepts the same state with the table injected, and refuses it under the empty shipped table', () => {
     const f = successorFixture();
     expect(judge(f, { successors: { [SYNTHETIC_SUCCESSOR]: f.tuple } }).ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
-    const unadopted = { ...f, d: { ...f.d, rebuild: f.constantOnly } };
+    const unadopted = { ...f, d: { ...f.d, rebuild: f.base } };
     expect(() => judge(unadopted)).toThrow(/Unsupported ladder expectation/);
   });
 
@@ -3437,10 +3506,16 @@ describe("successor ladder tuple — a coherent synthetic transition is judged b
       expect(() => judge(f)).toThrow(/Unsupported ladder expectation/);
     });
 
-    it('a rebuild constant the tuple does not share', () => {
-      const f = successorFixture();
-      f.d.rebuild = planClubSeasonsConstantEdit(f.d.rebuild, 1640, 1622);
-      expect(() => judge(f)).toThrow(/expects 1622 club_seasons rows/);
+    it('a successor transition that rewrites the predecessor constant, to the successor count or any other', () => {
+      for (const next of [1640, 1621]) {
+        const f = successorFixture();
+        f.d.rebuild = planClubSeasonsConstantEdit(f.d.rebuild, 1622, next);
+        expect(() => judge(f)).toThrow(new RegExp(`expects ${next} club_seasons rows in CLUB_SEASONS_EXPECTED, but the base declares 1622`));
+      }
+    });
+
+    it('a successor state judged without the base rebuild bytes it must leave the constant unchanged in', () => {
+      expect(() => judge(successorFixture(), { baseRebuild: null })).toThrow(/base bytes were not supplied/);
     });
 
     it('a tuple, contract and constant that agree with each other but not with the witness manifest', () => {

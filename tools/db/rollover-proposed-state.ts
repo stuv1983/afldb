@@ -48,6 +48,12 @@ export type ProposedDocuments = {
    * literal are read from it, so a successor profile is judged against the table the PROPOSED code would carry.
    */
   rebuild: string;
+  /**
+   * The CURRENT `tools/db/rebuild-test.ts` bytes the apply would replace. Required for a successor profile:
+   * its CLUB_SEASONS_EXPECTED.rows must be left exactly as the base declares it (the superseded predecessor's
+   * fingerprint-bound count), because stage 9 reads a successor's rows from its tuple.
+   */
+  baseRebuild?: string;
   /** The proposed ladder witness manifest, for a successor's independent row derivation. */
   witnessManifest?: string;
 };
@@ -140,7 +146,23 @@ export function validateProposedRebuildState(
     );
 
     const constantRows = readClubSeasonsExpectedRows(docs.rebuild);
-    if (constantRows !== ladder.expectedRows) {
+    const isSuccessor = typeof profile === 'string' && Object.hasOwn(proposedSuccessors, profile);
+    if (isSuccessor) {
+      // Stage 9 takes a successor's count from its tuple (already bound to the contract and re-derived from
+      // the witness manifest above). CLUB_SEASONS_EXPECTED.rows stays the predecessor's reviewed count.
+      if (docs.baseRebuild === undefined) {
+        throw new RebuildRefused(
+          'A successor profile is judged against the base tools/db/rebuild-test.ts, whose CLUB_SEASONS_EXPECTED.rows '
+          + 'it must leave unchanged; the base bytes were not supplied.');
+      }
+      const baseRows = readClubSeasonsExpectedRows(docs.baseRebuild);
+      if (constantRows !== baseRows) {
+        throw new RebuildRefused(
+          `The proposed tools/db/rebuild-test.ts expects ${constantRows} club_seasons rows in CLUB_SEASONS_EXPECTED, `
+          + `but the base declares ${baseRows}. That constant is the superseded predecessor's fingerprint-bound count; `
+          + `a successor transition never rewrites it (stage 9 reads ${ladder.expectedRows} from the successor tuple).`);
+      }
+    } else if (constantRows !== ladder.expectedRows) {
       throw new RebuildRefused(
         `The proposed tools/db/rebuild-test.ts expects ${constantRows} club_seasons rows, but the proposed `
         + `ladder rebuild_expectation resolves to ${ladder.expectedRows}. The two must be the same reviewed number.`);
