@@ -2373,7 +2373,7 @@ Recorded in the [decision package, Revision 6](../../docs/v2/issue316-c2-success
 
 ISSUE-316 OPEN; production NO-GO; successor approved conditionally and NOT ACTIVATED (tuple table `'{}'`); 1,640 not yet active; Brownlow 2026 pending on all three keys; ET unresolved.
 
-## v3-enforced rehearsal and Linux planner dry run at `15e43562` (2026-10-23; current)
+## v3-enforced rehearsal and Linux planner dry run at `15e43562` (2026-10-23; previous; superseded by "Pre-apply safety and revision G" below)
 
 Execution record: `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/EXECUTION_RECORD.md`, with `HASHES.sha256` (1,700 files) in the same folder.
 
@@ -2434,3 +2434,81 @@ Execution record: `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/EXECUTIO
   - Near the window: fresh censuses, then the dry run on the applying runtime, then a separate apply authorisation.
 
 ISSUE-316 OPEN; production NO-GO; successor approved conditionally and NOT ACTIVATED (no adoption, tuple table unchanged); 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved; no rollover, production write, deployment, push or cleanup.
+
+## Pre-apply safety and revision G (2026-10-23; current)
+
+Packages on C: (nothing applied):
+- credential incident: `C:/tmp/afldb-i316-CREDENTIAL-INCIDENT-20261023T0447Z/` (`INCIDENT.md`, `HASHES.sha256`);
+- revision G: `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-G-20261023T0600Z/` (`PROPOSAL_G.md`, `APPLICATION_SPEC.md`,
+  `REBUILD_SPEC.md`, `HASHES.sha256`).
+
+Package F is preserved unchanged and superseded.
+
+- **Scope.**
+  - One agent, no subagents.
+  - Authorised and done:
+    - local inspection;
+    - scoped planner/test/tool fixes and local commits;
+    - read-only ssh to the retained DEV rehearsal roots;
+    - nonsecret marker writes in the two affected disposable roots.
+  - Not done:
+    - no `--apply`;
+    - no rebuild;
+    - no database connection of any kind;
+    - no production or application credential or service change;
+    - no installation, WSL, deployment, push or cleanup.
+  - `.codex/` untouched.
+- **Disposable credential exposure: contained.**
+  - V3 (:55773) and V4 (:55774) rehearsal `afldb_owner` passwords were recorded by the LD_AUDIT sampler, because the
+    harness `post-inner.sh` passed the DSN as psql argv: 3 and 2 records. One V4 record was copied into the collected
+    `e8-shutdown.log`.
+  - No reuse; both clusters stopped. DEV originals sit behind 700 directories; C: originals were ACL-restricted.
+  - Markers written; `isolated-pg.ts` refuses a marked root (`0011b985`).
+  - CREDFIX-1 harness (PGPASSFILE, redact-before-truncate, no log echo) with 11/11 hygiene tests.
+  - Four sanitised copies; 0 real occurrences.
+  - A restart needs the offline single-user rotation and a fresh owner authorisation (`INCIDENT.md` §7).
+- **Proposal F review → two planner defects, corrected in `21749f57`.**
+  - (1) The unvalidated `CLUB_SEASONS_EXPECTED.rows` 1622 → 1640 global-counter edit was removed. Stage 9 uses the
+    tuple's `expected_rows`; the predecessor's fingerprint-bound 1622 is kept; the validator refuses a successor
+    state that rewrites it.
+  - (2) The rehearsal ran 91 checks and F built 90. The difference was `players_with_renumbered_profile = 4`
+    (ISSUE-136), dropped from the successor fingerprint: the key was unmapped and is printed with one space. It is
+    restored, and a dropped outgoing pin is refused.
+  - The other seven files are byte-identical to F's. Ownership, Brownlow, identity, ladder and provenance
+    protections were all verified present (`PROPOSAL_G.md` §5).
+- **Revision G.**
+  - The body equals F's (`5a410a82…`); **G-pinned `7beb7347235f0b25340267b9b2d8dd8c7a58bf4a6c1d76c540d382b35c4a7378`**.
+  - Finals:
+    - register `6a2a4b8681c2d3d89388abbdfe9aa7569f55014ce2be151788b1d80d67e5a049`;
+    - `rebuild-test.ts` `ec0ce520a3f2cf69ba89c040bc3a1880dff913f00e5e6ce38f6b5027474fb30a`;
+    - the other six as in F.
+  - Local Windows dry runs, exit 0 with 3/3 gates passed:
+    - the F-pinned control reproduces streamanator;
+    - G-pinned: pins match, 91 checks, root unchanged.
+  - The dumped planned bytes equal every pin. These runs are not the applying-runtime proof.
+- **Validation.**
+  - Suites passed: `tests/season-rollover.test.ts`, `tests/db-test-rebuild.test.ts`,
+    `tests/v2-isolated-test-target.test.ts`, `tests/afl-api-cutover.test.ts`.
+  - `tsc --noEmit` exit 0; eslint clean on the changed files.
+  - A post-apply simulation (DB-free vitest, base against base + G finals) lists the tests the apply commit must
+    update (`APPLICATION_SPEC.md` §7).
+  - **Post-apply simulation** (DB-free vitest; base = the `21749f57` archive, applied = + G files):
+    - **Commit 1 must be TEN files.** It needs the eight written files plus the two c2-2026 acquisition manifests
+      (`02bbcf93…`, `65c29907…`). Those manifests are untracked role-bound inputs that the planner does not write; the
+      committed register and contract bind them, and the rebuild requires a tracked manifest.
+    - `COVERAGE_REGISTRY` lacks 2027 entries for five families, so `docs/v2/coverage-matrix.md` must be
+      regenerated; the owner reviews the 2027 statuses.
+    - 99 tests in 16 files pin "2026 in progress" and must be restated without weakening.
+    - After the apply, 2026 is sealed: AFL API settle for 2026 refuses except through an audited correction, so 2026
+      settle completeness is an owner prerequisite.
+- **Remaining owner authorisations:**
+  1. The G application specification:
+     - census refresh close to the window;
+     - a streamanator LD_AUDIT-enforced G-pinned dry run at the pinned commit;
+     - `--apply` on 2026-10-24;
+     - the named commit scope.
+  2. Separately, the rebuild target database. The rebuild's allowlist admits only `afldb_test`, `code_test_db` or a
+     fresh isolated `afldb_v2_rb_*_test`, and the database field is awaiting the owner.
+
+ISSUE-316 OPEN; production NO-GO; successor NOT ACTIVATED; Brownlow 2026 pending on all three keys; ET unresolved; all
+source-authority, eligibility and ownership restrictions unchanged.

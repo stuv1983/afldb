@@ -15,6 +15,24 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Successor rollover keeps the predecessor club-season constant and the ISSUE-136 gate; exposed rehearsal credentials refused (2026-10-23)
+
+- The season-rollover planner changed (`21749f57`) in two ways:
+  - A transition that adds a reviewed successor ladder tuple no longer rewrites `CLUB_SEASONS_EXPECTED.rows`. Stage 9
+    reads a successor's count from its fingerprint-bound tuple, so the constant keeps the predecessor's 1622. The
+    planner refuses a tuple whose `expected_rows` differs from the witness rows. The proposed-state validator refuses
+    a successor state that changes the constant.
+  - The successor fingerprint now carries `players_with_renumbered_profile` (ISSUE-136) whenever the importer prints
+    it, and a successor that would drop a pin the outgoing baseline declares is refused. Previously the key was lost:
+    it is printed with a single separating space, and it was absent from the mapped key set. Without it, the
+    folded-renumbered-profile identity gate disappeared from the acceptance drift check and from final validation
+    (Proposal F built 90 checks; the rehearsal built 91).
+  - Proposal F is superseded by revision G (`G-pinned 7beb7347…`, C: evidence only, nothing applied).
+- `tools/v2/isolated-pg.ts` refuses every command except `stop` and `status` for a disposable cluster whose
+  `secrets/CREDENTIALS-EXPOSED` marker exists (`0011b985`). The V3 and V4 rehearsal clusters are marked: their
+  harness had passed the owner DSN as psql argv, and the enforcement sampler logged it. No application or production
+  credential was involved.
+
 ### ISSUE-319 / ISSUE-320 / ISSUE-316 - Successor gates resolved; enforced v4 rehearsal and Proposal F dry runs (2026-10-23)
 
 - ISSUE-319 resolved. The owner decided every source question: NM 1940 R8–R18 unattributed; the 479 unmapped roster

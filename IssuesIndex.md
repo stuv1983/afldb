@@ -461,7 +461,23 @@
 **AFLDB-ISSUE-278 resolved 2026-10-13** (merge-scoped; implementation commit `dd18adb93a0207eb2ed812ac56636a90e2c89239`, parent `e7f84f14`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). `db:test:rebuild` and `db:test:prove-reset` now assert the connected database and role before anything else runs, refuse a DSN that libpq would read differently from postgres.js (query-string redirects, host-less or default-port forms), and run their psql and stage children with the libpq routing variables removed. DB-free: `tests/db-test-rebuild.test.ts` 670/670, `tsc --noEmit` clean. Two verdicts, kept separate: Procedure A (read-only, `afldb_test`) PASSED 12/12 and was accepted; Procedure B attempt 2 (one attempt, `afldb_test` only) gave a **proof PASS** (the always-aborted real `RESET_SQL`, `psql exit 3`) and, separately, an **unchanged-observed-state MATCH** (Tier 1 `a39ad96b…`, Tier 2 `4f11fda9…`; 99 tables, 63 sequences, 1,454,440 rows digested). Attempt 1 stopped at the baseline (`text || "char"`) with no proof and no verdict. **Limits kept:** a MATCH is not proof that no sequence operation occurred; index/TOAST contents, extended statistics, publications, subscriptions, roles, database settings, large objects and planner statistics are not covered; no real rebuild has been run, so the rebuild-stream guard is proven by Procedure A and the DB-free tests only; Procedure A is a historical result about the pre-reboot postmaster; the unpinned control V4c was omitted. Readiness was **accepted under a scoped cleanliness exception, not a clean pass**: `merge:ready` BLOCKED by exactly one blocker (15 untracked primary-checkout paths: nine `.agents/skills` files and six zero-byte stray-named files), all left untouched with sizes and hashes re-verified at every checkpoint; the merge-mode preflight's only blocker was the same 15 paths. Not deployed; no deployment is required or implied. Runbook and both verification procedures: `issues/closed/AFLDB-ISSUE-278*.md` (§18).
 
 ### AFLDB-ISSUE-316 — AFL API cutover: retire AFL Tables network acquisition
-- **Raw replay, enforced v4 rehearsal, censuses and Proposal F at `691bdbae` (2026-10-23; current):**
+- **Pre-apply safety and revision G (2026-10-23; current):**
+  - **Disposable credential exposure contained:** V3/V4 `afldb_owner` DSNs were logged by the sampler via harness argv.
+    No reuse; both clusters stopped; markers written; `isolated-pg.ts` refuses marked roots (`0011b985`); CREDFIX-1
+    harness. Record `C:/tmp/afldb-i316-CREDENTIAL-INCIDENT-20261023T0447Z/INCIDENT.md`.
+  - **Proposal F superseded by G** (`21749f57`): the unvalidated CLUB_SEASONS_EXPECTED 1622→1640 edit was removed, and
+    the ISSUE-136 `players_with_renumbered_profile` gate was restored (90→91 checks). **G-pinned `7beb7347…`**;
+    `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-G-20261023T0600Z/` (`PROPOSAL_G.md`, `APPLICATION_SPEC.md`, `REBUILD_SPEC.md`).
+  - **Commit scope (post-apply simulation):**
+    - The apply commit is ten files: the eight written plus the two untracked c2-2026 manifests.
+    - A second commit adds the 2027 entries to `COVERAGE_REGISTRY` (statuses owner-reviewed) and restates 99 tests
+      that pin "2026 in progress".
+    - 2026 becomes sealed: AFL API settle for 2026 refuses afterwards except through an audited correction.
+  - **Next:** owner authorisation of the application spec: confirm 2026 settle completeness, fresh censuses, a
+    streamanator enforced G-pinned dry run, then `--apply` on 2026-10-24. Separately, the owner names the rebuild
+    target database.
+  - ISSUE-316 OPEN; successor NOT ACTIVATED; production NO-GO; Brownlow 2026 pending; ET unresolved.
+- **Raw replay, enforced v4 rehearsal, censuses and Proposal F at `691bdbae` (2026-10-23; previous):**
   - **G1 (ISSUE-319) RESOLVED:** mandatory coach raw-to-parsed replay in the rebuild preflight (`691bdbae`).
   - **G2 (ISSUE-320) RESOLVED for streamanator:** planner and rebuild runtimes bound to v3 record `685a281c…`.
   - **Enforced v4 rehearsal PASS:** exit 0, 30 stages, replay VERIFIED before census/capture/reset, strict D7 1,640,
@@ -470,8 +486,7 @@
   - **Censuses PASS** (total 0, 1897–2026): `afldb_prod` 03:28:51Z, `afldb_dev` 03:28:40Z, `afldb_test` 03:28:41Z.
   - **Proposal F:** F-pinned `cddde59e…`; genuine pinned planner dry runs on streamanator exit 0 (normal and
     LD_AUDIT-enforced), pins match, nothing written. `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-F-20261023T0312Z/PROPOSAL_F.md`.
-  - **Next:** a separate owner authorisation to apply F-pinned on streamanator on 2026-10-24, then the post-rollover
-    rebuild there.
+  - **Next (superseded by G):** apply F-pinned on streamanator on 2026-10-24, then the post-rollover rebuild there.
   - ISSUE-316 OPEN; successor NOT ACTIVATED; production NO-GO; Brownlow 2026 pending; ET unresolved.
 - **v3-enforced rehearsal and Linux dry run at `15e43562` (2026-10-23; previous):**
   - **Rehearsal under the enforced native closure PASS** (ISSUE-320): exit 0, 30 stages, census pass (fresh
