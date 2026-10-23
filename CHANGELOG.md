@@ -15,6 +15,24 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-323 - An exactly adopted successor runs the ordinary rebuild without rehearsal provenance (2026-10-23)
+
+- `tools/db/rebuild-test.ts` (`481511d2`): the candidate-provenance guards in `runPreflight` and `executeRebuild` now
+  exempt one binding only:
+  - it claims no provenance;
+  - its ladder pair is exactly a tuple of the closed successor table;
+  - its rows and source label equal that tuple's;
+  - it re-verifies against the tracked documents.
+
+  Candidate configuration, rehearsal-only profiles and a successor claiming provenance are refused as before.
+- ISSUE-316 revision I is prepared, not applied:
+  - I-pinned `e887fa19…` at `481511d2`. H is unchanged.
+  - The LD_AUDIT-enforced planner dry run on streamanator passed with nothing written.
+  - The one disposable post-transition rebuild passed the repaired guard. It then refused, with the database untouched,
+    at its first `npx` stage under the native closure.
+- Registered AFLDB-ISSUE-324 (the ordinary rebuild path cannot exec `npx`/`npm` under the reviewed native closure).
+- Recorded AFLDB-ISSUE-322's trace and its remaining promotion-policy choice.
+
 ### ISSUE-316 - Explicit predecessor fixture; post-transition set prepared and dry-run on streamanator (2026-10-23)
 
 - `tests/fixtures/rollover/predecessor-2026/` pins the exact transition base bytes of the seven reviewed reference
