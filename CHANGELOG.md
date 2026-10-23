@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 - Explicit predecessor fixture; post-transition set prepared and dry-run on streamanator (2026-10-23)
+
+- `tests/fixtures/rollover/predecessor-2026/` pins the exact transition base bytes of the seven reviewed reference
+  documents, and `tests/rollover-predecessor-fixture.ts` serves them (`63c35bde`). Tests of predecessor mechanics no
+  longer read the working tree, which the rollover rewrites. Behaviour is unchanged.
+- The complete post-transition state is prepared but not applied (revision H; G's change set unchanged):
+  - 2027 is `unsupported` in all five coverage families, per ADR 0011;
+  - the coverage matrix is regenerated;
+  - the 2026-boundary tests are restated.
+
+  The LD_AUDIT-enforced planner dry run on streamanator passed with nothing written.
+- Registered AFLDB-ISSUE-322 (the promotion contract leaves `brownlow_correction_receipts` unclassified) and
+  AFLDB-ISSUE-323 (the adopted successor cannot run the ordinary rebuild; owner decision pending).
+
 ### ISSUE-316 - Successor rollover keeps the predecessor club-season constant and the ISSUE-136 gate; exposed rehearsal credentials refused (2026-10-23)
 
 - The season-rollover planner changed (`21749f57`) in two ways:

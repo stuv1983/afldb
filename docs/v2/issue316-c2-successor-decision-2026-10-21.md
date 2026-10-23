@@ -410,7 +410,29 @@ The single current record is package D's `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-D-2
 
 ISSUE-316 OPEN; successor NOT ACCEPTED; production NO-GO; 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved.
 
-## Revision 6 — 2026-10-23 (current: owner decisions recorded, censuses, package E)
+## Revision 7 — 2026-10-23 (current: revision H, complete post-transition state, enforced dry run)
+
+* **Record.** `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-H-20261023T0554Z/PROPOSAL_H.md` is the single current execution record. Packages E, F and G are preserved; G is
+  re-verified 55/55. The G application and rebuild specifications stay the procedural base.
+* **What the owner now decides, in order.**
+
+| # | Decision | Default if blank |
+|---|---|---|
+| 1 | AFLDB-ISSUE-323: approve the drafted adopted-successor rebuild guard change (`PROPOSED-FIX-adopted-successor-rebuild-guard.md`). This means a re-pin as revision I and a new enforced dry run before the apply. Alternatively, apply H and accept that no rebuild runs until it is resolved. | Not approved; nothing changes |
+| 2 | Apply authorisation `PROPOSAL_H.md` §8: same-day censuses; a fresh enforced dry run; `--apply` on 2026-10-24 at `63c35bde` with `7beb7347…`; commits 1 (ten files) and 2 (`219961ff`). | Not authorised |
+| 3 | Rebuild (`REBUILD_AUTHORISATION_FORM.md`): the exact database name and fresh-versus-populated choice. Blocked by #1. | Not authorised; no target inferred |
+| 4 | 2026 football settle completeness: an owner attestation, if relied on. After the apply, 2026 settles need an audited correction. | No claim made |
+
+* **Settled by policy, not owner choice.** The 2027 coverage status is `unsupported` in all five families
+  (ADR 0011).
+* **Unchanged.**
+  * Brownlow 2026 pending on all three keys; publication unapproved.
+  * ET unresolved.
+  * Authority, eligibility and ownership restrictions unchanged.
+  * Successor NOT ACTIVATED.
+  * Production NO-GO.
+
+## Revision 6 — 2026-10-23 (previous: owner decisions recorded, censuses, package E)
 
 * **Records.** The single current execution record is `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/EXECUTION_RECORD.md`. The dated proposal is package E, `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-E-20261023T1045Z/` (`PROPOSAL_E.md`, `REHEARSAL_V3_PROPOSAL.md`, `HASHES.sha256` `2c598adfbae6f0570280666514b070767dd57cd3b73bf750302e320bdb13fe1c`).
 * **Earlier packages.** Packages A–D are unchanged: C 42/42 and D 26/26 re-verified.

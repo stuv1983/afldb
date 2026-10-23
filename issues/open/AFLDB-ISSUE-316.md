@@ -2435,7 +2435,28 @@ Execution record: `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/EXECUTIO
 
 ISSUE-316 OPEN; production NO-GO; successor approved conditionally and NOT ACTIVATED (no adoption, tuple table unchanged); 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved; no rollover, production write, deployment, push or cleanup.
 
-## Pre-apply safety and revision G (2026-10-23; current)
+## Revision H — complete post-transition state and enforced streamanator dry run (2026-10-23; current)
+
+Package `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-H-20261023T0554Z/` is the single current execution record: `PROPOSAL_H.md` §2–§8 (results, storage, dry run, commit
+plan, exact authorisation), `REBUILD_AUTHORISATION_FORM.md` and `PROPOSED-FIX-adopted-successor-rebuild-guard.md`.
+The dry-run logs are in `dryrun-streamanator/` and the validation summaries in `validation/`.
+
+- **G preserved.** H-pinned = G-pinned `7beb7347…` byte for byte. Planner and base unchanged.
+- **Pinned checkout** `63c35bde2d2f6297b53dd42530010c7e8e3d18c5`: the explicit predecessor fixture plus wiring. The
+  predecessor-state suite gives 11,143 pass / 2 fail (ISSUE-322).
+- **Post-transition set** (branch `i316/H-post-transition-on-63c35bde`, worktree
+  `D:/tmp/afldb-i316-H-20261023T0554Z/tree`):
+  - commit 1 `21444ba2` (simulated; ten files equal to the G finals);
+  - commit 2 `219961ff` (16 files; patch in `commit2/`).
+- **Results.**
+  - Full DB-free suite 11,169 / 2 / 27.
+  - `tsc` 0.
+  - Proposed-state validator: 91 checks.
+  - Enforced streamanator dry run: exit 0, pins match, 0 REFUSED, nothing written.
+- **Owner decision required: AFLDB-ISSUE-323.** The adopted successor's ordinary rebuild refuses for want of
+  rehearsal provenance. The fix is drafted, not applied.
+
+## Pre-apply safety and revision G (2026-10-23; previous)
 
 Packages on C: (nothing applied):
 - credential incident: `C:/tmp/afldb-i316-CREDENTIAL-INCIDENT-20261023T0447Z/` (`INCIDENT.md`, `HASHES.sha256`);
