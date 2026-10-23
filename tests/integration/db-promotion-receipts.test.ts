@@ -49,6 +49,8 @@ const PRE = 'afldb_v2_i322_pre_test';
 const SUPERUSER = 'afldb_v2_super';
 const TABLE = 'brownlow_correction_receipts';
 const TRIGGER = 'brownlow_receipt_immutable';
+const TRIGGER_DEF = 'CREATE TRIGGER brownlow_receipt_immutable BEFORE DELETE OR UPDATE OR TRUNCATE ON public.brownlow_correction_receipts '
+  + 'FOR EACH STATEMENT EXECUTE FUNCTION refuse_brownlow_receipt_mutation()';
 const PLAN = { candidate: 'afldb_prod_candidate_i322', oldDatabase: 'afldb_prod', preCutoverDump: '/backups/pre-cutover.dump', rebuiltDump: '/backups/rebuilt.dump' };
 /** generated name -> disposable name; longest first so no mapping is a prefix of a later one */
 const NAME_MAP: [string, string][] = [['afldb_prod_candidate_i322', CAND], ['afldb_prod_pre_rebuild_i322', PRE], ['afldb_prod', LIVE]];
@@ -96,7 +98,7 @@ async function trigger(name: string): Promise<string> {
     SELECT tgenabled::text AS enabled, pg_get_triggerdef(oid) AS def FROM pg_trigger
      WHERE tgrelid = ${`public.${TABLE}`}::regclass AND tgname = ${TRIGGER}`;
   expect(row, `${name}: trigger ${TRIGGER} present`).toBeDefined();
-  expect(row.def).toMatch(/BEFORE UPDATE OR DELETE OR TRUNCATE/);
+  expect(row.def).toBe(TRIGGER_DEF);   // migration 116's trigger, byte for byte as PostgreSQL renders it
   return row.enabled as string;
 }
 const replicationRole = async (name: string): Promise<string> =>
