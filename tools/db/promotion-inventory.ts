@@ -809,6 +809,26 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       + 'identity is the AFL Tables profile path in winners[].key (coleman:<season>:<path>). '
       + 'References auth_users and itself.',
   },
+  // --- Brownlow correction receipts (migration 116, AFLDB-ISSUE-322) --------------------
+  // Owner policy: reinstate / operations / productionOnly / compare equal / order 20. An
+  // append-only owner audit ledger like derived_award_results, with NO foreign key at all, but
+  // it carries a statement trigger that refuses TRUNCATE even on an empty table, so it is the
+  // one reinstated table the promotion TRUNCATE cannot name. `truncateStatementTables()` leaves
+  // it out of that statement and `truncateSql()` instead locks it and asserts the candidate
+  // copy is empty (EMPTY_ASSERTED_TABLES); the trigger is never bypassed.
+  {
+    schema: 'public', name: 'brownlow_correction_receipts', subsystem: 'Brownlow corrections', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    note: 'Append-only owner-operated receipts of guarded Brownlow corrections (migration 116, '
+      + 'AFLDB-ISSUE-322), keyed by plan_digest (no identity column, no foreign key): plan digest, '
+      + 'operation, code revision, approval reference, before/after digests and the result. A '
+      + 'reversal reads its original receipt, so the production rows are durable audit state that '
+      + 'must survive promotion unchanged. Production-only; the rebuilt copy holds none, and the '
+      + 'promotion REFUSES a candidate copy that is not empty rather than clearing it: the table '
+      + 'has a trigger refusing UPDATE, DELETE and TRUNCATE for every role, which is never bypassed. '
+      + 'Excluded from the promotion TRUNCATE statement (EMPTY_ASSERTED_TABLES), reinstated '
+      + 'data-only under the live trigger and compared equal.',
+  },
   // --- Brownlow eligibility decisions (migration 113, AFLDB V2 Launch F) ---------------
   // Decided exactly like derived_award_results (reinstate, no football reference): an
   // administrator's eligibility ruling is an audited HUMAN act (citation, note, decided_by and,
@@ -1190,6 +1210,42 @@ export function truncatedPublicTables(): string[] {
 }
 
 /**
+ * AFLDB-ISSUE-322. A reinstated table that the promotion transaction does NOT truncate: it is
+ * locked and asserted EMPTY in the candidate instead, because a trigger refuses TRUNCATE on it
+ * for every role (even when empty) and promotion never bypasses a trigger. Closed list: it holds
+ * exactly the tables the owner decided, `promotionContractProblems` pins each to a `reinstate`
+ * entry, and `promotionPlanProblems` checks the generated SQL against it.
+ */
+export interface EmptyAssertedTable {
+  readonly table: string;
+  /** Migration that created the table and its protection trigger. */
+  readonly migration: string;
+  /** The protection trigger that must never be bypassed, disabled or dropped by a promotion. */
+  readonly trigger: string;
+  readonly reason: string;
+}
+export const EMPTY_ASSERTED_TABLES: readonly EmptyAssertedTable[] = [
+  {
+    table: 'brownlow_correction_receipts',
+    migration: '116',
+    trigger: 'brownlow_receipt_immutable',
+    reason: 'Append-only owner audit ledger whose statement trigger refuses UPDATE, DELETE and TRUNCATE '
+      + 'even on an empty table (AFLDB-ISSUE-322): the production receipts are reinstated data-only under '
+      + 'that trigger, so the candidate copy must already be empty and is never emptied here.',
+  },
+];
+
+/**
+ * The tables the promotion TRUNCATE statement names: `truncatedPublicTables()` minus the
+ * empty-asserted ones (AFLDB-ISSUE-322). `truncatedPublicTables()` itself is unchanged because
+ * the freeze set derives from it; only the statement that is built and validated uses this.
+ */
+export function truncateStatementTables(): string[] {
+  const asserted = new Set(EMPTY_ASSERTED_TABLES.map((entry) => entry.table));
+  return truncatedPublicTables().filter((name) => !asserted.has(name));
+}
+
+/**
  * Public tables restored from the pre-cutover dump, in FK-safe order.
  *
  * AFLDB-ISSUE-143: a table declared historical-only for this environment is NOT here, which
@@ -1347,6 +1403,7 @@ function dependencyProblems(
 export function promotionContractProblems(
   contract: readonly TableTreatment[] = PROMOTION_CONTRACT,
   rebuiltReferrerFks: readonly RebuiltReferrerFk[] = REBUILT_REFERRER_FKS,
+  emptyAsserted: readonly EmptyAssertedTable[] = EMPTY_ASSERTED_TABLES,
 ): string[] {
   const problems: string[] = [];
   const keys = contract.map((t) => `${t.schema}.${t.name}`);
@@ -1428,6 +1485,26 @@ export function promotionContractProblems(
           && !(table.restoreAfter ?? []).includes(ref.references)) {
         problems.push(`${table.name}.${ref.column} references restored table ${ref.references} without restoreAfter`);
       }
+    }
+  }
+  // AFLDB-ISSUE-322: an empty-asserted table is excluded from the promotion TRUNCATE, so it
+  // must be a public, reinstated, non-historical-only table, or the exclusion would silently
+  // drop a table from the plan (or leave a rebuilt/truncated table unemptied).
+  const assertedNames = emptyAsserted.map((entry) => entry.table);
+  for (const name of new Set(assertedNames.filter((value, index) => assertedNames.indexOf(value) !== index))) {
+    problems.push(`public.${name} is declared empty-asserted more than once`);
+  }
+  for (const entry of emptyAsserted) {
+    const target = publicByName.get(entry.table);
+    if (!target) {
+      problems.push(`public.${entry.table} is declared empty-asserted but is not a public contract table`);
+    } else if (target.treatment !== 'reinstate') {
+      problems.push(`public.${entry.table} is declared empty-asserted but is not reinstated`);
+    } else if (target.historicalOnly) {
+      problems.push(`public.${entry.table} is declared empty-asserted but is historical-only`);
+    }
+    if (!entry.trigger.trim() || !entry.migration.trim() || !entry.reason.trim()) {
+      problems.push(`public.${entry.table} empty-asserted declaration has an empty field`);
     }
   }
   const constraints = rebuiltReferrerFks.map((fk) => fk.constraint);
@@ -2960,9 +3037,42 @@ export const REBUILT_REFERRER_FKS: readonly RebuiltReferrerFk[] = [
   },
 ];
 
+/**
+ * AFLDB-ISSUE-322. The exact lock and emptiness assertion `truncateSql()` writes for one
+ * empty-asserted table, and `promotionPlanProblems` looks for verbatim: one generator, so the
+ * generated text and its validation cannot drift. Neither string may contain a word the plan
+ * validator refuses elsewhere in the same file (the TRUNCATE statement itself, a row-by-row
+ * removal, a cascading option, a trigger or replication-role change, or a table alteration).
+ */
+export function emptyAssertionSql(entry: EmptyAssertedTable): { lock: string; assertion: string } {
+  const relation = `${quoteIdent('public')}.${quoteIdent(entry.table)}`;
+  const message = `AFLDB-ISSUE-322: the candidate copy of public.${entry.table} is not empty; `
+    + 'its production-only audit rows are reinstated from the pre-cutover dump and are never '
+    + 'emptied by a promotion, so nothing was emptied and the promotion is refused';
+  return {
+    lock: `LOCK TABLE ${relation} IN ACCESS EXCLUSIVE MODE;`,
+    assertion: `DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM ${relation}) THEN
+    RAISE EXCEPTION ${quoteSqlLiteral(message)};
+  END IF;
+END $$;`,
+  };
+}
+
 /** SQL that empties every non-rebuilt contract table in the candidate. */
 export function truncateSql(): string {
-  const tables = truncatedPublicTables().map((t) => `${quoteIdent('public')}.${quoteIdent(t)}`).join(',\n  ');
+  const tables = truncateStatementTables().map((t) => `${quoteIdent('public')}.${quoteIdent(t)}`).join(',\n  ');
+  // AFLDB-ISSUE-322: an empty-asserted table is locked and checked empty BEFORE any destructive
+  // statement; it is not in the TRUNCATE list below and nothing here touches its trigger.
+  const emptyAssertions = EMPTY_ASSERTED_TABLES.map((entry) => {
+    const { lock, assertion } = emptyAssertionSql(entry);
+    return `-- ${entry.table} (migration ${entry.migration}) is append-only under ${entry.trigger}, which refuses
+-- every mutation and is never bypassed: lock it, and refuse the whole promotion unless the
+-- candidate copy is already empty (AFLDB-ISSUE-322). The production rows come back by restore.
+${lock}
+${assertion}`;
+  }).join('\n\n');
   const dropFks = REBUILT_REFERRER_FKS.map((fk) => `-- ${fk.referrer} is REBUILT and holds ${fk.column} -> ${fk.references} (migration ${fk.migration}),
 -- so ${fk.references} cannot be truncated while the constraint exists (AFLDB-ISSUE-139).
 ALTER TABLE ${quoteIdent('public')}.${quoteIdent(fk.referrer)} DROP CONSTRAINT ${quoteIdent(fk.constraint)};`).join('\n');
@@ -2991,6 +3101,8 @@ END $$;`).join('\n');
 -- constraints are dropped and re-added around it below (AFLDB-ISSUE-139). One transaction:
 -- a refusal anywhere leaves the candidate exactly as it was.
 BEGIN;
+
+${emptyAssertions}
 
 ${dropFks}
 
@@ -3451,6 +3563,82 @@ function occurrences(source: string, needle: string): number {
   return source.split(needle).length - 1;
 }
 
+/**
+ * AFLDB-ISSUE-322. Everything the empty-asserted tables must hold to, checked on the generated
+ * text: not in the public TRUNCATE; exactly one LOCK and one emptiness assertion, in that order,
+ * after BEGIN and before the first destructive statement (the rebuilt-referrer constraint drop
+ * and the TRUNCATE); no replication-role, trigger or table-alteration statement touching the
+ * lifecycle; the table never the target of a TRUNCATE, row removal or UPDATE in any generated
+ * file; and its rows restored data-only, by the ordinary per-table restore, under the live trigger.
+ */
+function emptyAssertedPlanProblems(
+  artifacts: PromotionPlanArtifacts,
+  position: { begin: number; truncate: number; publicTruncate: string },
+): string[] {
+  const problems: string[] = [];
+  const sql = artifacts.truncate;
+  if (/session_replication_role|DISABLE\s+TRIGGER|ENABLE\s+(?:REPLICA\s+|ALWAYS\s+)?TRIGGER|DROP\s+TRIGGER/i.test(sql)) {
+    problems.push('truncate lifecycle bypasses a trigger or the session replication role');
+  }
+  for (const entry of EMPTY_ASSERTED_TABLES) {
+    const name = entry.table;
+    const target = `${quoteIdent('public')}.${quoteIdent(name)}`;
+    const { lock, assertion } = emptyAssertionSql(entry);
+    if (position.publicTruncate.includes(target)) {
+      problems.push(`truncate lifecycle names empty-asserted ${target} in the public TRUNCATE`);
+    }
+    if (new RegExp(`ALTER\\s+TABLE\\s+(?:ONLY\\s+)?(?:"?public"?\\.)?"?${name}"?(?![A-Za-z0-9_])`, 'i').test(sql)) {
+      problems.push(`truncate lifecycle alters empty-asserted ${target}`);
+    }
+    const lockCount = occurrences(sql, lock);
+    const assertionCount = occurrences(sql, assertion);
+    if (lockCount !== 1) {
+      problems.push(`truncate lifecycle must contain exactly one LOCK of empty-asserted ${target}`);
+    }
+    if (assertionCount !== 1) {
+      problems.push(`truncate lifecycle must contain exactly one emptiness assertion of ${target}`);
+    }
+    if (lockCount === 1 && assertionCount === 1) {
+      const lockAt = sql.indexOf(lock);
+      const assertionAt = sql.indexOf(assertion);
+      const firstDrop = Math.min(...REBUILT_REFERRER_FKS.map((fk) => {
+        const at = sql.indexOf(`ALTER TABLE ${quoteIdent('public')}.${quoteIdent(fk.referrer)} DROP CONSTRAINT`);
+        return at < 0 ? Number.POSITIVE_INFINITY : at;
+      }), Number.POSITIVE_INFINITY);
+      const destructive = position.truncate < 0 ? firstDrop : Math.min(firstDrop, position.truncate);
+      if (!(position.begin >= 0 && position.begin < lockAt && lockAt < assertionAt && assertionAt < destructive)) {
+        problems.push(`empty-assertion lifecycle for ${target} is not ordered BEGIN -> LOCK -> assertion -> destructive work`);
+      }
+    }
+    // Statement-level, comments stripped: no generated SQL file may TRUNCATE, remove rows from or
+    // UPDATE an empty-asserted table (the DELETE/UPDATE/TRUNCATE keyword and the table in one statement).
+    const mutating = /\b(?:TRUNCATE|DELETE\s+FROM|UPDATE)\b/i;
+    for (const [file, text] of [
+      ['truncate', artifacts.truncate], ['resyncIdentity', artifacts.resyncIdentity],
+      ['auditMarker', artifacts.auditMarker], ['stage', artifacts.stage], ['promoteStaged', artifacts.promoteStaged],
+    ] as const) {
+      const statements = text.split('\n').filter((line) => !line.trimStart().startsWith('--')).join('\n').split(';');
+      if (statements.some((statement) => statement.includes(name) && mutating.test(statement))) {
+        problems.push(`${file} truncates, deletes from or updates empty-asserted ${target}`);
+      }
+    }
+    // The reinstate transcript: exactly one restore of the table, the ordinary data-only line.
+    const lines = artifacts.reinstate.split('\n');
+    const restoreAt = lines.flatMap((line, index) => (
+      new RegExp(`--table=${name}(?![A-Za-z0-9_])`).test(line) ? [index] : []
+    ));
+    const restoreLine = new RegExp(`^ +--single-transaction --exit-on-error --table=${name} '(?:[^']|'"'"')*'$`);
+    const restoreHead = 'pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\';
+    if (restoreAt.length !== 1 || !restoreLine.test(lines[restoreAt[0]]) || lines[restoreAt[0] - 1] !== restoreHead) {
+      problems.push(`reinstate must restore empty-asserted ${target} exactly once with the plain data-only pg_restore line`);
+    }
+    if (lines.some((line) => !line.startsWith('#') && /(?:^|\s)--(?:clean|create)(?:\s|=|$)/.test(line))) {
+      problems.push('reinstate drops or recreates objects (--clean/--create)');
+    }
+  }
+  return problems;
+}
+
 /** Pure validation of the generated plan before any file is written or database is contacted. */
 export function promotionPlanProblems(
   artifacts: PromotionPlanArtifacts,
@@ -3470,12 +3658,15 @@ export function promotionPlanProblems(
   const publicTruncate = truncate >= 0
     ? sql.slice(truncate, sql.indexOf('RESTART IDENTITY;', truncate) + 'RESTART IDENTITY;'.length)
     : '';
-  for (const table of truncatedPublicTables()) {
+  // AFLDB-ISSUE-322: the statement names truncateStatementTables(), i.e. NOT the empty-asserted
+  // tables; those are checked separately below (emptyAssertedPlanProblems).
+  for (const table of truncateStatementTables()) {
     const target = `${quoteIdent('public')}.${quoteIdent(table)}`;
     if (occurrences(publicTruncate, target) !== 1) {
       problems.push(`truncate lifecycle must name ${target} exactly once in the public TRUNCATE`);
     }
   }
+  problems.push(...emptyAssertedPlanProblems(artifacts, { begin, truncate, publicTruncate }));
   for (const fk of REBUILT_REFERRER_FKS) {
     const relation = `${quoteIdent('public')}.${quoteIdent(fk.referrer)}`;
     const constraint = quoteIdent(fk.constraint);
