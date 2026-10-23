@@ -15,6 +15,12 @@
  *     npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db \
  *       --rehearsal-stop-after recreate
  *
+ * AFLDB-ISSUE-324 (intentional, recorded behaviour change): the ORDINARY CLI (no rehearsal provenance) now
+ * refuses `--target code_test_db` before anything is destroyed, because its `db:migrate:code-test` /
+ * `db:privileges:code-test` children are deliberately not authorised under the native exec closure; the two
+ * code_test_db invocations above are therefore not runnable through this CLI. The dedicated code_test_db
+ * rehearsal tools (e.g. tools/records/first-kick-goal-rehearsal.ts, which calls createCliDeps directly) are unaffected.
+ *
  * This is the ONE supported rebuild entry point. It runs the fixed dependency order,
  * fails closed at the first problem, and never touches `afldb_dev` or production. The
  * destructive targets are an explicit allowlist (REBUILD_TARGETS); the default is still
@@ -72,8 +78,10 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
-import { isAbsolute, join, relative } from 'node:path';
+// `listDirectorySync` is readdirSync under another name: the ISSUE-324 tsx-entry walk (not a label selection) uses it,
+// and a source pin in tests/db-test-rebuild.test.ts forbids the plain name between selectAcceptedBaseline and the stage graph.
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readdirSync as listDirectorySync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freezeBinding, verifyRehearsalPackage, resolutionLaunch, assertRehearsalResolution, type RehearsalPair, type RehearsalRequest } from '../v2/rehearsal-package.mjs';
 
@@ -95,7 +103,7 @@ import {
   type SuccessorLadderTuple,
 } from './ladder-successor';
 import {
-  PsqlCredentialRefused, psqlConnection, redact, runPsql, withoutLibpqRouting, type SpawnSyncLike,
+  PSQL_BIN, PsqlCredentialRefused, psqlConnection, redact, runPsql, withoutLibpqRouting, type SpawnSyncLike,
 } from './psql';
 import {
   bindCompletedCapture, captureBoundMarkerProblems, captureDirectory, pendingCaptureAbsent,
@@ -1355,6 +1363,252 @@ export function rehearsalChildEnv(inherited: Record<string, string | undefined> 
   for (const key of Object.keys(env)) if (key.toUpperCase() === 'PATH') delete env[key];
   env.PATH = pgBin;
   return env;
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-324 -- the ORDINARY (no rehearsal provenance) child-process boundary
+// ---------------------------------------------------------------------------
+//
+// Under the native LD_AUDIT closure every exec target must be a policy-bound object. `npx` and `npm` are
+// `#!/usr/bin/env node` scripts and are not, so the plan's `npx tsx ...` / `npm run db:migrate:test` children
+// were refused with EACCES. The rehearsal path avoids that with `rehearsalSpawn`; the ordinary path may not
+// reuse it (it needs verified rehearsal provenance), so this is its own, deliberately narrower mapping:
+//
+//   * the ONLY npx form is `npx tsx <argv>` where <argv> equals, element for element, one entry of the closed
+//     table `ordinaryTsxArgv()` (derived from the argv builders, so the plan and the table cannot drift);
+//   * the ONLY npm form is `npm run <name>` (exactly two arguments) with <name> an entry of the closed table
+//     ORDINARY_NPM_SCRIPTS, whose package.json bodies are also fixed here and re-verified;
+//   * both run as `process.execPath <checkout>/node_modules/tsx/dist/cli.mjs ...`, and only after
+//     `verifyOrdinaryTsxEntry` proves the executed tsx code is physically inside THIS checkout;
+//   * `psql` and the planner's Python interpreter pass through unchanged; every other command is refused.
+//
+// This is not an npm/npx-through-node bypass: no caller-controlled executable, package, script name or argument
+// reaches `process.execPath`. `--target code_test_db` plans use `db:migrate:code-test` / `db:privileges:code-test`,
+// which are deliberately NOT in the table: the ordinary CLI refuses that target under native enforcement (an
+// intentional, recorded behaviour change); the dedicated code_test_db rehearsal tool is unaffected.
+
+/** The `tsx` argument lists (everything after `npx tsx`) the ordinary plan issues. A new step fails to compile. */
+export function ordinaryTsxArgv(): string[][] {
+  const steps: Record<AflApiAdjudicationStep, null> = {
+    capture: null, 'registrations-reinstate': null, 'registrations-verify': null, reinstate: null, bijection: null,
+  };
+  return [
+    ...(Object.keys(steps) as AflApiAdjudicationStep[]).map((step) => aflApiAdjudicationArgv(step).slice(2)),
+    aflApiAdjudicationArgv('capture', true).slice(2),
+    firstKickGoalArgv().slice(2),
+    firstKickGoalValidateArgv().slice(2),
+  ];
+}
+
+/** The only package scripts the ordinary path may run: name -> the `tsx` argument list its fixed body runs. */
+const ORDINARY_NPM_SCRIPTS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['db:migrate:test', ['tools/db/migrate.ts', '--target', 'test']],
+  ['db:privileges:test', ['tools/db/privileges.ts', '--target', 'test']],
+]);
+
+/** The fixed package.json body of each permitted script. */
+export function ordinaryNpmScriptBodies(): Record<string, string> {
+  return Object.fromEntries([...ORDINARY_NPM_SCRIPTS].map(([name, argv]) => [name, `tsx ${argv.join(' ')}`]));
+}
+
+const sameArgv = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
+
+export type OrdinaryChild = { kind: 'passthrough' } | { kind: 'node'; argv: string[] };
+
+/**
+ * The single decision point: what an ordinary-path command becomes, or a refusal. Nothing is spawned here, so
+ * the same decision serves the spawn wrapper and the pre-destruction admissibility check.
+ */
+export function classifyOrdinaryCommand(command: unknown, args: unknown, python: string = resolvePython()): OrdinaryChild {
+  if (typeof command !== 'string' || !Array.isArray(args) || args.some((a) => typeof a !== 'string')) {
+    throw new RebuildRefused('Unbound child executable. Nothing was run.');
+  }
+  const argv = args as string[];
+  if (command === PSQL_BIN) return { kind: 'passthrough' };
+  if (command === 'npx') {
+    const rest = argv.slice(1);
+    if (argv[0] === 'tsx' && ordinaryTsxArgv().some((entry) => sameArgv(entry, rest))) return { kind: 'node', argv: rest };
+    throw new RebuildRefused('Unbound npx invocation. Nothing was run.');
+  }
+  if (command === 'npm') {
+    const script = argv.length === 2 && argv[0] === 'run' ? ORDINARY_NPM_SCRIPTS.get(argv[1]) : undefined;
+    if (script) return { kind: 'node', argv: [...script] };
+    // Message only: these two names are NEVER looked up as permitted (see the header comment above).
+    const codeTestScripts: string[] = [REBUILD_TARGETS.code_test_db.migrateScript, REBUILD_TARGETS.code_test_db.privilegesScript];
+    const codeTest = argv.length === 2 && argv[0] === 'run' && codeTestScripts.includes(argv[1]);
+    throw new RebuildRefused('Unbound package script. Nothing was run.'
+      + (codeTest ? ' The ordinary CLI does not run --target code_test_db under native enforcement '
+        + '(AFLDB-ISSUE-324, intentional); the dedicated code_test_db rehearsal tool is unaffected.' : ''));
+  }
+  if (command === python) {
+    if (!argv.length || argv[0].startsWith('-')) throw new RebuildRefused('Unbound Python invocation. Nothing was run.');
+    return { kind: 'passthrough' };
+  }
+  throw new RebuildRefused('Unbound child executable. Nothing was run.');
+}
+
+/** The file-system and root facts `verifyOrdinaryTsxEntry` reads. A test seam only: never a CLI or env switch. */
+export type OrdinaryIo = {
+  realpathSync: (path: string) => string;
+  lstatSync: (path: string) => { isSymbolicLink(): boolean; isDirectory(): boolean; isFile(): boolean };
+  readFileSync: (path: string, encoding: 'utf8') => string;
+  listDirectory: (path: string) => string[];
+  /** The working directory the children run in. */
+  repoRoot: string;
+  /** The checkout that contains THIS module (tools/db/rebuild-test.ts). */
+  moduleRoot: string;
+};
+
+const MODULE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+
+function defaultOrdinaryIo(): OrdinaryIo {
+  return {
+    realpathSync: (path) => realpathSync(path),
+    lstatSync: (path) => lstatSync(path),
+    readFileSync: (path, encoding) => readFileSync(path, encoding),
+    listDirectory: (path) => listDirectorySync(path),
+    repoRoot: REPO_ROOT,
+    moduleRoot: MODULE_ROOT,
+  };
+}
+
+/**
+ * Prove, before anything is spawned, that the `tsx` code the ordinary path would execute is this checkout's own:
+ * the working directory is the checkout containing this module; `node_modules/tsx` and its `dist/cli.mjs`
+ * RESOLVE (real path, not just lexical path) inside that checkout; no symbolic link or junction lies on the
+ * `node_modules` -> `tsx` -> `dist` chain or anywhere under `dist`; the installed tsx is the version and `bin`
+ * `package-lock.json` pins; and the two npm scripts have exactly the fixed bodies. A checkout-local link to a shared
+ * installation fails these on purpose. Returns the verified `cli.mjs` path; refuses on any failure.
+ */
+export function verifyOrdinaryTsxEntry(io: OrdinaryIo = defaultOrdinaryIo()): string {
+  const refuse = (check: string): never => {
+    throw new RebuildRefused(`Ordinary tsx entry point refused: ${check}. Nothing was run.`);
+  };
+  const attempt = <T>(check: string, body: () => T): T => {
+    try { return body(); } catch (error) {
+      if (error instanceof RebuildRefused) throw error;
+      return refuse(`${check} (${(error as NodeJS.ErrnoException).code ?? 'unreadable'})`);
+    }
+  };
+  const strictlyInside = (base: string, path: string): boolean => {
+    const rel = relative(base, path);
+    return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+  };
+
+  // (a) root binding
+  const realRoot = attempt('the working directory cannot be resolved', () => io.realpathSync(io.repoRoot));
+  const realModuleRoot = attempt('the module checkout cannot be resolved', () => io.realpathSync(io.moduleRoot));
+  if (relative(realRoot, realModuleRoot) !== '') refuse('the working directory is not the checkout that contains this module');
+
+  // (b) the fixed lexical entry point
+  const nodeModules = join(io.repoRoot, 'node_modules');
+  const tsxDir = join(nodeModules, 'tsx');
+  const distDir = join(tsxDir, 'dist');
+  const cli = join(distDir, 'cli.mjs');
+
+  // (c) the REAL path of the executed code is inside the pinned checkout, and no link lies on the chain
+  const realTsx = attempt('node_modules/tsx cannot be resolved', () => io.realpathSync(tsxDir));
+  if (!strictlyInside(realRoot, realTsx)) refuse('node_modules/tsx resolves outside the pinned checkout');
+  const realCli = attempt('node_modules/tsx/dist/cli.mjs cannot be resolved', () => io.realpathSync(cli));
+  if (!strictlyInside(realTsx, realCli)) refuse('node_modules/tsx/dist/cli.mjs resolves outside node_modules/tsx');
+  const regular = (path: string, label: string, want: 'directory' | 'file'): void => {
+    const stat = attempt(`${label} cannot be inspected`, () => io.lstatSync(path));
+    if (stat.isSymbolicLink()) refuse(`${label} is a symbolic link or junction`);
+    if (want === 'directory' ? !stat.isDirectory() : !stat.isFile()) refuse(`${label} is not a regular ${want}`);
+  };
+  const walk = (dir: string, label: string): void => {
+    for (const name of attempt(`${label} cannot be listed`, () => io.listDirectory(dir))) {
+      const child = `${label}/${name}`;
+      const stat = attempt(`${child} cannot be inspected`, () => io.lstatSync(join(dir, name)));
+      if (stat.isSymbolicLink()) refuse(`${child} is a symbolic link or junction`);
+      if (stat.isDirectory()) walk(join(dir, name), child);
+      else if (!stat.isFile()) refuse(`${child} is not a regular file`);
+    }
+  };
+  const manifest = join(tsxDir, 'package.json');
+  const rootManifest = join(io.repoRoot, 'package.json');
+  const lockFile = join(io.repoRoot, 'package-lock.json');
+  regular(nodeModules, 'node_modules', 'directory');
+  regular(tsxDir, 'node_modules/tsx', 'directory');
+  regular(distDir, 'node_modules/tsx/dist', 'directory');
+  regular(cli, 'node_modules/tsx/dist/cli.mjs', 'file');
+  regular(manifest, 'node_modules/tsx/package.json', 'file');
+  regular(rootManifest, 'package.json', 'file');
+  regular(lockFile, 'package-lock.json', 'file');
+  walk(distDir, 'node_modules/tsx/dist');
+
+  // (d) the installed tsx is the one the lock pins
+  const json = (path: string, label: string): Record<string, unknown> => attempt(`${label} cannot be read as JSON`, () => {
+    const value: unknown = JSON.parse(io.readFileSync(path, 'utf8'));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('not an object');
+    return value as Record<string, unknown>;
+  });
+  const installed = json(manifest, 'node_modules/tsx/package.json');
+  const lock = json(lockFile, 'package-lock.json');
+  const packages = lock.packages;
+  const locked = packages && typeof packages === 'object' && Object.hasOwn(packages, 'node_modules/tsx')
+    ? (packages as Record<string, unknown>)['node_modules/tsx'] : undefined;
+  if (!locked || typeof locked !== 'object') refuse('package-lock.json has no node_modules/tsx entry');
+  const pinned = locked as Record<string, unknown>;
+  const binOf = (bin: unknown): string | undefined => {
+    const value = typeof bin === 'string' ? bin
+      : bin && typeof bin === 'object' && Object.hasOwn(bin, 'tsx') ? (bin as Record<string, unknown>).tsx : undefined;
+    return typeof value === 'string' ? value.replace(/^\.\//, '') : undefined;
+  };
+  if (installed.name !== 'tsx') refuse('node_modules/tsx/package.json is not the tsx package');
+  if (typeof installed.version !== 'string' || installed.version !== pinned.version) {
+    refuse('the installed tsx version differs from package-lock.json');
+  }
+  if (binOf(installed.bin) !== 'dist/cli.mjs' || binOf(pinned.bin) !== 'dist/cli.mjs') {
+    refuse('the tsx bin entry is not dist/cli.mjs in both the installed package and package-lock.json');
+  }
+
+  // (e) the fixed npm-script bodies
+  const scripts = json(rootManifest, 'package.json').scripts;
+  for (const [name, body] of Object.entries(ordinaryNpmScriptBodies())) {
+    if (!scripts || typeof scripts !== 'object' || !Object.hasOwn(scripts, name)
+        || (scripts as Record<string, unknown>)[name] !== body) {
+      refuse(`package.json script ${name} differs from its fixed body`);
+    }
+  }
+  return cli;
+}
+
+/**
+ * The ORDINARY plan must be admissible BEFORE anything is destroyed (and before `--plan` reports success):
+ * every planned command stage is classified against the closed tables (nothing is spawned) and the tsx entry
+ * point is verified. A refusal names the stage and says nothing has been destroyed.
+ */
+export function assertOrdinaryStagesAdmissible(stages: readonly Stage[], io?: OrdinaryIo): void {
+  try {
+    for (const stage of stages) {
+      if (!stage.argv) continue;
+      try { classifyOrdinaryCommand(stage.argv[0], stage.argv.slice(1)); }
+      catch (error) {
+        if (error instanceof RebuildRefused) throw new RebuildRefused(`Stage '${stage.id}': ${error.message}`);
+        throw error;
+      }
+    }
+    verifyOrdinaryTsxEntry(io);
+  } catch (error) {
+    if (error instanceof RebuildRefused) throw new RebuildRefused(`${error.message} Nothing has been destroyed.`);
+    throw error;
+  }
+}
+
+/**
+ * The ordinary spawn wrapper: `npx tsx` and the two `npm run` scripts become the approved node binary plus the
+ * verified repository-local tsx entry; `psql` and Python pass through; everything else is refused before any spawn.
+ * `options` is passed through untouched (the caller's environment is never rebuilt here); only `shell` and `cwd` are fixed.
+ */
+export function ordinarySpawn(spawn: typeof import('node:child_process').spawnSync, io?: OrdinaryIo): typeof spawn {
+  return ((command: string, args: string[], options: import('node:child_process').SpawnSyncOptions) => {
+    const child = classifyOrdinaryCommand(command, args);
+    if (child.kind === 'passthrough') return spawn(command, args, options);
+    const cli = verifyOrdinaryTsxEntry(io);
+    return spawn(process.execPath, [cli, ...child.argv], { ...options, cwd: io?.repoRoot ?? REPO_ROOT, shell: false });
+  }) as typeof spawn;
 }
 
 /** Preserve genuine commands but remove PATH/shim/shell resolution for the candidate. */
@@ -4430,7 +4684,7 @@ async function main(): Promise<number> {
   const fitzroy = resolveFitzroySource(opts);
   const ladder = resolveLadderRebuildExpectation(fitzroy, target, ladderDocuments(), provenance);
   const binding: RebuildBinding = freezeBinding({ source: fitzroy, target, ladder, provenance });
-  const deps = createCliDeps(provenance ? rehearsalSpawn(spawnSync, binding) : spawnSync);
+  const deps = createCliDeps(provenance ? rehearsalSpawn(spawnSync, binding) : ordinarySpawn(spawnSync));
 
   console.log('AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)');
   // Names only — never a DSN, host or credential.
@@ -4460,6 +4714,11 @@ async function main(): Promise<number> {
   }
 
   const stages = planStages(target, fitzroy, opts, undefined, binding);
+
+  // AFLDB-ISSUE-324: the ordinary path proves every planned command and the repository-local tsx entry
+  // BEFORE the --plan report and before the destructive acknowledgement is consumed, so a refusal
+  // (including --target code_test_db) leaves the database untouched.
+  if (!provenance) assertOrdinaryStagesAdmissible(stages);
 
   if (opts.planOnly) {
     console.log('\n--plan: the stage graph only, nothing executed and nothing destroyed.\n');

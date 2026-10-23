@@ -1778,7 +1778,14 @@ import {
   brownlowAflApiSeasonArtefacts,
   brownlowAflApiStageSuffix,
   brownlowSeasonPreflightFiles,
+  classifyOrdinaryCommand,
   createCliDeps,
+  assertOrdinaryStagesAdmissible,
+  ordinaryNpmScriptBodies,
+  ordinarySpawn,
+  ordinaryTsxArgv,
+  verifyOrdinaryTsxEntry,
+  type OrdinaryIo,
 } from '../tools/db/rebuild-test';
 import {
   AFL_API_OWNERSHIP_COUNTS_SQL, AFL_API_OWNERSHIP_SCHEMA_SQL, AflApiOwnershipCensusError, CENSUS_MARKER,
@@ -2482,6 +2489,394 @@ describe('AFLDB-ISSUE-278 — inherited libpq routing cannot move the reset (chi
       for (const host of ['localhost:5432', '127.0.0.1:55432', 'db.example.invalid:5433', '[::1]:5432']) {
         expect(() => assertDsnPinsTarget(`postgres://afldb_owner:pw@${host}/afldb_test`, 'X'), host).not.toThrow();
       }
+    });
+  });
+});
+
+/*
+ * AFLDB-ISSUE-324 -- under the native LD_AUDIT closure `npx` / `npm` (env-node scripts) are unbound, so the
+ * ordinary rebuild path maps exactly `npx tsx <closed argv>` and `npm run <two scripts>` to the approved
+ * node binary + the checkout's own tsx cli.mjs, and refuses everything else BEFORE spawning. DB-free: a
+ * recording spawn proves the execution boundary; a temp checkout layout (via the OrdinaryIo seam) proves
+ * the entry-point verification, including the owner ruling that the REAL path of the executed tsx must be
+ * inside the pinned checkout (a checkout-local link to a shared install must refuse).
+ */
+describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm run become bound node)', () => {
+  type Spawn = typeof import('node:child_process').spawnSync;
+  type Raw = (command: string, args: string[], options: Record<string, unknown>) => unknown;
+  type Call = { command: string; args: string[]; options: Record<string, unknown> };
+  const tmpRoots: string[] = [];
+  afterEach(() => { for (const dir of tmpRoots.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+
+  const TSX_VERSION = '4.99.99';
+  const write = (path: string, text: string) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text); };
+  const tempDir = (tag: string) => {
+    const dir = nativeFs.realpathSync(mkdtempSync(join(tmpdir(), `issue324-${tag}-`)));
+    tmpRoots.push(dir);
+    return dir;
+  };
+  const ioFor = (repoRoot: string, moduleRoot = repoRoot): OrdinaryIo => ({
+    realpathSync: (p) => nativeFs.realpathSync(p),
+    lstatSync: (p) => nativeFs.lstatSync(p),
+    readFileSync: (p, encoding) => nativeFs.readFileSync(p, encoding),
+    listDirectory: (p) => nativeFs.readdirSync(p),
+    repoRoot,
+    moduleRoot,
+  });
+  /** A complete, honest temp checkout: real directories and regular files only. */
+  function buildLayout() {
+    const root = tempDir('checkout');
+    const tsx = join(root, 'node_modules', 'tsx');
+    write(join(root, 'package.json'), JSON.stringify({ name: 'fixture', scripts: { ...ordinaryNpmScriptBodies(), 'db:test:rebuild': 'tsx tools/db/rebuild-test.ts' } }));
+    write(join(root, 'package-lock.json'), JSON.stringify({ packages: { 'node_modules/tsx': { version: TSX_VERSION, bin: { tsx: 'dist/cli.mjs' } } } }));
+    write(join(tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: TSX_VERSION, bin: './dist/cli.mjs' }));
+    write(join(tsx, 'dist', 'cli.mjs'), '// fixture\n');
+    write(join(tsx, 'dist', 'esm', 'index.mjs'), '// fixture\n');
+    return { root, tsx, cli: join(tsx, 'dist', 'cli.mjs'), io: ioFor(root) };
+  }
+  const recorder = () => {
+    const calls: Call[] = [];
+    const spawn = ((command: string, args: string[], options: Record<string, unknown>) => {
+      calls.push({ command, args, options });
+      return { status: 0, stdout: '', stderr: '' };
+    }) as unknown as Spawn;
+    return { spawn, calls };
+  };
+  const wrap = (spawn: Spawn, io: OrdinaryIo): Raw => ordinarySpawn(spawn, io) as unknown as Raw;
+  const ENV = { PATH: '/bin', MARKER: 'passed-through-unchanged' };
+  const OPTIONS = () => ({ cwd: 'ignored', encoding: 'utf8', shell: true, env: ENV });
+  /** Creates a directory link (a junction on Windows, so no elevation is needed); a message on failure. */
+  const linkDir = (target: string, path: string): string | undefined => {
+    try { nativeFs.symlinkSync(target, path, process.platform === 'win32' ? 'junction' : 'dir'); return undefined; }
+    catch (error) { return (error as Error).message; }
+  };
+  const ORIGINAL_TSX_ARGV = ordinaryTsxArgv();
+  const CAPTURE = ORIGINAL_TSX_ARGV[0];
+
+  describe('permitted, at the execution boundary', () => {
+    it('the closed tsx table is derived from the argv builders: 5 steps + capture --recover + the two first-kick-goal argvs', () => {
+      expect(ORIGINAL_TSX_ARGV).toHaveLength(8);
+      for (const step of ['capture', 'registrations-reinstate', 'registrations-verify', 'reinstate', 'bijection'] as const) {
+        expect(ORIGINAL_TSX_ARGV).toContainEqual(aflApiAdjudicationArgv(step).slice(2));
+      }
+      expect(ORIGINAL_TSX_ARGV).toContainEqual(aflApiAdjudicationArgv('capture', true).slice(2));
+      expect(ORIGINAL_TSX_ARGV).toContainEqual(firstKickGoalArgv().slice(2));
+      expect(ORIGINAL_TSX_ARGV).toContainEqual(firstKickGoalValidateArgv().slice(2));
+      for (const argv of ORIGINAL_TSX_ARGV) expect(argv[0] === 'npx' || argv[0] === 'tsx').toBe(false);
+    });
+
+    it.each(ORIGINAL_TSX_ARGV.map((argv) => [argv.join(' '), argv] as [string, string[]]))(
+      'npx tsx %s runs as the approved node binary + the verified checkout cli.mjs', (_label, argv) => {
+        const L = buildLayout();
+        const { spawn, calls } = recorder();
+        wrap(spawn, L.io)('npx', ['tsx', ...argv], OPTIONS());
+        expect(calls).toHaveLength(1);
+        expect(calls[0].command).toBe(process.execPath);
+        expect(calls[0].args).toEqual([L.cli, ...argv]);
+        expect(calls[0].options).toMatchObject({ shell: false, cwd: L.root, encoding: 'utf8' });
+        expect(calls[0].options.env).toBe(ENV);                      // the caller's environment, untouched
+      });
+
+    it.each([
+      ['db:migrate:test', ['tools/db/migrate.ts', '--target', 'test']],
+      ['db:privileges:test', ['tools/db/privileges.ts', '--target', 'test']],
+    ] as [string, string[]][])('npm run %s runs as the approved node binary + the verified cli.mjs + its fixed argv', (name, expected) => {
+      const L = buildLayout();
+      const { spawn, calls } = recorder();
+      wrap(spawn, L.io)('npm', ['run', name], OPTIONS());
+      expect(calls).toHaveLength(1);
+      expect(calls[0].command).toBe(process.execPath);
+      expect(calls[0].args).toEqual([L.cli, ...expected]);
+      expect(calls[0].options).toMatchObject({ shell: false, cwd: L.root });
+      expect(calls[0].options.env).toBe(ENV);
+      expect(ordinaryNpmScriptBodies()[name]).toBe(`tsx ${expected.join(' ')}`);
+    });
+
+    it('psql and the planner\'s Python interpreter pass through unchanged (command, argv and the very options object)', () => {
+      const L = buildLayout();
+      const { spawn, calls } = recorder();
+      const options = OPTIONS();
+      wrap(spawn, L.io)(PSQL_BIN, ['-X', '-d', 'db'], options);
+      wrap(spawn, L.io)(resolvePython(), ['tools/migration/load_reference_data.py'], options);
+      expect(calls.map((c) => [c.command, c.args])).toEqual([
+        [PSQL_BIN, ['-X', '-d', 'db']], [resolvePython(), ['tools/migration/load_reference_data.py']],
+      ]);
+      expect(calls[0].options).toBe(options);
+      expect(calls[1].options).toBe(options);
+    });
+
+    it('every command the real predecessor plan issues is classified, and only npx/npm become node', () => {
+      for (const recover of [false, true]) {
+        const stages = planStages(target(), fitzroy(), { ...OPTS, recoverAflApiAdjudications: recover });
+        const commands = stages.filter((s) => s.argv);
+        expect(commands.length).toBeGreaterThan(10);
+        for (const stage of commands) {
+          const [command, ...args] = stage.argv!;
+          const child = classifyOrdinaryCommand(command, args);
+          expect(child.kind, stage.id).toBe(command === 'npx' || command === 'npm' ? 'node' : 'passthrough');
+        }
+      }
+    });
+  });
+
+  describe('refused before anything is spawned (nearby variants and attempted bypasses)', () => {
+    const cases: [string, string, string[]][] = [
+      ['npx tsx with an extra argument', 'npx', ['tsx', ...CAPTURE, 'extra']],
+      ['npx tsx with a missing argument', 'npx', ['tsx', ...CAPTURE.slice(0, -1)]],
+      ['npx tsx with the capture step swapped for another word', 'npx', ['tsx', CAPTURE[0], 'drop-everything']],
+      ['npx tsx with a different file', 'npx', ['tsx', 'tools/db/other.ts', 'capture']],
+      ['npx tsx with the argument order reversed', 'npx', ['tsx', ...[...CAPTURE].reverse()]],
+      ['npx tsx -e', 'npx', ['tsx', '-e', 'process.exit(0)']],
+      ['npx tsx --eval', 'npx', ['tsx', '--eval', 'process.exit(0)']],
+      ['npx tsx --import x before a permitted argv', 'npx', ['tsx', '--import', 'x', ...CAPTURE]],
+      ['npx tsx alone', 'npx', ['tsx']],
+      ['npx --yes tsx', 'npx', ['--yes', 'tsx', ...CAPTURE]],
+      ['npx -p tsx', 'npx', ['-p', 'tsx', 'tsx', ...CAPTURE]],
+      ['npx tsx@latest', 'npx', ['tsx@latest', ...CAPTURE]],
+      ['npx ts-node', 'npx', ['ts-node', ...CAPTURE]],
+      ['npx alone', 'npx', []],
+      ['npm run db:migrate:test --', 'npm', ['run', 'db:migrate:test', '--']],
+      ['npm run db:migrate:test extra', 'npm', ['run', 'db:migrate:test', 'extra']],
+      ['npm run-script db:migrate:test', 'npm', ['run-script', 'db:migrate:test']],
+      ['npm exec tsx', 'npm', ['exec', 'tsx']],
+      ['npm install', 'npm', ['install']],
+      ['npm alone', 'npm', []],
+      ['npm run alone', 'npm', ['run']],
+      ['npm run db:test:rebuild', 'npm', ['run', 'db:test:rebuild']],
+      ['npm run with a case-varied permitted name', 'npm', ['run', 'DB:MIGRATE:TEST']],
+      ['npm run with a padded permitted name', 'npm', ['run', ' db:migrate:test']],
+      ['npm run __proto__ (own-property lookup)', 'npm', ['run', '__proto__']],
+      ['npm run constructor (own-property lookup)', 'npm', ['run', 'constructor']],
+      ['npm run toString (own-property lookup)', 'npm', ['run', 'toString']],
+      ['npm run hasOwnProperty (own-property lookup)', 'npm', ['run', 'hasOwnProperty']],
+      ['node -e', 'node', ['-e', 'process.exit(0)']],
+      ['node with the tsx cli.mjs', 'node', ['node_modules/tsx/dist/cli.mjs', ...CAPTURE]],
+      ['tsx', 'tsx', [...CAPTURE]],
+      ['bash', 'bash', ['-c', 'true']],
+      ['sh', 'sh', ['-c', 'true']],
+      ['npx.cmd', 'npx.cmd', ['tsx', ...CAPTURE]],
+      ['npm.cmd', 'npm.cmd', ['run', 'db:migrate:test']],
+      ['/usr/bin/npx', '/usr/bin/npx', ['tsx', ...CAPTURE]],
+      ['NPX', 'NPX', ['tsx', ...CAPTURE]],
+      ['./node_modules/.bin/tsx', './node_modules/.bin/tsx', [...CAPTURE]],
+      ['the planner Python with -c', resolvePython(), ['-c', 'print(1)']],
+      ['the planner Python with no script', resolvePython(), []],
+    ];
+    it.each(cases)('%s', (_label, command, args) => {
+      const L = buildLayout();
+      const { spawn, calls } = recorder();
+      expect(() => wrap(spawn, L.io)(command, args, OPTIONS())).toThrow(RebuildRefused);
+      expect(calls).toHaveLength(0);                                  // refused BEFORE spawning
+      expect(() => classifyOrdinaryCommand(command, args)).toThrow(RebuildRefused);
+    });
+
+    it('non-string commands and arguments are refused, not coerced', () => {
+      expect(() => classifyOrdinaryCommand(undefined, [])).toThrow(RebuildRefused);
+      expect(() => classifyOrdinaryCommand('npx', 'tsx')).toThrow(RebuildRefused);
+      expect(() => classifyOrdinaryCommand('npx', ['tsx', 7])).toThrow(RebuildRefused);
+    });
+
+    it('the closed script table is exactly the two test scripts', () => {
+      expect(Object.keys(ordinaryNpmScriptBodies()).sort()).toEqual(['db:migrate:test', 'db:privileges:test']);
+    });
+
+    // Deliberately explicit: this must fail loudly if anyone ever adds the code-test pair to the table.
+    it('REFUSES the ordinary CLI code_test_db pair (db:migrate:code-test / db:privileges:code-test): intentionally NOT authorised (AFLDB-ISSUE-324)', () => {
+      for (const name of [REBUILD_TARGETS.code_test_db.migrateScript, REBUILD_TARGETS.code_test_db.privilegesScript]) {
+        expect(name).toMatch(/code-test$/);
+        const L = buildLayout();
+        const { spawn, calls } = recorder();
+        expect(() => wrap(spawn, L.io)('npm', ['run', name], OPTIONS())).toThrow(/Unbound package script.*code_test_db.*AFLDB-ISSUE-324/s);
+        expect(calls).toHaveLength(0);
+        expect(Object.keys(ordinaryNpmScriptBodies())).not.toContain(name);
+      }
+      expect(JSON.stringify(ordinaryNpmScriptBodies())).not.toContain('code-test');
+    });
+
+    it('a broken entry point refuses the mapped command before it spawns, but never gates psql', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: '0.0.1', bin: './dist/cli.mjs' }));
+      const { spawn, calls } = recorder();
+      expect(() => wrap(spawn, L.io)('npx', ['tsx', ...CAPTURE], OPTIONS())).toThrow(/version differs/);
+      expect(() => wrap(spawn, L.io)('npm', ['run', 'db:migrate:test'], OPTIONS())).toThrow(/version differs/);
+      expect(calls).toHaveLength(0);
+      wrap(spawn, L.io)(PSQL_BIN, ['-X'], OPTIONS());
+      expect(calls).toHaveLength(1);
+    });
+  });
+
+  describe('entry-point verification (the real path of the executed tsx stays inside the pinned checkout)', () => {
+    it('accepts a complete, honest checkout layout and returns its cli.mjs', () => {
+      const L = buildLayout();
+      expect(verifyOrdinaryTsxEntry(L.io)).toBe(L.cli);
+    });
+
+    it('refuses when the working directory is not the checkout that contains this module', () => {
+      const L = buildLayout();
+      expect(() => verifyOrdinaryTsxEntry(ioFor(L.root, tempDir('elsewhere')))).toThrow(/not the checkout that contains this module.*Nothing was run/s);
+    });
+
+    it('refuses node_modules that is a link (junction on Windows) to a directory OUTSIDE the checkout', ({ skip }) => {
+      const L = buildLayout();
+      const outside = tempDir('shared-install');
+      nativeFs.renameSync(join(L.root, 'node_modules'), join(outside, 'node_modules'));
+      const failed = linkDir(join(outside, 'node_modules'), join(L.root, 'node_modules'));
+      if (failed) skip(`directory link creation is not permitted here: ${failed}`);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/resolves outside the pinned checkout.*Nothing was run/s);
+    });
+
+    it('refuses node_modules/tsx that is a link to a directory outside the checkout', ({ skip }) => {
+      const L = buildLayout();
+      const outside = tempDir('shared-tsx');
+      nativeFs.renameSync(L.tsx, join(outside, 'tsx'));
+      const failed = linkDir(join(outside, 'tsx'), L.tsx);
+      if (failed) skip(`directory link creation is not permitted here: ${failed}`);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/resolves outside the pinned checkout/);
+    });
+
+    it('refuses node_modules/tsx/dist that is a link to a directory outside tsx', ({ skip }) => {
+      const L = buildLayout();
+      const outside = tempDir('shared-dist');
+      nativeFs.renameSync(join(L.tsx, 'dist'), join(outside, 'dist'));
+      const failed = linkDir(join(outside, 'dist'), join(L.tsx, 'dist'));
+      if (failed) skip(`directory link creation is not permitted here: ${failed}`);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/resolves outside node_modules\/tsx/);
+    });
+
+    it('refuses a link anywhere under dist, even one whose target stays inside the checkout', ({ skip }) => {
+      const L = buildLayout();
+      const failed = linkDir(join(L.tsx, 'dist', 'esm'), join(L.tsx, 'dist', 'alias'));
+      if (failed) skip(`directory link creation is not permitted here: ${failed}`);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/dist\/alias is a symbolic link or junction/);
+    });
+
+    it('checks the REAL path, not only the logical one: a lying realpath outside the checkout refuses with every lstat clean', () => {
+      const L = buildLayout();
+      const outside = tempDir('claims');
+      const lying: OrdinaryIo = { ...L.io, realpathSync: (p) => (p === L.tsx ? outside : nativeFs.realpathSync(p)) };
+      expect(() => verifyOrdinaryTsxEntry(lying)).toThrow(/node_modules\/tsx resolves outside the pinned checkout/);
+      const lyingCli: OrdinaryIo = { ...L.io, realpathSync: (p) => (p === L.cli ? join(outside, 'cli.mjs') : nativeFs.realpathSync(p)) };
+      expect(() => verifyOrdinaryTsxEntry(lyingCli)).toThrow(/cli\.mjs resolves outside node_modules\/tsx/);
+    });
+
+    it('refuses a missing cli.mjs', () => {
+      const L = buildLayout();
+      rmSync(L.cli);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/cannot be resolved/);
+    });
+
+    it('refuses an installed tsx whose version differs from package-lock.json', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: '4.0.0', bin: './dist/cli.mjs' }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/version differs from package-lock\.json/);
+    });
+
+    it('refuses a package that is not named tsx', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'not-tsx', version: TSX_VERSION, bin: './dist/cli.mjs' }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/is not the tsx package/);
+    });
+
+    it('refuses an installed bin that is not dist/cli.mjs, and a lock bin that is not', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: TSX_VERSION, bin: { tsx: './dist/evil.mjs' } }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/bin entry is not dist\/cli\.mjs/);
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: TSX_VERSION, bin: './dist/cli.mjs' }));
+      write(join(L.root, 'package-lock.json'), JSON.stringify({ packages: { 'node_modules/tsx': { version: TSX_VERSION, bin: { tsx: 'dist/evil.mjs' } } } }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/bin entry is not dist\/cli\.mjs/);
+    });
+
+    it('refuses a lock with no node_modules/tsx entry', () => {
+      const L = buildLayout();
+      write(join(L.root, 'package-lock.json'), JSON.stringify({ packages: {} }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/no node_modules\/tsx entry/);
+      write(join(L.root, 'package-lock.json'), JSON.stringify({}));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/no node_modules\/tsx entry/);
+    });
+
+    it('refuses an altered or missing fixed npm-script body', () => {
+      const L = buildLayout();
+      const bodies = ordinaryNpmScriptBodies();
+      write(join(L.root, 'package.json'), JSON.stringify({ scripts: { ...bodies, 'db:migrate:test': 'tsx tools/db/migrate.ts --target code-test' } }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/script db:migrate:test differs from its fixed body/);
+      write(join(L.root, 'package.json'), JSON.stringify({ scripts: { 'db:migrate:test': bodies['db:migrate:test'] } }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/script db:privileges:test differs from its fixed body/);
+      write(join(L.root, 'package.json'), JSON.stringify({}));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/differs from its fixed body/);
+    });
+
+    it('the real checkout agrees with a direct lstat of its own node_modules chain (a linked install refuses by design)', () => {
+      const linked = ['node_modules', join('node_modules', 'tsx')].some((p) => nativeFs.lstatSync(join(process.cwd(), p)).isSymbolicLink());
+      if (linked) {
+        expect(() => verifyOrdinaryTsxEntry()).toThrow(/Ordinary tsx entry point refused/);
+      } else {
+        expect(verifyOrdinaryTsxEntry()).toBe(join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs'));
+      }
+    });
+  });
+
+  describe('admissibility before destruction (the ordinary plan, without spawning)', () => {
+    it('the real ordinary plan for the afldb_test target is admissible, including capture --recover', () => {
+      const L = buildLayout();
+      for (const recover of [false, true]) {
+        expect(() => assertOrdinaryStagesAdmissible(planStages(target(), fitzroy(), { ...OPTS, recoverAflApiAdjudications: recover }), L.io)).not.toThrow();
+      }
+    });
+
+    it('a --target code_test_db ordinary plan is refused before any command or SQL runs, naming the stage', () => {
+      const L = buildLayout();
+      const code = target({ database: 'code_test_db', adminDsn: 'postgres://afldb_owner:pw@localhost:5432/code_test_db',
+        importDsn: 'postgres://afldb_import:pw@localhost:5432/code_test_db' });
+      const stages = planStages(code, fitzroy(), OPTS);
+      const { deps, commands, sqlRuns, validationRuns } = fakeDeps();
+      const attempt = () => {
+        assertOrdinaryStagesAdmissible(stages, L.io);
+        executeRebuild(stages, code, deps);          // the order main() uses: admissibility first
+      };
+      expect(attempt).toThrow(RebuildRefused);
+      expect(attempt).toThrow(/Stage 'migrations'.*Unbound package script/s);
+      expect(attempt).toThrow(/code_test_db.*Nothing has been destroyed/s);
+      expect([commands, sqlRuns, validationRuns]).toEqual([[], [], []]);
+    });
+
+    it('a stage with any unbound command is refused and named, before anything is destroyed', () => {
+      const L = buildLayout();
+      const stages = planStages(target(), fitzroy(), OPTS);
+      for (const argv of [['bash', '-c', 'true'], ['npx', '--yes', 'tsx', ...CAPTURE], ['npm', 'run', 'db:test:rebuild']]) {
+        const bad = stages.map((s) => (s.id === 'afl-api-adjudications-capture' ? { ...s, argv } : s));
+        expect(() => assertOrdinaryStagesAdmissible(bad, L.io)).toThrow(/Stage 'afl-api-adjudications-capture'.*Nothing has been destroyed/s);
+      }
+    });
+
+    it('an entry-point failure is also reported as nothing destroyed', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: '0.0.1', bin: './dist/cli.mjs' }));
+      expect(() => assertOrdinaryStagesAdmissible(planStages(target(), fitzroy(), OPTS), L.io))
+        .toThrow(/Ordinary tsx entry point refused.*Nothing was run.*Nothing has been destroyed/s);
+    });
+
+    it('main() builds the ordinary spawn on the non-provenance branch and checks admissibility before --plan, preflight and the destructive acknowledgement (source pin)', () => {
+      const mainBody = runnerSource.slice(runnerSource.indexOf('async function main()'));
+      expect(mainBody).toContain('createCliDeps(provenance ? rehearsalSpawn(spawnSync, binding) : ordinarySpawn(spawnSync))');
+      expect(mainBody).not.toMatch(/:\s*spawnSync\)/);
+      const admissible = mainBody.indexOf('if (!provenance) assertOrdinaryStagesAdmissible(stages);');
+      expect(admissible).toBeGreaterThan(-1);
+      expect(admissible).toBeGreaterThan(mainBody.indexOf('planStages(target, fitzroy, opts, undefined, binding)'));
+      expect(admissible).toBeLessThan(mainBody.indexOf('if (opts.planOnly)'));
+      expect(admissible).toBeLessThan(mainBody.indexOf('runPreflight('));
+      expect(admissible).toBeLessThan(mainBody.indexOf('assertDestructiveAcknowledgement(target'));
+    });
+
+    it('the ordinary block precedes rehearsalSpawn and never rebuilds an environment or uses a shell', () => {
+      const start = runnerSource.indexOf('// AFLDB-ISSUE-324 -- the ORDINARY');
+      const end = runnerSource.indexOf('function rehearsalSpawn(');
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      const block = runnerSource.slice(start, end);
+      expect(block).not.toMatch(/\.\.\.options\.env|rehearsalChildEnv|shell: true|process\.env/);
+      expect(block).toContain('shell: false');
+      expect(runnerSource.split('SUCCESSOR_LADDER_TUPLES_JSON =')).toHaveLength(2);   // anchors untouched
+      expect(runnerSource.split('export const CLUB_SEASONS_EXPECTED =')).toHaveLength(2);
     });
   });
 });
