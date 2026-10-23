@@ -461,7 +461,18 @@
 **AFLDB-ISSUE-278 resolved 2026-10-13** (merge-scoped; implementation commit `dd18adb93a0207eb2ed812ac56636a90e2c89239`, parent `e7f84f14`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). `db:test:rebuild` and `db:test:prove-reset` now assert the connected database and role before anything else runs, refuse a DSN that libpq would read differently from postgres.js (query-string redirects, host-less or default-port forms), and run their psql and stage children with the libpq routing variables removed. DB-free: `tests/db-test-rebuild.test.ts` 670/670, `tsc --noEmit` clean. Two verdicts, kept separate: Procedure A (read-only, `afldb_test`) PASSED 12/12 and was accepted; Procedure B attempt 2 (one attempt, `afldb_test` only) gave a **proof PASS** (the always-aborted real `RESET_SQL`, `psql exit 3`) and, separately, an **unchanged-observed-state MATCH** (Tier 1 `a39ad96b…`, Tier 2 `4f11fda9…`; 99 tables, 63 sequences, 1,454,440 rows digested). Attempt 1 stopped at the baseline (`text || "char"`) with no proof and no verdict. **Limits kept:** a MATCH is not proof that no sequence operation occurred; index/TOAST contents, extended statistics, publications, subscriptions, roles, database settings, large objects and planner statistics are not covered; no real rebuild has been run, so the rebuild-stream guard is proven by Procedure A and the DB-free tests only; Procedure A is a historical result about the pre-reboot postmaster; the unpinned control V4c was omitted. Readiness was **accepted under a scoped cleanliness exception, not a clean pass**: `merge:ready` BLOCKED by exactly one blocker (15 untracked primary-checkout paths: nine `.agents/skills` files and six zero-byte stray-named files), all left untouched with sizes and hashes re-verified at every checkpoint; the merge-mode preflight's only blocker was the same 15 paths. Not deployed; no deployment is required or implied. Runbook and both verification procedures: `issues/closed/AFLDB-ISSUE-278*.md` (§18).
 
 ### AFLDB-ISSUE-316 — AFL API cutover: retire AFL Tables network acquisition
-- **Successor readiness E (2026-10-23; current):**
+- **v3-enforced rehearsal and Linux dry run at `15e43562` (2026-10-23; current):**
+  - **Rehearsal under the enforced native closure PASS** (ISSUE-320): exit 0, 30 stages, census pass (fresh
+    database: mechanism only), strict real D7 1,640, 91 checks, `AFLDB-POST PASSED`, 0 REFUSED; clean guarded shutdown.
+  - **Linux pinned planner DRY RUN on DEV, exit 0** (no `--apply`): three gates PASSED, `1622 -> 1640`, nothing
+    written, root unchanged. Census records used: 2026-10-22T21:57:39Z / 21:56:37Z / 21:56:38Z. No freshness or
+    apply-readiness claim; DEV is not the applying-runtime proof.
+  - Evidence: `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/` (`EXECUTION_RECORD.md`, `HASHES.sha256`).
+  - **Next:** ISSUE-319 owner choices; ISSUE-320 per-environment records and §3 acknowledgement; fresh censuses,
+    the applying-runtime dry run and a separate apply approval near the window.
+  - ISSUE-316 OPEN; production NO-GO; successor NOT ACTIVATED; 1,640 rehearsal-only; Brownlow 2026 pending; ET
+    unresolved.
+- **Successor readiness E (2026-10-23; previous):**
   - **Owner decisions recorded:** rollover date 2026-10-24; D-316-1 granted for preparation; successor approved
     conditionally on ISSUE-319 and ISSUE-320 (not activated); census scope 1897–2026 with no exclusions; Brownlow 2026
     pending; ET unresolved; apply, rebuild, migrations, deployment and push not authorised.

@@ -2330,7 +2330,7 @@ Recorded in the [decision package, Revision 5](../../docs/v2/issue316-c2-success
 
 ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved.
 
-## Successor readiness E — owner decisions, censuses, ISSUE-319/320, package E (2026-10-23; current)
+## Successor readiness E — owner decisions, censuses, ISSUE-319/320, package E (2026-10-23; previous; superseded by "v3-enforced rehearsal and Linux planner dry run" below)
 
 Recorded in the [decision package, Revision 6](../../docs/v2/issue316-c2-successor-decision-2026-10-21.md#revision-6--2026-10-23-current-owner-decisions-recorded-censuses-package-e).
 * Single current execution record: `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/EXECUTION_RECORD.md`.
@@ -2372,3 +2372,65 @@ Recorded in the [decision package, Revision 6](../../docs/v2/issue316-c2-success
 - **Gate preventing a "ready" dry run:** ISSUE-319 (adjudication) and ISSUE-320 (v3 rehearsal and per-environment records). After those, near the window: fresh censuses, then a Linux re-run of the E-pinned dry run on the applying runtime, then a separate apply authorisation.
 
 ISSUE-316 OPEN; production NO-GO; successor approved conditionally and NOT ACTIVATED (tuple table `'{}'`); 1,640 not yet active; Brownlow 2026 pending on all three keys; ET unresolved.
+
+## v3-enforced rehearsal and Linux planner dry run at `15e43562` (2026-10-23; current)
+
+Execution record: `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/EXECUTION_RECORD.md`, with `HASHES.sha256` (1,700 files) in the same folder.
+
+- **Scope.**
+  - One agent, no subagents.
+  - Owner-authorised for this task only:
+    - ssh/scp to DEV `streamanator`;
+    - read-only and owned-process commands;
+    - the guarded shutdown of the rehearsal's own cluster;
+    - the Linux planner DRY RUN;
+    - scoped local commits.
+  - Not done: no apply, adoption, production write, deployment, push, retry, limit extension or auditor/verifier/watchdog change.
+  - No cleanup or deletion of any root. The rehearsal root and cluster data, the dry-run stage and the disposable root are all retained on DEV.
+  - `.codex/` untouched.
+- **Rehearsal under the enforced native closure: PASS** (detail in `issues/open/AFLDB-ISSUE-320.md` §7).
+  - Root `/home/arm/afldb-c2-rehearsal-v3-15e43562-20261023T0026Z`; system id `7699653836114564799`; `afldb_v2_rb_c2cand5_test` on 127.0.0.1:55773.
+  - The production launcher ran 00:34:56Z–01:17:50Z, exit 0, before the original deadline of 02:34:54Z. No tripwire fired.
+  - All 30 stages completed:
+    - census `verdict=pass total=0` (`schema_absent`; fresh database: mechanism only);
+    - strict real D7, all 1,640;
+    - `AFLDB-FINAL-VALIDATION PASSED: 91 checks`;
+    - `AFLDB-POST PASSED` (2026 pending on all three keys, 0 exposed, historical 98 / 79,113 / 112).
+  - 0 native REFUSED lines in the run. 250/250 closure objects were unchanged afterwards.
+  - Clean guarded shutdown.
+  - Pre-launch, the nc3 control refused at the verifier rather than at the harness-expected auditor 127. This is recorded under ISSUE-320.
+- **Linux pinned planner DRY RUN (DEV, no `--apply`): exit 0.**
+  - The stage was copied to `/home/arm/afldb-c2-dryrun-linux-stage-20261023T012253Z`. `STAGE.sha256` verified 9/9.
+  - The disposable root `/home/arm/afldb-c2-dryrun-linux-root-20261023T0124Z` was built from:
+    - `git archive 15e43562`;
+    - 364 acquired/recovered inputs, hash-verified, copied from the installed package source;
+    - package E drafts (6 placed, 2 equal to tracked files);
+    - the E-pinned change set `410b0787…1991`;
+    - the retained census JSONs;
+    - `node_modules` as a symlink to the reviewed clean install (`repolock-scripts-reviewed`).
+  - Runtime: Node 22.23.2, and the clean-install venv `python3.12` (Python 3.12.3).
+  - Results:
+    - `All three pre-apply gates PASSED against the computed successor state`;
+    - `club_seasons expected 1622 -> 1640`;
+    - selector `c2-2026-successor`;
+    - 90 final-validation checks built and **not** executed;
+    - `DRY RUN — nothing was written`;
+    - `root unchanged by the dry run (all files re-hashed)`: 2,695 files, before = after `88d26ba1…7bb4`.
+  - Outside the disposable root:
+    - The planner's temporary contract directory `/tmp/afldb-rollover-SdPN3T` was absent at the post-check.
+    - The tsx cache `/tmp/tsx-1000` mtime moved.
+    - The clean install had 0 files newer than the start marker. The rehearsal package was still hash-verified.
+  - Evidence: `dryrun-linux/results-20261023T0123Z/` (run log, prepare log, before/after inventories).
+- **Census records used** (`captured_at_utc`, read from the JSONs):
+  - `afldb_prod` 2026-10-22T21:57:39Z;
+  - `afldb_dev` 2026-10-22T21:56:37Z;
+  - `afldb_test` 2026-10-22T21:56:38Z.
+  - The run script's header comment says "22:00Z / 22:07Z". The JSON values above are the actual ones.
+  - **No freshness claim and no apply-readiness claim.**
+  - This run used DEV with the clean-install runtime. It is not proof on the applying runtime, and it is not permission to apply.
+- **Remaining gates.**
+  - ISSUE-319: owner choices on runbook §4 items 1–5, all PENDING.
+  - ISSUE-320: a v3 record for each environment that runs guarded steps, and acknowledgement of the §3 boundary.
+  - Near the window: fresh censuses, then the dry run on the applying runtime, then a separate apply authorisation.
+
+ISSUE-316 OPEN; production NO-GO; successor approved conditionally and NOT ACTIVATED (no adoption, tuple table unchanged); 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved; no rollover, production write, deployment, push or cleanup.
