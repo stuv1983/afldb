@@ -1297,7 +1297,9 @@ function assertCandidateOptions(opts: Options, binding: RebuildBinding, source?:
   }
 }
 /** Re-read original documents; never adopt a new pair midway through a run. */
-export function checkRebuildBinding(binding: RebuildBinding, checkpoint: string): void {
+export function checkRebuildBinding(binding: RebuildBinding, checkpoint: string,
+  /** The tracked documents; only `isAdoptedSuccessorBinding`'s own tests supply others. */
+  documents: LadderDocuments = ladderDocuments()): void {
   if (binding.ladder.pair.profile === 'c2-2026-rehearsal-only' && !binding.provenance) throw new RebuildRefused('Missing candidate provenance.');
   if (binding.provenance) {
     const v = verifyRehearsalPackage(rehearsalRequest(binding.provenance, binding.ladder, binding.target, checkpoint));
@@ -1306,7 +1308,6 @@ export function checkRebuildBinding(binding: RebuildBinding, checkpoint: string)
         || process.env[CAPTURE_ROOT_ENV] !== v.spec.capture_root || process.env.AFLDB_V2_PG_ROOT !== v.spec.cluster_root
         || Number(process.env.AFLDB_V2_PG_PORT) !== v.target.port) throw new RebuildRefused('Runtime/capture/cluster binding mismatch.');
   }
-  const documents = ladderDocuments();
   const selected = documents.register.baselines.find((b: any) => b.snapshot_label === binding.source.label);
   const witness = documents.contract.datasets?.ladder?.accepted_witness;
   for (const [path, digest] of [[selected?.acquisition?.manifest_path, binding.ladder.pair.core_manifest_sha256],
@@ -1316,6 +1317,31 @@ export function checkRebuildBinding(binding: RebuildBinding, checkpoint: string)
   }
   const fresh = resolveLadderRebuildExpectation(binding.source, binding.target, documents, binding.provenance);
   if (JSON.stringify(fresh) !== JSON.stringify(binding.ladder)) throw new RebuildRefused('Frozen ladder/scope drift.');
+}
+
+/**
+ * AFLDB-ISSUE-323: the ORDINARY rebuild of an ADOPTED successor. Its core and witness carry the c2-2026-final-*
+ * labels that, before adoption, only a candidate rehearsal could run, and a successor may never claim rehearsal
+ * provenance, so without this the adopted state could never rebuild. True only when every one of these holds,
+ * re-derived here from the CLOSED successor table and the tracked documents (never a caller's table, never the
+ * `Deps.checkBinding` seam): the binding claims no provenance; its profile is a reviewed successor tuple and its pair
+ * is exactly that tuple; its source is that tuple's core; the pinned core and witness manifest bytes still hash to
+ * the tuple; and a fresh resolution of the documents (`assertSuccessorTransition` included) equals the binding's
+ * frozen ladder. A label, profile name or row count alone grants nothing. Anything else, a refusal or an error
+ * included, is false, and the candidate guards refuse exactly as before. With the shipped empty table it is false.
+ */
+export function isAdoptedSuccessorBinding(binding?: RebuildBinding, documents?: LadderDocuments): boolean {
+  if (!binding || binding.provenance) return false;
+  const { pair } = binding.ladder;
+  const tuple = Object.hasOwn(SUCCESSOR_LADDER_TUPLES, pair.profile) ? SUCCESSOR_LADDER_TUPLES[pair.profile] : undefined;
+  if (!tuple || JSON.stringify(pair) !== JSON.stringify(successorPair(tuple))
+      || binding.ladder.expectedRows !== tuple.expected_rows || binding.source.label !== tuple.core_snapshot_label) return false;
+  try {
+    checkRebuildBinding(binding, 'adopted-successor', documents ?? ladderDocuments());
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -2922,8 +2948,11 @@ export function executeRebuild(
   const binding = control.binding;
   const candidateConfigured = ladderDocuments().contract.datasets?.ladder?.rebuild_expectation?.profile === 'c2-2026-rehearsal-only';
   const planned = boundPlans.get(stages);
+  // AFLDB-ISSUE-323: the c2-2026-final-* argv no longer means "candidate" once the successor is adopted, but only
+  // for the exact plan bound to an adopted-successor binding; the checkpoint below re-proves that plan's bytes.
+  const candidateArgv = stages.some((s) => s.argv?.some((a) => a.startsWith('c2-2026-final-')));
   if ((candidateConfigured || planned?.binding.provenance || binding?.provenance
-      || stages.some((s) => s.argv?.some((a) => a.startsWith('c2-2026-final-')))) && !binding?.provenance) {
+      || (candidateArgv && !(planned?.binding === binding && isAdoptedSuccessorBinding(binding)))) && !binding?.provenance) {
     throw new RebuildRefused('Candidate execution requires original external provenance.');
   }
   const checkpoint = (name: string) => {
@@ -3077,7 +3106,11 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource,
                              readHeightContract?: HeightContractReader, binding?: RebuildBinding): void {
   assertNoPendingRolloverApply();
   const candidateConfigured = ladderDocuments().contract.datasets?.ladder?.rebuild_expectation?.profile === 'c2-2026-rehearsal-only';
-  if ((candidateConfigured || source?.label === 'c2-2026-final-core-v1' || opts.rehearsalLaunchSpec) && !binding?.provenance) {
+  // AFLDB-ISSUE-323: the successor's core label refuses here unless the preflighted source IS the adopted
+  // successor binding's own source; a rehearsal launch spec still always demands provenance.
+  const candidateLabel = source?.label === 'c2-2026-final-core-v1'
+    && !(JSON.stringify(source) === JSON.stringify(binding?.source) && isAdoptedSuccessorBinding(binding));
+  if ((candidateConfigured || candidateLabel || opts.rehearsalLaunchSpec) && !binding?.provenance) {
     throw new RebuildRefused('Candidate preflight requires external rehearsal provenance.');
   }
   if (binding) {

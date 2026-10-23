@@ -112,6 +112,8 @@ import {
   planStages as realPlanStages,
   resolveLadderRebuildExpectation,
   completedSeasonChecks,
+  isAdoptedSuccessorBinding,
+  SUCCESSOR_LADDER_TUPLES,
   type LadderRebuildExpectation,
   type RebuildBinding,
   resolveFitzroySource,
@@ -200,6 +202,63 @@ describe('ISSUE-316 ladder-season-scope', () => {
       .toBe(e.pair.witness_manifest_sha256);
     expect(d.contract.datasets.ladder.rebuild_expectation.evidence_ref).toContain('independent results/H&A');
     expect(CLUB_SEASONS_EXPECTED.rows).toBe(1622);
+  });
+  // AFLDB-ISSUE-323 at the PREDECESSOR state. The successor table ships empty, so no binding is an adopted successor
+  // and every c2-2026-final-* path still demands candidate provenance at the REAL preflight and execution boundaries.
+  // The adopted state's positive path is proven on the post-transition tree (the ISSUE-316 commit 2 suite).
+  describe('AFLDB-ISSUE-323 adopted-successor guard, predecessor state', () => {
+    const successorSource = () => ({ ...source(), label: 'c2-2026-final-core-v1' });
+    // The reviewed tuple's exact values (the transition change set's ladder_successor_tuple), typed here so the
+    // fabrication is as faithful as an attacker could make it; the closed table, not these values, decides.
+    const tuplePair = () => ({ profile: 'c2-2026-successor', core_snapshot_label: 'c2-2026-final-core-v1',
+      core_manifest_sha256: '02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988',
+      core_artefact_set_sha256: '817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e',
+      witness_snapshot_label: 'c2-2026-final-ladder-v1',
+      witness_manifest_sha256: '65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34',
+      first_season: 1897, last_season: 2026, expected_rows: 1640 });
+    const fabricated = (provenance?: { specPath: string; specSha256: string }): RebuildBinding => Object.freeze({
+      source: successorSource(), target: target(), provenance,
+      ladder: { pair: tuplePair(), expectedRows: 1640, firstSeason: 1897, lastSeason: 2026,
+        censusScope: { firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] } } });
+    const predecessorBinding = (): RebuildBinding => {
+      const t = target();
+      return Object.freeze({ source: source(), target: t, ladder: resolveLadderRebuildExpectation(source(), t) });
+    };
+    const stubStop = (deps: Deps): Deps => ({ ...deps, runCommand: () => { throw new Error('stub stop'); } });
+
+    it('ships an empty successor table, so no binding, however faithful, is an adopted successor', () => {
+      expect(SUCCESSOR_LADDER_TUPLES).toEqual({});
+      expect(isAdoptedSuccessorBinding(undefined)).toBe(false);
+      expect(isAdoptedSuccessorBinding(fabricated())).toBe(false);
+      expect(isAdoptedSuccessorBinding(fabricated({ specPath: '/spec', specSha256: 'a'.repeat(64) }))).toBe(false);
+      expect(isAdoptedSuccessorBinding(predecessorBinding())).toBe(false);
+    });
+    it('refuses the fabricated successor binding at the real preflight, before any child runs', () => {
+      const b = fabricated(), f = fakeDeps();
+      expect(() => runPreflight(f.deps, OPTS, b.source, undefined, b)).toThrow('Candidate preflight requires external rehearsal provenance.');
+      expect(() => runPreflight(f.deps, OPTS, b.source)).toThrow('Candidate preflight requires external rehearsal provenance.');
+      expect(f.commands).toEqual([]);
+    });
+    it('refuses a c2-2026-final-* plan with the fabricated binding or none at the real execution, before any stage', () => {
+      const plan = planStages(target(), source(), OPTS);
+      const candidate: Stage[] = JSON.parse(JSON.stringify(plan).replaceAll('full-history-20260902', 'c2-2026-final-core-v1'));
+      expect(candidate.some((s) => s.argv?.includes('c2-2026-final-core-v1'))).toBe(true);
+      for (const binding of [fabricated(), undefined]) {
+        const f = fakeDeps();
+        expect(() => executeRebuild(candidate, target(), f.deps, { binding }))
+          .toThrow('Candidate execution requires original external provenance.');
+        expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+      }
+    });
+    it('keeps the ordinary predecessor rebuild unchanged: guards pass and the real plan reaches its first stage', () => {
+      const b = predecessorBinding();
+      expect(b.ladder.pair.profile).toBe('predecessor-1897-2025');
+      const stages = realPlanStages(b.target, b.source, OPTS, undefined, b);
+      let preflight: unknown;
+      try { runPreflight(fakeDeps().deps, OPTS, b.source, undefined, b); } catch (error) { preflight = error; }
+      expect(String(preflight ?? '')).not.toMatch(/provenance/);
+      expect(() => executeRebuild(stages, b.target, stubStop(fakeDeps().deps), { binding: b })).toThrow('stub stop');
+    });
   });
   it.each([undefined, null, [], {}, 'predecessor-1897-2025'])('refuses an absent or invalid actual-contract block: %s', (block) => {
     const d = activeDocuments();
