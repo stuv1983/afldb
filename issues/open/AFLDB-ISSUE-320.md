@@ -30,6 +30,7 @@ The implementation must:
   * The loader and auditor are members, as are every bound executable and every ELF file in a runtime root.
   * The runtime-root digests agree.
   * It refuses before any spawn.
+* **The verifying launcher itself** (added 2026-10-23 after the proposal review; `assertLauncherNativeImage`). It starts every guarded child, so the auditor cannot already be in it. Before any spawn it refuses any `LD_*` variable in its own environment and, on Linux, any file-backed executable mapping in its own `/proc/self/maps` that is not a bound closure object mapped from the verified inode. Version 1/2 records are unchanged.
 * **Guards.**
   * The Node guard (`rehearsal-resolution-guard.mjs` `assertNativeEnforcement`) and the Python guard self-check LD_AUDIT, the pin, the auditor bytes and the `/proc/self/maps` inode.
   * They refuse when not enforced.

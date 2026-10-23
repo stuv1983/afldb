@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join } from 'node:path';
 import * as nativeFs from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { inventoryEntries, strictJson, verifyRehearsalPackage, launchRehearsal, resolutionLaunch, assertRehearsalResolution, guardedListenerTool, pythonStartupLandmarks, nativePolicyText } from '../tools/v2/rehearsal-package.mjs';
+import { inventoryEntries, strictJson, verifyRehearsalPackage, launchRehearsal, resolutionLaunch, assertRehearsalResolution, guardedListenerTool, pythonStartupLandmarks, nativePolicyText, assertLauncherNativeImage } from '../tools/v2/rehearsal-package.mjs';
 import { assertNativeEnforcement } from '../tools/v2/rehearsal-resolution-guard.mjs';
 
 import {
@@ -1478,6 +1478,8 @@ describe('ISSUE-316 ladder-season-scope', () => {
               .map((path) => ({ path, sha256: digest(v.files.get(path)!) })) });
           const rebind = (extra: string[] = []) => { v.sync(); v.rt.schema_version = 3; v.rt.native_closure = closure(extra); v.commit(); };
           rebind();
+          // The verifying process's own image (read only on Linux): bound objects only, from their inodes.
+          v.put('/proc/self/maps', [v.node, loader, auditor].map((p, i) => `7f${i}000-7f${i}fff r-xp 00000000 fd:01 ${v.inodeOf(p)}    ${p}`).join('\n') + '\n');
           return { ...v, nativeDir, auditor, loader, module, rebind };
         }
         type V3 = ReturnType<typeof v3Fixture>;
@@ -1495,7 +1497,7 @@ describe('ISSUE-316 ladder-season-scope', () => {
         });
         it('launches every guarded child with the bound auditor, the derived policy file and its pin', () => {
           const v = v3Fixture(), spawn = vi.fn(() => ({ status: 0 }));
-          expect(launchRehearsal(v.request, spawn as any, v.io)).toBe(0);
+          expect(launchRehearsal(v.request, spawn as any, v.io, {})).toBe(0);
           const env = (spawn.mock.calls[0] as any)[2].env;
           expect(env.LD_AUDIT).toBe(v.auditor);
           expect(dirname(env.AFLDB_NATIVE_POLICY)).toBe(v.spec.temp_root);
@@ -1544,14 +1546,43 @@ describe('ISSUE-316 ladder-season-scope', () => {
           ['a setuid object', (v: V3) => { v.modes.set(v.loader, 0o4755); }, /native object mode/],
         ])('refuses before any spawn on %s', (_name, change, pattern) => {
           const v = v3Fixture(), spawn = vi.fn(); change(v);
-          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(pattern);
+          expect(() => launchRehearsal(v.request, spawn as any, v.io, {})).toThrow(pattern);
           expect(spawn).not.toHaveBeenCalled();
         });
         it('refuses a writable root over a bound object and drift of an object during the run', () => {
           const v = v3Fixture(); v.spec.capture_root = v.nativeDir; v.commit();
           expect(() => v.verify()).toThrow(/writable root overlap/);
           const w = v3Fixture(), spawn = vi.fn(() => { w.put(w.loader, 'drift'); return { status: 0 }; });
-          expect(() => launchRehearsal(w.request, spawn as any, w.io)).toThrow(/pinned bytes changed/); expect(spawn).toHaveBeenCalledOnce();
+          expect(() => launchRehearsal(w.request, spawn as any, w.io, {})).toThrow(/pinned bytes changed/); expect(spawn).toHaveBeenCalledOnce();
+        });
+        it.each(['LD_PRELOAD', 'LD_LIBRARY_PATH', 'LD_AUDIT', 'LD_BIND_NOT'])('the verifying launcher refuses %s in its own environment before any spawn', (key) => {
+          const v = v3Fixture(), spawn = vi.fn(() => ({ status: 0 }));
+          expect(() => launchRehearsal(v.request, spawn as any, v.io, { [key]: '/elsewhere.so', HOME: '/h' })).toThrow(/loader override in the verifying process/);
+          expect(spawn).not.toHaveBeenCalled();
+          // A version 2 record keeps its behaviour exactly.
+          const w = v2Fixture();
+          expect(() => assertLauncherNativeImage(w.verify(), { [key]: '/elsewhere.so' }, w.io, 'linux')).not.toThrow();
+        });
+
+        describe("the verifying launcher's own image (Linux /proc/self/maps)", () => {
+          const objects = ['/opt/n/ld-linux-x86-64.so.2', '/opt/n/libc.so.6', '/opt/n/node'].map((path) => ({ path, sha256: 'a'.repeat(64) }));
+          const verified = { runtime: { native_closure: { objects } } } as any;
+          const inode = new Map([['/opt/n/ld-linux-x86-64.so.2', 11], ['/opt/n/libc.so.6', 12], ['/opt/n/node', 13], ['/opt/x/libother.so', 14]]);
+          const line = (path: string, perms = 'r-xp', ino = inode.get(path) ?? 0) => `7f00-7f10 ${perms} 00000000 fd:01 ${ino}    ${path}`;
+          const good = [...objects.map((o) => line(o.path)), line('/opt/n/node', 'r--p'), '7f40-7f50 r-xp 00000000 00:00 0    [vdso]', '7f60-7f70 rwxp 00000000 00:00 0 '];
+          const io = (maps: string[]) => ({ readFileSync: () => maps.join('\n') + '\n', lstatSync: (p: string) => ({ ino: inode.get(p) ?? 99 }) }) as any;
+          it('passes when every file-backed executable mapping is a bound object from its inode (anonymous, vDSO and data mappings are not files)', () => {
+            expect(() => assertLauncherNativeImage(verified, {}, io(good), 'linux')).not.toThrow();
+            expect(() => assertLauncherNativeImage(verified, {}, io([line('/opt/x/libother.so')]), 'win32')).not.toThrow(); // no /proc there
+            expect(() => assertLauncherNativeImage(verified, {}, io([...good, line('/opt/x/libother.so', 'r--p')]), 'linux')).not.toThrow();
+          });
+          it.each([
+            ['an unbound library', [...good, line('/opt/x/libother.so')]],
+            ['a bound path mapped from another inode', [...good, line('/opt/n/libc.so.6', 'r-xp', 77)]],
+            ['a deleted (replaced) bound object', [...good, line('/opt/n/libc.so.6 (deleted)')]],
+          ])('refuses %s', (_name, maps) => {
+            expect(() => assertLauncherNativeImage(verified, {}, io(maps), 'linux')).toThrow(/verifying process maps native code outside the closure/);
+          });
         });
 
         describe('guard self-check: the auditor must be enforcing in the guarded process', () => {

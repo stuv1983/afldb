@@ -572,12 +572,33 @@ export function guardedListenerTool(env = process.env, io = fs, verify = verifyR
   return listener;
 }
 
+/** Runtime record version 3: the verifying process itself. It starts every guarded child, so the auditor
+ * cannot already be in it. Before any spawn it must carry no loader override (no LD_* variable at all) and,
+ * on Linux, every file-backed executable mapping in /proc/self/maps must be a bound closure object mapped
+ * from the inode verification hashed. Anonymous and vDSO mappings are not files (the auditor's boundary).
+ * Version 1/2 records are unchanged. `env`, `io` and `platform` are test seams. */
+export function assertLauncherNativeImage(verified, env = process.env, io = fs, platform = process.platform) {
+  const n = verified.runtime.native_closure;
+  if (n === undefined) return;
+  if (Object.keys(env).some((key) => key.startsWith('LD_'))) refuse('loader override in the verifying process');
+  if (platform !== 'linux') return;
+  const bound = new Set(n.objects.map((o) => o.path));
+  for (const line of String(io.readFileSync('/proc/self/maps', 'utf8')).split('\n')) {
+    const m = line.trim().split(/\s+/);
+    if (m.length < 6 || !m[1].includes('x')) continue;
+    const file = m.slice(5).join(' ');
+    if (!file.startsWith('/')) continue;
+    if (!bound.has(file) || Number(io.lstatSync(file).ino) !== Number(m[4])) refuse('verifying process maps native code outside the closure');
+  }
+}
+
 /** Fixed launcher; injection is an API test seam, never a CLI bypass. */
-export function launchRehearsal(request, spawn = spawnSync, io = fs) {
+export function launchRehearsal(request, spawn = spawnSync, io = fs, launcherEnv = process.env) {
   request = freezeBinding(structuredClone(request)); // Keep the original reviewed pins through terminal readback.
   const verified = verifyRehearsalPackage(request, io);
   const { spec: s, runtime: r } = verified;
   if (r.node !== process.execPath) refuse('bootstrap interpreter is not the reviewed Node executable');
+  assertLauncherNativeImage(verified, launcherEnv, io);
   const options = [...s.runner_options, '--rehearsal-launch-spec', request.specPath, '--rehearsal-launch-spec-sha256', request.specSha256];
   const enforcement = resolutionLaunch(verified, io);
   const args = [...enforcement.nodeArgs, path.join(s.source_root, 'tools/v2/isolated-pg.ts'), 'run', s.target.database, '--',

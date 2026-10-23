@@ -34,7 +34,11 @@ export function resolutionLaunch(verified: VerifiedRehearsal, io?: typeof fs): {
 };
 export function assertRehearsalResolution(verified: VerifiedRehearsal): void;
 export function verifyRehearsalPackage(request: RehearsalRequest, io?: typeof fs): VerifiedRehearsal;
-export function launchRehearsal(request: RehearsalRequest, spawn?: typeof spawnSync, io?: typeof fs): number;
+export function launchRehearsal(request: RehearsalRequest, spawn?: typeof spawnSync, io?: typeof fs,
+  env?: Readonly<Record<string, string | undefined>>): number;
+/** Version 3: the verifying process carries no LD_* override and (Linux) maps only bound native code. */
+export function assertLauncherNativeImage(verified: VerifiedRehearsal,
+  env?: Readonly<Record<string, string | undefined>>, io?: typeof fs, platform?: string): void;
 /** Exact reviewed start-up landmarks (prefix/venv/build selection) for a canonical interpreter path. */
 export function pythonStartupLandmarks(python: string): string[];
 export function guardedListenerTool(
