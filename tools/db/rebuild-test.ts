@@ -80,7 +80,7 @@
 import { createHash } from 'node:crypto';
 // `listDirectorySync` is readdirSync under another name: the ISSUE-324 tsx-entry walk (not a label selection) uses it,
 // and a source pin in tests/db-test-rebuild.test.ts forbids the plain name between selectAcceptedBaseline and the stage graph.
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readdirSync as listDirectorySync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readdirSync as listDirectorySync, readlinkSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freezeBinding, verifyRehearsalPackage, resolutionLaunch, assertRehearsalResolution, type RehearsalPair, type RehearsalRequest } from '../v2/rehearsal-package.mjs';
@@ -1386,6 +1386,15 @@ export function rehearsalChildEnv(inherited: Record<string, string | undefined> 
 // reaches `process.execPath`. `--target code_test_db` plans use `db:migrate:code-test` / `db:privileges:code-test`,
 // which are deliberately NOT in the table: the ordinary CLI refuses that target under native enforcement (an
 // intentional, recorded behaviour change); the dedicated code_test_db rehearsal tool is unaffected.
+//
+// The DISCLOSED esbuild native-binary exception (owner ruling, ISSUE-316 revision J): every JavaScript/TypeScript
+// package file under the checkout's `node_modules` must be physically inside the checkout, and the whole tree is
+// walked. Exactly two lexical paths -- tsx's own esbuild native binaries, ORDINARY_ESBUILD_LINKS -- MAY instead be
+// absolute symlinks, and then only to the exact policy-bound real path fixed here, whose bytes must hash to
+// ORDINARY_ESBUILD_SHA256 before every execution. The table is keyed by lexical path, never by target; no package
+// directory, tsx file or other binary receives it. An npm `.bin/<name>` link is admitted only when its real file is
+// inside the checkout's own node_modules (it claims no exception). No environment variable selects an executable or
+// module location: ORDINARY_FORBIDDEN_ENV is refused, never stripped.
 
 /** The `tsx` argument lists (everything after `npx tsx`) the ordinary plan issues. A new step fails to compile. */
 export function ordinaryTsxArgv(): string[][] {
@@ -1409,6 +1418,35 @@ const ORDINARY_NPM_SCRIPTS: ReadonlyMap<string, readonly string[]> = new Map([
 /** The fixed package.json body of each permitted script. */
 export function ordinaryNpmScriptBodies(): Record<string, string> {
   return Object.fromEntries([...ORDINARY_NPM_SCRIPTS].map(([name, argv]) => [name, `tsx ${argv.join(' ')}`]));
+}
+
+/**
+ * The esbuild native-binary exception (see the header). Constants, not derived from the native policy: the policy
+ * reaches this process only through the harness environment, so deriving from it would let the caller choose the
+ * target. These are reviewed in the diff, pinned with this file, and independently re-bound (path + digest) by the
+ * reviewed native policy `30199b6a…` lines 21-22. A moved install or an esbuild bump refuses until re-reviewed.
+ */
+export const ORDINARY_ESBUILD_SHA256 = 'e1698a3d5c6c0798fee4fd3b5cc816651f460c63d390a7a26ea4beb0b1884100';
+const ORDINARY_ESBUILD_INSTALL = '/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed';
+export const ORDINARY_ESBUILD_LINKS: readonly { readonly path: string; readonly target: string; readonly lockKey: string }[] = Object.freeze([
+  'node_modules/tsx/node_modules/@esbuild/linux-x64',
+  'node_modules/tsx/node_modules/esbuild',
+].map((lockKey) => Object.freeze({
+  path: `${lockKey}/bin/esbuild`,
+  target: `${ORDINARY_ESBUILD_INSTALL}/${lockKey}/bin/esbuild`,
+  lockKey,
+})));
+
+/** Environment keys that would select an executable or load code from outside the checkout: refused, never stripped. */
+export const ORDINARY_FORBIDDEN_ENV: readonly string[] = Object.freeze(['ESBUILD_BINARY_PATH', 'NODE_OPTIONS', 'NODE_PATH', 'TSX_TSCONFIG_PATH']);
+
+/** Refuse when the environment a child would receive names any ORDINARY_FORBIDDEN_ENV key (case-insensitively). */
+export function assertOrdinaryEnvironment(env: Readonly<Record<string, string | undefined>> | undefined): void {
+  const present = Object.keys(env ?? {}).filter((key) => ORDINARY_FORBIDDEN_ENV.includes(key.toUpperCase()));
+  if (present.length) {
+    throw new RebuildRefused(`The ordinary path refuses an inherited ${present.join(', ')}: no environment variable may select `
+      + 'an executable or a module location (AFLDB-ISSUE-324). Unset it and retry. Nothing was run.');
+  }
 }
 
 const sameArgv = (a: readonly string[], b: readonly string[]): boolean =>
@@ -1454,6 +1492,9 @@ export type OrdinaryIo = {
   lstatSync: (path: string) => { isSymbolicLink(): boolean; isDirectory(): boolean; isFile(): boolean };
   readFileSync: (path: string, encoding: 'utf8') => string;
   listDirectory: (path: string) => string[];
+  readlinkSync: (path: string) => string;
+  /** sha256 (hex) of a file's bytes. */
+  sha256File: (path: string) => string;
   /** The working directory the children run in. */
   repoRoot: string;
   /** The checkout that contains THIS module (tools/db/rebuild-test.ts). */
@@ -1468,6 +1509,8 @@ function defaultOrdinaryIo(): OrdinaryIo {
     lstatSync: (path) => lstatSync(path),
     readFileSync: (path, encoding) => readFileSync(path, encoding),
     listDirectory: (path) => listDirectorySync(path),
+    readlinkSync: (path) => readlinkSync(path),
+    sha256File: (path) => createHash('sha256').update(readFileSync(path)).digest('hex'),
     repoRoot: REPO_ROOT,
     moduleRoot: MODULE_ROOT,
   };
@@ -1478,8 +1521,10 @@ function defaultOrdinaryIo(): OrdinaryIo {
  * the working directory is the checkout containing this module; `node_modules/tsx` and its `dist/cli.mjs`
  * RESOLVE (real path, not just lexical path) inside that checkout; no symbolic link or junction lies on the
  * `node_modules` -> `tsx` -> `dist` chain or anywhere under `dist`; the installed tsx is the version and `bin`
- * `package-lock.json` pins; and the two npm scripts have exactly the fixed bodies. A checkout-local link to a shared
- * installation fails these on purpose. Returns the verified `cli.mjs` path; refuses on any failure.
+ * `package-lock.json` pins; the two npm scripts have exactly the fixed bodies; and every entry of the whole
+ * `node_modules` tree is a regular file or directory, an in-checkout `.bin` link, or one of the two esbuild
+ * native-binary exception links exactly as fixed (target, real path, sha256, lock version). A checkout-local link to
+ * a shared installation fails these on purpose. Returns the verified `cli.mjs` path; refuses on any failure.
  */
 export function verifyOrdinaryTsxEntry(io: OrdinaryIo = defaultOrdinaryIo()): string {
   const refuse = (check: string): never => {
@@ -1572,6 +1617,47 @@ export function verifyOrdinaryTsxEntry(io: OrdinaryIo = defaultOrdinaryIo()): st
       refuse(`package.json script ${name} differs from its fixed body`);
     }
   }
+
+  // (f) ALL package code is physically inside the checkout: walk the whole of node_modules. A link is admitted only
+  // as (1) one of the two esbuild native-binary exception entries, exactly as fixed, or (2) an npm `.bin/<name>`
+  // link whose real file is inside this checkout's real node_modules. Anything else refuses.
+  const realNodeModules = attempt('node_modules cannot be resolved', () => io.realpathSync(nodeModules));
+  const exceptions = new Map(ORDINARY_ESBUILD_LINKS.map((entry) => [entry.path, entry]));
+  const esbuildLink = (entry: (typeof ORDINARY_ESBUILD_LINKS)[number], lexical: string): void => {
+    const label = `${entry.path} (esbuild native-binary exception)`;
+    const text = attempt(`${label} cannot be read as a link`, () => io.readlinkSync(lexical));
+    if (text !== entry.target) refuse(`${label} does not link to its fixed target`);
+    const real = attempt(`${label} target cannot be resolved`, () => io.realpathSync(lexical));
+    if (real !== entry.target) refuse(`${label} does not resolve to its fixed real path`);
+    const stat = attempt(`${label} target cannot be inspected`, () => io.lstatSync(entry.target));
+    if (stat.isSymbolicLink() || !stat.isFile()) refuse(`${label} target is not a regular file`);
+    const digest = attempt(`${label} target cannot be hashed`, () => io.sha256File(entry.target));
+    if (digest !== ORDINARY_ESBUILD_SHA256) refuse(`${label} target bytes differ from the fixed sha256`);
+    const owner = json(join(io.repoRoot, ...entry.lockKey.split('/'), 'package.json'), `${entry.lockKey}/package.json`);
+    const pinnedOwner = (packages as Record<string, unknown> | undefined)?.[entry.lockKey];
+    const lockedVersion = pinnedOwner && typeof pinnedOwner === 'object' ? (pinnedOwner as Record<string, unknown>).version : undefined;
+    if (typeof owner.version !== 'string' || owner.version !== lockedVersion) refuse(`${entry.lockKey} version differs from package-lock.json`);
+  };
+  const tree = (dir: string, label: string): void => {
+    for (const name of attempt(`${label} cannot be listed`, () => io.listDirectory(dir))) {
+      const child = `${label}/${name}`;
+      const path = join(dir, name);
+      const stat = attempt(`${child} cannot be inspected`, () => io.lstatSync(path));
+      const exception = exceptions.get(child);
+      if (exception) {
+        if (stat.isSymbolicLink()) esbuildLink(exception, path);
+        else if (!stat.isFile()) refuse(`${child} is not a regular file`);
+      } else if (stat.isSymbolicLink()) {
+        if (!/\/\.bin\/[^/]+$/.test(child)) refuse(`${child} is a symbolic link or junction outside the esbuild native-binary exception`);
+        const real = attempt(`${child} cannot be resolved`, () => io.realpathSync(path));
+        if (!strictlyInside(realNodeModules, real)) refuse(`${child} resolves outside the checkout's node_modules`);
+        const target = attempt(`${child} target cannot be inspected`, () => io.lstatSync(real));
+        if (!target.isFile()) refuse(`${child} does not resolve to a regular file`);
+      } else if (stat.isDirectory()) tree(path, child);
+      else if (!stat.isFile()) refuse(`${child} is not a regular file`);
+    }
+  };
+  tree(nodeModules, 'node_modules');
   return cli;
 }
 
@@ -1580,8 +1666,11 @@ export function verifyOrdinaryTsxEntry(io: OrdinaryIo = defaultOrdinaryIo()): st
  * every planned command stage is classified against the closed tables (nothing is spawned) and the tsx entry
  * point is verified. A refusal names the stage and says nothing has been destroyed.
  */
-export function assertOrdinaryStagesAdmissible(stages: readonly Stage[], io?: OrdinaryIo): void {
+export function assertOrdinaryStagesAdmissible(
+  stages: readonly Stage[], io?: OrdinaryIo, env: Readonly<Record<string, string | undefined>> = process.env,
+): void {
   try {
+    assertOrdinaryEnvironment(env);
     for (const stage of stages) {
       if (!stage.argv) continue;
       try { classifyOrdinaryCommand(stage.argv[0], stage.argv.slice(1)); }
@@ -1604,6 +1693,7 @@ export function assertOrdinaryStagesAdmissible(stages: readonly Stage[], io?: Or
  */
 export function ordinarySpawn(spawn: typeof import('node:child_process').spawnSync, io?: OrdinaryIo): typeof spawn {
   return ((command: string, args: string[], options: import('node:child_process').SpawnSyncOptions) => {
+    assertOrdinaryEnvironment(options?.env ?? process.env);   // read only: an absent env means the child inherits this one
     const child = classifyOrdinaryCommand(command, args);
     if (child.kind === 'passthrough') return spawn(command, args, options);
     const cli = verifyOrdinaryTsxEntry(io);

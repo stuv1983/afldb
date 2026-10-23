@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join } from 'node:path';
 import * as nativeFs from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { inventoryEntries, strictJson, verifyRehearsalPackage, launchRehearsal, resolutionLaunch, assertRehearsalResolution, guardedListenerTool, pythonStartupLandmarks, nativePolicyText, assertLauncherNativeImage } from '../tools/v2/rehearsal-package.mjs';
 import { assertNativeEnforcement } from '../tools/v2/rehearsal-resolution-guard.mjs';
 
@@ -1785,6 +1785,9 @@ import {
   ordinarySpawn,
   ordinaryTsxArgv,
   verifyOrdinaryTsxEntry,
+  ORDINARY_ESBUILD_LINKS,
+  ORDINARY_ESBUILD_SHA256,
+  ORDINARY_FORBIDDEN_ENV,
   type OrdinaryIo,
 } from '../tools/db/rebuild-test';
 import {
@@ -2520,6 +2523,8 @@ describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm 
     lstatSync: (p) => nativeFs.lstatSync(p),
     readFileSync: (p, encoding) => nativeFs.readFileSync(p, encoding),
     listDirectory: (p) => nativeFs.readdirSync(p),
+    readlinkSync: (p) => nativeFs.readlinkSync(p),
+    sha256File: (p) => createHash('sha256').update(nativeFs.readFileSync(p)).digest('hex'),
     repoRoot,
     moduleRoot,
   });
@@ -2805,7 +2810,7 @@ describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm 
       expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/differs from its fixed body/);
     });
 
-    it('the real checkout agrees with a direct lstat of its own node_modules chain (a linked install refuses by design)', () => {
+    it('the real checkout (its WHOLE node_modules tree is walked) agrees with a direct lstat of its own node_modules chain (a linked install refuses by design)', () => {
       const linked = ['node_modules', join('node_modules', 'tsx')].some((p) => nativeFs.lstatSync(join(process.cwd(), p)).isSymbolicLink());
       if (linked) {
         expect(() => verifyOrdinaryTsxEntry()).toThrow(/Ordinary tsx entry point refused/);
@@ -2819,7 +2824,7 @@ describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm 
     it('the real ordinary plan for the afldb_test target is admissible, including capture --recover', () => {
       const L = buildLayout();
       for (const recover of [false, true]) {
-        expect(() => assertOrdinaryStagesAdmissible(planStages(target(), fitzroy(), { ...OPTS, recoverAflApiAdjudications: recover }), L.io)).not.toThrow();
+        expect(() => assertOrdinaryStagesAdmissible(planStages(target(), fitzroy(), { ...OPTS, recoverAflApiAdjudications: recover }), L.io, {})).not.toThrow();
       }
     });
 
@@ -2830,7 +2835,7 @@ describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm 
       const stages = planStages(code, fitzroy(), OPTS);
       const { deps, commands, sqlRuns, validationRuns } = fakeDeps();
       const attempt = () => {
-        assertOrdinaryStagesAdmissible(stages, L.io);
+        assertOrdinaryStagesAdmissible(stages, L.io, {});
         executeRebuild(stages, code, deps);          // the order main() uses: admissibility first
       };
       expect(attempt).toThrow(RebuildRefused);
@@ -2844,14 +2849,14 @@ describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm 
       const stages = planStages(target(), fitzroy(), OPTS);
       for (const argv of [['bash', '-c', 'true'], ['npx', '--yes', 'tsx', ...CAPTURE], ['npm', 'run', 'db:test:rebuild']]) {
         const bad = stages.map((s) => (s.id === 'afl-api-adjudications-capture' ? { ...s, argv } : s));
-        expect(() => assertOrdinaryStagesAdmissible(bad, L.io)).toThrow(/Stage 'afl-api-adjudications-capture'.*Nothing has been destroyed/s);
+        expect(() => assertOrdinaryStagesAdmissible(bad, L.io, {})).toThrow(/Stage 'afl-api-adjudications-capture'.*Nothing has been destroyed/s);
       }
     });
 
     it('an entry-point failure is also reported as nothing destroyed', () => {
       const L = buildLayout();
       write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: '0.0.1', bin: './dist/cli.mjs' }));
-      expect(() => assertOrdinaryStagesAdmissible(planStages(target(), fitzroy(), OPTS), L.io))
+      expect(() => assertOrdinaryStagesAdmissible(planStages(target(), fitzroy(), OPTS), L.io, {}))
         .toThrow(/Ordinary tsx entry point refused.*Nothing was run.*Nothing has been destroyed/s);
     });
 
@@ -2873,10 +2878,216 @@ describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm 
       expect(start).toBeGreaterThan(-1);
       expect(end).toBeGreaterThan(start);
       const block = runnerSource.slice(start, end);
-      expect(block).not.toMatch(/\.\.\.options\.env|rehearsalChildEnv|shell: true|process\.env/);
+      // It may READ the environment (to refuse ORDINARY_FORBIDDEN_ENV) but never rebuilds or spreads one.
+      expect(block).not.toMatch(/\.\.\.options\.env|rehearsalChildEnv|shell: true|\.\.\.process\.env|env: \{/);
       expect(block).toContain('shell: false');
       expect(runnerSource.split('SUCCESSOR_LADDER_TUPLES_JSON =')).toHaveLength(2);   // anchors untouched
       expect(runnerSource.split('export const CLUB_SEASONS_EXPECTED =')).toHaveLength(2);
+    });
+  });
+
+  /*
+   * The DISCLOSED esbuild native-binary exception (owner ruling, ISSUE-316 revision J). Links are simulated through
+   * the OrdinaryIo seam (file symlinks need elevation on Windows): `virtual` overlays link entries and absolute
+   * targets on a real, honest temp checkout.
+   */
+  describe('the esbuild native-binary exception and the whole node_modules walk', () => {
+    const ESB_VERSION = '0.28.2';
+    type Link = { rel: string; text: string; real?: string | Error };
+    type Target = { sha256: string; kind?: 'file' | 'directory' | 'link' } | Error;
+    const enoent = () => Object.assign(new Error('no such file'), { code: 'ENOENT' });
+    const fileStat = (kind: 'file' | 'directory' | 'link') => ({
+      isSymbolicLink: () => kind === 'link', isDirectory: () => kind === 'directory', isFile: () => kind === 'file',
+    });
+    /** A real checkout with tsx's two esbuild package directories and their lock entries (bin/ left empty). */
+    function esbuildLayout() {
+      const L = buildLayout();
+      const lock = { packages: { 'node_modules/tsx': { version: TSX_VERSION, bin: { tsx: 'dist/cli.mjs' } } } as Record<string, unknown> };
+      for (const { lockKey } of ORDINARY_ESBUILD_LINKS) {
+        write(join(L.root, ...lockKey.split('/'), 'package.json'), JSON.stringify({ name: lockKey.split('node_modules/').pop(), version: ESB_VERSION }));
+        mkdirSync(join(L.root, ...lockKey.split('/'), 'bin'), { recursive: true });
+        lock.packages[lockKey] = { version: ESB_VERSION };
+      }
+      write(join(L.root, 'package-lock.json'), JSON.stringify(lock));
+      return L;
+    }
+    function virtual(L: ReturnType<typeof buildLayout>, links: Link[], targets: Record<string, Target> = {}): OrdinaryIo {
+      const at = (rel: string) => join(L.root, ...rel.split('/'));
+      const byPath = new Map(links.map((link) => [at(link.rel), link]));
+      const base = L.io;
+      return {
+        ...base,
+        listDirectory: (dir) => {
+          const names = nativeFs.existsSync(dir) ? base.listDirectory(dir) : [];
+          for (const path of byPath.keys()) if (dirname(path) === dir && !names.includes(basename(path))) names.push(basename(path));
+          return names;
+        },
+        lstatSync: (path) => {
+          if (byPath.has(path)) return fileStat('link');
+          const target = targets[path];
+          if (target instanceof Error) throw target;
+          if (target) return fileStat(target.kind ?? 'file');
+          return base.lstatSync(path);
+        },
+        readlinkSync: (path) => {
+          const link = byPath.get(path);
+          if (!link) throw Object.assign(new Error('not a link'), { code: 'EINVAL' });
+          return link.text;
+        },
+        realpathSync: (path) => {
+          const link = byPath.get(path);
+          if (!link) return base.realpathSync(path);
+          const real = link.real ?? link.text;
+          if (real instanceof Error) throw real;
+          return real;
+        },
+        sha256File: (path) => {
+          const target = targets[path];
+          if (target instanceof Error) throw target;
+          return target ? target.sha256 : base.sha256File(path);
+        },
+      };
+    }
+    const exactLinks = (): Link[] => ORDINARY_ESBUILD_LINKS.map((entry) => ({ rel: entry.path, text: entry.target }));
+    const goodTargets = (): Record<string, Target> =>
+      Object.fromEntries(ORDINARY_ESBUILD_LINKS.map((entry) => [entry.target, { sha256: ORDINARY_ESBUILD_SHA256 }]));
+    const [PLATFORM, WRAPPER] = ORDINARY_ESBUILD_LINKS;
+
+    it('the closed table: exactly tsx\'s two esbuild native binaries, absolute policy-bound targets, one fixed digest', () => {
+      expect(ORDINARY_ESBUILD_LINKS.map((entry) => entry.path)).toEqual([
+        'node_modules/tsx/node_modules/@esbuild/linux-x64/bin/esbuild',
+        'node_modules/tsx/node_modules/esbuild/bin/esbuild',
+      ]);
+      const install = '/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed/';
+      for (const entry of ORDINARY_ESBUILD_LINKS) expect(entry.target).toBe(`${install}${entry.path}`);
+      expect(ORDINARY_ESBUILD_SHA256).toBe('e1698a3d5c6c0798fee4fd3b5cc816651f460c63d390a7a26ea4beb0b1884100');
+      expect(Object.isFrozen(ORDINARY_ESBUILD_LINKS) && ORDINARY_ESBUILD_LINKS.every((entry) => Object.isFrozen(entry))).toBe(true);
+      expect([...ORDINARY_FORBIDDEN_ENV]).toEqual(['ESBUILD_BINARY_PATH', 'NODE_OPTIONS', 'NODE_PATH', 'TSX_TSCONFIG_PATH']);
+    });
+
+    it('accepts the two exact links (fixed target, fixed real path, regular target, fixed sha256, lock versions)', () => {
+      const L = esbuildLayout();
+      expect(verifyOrdinaryTsxEntry(virtual(L, exactLinks(), goodTargets()))).toBe(L.cli);
+    });
+
+    it('accepts regular files at both paths: no exception is claimed (the normal install and Windows keep working)', () => {
+      const L = esbuildLayout();
+      for (const entry of ORDINARY_ESBUILD_LINKS) write(join(L.root, ...entry.path.split('/')), 'ELF fixture');
+      expect(verifyOrdinaryTsxEntry(L.io)).toBe(L.cli);
+    });
+
+    it('accepts an npm .bin link whose real file is inside the checkout node_modules', () => {
+      const L = esbuildLayout();
+      mkdirSync(join(L.root, 'node_modules', '.bin'));
+      const io = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx/dist/cli.mjs', real: L.cli }]);
+      expect(verifyOrdinaryTsxEntry(io)).toBe(L.cli);
+    });
+
+    it.each([
+      ['a relative form of the right target', (t: string) => `../../../../../..${t}`],
+      ['another absolute path', () => '/home/arm/projects/afldb/node_modules/tsx/node_modules/esbuild/bin/esbuild'],
+    ])('refuses a link whose text is %s', (_label, text) => {
+      const L = esbuildLayout();
+      const links = exactLinks().map((link, i) => (i === 0 ? { ...link, text: text(link.text), real: PLATFORM.target } : link));
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/does not link to its fixed target.*Nothing was run/s);
+    });
+
+    it('refuses the two table entries cross-wired (path A -> target B)', () => {
+      const L = esbuildLayout();
+      const links: Link[] = [{ rel: PLATFORM.path, text: WRAPPER.target }, { rel: WRAPPER.path, text: PLATFORM.target }];
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/does not link to its fixed target/);
+    });
+
+    it('refuses when the fixed target itself resolves elsewhere (a link on the target chain)', () => {
+      const L = esbuildLayout();
+      const links = exactLinks().map((link, i) => (i === 1 ? { ...link, real: '/srv/other/esbuild' } : link));
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/does not resolve to its fixed real path/);
+    });
+
+    it('refuses a missing target with its code, and a target that is not a regular file', () => {
+      const L = esbuildLayout();
+      const missing = exactLinks().map((link, i) => (i === 0 ? { ...link, real: enoent() } : link));
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, missing, goodTargets()))).toThrow(/target cannot be resolved \(ENOENT\)/);
+      const directory = { ...goodTargets(), [PLATFORM.target]: { sha256: ORDINARY_ESBUILD_SHA256, kind: 'directory' as const } };
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, exactLinks(), directory))).toThrow(/target is not a regular file/);
+    });
+
+    it('refuses a target whose bytes differ from the fixed sha256', () => {
+      const L = esbuildLayout();
+      const wrong = { ...goodTargets(), [WRAPPER.target]: { sha256: '0'.repeat(64) } };
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, exactLinks(), wrong))).toThrow(/target bytes differ from the fixed sha256.*Nothing was run/s);
+    });
+
+    it('refuses an esbuild package whose installed version differs from package-lock.json', () => {
+      const L = esbuildLayout();
+      write(join(L.root, ...WRAPPER.lockKey.split('/'), 'package.json'), JSON.stringify({ name: 'esbuild', version: '0.27.0' }));
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, exactLinks(), goodTargets()))).toThrow(/tsx\/node_modules\/esbuild version differs from package-lock\.json/);
+    });
+
+    it('keys the exception by lexical path: a non-table path linked to a table target with the right hash refuses', () => {
+      const L = esbuildLayout();
+      const links = [...exactLinks(), { rel: 'node_modules/tsx/node_modules/esbuild/bin/esbuild-copy', text: WRAPPER.target }];
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/esbuild-copy is a symbolic link or junction outside the esbuild native-binary exception/);
+    });
+
+    it('refuses an extra link anywhere else, even one resolving inside the checkout', () => {
+      const L = esbuildLayout();
+      write(join(L.root, 'node_modules', 'pg', 'lib', 'index.js'), '// fixture\n');
+      const links = [...exactLinks(), { rel: 'node_modules/pg/lib/alias.js', text: './index.js', real: join(L.root, 'node_modules', 'pg', 'lib', 'index.js') }];
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/pg\/lib\/alias\.js is a symbolic link or junction outside the esbuild native-binary exception/);
+    });
+
+    it('refuses a symlinked package directory (tsx\'s esbuild package linked to a shared install)', () => {
+      const L = esbuildLayout();
+      const pkg = WRAPPER.lockKey;
+      rmSync(join(L.root, ...pkg.split('/')), { recursive: true, force: true });
+      const links = [{ rel: pkg, text: `/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed/${pkg}` }];
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/node_modules\/tsx\/node_modules\/esbuild is a symbolic link or junction outside the esbuild native-binary exception/);
+    });
+
+    it('refuses a symlinked tsx file: package.json and dist/cli.mjs get no exception', () => {
+      const L = esbuildLayout();
+      for (const rel of ['node_modules/tsx/package.json', 'node_modules/tsx/dist/cli.mjs']) {
+        rmSync(join(L.root, ...rel.split('/')));
+        const io = virtual(L, [{ rel, text: `/home/arm/shared/${rel}` }]);
+        expect(() => verifyOrdinaryTsxEntry(io), rel).toThrow(/Ordinary tsx entry point refused.*(symbolic link|resolves outside)/s);
+        write(join(L.root, ...rel.split('/')), rel.endsWith('.json') ? JSON.stringify({ name: 'tsx', version: TSX_VERSION, bin: './dist/cli.mjs' }) : '// fixture\n');
+      }
+    });
+
+    it('refuses a .bin link resolving outside the checkout node_modules, or to a directory', () => {
+      const L = esbuildLayout();
+      mkdirSync(join(L.root, 'node_modules', '.bin'));
+      const outside = virtual(L, [{ rel: 'node_modules/.bin/esbuild', text: WRAPPER.target }], goodTargets());
+      expect(() => verifyOrdinaryTsxEntry(outside)).toThrow(/\.bin\/esbuild resolves outside the checkout's node_modules/);
+      const dir = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx', real: L.tsx }]);
+      expect(() => verifyOrdinaryTsxEntry(dir)).toThrow(/\.bin\/tsx does not resolve to a regular file/);
+    });
+
+    describe('no environment variable may select an executable or a module location (refused, never stripped)', () => {
+      const variants = ORDINARY_FORBIDDEN_ENV.flatMap((key) => [key, key.toLowerCase()]);
+
+      it.each(variants)('ordinarySpawn refuses %s for npx, npm, psql and Python without spawning', (key) => {
+        const L = buildLayout();
+        const { spawn, calls } = recorder();
+        const options = { ...OPTIONS(), env: { ...ENV, [key]: '/home/arm/elsewhere/esbuild' } };
+        for (const [command, args] of [
+          ['npx', ['tsx', ...CAPTURE]], ['npm', ['run', 'db:migrate:test']], [PSQL_BIN, ['-X']], [resolvePython(), ['tools/x.py']],
+        ] as [string, string[]][]) {
+          expect(() => wrap(spawn, L.io)(command, args, options), command).toThrow(/refuses an inherited .*Nothing was run/s);
+        }
+        expect(calls).toHaveLength(0);
+      });
+
+      it('assertOrdinaryStagesAdmissible refuses a forbidden key before anything is destroyed', () => {
+        const L = buildLayout();
+        const stages = planStages(target(), fitzroy(), OPTS);
+        expect(() => assertOrdinaryStagesAdmissible(stages, L.io, { ESBUILD_BINARY_PATH: '/x' }))
+          .toThrow(/ESBUILD_BINARY_PATH.*Nothing has been destroyed/s);
+        expect(() => assertOrdinaryStagesAdmissible(stages, L.io, { node_options: '--require /x.js' }))
+          .toThrow(/node_options.*Nothing has been destroyed/s);
+        expect(() => assertOrdinaryStagesAdmissible(stages, L.io, { PATH: '/bin' })).not.toThrow();
+      });
     });
   });
 });
