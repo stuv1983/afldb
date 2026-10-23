@@ -190,8 +190,15 @@
         "matches_with_both_coaches": 15817,
         "matches_with_one_coach": 400,
         "matches_without_coach": 621
+      },
+      "raw_bundle": {
+        "$comment": "AFLDB-ISSUE-319 (owner decision 2026-10-23: raw-to-parsed coach replay inside preflight). The recovered raw HTML of this capture as ONE uncompressed tar, gitignored like every raw artefact and placed at data/sources/afltables/coaches/<label>/<filename>: one directory entry `raw` and exactly the manifest's raw files as regular members `raw/<file>` (the space in `raw/Allan_La Fontaine.html` lives only inside the tar, never in a package path). tools/migration/import_match_coaches.py --require-raw-bundle reads it in memory, refuses any other, changed, missing, extra, duplicate, linked or nonregular member, replays the acquisition parser (tools/rebuild/afltables/coach_snapshot_parser.py) and refuses unless the rendered CSV bytes equal the manifest digests and the parsed bytes it loads. The rebuild passes that flag in preflight and in the stage for every ladder profile except predecessor-1897-2025, and refuses before anything is destroyed when this pin or the file is absent. Bytes only: no authenticity claim.",
+        "filename": "coaches-20260905-raw.tar",
+        "sha256": "2468569067209ec3810b5bbcc45cb8d75c616f69517bac8531fbffa47c661e4a",
+        "bytes": 24023040,
+        "members": 387
       }
     },
-    "accepted_snapshot_rule": "Set to {label, manifest, manifest_sha256_lf, accepted_on, accepted_in, evidence, measured} by the session that accepts a capture for the rebuild's coaches stage; the rebuild refuses a missing or mismatched pin, exactly like club_player_lists.accepted_snapshot."
+    "accepted_snapshot_rule": "Set to {label, manifest, manifest_sha256_lf, accepted_on, accepted_in, evidence, measured} by the session that accepts a capture for the rebuild's coaches stage; the rebuild refuses a missing or mismatched pin, exactly like club_player_lists.accepted_snapshot. raw_bundle {filename, sha256, bytes, members} pins the capture's raw bytes for the mandatory replay (AFLDB-ISSUE-319); a profile that requires it refuses without it."
   }
 }

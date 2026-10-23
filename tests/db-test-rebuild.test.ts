@@ -48,6 +48,9 @@ import {
   coachChecks,
   coachesImportArgv,
   coachesValidateArgv,
+  COACH_RAW_REPLAY_EXEMPT_PROFILES,
+  coachRawReplayPreflight,
+  coachRawReplayRequired,
   FATHER_SON_ADJUDICATIONS,
   FATHER_SON_CSV,
   FATHER_SON_LOADER,
@@ -689,6 +692,13 @@ describe('ISSUE-316 ladder-season-scope', () => {
       expect(f.events.indexOf('census')).toBeLessThan(f.events.indexOf('capture'));
       expect(f.events.indexOf('capture')).toBeLessThan(f.events.indexOf('reset'));
       expect(f.events.filter((e) => e === 'live')).toHaveLength(4);
+    });
+    it('plans the candidate coaches stage with the mandatory raw replay (AFLDB-ISSUE-319)', () => {
+      const f = runnerFixture();
+      const coaches = f.stages.find((s) => s.id === 'coaches')!;
+      expect(coaches.argv!.at(-1)).toBe('--require-raw-bundle');
+      expect(coaches.name).toContain('mandatory raw replay');
+      expect(f.stages.findIndex((s) => s.id === 'recreate')).toBeLessThan(f.stages.indexOf(coaches));
     });
     it('refuses the coherent candidate on an ordinary target even with provenance, before verification', () => {
       const f = runnerFixture(), verify = vi.fn(f.verify);
@@ -3776,6 +3786,107 @@ describe('stage graph', () => {
       expect(validate.some((a) => a.includes(COACH_LOADER) && a.includes(afltablesCoachesPin().label) && a.includes(FULL_LABEL))).toBe(true);
       expect(() => runPreflight(withFailing(COACH_LOADER), OPTS, fitzroy()))
         .toThrow(/Coaches preflight failed[\s\S]*Nothing has been destroyed/);
+      // The predecessor keeps its reviewed parsed-only behaviour: no raw replay flag.
+      expect(commands.filter((a) => a.includes(COACH_LOADER)).every((a) => !a.includes('--require-raw-bundle'))).toBe(true);
+    });
+
+    describe('mandatory raw replay outside the predecessor (AFLDB-ISSUE-319)', () => {
+      const real = () => JSON.parse(readFileSync(contractPath, 'utf8'));
+      const bundleRel = () => join('data', 'sources', 'afltables', 'coaches', afltablesCoachesPin().label,
+        afltablesCoachesPin().rawBundle!.filename);
+      // The predecessor's own resolved expectation, relabelled: only the profile decides the requirement.
+      const swapped = (profile: string): RebuildBinding => {
+        const ladder = resolveLadderRebuildExpectation(fitzroy(), target());
+        return { source: fitzroy(), target: target(), ladder: { ...ladder, pair: { ...ladder.pair, profile } } };
+      };
+      const recording = (opts: { failCoach?: boolean; missing?: string } = {}) => {
+        const commands: string[][] = [];
+        const fake = fakeDeps();
+        const deps: Deps = {
+          ...fake.deps, checkBinding: () => {},
+          fileExists: (p) => p !== opts.missing,
+          runCommand: (a: string[]) => {
+            commands.push(a);
+            if (opts.failCoach && a.includes(COACH_LOADER)) return { status: 1, stdout: '', stderr: 'AFLDB-COACH-RAW-REPLAY REFUSED: fixture' };
+            if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+            return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+          },
+        };
+        return { deps, commands, fake };
+      };
+
+      it('exempts only the predecessor; every other or unknown profile requires the replay', () => {
+        expect(COACH_RAW_REPLAY_EXEMPT_PROFILES).toEqual(['predecessor-1897-2025']);
+        expect(Object.isFrozen(COACH_RAW_REPLAY_EXEMPT_PROFILES)).toBe(true);
+        expect(coachRawReplayRequired('predecessor-1897-2025')).toBe(false);
+        for (const p of ['c2-2026-rehearsal-only', 'c2-2026-successor', 'Predecessor-1897-2025', '', undefined, null, 1]) {
+          expect(coachRawReplayRequired(p), String(p)).toBe(true);
+        }
+      });
+
+      it('carries the flag in the stage and the derived preflight argv', () => {
+        const base = coachesImportArgv(FULL_LABEL);
+        expect(base).not.toContain('--require-raw-bundle');
+        expect(coachesImportArgv(FULL_LABEL, undefined, undefined, true)).toEqual([...base, '--require-raw-bundle']);
+        expect(coachesValidateArgv(FULL_LABEL, undefined, undefined, true)).toEqual([...base, '--require-raw-bundle', '--validate-only']);
+      });
+
+      it('reads the exact raw_bundle pin and refuses a malformed one', () => {
+        expect(afltablesCoachesPin().rawBundle).toEqual({
+          filename: 'coaches-20260905-raw.tar', sha256: '2468569067209ec3810b5bbcc45cb8d75c616f69517bac8531fbffa47c661e4a',
+          bytes: 24023040, members: 387 });
+        const without = real();
+        delete without.coaches.accepted_snapshot.raw_bundle;
+        expect(afltablesCoachesPin(() => without).rawBundle).toBeUndefined();
+        for (const mutate of [
+          (r: Record<string, unknown>) => { delete r.sha256; }, (r: Record<string, unknown>) => { r.extra = 1; },
+          (r: Record<string, unknown>) => { r.sha256 = 'A'.repeat(64); }, (r: Record<string, unknown>) => { r.filename = '../x.tar'; },
+          (r: Record<string, unknown>) => { r.filename = 'x.tar.gz'; }, (r: Record<string, unknown>) => { r.bytes = '24023040'; },
+          (r: Record<string, unknown>) => { r.members = 0; }, (r: Record<string, unknown>) => { r.bytes = 1.5; },
+        ]) {
+          const c = real(); mutate(c.coaches.accepted_snapshot.raw_bundle);
+          expect(() => afltablesCoachesPin(() => c)).toThrow(/raw_bundle is not exactly/);
+        }
+        const nulled = real(); nulled.coaches.accepted_snapshot.raw_bundle = null;
+        expect(() => afltablesCoachesPin(() => nulled)).toThrow(/raw_bundle is not exactly/);
+      });
+
+      it('requires the pin and the bundle file before any loader runs, and never for the predecessor', () => {
+        const seen: string[] = [];
+        const exists = (p: string) => { seen.push(p); return true; };
+        expect(coachRawReplayPreflight('predecessor-1897-2025', exists)).toBe(false);
+        expect(seen).toEqual([]);
+        expect(coachRawReplayPreflight('c2-2026-successor', exists)).toBe(true);
+        expect(seen).toEqual([bundleRel()]);
+        const without = real();
+        delete without.coaches.accepted_snapshot.raw_bundle;
+        expect(() => coachRawReplayPreflight('c2-2026-rehearsal-only', exists, () => without))
+          .toThrow(/profile 'c2-2026-rehearsal-only' requires the mandatory raw replay[\s\S]*no raw_bundle pin[\s\S]*Nothing has been destroyed/);
+        expect(() => coachRawReplayPreflight('c2-2026-successor', () => false))
+          .toThrow(/the mandatory raw bundle .*coaches-20260905-raw\.tar is missing[\s\S]*Nothing has been destroyed/);
+      });
+
+      it.each(['c2-2026-rehearsal-only', 'c2-2026-successor'])(
+        '%s: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure', (profile) => {
+          const ok = recording();
+          runPreflight(ok.deps, OPTS, fitzroy(), undefined, swapped(profile));
+          const coachRuns = ok.commands.filter((a) => a.includes(COACH_LOADER));
+          expect(coachRuns).toEqual([coachesValidateArgv(FULL_LABEL, undefined, undefined, true)]);
+          expect(ok.fake.sqlRuns).toEqual([]);
+          expect(ok.fake.validationRuns).toEqual([]);
+
+          const missing = recording({ missing: bundleRel() });
+          expect(() => runPreflight(missing.deps, OPTS, fitzroy(), undefined, swapped(profile)))
+            .toThrow(/mandatory raw bundle[\s\S]*Nothing has been destroyed/);
+          expect(missing.commands.some((a) => a.includes(COACH_LOADER))).toBe(false);
+          expect(missing.fake.sqlRuns).toEqual([]);
+
+          const refused = recording({ failCoach: true });
+          expect(() => runPreflight(refused.deps, OPTS, fitzroy(), undefined, swapped(profile)))
+            .toThrow(/Coaches preflight failed \(tools\/migration\/import_match_coaches\.py --validate-only --require-raw-bundle\)[\s\S]*does not replay[\s\S]*Nothing has been destroyed[\s\S]*AFLDB-COACH-RAW-REPLAY REFUSED/);
+          expect(refused.fake.sqlRuns).toEqual([]);
+          expect(refused.fake.validationRuns).toEqual([]);
+        });
     });
 
     it('gates the rebuilt coaching on the contract pin: people, proven links only, assignments, coverage shape', () => {

@@ -401,6 +401,9 @@ afterAll(() => { for (const t of temps) rmSync(t, { recursive: true, force: true
 type Control = 'active' | 'retired' | 'missing' | 'garbage' | 'unbounded' | 'beyond';
 const REFUSED: readonly Control[] = ['retired', 'missing', 'garbage', 'unbounded'];
 
+/** AFLDB-ISSUE-319: the quarantined coach adapter imports this tools/ parser at load. */
+const COACH_PARSER = 'tools/rebuild/afltables/coach_snapshot_parser.py';
+
 /** A temporary tree holding ONLY the control, the register (and `extra` files, CR-stripped). */
 function tree(control: Control, extra: Record<string, string> = {}): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'afltables-network-'));
@@ -483,9 +486,10 @@ describe.skipIf(!HAVE_RSCRIPT)('acquire_club_lists.R gate (httr club pages)', ()
 describe.skipIf(!PYTHON)('acquire_coaches.py gate (urllib coach pages)', () => {
   const rel = 'legacy/offline/tools/rebuild/afltables/acquire_coaches.py';
   // The script resolves its repository root from its own path, so it is copied
-  // into the temporary tree beside the control rather than run in place.
+  // into the temporary tree beside the control rather than run in place, with the
+  // shared coach parser it imports (AFLDB-ISSUE-319; network-free, no gate of its own).
   const py = (control: Control) => {
-    const dir = tree(control, { [rel]: rel });
+    const dir = tree(control, { [rel]: rel, [COACH_PARSER]: COACH_PARSER });
     return run(PYTHON!, ['-I', path.join(dir, rel), '--out-dir', path.join(dir, 'out')], dir);
   };
   for (const control of REFUSED) {
@@ -653,7 +657,7 @@ describe('the last_season number contract is the same in every gate', () => {
   describe.skipIf(!PYTHON)('Python', () => {
     const rel = 'legacy/offline/tools/rebuild/afltables/acquire_coaches.py';
     it.each(NUMBER_CONTRACT)('acquire_coaches.py: $label -> $expected', (c) => {
-      const dir = rawTree(c, { [rel]: rel });
+      const dir = rawTree(c, { [rel]: rel, [COACH_PARSER]: COACH_PARSER });
       const r = run(PYTHON!, ['-I', path.join(dir, rel), '--out-dir', path.join(dir, 'out')], dir);
       expect(outcomeOf(r.out)).toBe(c.expected);
       expect(r.status).not.toBe(0);

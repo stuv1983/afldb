@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-319 - Mandatory coach raw-to-parsed replay inside the rebuild preflight (2026-10-23)
+
+- Rebuild behaviour: for every ladder profile except `predecessor-1897-2025` (the rehearsal-only profile and any
+  successor), the coaches preflight and the coaches stage now run `import_match_coaches.py --require-raw-bundle`.
+  - The loader reads the raw bundle pinned in `afltables-contract.json` `coaches.accepted_snapshot.raw_bundle`
+    (`coaches-20260905-raw.tar`, sha256 `24685690…4a`, 387 members) in memory, and nothing is extracted. It refuses
+    a changed, missing, extra, duplicate, linked, nonregular, absolute or `..` member, or any directory other than
+    `raw`.
+  - It replays the acquisition's own parser and refuses unless the rendered CSVs equal the manifest digests and the
+    exact bytes it then loads. A missing pin or bundle refuses before the census, the capture or the reset.
+    Parsed-only is never a fallback outside the predecessor.
+- The network-free parser moved unchanged from the quarantined adapter to
+  `tools/rebuild/afltables/coach_snapshot_parser.py`. The adapter imports it, and its `write_csv` output is
+  byte-identical. `tools/` imports nothing from `legacy/`. The package filename alphabet is unchanged: the space in
+  `Allan_La Fontaine.html` exists only inside the tar.
+- The predecessor's parsed-only behaviour is unchanged.
+
 ### ISSUE-320 - Enforced native-library closure for guarded rehearsal processes (2026-10-23)
 
 - Rehearsal runtime trust: runtime record schema version 3 adds `native_closure`, which is enforced, not observed.

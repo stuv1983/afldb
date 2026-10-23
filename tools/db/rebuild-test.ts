@@ -1637,12 +1637,14 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // column, reconciled to the pages by exact string. Manifest-pinned snapshot
       // (afltables-contract.json coaches.accepted_snapshot); the tracked parsed
       // artefacts are the input bytes. Needs matches, clubs and identities: after
-      // fitzroy; nothing later reads it. No network.
+      // fitzroy; nothing later reads it. No network. AFLDB-ISSUE-319: outside the
+      // predecessor the stage replays the pinned raw bundle again, in the loading process.
       id: 'coaches',
-      name: `COACHES — AFL Tables coach pages ${afltablesCoachesPin().label} + shared height/coach stats (${statsInputs}) Coach column`,
+      name: `COACHES — AFL Tables coach pages ${afltablesCoachesPin().label} + shared height/coach stats (${statsInputs}) Coach column`
+        + (coachRawReplayRequired(ladder.pair.profile) ? ' + mandatory raw replay' : ''),
       kind: 'data',
       run: 'command',
-      argv: coachesImportArgv(fitzroy.label, python, readHeightContract),
+      argv: coachesImportArgv(fitzroy.label, python, readHeightContract, coachRawReplayRequired(ladder.pair.profile)),
       envOverlay: dataEnv,
     },
     {
@@ -3251,14 +3253,20 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource,
   // AFLDB-ISSUE-118 §23.27. The coaches stage reads the pinned coach-page snapshot (its
   // parsed artefacts tracked, raw bytes gitignored) and the shared height/coach stats
   // inputs: prove the pin binding (inside afltablesCoachesPin) and every hash offline.
+  // AFLDB-ISSUE-319: outside the predecessor, the loader must also replay the pinned raw
+  // bundle into exactly the parsed bytes the stage loads; a missing pin or bundle refuses
+  // here, before the census, the capture or the reset. Parsed-only is never a fallback.
+  const requireCoachRaw = coachRawReplayPreflight(
+    binding ? binding.ladder.pair.profile : ladderDocuments().contract.datasets?.ladder?.rebuild_expectation?.profile,
+    deps.fileExists);
   if (source) {
-    const coaches = deps.runCommand(coachesValidateArgv(source.label, python, readHeightContract), {});
+    const coaches = deps.runCommand(coachesValidateArgv(source.label, python, readHeightContract, requireCoachRaw), {});
     if (coaches.status !== 0) {
       throw new RebuildRefused(
-        `Coaches preflight failed (${COACH_LOADER} --validate-only). The AFL Tables contract `
+        `Coaches preflight failed (${COACH_LOADER} --validate-only${requireCoachRaw ? ' --require-raw-bundle' : ''}). The AFL Tables contract `
         + `pins '${afltablesCoachesPin().label}', but its tracked artefacts, the baseline's `
         + `shared height/coach stats (${heightStatsInputDescription(source.label, readHeightContract)}) are missing, incomplete or do not match `
-        + 'their manifests. Re-acquire the coach pages with '
+        + `their manifests${requireCoachRaw ? ', or the pinned raw bundle does not replay into the parsed bytes the stage loads' : ''}. Re-acquire the coach pages with `
         + 'legacy/offline/tools/rebuild/afltables/acquire_coaches.py. Nothing has been destroyed.\n'
         + `${coaches.stdout}${coaches.stderr}`);
     }
@@ -3707,7 +3715,10 @@ export function birthDateChecks(readAfltables?: SourceContractReaders['afltables
   ];
 }
 
+/** AFLDB-ISSUE-319: the contract-pinned raw bundle of the accepted coach capture. */
+export type CoachRawBundlePin = Readonly<{ filename: string; sha256: string; bytes: number; members: number }>;
 export type AflTablesCoachesPin = PinnedManifest & {
+  rawBundle?: CoachRawBundlePin;
   measured: {
     coaches: number;
     coachesLinkedToPlayers: number;
@@ -3736,7 +3747,7 @@ export function afltablesCoachesPin(
   const block = contract?.coaches as Record<string, unknown> | undefined;
   const accepted = block?.accepted_snapshot as
     { label?: unknown; manifest?: unknown; manifest_sha256_lf?: unknown;
-      measured?: Record<string, unknown> } | undefined | null;
+      measured?: Record<string, unknown>; raw_bundle?: unknown } | undefined | null;
   if (!accepted?.label || !accepted.manifest || !accepted.manifest_sha256_lf
       || !accepted.measured) {
     throw new RebuildRefused(
@@ -3759,6 +3770,7 @@ export function afltablesCoachesPin(
   };
   return {
     ...pin,
+    ...(accepted.raw_bundle === undefined ? {} : { rawBundle: coachRawBundlePin(accepted.raw_bundle) }),
     measured: {
       coaches: int('coaches'),
       coachesLinkedToPlayers: int('coaches_linked_to_players'),
@@ -3771,18 +3783,67 @@ export function afltablesCoachesPin(
   };
 }
 
+/** A present raw_bundle pin is exact or refused; it is never partly read. */
+function coachRawBundlePin(value: unknown): CoachRawBundlePin {
+  const v = value as Record<string, unknown> | null;
+  const keys = v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).filter((k) => k !== '$comment').sort() : [];
+  if (keys.join(' ') !== 'bytes filename members sha256'
+      || typeof v!.filename !== 'string' || !/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.tar$/.test(v!.filename)
+      || typeof v!.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(v!.sha256)
+      || !Number.isInteger(v!.bytes) || (v!.bytes as number) <= 0
+      || !Number.isInteger(v!.members) || (v!.members as number) <= 0) {
+    throw new RebuildRefused('coaches.accepted_snapshot.raw_bundle is not exactly {filename, sha256, bytes, members}.');
+  }
+  return { filename: v!.filename, sha256: v!.sha256, bytes: v!.bytes as number, members: v!.members as number };
+}
+
+/**
+ * AFLDB-ISSUE-319 (owner decision 2026-10-23: "Require raw-to-parsed coach replay inside preflight").
+ * Every ladder profile except these replays the pinned raw bundle in preflight and in the stage;
+ * the predecessor keeps its reviewed parsed-only behaviour. An unknown profile is never exempt.
+ */
+export const COACH_RAW_REPLAY_EXEMPT_PROFILES: readonly string[] = Object.freeze(['predecessor-1897-2025']);
+export function coachRawReplayRequired(profile: unknown): boolean {
+  return !(typeof profile === 'string' && COACH_RAW_REPLAY_EXEMPT_PROFILES.includes(profile));
+}
+
+/**
+ * Preflight half of AFLDB-ISSUE-319: whether `profile` requires the raw replay, and if so that the
+ * contract pins a raw bundle and the file is in the checkout. Refuses before any destructive step;
+ * the loader then proves the bytes (`--require-raw-bundle`).
+ */
+export function coachRawReplayPreflight(profile: unknown, fileExists: (path: string) => boolean,
+                                        readAfltables?: () => Record<string, unknown> | null): boolean {
+  if (!coachRawReplayRequired(profile)) return false;
+  const pin = afltablesCoachesPin(readAfltables);
+  if (!pin.rawBundle) {
+    throw new RebuildRefused(
+      `Coaches preflight: ladder profile '${String(profile)}' requires the mandatory raw replay `
+      + `(AFLDB-ISSUE-319), but ${AFLTABLES_CONTRACT} coaches.accepted_snapshot has no raw_bundle pin. `
+      + 'Nothing has been destroyed.');
+  }
+  const bundle = join('data', 'sources', 'afltables', 'coaches', pin.label, pin.rawBundle.filename);
+  if (!fileExists(bundle)) {
+    throw new RebuildRefused(
+      `Coaches preflight: the mandatory raw bundle ${bundle} is missing (AFLDB-ISSUE-319; profile `
+      + `'${String(profile)}'). Nothing has been destroyed.`);
+  }
+  return true;
+}
+
 /** The COACHES data stage: pinned coach pages and the same declared stats inputs as heights. */
 export function coachesImportArgv(fitzroyLabel: string, python: string = resolvePython(),
-                                  readContract?: HeightContractReader): string[] {
+                                  readContract?: HeightContractReader, requireRawBundle = false): string[] {
   const argv = [python, COACH_LOADER, '--label', afltablesCoachesPin().label, '--fitzroy-label', fitzroyLabel];
   for (const s of heightEnrichmentPins(readContract, fitzroyLabel).supplements) argv.push('--supplement-label', s.label);
+  if (requireRawBundle) argv.push('--require-raw-bundle');
   return argv;
 }
 
 /** The same argv plus --validate-only: manifests and artefact hashes, no database. */
 export function coachesValidateArgv(fitzroyLabel: string, python: string = resolvePython(),
-                                    readContract?: HeightContractReader): string[] {
-  return [...coachesImportArgv(fitzroyLabel, python, readContract), '--validate-only'];
+                                    readContract?: HeightContractReader, requireRawBundle = false): string[] {
+  return [...coachesImportArgv(fitzroyLabel, python, readContract, requireRawBundle), '--validate-only'];
 }
 
 /**
