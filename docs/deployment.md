@@ -250,15 +250,28 @@ Normal test rebuild — unchanged:
 npm run db:test:rebuild -- --acknowledge-destroy afldb_test
 ```
 
-Rehearsal rebuild of `code_test_db` — the same runner, the same stage graph, nothing reduced:
+**The ordinary CLI no longer runs `--target code_test_db` (AFLDB-ISSUE-324, intentional).**
+`npm run db:test:rebuild -- --target code_test_db …` (with or without `--plan`) is now refused
+before any database contact, on every platform: the ordinary path runs only a closed table of
+`npx tsx` argument lists and the two package scripts `db:migrate:test` / `db:privileges:test`,
+mapped to the bound `node` and the checkout's own `node_modules/tsx/dist/cli.mjs`, and
+`db:migrate:code-test` / `db:privileges:code-test` are deliberately not in that table (owner
+ruling, ISSUE-316 revision J; a test pins the refusal). The dedicated `code_test_db` rehearsal
+tools (`npm run db:code-test:*-rehearsal`, which call the runner directly) are unaffected. The
+target contract below still describes how the runner itself validates a `code_test_db` binding.
 
-```bash
-npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
-```
+The ordinary path also refuses, before anything runs, when:
 
-```powershell
-npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
-```
+- the checkout's `node_modules` (or anything under it) is a symbolic link or junction to a
+  shared installation. Every package file must be physically inside the checkout. npm's own
+  `.bin/<name>` links are admitted only when their real file is inside the checkout's
+  `node_modules`. The single exception is the two esbuild native binaries tsx execs
+  (`node_modules/tsx/node_modules/{@esbuild/linux-x64,esbuild}/bin/esbuild`). Each may be an
+  absolute symlink to its fixed, policy-bound real path in the reviewed DEV clean install, and
+  its bytes must hash to the fixed sha256 before every execution. A regular file there claims
+  no exception.
+- the environment carries `ESBUILD_BINARY_PATH`, `NODE_OPTIONS`, `NODE_PATH` or
+  `TSX_TSCONFIG_PATH`. These are refused, not stripped.
 
 Add `--plan` to print the stage graph and exit without touching anything. The core source is
 never named on the command line (it is the single accepted baseline in
@@ -331,8 +344,8 @@ stage `id` is what `--plan` prints and what a failure names.
 | 1a | `afl-api-ownership-census` | **validation** — refuse if any completed season in the rebuild scope holds a canonical match owned by source `afl_api`, naming every season and count; runs before the capture marker and the reset, with no override (AFLDB-ISSUE-233 D-233-3) | `AFLDB_TEST_DATABASE_URL` (owner; one read-only transaction) |
 | 2 | `afl-api-adjudications-capture` | **capture** the combined rebuild state — the human `afl_api` adjudication ledger (AFLDB-ISSUE-235), the importer-created `afl_api` identities (AFLDB-ISSUE-237) and the manual player registrations (AFLDB-ISSUE-245) — before anything is destroyed, then set the database marker | `AFLDB_TEST_DATABASE_URL` (owner; read-only snapshot, then the marker in its own transaction) |
 | 3 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
-| 4 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
-| 5 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
+| 4 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` only through the dedicated rehearsal tools — the ordinary CLI refuses it, AFLDB-ISSUE-324) | `AFLDB_TEST_DATABASE_URL` |
+| 5 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` only through the dedicated rehearsal tools — the ordinary CLI refuses it) | `AFLDB_TEST_DATABASE_URL` |
 | 6 | `reference` | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 7 | `fitzroy` | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 8 | `heights` | heights — AFL Tables player-details register | `AFLDB_TEST_IMPORT_DATABASE_URL` |

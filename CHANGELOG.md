@@ -15,6 +15,34 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-324 / ISSUE-322 / ISSUE-316 - Ordinary rebuild runs only bound node; receipts survive promotion; revision J pinned (2026-10-24)
+
+- `tools/db/rebuild-test.ts` (`82603dc7`, `14abea5e`), AFLDB-ISSUE-324: the ordinary rebuild path no longer spawns
+  `npx`/`npm` through PATH.
+  - It maps a closed table of `npx tsx` argument lists, plus `npm run db:migrate:test` and `db:privileges:test`, to
+    the bound `node` and the checkout's own verified `node_modules/tsx/dist/cli.mjs` (`shell: false`).
+  - It refuses everything else before `--plan` reports and before anything is destroyed.
+- **Intentional behaviour change:** the ordinary CLI now refuses `--target code_test_db`, `--plan` included. The
+  dedicated `db:code-test:*-rehearsal` tools are unaffected. `docs/deployment.md` §6a is updated.
+- Strict realpath: every package file must be physically inside the checkout.
+  - npm `.bin/<name>` links are admitted only when their real file is inside the checkout's `node_modules`.
+  - The disclosed esbuild native-binary exception covers only the two esbuild binaries tsx execs. Each may be an
+    absolute symlink to its fixed, policy-bound real path, and its sha256 is checked before every execution. Owner
+    rulings set 3 clarify that only these two binaries may use a symlink whose resolved target leaves the checkout.
+  - A shared-install `node_modules` link or junction now refuses.
+- The ordinary path refuses an inherited `ESBUILD_BINARY_PATH`, `NODE_OPTIONS`, `NODE_PATH` or `TSX_TSCONFIG_PATH`.
+- `tools/db/promotion-inventory.ts` (`db541ae3`), AFLDB-ISSUE-322, resolved: `brownlow_correction_receipts` is
+  reinstated through promotion.
+  - It is excluded only from the TRUNCATE statement.
+  - After `BEGIN` it is locked `ACCESS EXCLUSIVE` and asserted empty.
+  - It is never trigger-bypassed.
+  - The freeze set grows from 42 to 43 tables.
+  - The real swap and rollback integration test passed: 7 passed, 0 skipped.
+- ISSUE-316 revision J is pinned, not applied: pinned checkout `dfbfc1ab`, J-pinned `5c0763fa…`, rollover date
+  2026-10-24.
+  - The enforced streamanator dry run refused at gate 1 with nothing written. An OS update changed
+    `libz.so.1.3`, which the native policy binds, so the disposable rebuild was not run. Production remains NO-GO.
+
 ### ISSUE-323 - An exactly adopted successor runs the ordinary rebuild without rehearsal provenance (2026-10-23)
 
 - `tools/db/rebuild-test.ts` (`481511d2`): the candidate-provenance guards in `runPreflight` and `executeRebuild` now
