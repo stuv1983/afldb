@@ -535,8 +535,14 @@
     by the cited revisions; roster bytes 15/15.
   - Blocked: the NM 1940 R8–R18 attribution conflict; 479 unmapped roster ids; rejected matches and height
     disagreements; roster completeness and raw; the parsed-only consumption policy.
-- **Key files:** `issues/open/AFLDB-ISSUE-319.md`; evidence `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/source-evidence/`.
-- **Next:** owner adjudication of runbook §3 items 1–5, or named additional evidence.
+  - Second pass (2026-10-23, runbook §4): five questions prepared with new labelled captures, none adjudicated.
+    - NM 1940: the publisher's match pages list joint Carter + Adamson, which the one-coach schema cannot hold.
+    - Caps: origin reads confirm the same-publisher disagreement.
+    - Raw coaches: a fail-closed replay preflight is prototyped (8/8 controls), not implemented.
+  - Unchanged by the v3 rehearsal at `15e43562`: the coaches stage ran parsed-only. All five stay PENDING.
+- **Key files:** `issues/open/AFLDB-ISSUE-319.md`; evidence `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/source-evidence/`
+  and `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/source-evidence-319/`.
+- **Next:** owner choice on runbook §4 items 1–5, or named additional evidence.
 
 ### AFLDB-ISSUE-320 — Enforced native-library closure for guarded rehearsal/rebuild processes
 - **Severity:** High (ISSUE-316 successor gate G2). **Area:** V2 rehearsal/rebuild runtime trust boundary.

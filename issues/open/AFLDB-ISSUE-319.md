@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-319 — Successor source-evidence requirements unresolved
 
-**Status:** OPEN / BLOCKED, registered 2026-10-23. Part of it is resolved by evidence; the rest needs owner adjudication or evidence that is not available.
+**Status:** OPEN / BLOCKED, registered 2026-10-23. Part of it is resolved by evidence; the rest needs owner adjudication or evidence that is not available. Second evidence pass 2026-10-23 (§4): five questions prepared, none adjudicated.
 **Severity:** High, as an ISSUE-316 successor gate. **Area:** source provenance and coverage (coaches, rosters, heights, identity).
 **Linked:** AFLDB-ISSUE-316 (gate G1 of successor package E).
 
@@ -60,5 +60,60 @@ The evidence for this issue is in `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-2026102
 
 ET applicability and Brownlow 2026 stay under ISSUE-316 (owner: unresolved and unapproved).
 
-## 4. Next action
-Owner answers to §3 items 1–5, or named additional evidence. No item is accepted by default.
+## 4. Prepared for owner decision (2026-10-23, second pass)
+The full package is in `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/source-evidence-319/SOURCE_QUESTIONS.md`. Every script and JSON sits beside it.
+
+**What this pass did and did not do.**
+* Earlier evidence was reused. The 479-id classing and the ten-coach totals were not re-measured.
+* New publisher reads are separately labelled captures: GET only, robots.txt 404 captured first, every response
+  hashed in `MANIFEST.tsv`.
+* Nothing was adjudicated, name-matched, voted on, averaged or zero-filled.
+
+1. **NM 1940.**
+   * *Observed:* in the packaged core (34,112 (match, club) groups, 1,642 blank), the only blank Coach groups after
+     1922 are exactly these eleven games. R1–R7 carry "Thomas, Len".
+   * *Publisher statement, new capture* (`nm1940-match-pages-capture-20261023T0037Z/`, 18 match pages, HTTP 200):
+     every R8–R18 page lists **two** North Melbourne coaches, Carter and Adamson. Their joint counters run 1 → 11.
+     R1–R7 list Thomas only. These are the only two-coach games in the capture.
+   * `match_coaches` is keyed `(match_id, club_id)` (migration 087), so a joint attribution is not representable
+     today.
+   * *Owner choice:*
+     * (a) keep unattributed as a recorded limitation;
+     * (b) adopt the joint attribution, which needs a schema/importer design change;
+     * (c) designate another authority. Wikipedia's Thomas 12 / Adamson 6 contradicts both AFL Tables and the core's
+       7 Thomas games.
+2. **479 ids.**
+   * A targeted check joined by `providerId` only. 443 of the 479 have no publisher `debutYear`, but 387 of the 1,916
+     *mapped* ids also lack one. The field cannot show never-debuted players, so the question is not resolved.
+   * Nine class-C ids state a debut. They are listed in the package.
+   * *Owner choice:* name acceptable non-name identity evidence (a cross-publisher mapping source, or an explicit
+     attribute-key policy), or keep the ids excluded.
+3. **Caps and heights.**
+   * The first byte-hashed origin reads of the nine Collingwood pages (`caps-capture-20261023T0051Z/`). Victor
+     Jackson's profile, unreadable on 2026-10-21, is now read: DOB 9-Apr-1889, 185 cm, 1912 Collingwood, 3 games / 4
+     goals.
+   * The register's 22/blank/34/181 against the profiles' 18/4/35/180 persists. These are same-publisher statements.
+   * *Owner choice:* designate an independent authority and authorise evidence from it, or accept the differences as
+     evidence-only.
+4. **Roster completeness.**
+   * No evidence obtainable after the fact can establish the completeness of the 2026-09-04 capture.
+   * *Owner choice:* a separately labelled successor capture with raw retention (broad, not authorised here), or
+     frozen evidence-only use with completeness unvalidated.
+5. **Parsed-only coaches.**
+   * A fail-closed prototype (`raw-replay-preflight/`) verifies the parsed CSVs the run would load against an
+     in-memory replay of the package's own raw tar. It needs no package path change.
+   * Positive result: equal three ways. 8 of 8 negative controls refuse. A void first control is retained.
+   * `OPTION.md` holds the exact implementation and tests. They are **not implemented**, and no rehearsal executed
+     them.
+   * *Owner choice:* out-of-band replay proof is sufficient, or in-run verification is required. Choosing in-run
+     verification means a new commit, a new package and a fresh enforced rehearsal.
+
+## 5. Next action
+Owner answers to §4 items 1–5, or named additional evidence. No item is accepted by default.
+
+**Unchanged by the v3 rehearsal at `15e43562` (2026-10-23; ISSUE-320).**
+* The rehearsal passed, but it answers none of §4.
+* Its coaches stage ran parsed-only. The log line is `raw/ not present (the tracked parsed artefacts are the rebuild input)`.
+* The cross-check gave 376 / 386, the same as before. `match_coaches` has 32,470 rows; 621 matches have no coach.
+* The raw-replay prototype was not implemented or executed.
+* NM 1940, the 479 ids, caps and heights, roster completeness and the parsed-only policy all stay PENDING owner choice.
