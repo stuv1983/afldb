@@ -140,10 +140,10 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | validate_stage | `src/lib/acquisition/afl-api-bundle.ts:329` | `emitAflApiMatch` | staging |
 | validate_stage | `src/lib/acquisition/afl-api-bundle.ts:533` | `emitAflApiPlayerMatchStats` | staging |
 | validate_stage | `src/lib/acquisition/afl-api-bundle.ts:726` | `emitAflApiMatchRoster` | staging |
-| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:834` | `emitAflApiBrownlowMatchVotes` | staging |
-| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:928` | `emitAflApiBrownlowLeaderboard` | staging |
-| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:1180` | `buildAflApiMatchBundle` | staging |
-| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:1296` | `buildAflApiSettleRecords` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:838` | `emitAflApiBrownlowMatchVotes` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:933` | `emitAflApiBrownlowLeaderboard` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:1185` | `buildAflApiMatchBundle` | staging |
+| validate_stage | `src/lib/acquisition/afl-api-bundle.ts:1301` | `buildAflApiSettleRecords` | staging |
 | validate_stage | `src/lib/acquisition/settle-afl-api.ts:241` | `buildAflApiSettleBundle` | staging |
 | validate_stage | `src/lib/acquisition/afl-api-season-enumeration.ts:156` | `assessAflApiSeasonEnumeration` | staging |
 | validate_stage | `src/lib/acquisition/observations.ts:128` | `canonicalJson` | staging |
@@ -158,7 +158,7 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | resolve_identity | `packages/acquisition/src/fixture-contract.ts:479` | `detectAflApiFixtureCollisions` | nothing |
 | reconcile | `src/lib/acquisition/reconciliation.ts:467` | `reconcile` | nothing |
 | reconcile | `src/lib/acquisition/afl-api-settle-plan.ts:520` | `planAflApiMatchUnit` | nothing |
-| reconcile | `src/lib/acquisition/afl-api-brownlow.ts:1369` | `reconcileAflApiBrownlowSeason` | nothing |
+| reconcile | `src/lib/acquisition/afl-api-brownlow.ts:1397` | `reconcileAflApiBrownlowSeason` | nothing |
 | reconcile | `packages/acquisition/src/reconciliation-report.ts:136` | `buildAflApiReconciliationReport` | nothing |
 | reconcile | `packages/acquisition/src/reconciliation-report.ts:248` | `validateAflApiReconciliationReport` | nothing |
 | promote | `tools/current-season/settle-afl-api.ts:123` | `loadAflApiSettleBundle` | canonical |
@@ -169,14 +169,14 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | promote | `src/lib/acquisition/settle-core.ts:392` | `acquireSettlePromotionGate` | canonical |
 | promote | `src/lib/acquisition/settle-afl-api.ts:1973` | `runSettleAflApi` | canonical |
 | promote | `src/lib/acquisition/settle-afl-api.ts:1969` | `normaliseAflApiCountersAfterFullRollback` | canonical |
-| promote | `src/lib/acquisition/afl-api-brownlow.ts:1424` | `runSettleAflApiBrownlow` | canonical |
+| promote | `src/lib/acquisition/afl-api-brownlow.ts:1502` | `runSettleAflApiBrownlow` | canonical |
 | promote | `src/lib/acquisition/canonical-apply.ts:1041` | `applyCanonicalUnit` | canonical |
 | derive | `src/lib/acquisition/settle-core.ts:297` | `runDerivedRecomputeWithDeadlockRetry` | derived |
-| derive | `src/db/queries/player-derived.ts:46` | `recomputePlayerDerivedStats` | derived |
-| derive | `src/db/queries/player-derived.ts:435` | `recomputeClubSeasons` | derived |
-| derive | `src/db/queries/player-derived.ts:537` | `recomputeSeasonMetadata` | derived |
-| derive | `src/db/queries/player-derived.ts:383` | `recomputeSeasonBrownlowStatus` | derived |
-| derive | `src/db/queries/player-derived.ts:678` | `recomputeBrownlowCoverage` | derived |
+| derive | `src/db/queries/player-derived.ts:47` | `recomputePlayerDerivedStats` | derived |
+| derive | `src/db/queries/player-derived.ts:425` | `recomputeClubSeasons` | derived |
+| derive | `src/db/queries/player-derived.ts:527` | `recomputeSeasonMetadata` | derived |
+| derive | `src/db/queries/player-derived.ts:379` | `recomputeSeasonBrownlowStatus` | derived |
+| derive | `src/db/queries/player-derived.ts:670` | `recomputeBrownlowCoverage` | derived |
 <!-- stage-map:end -->
 
 ## 10. Admin operations centre (Stage 5)

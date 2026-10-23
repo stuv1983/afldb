@@ -6418,8 +6418,14 @@ describe('AFLDB-ISSUE-130 — the R runtime declaration', () => {
         `${fragment}\necho "AFLDB_TEST_FRAGMENT_ROOT=$PWD"\n`,
       );
       writeFileSync(join(root, 'data', 'reference', 'seasons.json'), '{"in_progress_seasons":[]}\n');
+      // The fake interpreter answers the AFL Tables switch read (AFLDB-ISSUE-316) with an explicit
+      // 'active', independent of the tracked switch; any other answer is retired (fail closed) and
+      // stops the script before the fragment. Every other read gets the season gate's AMBIGUOUS:0.
       const python = join(root, 'fake-python');
-      writeFileSync(python, '#!/bin/sh\ncat >/dev/null\necho AMBIGUOUS:0\n');
+      writeFileSync(
+        python,
+        '#!/bin/sh\ncase "$(cat)" in\n  *afltables-network.json*) echo active ;;\n  *) echo AMBIGUOUS:0 ;;\nesac\n',
+      );
       chmodSync(python, 0o755);
       return root;
     }

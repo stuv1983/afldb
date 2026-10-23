@@ -4,10 +4,11 @@
  * correction field is refused, and the real data/reference/seasons.json seals 2025 but not 2026.
  * No database, no network.
  */
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import {
   ADJUDICATION_NOTE_MAX_LENGTH,
@@ -25,6 +26,8 @@ import {
   type AuditedCorrection,
   type SeasonRegistry,
 } from '@afldb/domain';
+
+import { isSettleSeasonSealed, refuseSealedSeasonForSettle } from '../tools/current-season/settle-season-seal';
 
 const REAL_REGISTRY = JSON.parse(
   readFileSync(join(__dirname, '..', 'data', 'reference', 'seasons.json'), 'utf8'),
@@ -164,6 +167,44 @@ describe('evaluateSeasonWrite', () => {
   it('keeps the note bounds equal to the adjudication workflow bounds it mirrors', () => {
     expect(CORRECTION_NOTE_MIN_LENGTH).toBe(ADJUDICATION_NOTE_MIN_LENGTH);
     expect(CORRECTION_NOTE_MAX_LENGTH).toBe(ADJUDICATION_NOTE_MAX_LENGTH);
+  });
+});
+
+describe('the settle gate across the 2026 -> 2027 season boundary (AFLDB-ISSUE-316)', () => {
+  // EXPLICIT predecessor and candidate registries, never the tracked file: the gate reads
+  // data/reference/seasons.json under the CLI's own project root, so each case gets its own root.
+  const PREDECESSOR = { first_season: 1897, last_season: 2026, in_progress_seasons: [2026] };
+  const CANDIDATE = { first_season: 1897, last_season: 2027, in_progress_seasons: [2027] };
+  const roots: string[] = [];
+  const rootFor = (registry: SeasonRegistry): string => {
+    const root = mkdtempSync(join(tmpdir(), 'afldb-season-boundary-'));
+    roots.push(root);
+    mkdirSync(join(root, 'data', 'reference'), { recursive: true });
+    writeFileSync(join(root, 'data', 'reference', 'seasons.json'), `${JSON.stringify(registry)}\n`);
+    return root;
+  };
+  afterAll(() => {
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('admits a 2026 settle before the rollover and refuses it after, before any client', () => {
+    expect(isSettleSeasonSealed(rootFor(PREDECESSOR), 2026)).toBe(false);
+    expect(() => refuseSealedSeasonForSettle(rootFor(PREDECESSOR), 2026)).not.toThrow();
+    const candidate = rootFor(CANDIDATE);
+    expect(isSettleSeasonSealed(candidate, 2026)).toBe(true);
+    expect(() => refuseSealedSeasonForSettle(candidate, 2026))
+      .toThrow(expect.objectContaining({ name: 'SealedSeasonRefusal', code: 'season_sealed', season: 2026 }));
+    expect(() => refuseSealedSeasonForSettle(candidate, 2027)).not.toThrow();
+  });
+
+  it('leaves sealed 2026 to the audited workflows only: brownlow_authority with a valid record, never a settle', () => {
+    const sealed = sealedSeasonsFrom(CANDIDATE);
+    expect(evaluateSeasonWrite({ season: 2026, sealed, correction: null }))
+      .toMatchObject({ allowed: false, code: 'season_sealed' });
+    expect(evaluateSeasonWrite({ season: 2026, sealed, correction: correction({ workflow: 'brownlow_authority' }) }))
+      .toMatchObject({ allowed: true, basis: 'audited_correction', audit: { season: 2026, workflow: 'brownlow_authority' } });
+    expect(evaluateSeasonWrite({ season: 2026, sealed, correction: correction({ workflow: 'settle' }) }))
+      .toMatchObject({ allowed: false, code: 'correction_invalid' });
   });
 });
 

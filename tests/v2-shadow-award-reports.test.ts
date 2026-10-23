@@ -118,6 +118,11 @@ const STUB_SCHEMA = `
     votes smallint NOT NULL, vote_rank smallint, eligible_rank smallint,
     is_ineligible boolean NOT NULL DEFAULT false, is_winner boolean NOT NULL DEFAULT false,
     CONSTRAINT brownlow_season_uq UNIQUE (season, player_id));
+  -- Read by the Brownlow loader's acceptance decision (brownlowAcceptedSql, AFLDB-ISSUE-316): 2024 is
+  -- an explicitly accepted season, as in tests/v2-admin-operations.test.ts.
+  CREATE TABLE stat_availability (stat_key text, season int, coverage text);
+  INSERT INTO stat_availability VALUES ('brownlow_season_total', 2024, 'complete');
+  CREATE TABLE brownlow_season_authority (season int PRIMARY KEY, published_revision int);
   -- Read only by the Stage 5 comparator the equivalence test calls (listColemanPublications); always empty.
   CREATE TABLE derived_award_results (
     id integer PRIMARY KEY, award_slug text NOT NULL, season smallint NOT NULL, method_version smallint NOT NULL,

@@ -789,6 +789,81 @@ with tempfile.TemporaryDirectory() as tmp:
 
 
 # ---------------------------------------------------------------------------
+# AFLDB-ISSUE-316: the season boundary at the database half of the gate
+# (check_database_coverage, the last check before the first write). A fake
+# cursor answers exactly the four reads it makes. After the rollover seals
+# 2026 (seasons.status 'completed'), an AFL API 2026 artefact is admissible
+# only where stat_availability already says 'complete'; while 2026 is in
+# progress it is refused even then; pending availability never admits it;
+# and an admin-published season still outranks any artefact.
+# ---------------------------------------------------------------------------
+
+section("ISSUE-316: database coverage gate across the 2026 season boundary")
+
+
+class _BoundaryCursor:
+    def __init__(self, state: dict) -> None:
+        self.state, self.rows = state, []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        return False
+
+    def execute(self, sql: str, params=None) -> None:
+        text = " ".join(sql.split())
+        if "JOIN sources" in text:
+            self.rows = [(s,) for s in self.state["manual_seasons"]]
+        elif "FROM stat_availability" in text:
+            self.rows = [(s,) for s in self.state["complete"]]
+        elif "status = 'in_progress'" in text:
+            self.rows = [(s,) for s, status in self.state["seasons"].items() if status == "in_progress"]
+        elif text == "SELECT year FROM seasons":
+            self.rows = [(s,) for s in self.state["seasons"]]
+        else:
+            raise AssertionError(f"unexpected read in check_database_coverage: {text}")
+
+    def fetchall(self) -> list:
+        return self.rows
+
+
+class _BoundaryDb:
+    def __init__(self, **state) -> None:
+        self.state = state
+
+    def cursor(self) -> _BoundaryCursor:
+        return _BoundaryCursor(self.state)
+
+
+def boundary_refusal(db: _BoundaryDb, declared: set[int]) -> str:
+    try:
+        loader.check_database_coverage(db, declared)
+    except loader.BrownlowSeasonLoadRefused as exc:
+        return str(exc)
+    return ""
+
+
+decided = set(range(2020, 2026))
+sealed_2026 = {**{s: "completed" for s in decided}, 2026: "completed", 2027: "in_progress"}
+open_2026 = {**{s: "completed" for s in decided}, 2026: "in_progress"}
+check("ISSUE-316 sealed 2026 + reviewed availability complete: the AFL API 2026 rows are admissible",
+      boundary_refusal(_BoundaryDb(manual_seasons=[], complete=decided | {2026}, seasons=sealed_2026),
+                       decided | {2026}) == "")
+check("ISSUE-316 sealed 2026 + availability still pending: an artefact for 2026 is refused (presence never accepts)",
+      "beyond" in boundary_refusal(_BoundaryDb(manual_seasons=[], complete=decided, seasons=sealed_2026),
+                                   decided | {2026}))
+check("ISSUE-316 2026 in progress: even 'complete' availability cannot admit its rows",
+      "in-progress season(s) [2026]" in boundary_refusal(
+          _BoundaryDb(manual_seasons=[], complete=decided | {2026}, seasons=open_2026), decided | {2026}))
+check("ISSUE-316 sealed 2026 published by an admin: the reload is refused, the authority decision stands",
+      "admin-published" in boundary_refusal(
+          _BoundaryDb(manual_seasons=[2026], complete=decided | {2026}, seasons=sealed_2026), decided | {2026}))
+check("ISSUE-316 sealed 2026 without an artefact row: pending 2026 needs nothing and refuses nothing",
+      boundary_refusal(_BoundaryDb(manual_seasons=[], complete=decided, seasons=sealed_2026), decided) == "")
+
+
+# ---------------------------------------------------------------------------
 # AFLDB-ISSUE-233: stable AFL Tables identity. One accepted path, or exactly one
 # tracked profile_url_continuity pair -> its continuing_url; everything else
 # refuses. Rules come only through the fitzRoy importer's own validator.
