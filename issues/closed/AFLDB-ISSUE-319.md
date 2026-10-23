@@ -1,6 +1,7 @@
 # AFLDB-ISSUE-319 — Successor source-evidence requirements unresolved
 
-**Status:** OPEN / BLOCKED, registered 2026-10-23. Part of it is resolved by evidence; the rest needs owner adjudication or evidence that is not available. Second evidence pass 2026-10-23 (§4): five questions prepared, none adjudicated.
+**Status:** RESOLVED 2026-10-23 (§6). The owner decided every §4 item explicitly. Item 5, the in-run raw replay, is implemented in `691bdbae` and proven inside the enforced v4 rehearsal. The deferred data-quality questions move to AFLDB-ISSUE-321. Resolution does not authorise apply.
+*History:* registered 2026-10-23 as OPEN / BLOCKED. Part of it was resolved by evidence; the rest needed owner adjudication or evidence that was not available. Second evidence pass 2026-10-23 (§4): five questions prepared, none adjudicated at that time.
 **Severity:** High, as an ISSUE-316 successor gate. **Area:** source provenance and coverage (coaches, rosters, heights, identity).
 **Linked:** AFLDB-ISSUE-316 (gate G1 of successor package E).
 
@@ -117,3 +118,49 @@ Owner answers to §4 items 1–5, or named additional evidence. No item is accep
 * The cross-check gave 376 / 386, the same as before. `match_coaches` has 32,470 rows; 621 matches have no coach.
 * The raw-replay prototype was not implemented or executed.
 * NM 1940, the 479 ids, caps and heights, roster completeness and the parsed-only policy all stay PENDING owner choice.
+
+## 6. Owner decisions and resolution (2026-10-23)
+### 6.1 Owner decisions (verbatim substance)
+| §4 item | Decision | Effect |
+|---|---|---|
+| 1. NM 1940 R8–R18 | "remains unattributed. Defer multi-coach schema changes." | Option (a). The eleven games keep no NM coach, as the core has it. `match_coaches (match_id, club_id)` is unchanged. Joint attribution → ISSUE-321 |
+| 2. 479 unmapped roster ids | "remain excluded pending stable identity evidence." | No name inference and no mapping. Excluded from roster corroboration → ISSUE-321 |
+| 3. Conflicting goals/heights | "remain evidence-only. Preserve existing authority, rejected matches and missing-value semantics." | Heights stay AFL Tables. The 18 rejections stay rejected. Caps, the 737 AFL API and 24 Wikipedia differences are evidence-only. NULL stays NULL → ISSUE-321 |
+| 4. Roster completeness | "remains evidence-only, with completeness unvalidated. No new broad roster capture is required for this scope." | Frozen `rosters-20260905` (15/15) is used as evidence only; no acquisition → ISSUE-321 |
+| 5. Parsed-only coaches | "Require raw-to-parsed coach replay inside preflight." | Implemented and proven (§6.2) |
+
+These decisions are the owner's adjudication. They do not document the questions away. No value was chosen, averaged, name-matched or force-mapped. Authority and eligibility are unchanged.
+
+### 6.2 Mandatory in-run raw replay (`691bdbae580c32a952411df48d59849f0198683a`)
+**Implementation:**
+* The network-free parser moved byte-identically into `tools/rebuild/afltables/coach_snapshot_parser.py`, with `render_csv`.
+  * The quarantined acquisition adapter imports it, so acquisition output is unchanged.
+  * No tools→legacy import was added and no parser logic was duplicated.
+* `import_match_coaches.py --require-raw-bundle` (validate, dry-run and load modes):
+  * the bundle pin `coaches.accepted_snapshot.raw_bundle` (`coaches-20260905-raw.tar`, `24685690…1e4a`, 24,023,040 B, 387 members) is checked against the bundle's filename rule, size, `O_NOFOLLOW` read, fstat identity and sha256;
+  * members are read in memory with no extraction, and exact coverage is required: changed, missing, extra, duplicate, unsafe or non-regular members refuse;
+  * the genuine parser is replayed, and its CSV bytes are compared with the manifest sha256 and with **the exact bytes the loader reads to load**.
+* `rebuild-test.ts` runs the replay inside `runPreflight`, before the first stage and so before census, capture and reset.
+  * A successor or rehearsal profile with an absent pin or bundle refuses: "Nothing has been destroyed".
+  * Only `predecessor-1897-2025` is exempt.
+  * The coaches stage repeats the replay.
+* The package filename alphabet is unchanged: the raw tar is a single regular source member.
+
+**Tests** (existing suites extended): `tests/coach-reconciliation.test.ts` (the prototype's controls plus `pin_leading_dash`, the genuine-bundle replay, the parser-move equivalence, the parser-failure and missing index/page controls, with the void first control kept as history), `tests/db-test-rebuild.test.ts` (preflight order and argv) and `tests/afl-api-cutover.test.ts`. 5 suites 1,854 passed / 4 skipped; `tsc` 0.
+
+**Real-launcher controls (v4, isolated control database, 0 tables before/after):**
+* NCR1, bundle absent: refused at preflight with 0 stages.
+* NCR2, one member byte flipped and re-pinned: `REFUSED: 1 raw members differ from the manifest`, 0 stages.
+* NCR2's first attempt was a harness spec-lookup fault (exit 2, gate not reached). It is retained as VOID.
+
+**Enforced full rehearsal v4** (`C:/tmp/afldb-c2-REHEARSAL-V4-691bdbae-20261023T0248Z/EXECUTION_RECORD.md`), exit 0, 30 stages:
+* The preflight `AFLDB-COACH-RAW-REPLAY VERIFIED … replayed (387 members): coaches_index 525ae887…42ef, coach_pages ec4959a4…113b equal to the replay, the manifest and the loaded files` is at `rebuild.log` line 103. That is before the first stage marker (149), the census (150) and the reset (160).
+* It repeats in the coaches stage (line 425).
+* Those digests equal the installed package's parsed files after the run.
+* The out-of-band prototype was not relied on.
+
+### 6.3 Verdict
+**RESOLVED.** Items 1–5 have an owner decision, and item 5 is satisfied by implementation and in-run proof.
+* §3 item 6 (N2/N3, +89) and the deferred consequences of items 1–4 are tracked as **AFLDB-ISSUE-321**. They are retained limitations, not acceptance of the disputed values.
+* Unchanged: Brownlow 2026 pending; ET unresolved; authority, eligibility and ownership restrictions.
+* Resolution does not authorise rollover/apply, a populated-target rebuild or deployment.

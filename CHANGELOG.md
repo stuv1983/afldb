@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-319 / ISSUE-320 / ISSUE-316 - Successor gates resolved; enforced v4 rehearsal and Proposal F dry runs (2026-10-23)
+
+- ISSUE-319 resolved. The owner decided every source question: NM 1940 R8–R18 unattributed; the 479 unmapped roster
+  ids excluded; goal/height disagreements evidence-only; the frozen roster evidence-only. The in-run coach raw replay
+  (`691bdbae`, entry below) was proven inside the real run: the preflight verified the exact parsed bytes it then
+  loaded, before the census, the capture and the reset. The deferred data-quality questions are tracked as ISSUE-321.
+- ISSUE-320 resolved for DEV `streamanator`, the only environment named for the rollover planner and the post-rollover
+  rebuild. The owner accepted the documented enforcement boundary.
+  - Enforced v4 rehearsal at `691bdbae`: exit 0, 30 stages, strict D7 1,640, 91 checks, post-rebuild checks, 0 native
+    refusals, closure unchanged.
+  - The planner runtime is bound to the same v3 record, and an LD_AUDIT-enforced dry run exited 0.
+  - No other host has a record.
+- ISSUE-316 Proposal F (C: evidence only, nothing installed): fresh read-only ownership censuses PASS on
+  `afldb_prod`, `afldb_dev` and `afldb_test` (total 0, 1897–2026). The genuine pinned planner dry runs on streamanator
+  passed with the pins matching; F-pinned is `cddde59e…`. Apply, adoption, the populated-target rebuild and
+  deployment stay unauthorised; production NO-GO.
+
 ### ISSUE-319 - Mandatory coach raw-to-parsed replay inside the rebuild preflight (2026-10-23)
 
 - Rebuild behaviour: for every ladder profile except `predecessor-1897-2025` (the rehearsal-only profile and any
