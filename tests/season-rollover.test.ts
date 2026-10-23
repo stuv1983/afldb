@@ -88,6 +88,7 @@ import {
   SUCCESSOR_LADDER_TUPLES, SUCCESSOR_LADDER_TUPLES_JSON, finalValidationChecks, resolveLadderRebuildExpectation,
 } from '../tools/db/rebuild-test';
 import { validateProposedRebuildState, type ProposedDocuments } from '../tools/db/rollover-proposed-state';
+import { predecessorText } from './rollover-predecessor-fixture';
 
 const root = process.cwd();
 
@@ -2777,7 +2778,8 @@ describe('the staged apply, its journal and recovery', () => {
 // AFLDB-ISSUE-316 C2 — the PROPOSED state is judged by the rebuild's own validators
 // ---------------------------------------------------------------------------
 //
-// The base is the REAL repository state, so every manifest pin is proven against real bytes. Each
+// The base is the explicit predecessor state (the reviewed transition base bytes, whose manifests are
+// tracked), so every manifest pin is proven against real bytes. Each
 // case then changes one thing and leaves every hash internally consistent, which is exactly what a
 // hash-only check cannot see. Nothing is written anywhere: the validators take the bytes by injection.
 
@@ -2786,16 +2788,20 @@ type StateDocs = {
   register: any; seasons: any; contract: any; aflApi: any; afltables: any; rebuild: string;
 };
 const repoText = (path: string) => readFileSync(join(root, path), 'utf8');
-function realStateDocs(): StateDocs {
+function stateDocs(text: (path: string) => string): StateDocs {
   return {
-    register: JSON.parse(repoText(REGISTER_PATH)),
-    seasons: JSON.parse(repoText(SEASONS_PATH)),
-    contract: JSON.parse(repoText(CONTRACT_PATH)),
-    aflApi: JSON.parse(repoText('tools/rebuild/afl_api/afl-api-contract.json')),
-    afltables: JSON.parse(repoText('tools/rebuild/afltables/afltables-contract.json')),
-    rebuild: repoText(REBUILD_PATH),
+    register: JSON.parse(text(REGISTER_PATH)),
+    seasons: JSON.parse(text(SEASONS_PATH)),
+    contract: JSON.parse(text(CONTRACT_PATH)),
+    aflApi: JSON.parse(text('tools/rebuild/afl_api/afl-api-contract.json')),
+    afltables: JSON.parse(text('tools/rebuild/afltables/afltables-contract.json')),
+    rebuild: text(REBUILD_PATH),
   };
 }
+/** The CURRENT tracked state; only tests that state a fact about the repository as it ships use it. */
+const realStateDocs = (): StateDocs => stateDocs(repoText);
+/** The EXPLICIT predecessor of the 2026 rollover (2026 in progress): every mechanics case starts here. */
+const predecessorStateDocs = (): StateDocs => stateDocs(predecessorText);
 const asProposed = (d: StateDocs): ProposedDocuments => ({
   register: JSON.stringify(d.register), seasons: JSON.stringify(d.seasons),
   contract: JSON.stringify(d.contract), aflApi: JSON.stringify(d.aflApi),
@@ -2822,32 +2828,32 @@ describe("proposed-state validation — the rebuild's own validators over the pr
   });
 
   it('judges the bytes it is given, not the working tree', () => {
-    const d = realStateDocs();
+    const d = predecessorStateDocs();
     const before = repoText(CONTRACT_PATH);
     ladderOf(d).rebuild_expectation.profile = 'edited-in-memory';
     expect(() => validateState(d)).toThrow(RolloverRefused);
     expect(repoText(CONTRACT_PATH)).toBe(before);
-    expect(() => validateState(realStateDocs())).not.toThrow();
+    expect(() => validateState(predecessorStateDocs())).not.toThrow();
   });
 
   it.each([
     ['the register', 'register'], ['the seasons reference', 'seasons'], ['the fitzRoy contract', 'contract'],
     ['the AFL API contract', 'aflApi'], ['the AFL Tables contract', 'afltables'],
   ] as const)('refuses malformed JSON in %s', (_label, key) => {
-    const docs = asProposed(realStateDocs());
+    const docs = asProposed(predecessorStateDocs());
     docs[key] = '{ not json';
     expect(() => validateProposedRebuildState(docs)).toThrow(/is not valid JSON/);
   });
 
   describe('the ladder selector', () => {
     it('refuses a profile name outside the closed reviewed table even when every hash is consistent', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       ladderOf(d).rebuild_expectation.profile = 'owner-chosen-profile';
       expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
     });
 
     it('accepts that name only once a reviewed tuple lists it', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       const block = ladderOf(d).rebuild_expectation;
       block.profile = 'owner-chosen-profile';
       const pairs = {
@@ -2869,21 +2875,21 @@ describe("proposed-state validation — the rebuild's own validators over the pr
 
     it('never treats an inherited object key as a reviewed profile', () => {
       for (const profile of ['constructor', '__proto__', 'toString']) {
-        const d = realStateDocs();
+        const d = predecessorStateDocs();
         ladderOf(d).rebuild_expectation.profile = profile;
         expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
       }
     });
 
     it('refuses the rehearsal-only profile as an active profile, whatever it carries', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       ladderOf(d).rebuild_expectation.profile = 'c2-2026-rehearsal-only';
       expect(() => validateState(d)).toThrow(/can never be an active contract profile/);
     });
 
     it('refuses an absent or non-object expectation block', () => {
       for (const block of [undefined, null, [], 'predecessor-1897-2025']) {
-        const d = realStateDocs();
+        const d = predecessorStateDocs();
         if (block === undefined) delete ladderOf(d).rebuild_expectation;
         else ladderOf(d).rebuild_expectation = block;
         expect(() => validateState(d)).toThrow(/rebuild's own validators/);
@@ -2893,39 +2899,39 @@ describe("proposed-state validation — the rebuild's own validators over the pr
 
   describe('ladder, range and constant combinations', () => {
     it('refuses a row count the rebuild constant does not share', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       d.rebuild = planClubSeasonsConstantEdit(d.rebuild, 1622, 1640);
       expect(() => validateState(d)).toThrow(/expects 1640 club_seasons rows/);
     });
 
     it('refuses a row count the reviewed tuple does not carry', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       ladderOf(d).rebuild_expectation.expected_rows = 1640;
       d.rebuild = planClubSeasonsConstantEdit(d.rebuild, 1622, 1640);
       expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
     });
 
     it('refuses an accepted range the ladder expectation does not cover', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       acceptedOf(d).measured.seasons_last = 2026;
       expect(() => validateState(d)).toThrow(/binding mismatch/);
     });
 
     it('refuses a witness fingerprint that does not match the proposed contract witness', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       ladderOf(d).accepted_witness.manifest_sha256 = '0'.repeat(64);
       expect(() => validateState(d)).toThrow(/binding mismatch/);
     });
 
     it('refuses an approved source gap the completed scope does not allow', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       d.contract.full_history.approved_source_gaps.seasons = [1916];
       expect(() => validateState(d)).toThrow(/binding mismatch/);
     });
 
     it('refuses zero or two accepted baselines', () => {
       for (const count of [0, 2]) {
-        const d = realStateDocs();
+        const d = predecessorStateDocs();
         const accepted = acceptedOf(d);
         d.register.baselines = Array.from({ length: count }, () => structuredClone(accepted));
         expect(() => validateState(d)).toThrow(/rebuild's own validators/);
@@ -2937,7 +2943,7 @@ describe("proposed-state validation — the rebuild's own validators over the pr
     const heights = (d: StateDocs) => d.contract.datasets.player_details.height_enrichment;
 
     it('refuses baseline_only bound to another baseline', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       Object.assign(heights(d), {
         stats_input_mode: 'baseline_only', supplements: [], baseline_snapshot_label: 'some-other-label',
       });
@@ -2945,7 +2951,7 @@ describe("proposed-state validation — the rebuild's own validators over the pr
     });
 
     it('refuses baseline_only that still lists a supplement', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       Object.assign(heights(d), {
         stats_input_mode: 'baseline_only', baseline_snapshot_label: acceptedOf(d).snapshot_label,
       });
@@ -2954,7 +2960,7 @@ describe("proposed-state validation — the rebuild's own validators over the pr
     });
 
     it('accepts baseline_only exactly when it names the selected baseline with an empty list', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       Object.assign(heights(d), {
         stats_input_mode: 'baseline_only', supplements: [], baseline_snapshot_label: acceptedOf(d).snapshot_label,
       });
@@ -2962,13 +2968,13 @@ describe("proposed-state validation — the rebuild's own validators over the pr
     });
 
     it('refuses an empty supplement list that does not declare baseline_only', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       heights(d).supplements = [];
       expect(() => validateState(d)).toThrow(/requires nonempty supplements/);
     });
 
     it('refuses an unknown stats_input_mode', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       heights(d).stats_input_mode = 'whatever';
       expect(() => validateState(d)).toThrow(/stats_input_mode must be/);
     });
@@ -2983,7 +2989,7 @@ describe("proposed-state validation — the rebuild's own validators over the pr
       ['contract', ['datasets', 'player_details', 'height_enrichment', 'measured', 'players_with_height']],
     ] as const)('refuses a non-integer or missing %s count %j', (doc, path) => {
       for (const bad of ['1916', 1.5, null, undefined]) {
-        const d = realStateDocs();
+        const d = predecessorStateDocs();
         const parent = parentOf(d[doc], path);
         const key = path[path.length - 1];
         if (bad === undefined) delete parent[key];
@@ -2997,13 +3003,13 @@ describe("proposed-state validation — the rebuild's own validators over the pr
       ['afltables', ['club_player_lists', 'accepted_snapshot', 'manifest_sha256_lf']],
       ['afltables', ['coaches', 'accepted_snapshot', 'manifest_sha256_lf']],
     ] as const)('refuses a %s pin that no longer matches the manifest it names %j', (doc, path) => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       parentOf(d[doc], path)[path[path.length - 1]] = '0'.repeat(64);
       expect(() => validateState(d)).toThrow(/hashes to/);
     });
 
     it('accepts changed counts that stay integers, because the count is a claim the database must later test', () => {
-      const d = realStateDocs();
+      const d = predecessorStateDocs();
       d.aflApi.roster.accepted_snapshot.measured.players_with_afl_api_evidence += 92;
       const verdict = validateState(d);
       expect(verdict.finalChecks.find((c) => c.key === 'players_with_afl_api_height_evidence')!.expected)
@@ -3257,9 +3263,9 @@ describe('the bound apply and its failure modes', () => {
 
 const SYNTHETIC_SUCCESSOR = 'c2-2026-successor';
 const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
-/** The reviewed predecessor tuple, read from the real documents it is bound to. */
+/** The reviewed predecessor tuple, read from the explicit predecessor documents it is bound to. */
 const PREDECESSOR_PAIR = (() => {
-  const d = realStateDocs();
+  const d = predecessorStateDocs();
   const b = acceptedOf(d);
   const w = ladderOf(d).accepted_witness;
   return {
@@ -3291,7 +3297,7 @@ function successorFixture(opts: SuccessorFixtureOptions = {}) {
     first_season: 1897, last_season: last, expected_rows: claimedRows,
   };
 
-  const d = realStateDocs();
+  const d = predecessorStateDocs();
   const predecessor = acceptedOf(d);
   const next = structuredClone(predecessor);
   predecessor.acceptance_status = 'retired';
@@ -3652,9 +3658,9 @@ describe("successor ladder tuple — a coherent synthetic transition is judged b
       expect(() => resolveDirect(successorFixture(), undefined, false)).toThrow(/Unsupported ladder expectation/);
     });
 
-    it('still accepts the real predecessor state and refuses the unreviewed successor name', () => {
-      expect(validateState(realStateDocs()).ladderProfile).toBe('predecessor-1897-2025');
-      const d = realStateDocs();
+    it('still accepts the predecessor state and refuses the unreviewed successor name', () => {
+      expect(validateState(predecessorStateDocs()).ladderProfile).toBe('predecessor-1897-2025');
+      const d = predecessorStateDocs();
       ladderOf(d).rebuild_expectation.profile = 'c2-2026-successor';
       expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
     });

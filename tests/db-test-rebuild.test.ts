@@ -123,11 +123,14 @@ import {
   type RunResult,
   type Stage,
 } from '../tools/db/rebuild-test';
+import { predecessorJson } from './rollover-predecessor-fixture';
 
 // Explicit synthetic predecessor expectation for domain regressions. The actual active
-// contract is exercised separately below, without this fixture's injected block.
+// contract is exercised separately below, without this fixture's injected block. The documents
+// are the EXPLICIT predecessor of the 2026 rollover (tests/rollover-predecessor-fixture.ts), never
+// the tracked files, which the rollover rewrites.
 function predecessorDocuments() {
-  const read = (p: string) => JSON.parse(readFileSync(join(process.cwd(), p), 'utf8'));
+  const read = predecessorJson;
   const register = read('data/reference/fitzroy-accepted-baselines.json');
   const contract = read('tools/rebuild/fitzroy/fitzroy-contract.json');
   const seasons = read('data/reference/seasons.json');
