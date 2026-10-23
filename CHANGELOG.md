@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-324 / ISSUE-316 - `.bin` link chains checked hop by hop; revision J2 re-pinned; streamanator native policy re-derived (2026-10-24)
+
+- `tools/db/rebuild-test.ts` (`876dadbf`), AFLDB-ISSUE-324 (F-J01): the ordinary path admits a `node_modules`
+  `.bin/<name>` link only when every hop of its link chain stays inside the checkout's real `node_modules` and ends at
+  a regular file there; a chain that leaves the checkout and comes back is refused, and `realpath` must agree with
+  the walked chain. Only the two esbuild native-binary links keep their external-target exception. 13 new tests in
+  `tests/db-test-rebuild.test.ts`; `docs/deployment.md` states the rule.
+- ISSUE-316 revision J2 (local only; nothing pushed, applied or activated):
+  - re-pinned at `876dadbf`: J2-pinned change set `85b5f05a…`, where only the `tools/db/rebuild-test.ts` pins changed;
+  - streamanator's native policy and runtime record were re-derived in a new root and reviewed: policy `a8e586e0…`,
+    record `82e25a10…`. They differ from V4 only by the auditor path and the zlib1g 2.3 security update, and V4 is
+    unchanged;
+  - new fail-stop dry-run and rebuild harnesses (F-J03).
+- The J2 enforced dry run and the disposable rebuild were not run: the run stopped at the owner-run proof-window hold.
+  Production NO-GO.
+
 ### ISSUE-324 / ISSUE-322 / ISSUE-316 - Ordinary rebuild runs only bound node; receipts survive promotion; revision J pinned (2026-10-24)
 
 - `tools/db/rebuild-test.ts` (`82603dc7`, `14abea5e`), AFLDB-ISSUE-324: the ordinary rebuild path no longer spawns

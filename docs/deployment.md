@@ -264,8 +264,9 @@ The ordinary path also refuses, before anything runs, when:
 
 - the checkout's `node_modules` (or anything under it) is a symbolic link or junction to a
   shared installation. Every package file must be physically inside the checkout. npm's own
-  `.bin/<name>` links are admitted only when their real file is inside the checkout's
-  `node_modules`. The single exception is the two esbuild native binaries tsx execs
+  `.bin/<name>` links are admitted only when every hop of the link chain stays inside the
+  checkout's real `node_modules` and the chain ends at a regular file there. A chain that
+  leaves and comes back is refused. The single exception is the two esbuild native binaries tsx execs
   (`node_modules/tsx/node_modules/{@esbuild/linux-x64,esbuild}/bin/esbuild`). Each may be an
   absolute symlink to its fixed, policy-bound real path in the reviewed DEV clean install, and
   its bytes must hash to the fixed sha256 before every execution. A regular file there claims

@@ -461,7 +461,18 @@
 **AFLDB-ISSUE-278 resolved 2026-10-13** (merge-scoped; implementation commit `dd18adb93a0207eb2ed812ac56636a90e2c89239`, parent `e7f84f14`, fast-forwarded to `main` and pushed; documentation-only closure commit follows it). `db:test:rebuild` and `db:test:prove-reset` now assert the connected database and role before anything else runs, refuse a DSN that libpq would read differently from postgres.js (query-string redirects, host-less or default-port forms), and run their psql and stage children with the libpq routing variables removed. DB-free: `tests/db-test-rebuild.test.ts` 670/670, `tsc --noEmit` clean. Two verdicts, kept separate: Procedure A (read-only, `afldb_test`) PASSED 12/12 and was accepted; Procedure B attempt 2 (one attempt, `afldb_test` only) gave a **proof PASS** (the always-aborted real `RESET_SQL`, `psql exit 3`) and, separately, an **unchanged-observed-state MATCH** (Tier 1 `a39ad96b…`, Tier 2 `4f11fda9…`; 99 tables, 63 sequences, 1,454,440 rows digested). Attempt 1 stopped at the baseline (`text || "char"`) with no proof and no verdict. **Limits kept:** a MATCH is not proof that no sequence operation occurred; index/TOAST contents, extended statistics, publications, subscriptions, roles, database settings, large objects and planner statistics are not covered; no real rebuild has been run, so the rebuild-stream guard is proven by Procedure A and the DB-free tests only; Procedure A is a historical result about the pre-reboot postmaster; the unpinned control V4c was omitted. Readiness was **accepted under a scoped cleanliness exception, not a clean pass**: `merge:ready` BLOCKED by exactly one blocker (15 untracked primary-checkout paths: nine `.agents/skills` files and six zero-byte stray-named files), all left untouched with sizes and hashes re-verified at every checkpoint; the merge-mode preflight's only blocker was the same 15 paths. Not deployed; no deployment is required or implied. Runbook and both verification procedures: `issues/closed/AFLDB-ISSUE-278*.md` (§18).
 
 ### AFLDB-ISSUE-316 — AFL API cutover: retire AFL Tables network acquisition
-- **Revision J (2026-10-24; current):** record `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J-20261023T2234Z/` (`PROPOSAL_J.md`).
+- **Revision J2 (2026-10-24; current):** record `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z/` (`PROPOSAL_J2.md`).
+  - F-J01 fixed in `876dadbf` (every `.bin` link hop must stay inside the checkout's real `node_modules`; ISSUE-324).
+    J2 pinned checkout `876dadbf`, J2-pinned `85b5f05a…` (only `tools/db/rebuild-test.ts` pins changed); commit 1
+    `a1e16e67` (simulated), commit 2′ `87da1563`; DB-free 11,278/0/27 and 11,327/0/27; tsc 0.
+  - streamanator native policy re-derived in a new root: policy `a8e586e0…`, record `82e25a10…`. It differs from V4
+    only by the auditor path and libz (zlib1g 2.2 → 2.3, CVE-2026-85091). Reviewed ACCEPT-WITH-CONDITIONS; V4 unchanged.
+  - F-J03 harness: every setup and control step is gated, with in-driver negative controls; a mechanical criteria gate;
+    self-test 15/15.
+  - **Stopped at the hold gate:** holding OS upgrades needs root, and sudo needs the owner's password. Dry run and
+    rebuild NOT run; attempt not consumed.
+  - Next: the owner runs `j2-hold-apply.sh`, then the J2 dry run, and the one rebuild only if it passes. Production NO-GO.
+- **Revision J (2026-10-24; superseded by J2):** record `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J-20261023T2234Z/` (`PROPOSAL_J.md`).
   - Commits `82603dc7` (ISSUE-324), `db541ae3` (ISSUE-322, resolved), `14abea5e` (esbuild native-binary exception,
     forbidden-environment refusals), `4fcc95ef`/`60eb5e0c`/`dfbfc1ab` (ISSUE-322 integration test, 7 passed).
   - J pinned checkout `dfbfc1ab`, J-pinned `5c0763fa…`; commit 1 `31f0ab32` (simulated), commit 2′ `72e37fa7`;
@@ -603,8 +614,10 @@
   destruction, ordinary `--target code_test_db` refused intentionally) and `14abea5e` (esbuild native-binary
   exception as clarified by owner set 3; `ESBUILD_BINARY_PATH`/`NODE_OPTIONS`/`NODE_PATH`/`TSX_TSCONFIG_PATH`
   refused). Real enforced execution unproven: the J dry run refused on libz drift; rebuild not run.
-- **Next:** close after a real enforced ordinary successor rebuild passes the execution boundary (after the owner's
-  libz drift decision, ISSUE-316).
+- **J2 (2026-10-24):** `876dadbf` fixes F-J01. A `.bin` link is admitted only when every hop stays inside the
+  checkout's real `node_modules`; a chain that leaves and returns is refused. The J2 rebuild is not run yet (hold gate).
+- **Next:** close after a real enforced ordinary successor rebuild passes the execution boundary (J2, after the
+  owner's hold, ISSUE-316).
 
 ### AFLDB-ISSUE-323 — Adopted ISSUE-316 successor cannot run the ordinary rebuild
 - **Severity:** High. **Area:** rebuild runner `tools/db/rebuild-test.ts` (`runPreflight`, `executeRebuild`).
@@ -613,7 +626,8 @@
   enforced streamanator preflight passed the guard; real execution not reached (ISSUE-324).
 - **Key files:** `tools/db/rebuild-test.ts`, `tests/db-test-rebuild.test.ts`.
 - **Revision J (2026-10-24):** fix unchanged in `dfbfc1ab`; J rebuild not run (dry run refused on libz drift).
-- **Next:** close after a real enforced ordinary successor rebuild passes, after ISSUE-324 and the libz decision.
+- **Revision J2 (2026-10-24):** fix unchanged in `876dadbf`; J2 rebuild not run (stopped at the hold gate).
+- **Next:** close after a real enforced ordinary successor rebuild passes (J2, after the owner's hold).
 
 ### AFLDB-ISSUE-321 — Deferred successor source data-quality questions
 - **Severity:** Low. **Area:** source provenance / data quality: `match_coaches`, AFL API roster identity, height and
