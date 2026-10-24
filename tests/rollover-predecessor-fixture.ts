@@ -6,8 +6,9 @@
  * predecessor. The rollover rewrites them, so a test that means "the predecessor" must say so:
  * tests/fixtures/rollover/predecessor-2026/ holds the exact bytes of the seven reference documents
  * of the reviewed transition base (`PREDECESSOR_BASE_SHA256`, the base column of the G-pinned change
- * set). `tools/db/rebuild-test.ts` is not copied: the transition changes only its successor tuple
- * table, so its predecessor text is the tracked source with that one literal emptied.
+ * set). `tools/db/rebuild-test.ts` is not copied: only the separate successor activation changes it,
+ * and only its successor tuple table (the apply leaves it untouched), so its predecessor text is the
+ * tracked source with that one literal emptied.
  *
  * A test about the CURRENT tracked state reads the tracked files; never this module.
  */

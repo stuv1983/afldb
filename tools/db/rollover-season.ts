@@ -90,6 +90,13 @@
  * source contracts' measured counts. That needs no database and writes nothing;
  * what only a database can prove is printed as PENDING, never as passed.
  *
+ * SUCCESSOR ACTIVATION IS NOT PART OF THE APPLY (AFLDB-ISSUE-316, owner ruling 2026-10-25). A change set
+ * carrying `ladder_successor_tuple` installs the successor's documents and leaves tools/db/rebuild-test.ts,
+ * whose closed SUCCESSOR_LADDER_TUPLES_JSON table is the activation state, unwritten: the successor is
+ * INACTIVE after the apply. The dry run validates the state the activation would complete (these files plus
+ * the projected one-line tuple append) and prints that projection's pins for the activation authority;
+ * `tools/db/successor-activation.ts` is the only writer of the table, under its own bound authority.
+ *
  * Usage (dry run):
  *
  *   npx tsx tools/db/rollover-season.ts \
@@ -167,6 +174,10 @@ import {
   type InputRole,
   type PreparedTransition,
 } from '../../src/lib/rollover/transition-change-set';
+import {
+  assertInactiveApplyState,
+  formatActivationProjection,
+} from '../../src/lib/rollover/successor-activation';
 import { resolvePython } from './rebuild-test';
 import { validateProposedRebuildState } from './rollover-proposed-state';
 
@@ -534,18 +545,28 @@ function main(argv: string[]): number {
 
       // The complete PROPOSED state, judged by the rebuild's own validators before anything is
       // written and before any hash is offered for pinning. Nothing is written to the working tree.
+      // For a successor the apply leaves rebuild-test.ts unchanged (bound read-only below), and what is
+      // judged is the state the separately authorised ACTIVATION would complete: these files plus the
+      // projected one-line tuple append. The inactive state itself is proven not to resolve the profile.
+      const activation = plan.activation;
       const validated = validateTransitionState({
         files: writeSet,
         readRepo: readRepoBytes,
-        validate: (documents) => validateProposedRebuildState({
-          ...documents, witnessManifest: witness.text, baseRebuild: sources.rebuild,
-        }),
+        validate: (documents) => {
+          if (activation) assertInactiveApplyState(documents.rebuild, activation);
+          return validateProposedRebuildState({
+            ...documents,
+            ...(activation ? { rebuild: activation.activeContent } : {}),
+            witnessManifest: witness.text, baseRebuild: sources.rebuild,
+          });
+        },
       });
       binding = validated.binding;
       console.log('\nPROPOSED-STATE VALIDATION - the rebuild\'s own validators over the proposed bytes '
         + '(nothing written; no database)');
       console.log(`  accepted baseline          ${validated.verdict.acceptedLabel}`);
-      console.log(`  ladder profile (selector)  ${validated.verdict.ladderProfile}`);
+      console.log(`  ladder profile (selector)  ${validated.verdict.ladderProfile}`
+        + `${activation ? ' (resolves only once separately activated; INACTIVE after this apply)' : ''}`);
       console.log(`  club_seasons expected      ${validated.verdict.expectedRows}`);
       console.log(`  final-validation checks    ${validated.verdict.finalChecks.length} built from the proposal`);
       console.log('  PENDING - needs the isolated database phase; not proven here:');
@@ -567,6 +588,10 @@ function main(argv: string[]): number {
       } else {
         console.log('\nfinal_sha256 pins match this plan for every file.');
       }
+      if (activation) {
+        console.log('\nSUCCESSOR ACTIVATION - NOT performed by this apply (a separate, separately authorised step)');
+        for (const line of formatActivationProjection(activation)) console.log(`  ${line}`);
+      }
     }
 
     if (!apply) {
@@ -580,9 +605,14 @@ function main(argv: string[]): number {
     applyStagedWrites(repoIo, args.season, writeSet, binding);
 
     console.log(`\nWROTE ${writeSet.length} files.`);
+    if (plan.activation) {
+      console.log(`The successor ${JSON.stringify(plan.activation.tuple.profile)} is INSTALLED and INACTIVE: `
+        + `${REBUILD} was not written. Activation is tools/db/successor-activation.ts, separately authorised.`);
+    }
     console.log('Review the diff before anything else. Git is the recovery boundary for the old '
       + 'bytes; if this process was interrupted the next invocation refuses and prints the steps.');
-    console.log('\nRemaining proof, which genuinely needs the rebuilt database:');
+    console.log('\nRemaining proof, which genuinely needs the rebuilt database'
+      + `${plan.activation ? ' (refused while the successor is inactive; it applies only after activation)' : ''}:`);
     console.log('  npm run db:test:rebuild -- --acknowledge-destroy afldb_test');
     console.log(`     PRECHECK re-runs ${IMPORTER} --require-accepted-baseline against the `
       + 'landed tracked documents, then the witness --compare cross-check against the '

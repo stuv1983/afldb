@@ -58,6 +58,8 @@ export const TRANSITION_FLAG = '--transition-change-set';
 export const TRANSACTION_JOURNAL_PATH = '.rollover-transaction.json';
 export const TRANSACTION_JOURNAL_SCHEMA = 'afldb.rollover.transaction_journal/1';
 export const STAGING_SUFFIX = '.rollover-tmp';
+/** The successor activation's staged file (`successor-activation.ts`); a leftover blocks every rollover invocation too. */
+export const ACTIVATION_STAGING_PATH = `${REBUILD_PATH}.activation-tmp`;
 /** The proposal's marker for an owner-supplied, gate-produced or implementation-blocked field. */
 export const SENTINEL_MARKER = 'UNRESOLVED:';
 
@@ -73,6 +75,16 @@ export const PLANNER_OWNED_WRITES: readonly string[] = [
   AFLTABLES_NETWORK_PATH, REGISTER_PATH, SEASONS_PATH, CONTRACT_PATH, STAT_AVAILABILITY_PATH,
   REBUILD_PATH,
 ];
+
+/**
+ * The planner's writes for one change set. A change set carrying a successor ladder tuple never writes
+ * tools/db/rebuild-test.ts: appending the tuple to its closed table is the successor ACTIVATION, a separately
+ * authorised step (`successor-activation.ts`), so the apply leaves the successor inactive (AFLDB-ISSUE-316,
+ * owner ruling 2026-10-25). Without a tuple the ISSUE-101 stage-9 constant edit is written as before.
+ */
+export function plannerOwnedWrites(successor: boolean): readonly string[] {
+  return successor ? PLANNER_OWNED_WRITES.filter((p) => p !== REBUILD_PATH) : PLANNER_OWNED_WRITES;
+}
 export const INPUT_ROLES = [
   'core_manifest', 'ladder_manifest', 'ladder_coverage', 'stat_availability', 'accepted_corrections',
 ] as const;
@@ -157,7 +169,7 @@ export type TransitionChangeSet = {
   base: TransitionFileRef | null;
   replace: TransitionFileRef[];
   registerPatches: RegisterPatch[];
-  /** A reviewed successor ladder tuple, appended to the rebuild's closed table by the planner. */
+  /** A reviewed successor ladder tuple. The apply only projects its append; the separate activation writes it. */
   successorLadderTuple: SuccessorLadderTuple | null;
   writeSet: string[];
   finalSha256: Record<string, string> | null;
@@ -389,7 +401,15 @@ export function prepareTransition(input: {
     notes.push(`transition replace: ${ref.path} ${ref.oldSha256} -> ${ref.proposedSha256} (verbatim).`);
   }
 
-  const expected = new Set<string>([...PLANNER_OWNED_WRITES, ...replacements.map((r) => r.path)]);
+  const successor = changeSet.successorLadderTuple !== null;
+  if (successor && (changeSet.writeSet.includes(REBUILD_PATH)
+      || (changeSet.finalSha256 !== null && Object.hasOwn(changeSet.finalSha256, REBUILD_PATH)))) {
+    refuse(`This change set carries the successor ladder tuple ${JSON.stringify(changeSet.successorLadderTuple!.profile)} `
+      + `and also names ${REBUILD_PATH} in write_set or final_sha256. The apply never writes that file for a `
+      + 'successor: appending the tuple is the successor activation, a separately authorised step '
+      + '(tools/db/successor-activation.ts). Remove it from both.');
+  }
+  const expected = new Set<string>([...plannerOwnedWrites(successor), ...replacements.map((r) => r.path)]);
   const declared = new Set(changeSet.writeSet);
   const missing = [...expected].filter((p) => !declared.has(p)).sort();
   const extra = [...declared].filter((p) => !expected.has(p)).sort();
@@ -427,7 +447,7 @@ export function assertTransitionWriteSet(input: {
   const { prepared, planned, apply } = input;
 
   const plannedPaths = planned.map((f) => f.path).sort();
-  const ownedPaths = [...PLANNER_OWNED_WRITES].sort();
+  const ownedPaths = [...plannerOwnedWrites(prepared.changeSet.successorLadderTuple !== null)].sort();
   if (JSON.stringify(plannedPaths) !== JSON.stringify(ownedPaths)) {
     refuse(`The planner produced [${plannedPaths.join(', ')}], not the expected [${ownedPaths.join(', ')}]. `
       + 'The change set was written against a different planner.');
@@ -736,6 +756,7 @@ export function pendingTransactionProblem(io: FileIo): string[] | null {
   }
   const leftovers = [...PLANNER_OWNED_WRITES, ...TRANSITION_REPLACEABLE_PATHS, TRANSACTION_JOURNAL_PATH]
     .map((path) => `${path}${STAGING_SUFFIX}`)
+    .concat(ACTIVATION_STAGING_PATH)
     .filter((path) => io.read(path) !== null);
   return leftovers.length === 0 ? null : [
     `Staged rollover files from an earlier run remain: ${leftovers.join(', ')}.`,

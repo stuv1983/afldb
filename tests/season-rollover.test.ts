@@ -53,13 +53,15 @@ import {
   type RolloverRequest,
   type TransitionInput,
 } from '../src/lib/rollover/season-rollover';
-import { planAfltablesNetworkRetirement } from '../src/lib/rollover/afltables-network-retirement';
+import { AFLTABLES_NETWORK_PATH, planAfltablesNetworkRetirement } from '../src/lib/rollover/afltables-network-retirement';
 import {
   PLANNER_OWNED_WRITES,
   SENTINEL_MARKER,
   TRANSACTION_JOURNAL_SCHEMA,
   TRANSACTION_JOURNAL_PATH,
+  TRANSITION_REPLACEABLE_PATHS,
   TRANSITION_SCHEMA,
+  plannerOwnedWrites,
   applyStagedWrites,
   assertBindingHolds,
   assertNoSentinel,
@@ -82,12 +84,20 @@ import {
 import { censusRecord, type CensusScope } from '../src/lib/rollover/afl-api-ownership-census';
 import {
   LadderSuccessorRefused, assertSuccessorLadderTuple, deriveLadderWitnessRows, parseSuccessorLadderTuples,
-  planSuccessorTuplesEdit, readSuccessorLadderTuplesJson, type SuccessorLadderTuple,
+  planSuccessorTuplesEdit, planSuccessorTuplesRemoval, readSuccessorLadderTuplesJson, successorTupleSha256,
+  type SuccessorLadderTuple,
 } from '../src/lib/rollover/ladder-successor';
+import {
+  ACTIVATION_SCHEMA, ACTIVATION_STAGING_PATH, activationPendingProblem, applyActivationWrite, assertCommitBinding,
+  assertInactiveApplyState, assertMigrationBinding, bindActivationChangeSet, classifyActivationState,
+  formatActivationProjection, migrationSetState, parseActivationAuthority, planActivationWrite,
+} from '../src/lib/rollover/successor-activation';
 import {
   SUCCESSOR_LADDER_TUPLES, SUCCESSOR_LADDER_TUPLES_JSON, finalValidationChecks, resolveLadderRebuildExpectation,
 } from '../tools/db/rebuild-test';
-import { validateProposedRebuildState, type ProposedDocuments } from '../tools/db/rollover-proposed-state';
+import {
+  validateActivationStates, validateProposedRebuildState, type ProposedDocuments,
+} from '../tools/db/rollover-proposed-state';
 import { predecessorText } from './rollover-predecessor-fixture';
 
 const root = process.cwd();
@@ -2814,7 +2824,7 @@ const acceptedOf = (d: StateDocs) =>
   d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
 
 describe("proposed-state validation — the rebuild's own validators over the proposed bytes", () => {
-  it('accepts the real repository state and names what stays pending', () => {
+  it('state A (the real repository, predecessor, pre-apply): accepts the state and names what stays pending', () => {
     const verdict = validateState(realStateDocs());
     expect(verdict.ladderProfile).toBe('predecessor-1897-2025');
     expect(verdict.expectedRows).toBe(1622);
@@ -3258,8 +3268,9 @@ describe('the bound apply and its failure modes', () => {
 // ---------------------------------------------------------------------------
 //
 // Every value below is synthetic: the profile name, the labels, the fingerprints and the witness manifest
-// exist only in this file. The shipped table is EMPTY, so nothing here activates a successor or accepts a
-// row count. Each negative case changes one thing in an otherwise coherent successor transition.
+// exist only in this file. In states A and B (everything before a separately authorised activation) the shipped table
+// is EMPTY, so nothing here activates a successor or accepts a row count. State C (table lists the bound tuple) is
+// proved by the activation tests further down, never by a test that reads the shipped table. Each negative case changes one thing in an otherwise coherent successor transition.
 
 const SYNTHETIC_SUCCESSOR = 'c2-2026-successor';
 const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
@@ -3348,7 +3359,7 @@ const judge = (
 describe('successor ladder tuple — the pure module', () => {
   const tuple = () => successorFixture().tuple;
 
-  it('ships an EMPTY closed table, so no successor profile is accepted until an owner-reviewed adoption', () => {
+  it('states A and B: ships an EMPTY closed table, so no successor profile is accepted until a separately authorised activation (state C)', () => {
     expect(SUCCESSOR_LADDER_TUPLES_JSON).toBe('{}');
     expect(SUCCESSOR_LADDER_TUPLES).toEqual({});
     expect(Object.isFrozen(SUCCESSOR_LADDER_TUPLES)).toBe(true);
@@ -3432,21 +3443,33 @@ describe('successor ladder tuple — the pure module', () => {
     }
   });
 
-  it('writes the tuple through the planner into the rebuild source, and only when one is supplied', () => {
+  it('PROJECTS the tuple append but never writes the rebuild source for a successor (activation is separate)', () => {
     const stub = `${REBUILD_STUB}export const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
     const plain = run({ rebuildSource: stub });
     expect(fileIn(plain, REBUILD_PATH).content).toContain("SUCCESSOR_LADDER_TUPLES_JSON = '{}'");
+    expect(plain.activation).toBeUndefined();
     // This scenario's synthetic witness carries ROWS_2026; the tuple must carry the same count.
     const scenarioTuple = { ...tuple(), expected_rows: ROWS_2026 };
     const withTuple = run({ rebuildSource: stub, transition: { successorLadderTuple: scenarioTuple } });
-    const out = fileIn(withTuple, REBUILD_PATH).content;
-    expect(parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(out))[SYNTHETIC_SUCCESSOR]).toEqual(scenarioTuple);
-    // Stage 9 reads the successor's count from the tuple; the constant keeps the predecessor's.
-    expect(readClubSeasonsExpectedRows(out)).toBe(ROWS_2025);
+    // The apply's files do not include rebuild-test.ts at all: the successor stays inactive.
+    expect(withTuple.files.map((f) => f.path)).not.toContain(REBUILD_PATH);
+    expect(withTuple.files.map((f) => f.path).sort()).toEqual([REGISTER_PATH, SEASONS_PATH, CONTRACT_PATH, STAT_AVAILABILITY_PATH].sort());
+    // The projection is the reviewed one-line append to the unchanged current bytes, and nothing else.
+    const activation = withTuple.activation!;
+    expect(activation.path).toBe(REBUILD_PATH);
+    expect(activation.inactiveContent).toBe(stub);
+    expect(activation.activeContent).toBe(planSuccessorTuplesEdit(stub, scenarioTuple));
+    expect(parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(activation.activeContent))[SYNTHETIC_SUCCESSOR]).toEqual(scenarioTuple);
+    // Stage 9 reads the successor's count from the tuple; the constant keeps the predecessor's either side.
+    expect(readClubSeasonsExpectedRows(activation.activeContent)).toBe(ROWS_2025);
     expect(readClubSeasonsExpectedRows(fileIn(plain, REBUILD_PATH).content)).toBe(ROWS_2026);
+    expect(withTuple.notes.join(' ')).toMatch(/successor activation NOT performed/);
     expect(() => run({ rebuildSource: stub, transition: { successorLadderTuple: { ...tuple(), expected_rows: ROWS_2026 + 1 } } }))
       .toThrow(/carries expected_rows .* but the ladder witness carries/);
     expect(() => run({ transition: { successorLadderTuple: scenarioTuple } })).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
+    // A successor already in the table is active BEFORE the apply: refused.
+    const active = planSuccessorTuplesEdit(stub, scenarioTuple);
+    expect(() => run({ rebuildSource: active, transition: { successorLadderTuple: scenarioTuple } })).toThrow(/already lists/);
   });
 });
 
@@ -3459,7 +3482,7 @@ describe("successor ladder tuple — a coherent synthetic transition is judged b
     expect(verdict.pendingDatabase.join(' ')).toMatch(/NOT executed/);
   });
 
-  it('accepts the same state with the table injected, and refuses it under the empty shipped table', () => {
+  it('accepts the same state with the table injected (state C), and refuses it under the empty shipped table (states A and B)', () => {
     const f = successorFixture();
     expect(judge(f, { successors: { [SYNTHETIC_SUCCESSOR]: f.tuple } }).ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
     const unadopted = { ...f, d: { ...f.d, rebuild: f.base } };
@@ -3654,7 +3677,7 @@ describe("successor ladder tuple — a coherent synthetic transition is judged b
         .toThrow(/cannot claim candidate rehearsal purpose/);
     });
 
-    it('the shipped empty table refuses the same state: the name alone grants nothing', () => {
+    it('states A and B: the shipped empty table refuses the same state, so the name alone grants nothing', () => {
       expect(() => resolveDirect(successorFixture(), undefined, false)).toThrow(/Unsupported ladder expectation/);
     });
 
@@ -3666,3 +3689,381 @@ describe("successor ladder tuple — a coherent synthetic transition is judged b
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-316 — successor ACTIVATION separated from the apply (owner ruling 2026-10-25)
+// ---------------------------------------------------------------------------
+//
+// States: A pre-apply, B applied/inactive, C activated, D deactivated (= B). The apply leaves
+// tools/db/rebuild-test.ts unwritten; only the bound activation changes its closed successor table.
+// Synthetic documents only; nothing is written anywhere but in-memory maps.
+
+describe('successor activation — STATE B: the apply leaves the successor inactive', () => {
+  const STUB = `${REBUILD_STUB}export const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
+  const scenarioTuple = (): SuccessorLadderTuple => ({ ...successorFixture().tuple, expected_rows: ROWS_2026 });
+
+  function successorScenario(): Scenario {
+    const s = scenario();
+    s.disk.set(REBUILD_PATH, STUB);
+    s.changeSet.ladder_successor_tuple = scenarioTuple();
+    s.changeSet.write_set = (s.changeSet.write_set as string[]).filter((p) => p !== REBUILD_PATH);
+    return s;
+  }
+  function planSuccessor(prepared: ReturnType<typeof prepare>) {
+    const plan = run({ rebuildSource: STUB, transition: prepared.transition });
+    const network = planAfltablesNetworkRetirement({
+      completedSeason: COMPLETING, rolloverDate: DATE, decision: 'D-316-1',
+      currentSource: NETWORK_SOURCE, currentSeasons: { in_progress_seasons: [COMPLETING] },
+    });
+    return { plan, planned: [network.file, ...plan.files] };
+  }
+  /** Dry run, pin, then the pinned apply's judged write set, exactly as the CLI sequences them. */
+  function pinnedApply() {
+    const s = successorScenario();
+    const dry = prepare(s);
+    s.changeSet.final_sha256 = assertTransitionWriteSet({ prepared: dry, planned: planSuccessor(dry).planned, apply: false }).finalHashes;
+    const pinned = prepare(s);
+    const { plan, planned } = planSuccessor(pinned);
+    const { files } = assertTransitionWriteSet({ prepared: pinned, planned, apply: true });
+    return { s, plan, files };
+  }
+
+  it('completes a pinned apply with rebuild-test.ts neither planned, pinned, journaled nor written', () => {
+    const { s, plan, files } = pinnedApply();
+    expect(files.map((f) => f.path)).not.toContain(REBUILD_PATH);
+    expect(files).toHaveLength(7);
+    expect(Object.keys(s.changeSet.final_sha256 as Record<string, string>)).not.toContain(REBUILD_PATH);
+
+    let judgedRebuild: string | undefined;
+    const { binding } = validateTransitionState({
+      files, readRepo: bufferOf(s.disk),
+      validate: (documents) => { judgedRebuild = documents.rebuild; assertInactiveApplyState(documents.rebuild, plan.activation!); return null; },
+    });
+    // The validator reads the UNCHANGED current file, which the binding then holds read-only up to the write.
+    expect(judgedRebuild).toBe(STUB);
+    expect(binding.readOnlySha256[REBUILD_PATH]).toBe(sha256Hex(STUB));
+    expect(binding.finalSha256).not.toHaveProperty([REBUILD_PATH]);
+    // The rollover's recovery journal can never restore (or reverse) the activation state.
+    expect(buildTransactionJournal(COMPLETING, files, bufferOf(s.disk)).entries.map((e) => e.path)).not.toContain(REBUILD_PATH);
+
+    const fs = new Map(s.disk);
+    const io = mapIo(fs);
+    applyStagedWrites(io, COMPLETING, files, binding);
+    for (const f of files) expect(fs.get(f.path)).toBe(f.content);
+    expect(fs.get(REBUILD_PATH)).toBe(STUB);
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('state B: never populates the selector table: after the apply it is empty and stage 9 still reads the predecessor constant', () => {
+    const { s, plan, files } = pinnedApply();
+    const fs = new Map(s.disk);
+    applyStagedWrites(mapIo(fs), COMPLETING, files);
+    expect(readSuccessorLadderTuplesJson(fs.get(REBUILD_PATH)!)).toBe('{}');
+    expect(readStageNineExpectedRows(fs.get(REBUILD_PATH)!, JSON.parse(fs.get(CONTRACT_PATH)!))).toBe(ROWS_2025);
+    // The projection exists only in the plan, as the reviewed one-line append; it is not a file of the apply.
+    expect(plan.activation!.activeContent).toBe(planSuccessorTuplesEdit(STUB, scenarioTuple()));
+    expect(plan.files.some((f) => f.content === plan.activation!.activeContent)).toBe(false);
+  });
+
+  it('refuses a successor change set that names rebuild-test.ts in its write set or its pins', () => {
+    const inWriteSet = successorScenario();
+    (inWriteSet.changeSet.write_set as string[]).push(REBUILD_PATH);
+    expect(() => prepare(inWriteSet)).toThrow(/never writes that file for a successor/);
+    const pinned = successorScenario();
+    pinned.changeSet.final_sha256 = { [REBUILD_PATH]: sha256Hex('x') };
+    expect(() => prepare(pinned)).toThrow(/never writes that file for a successor/);
+  });
+
+  it('refuses a planner output that would write rebuild-test.ts for a successor', () => {
+    const p = prepare(successorScenario());
+    const { planned } = planSuccessor(p);
+    const smuggled = [...planned, { path: REBUILD_PATH, content: planSuccessorTuplesEdit(STUB, scenarioTuple()), reformatted: false }];
+    expect(() => assertTransitionWriteSet({ prepared: p, planned: smuggled, apply: false })).toThrow(/The planner produced/);
+  });
+
+  it('leaves no other route for the apply to write the activation file', () => {
+    expect(plannerOwnedWrites(true)).not.toContain(REBUILD_PATH);
+    expect(plannerOwnedWrites(false)).toEqual(PLANNER_OWNED_WRITES);
+    expect(TRANSITION_REPLACEABLE_PATHS).not.toContain(REBUILD_PATH);
+    const cli = repoText('tools/db/rollover-season.ts');
+    expect(cli).not.toContain('planSuccessorTuplesEdit');
+    expect(cli).not.toContain('applyActivationWrite');
+  });
+
+  it('refuses an apply-time rebuild source that changed, already lists the profile, or projects anything else', () => {
+    const { plan } = pinnedApply();
+    const a = plan.activation!;
+    expect(() => assertInactiveApplyState(`${STUB}\n`, a)).toThrow(/changed between planning and validation/);
+    expect(() => assertInactiveApplyState(a.activeContent, { ...a, inactiveContent: a.activeContent })).toThrow(/already lists/);
+    expect(() => assertInactiveApplyState(STUB, { ...a, activeContent: `${a.activeContent}\n` })).toThrow(/not the reviewed one-line append/);
+    expect(formatActivationProjection(a).join('\n')).toContain(sha256Hex(a.activeContent));
+  });
+});
+
+describe('successor activation — STATE B to C and back (D): bound, single-file, reversible', () => {
+  const HEAD = 'b'.repeat(40);
+  const SOURCE = 'a'.repeat(40);
+  const MIGRATIONS = [
+    { name: '001_first.sql', text: 'create table a (x int);\n' },
+    { name: '117_last.sql', text: 'select 1;\r\n' },
+  ];
+
+  /** State B: the applied documents of a coherent synthetic successor, its pinned change set, rebuild-test.ts untouched. */
+  function applied() {
+    const f = successorFixture();
+    acceptedOf(f.d).accepted_on = DATE;
+    const appliedFiles = new Map<string, string>([
+      [AFLTABLES_NETWORK_PATH, serialiseJson({ status: 'retired', last_season: 2026, decision: 'D-316-1', changed_at: DATE })],
+      [REGISTER_PATH, serialiseJson(f.d.register)],
+      [SEASONS_PATH, serialiseJson(f.d.seasons)],
+      [CONTRACT_PATH, serialiseJson(f.d.contract)],
+      [STAT_AVAILABILITY_PATH, serialiseJson(baseStatAvailability())],
+    ]);
+    const disk = new Map<string, string>([
+      ...appliedFiles,
+      [AFL_API_PATH, serialiseJson(f.d.aflApi)],
+      [AFLTABLES_PATH, serialiseJson(f.d.afltables)],
+      [ladderOf(f.d).accepted_witness.manifest, f.witnessText],
+      [REBUILD_PATH, f.base],
+      ['src/app/unrelated.ts', 'untouched'],
+    ]);
+    const changeSet: Record<string, unknown> = {
+      schema: TRANSITION_SCHEMA, season: 2026,
+      inputs: (Object.keys(TRANSITION_INPUTS) as InputRole[]).map((role) => ({ role, ...TRANSITION_INPUTS[role] })),
+      replace: [], register_patches: [],
+      write_set: [...appliedFiles.keys()],
+      final_sha256: Object.fromEntries([...appliedFiles].map(([p, c]) => [p, sha256Hex(c)])),
+      ladder_successor_tuple: f.tuple,
+    };
+    return { f, disk, changeSet, changeSetText: JSON.stringify(changeSet, null, 2) };
+  }
+  type Applied = ReturnType<typeof applied>;
+
+  function authorityDoc(a: Applied, over: Record<string, unknown> = {}): Record<string, unknown> {
+    const m = migrationSetState(MIGRATIONS);
+    return {
+      schema: ACTIVATION_SCHEMA, action: 'activate', decision: 'D-316-ACT-1', season: 2026, profile: SYNTHETIC_SUCCESSOR,
+      rollover_date: DATE, source_commit: SOURCE, head_commit: HEAD,
+      transition_change_set_sha256: sha256Hex(a.changeSetText), tuple_sha256: successorTupleSha256(a.f.tuple),
+      migrations: { count: m.count, last: m.last, set_sha256: m.setSha256 },
+      rebuild_sha256: { inactive: sha256Hex(a.f.base), active: sha256Hex(planSuccessorTuplesEdit(a.f.base, a.f.tuple)) },
+      ...over,
+    };
+  }
+
+  /** The CLI's whole judgement, in its order, over an in-memory tree; returns the one write it would make. */
+  function judgeActivation(a: Applied, disk: Map<string, string>, over: {
+    authority?: Record<string, unknown>; changeSetText?: string;
+    git?: { head: string; sourceIsAncestor: boolean }; migrations?: Array<{ name: string; text: string }>;
+  } = {}) {
+    const io = mapIo(disk);
+    const pending = activationPendingProblem(io);
+    if (pending) throw new RolloverRefused(pending.join(' '));
+    const authority = parseActivationAuthority(JSON.stringify(over.authority ?? authorityDoc(a)));
+    const { changeSet, tuple } = bindActivationChangeSet(authority, Buffer.from(over.changeSetText ?? a.changeSetText));
+    assertCommitBinding(authority, over.git ?? { head: HEAD, sourceIsAncestor: true });
+    assertMigrationBinding(authority, migrationSetState(over.migrations ?? MIGRATIONS));
+    const classified = classifyActivationState({ authority, changeSet, tuple, readRepo: io.read });
+    const text = (p: string) => disk.get(p)!;
+    const proof = validateActivationStates({
+      register: text(REGISTER_PATH), seasons: text(SEASONS_PATH), contract: text(CONTRACT_PATH),
+      aflApi: text(AFL_API_PATH), afltables: text(AFLTABLES_PATH),
+      witnessManifest: text(JSON.parse(text(CONTRACT_PATH)).datasets.ladder.accepted_witness.manifest),
+    }, classified.inactiveText, classified.activeText, authority.profile, tuple.expected_rows);
+    return { authority, changeSet, tuple, classified, proof, io, write: planActivationWrite(authority.action, classified) };
+  }
+  const activate = (a: Applied, disk: Map<string, string>, over: Parameters<typeof judgeActivation>[2] = {}) => {
+    const j = judgeActivation(a, disk, over);
+    applyActivationWrite(j.io, j.write, () => undefined);
+    return j;
+  };
+  const changedPaths = (before: Map<string, string>, after: Map<string, string>) =>
+    [...new Set([...before.keys(), ...after.keys()])].filter((p) => before.get(p) !== after.get(p)).sort();
+
+  it('state B: runs the post-apply validation inactive: B classified, projected C resolves, installed B refuses', () => {
+    const a = applied();
+    const before = new Map(a.disk);
+    const j = judgeActivation(a, a.disk);
+    expect(j.classified.state).toBe('applied-inactive');
+    expect(j.proof.active.ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
+    expect(j.proof.active.expectedRows).toBe(1640);
+    expect(j.proof.inactiveRefusal).toMatch(/Unsupported ladder expectation/);
+    expect(readSuccessorLadderTuplesJson(a.disk.get(REBUILD_PATH)!)).toBe('{}');
+    expect(changedPaths(before, a.disk)).toEqual([]);
+  });
+
+  it('state C: activation changes only rebuild-test.ts, from the inactive pin to the active pin, by exactly the bound tuple', () => {
+    const a = applied();
+    const before = new Map(a.disk);
+    const j = activate(a, a.disk);
+    expect(changedPaths(before, a.disk)).toEqual([REBUILD_PATH]);
+    const now = a.disk.get(REBUILD_PATH)!;
+    expect(sha256Hex(now)).toBe(j.authority.rebuildSha256.active);
+    expect(parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(now))).toEqual({ [SYNTHETIC_SUCCESSOR]: a.f.tuple });
+    expect(now.replace(readSuccessorLadderTuplesJson(now), '{}')).toBe(a.f.base);
+    expect(a.disk.has(ACTIVATION_STAGING_PATH)).toBe(false);
+    expect(activationPendingProblem(mapIo(a.disk))).toBeNull();
+    // C is the same one-line edit the coupled apply made on the same base bytes (determinism of that edit; the real
+    // pin is re-derived at P and compared with the authority's rebuild_sha256.active, never assumed from J2).
+    expect(now).toBe(a.f.d.rebuild);
+    expect(judgeActivation(a, a.disk, { authority: authorityDoc(a, { action: 'deactivate' }) }).classified.state).toBe('activated');
+  });
+
+  it('state C: refuses a second activation and writes nothing (never a silent no-op)', () => {
+    const a = applied();
+    activate(a, a.disk);
+    const before = new Map(a.disk);
+    expect(() => judgeActivation(a, a.disk)).toThrow(/ALREADY ACTIVE/);
+    expect(changedPaths(before, a.disk)).toEqual([]);
+  });
+
+  it('state D: deactivation changes only rebuild-test.ts back to the inactive pin (B) and leaves the rollover applied', () => {
+    const a = applied();
+    const appliedState = new Map(a.disk);
+    activate(a, a.disk);
+    const activeState = new Map(a.disk);
+    activate(a, a.disk, { authority: authorityDoc(a, { action: 'deactivate' }) });
+    expect(changedPaths(activeState, a.disk)).toEqual([REBUILD_PATH]);
+    expect(changedPaths(appliedState, a.disk)).toEqual([]);          // D is exactly B
+    for (const [path, pin] of Object.entries(a.changeSet.final_sha256 as Record<string, string>)) {
+      expect(sha256Hex(a.disk.get(path)!)).toBe(pin);                // the rollover itself is not reversed
+    }
+    expect(() => judgeActivation(a, a.disk, { authority: authorityDoc(a, { action: 'deactivate' }) })).toThrow(/ALREADY INACTIVE/);
+    activate(a, a.disk);                                             // and it is reversible again
+    expect(a.disk).toEqual(activeState);
+  });
+
+  describe('refuses a different candidate, and writes nothing', () => {
+    type Case = [string, (a: Applied) => Parameters<typeof judgeActivation>[2] & { disk?: (d: Map<string, string>) => void }, RegExp];
+    const cases: Case[] = [
+      ['another change set', (a) => ({ changeSetText: `${a.changeSetText} ` }), /not the one this authority binds/],
+      ['another profile', (a) => ({ authority: authorityDoc(a, { profile: 'c2-2026-other' }) }), /successor profile is "c2-2026-successor", but the authority names "c2-2026-other"/],
+      ['another tuple', (a) => ({ authority: authorityDoc(a, { tuple_sha256: 'c'.repeat(64) }) }), /tuple hashes to/],
+      ['another season', (a) => ({ authority: authorityDoc(a, { season: 2027 }) }), /is for season 2026, but the authority names 2027/],
+      ['another rollover date', (a) => ({ authority: authorityDoc(a, { rollover_date: '2026-11-04' }) }), /bound to another rollover/],
+      ['another inactive pin', (a) => ({ authority: authorityDoc(a, { rebuild_sha256: { inactive: 'c'.repeat(64), active: sha256Hex(planSuccessorTuplesEdit(a.f.base, a.f.tuple)) } }) }), /neither the authority's inactive pin/],
+      ['another active pin', (a) => ({ authority: authorityDoc(a, { rebuild_sha256: { inactive: sha256Hex(a.f.base), active: 'c'.repeat(64) } }) }), /not the authority's active pin/],
+      ['another HEAD', () => ({ git: { head: 'd'.repeat(40), sourceIsAncestor: true } }), /HEAD is d+, but the authority is bound to b+/],
+      ['a source commit that is not an ancestor', () => ({ git: { head: HEAD, sourceIsAncestor: false } }), /is not an ancestor of HEAD/],
+      ['another migration set', () => ({ migrations: [...MIGRATIONS, { name: '118_new.sql', text: 'select 2;\n' }] }), /migration set is 3 files ending 118_new\.sql/],
+      ['an edited migration', () => ({ migrations: [MIGRATIONS[0], { ...MIGRATIONS[1], text: 'select 3;\n' }] }), /migration set is 2 files/],
+      ['drift in an applied file', () => ({ disk: (d) => d.set(SEASONS_PATH, `${d.get(SEASONS_PATH)}\n`) }), /not the applied state of the bound change set/],
+      ['the pre-apply state A', () => ({ disk: (d) => d.set(REGISTER_PATH, predecessorText(REGISTER_PATH)) }), /not the applied state of the bound change set/],
+      ['a different tuple already in the table', (a) => ({ disk: (d) => d.set(REBUILD_PATH, planSuccessorTuplesEdit(a.f.base, { ...a.f.tuple, expected_rows: 1641 })) }), /neither the authority's inactive pin/],
+      ['a pending rollover apply journal', () => ({ disk: (d) => d.set(TRANSACTION_JOURNAL_PATH, JSON.stringify({ schema: TRANSACTION_JOURNAL_SCHEMA, season: 2026, entries: [] })) }), /did not finish/],
+      ['a leftover staged activation', () => ({ disk: (d) => d.set(ACTIVATION_STAGING_PATH, 'x') }), /staged activation file remains/],
+    ];
+    it.each(cases)('%s', (_label, make, message) => {
+      const a = applied();
+      const over = make(a);
+      over.disk?.(a.disk);
+      const before = new Map(a.disk);
+      expect(() => judgeActivation(a, a.disk, over)).toThrow(message);
+      expect(changedPaths(before, a.disk)).toEqual([]);
+    });
+
+    it.each([
+      ['carries no tuple', (c: Record<string, unknown>) => { delete c.ladder_successor_tuple; }, /carries no ladder_successor_tuple/],
+      ['is not pinned', (c: Record<string, unknown>) => { delete c.final_sha256; }, /no final_sha256/],
+      ['names rebuild-test.ts (a coupled apply)', (c: Record<string, unknown>) => { (c.write_set as string[]).push(REBUILD_PATH); }, /predates the separated activation/],
+    ])('a change set that %s', (_label, mutate, message) => {
+      const a = applied();
+      const changeSet = structuredClone(a.changeSet);
+      mutate(changeSet);
+      const text = JSON.stringify(changeSet);
+      expect(() => judgeActivation(a, a.disk, { changeSetText: text, authority: authorityDoc(a, { transition_change_set_sha256: sha256Hex(text) }) }))
+        .toThrow(message);
+    });
+  });
+
+  it('keeps apply rollback and activation rollback apart: a rolled-back apply cannot be activated or deactivated', () => {
+    const a = applied();
+    activate(a, a.disk);
+    // Apply recovery restores the rollover files only; the table it never wrote stays active, and the activation
+    // tool refuses both directions on that tree (deactivate first, then recover the apply).
+    for (const path of Object.keys(a.changeSet.final_sha256 as Record<string, string>)) a.disk.set(path, `${predecessorText(path)}`);
+    for (const action of ['activate', 'deactivate']) {
+      expect(() => judgeActivation(a, a.disk, { authority: authorityDoc(a, { action }) })).toThrow(/not the applied state/);
+    }
+    expect(ACTIVATION_STAGING_PATH).not.toMatch(/rollover-tmp$/);
+    expect(ACTIVATION_STAGING_PATH).not.toBe(TRANSACTION_JOURNAL_PATH);
+  });
+
+  it('makes a leftover staged activation block the rollover too, not only the activation tool', () => {
+    const fs = new Map([[ACTIVATION_STAGING_PATH, 'x']]);
+    expect(pendingTransactionProblem(mapIo(fs))?.join(' ')).toContain(ACTIVATION_STAGING_PATH);
+  });
+
+  it('re-judges before the rename and leaves the file and no staging behind on any refusal', () => {
+    const a = applied();
+    const j = judgeActivation(a, a.disk);
+    const before = new Map(a.disk);
+    expect(() => applyActivationWrite(j.io, j.write, () => { throw new RolloverRefused('state moved'); })).toThrow(/state moved/);
+    expect(changedPaths(before, a.disk)).toEqual([]);
+    expect(() => applyActivationWrite(j.io, j.write, () => { a.disk.set(REBUILD_PATH, `${a.f.base} `); })).toThrow(/changed after it was judged/);
+    expect(a.disk.has(ACTIVATION_STAGING_PATH)).toBe(false);
+    a.disk.set(REBUILD_PATH, a.f.base);
+    a.disk.set(ACTIVATION_STAGING_PATH, 'x');
+    expect(() => applyActivationWrite(j.io, j.write, () => undefined)).toThrow(/already exists/);
+    expect(a.disk.get(REBUILD_PATH)).toBe(a.f.base);
+  });
+
+  it.each([
+    ['an unknown field', (o: Record<string, unknown>) => { o.force = true; }, /unknown field "force"/],
+    ['a missing field', (o: Record<string, unknown>) => { delete o.head_commit; }, /missing "head_commit"/],
+    ['another schema', (o: Record<string, unknown>) => { o.schema = 'x/2'; }, /schema is "x\/2"/],
+    ['another action', (o: Record<string, unknown>) => { o.action = 'enable'; }, /"activate" or "deactivate"/],
+    ['an unresolved field', (o: Record<string, unknown>) => { o.decision = 'UNRESOLVED: owner'; }, /unresolved-proposal marker/],
+    ['a non-calendar date', (o: Record<string, unknown>) => { o.rollover_date = '2026-02-30'; }, /not a calendar date/],
+    ['a short commit', (o: Record<string, unknown>) => { o.head_commit = 'abc1234'; }, /head_commit is malformed/],
+    ['equal pins', (o: Record<string, unknown>) => { o.rebuild_sha256 = { inactive: 'c'.repeat(64), active: 'c'.repeat(64) }; }, /same bytes/],
+    ['a decision that is not an id', (o: Record<string, unknown>) => { o.decision = 'yes'; }, /decision is malformed/],
+  ])('parses the authority strictly: refuses %s', (_label, mutate, message) => {
+    const o = authorityDoc(applied());
+    mutate(o);
+    expect(() => parseActivationAuthority(JSON.stringify(o))).toThrow(message);
+  });
+
+  it('binds the migration set independent of line endings and order, and refuses malformed sets', () => {
+    const lf = migrationSetState(MIGRATIONS);
+    const crlf = migrationSetState([...MIGRATIONS].reverse().map((m) => ({ ...m, text: m.text.replace(/\r?\n/g, '\r\n') })));
+    expect(crlf).toEqual(lf);
+    expect(lf).toMatchObject({ count: 2, last: '117_last.sql' });
+    expect(() => migrationSetState([])).toThrow(/holds no migration/);
+    expect(() => migrationSetState([{ name: 'notes.sql', text: '' }])).toThrow(/not a migration file name/);
+    expect(() => migrationSetState([MIGRATIONS[0], MIGRATIONS[0]])).toThrow(/twice/);
+  });
+
+  it('removes exactly one reviewed tuple, the exact inverse of the append, and refuses anything else', () => {
+    const { tuple, base } = successorFixture();
+    const other: SuccessorLadderTuple = { ...tuple, profile: 'c2-2027-successor', supersedes: SYNTHETIC_SUCCESSOR };
+    const withOther = planSuccessorTuplesEdit(base, other);
+    const both = planSuccessorTuplesEdit(withOther, tuple);
+    expect(planSuccessorTuplesRemoval(both, tuple)).toBe(withOther);
+    expect(planSuccessorTuplesRemoval(planSuccessorTuplesEdit(base, tuple), tuple)).toBe(base);
+    expect(() => planSuccessorTuplesRemoval(base, tuple)).toThrow(/does not list/);
+    expect(() => planSuccessorTuplesRemoval(planSuccessorTuplesEdit(base, { ...tuple, expected_rows: 1641 }), tuple))
+      .toThrow(/values other than the reviewed tuple/);
+    expect(successorTupleSha256(tuple)).toBe(sha256Hex(JSON.stringify(tuple)));
+  });
+
+  it('has one write site in the CLI, after the dry-run return, and no database, migration or rebuild call', () => {
+    const cli = repoText('tools/db/successor-activation.ts');
+    expect((cli.match(/applyActivationWrite\(repoIo/g) ?? []).length).toBe(1);
+    expect(cli.indexOf('if (!args.apply)')).toBeLessThan(cli.indexOf('applyActivationWrite(repoIo'));
+    expect((cli.match(/renameSync\(/g) ?? []).length).toBe(1);
+    expect(cli).not.toMatch(/repoIo\.(write|rename|remove)\(/);
+    // Imports only: no database client, migration runner, rebuild, rollover CLI or census module.
+    expect(cli).not.toMatch(/from '[^']*(postgres|migrate|rebuild-test|rollover-season|ownership-census)[^']*'/);
+  });
+});
+
+/** A FileIo over a Map, for the activation and apply tests above. */
+function mapIo(fs: Map<string, string>): FileIo {
+  return {
+    read: (p) => (fs.has(p) ? Buffer.from(fs.get(p)!) : null),
+    write: (p, c) => { fs.set(p, c); },
+    rename: (from, to) => { fs.set(to, fs.get(from)!); fs.delete(from); },
+    remove: (p) => { fs.delete(p); },
+  };
+}

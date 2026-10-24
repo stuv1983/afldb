@@ -13,6 +13,8 @@
  * WHAT IT DOES NOT DO. It adopts nothing. The table is EMPTY in the repository until an owner-reviewed
  * adoption replaces the literal; it grants no census, rollover, source-acceptance or target authority,
  * and it never relaxes the rehearsal-only restrictions. Those checks live where they always did.
+ * Adoption is the separately authorised successor ACTIVATION (`successor-activation.ts`), never the rollover
+ * apply: the apply installs the documents the tuple is judged against and leaves this table unchanged.
  *
  * Pure: no filesystem, no database, no clock.
  */
@@ -166,6 +168,39 @@ export function planSuccessorTuplesEdit(source: string, tuple: SuccessorLadderTu
     refuse('the successor tuple table did not round-trip.');
   }
   for (const [k, v] of Object.entries(current)) {
+    if (JSON.stringify(next[k]) !== JSON.stringify(v)) refuse(`the existing successor tuple ${JSON.stringify(k)} changed.`);
+  }
+  return source.replace(LITERAL, (_m, a: string, _b: string, c: string) => `${a}${nextJson}${c}`);
+}
+
+/**
+ * SHA-256 of a tuple exactly as `planSuccessorTuplesEdit` serialises it into the literal (the frozen field order
+ * `assertSuccessorLadderTuple` builds), so a pin names the bytes the table carries.
+ */
+export function successorTupleSha256(tuple: SuccessorLadderTuple): string {
+  return createHash('sha256').update(JSON.stringify(assertSuccessorLadderTuple(tuple, tuple.profile)), 'utf8').digest('hex');
+}
+
+/**
+ * The exact inverse of `planSuccessorTuplesEdit`: remove exactly one reviewed tuple. The entry must be present
+ * and equal to `tuple`, every other entry stays byte-identical, and the result must parse back to the table
+ * without it. Used only by successor deactivation (`successor-activation.ts`).
+ */
+export function planSuccessorTuplesRemoval(source: string, tuple: SuccessorLadderTuple): string {
+  const current = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(source));
+  if (!Object.hasOwn(current, tuple.profile)) {
+    refuse(`rebuild-test.ts does not list the successor profile ${JSON.stringify(tuple.profile)}.`);
+  }
+  if (JSON.stringify(current[tuple.profile]) !== JSON.stringify(assertSuccessorLadderTuple(tuple, tuple.profile))) {
+    refuse(`rebuild-test.ts lists ${JSON.stringify(tuple.profile)} with values other than the reviewed tuple.`);
+  }
+  const kept = Object.entries(current).filter(([k]) => k !== tuple.profile);
+  const nextJson = `{${kept.map(([k, v]) => `${JSON.stringify(k)}:${JSON.stringify(v)}`).join(',')}}`;
+  const next = parseSuccessorLadderTuples(nextJson);
+  if (Object.hasOwn(next, tuple.profile) || Object.keys(next).length !== Object.keys(current).length - 1) {
+    refuse('the successor tuple table did not round-trip.');
+  }
+  for (const [k, v] of kept) {
     if (JSON.stringify(next[k]) !== JSON.stringify(v)) refuse(`the existing successor tuple ${JSON.stringify(k)} changed.`);
   }
   return source.replace(LITERAL, (_m, a: string, _b: string, c: string) => `${a}${nextJson}${c}`);

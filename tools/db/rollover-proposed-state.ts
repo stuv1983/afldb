@@ -49,7 +49,8 @@ export type ProposedDocuments = {
    */
   rebuild: string;
   /**
-   * The CURRENT `tools/db/rebuild-test.ts` bytes the apply would replace. Required for a successor profile:
+   * The CURRENT `tools/db/rebuild-test.ts` bytes (for a successor, the inactive bytes the apply leaves in place and
+   * the activation appends the tuple to). Required for a successor profile:
    * its CLUB_SEASONS_EXPECTED.rows must be left exactly as the base declares it (the superseded predecessor's
    * fingerprint-bound count), because stage 9 reads a successor's rows from its tuple.
    */
@@ -193,4 +194,33 @@ export function validateProposedRebuildState(
     }
     throw error;
   }
+}
+
+/**
+ * AFLDB-ISSUE-316 successor activation: the two states either side of the activation, judged by the same
+ * validators over the same installed documents. With `activeRebuild` (the bound tuple appended) the state must
+ * resolve exactly `profile` and `expectedRows`; with `inactiveRebuild` (the table as the apply left it) it must
+ * refuse the installed profile as an unsupported ladder expectation, which is what makes it INACTIVE.
+ */
+export function validateActivationStates(
+  docs: Omit<ProposedDocuments, 'rebuild' | 'baseRebuild'>,
+  inactiveRebuild: string, activeRebuild: string, profile: string, expectedRows: number,
+): { active: ProposedStateVerdict; inactiveRefusal: string } {
+  const active = validateProposedRebuildState({ ...docs, rebuild: activeRebuild, baseRebuild: inactiveRebuild });
+  if (active.ladderProfile !== profile || active.expectedRows !== expectedRows) {
+    throw new RolloverRefused(`The activated state resolves ${active.ladderProfile} with ${active.expectedRows} rows, `
+      + `not ${profile} with ${expectedRows}.`);
+  }
+  let inactiveRefusal: string | undefined;
+  try {
+    validateProposedRebuildState({ ...docs, rebuild: inactiveRebuild, baseRebuild: inactiveRebuild });
+  } catch (error) {
+    if (!(error instanceof RolloverRefused)) throw error;
+    inactiveRefusal = error.message;
+  }
+  if (inactiveRefusal === undefined || !inactiveRefusal.includes('Unsupported ladder expectation')) {
+    throw new RolloverRefused('The inactive state does not refuse the installed profile as an unsupported ladder '
+      + `expectation (${inactiveRefusal ?? 'it resolved'}); it is not inactive.`);
+  }
+  return { active, inactiveRefusal };
 }

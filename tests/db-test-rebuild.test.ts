@@ -226,7 +226,7 @@ describe('ISSUE-316 ladder-season-scope', () => {
     };
     const stubStop = (deps: Deps): Deps => ({ ...deps, runCommand: () => { throw new Error('stub stop'); } });
 
-    it('ships an empty successor table, so no binding, however faithful, is an adopted successor', () => {
+    it('states A and B (before activation): ships an empty successor table, so no binding, however faithful, is an adopted successor', () => {
       expect(SUCCESSOR_LADDER_TUPLES).toEqual({});
       expect(isAdoptedSuccessorBinding(undefined)).toBe(false);
       expect(isAdoptedSuccessorBinding(fabricated())).toBe(false);

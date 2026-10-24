@@ -1313,7 +1313,10 @@ export type PlannedFile = { path: string; content: string; reformatted: boolean 
 export type TransitionInput = {
   contractBase?: Json;
   registerPatches?: RegisterPatch[];
-  /** A reviewed successor ladder tuple appended to `SUCCESSOR_LADDER_TUPLES_JSON` in tools/db/rebuild-test.ts. */
+  /**
+   * A reviewed successor ladder tuple. The plan only PROJECTS its append to `SUCCESSOR_LADDER_TUPLES_JSON` in
+   * tools/db/rebuild-test.ts (`RolloverPlan.activation`); the apply never writes it (successor activation).
+   */
   successorLadderTuple?: SuccessorLadderTuple;
 };
 
@@ -1469,6 +1472,12 @@ export type RolloverPlan = {
   clubSeasonRows: { from: number; to: number };
   files: PlannedFile[];
   notes: string[];
+  /**
+   * A successor transition only: the activation edit this plan does NOT write. `inactiveContent` is the current
+   * rebuild source, left unchanged by the apply; `activeContent` is that source with exactly the reviewed tuple
+   * appended, which only the separately authorised `tools/db/successor-activation.ts` may write.
+   */
+  activation?: SuccessorActivationProjection;
   /** The bindings the remaining pre-apply gates must be checked against. */
   authority: {
     coreManifestPath: string;
@@ -1478,6 +1487,13 @@ export type RolloverPlan = {
     successorRegisterContent: string;
     reviewedStatAvailabilityContent: string;
   };
+};
+
+export type SuccessorActivationProjection = {
+  path: string;
+  tuple: SuccessorLadderTuple;
+  inactiveContent: string;
+  activeContent: string;
 };
 
 export const REGISTER_PATH = 'data/reference/fitzroy-accepted-baselines.json';
@@ -1986,19 +2002,34 @@ export function planSeasonRollover(input: {
   // what its declaration says it is, the superseded predecessor's 1897-Y-1 universe, so a successor
   // transition never rewrites it: a second copy of the successor's number would gate nothing and
   // would falsify the predecessor's. Without a tuple the ISSUE-101 constant edit is unchanged.
+  //
+  // AFLDB-ISSUE-316 (owner ruling 2026-10-25): adding the tuple to the closed table IS the successor
+  // activation, and the apply never performs it. A successor transition therefore does not write
+  // rebuild-test.ts at all; the edit is only PROJECTED here, from the same function and the same bytes,
+  // so the dry run can validate the activated state and print its pin, and the separately authorised
+  // `tools/db/successor-activation.ts` writes exactly that projection later. Refuses, as before, when the
+  // profile is already in the table: the successor must be inactive before the apply.
   const successorTuple = input.transition?.successorLadderTuple;
-  let rebuildNext: string;
+  let rebuildNext: string | undefined;
+  let activation: SuccessorActivationProjection | undefined;
   if (successorTuple) {
     if (successorTuple.expected_rows !== witnessRows) {
       refuse(`The successor ladder tuple ${JSON.stringify(successorTuple.profile)} carries expected_rows `
         + `${successorTuple.expected_rows}, but the ladder witness carries ${witnessRows} rows.`);
     }
     try {
-      rebuildNext = planSuccessorTuplesEdit(currentSources.rebuild, successorTuple);
+      activation = {
+        path: REBUILD_PATH, tuple: successorTuple, inactiveContent: currentSources.rebuild,
+        activeContent: planSuccessorTuplesEdit(currentSources.rebuild, successorTuple),
+      };
     } catch (error) {
       if (error instanceof LadderSuccessorRefused) refuse(error.message);
       throw error;
     }
+    notes.push(`successor activation NOT performed: ${REBUILD_PATH} is not written by this apply and its `
+      + `successor table stays as it is, so ${JSON.stringify(successorTuple.profile)} stays INACTIVE (every `
+      + 'rebuild refuses the installed profile) until a separately authorised '
+      + '`tools/db/successor-activation.ts --apply` appends exactly this tuple.');
   } else {
     rebuildNext = planClubSeasonsConstantEdit(
       currentSources.rebuild, current.clubSeasonsExpectedRows, witnessRows,
@@ -2046,7 +2077,7 @@ export function planSeasonRollover(input: {
       reformatted: successor.contractReformatted },
     { path: STAT_AVAILABILITY_PATH, content: evidence.statAvailabilityText,
       reformatted: false },
-    { path: REBUILD_PATH, content: rebuildNext, reformatted: false },
+    ...(rebuildNext === undefined ? [] : [{ path: REBUILD_PATH, content: rebuildNext, reformatted: false }]),
   ];
   const reformatted = planned.filter((f) => f.reformatted).map((f) => f.path);
   if (reformatted.length > 0) {
@@ -2092,6 +2123,7 @@ export function planSeasonRollover(input: {
     clubSeasonRows: { from: current.clubSeasonsExpectedRows, to: witnessRows },
     files: planned,
     notes,
+    ...(activation ? { activation } : {}),
     authority: {
       coreManifestPath: evidence.coreManifestPath,
       coreSnapshotDir: evidence.coreSnapshotDir,
