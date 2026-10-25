@@ -1,0 +1,184 @@
+{
+  "state": "B",
+  "mode": "broader",
+  "started_at": "2026-10-25T06:54:45.424Z",
+  "completed_at": "2026-10-25T06:56:00.302Z",
+  "tests": [
+    "tests/afl-api-cutover.test.ts",
+    "tests/afl-api-settle-cli-gate.test.ts",
+    "tests/db-promotion-check.test.ts",
+    "tests/db-test-rebuild.test.ts",
+    "tests/first-kick-goal-source.test.ts",
+    "tests/fitzroy-acquisition.test.ts",
+    "tests/fitzroy-core-import.test.ts",
+    "tests/reference-data.test.ts",
+    "tests/season-rollover.test.ts",
+    "tests/v2-admin-operations-ui.test.ts",
+    "tests/v2-admin-operations.test.ts",
+    "tests/v2-coverage-registry.test.ts",
+    "tests/v2-historical-manifest.test.ts",
+    "tests/v2-season-seal.test.ts"
+  ],
+  "exit_code": 1,
+  "error": null,
+  "passed": 2944,
+  "skipped": 7,
+  "failed": 22,
+  "suite_failures": 12,
+  "expected_skips_match": true,
+  "skips": [
+    "AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate prepare-promotion-source: the run (fake settles, no database) ISSUE-314: --record-out is checked before anything is verified, opened or written recordOutProblems refuses a dangling symbolic link, which the exclusive write also refuses",
+    "AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm run become bound node) the esbuild native-binary exception and the whole node_modules walk npm .bin link chains: every hop stays inside the checkout node_modules (F-J01) real symbolic links: an inside chain is admitted, a leave-and-return chain refuses (skipped only where file links cannot be created)",
+    "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process (POSIX): SIGTERM alone ends a default process, reported by its signal",
+    "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process that ignores SIGTERM (POSIX): SIGKILL ends it after the grace",
+    "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) refuses a dangling symlink named like the startup zip (exists() is false, lexists() is true)",
+    "ISSUE-316 ladder-season-scope package-provenance runtime record version 2: inert links, absent landmarks, bound executables, hard-link groups absent Python startup landmarks reviewed start-up layout landmarks (prefix, venv, build and ._pth selection) derives exactly the reviewed set for an interpreter at /usr/bin/python3.12",
+    "curated player alias reference (AFLDB-ISSUE-110 Stage 2) loads through external identity into player_name_aliases: normalised, idempotent, preserving, fail-closed (rolled back)"
+  ],
+  "failures": [
+    {
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends the production watchdog adapter: real spawn, real files, real liveness the watchdog command runs through the tsx loader with no wrapper, so the spawned PID is the watchdog's own",
+      "message": [
+        "AssertionError: expected 1 to be +0 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/afl-api-cutover.test.ts:2656:24\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process: the tsx loader runs the script in the spawned PID itself, where the tsx CLI does not",
+      "message": [
+        "AssertionError: expected 1 to be +0 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/afl-api-cutover.test.ts:2952:36\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ]
+    },
+    {
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process: a descendant that keeps the inherited pipes open does not keep the parent alive once the result is produced",
+      "message": [
+        "Error: ENOENT: no such file or directory, open 'C:\\Users\\stuar\\AppData\\Local\\Temp\\c4b-step-NlOySM\\evidence\\report.json'\n    at Proxy.readFileSync (node:fs:441:20)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/afl-api-cutover.test.ts:3000:37\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope invariant: explicit predecessor plan reaches its first stage with predecessor documents",
+      "message": [
+        "Error: Pinned core/witness manifest bytes changed.\n    at checkRebuildBinding (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1324:68)\n    at planStages (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1915:5)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:295:20\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) loads a real bound dependency through mjs and the actual tsx preload",
+      "message": [
+        "AssertionError: node:os:305\r\n    throw new ERR_SYSTEM_ERROR(ctx);\r\n          ^\r\n\r\nSystemError [ERR_SYSTEM_ERROR]: A system error occurred: uv_os_get_passwd returned ENOMEM (not enough memory)\r\n    at Object.userInfo (node:os:305:11)\r\n    at file:///D:/dev/afldbV2/node_modules/tsx/dist/temporary-directory-BDDVQOvU.mjs:1:84\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\r\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\r\n    at async installResolutionGuard (file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-KisiTm/source/tools/v2/rehearsal-resolution-guard.mjs:87:3)\r\n    at async file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-KisiTm/source/tools/v2/rehearsal-resolution-guard.mjs:97:3 {\r\n  code: 'ERR_SYSTEM_ERROR',\r\n  info: {\r\n    errno: -4057,\r\n    code: 'ENOMEM',\r\n    message: 'not enough memory',\r\n    syscall: 'uv_os_get_passwd'\r\n  },\r\n  errno: [Getter/Setter],\r\n  syscall: [Getter/Setter]\r\n}\r\n\r\nNode.js v22.21.0\r\n: expected 1 to be +0 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:447:46\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) loads a real bound dependency through cjs and the actual tsx preload",
+      "message": [
+        "AssertionError: node:os:305\r\n    throw new ERR_SYSTEM_ERROR(ctx);\r\n          ^\r\n\r\nSystemError [ERR_SYSTEM_ERROR]: A system error occurred: uv_os_get_passwd returned ENOMEM (not enough memory)\r\n    at Object.userInfo (node:os:305:11)\r\n    at file:///D:/dev/afldbV2/node_modules/tsx/dist/temporary-directory-BDDVQOvU.mjs:1:84\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\r\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\r\n    at async installResolutionGuard (file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-Jeu8Yx/source/tools/v2/rehearsal-resolution-guard.mjs:87:3)\r\n    at async file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-Jeu8Yx/source/tools/v2/rehearsal-resolution-guard.mjs:97:3 {\r\n  code: 'ERR_SYSTEM_ERROR',\r\n  info: {\r\n    errno: -4057,\r\n    code: 'ENOMEM',\r\n    message: 'not enough memory',\r\n    syscall: 'uv_os_get_passwd'\r\n  },\r\n  errno: [Getter/Setter],\r\n  syscall: [Getter/Setter]\r\n}\r\n\r\nNode.js v22.21.0\r\n: expected 1 to be +0 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:447:46\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) loads a real bound dependency through ts and the actual tsx preload",
+      "message": [
+        "AssertionError: node:os:305\r\n    throw new ERR_SYSTEM_ERROR(ctx);\r\n          ^\r\n\r\nSystemError [ERR_SYSTEM_ERROR]: A system error occurred: uv_os_get_passwd returned ENOMEM (not enough memory)\r\n    at Object.userInfo (node:os:305:11)\r\n    at file:///D:/dev/afldbV2/node_modules/tsx/dist/temporary-directory-BDDVQOvU.mjs:1:84\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\r\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\r\n    at async installResolutionGuard (file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-lKAUQJ/source/tools/v2/rehearsal-resolution-guard.mjs:87:3)\r\n    at async file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-lKAUQJ/source/tools/v2/rehearsal-resolution-guard.mjs:97:3 {\r\n  code: 'ERR_SYSTEM_ERROR',\r\n  info: {\r\n    errno: -4057,\r\n    code: 'ENOMEM',\r\n    message: 'not enough memory',\r\n    syscall: 'uv_os_get_passwd'\r\n  },\r\n  errno: [Getter/Setter],\r\n  syscall: [Getter/Setter]\r\n}\r\n\r\nNode.js v22.21.0\r\n: expected 1 to be +0 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:447:46\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) loads the runner-style CommonJS TypeScript path with real type transformation",
+      "message": [
+        "AssertionError: node:os:305\r\n    throw new ERR_SYSTEM_ERROR(ctx);\r\n          ^\r\n\r\nSystemError [ERR_SYSTEM_ERROR]: A system error occurred: uv_os_get_passwd returned ENOMEM (not enough memory)\r\n    at Object.userInfo (node:os:305:11)\r\n    at file:///D:/dev/afldbV2/node_modules/tsx/dist/temporary-directory-BDDVQOvU.mjs:1:84\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\r\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\r\n    at async installResolutionGuard (file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-ZXl1aY/source/tools/v2/rehearsal-resolution-guard.mjs:87:3)\r\n    at async file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-ZXl1aY/source/tools/v2/rehearsal-resolution-guard.mjs:97:3 {\r\n  code: 'ERR_SYSTEM_ERROR',\r\n  info: {\r\n    errno: -4057,\r\n    code: 'ENOMEM',\r\n    message: 'not enough memory',\r\n    syscall: 'uv_os_get_passwd'\r\n  },\r\n  errno: [Getter/Setter],\r\n  syscall: [Getter/Setter]\r\n}\r\n\r\nNode.js v22.21.0\r\n: expected 1 to be +0 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:453:46\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) refuses ancestor imports on the runner-style CommonJS TypeScript path",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:459:66\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) refuses resolvable ancestor dependency before sentinel execution via mjs",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:469:31\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) refuses resolvable ancestor dependency before sentinel execution via cjs",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:469:31\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) refuses resolvable ancestor dependency before sentinel execution via ts",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:469:31\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) rejects changed bound dependency bytes at module load via mjs",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:475:66\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) rejects changed bound dependency bytes at module load via cjs",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:475:66\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) rejects changed bound dependency bytes at module load via ts",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:475:66\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) uses the real TS loader for an inventoried workspace alias and transitive import",
+      "message": [
+        "AssertionError: node:os:305\r\n    throw new ERR_SYSTEM_ERROR(ctx);\r\n          ^\r\n\r\nSystemError [ERR_SYSTEM_ERROR]: A system error occurred: uv_os_get_passwd returned ENOMEM (not enough memory)\r\n    at Object.userInfo (node:os:305:11)\r\n    at file:///D:/dev/afldbV2/node_modules/tsx/dist/temporary-directory-BDDVQOvU.mjs:1:84\r\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\r\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\r\n    at async installResolutionGuard (file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-FQRMtN/source/tools/v2/rehearsal-resolution-guard.mjs:87:3)\r\n    at async file:///C:/Users/stuar/AppData/Local/Temp/issue316-resolution-egLyoO/case-FQRMtN/source/tools/v2/rehearsal-resolution-guard.mjs:97:3 {\r\n  code: 'ERR_SYSTEM_ERROR',\r\n  info: {\r\n    errno: -4057,\r\n    code: 'ENOMEM',\r\n    message: 'not enough memory',\r\n    syscall: 'uv_os_get_passwd'\r\n  },\r\n  errno: [Getter/Setter],\r\n  syscall: [Getter/Setter]\r\n}\r\n\r\nNode.js v22.21.0\r\n: expected 1 to be +0 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:491:46\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) refuses an unbound workspace alias target before its code executes",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:497:66\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) loads a real hard-linked module only when the policy declares that exact link count",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'Rehearsal resolution refused'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:594:68\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage db:privileges (direct run): runs its work, refusing rather than skipping",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'unknown privileges target \\'no-such-t…'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7024:32\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the ownership census CLI refuses before reading its evidence or launching psql",
+      "message": [
+        "AssertionError: expected 1 to be 2 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7041:28\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the reset proof CLI refuses before opening a session or launching psql",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'REFUSED: AFLDB_TEST_DATABASE_URL cann…'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7050:28\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the convergence rehearsal refuses before connecting or seeding anything",
+      "message": [
+        "AssertionError: expected 'node:os:305\\r\\n    throw new ERR_SYST…' to contain 'REFUSED: The owner DSN cannot be used…'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7063:30\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    }
+  ],
+  "network_audit": {
+    "guarded_processes": 175,
+    "blocked_attempts": 0,
+    "local_tsx_ipc": 0
+  },
+  "protected_files": {
+    "files": 1574,
+    "mismatches": []
+  },
+  "accepted_product_or_assertion_edits": false,
+  "proposal_assertion_edits": true,
+  "result_file": "validation/restatement-repair/state-B-broader-1.results.json"
+}

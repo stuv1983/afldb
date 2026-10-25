@@ -1,0 +1,5 @@
+# Proposal evidence; preserve exact bytes. No product-file attribute changes.
+* -text !eol
+*.patch -diff
+*.bundle -diff
+validation/*.log -diff

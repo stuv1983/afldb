@@ -1,0 +1,2161 @@
+{
+  "verified_at": "2026-10-25T03:49:42.498Z",
+  "authority": "Owner 2026-10-25: named J2 package and its explicitly referenced local inputs, offline only",
+  "external_root": "D:/tmp/afldb-i316-J2-20261023T2317Z/local/dryrun-2-pinned",
+  "reference": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\dryrun-2-J2-pinned.log",
+  "inventory": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\FILE_ORIGINS.json",
+  "inventory_sha256": "cda37210cffb7076bc7bb8c24b9475d9871550be18be3b0cc94125f7f81fdcc8",
+  "files": [
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_details.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_details.csv",
+      "expected_sha256": "03f790eeeca85426b7866e2b034c600091a4061177eb4c0e572667cea91f133f",
+      "actual_sha256": "03f790eeeca85426b7866e2b034c600091a4061177eb4c0e572667cea91f133f",
+      "bytes": 1761713,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1897.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1897.csv",
+      "expected_sha256": "00f439ce050936f2ea3aeb27b122c41beda8dc058122ef3f93cd6412a91a4306",
+      "actual_sha256": "00f439ce050936f2ea3aeb27b122c41beda8dc058122ef3f93cd6412a91a4306",
+      "bytes": 809958,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1898.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1898.csv",
+      "expected_sha256": "16ede022402ac31586ccaf1382b5164c306e06fd5d907441c3555c64059ca37b",
+      "actual_sha256": "16ede022402ac31586ccaf1382b5164c306e06fd5d907441c3555c64059ca37b",
+      "bytes": 918275,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1899.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1899.csv",
+      "expected_sha256": "9bf1fcff20e00c35c014eb7ae14debfd8a7e8e99d2f1973a6ea956289fcdfefd",
+      "actual_sha256": "9bf1fcff20e00c35c014eb7ae14debfd8a7e8e99d2f1973a6ea956289fcdfefd",
+      "bytes": 815138,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1900.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1900.csv",
+      "expected_sha256": "9a538526ae65bbbf2255cf01fd018c401f3c1a5613239447945b3acc1ee44286",
+      "actual_sha256": "9a538526ae65bbbf2255cf01fd018c401f3c1a5613239447945b3acc1ee44286",
+      "bytes": 830056,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1901.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1901.csv",
+      "expected_sha256": "2f7e00cb4578038fe2709d7c5a97f6f685ea1cff51ead0cbfc96c70780c678d5",
+      "actual_sha256": "2f7e00cb4578038fe2709d7c5a97f6f685ea1cff51ead0cbfc96c70780c678d5",
+      "bytes": 842772,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1902.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1902.csv",
+      "expected_sha256": "fe1adeaff2ab9da80ea967b2fbd2607b39e41f83d9a34ebb1ec181c83e6354c0",
+      "actual_sha256": "fe1adeaff2ab9da80ea967b2fbd2607b39e41f83d9a34ebb1ec181c83e6354c0",
+      "bytes": 858211,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1903.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1903.csv",
+      "expected_sha256": "651249c42251c445f49ee789513e204c9ab61fa2a4fd661a72137ee76e891c84",
+      "actual_sha256": "651249c42251c445f49ee789513e204c9ab61fa2a4fd661a72137ee76e891c84",
+      "bytes": 847188,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1904.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1904.csv",
+      "expected_sha256": "f354c3d84554335a974dda51ea5e497487a19a691367f382f7e957d3572188ea",
+      "actual_sha256": "f354c3d84554335a974dda51ea5e497487a19a691367f382f7e957d3572188ea",
+      "bytes": 848317,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1905.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1905.csv",
+      "expected_sha256": "b9ec7a5dd6beb5a32ca89d1b15c4b20b58491d519c8ff18a9f1b3a65bbe67551",
+      "actual_sha256": "b9ec7a5dd6beb5a32ca89d1b15c4b20b58491d519c8ff18a9f1b3a65bbe67551",
+      "bytes": 864572,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1906.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1906.csv",
+      "expected_sha256": "92c283e26a2179aeffa837100c6dd86421cb234c739b45c9506993344186d95c",
+      "actual_sha256": "92c283e26a2179aeffa837100c6dd86421cb234c739b45c9506993344186d95c",
+      "bytes": 857256,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1907.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1907.csv",
+      "expected_sha256": "6357601c28f10f062e9d0308dccdf5929292740d6aab01c41119563aaf32a5c1",
+      "actual_sha256": "6357601c28f10f062e9d0308dccdf5929292740d6aab01c41119563aaf32a5c1",
+      "bytes": 855615,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1908.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1908.csv",
+      "expected_sha256": "f917862ff79943c88fe9120cc942d7f62a3742fb6076e32703789128a050860b",
+      "actual_sha256": "f917862ff79943c88fe9120cc942d7f62a3742fb6076e32703789128a050860b",
+      "bytes": 1136762,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1909.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1909.csv",
+      "expected_sha256": "8a51cdaeb103b96e33765f47b937d8302f77c6efaa0617115e8bcd55b66c71ec",
+      "actual_sha256": "8a51cdaeb103b96e33765f47b937d8302f77c6efaa0617115e8bcd55b66c71ec",
+      "bytes": 1155213,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1910.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1910.csv",
+      "expected_sha256": "04bdcdadb9fa5305632c51f94d4f3f26b0b169bdeca8dbe0d5f4f7b031f1e483",
+      "actual_sha256": "04bdcdadb9fa5305632c51f94d4f3f26b0b169bdeca8dbe0d5f4f7b031f1e483",
+      "bytes": 1163563,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1911.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1911.csv",
+      "expected_sha256": "b6de7123a0cef1b2b1b1b9840cbae6e2a43ef378a729f13bb6cdc47a0e3e1e09",
+      "actual_sha256": "b6de7123a0cef1b2b1b1b9840cbae6e2a43ef378a729f13bb6cdc47a0e3e1e09",
+      "bytes": 1147520,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1912.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1912.csv",
+      "expected_sha256": "d5f15a1bea8e4744944bdbfa055fe304f6053f8272d71943d6ab4376b63009c5",
+      "actual_sha256": "d5f15a1bea8e4744944bdbfa055fe304f6053f8272d71943d6ab4376b63009c5",
+      "bytes": 1171145,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1913.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1913.csv",
+      "expected_sha256": "76dfcd6d3cc7728d9f8cff296ba38db6e0235ad5354631a19c73b2dad10c51fc",
+      "actual_sha256": "76dfcd6d3cc7728d9f8cff296ba38db6e0235ad5354631a19c73b2dad10c51fc",
+      "bytes": 1174997,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1914.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1914.csv",
+      "expected_sha256": "bcaab10c7b9bb561e9d101ff4b9db37fa7f5928c4d8d70805c176e81301bd6d0",
+      "actual_sha256": "bcaab10c7b9bb561e9d101ff4b9db37fa7f5928c4d8d70805c176e81301bd6d0",
+      "bytes": 1177700,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1915.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1915.csv",
+      "expected_sha256": "1c070678e6a4d21e7856b763a22979df8b61092044a0b256f67d99d22c7b6deb",
+      "actual_sha256": "1c070678e6a4d21e7856b763a22979df8b61092044a0b256f67d99d22c7b6deb",
+      "bytes": 949037,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1916.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1916.csv",
+      "expected_sha256": "281d8c356d4e9bd47ce18b013d1ede439a5aa65e6bc357b1af10192860364837",
+      "actual_sha256": "281d8c356d4e9bd47ce18b013d1ede439a5aa65e6bc357b1af10192860364837",
+      "bytes": 349723,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1917.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1917.csv",
+      "expected_sha256": "c128b3e1aedd252efeb0d6041b8ae75caf3db55ef18db3ef3daa5a1c59bbeb92",
+      "actual_sha256": "c128b3e1aedd252efeb0d6041b8ae75caf3db55ef18db3ef3daa5a1c59bbeb92",
+      "bytes": 610052,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1918.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1918.csv",
+      "expected_sha256": "f7009787fb43c9cd1312f0da5c2605b22ce6250646a0e692da25631019a2e561",
+      "actual_sha256": "f7009787fb43c9cd1312f0da5c2605b22ce6250646a0e692da25631019a2e561",
+      "bytes": 734769,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1919.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1919.csv",
+      "expected_sha256": "c1e011af78584f327c1fa57e7146e486e2be1161f6cf6013cafe86606ebfd05a",
+      "actual_sha256": "c1e011af78584f327c1fa57e7146e486e2be1161f6cf6013cafe86606ebfd05a",
+      "bytes": 949530,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1920.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1920.csv",
+      "expected_sha256": "d13896d7c6a6daae20908c1651179fe4c7818e62a49bf34cf353446dde82c029",
+      "actual_sha256": "d13896d7c6a6daae20908c1651179fe4c7818e62a49bf34cf353446dde82c029",
+      "bytes": 957849,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1921.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1921.csv",
+      "expected_sha256": "21fe9beb0aafa6ce3caa459f8fca8fee930d5ec710abfa57e498f8123c9a1909",
+      "actual_sha256": "21fe9beb0aafa6ce3caa459f8fca8fee930d5ec710abfa57e498f8123c9a1909",
+      "bytes": 964060,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1922.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1922.csv",
+      "expected_sha256": "44b8f25e6abb3fec3df15b57412fc616d66bd818ff0c01d3b81e86bf609644d2",
+      "actual_sha256": "44b8f25e6abb3fec3df15b57412fc616d66bd818ff0c01d3b81e86bf609644d2",
+      "bytes": 962981,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1923.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1923.csv",
+      "expected_sha256": "56a4d9c004a3c7edd5c2e8c3f4b8969e423b7fa2a8da0856bc29cf0ed85466df",
+      "actual_sha256": "56a4d9c004a3c7edd5c2e8c3f4b8969e423b7fa2a8da0856bc29cf0ed85466df",
+      "bytes": 966297,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1924.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1924.csv",
+      "expected_sha256": "fd745310f18a7445f8ec3a3001be9b07bcf8c16eb462a346f1155d4b4214dca7",
+      "actual_sha256": "fd745310f18a7445f8ec3a3001be9b07bcf8c16eb462a346f1155d4b4214dca7",
+      "bytes": 997204,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1925.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1925.csv",
+      "expected_sha256": "7c2f738ba69c204135e6cefbd60ad373f362a338338b21972b854b32009365ee",
+      "actual_sha256": "7c2f738ba69c204135e6cefbd60ad373f362a338338b21972b854b32009365ee",
+      "bytes": 1356743,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1926.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1926.csv",
+      "expected_sha256": "677bba19cdcf878bc115b1dbe53fd97d6e71f19f3de74e3a982af26b8283b5ec",
+      "actual_sha256": "677bba19cdcf878bc115b1dbe53fd97d6e71f19f3de74e3a982af26b8283b5ec",
+      "bytes": 1435850,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1927.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1927.csv",
+      "expected_sha256": "b7dae441bd10378d2590606fa8e67fd6984ca9e8a6b3601df8a9180ff981337d",
+      "actual_sha256": "b7dae441bd10378d2590606fa8e67fd6984ca9e8a6b3601df8a9180ff981337d",
+      "bytes": 1426761,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1928.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1928.csv",
+      "expected_sha256": "771b46c5f80f4f9f2d6fd2304a209433981318f985afafdbb66a61962e1f7e65",
+      "actual_sha256": "771b46c5f80f4f9f2d6fd2304a209433981318f985afafdbb66a61962e1f7e65",
+      "bytes": 1447206,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1929.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1929.csv",
+      "expected_sha256": "1ca1e109f146c3a52ba14c396cfb0a550575643892c002ed6aec6f0ceefcde50",
+      "actual_sha256": "1ca1e109f146c3a52ba14c396cfb0a550575643892c002ed6aec6f0ceefcde50",
+      "bytes": 1440129,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1930.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1930.csv",
+      "expected_sha256": "b9fccd0ff1110608ab802fde6e1c83587eab0cfcc4e49012e2f83d79085f44e6",
+      "actual_sha256": "b9fccd0ff1110608ab802fde6e1c83587eab0cfcc4e49012e2f83d79085f44e6",
+      "bytes": 1520563,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1931.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1931.csv",
+      "expected_sha256": "aa1f35bee6dfbac1234ee58206d655ed4a29e62834fc84e034a8c2a603555077",
+      "actual_sha256": "aa1f35bee6dfbac1234ee58206d655ed4a29e62834fc84e034a8c2a603555077",
+      "bytes": 1526160,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1932.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1932.csv",
+      "expected_sha256": "535ff0f71fc5f27fbf486fd12b6ce263321ffec04f25a2f36238c3d525f3d6f0",
+      "actual_sha256": "535ff0f71fc5f27fbf486fd12b6ce263321ffec04f25a2f36238c3d525f3d6f0",
+      "bytes": 1528076,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1933.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1933.csv",
+      "expected_sha256": "22a3566276144790e72a3fe0870d8f540b6e37656288b6b15ca4d12f4acd2a36",
+      "actual_sha256": "22a3566276144790e72a3fe0870d8f540b6e37656288b6b15ca4d12f4acd2a36",
+      "bytes": 1528509,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1934.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1934.csv",
+      "expected_sha256": "cede4df7b7b29ea6346f77b339240daa1992f44ad035eb6ae1a2c2ba23bce275",
+      "actual_sha256": "cede4df7b7b29ea6346f77b339240daa1992f44ad035eb6ae1a2c2ba23bce275",
+      "bytes": 1529134,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1935.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1935.csv",
+      "expected_sha256": "726f0c4dfa231ef42378c448a8549b6536832e382e1ac340ab7fa95a57d94505",
+      "actual_sha256": "726f0c4dfa231ef42378c448a8549b6536832e382e1ac340ab7fa95a57d94505",
+      "bytes": 1523403,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1936.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1936.csv",
+      "expected_sha256": "f4ad5a43c3fad105a9b5b61d9d8eb56f660b150b2e4a6a6e9034af0eecf97ed6",
+      "actual_sha256": "f4ad5a43c3fad105a9b5b61d9d8eb56f660b150b2e4a6a6e9034af0eecf97ed6",
+      "bytes": 1526862,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1937.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1937.csv",
+      "expected_sha256": "d1230e908b971eb8e11b2b89fc083307e75981c34613b381ab463d54e72c17e1",
+      "actual_sha256": "d1230e908b971eb8e11b2b89fc083307e75981c34613b381ab463d54e72c17e1",
+      "bytes": 1527430,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1938.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1938.csv",
+      "expected_sha256": "eddac95f20d0393d44fbcac2bb624e8ad99b3c241d0d491a260f3a807bc5d7b3",
+      "actual_sha256": "eddac95f20d0393d44fbcac2bb624e8ad99b3c241d0d491a260f3a807bc5d7b3",
+      "bytes": 1527399,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1939.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1939.csv",
+      "expected_sha256": "0b7aa660307769e30d461eef5a786a162e79019daa20247eab3a4b3f6305b52a",
+      "actual_sha256": "0b7aa660307769e30d461eef5a786a162e79019daa20247eab3a4b3f6305b52a",
+      "bytes": 1533602,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1940.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1940.csv",
+      "expected_sha256": "15e4ac686d7f57b8a61b368096a4571db9340a03344ee172d305a8fa7add0d1c",
+      "actual_sha256": "15e4ac686d7f57b8a61b368096a4571db9340a03344ee172d305a8fa7add0d1c",
+      "bytes": 1523839,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1941.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1941.csv",
+      "expected_sha256": "0c215fcf9247fbf8a7d32fb0d3f7d7fd5d30cd23f80dffcb6f2db0254b18dce9",
+      "actual_sha256": "0c215fcf9247fbf8a7d32fb0d3f7d7fd5d30cd23f80dffcb6f2db0254b18dce9",
+      "bytes": 1524158,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1942.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1942.csv",
+      "expected_sha256": "ed264b122455990f652bf7f2345865bfcdc202d7fad144a8cf8807c789195ecd",
+      "actual_sha256": "ed264b122455990f652bf7f2345865bfcdc202d7fad144a8cf8807c789195ecd",
+      "bytes": 1145834,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1943.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1943.csv",
+      "expected_sha256": "0d312b14b8ca0f513702db12c402e8cbf1d3c91f84873b5e62fafaaa7bea0153",
+      "actual_sha256": "0d312b14b8ca0f513702db12c402e8cbf1d3c91f84873b5e62fafaaa7bea0153",
+      "bytes": 1140288,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1944.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1944.csv",
+      "expected_sha256": "c732a4bc9cc649dd493db325f20d7668532511b37f8b6660f26f9ee0ae510b16",
+      "actual_sha256": "c732a4bc9cc649dd493db325f20d7668532511b37f8b6660f26f9ee0ae510b16",
+      "bytes": 1518845,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1945.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1945.csv",
+      "expected_sha256": "00ed6c685c935e3e776679686c52fa5417852b205e75d0ba1e016f6f4f57a97f",
+      "actual_sha256": "00ed6c685c935e3e776679686c52fa5417852b205e75d0ba1e016f6f4f57a97f",
+      "bytes": 1687878,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1946.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1946.csv",
+      "expected_sha256": "263ab96d110b91d6283e2ac90cf25beb031a0ae7e328ea8f51c08d6858fcdf89",
+      "actual_sha256": "263ab96d110b91d6283e2ac90cf25beb031a0ae7e328ea8f51c08d6858fcdf89",
+      "bytes": 1703960,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1947.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1947.csv",
+      "expected_sha256": "b26df67b5ee20519bbb01dfa4ee4b86e5fa66522c4522684f287003495c440ef",
+      "actual_sha256": "b26df67b5ee20519bbb01dfa4ee4b86e5fa66522c4522684f287003495c440ef",
+      "bytes": 1685167,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1948.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1948.csv",
+      "expected_sha256": "6993c63290c0224bdb351524a3c5833b004ba545768334a5344e23b58402e223",
+      "actual_sha256": "6993c63290c0224bdb351524a3c5833b004ba545768334a5344e23b58402e223",
+      "bytes": 1695038,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1949.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1949.csv",
+      "expected_sha256": "6c430d4a6e060e9e117c8c08dfb326d5ef961c4d418b223d79a6960d9cd189aa",
+      "actual_sha256": "6c430d4a6e060e9e117c8c08dfb326d5ef961c4d418b223d79a6960d9cd189aa",
+      "bytes": 1684426,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1950.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1950.csv",
+      "expected_sha256": "72f1eb09f8d0e43fdfb90e3e2c15ab5d63d35908a688bdbab05e459616007c33",
+      "actual_sha256": "72f1eb09f8d0e43fdfb90e3e2c15ab5d63d35908a688bdbab05e459616007c33",
+      "bytes": 1600669,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1951.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1951.csv",
+      "expected_sha256": "b2914580f07d5fb933d215ac000076066d18643397015a7cc7c728b904cbe023",
+      "actual_sha256": "b2914580f07d5fb933d215ac000076066d18643397015a7cc7c728b904cbe023",
+      "bytes": 1594983,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1952.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1952.csv",
+      "expected_sha256": "71bb04ee25533dcd41475a84c46a036600f0138fd95337b6d91ef544320d99d2",
+      "actual_sha256": "71bb04ee25533dcd41475a84c46a036600f0138fd95337b6d91ef544320d99d2",
+      "bytes": 1678094,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1953.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1953.csv",
+      "expected_sha256": "11546485b0be96ce5e4f31bd8f5b524f7c91762664df5b404fa9f8746e8b72e9",
+      "actual_sha256": "11546485b0be96ce5e4f31bd8f5b524f7c91762664df5b404fa9f8746e8b72e9",
+      "bytes": 1592912,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1954.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1954.csv",
+      "expected_sha256": "233280e386fc38c3ab143d4e7ef332fdf549e01e3e9e3cfd5f4814808735209d",
+      "actual_sha256": "233280e386fc38c3ab143d4e7ef332fdf549e01e3e9e3cfd5f4814808735209d",
+      "bytes": 1598396,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1955.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1955.csv",
+      "expected_sha256": "2bf503f71bcd895ac2b9032ff579e0020aa12600ff0746c237c70da1cef9eed0",
+      "actual_sha256": "2bf503f71bcd895ac2b9032ff579e0020aa12600ff0746c237c70da1cef9eed0",
+      "bytes": 1592864,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1956.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1956.csv",
+      "expected_sha256": "f158c37cfb96f804458d0ac01a6312012bc0cfddab7158367268a4c725432184",
+      "actual_sha256": "f158c37cfb96f804458d0ac01a6312012bc0cfddab7158367268a4c725432184",
+      "bytes": 1591403,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1957.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1957.csv",
+      "expected_sha256": "76889d76d85954068daf4c0332a7e90dbdb7a9d646d1f68c802b2d08af7ea4f1",
+      "actual_sha256": "76889d76d85954068daf4c0332a7e90dbdb7a9d646d1f68c802b2d08af7ea4f1",
+      "bytes": 1597026,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1958.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1958.csv",
+      "expected_sha256": "40547b75954d8c6bab4aa6b6d39f507f7bcef3db84ff3137b6ac4b0a2000be9a",
+      "actual_sha256": "40547b75954d8c6bab4aa6b6d39f507f7bcef3db84ff3137b6ac4b0a2000be9a",
+      "bytes": 1590924,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1959.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1959.csv",
+      "expected_sha256": "9c56e9edf71cfd7bcccbf9c64b87fd54ae5e44c0468f32841d29bd37b573af2b",
+      "actual_sha256": "9c56e9edf71cfd7bcccbf9c64b87fd54ae5e44c0468f32841d29bd37b573af2b",
+      "bytes": 1590004,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1960.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1960.csv",
+      "expected_sha256": "ff40f0cc28d736ac7624315264fc2ae1b364d2432e923e6bfe40e67f625b34e4",
+      "actual_sha256": "ff40f0cc28d736ac7624315264fc2ae1b364d2432e923e6bfe40e67f625b34e4",
+      "bytes": 1584757,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1961.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1961.csv",
+      "expected_sha256": "ac918fae10f3bea99ac58559dff51cdb5bf3ae8f3c940a8a6dfc0dab7171423f",
+      "actual_sha256": "ac918fae10f3bea99ac58559dff51cdb5bf3ae8f3c940a8a6dfc0dab7171423f",
+      "bytes": 1583583,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1962.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1962.csv",
+      "expected_sha256": "32dfa95a12dbb764908644d480d6fe63e22ffe72efe6e8f812ee9c799c2e919c",
+      "actual_sha256": "32dfa95a12dbb764908644d480d6fe63e22ffe72efe6e8f812ee9c799c2e919c",
+      "bytes": 1597609,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1963.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1963.csv",
+      "expected_sha256": "8c6f96cfd7ebb87aba31712fc3d7c45dd06aaf2fee586dd2abbb57a024add0b6",
+      "actual_sha256": "8c6f96cfd7ebb87aba31712fc3d7c45dd06aaf2fee586dd2abbb57a024add0b6",
+      "bytes": 1581424,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1964.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1964.csv",
+      "expected_sha256": "6cf78ff0c5f01ad76870f21b05c592a17afdf45073d1d8bf78ec9acc6ceb44ce",
+      "actual_sha256": "6cf78ff0c5f01ad76870f21b05c592a17afdf45073d1d8bf78ec9acc6ceb44ce",
+      "bytes": 1582673,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1965.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1965.csv",
+      "expected_sha256": "d3cde8b92ce84f04ba48528492ffa5579d411aa59ed3df88f99f7a036f6993cf",
+      "actual_sha256": "d3cde8b92ce84f04ba48528492ffa5579d411aa59ed3df88f99f7a036f6993cf",
+      "bytes": 1622428,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1966.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1966.csv",
+      "expected_sha256": "0bc49a22a490459d0dd997109570134915d84f66dd8fce0cb7a6c59c14361b9e",
+      "actual_sha256": "0bc49a22a490459d0dd997109570134915d84f66dd8fce0cb7a6c59c14361b9e",
+      "bytes": 1631241,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1967.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1967.csv",
+      "expected_sha256": "9787c589aaa2f3e4dffb370f5c02455421c23c1945aabeca50952fde029be9c4",
+      "actual_sha256": "9787c589aaa2f3e4dffb370f5c02455421c23c1945aabeca50952fde029be9c4",
+      "bytes": 1635169,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1968.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1968.csv",
+      "expected_sha256": "95dadc606119c73e76c1a692aab0297b683716a475f86efb607c0ce3c8a39e6a",
+      "actual_sha256": "95dadc606119c73e76c1a692aab0297b683716a475f86efb607c0ce3c8a39e6a",
+      "bytes": 1815569,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1969.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1969.csv",
+      "expected_sha256": "b1e40ca790de0d764b246e0bc8fdb23a64268d08c255f5c08fb268148fcd0790",
+      "actual_sha256": "b1e40ca790de0d764b246e0bc8fdb23a64268d08c255f5c08fb268148fcd0790",
+      "bytes": 1826396,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1970.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1970.csv",
+      "expected_sha256": "914c6f687122b8220c4c3e2d4ba3b948ff28c7540d6624a71ffdb435f0e3d791",
+      "actual_sha256": "914c6f687122b8220c4c3e2d4ba3b948ff28c7540d6624a71ffdb435f0e3d791",
+      "bytes": 1999160,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1971.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1971.csv",
+      "expected_sha256": "4408ce7f82751994ad705a3329a8159a08686c60cd911e4a201a239b5326cf2b",
+      "actual_sha256": "4408ce7f82751994ad705a3329a8159a08686c60cd911e4a201a239b5326cf2b",
+      "bytes": 2002310,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1972.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1972.csv",
+      "expected_sha256": "ebfb959bf631c56a960d5b0d74479c18288dc5bbc53d950bc583e56ab60eeb06",
+      "actual_sha256": "ebfb959bf631c56a960d5b0d74479c18288dc5bbc53d950bc583e56ab60eeb06",
+      "bytes": 2048719,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1973.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1973.csv",
+      "expected_sha256": "3601f5d91659697e4df4a1310436ecb47544fc3575a5f141ba938f4f89108c6d",
+      "actual_sha256": "3601f5d91659697e4df4a1310436ecb47544fc3575a5f141ba938f4f89108c6d",
+      "bytes": 2039772,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1974.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1974.csv",
+      "expected_sha256": "867a71d17eccd33a75e666284be58491077f87b734b2115385edc6b317cec5cd",
+      "actual_sha256": "867a71d17eccd33a75e666284be58491077f87b734b2115385edc6b317cec5cd",
+      "bytes": 2032987,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1975.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1975.csv",
+      "expected_sha256": "99e14cbb5fc5c281d7dcf5c135de04a2b6c2189234c5dcda1e1d3f5e4b38e9af",
+      "actual_sha256": "99e14cbb5fc5c281d7dcf5c135de04a2b6c2189234c5dcda1e1d3f5e4b38e9af",
+      "bytes": 2037700,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1976.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1976.csv",
+      "expected_sha256": "daec0184c7e4b449f3ac9262852d2472ce3608c90b68e904879d582fdcd82e72",
+      "actual_sha256": "daec0184c7e4b449f3ac9262852d2472ce3608c90b68e904879d582fdcd82e72",
+      "bytes": 2123841,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1977.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1977.csv",
+      "expected_sha256": "6acd48c51af78ec4eb3db62d40bf7c9eb5a5ca6068b683e5d837a9dbcd8085e2",
+      "actual_sha256": "6acd48c51af78ec4eb3db62d40bf7c9eb5a5ca6068b683e5d837a9dbcd8085e2",
+      "bytes": 2144103,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1978.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1978.csv",
+      "expected_sha256": "0f57c7e4dc35a3b724bd9db163f4ac7e9401c4f2122fd578a221be77378ab67a",
+      "actual_sha256": "0f57c7e4dc35a3b724bd9db163f4ac7e9401c4f2122fd578a221be77378ab67a",
+      "bytes": 2142595,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1979.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1979.csv",
+      "expected_sha256": "bb4c984ba0d0f22caa5bbb83152a3023a92f9237890f298c5b74909cdf20f0ed",
+      "actual_sha256": "bb4c984ba0d0f22caa5bbb83152a3023a92f9237890f298c5b74909cdf20f0ed",
+      "bytes": 2137962,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1980.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1980.csv",
+      "expected_sha256": "415fcb4329c65a3235e92127e617e8472a93afce48d0161c259bdddd6d59b881",
+      "actual_sha256": "415fcb4329c65a3235e92127e617e8472a93afce48d0161c259bdddd6d59b881",
+      "bytes": 2137034,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1981.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1981.csv",
+      "expected_sha256": "2e5d582c27388be19339d794e9cacdd83fb8c156115995f17661a8931bbf1ebf",
+      "actual_sha256": "2e5d582c27388be19339d794e9cacdd83fb8c156115995f17661a8931bbf1ebf",
+      "bytes": 2129326,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1982.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1982.csv",
+      "expected_sha256": "646ffac848b45ae0eecf7c4946b339dc1ffe894f608d571264242c9b40a0bf2d",
+      "actual_sha256": "646ffac848b45ae0eecf7c4946b339dc1ffe894f608d571264242c9b40a0bf2d",
+      "bytes": 2131466,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1983.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1983.csv",
+      "expected_sha256": "2dbaa1aa1c35e4208b822b8fed1b2f875a9fd9c48ab84dfeef1a5ec2c9e28898",
+      "actual_sha256": "2dbaa1aa1c35e4208b822b8fed1b2f875a9fd9c48ab84dfeef1a5ec2c9e28898",
+      "bytes": 2122630,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1984.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1984.csv",
+      "expected_sha256": "f41c2d6ee1ba12096e0455efda5814fea1e4cc0c1006ae3ca401f73eff04c9d8",
+      "actual_sha256": "f41c2d6ee1ba12096e0455efda5814fea1e4cc0c1006ae3ca401f73eff04c9d8",
+      "bytes": 2127634,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1985.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1985.csv",
+      "expected_sha256": "47ed0ab339ca1e64754cf4b2400e8606fcebe919bd133272cc514158c2287c62",
+      "actual_sha256": "47ed0ab339ca1e64754cf4b2400e8606fcebe919bd133272cc514158c2287c62",
+      "bytes": 2128155,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1986.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1986.csv",
+      "expected_sha256": "e6564f2669114b2f78ac22823977d67fcd5d0003e38c1469de7ef58f41085b3c",
+      "actual_sha256": "e6564f2669114b2f78ac22823977d67fcd5d0003e38c1469de7ef58f41085b3c",
+      "bytes": 2124067,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1987.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1987.csv",
+      "expected_sha256": "2baf017e932a6e4e81eb30223320fc0dc24ae36ac3cac5670e4ebd15dd6d2b65",
+      "actual_sha256": "2baf017e932a6e4e81eb30223320fc0dc24ae36ac3cac5670e4ebd15dd6d2b65",
+      "bytes": 2484935,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1988.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1988.csv",
+      "expected_sha256": "74dea5a43207952ab1ffe124b6fd1c2b18a9ac19bab712f4aee75a076472b767",
+      "actual_sha256": "74dea5a43207952ab1ffe124b6fd1c2b18a9ac19bab712f4aee75a076472b767",
+      "bytes": 2480548,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1989.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1989.csv",
+      "expected_sha256": "02a5b434082c96fe789a921287d4f38dd77537439fb972fd7bdb523c41380823",
+      "actual_sha256": "02a5b434082c96fe789a921287d4f38dd77537439fb972fd7bdb523c41380823",
+      "bytes": 2482980,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1990.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1990.csv",
+      "expected_sha256": "6e0aaad1b70fc5dda6ab8bb02d26caa7494cfd04712bcc544b866050a80d1bba",
+      "actual_sha256": "6e0aaad1b70fc5dda6ab8bb02d26caa7494cfd04712bcc544b866050a80d1bba",
+      "bytes": 2506945,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1991.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1991.csv",
+      "expected_sha256": "c83912a1ec8acd794f4fe060b53a59a50b93a9307117f96f91cc0f8c74b8aea3",
+      "actual_sha256": "c83912a1ec8acd794f4fe060b53a59a50b93a9307117f96f91cc0f8c74b8aea3",
+      "bytes": 2682983,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1992.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1992.csv",
+      "expected_sha256": "2212972e93cd659c6a53de843ce0dda9d9191e94365d22cd6cd3c01f10497670",
+      "actual_sha256": "2212972e93cd659c6a53de843ce0dda9d9191e94365d22cd6cd3c01f10497670",
+      "bytes": 2679128,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1993.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1993.csv",
+      "expected_sha256": "d1068bcadc09c9f380b091c3be84e7774022f271fed01efb16bca365be43bcad",
+      "actual_sha256": "d1068bcadc09c9f380b091c3be84e7774022f271fed01efb16bca365be43bcad",
+      "bytes": 2439424,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1994.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1994.csv",
+      "expected_sha256": "6efc0bdafa5406169928ac5c601c70d6de27da7e34feb3bd7794416fe02aebb4",
+      "actual_sha256": "6efc0bdafa5406169928ac5c601c70d6de27da7e34feb3bd7794416fe02aebb4",
+      "bytes": 2933506,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1995.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1995.csv",
+      "expected_sha256": "340cc2ba3bf1ace1c7110abd2a75610cf31ce83cade86790bb6eb3e5f650a7d3",
+      "actual_sha256": "340cc2ba3bf1ace1c7110abd2a75610cf31ce83cade86790bb6eb3e5f650a7d3",
+      "bytes": 3120221,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1996.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1996.csv",
+      "expected_sha256": "9fe056e6c1578a044a5cfef1501b182f18e33a5c21c324eec9cdc6953535e494",
+      "actual_sha256": "9fe056e6c1578a044a5cfef1501b182f18e33a5c21c324eec9cdc6953535e494",
+      "bytes": 3122321,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1997.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1997.csv",
+      "expected_sha256": "80bb1a8bf202e2bc77618cdb8f579029259d77c30dc9c683af6acdca3be77c05",
+      "actual_sha256": "80bb1a8bf202e2bc77618cdb8f579029259d77c30dc9c683af6acdca3be77c05",
+      "bytes": 3136836,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1998.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1998.csv",
+      "expected_sha256": "c684bffc41854a6d95e1e6ca4ebc9f6376c33c1c33053af7b6c37c229d68b179",
+      "actual_sha256": "c684bffc41854a6d95e1e6ca4ebc9f6376c33c1c33053af7b6c37c229d68b179",
+      "bytes": 3331804,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_1999.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1999.csv",
+      "expected_sha256": "d25542e2cc4ea55078fc23255ed0a2141c6585d7c3934509af70ee8df013ad9d",
+      "actual_sha256": "d25542e2cc4ea55078fc23255ed0a2141c6585d7c3934509af70ee8df013ad9d",
+      "bytes": 3375222,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2000.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2000.csv",
+      "expected_sha256": "532da47358c02bdd7624d7120a6b47fb4b357bf383f2b314409c9999a59a90ea",
+      "actual_sha256": "532da47358c02bdd7624d7120a6b47fb4b357bf383f2b314409c9999a59a90ea",
+      "bytes": 3387491,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2001.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2001.csv",
+      "expected_sha256": "62c739dd9fbfc8c74cb5df0dfce0be06ab8c65e957a2251cb703f6c10bbaf1fa",
+      "actual_sha256": "62c739dd9fbfc8c74cb5df0dfce0be06ab8c65e957a2251cb703f6c10bbaf1fa",
+      "bytes": 3378172,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2002.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2002.csv",
+      "expected_sha256": "57c344c08e61125b77ff2a25c403674e52e783a3d03178ea9b865133a38679ca",
+      "actual_sha256": "57c344c08e61125b77ff2a25c403674e52e783a3d03178ea9b865133a38679ca",
+      "bytes": 3389686,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2003.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2003.csv",
+      "expected_sha256": "b972defee2616502849758fc6ffee123ae902d9be50703d503649eb9cf27d952",
+      "actual_sha256": "b972defee2616502849758fc6ffee123ae902d9be50703d503649eb9cf27d952",
+      "bytes": 3409693,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2004.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2004.csv",
+      "expected_sha256": "2ca38945a6d5339fcf9cf76e21face0d881d2e54b97622dcc5acb5aa66700ea5",
+      "actual_sha256": "2ca38945a6d5339fcf9cf76e21face0d881d2e54b97622dcc5acb5aa66700ea5",
+      "bytes": 3404469,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2005.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2005.csv",
+      "expected_sha256": "7430cff9195649ff3c881e13790ab45b4ca2d32617a213c49137c14e838837a1",
+      "actual_sha256": "7430cff9195649ff3c881e13790ab45b4ca2d32617a213c49137c14e838837a1",
+      "bytes": 3405241,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2006.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2006.csv",
+      "expected_sha256": "d5a28de256028f10c78f866616c2169e66fc8b9f6ae4e30830e1eea483eaba04",
+      "actual_sha256": "d5a28de256028f10c78f866616c2169e66fc8b9f6ae4e30830e1eea483eaba04",
+      "bytes": 3410860,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2007.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2007.csv",
+      "expected_sha256": "e410e7b536e7c4e148936c1fd4696f93bd32087bfbf89e14ab0bcc3c46a8b6bb",
+      "actual_sha256": "e410e7b536e7c4e148936c1fd4696f93bd32087bfbf89e14ab0bcc3c46a8b6bb",
+      "bytes": 3410523,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2008.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2008.csv",
+      "expected_sha256": "f99bb8f0f160282f6f94a11bbcb7fcb38b1e1a5e19e1e7ae96d7972fafaec921",
+      "actual_sha256": "f99bb8f0f160282f6f94a11bbcb7fcb38b1e1a5e19e1e7ae96d7972fafaec921",
+      "bytes": 3425702,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2009.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2009.csv",
+      "expected_sha256": "a98323fb84534665f05d92dd026e4f418935956ce52f76a49f9785b1a33fc97c",
+      "actual_sha256": "a98323fb84534665f05d92dd026e4f418935956ce52f76a49f9785b1a33fc97c",
+      "bytes": 3414163,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2010.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2010.csv",
+      "expected_sha256": "3b8a77a496f40892f2ead3e7b0efdc0aa09b64efea6b9450b3ba84f7fd02e3c3",
+      "actual_sha256": "3b8a77a496f40892f2ead3e7b0efdc0aa09b64efea6b9450b3ba84f7fd02e3c3",
+      "bytes": 3434660,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2011.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2011.csv",
+      "expected_sha256": "3162a19e6bf3abe65266133254a253c4ec132560580aafb8a7ebe2d4fc1cc387",
+      "actual_sha256": "3162a19e6bf3abe65266133254a253c4ec132560580aafb8a7ebe2d4fc1cc387",
+      "bytes": 3635575,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2012.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2012.csv",
+      "expected_sha256": "3cd5b38fdf841cb8d6c20e789811d8363f472e33d7d102297d596c4cd69872f2",
+      "actual_sha256": "3cd5b38fdf841cb8d6c20e789811d8363f472e33d7d102297d596c4cd69872f2",
+      "bytes": 3863346,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2013.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2013.csv",
+      "expected_sha256": "505b354f97656c64a97c88e81563aefc921056f487734ba98f2fca3dbe519e40",
+      "actual_sha256": "505b354f97656c64a97c88e81563aefc921056f487734ba98f2fca3dbe519e40",
+      "bytes": 3861364,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2014.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2014.csv",
+      "expected_sha256": "478e8caba3162b88d183405475817faef5c5477fe6e26991367e7da97b47d6eb",
+      "actual_sha256": "478e8caba3162b88d183405475817faef5c5477fe6e26991367e7da97b47d6eb",
+      "bytes": 3863007,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2015.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2015.csv",
+      "expected_sha256": "1303aa4c5d0889ad7b00f302a057eb87cbf32df2b623eab819731d4e86ec8271",
+      "actual_sha256": "1303aa4c5d0889ad7b00f302a057eb87cbf32df2b623eab819731d4e86ec8271",
+      "bytes": 3833871,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2016.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2016.csv",
+      "expected_sha256": "1713fb5f9e2e27fee75f231f9069d8debe8fee64ddfc5911ac0fd282b57b543f",
+      "actual_sha256": "1713fb5f9e2e27fee75f231f9069d8debe8fee64ddfc5911ac0fd282b57b543f",
+      "bytes": 3842771,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2017.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2017.csv",
+      "expected_sha256": "2be8e8fcc0941e6e8ba5ae23ece204e0cde82b35d7d49b9c7f2f223e900f491e",
+      "actual_sha256": "2be8e8fcc0941e6e8ba5ae23ece204e0cde82b35d7d49b9c7f2f223e900f491e",
+      "bytes": 3849679,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2018.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2018.csv",
+      "expected_sha256": "12b819566d32c383ce0b3d863a1e658e48ede89daad25cf1d4c3e07492aa6a28",
+      "actual_sha256": "12b819566d32c383ce0b3d863a1e658e48ede89daad25cf1d4c3e07492aa6a28",
+      "bytes": 3843341,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2019.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2019.csv",
+      "expected_sha256": "3b5b2674868b8280f2ccd0a8a7fa113c801da85a2485506136f718261cda41f6",
+      "actual_sha256": "3b5b2674868b8280f2ccd0a8a7fa113c801da85a2485506136f718261cda41f6",
+      "bytes": 3840870,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2020.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2020.csv",
+      "expected_sha256": "5b8ae4d76e6c3c63604aaa8f2df2ec998754992adc1f5177d71d0b37b4a222b9",
+      "actual_sha256": "5b8ae4d76e6c3c63604aaa8f2df2ec998754992adc1f5177d71d0b37b4a222b9",
+      "bytes": 2969856,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2021.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2021.csv",
+      "expected_sha256": "3582bf510dd156eb5256e0b04eb6742f026e74f14f637adf70fd366ca38b94d8",
+      "actual_sha256": "3582bf510dd156eb5256e0b04eb6742f026e74f14f637adf70fd366ca38b94d8",
+      "bytes": 4017408,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2022.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2022.csv",
+      "expected_sha256": "9ef09869fda8b6fc2d6bf532401d31ce50b3ebbf5db21a792c474ed5adc6a1f6",
+      "actual_sha256": "9ef09869fda8b6fc2d6bf532401d31ce50b3ebbf5db21a792c474ed5adc6a1f6",
+      "bytes": 4021312,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2023.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2023.csv",
+      "expected_sha256": "d548769c2c827681c71d678a1cf65671bb5801bbd1d92ab9f5f206173b28500b",
+      "actual_sha256": "d548769c2c827681c71d678a1cf65671bb5801bbd1d92ab9f5f206173b28500b",
+      "bytes": 4498315,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2024.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2024.csv",
+      "expected_sha256": "250b3aad0455fb3b42e0294181f580503d41ba04370b38f875a7412d5f7c5dc1",
+      "actual_sha256": "250b3aad0455fb3b42e0294181f580503d41ba04370b38f875a7412d5f7c5dc1",
+      "bytes": 4500832,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2025.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2025.csv",
+      "expected_sha256": "166bd1e7b8f8127ebb4f80073a482a885b0f01bd8bb8b3240d0713a0b9de1d59",
+      "actual_sha256": "166bd1e7b8f8127ebb4f80073a482a885b0f01bd8bb8b3240d0713a0b9de1d59",
+      "bytes": 4488524,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\player_stats_2026.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_2026.csv",
+      "expected_sha256": "79db69732ea1018b577e548622e6c702c1a79270478cc019dc80571fc217898f",
+      "actual_sha256": "79db69732ea1018b577e548622e6c702c1a79270478cc019dc80571fc217898f",
+      "bytes": 4513471,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-core-v1\\results.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/results.csv",
+      "expected_sha256": "73769e3ef608103c6c4e7ac6f58ce82484f85bd8058955ec502a9d64cb834f52",
+      "actual_sha256": "73769e3ef608103c6c4e7ac6f58ce82484f85bd8058955ec502a9d64cb834f52",
+      "bytes": 1646918,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1897.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1897.csv",
+      "expected_sha256": "badcacc624133fa37757d5b94e323043615c1bcd5d276f3644e5179d5cd5ff13",
+      "actual_sha256": "badcacc624133fa37757d5b94e323043615c1bcd5d276f3644e5179d5cd5ff13",
+      "bytes": 496,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1898.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1898.csv",
+      "expected_sha256": "1db29bad291d4d661ececb36a9d2fc5628e84160ec077a00a692388899dd0745",
+      "actual_sha256": "1db29bad291d4d661ececb36a9d2fc5628e84160ec077a00a692388899dd0745",
+      "bytes": 498,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1899.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1899.csv",
+      "expected_sha256": "b5171d386b6e042ccc41f02af37263f660e6b0df2ce1be11737bcea1ccee39bf",
+      "actual_sha256": "b5171d386b6e042ccc41f02af37263f660e6b0df2ce1be11737bcea1ccee39bf",
+      "bytes": 498,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1900.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1900.csv",
+      "expected_sha256": "889070e1e85e4c03c05702b9db93bab89bbfe44a010113495d7da953e997b335",
+      "actual_sha256": "889070e1e85e4c03c05702b9db93bab89bbfe44a010113495d7da953e997b335",
+      "bytes": 499,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1901.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1901.csv",
+      "expected_sha256": "62c013e190a40f354b2b7ea5e0277021ee4ef23f1c262117ed2559b3af3ee041",
+      "actual_sha256": "62c013e190a40f354b2b7ea5e0277021ee4ef23f1c262117ed2559b3af3ee041",
+      "bytes": 501,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1902.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1902.csv",
+      "expected_sha256": "f47fc1e96d0dde9dc76391d859f1c2f2e4756444cd7e0252f6b5f68cc9087f35",
+      "actual_sha256": "f47fc1e96d0dde9dc76391d859f1c2f2e4756444cd7e0252f6b5f68cc9087f35",
+      "bytes": 491,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1903.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1903.csv",
+      "expected_sha256": "5c50724cd434629ea5b2eb001d15689bf1c3a754d6846839c8a8e1f326e6abd9",
+      "actual_sha256": "5c50724cd434629ea5b2eb001d15689bf1c3a754d6846839c8a8e1f326e6abd9",
+      "bytes": 502,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1904.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1904.csv",
+      "expected_sha256": "fdc82d3f70a1616b1d0f2e53d1a50e304e1089a64c6238718bc007b914c9d858",
+      "actual_sha256": "fdc82d3f70a1616b1d0f2e53d1a50e304e1089a64c6238718bc007b914c9d858",
+      "bytes": 500,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1905.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1905.csv",
+      "expected_sha256": "2068073f0fc4257fde0675ae4d1cbc152aeb0ad95334b0a7910d4c0256cb6f9e",
+      "actual_sha256": "2068073f0fc4257fde0675ae4d1cbc152aeb0ad95334b0a7910d4c0256cb6f9e",
+      "bytes": 504,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1906.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1906.csv",
+      "expected_sha256": "62463c86514ebcf09fd7cc6e669ea9cdc884c9d2b2472e45e51d89b6d1b4d82b",
+      "actual_sha256": "62463c86514ebcf09fd7cc6e669ea9cdc884c9d2b2472e45e51d89b6d1b4d82b",
+      "bytes": 505,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1907.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1907.csv",
+      "expected_sha256": "74f200d336da6035afea52ee3ea3875a0e68cb47b5ff4de48a70c195d4681e97",
+      "actual_sha256": "74f200d336da6035afea52ee3ea3875a0e68cb47b5ff4de48a70c195d4681e97",
+      "bytes": 503,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1908.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1908.csv",
+      "expected_sha256": "1f0fd45ddb8bf89c0e2256b43063721a9eab54c68c1ebef8f956635a03c14d0f",
+      "actual_sha256": "1f0fd45ddb8bf89c0e2256b43063721a9eab54c68c1ebef8f956635a03c14d0f",
+      "bytes": 596,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1909.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1909.csv",
+      "expected_sha256": "bc5255102c59bce7e3caa5c89f3732d33ed3667b848f75b98a322f8c15dfe5f6",
+      "actual_sha256": "bc5255102c59bce7e3caa5c89f3732d33ed3667b848f75b98a322f8c15dfe5f6",
+      "bytes": 598,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1910.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1910.csv",
+      "expected_sha256": "4d0b8ffbfc9866faa507f0ce080073a43a8d1138a7333968d6047c38194e3b8c",
+      "actual_sha256": "4d0b8ffbfc9866faa507f0ce080073a43a8d1138a7333968d6047c38194e3b8c",
+      "bytes": 604,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1911.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1911.csv",
+      "expected_sha256": "941a638cb8f64a48a16e1b81c834502c741ace16f6145cd1b6a2425aaac772fe",
+      "actual_sha256": "941a638cb8f64a48a16e1b81c834502c741ace16f6145cd1b6a2425aaac772fe",
+      "bytes": 610,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1912.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1912.csv",
+      "expected_sha256": "0fdfa484d344f9ce27c66df8b2e73f1c17df927e4b5a1488a6af95fececa4ea1",
+      "actual_sha256": "0fdfa484d344f9ce27c66df8b2e73f1c17df927e4b5a1488a6af95fececa4ea1",
+      "bytes": 610,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1913.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1913.csv",
+      "expected_sha256": "81e2ba3e29fb9d34fb70bb5dbabaad5d3092b320bd84a28cc56423692510bbab",
+      "actual_sha256": "81e2ba3e29fb9d34fb70bb5dbabaad5d3092b320bd84a28cc56423692510bbab",
+      "bytes": 616,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1914.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1914.csv",
+      "expected_sha256": "44581e706165b0a0058f3713c7ac49ca21911e42575782cef93a35d444d7ae82",
+      "actual_sha256": "44581e706165b0a0058f3713c7ac49ca21911e42575782cef93a35d444d7ae82",
+      "bytes": 609,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1915.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1915.csv",
+      "expected_sha256": "f20550558606cc66101deac5ef1087023764ded541b23beb22b846ceac4313dd",
+      "actual_sha256": "f20550558606cc66101deac5ef1087023764ded541b23beb22b846ceac4313dd",
+      "bytes": 556,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1916.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1916.csv",
+      "expected_sha256": "fb4b41139dc605dfe459b66f3d95cc743b1df445771519ff9342d8c6b0ee4bbf",
+      "actual_sha256": "fb4b41139dc605dfe459b66f3d95cc743b1df445771519ff9342d8c6b0ee4bbf",
+      "bytes": 290,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1917.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1917.csv",
+      "expected_sha256": "b4923d57e182d8ac353fe6bc8a09af91db1c015f6c412f9a57d89ee29a7b7a23",
+      "actual_sha256": "b4923d57e182d8ac353fe6bc8a09af91db1c015f6c412f9a57d89ee29a7b7a23",
+      "bytes": 400,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1918.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1918.csv",
+      "expected_sha256": "e84f4fcea03be43547e0443c3fd35a25f7303fbe2e725f27d40423dc1bc1c47f",
+      "actual_sha256": "e84f4fcea03be43547e0443c3fd35a25f7303fbe2e725f27d40423dc1bc1c47f",
+      "bytes": 500,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1919.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1919.csv",
+      "expected_sha256": "5977b5f3a4d1bb8f45de28790c008d496a50c03639123797875f0a352f34d390",
+      "actual_sha256": "5977b5f3a4d1bb8f45de28790c008d496a50c03639123797875f0a352f34d390",
+      "bytes": 556,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1920.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1920.csv",
+      "expected_sha256": "07281b3ca935614749c21b5141afa76bc2df8718644831ea5daccdb0096e4f07",
+      "actual_sha256": "07281b3ca935614749c21b5141afa76bc2df8718644831ea5daccdb0096e4f07",
+      "bytes": 560,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1921.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1921.csv",
+      "expected_sha256": "d3deb4603b01b6f84861498985b7655d3eadecae5802151d9d984b5682595cca",
+      "actual_sha256": "d3deb4603b01b6f84861498985b7655d3eadecae5802151d9d984b5682595cca",
+      "bytes": 558,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1922.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1922.csv",
+      "expected_sha256": "ba3d6ae898cbde5fbcbeca311e89366014e6b14f795423b633f9fff139fb8ed8",
+      "actual_sha256": "ba3d6ae898cbde5fbcbeca311e89366014e6b14f795423b633f9fff139fb8ed8",
+      "bytes": 568,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1923.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1923.csv",
+      "expected_sha256": "b9960b03b1c2dcf1fe276a3aabb4a272d0aeb6be34bca17a3f6f4faa3f15d0c5",
+      "actual_sha256": "b9960b03b1c2dcf1fe276a3aabb4a272d0aeb6be34bca17a3f6f4faa3f15d0c5",
+      "bytes": 561,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1924.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1924.csv",
+      "expected_sha256": "5e1ecbc99bf7863088df730ebfcd28da5581da010f777bcaac9c523e5197d9e7",
+      "actual_sha256": "5e1ecbc99bf7863088df730ebfcd28da5581da010f777bcaac9c523e5197d9e7",
+      "bytes": 565,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1925.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1925.csv",
+      "expected_sha256": "1ad789be141ec2a6002472b4a495dec7cc8b1ef0c0f8881c8e92744eade79e30",
+      "actual_sha256": "1ad789be141ec2a6002472b4a495dec7cc8b1ef0c0f8881c8e92744eade79e30",
+      "bytes": 724,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1926.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1926.csv",
+      "expected_sha256": "05c74866276bd5c231f3fbae94024bf6b53dff51de1c4058821d4647a3acd9f9",
+      "actual_sha256": "05c74866276bd5c231f3fbae94024bf6b53dff51de1c4058821d4647a3acd9f9",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1927.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1927.csv",
+      "expected_sha256": "c8275259fd10501f43064fee82b3bb4c6653204419b1e242885874b9b854f413",
+      "actual_sha256": "c8275259fd10501f43064fee82b3bb4c6653204419b1e242885874b9b854f413",
+      "bytes": 734,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1928.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1928.csv",
+      "expected_sha256": "0d811f131f600d165397fc2c4924b1f68d838a5e15cc5c147eb176320519f229",
+      "actual_sha256": "0d811f131f600d165397fc2c4924b1f68d838a5e15cc5c147eb176320519f229",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1929.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1929.csv",
+      "expected_sha256": "93b87127340fba7f79af1459e5a7e054b318f3bc0e5858c4098733f1f120f78f",
+      "actual_sha256": "93b87127340fba7f79af1459e5a7e054b318f3bc0e5858c4098733f1f120f78f",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1930.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1930.csv",
+      "expected_sha256": "6bb4aa7ee8dff65734b5dc71cb689cd5b2c0a9744c1b0f4aea5ffeecb3c9daac",
+      "actual_sha256": "6bb4aa7ee8dff65734b5dc71cb689cd5b2c0a9744c1b0f4aea5ffeecb3c9daac",
+      "bytes": 713,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1931.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1931.csv",
+      "expected_sha256": "528d1e329fa82c3b72e6d20d6a01056db68361f222b6af4914c228ab3316918c",
+      "actual_sha256": "528d1e329fa82c3b72e6d20d6a01056db68361f222b6af4914c228ab3316918c",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1932.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1932.csv",
+      "expected_sha256": "fe3ec42ce40705101245e17f1ee4d2223f0dac64b5a11c86e21a00f0c9fc1998",
+      "actual_sha256": "fe3ec42ce40705101245e17f1ee4d2223f0dac64b5a11c86e21a00f0c9fc1998",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1933.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1933.csv",
+      "expected_sha256": "60d74434356990b8db662bcbd09dfc6971419a3dc7d3478472a4df290d73944b",
+      "actual_sha256": "60d74434356990b8db662bcbd09dfc6971419a3dc7d3478472a4df290d73944b",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1934.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1934.csv",
+      "expected_sha256": "6edcf92d67b621eeb200a671d6e0550fced5ba057c12c0a822365bc278a558eb",
+      "actual_sha256": "6edcf92d67b621eeb200a671d6e0550fced5ba057c12c0a822365bc278a558eb",
+      "bytes": 730,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1935.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1935.csv",
+      "expected_sha256": "74c3f715bf6c76a7ce6cc6aac1dbf2aef7af6dac6d3ba381977a25e053d3d29b",
+      "actual_sha256": "74c3f715bf6c76a7ce6cc6aac1dbf2aef7af6dac6d3ba381977a25e053d3d29b",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1936.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1936.csv",
+      "expected_sha256": "230e3d3f49353b5bd4f88be266b949921ff6122ea4c1d70b04f5a6b9b3e5a3a5",
+      "actual_sha256": "230e3d3f49353b5bd4f88be266b949921ff6122ea4c1d70b04f5a6b9b3e5a3a5",
+      "bytes": 730,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1937.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1937.csv",
+      "expected_sha256": "52d8fa02282ede67dec3b32b583a467139ced37c38eebab7af22e6c92582969f",
+      "actual_sha256": "52d8fa02282ede67dec3b32b583a467139ced37c38eebab7af22e6c92582969f",
+      "bytes": 721,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1938.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1938.csv",
+      "expected_sha256": "e20586bbd30d4dc44c4568853b8b61704bc05ebe579b10f65615e39e0e2056a1",
+      "actual_sha256": "e20586bbd30d4dc44c4568853b8b61704bc05ebe579b10f65615e39e0e2056a1",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1939.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1939.csv",
+      "expected_sha256": "6747fb854c931c9bc75635da5b7dd8fe32a08bc09c921251ba3ea78f29c73f3f",
+      "actual_sha256": "6747fb854c931c9bc75635da5b7dd8fe32a08bc09c921251ba3ea78f29c73f3f",
+      "bytes": 734,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1940.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1940.csv",
+      "expected_sha256": "2aec09154291f7da6a18b3dbb0f88b496a12cf09e8767619447dc2058bb20e72",
+      "actual_sha256": "2aec09154291f7da6a18b3dbb0f88b496a12cf09e8767619447dc2058bb20e72",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1941.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1941.csv",
+      "expected_sha256": "b31c2d8a49cb3aecb56a5afaf9975947d26033a5245844c6035389fd3739a7b6",
+      "actual_sha256": "b31c2d8a49cb3aecb56a5afaf9975947d26033a5245844c6035389fd3739a7b6",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1942.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1942.csv",
+      "expected_sha256": "c8b8c0317b164436def0e5b789994fe4129e38dcf0a8b4fa7b99428c9834380c",
+      "actual_sha256": "c8b8c0317b164436def0e5b789994fe4129e38dcf0a8b4fa7b99428c9834380c",
+      "bytes": 680,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1943.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1943.csv",
+      "expected_sha256": "1907701c2da5364738ca50e62c47e0ff957982f6923cc88cc66a9ca71e7ec0cd",
+      "actual_sha256": "1907701c2da5364738ca50e62c47e0ff957982f6923cc88cc66a9ca71e7ec0cd",
+      "bytes": 656,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1944.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1944.csv",
+      "expected_sha256": "6b191fe2088d2e82503584ac6c5db302dc52cc7e0c0c071e060241ce9d40bd35",
+      "actual_sha256": "6b191fe2088d2e82503584ac6c5db302dc52cc7e0c0c071e060241ce9d40bd35",
+      "bytes": 722,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1945.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1945.csv",
+      "expected_sha256": "ddcd1cebd405de3e01f63a924fe258780f3c6860efccd550ba4e36c6a2fb0af3",
+      "actual_sha256": "ddcd1cebd405de3e01f63a924fe258780f3c6860efccd550ba4e36c6a2fb0af3",
+      "bytes": 730,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1946.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1946.csv",
+      "expected_sha256": "06972181b389deea1659cbecff7588940e60c6663d3aa63fc873257a7d054cd0",
+      "actual_sha256": "06972181b389deea1659cbecff7588940e60c6663d3aa63fc873257a7d054cd0",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1947.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1947.csv",
+      "expected_sha256": "b64baa314886c9472207488c458f694169e3d39868215f1c958d2c58b516a908",
+      "actual_sha256": "b64baa314886c9472207488c458f694169e3d39868215f1c958d2c58b516a908",
+      "bytes": 728,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1948.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1948.csv",
+      "expected_sha256": "59ee90fc3aae18447787206e8ea85fbb22e4d1f9d97eff6049d94db3f4d39367",
+      "actual_sha256": "59ee90fc3aae18447787206e8ea85fbb22e4d1f9d97eff6049d94db3f4d39367",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1949.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1949.csv",
+      "expected_sha256": "0faf4f3b2a331e2b38bbdf30324d1c6de5ceaf5e05260ac2c8628e436ede14b8",
+      "actual_sha256": "0faf4f3b2a331e2b38bbdf30324d1c6de5ceaf5e05260ac2c8628e436ede14b8",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1950.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1950.csv",
+      "expected_sha256": "93e4eadaa440df54e00aa74f2afcc34a708d0478b4273a667f856accc7c4bcee",
+      "actual_sha256": "93e4eadaa440df54e00aa74f2afcc34a708d0478b4273a667f856accc7c4bcee",
+      "bytes": 729,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1951.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1951.csv",
+      "expected_sha256": "faffb65cc5603169825623f1641d4931164a1ec7fd2a626513c46f96b86b5a94",
+      "actual_sha256": "faffb65cc5603169825623f1641d4931164a1ec7fd2a626513c46f96b86b5a94",
+      "bytes": 730,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1952.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1952.csv",
+      "expected_sha256": "f2eef72d43a89509738a7c26ac507645950f2982ffb6d706990c04d2ddacd670",
+      "actual_sha256": "f2eef72d43a89509738a7c26ac507645950f2982ffb6d706990c04d2ddacd670",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1953.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1953.csv",
+      "expected_sha256": "16e9766d5dd5c6a97860909bcb6a49f930beead9010c83f313c0490497a8a891",
+      "actual_sha256": "16e9766d5dd5c6a97860909bcb6a49f930beead9010c83f313c0490497a8a891",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1954.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1954.csv",
+      "expected_sha256": "8b134353baf923a0eedd35b620a545c1e9d7999f5fae74efd3a1294accfe4707",
+      "actual_sha256": "8b134353baf923a0eedd35b620a545c1e9d7999f5fae74efd3a1294accfe4707",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1955.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1955.csv",
+      "expected_sha256": "4c1586cd73771eb6e234909b79a7e382d8cf98160316c2879534ee542131d077",
+      "actual_sha256": "4c1586cd73771eb6e234909b79a7e382d8cf98160316c2879534ee542131d077",
+      "bytes": 730,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1956.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1956.csv",
+      "expected_sha256": "4787e2a6290d2331e007cfe7075127fa196ba94586d528164c990136a5a8c727",
+      "actual_sha256": "4787e2a6290d2331e007cfe7075127fa196ba94586d528164c990136a5a8c727",
+      "bytes": 734,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1957.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1957.csv",
+      "expected_sha256": "6b7b04e7fb87273b31829e854fbfb12103711a06250addf70d693011fe5ae2ec",
+      "actual_sha256": "6b7b04e7fb87273b31829e854fbfb12103711a06250addf70d693011fe5ae2ec",
+      "bytes": 735,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1958.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1958.csv",
+      "expected_sha256": "d5de9cdc917f91a555c2e63090305cf67e1171270dfe53f7744049ec445e08b1",
+      "actual_sha256": "d5de9cdc917f91a555c2e63090305cf67e1171270dfe53f7744049ec445e08b1",
+      "bytes": 735,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1959.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1959.csv",
+      "expected_sha256": "4c61b8ee28af9dac6bb0f0af51c304028ee9b31ee4a7301ac438ec9f15c59727",
+      "actual_sha256": "4c61b8ee28af9dac6bb0f0af51c304028ee9b31ee4a7301ac438ec9f15c59727",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1960.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1960.csv",
+      "expected_sha256": "ed71dfa9db9d8f93b388ce8997f7e9335c03d750fa8ff53282deadeef77c651b",
+      "actual_sha256": "ed71dfa9db9d8f93b388ce8997f7e9335c03d750fa8ff53282deadeef77c651b",
+      "bytes": 720,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1961.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1961.csv",
+      "expected_sha256": "c4c0bb314e71a36e3fc7b6037854ae31d26487693f2b702dc4935cffc073be96",
+      "actual_sha256": "c4c0bb314e71a36e3fc7b6037854ae31d26487693f2b702dc4935cffc073be96",
+      "bytes": 721,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1962.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1962.csv",
+      "expected_sha256": "e5b5045c6e7e70f13ff57e2e0a58dedaa925374047c2b81fbc511b63ac834117",
+      "actual_sha256": "e5b5045c6e7e70f13ff57e2e0a58dedaa925374047c2b81fbc511b63ac834117",
+      "bytes": 734,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1963.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1963.csv",
+      "expected_sha256": "cc16d72a39acb2179c65b9b28255c9d095cb9c3b3f4f1ea6a13222bf33cf0cd6",
+      "actual_sha256": "cc16d72a39acb2179c65b9b28255c9d095cb9c3b3f4f1ea6a13222bf33cf0cd6",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1964.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1964.csv",
+      "expected_sha256": "fdb90b6078c2df0b8a45a3fd13552e0a5043a41e5258931724206f44314afec0",
+      "actual_sha256": "fdb90b6078c2df0b8a45a3fd13552e0a5043a41e5258931724206f44314afec0",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1965.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1965.csv",
+      "expected_sha256": "0aaafa772746c1534a361179e734287b49bc81a0d6bf2f7e7cd5874821b86de4",
+      "actual_sha256": "0aaafa772746c1534a361179e734287b49bc81a0d6bf2f7e7cd5874821b86de4",
+      "bytes": 730,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1966.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1966.csv",
+      "expected_sha256": "d03aa3d6a4ea664d90fa50b88ee102db92ad7ef3a838acf33c56e52474b6d370",
+      "actual_sha256": "d03aa3d6a4ea664d90fa50b88ee102db92ad7ef3a838acf33c56e52474b6d370",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1967.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1967.csv",
+      "expected_sha256": "960580f93aa6e64dfa770d28e258fc888437b340dddc416e2185d3ef546dd0a1",
+      "actual_sha256": "960580f93aa6e64dfa770d28e258fc888437b340dddc416e2185d3ef546dd0a1",
+      "bytes": 734,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1968.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1968.csv",
+      "expected_sha256": "ec27b527ef0fdb8f10968ba53c0c8a5813dd40140358d23ab100d918f6a9fe97",
+      "actual_sha256": "ec27b527ef0fdb8f10968ba53c0c8a5813dd40140358d23ab100d918f6a9fe97",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1969.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1969.csv",
+      "expected_sha256": "8bfc3d445d037ce07b1a28e13b725c1562a3db45f12b85726b0244e52c75d073",
+      "actual_sha256": "8bfc3d445d037ce07b1a28e13b725c1562a3db45f12b85726b0244e52c75d073",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1970.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1970.csv",
+      "expected_sha256": "36f4164b9e234d5cd9702f83ea05f11dd96668352f4e84b310a5377d566593f6",
+      "actual_sha256": "36f4164b9e234d5cd9702f83ea05f11dd96668352f4e84b310a5377d566593f6",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1971.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1971.csv",
+      "expected_sha256": "8ad0af2e9e4bf56580da4e61a8515f61582c1105af4e88e14218f816345cc694",
+      "actual_sha256": "8ad0af2e9e4bf56580da4e61a8515f61582c1105af4e88e14218f816345cc694",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1972.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1972.csv",
+      "expected_sha256": "656b525ed571d312783b71e8df2bfaae46ac83e7190519b6b2410647cc07d8f0",
+      "actual_sha256": "656b525ed571d312783b71e8df2bfaae46ac83e7190519b6b2410647cc07d8f0",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1973.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1973.csv",
+      "expected_sha256": "99ab32a9e4978f3dd10464a0af2f04f211805e97c8a405d6ad3a9288dbe6a258",
+      "actual_sha256": "99ab32a9e4978f3dd10464a0af2f04f211805e97c8a405d6ad3a9288dbe6a258",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1974.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1974.csv",
+      "expected_sha256": "03e21e96a2aebe7f7de8c4d77e53dce057934871721d0402526c31c9f6927c80",
+      "actual_sha256": "03e21e96a2aebe7f7de8c4d77e53dce057934871721d0402526c31c9f6927c80",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1975.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1975.csv",
+      "expected_sha256": "447a8153088664338aa84c7d3bc2a3611acbe91f60cfde1549a41ad76f8a24dc",
+      "actual_sha256": "447a8153088664338aa84c7d3bc2a3611acbe91f60cfde1549a41ad76f8a24dc",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1976.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1976.csv",
+      "expected_sha256": "08cbb5a4bc050544a4b339143f9c4d17ae67de6b37764413ee35a7fae46f12db",
+      "actual_sha256": "08cbb5a4bc050544a4b339143f9c4d17ae67de6b37764413ee35a7fae46f12db",
+      "bytes": 736,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1977.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1977.csv",
+      "expected_sha256": "6b64ff76a2d68addbce63759c2a07438e12fcee4b6eb972e0629be86eac81514",
+      "actual_sha256": "6b64ff76a2d68addbce63759c2a07438e12fcee4b6eb972e0629be86eac81514",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1978.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1978.csv",
+      "expected_sha256": "459c1c9d0ec1e52609449fa72767409e6b75132b60ced5add7a57d022621725a",
+      "actual_sha256": "459c1c9d0ec1e52609449fa72767409e6b75132b60ced5add7a57d022621725a",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1979.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1979.csv",
+      "expected_sha256": "e1613e14c220221f316285a2c3c53084957007ee15da08aca0fdadebeee9bf76",
+      "actual_sha256": "e1613e14c220221f316285a2c3c53084957007ee15da08aca0fdadebeee9bf76",
+      "bytes": 734,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1980.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1980.csv",
+      "expected_sha256": "b91857a66c8f1098effe87f7b0adec7eec2ed48fef85871e0187c25fece2040d",
+      "actual_sha256": "b91857a66c8f1098effe87f7b0adec7eec2ed48fef85871e0187c25fece2040d",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1981.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1981.csv",
+      "expected_sha256": "5f732cbf49e01468ae4cb9d281fa65734a5922ae3b25eef168ce27768f4b48a4",
+      "actual_sha256": "5f732cbf49e01468ae4cb9d281fa65734a5922ae3b25eef168ce27768f4b48a4",
+      "bytes": 728,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1982.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1982.csv",
+      "expected_sha256": "86ef53c9a076dbc82ebfd169998286da7efb8be8c094e637a44474059ca095ff",
+      "actual_sha256": "86ef53c9a076dbc82ebfd169998286da7efb8be8c094e637a44474059ca095ff",
+      "bytes": 732,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1983.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1983.csv",
+      "expected_sha256": "fb9827222c3886e96061976cfb24588f82e28633ec6742dce2f6a83869fd7bd6",
+      "actual_sha256": "fb9827222c3886e96061976cfb24588f82e28633ec6742dce2f6a83869fd7bd6",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1984.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1984.csv",
+      "expected_sha256": "b5862ca5befec3fcdac5dd77d6645020c821ea45fd98fe9a407fa82a44e3ca4d",
+      "actual_sha256": "b5862ca5befec3fcdac5dd77d6645020c821ea45fd98fe9a407fa82a44e3ca4d",
+      "bytes": 733,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1985.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1985.csv",
+      "expected_sha256": "cb877fc8942af33385eb8b1e1be563f6b0b3fe2b0b02620a2a4c0f79abe15228",
+      "actual_sha256": "cb877fc8942af33385eb8b1e1be563f6b0b3fe2b0b02620a2a4c0f79abe15228",
+      "bytes": 722,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1986.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1986.csv",
+      "expected_sha256": "669a233355531e485bc9bb8fe96918ccc3832c79f48f334f46312f67f35a67fa",
+      "actual_sha256": "669a233355531e485bc9bb8fe96918ccc3832c79f48f334f46312f67f35a67fa",
+      "bytes": 731,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1987.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1987.csv",
+      "expected_sha256": "9c55571c658ea7447d917962ef066a5d1dc50973fbda4906c3ca401e805514b5",
+      "actual_sha256": "9c55571c658ea7447d917962ef066a5d1dc50973fbda4906c3ca401e805514b5",
+      "bytes": 849,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1988.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1988.csv",
+      "expected_sha256": "0ff9774f5beb199a5562bc16078bbed48637949b334553170633858950ebd40a",
+      "actual_sha256": "0ff9774f5beb199a5562bc16078bbed48637949b334553170633858950ebd40a",
+      "bytes": 846,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1989.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1989.csv",
+      "expected_sha256": "47a4ebf2b74602536e76ca27ec996f9c98cc16f87d3536a4c19e62372274bd1a",
+      "actual_sha256": "47a4ebf2b74602536e76ca27ec996f9c98cc16f87d3536a4c19e62372274bd1a",
+      "bytes": 848,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1990.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1990.csv",
+      "expected_sha256": "4e3bf85be629d8a8001cbc3d6cf05e43db8883cb174d362193d8090d0c8844f6",
+      "actual_sha256": "4e3bf85be629d8a8001cbc3d6cf05e43db8883cb174d362193d8090d0c8844f6",
+      "bytes": 833,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1991.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1991.csv",
+      "expected_sha256": "c0e4783107bb6e9c06f92a287c9f9d6beea6a78cc08c9d2b327d1376eb3fcd1d",
+      "actual_sha256": "c0e4783107bb6e9c06f92a287c9f9d6beea6a78cc08c9d2b327d1376eb3fcd1d",
+      "bytes": 898,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1992.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1992.csv",
+      "expected_sha256": "768414ee17abe7bb50039de9cc76b126ed47f74a63d1049e6f6351916dd348c8",
+      "actual_sha256": "768414ee17abe7bb50039de9cc76b126ed47f74a63d1049e6f6351916dd348c8",
+      "bytes": 896,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1993.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1993.csv",
+      "expected_sha256": "b8be009580d45f00c9ba06cea8978036b1665c5e0b7f395723a0ab13b750b9b0",
+      "actual_sha256": "b8be009580d45f00c9ba06cea8978036b1665c5e0b7f395723a0ab13b750b9b0",
+      "bytes": 896,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1994.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1994.csv",
+      "expected_sha256": "7b4a3f5e1decf9378e104ad685da7f28e5591a195fc26d5eb678bef2be3976bd",
+      "actual_sha256": "7b4a3f5e1decf9378e104ad685da7f28e5591a195fc26d5eb678bef2be3976bd",
+      "bytes": 899,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1995.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1995.csv",
+      "expected_sha256": "7e181812390a0b36e2d83baf84246ded5cc8726088eaba8941ad9eb62365db4a",
+      "actual_sha256": "7e181812390a0b36e2d83baf84246ded5cc8726088eaba8941ad9eb62365db4a",
+      "bytes": 952,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1996.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1996.csv",
+      "expected_sha256": "c542737f8797d9d8a1e407c55f7abcb5d30cb5f7e44edc89cc019eda90564bdd",
+      "actual_sha256": "c542737f8797d9d8a1e407c55f7abcb5d30cb5f7e44edc89cc019eda90564bdd",
+      "bytes": 946,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1997.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1997.csv",
+      "expected_sha256": "31cda675cbc72ba5f3478bbb5ff3af1f65e542bc930d8d002062936b6f8647fd",
+      "actual_sha256": "31cda675cbc72ba5f3478bbb5ff3af1f65e542bc930d8d002062936b6f8647fd",
+      "bytes": 953,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1998.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1998.csv",
+      "expected_sha256": "5926af85202a39c97cc5cd776f3679a3ea69313acc297914dfca7b6c906edd5c",
+      "actual_sha256": "5926af85202a39c97cc5cd776f3679a3ea69313acc297914dfca7b6c906edd5c",
+      "bytes": 957,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_1999.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_1999.csv",
+      "expected_sha256": "3e1fccc6fb07cb4a7a7e4e3fbd58d97381c2a5e87192bdf62ff1fc2fb6f693b6",
+      "actual_sha256": "3e1fccc6fb07cb4a7a7e4e3fbd58d97381c2a5e87192bdf62ff1fc2fb6f693b6",
+      "bytes": 960,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2000.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2000.csv",
+      "expected_sha256": "f33a8717ceae4c6332de5713d01c03d5b92ee6507edff2923024ad1ff52f0da3",
+      "actual_sha256": "f33a8717ceae4c6332de5713d01c03d5b92ee6507edff2923024ad1ff52f0da3",
+      "bytes": 957,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2001.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2001.csv",
+      "expected_sha256": "de428dc939253f58e5ed5d5f5dcd174f80dc69eb18db65fa2cd6d08108d9a67f",
+      "actual_sha256": "de428dc939253f58e5ed5d5f5dcd174f80dc69eb18db65fa2cd6d08108d9a67f",
+      "bytes": 955,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2002.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2002.csv",
+      "expected_sha256": "52f38d870b67d96cf15623127604e7b3015b91b3594c862782036abd562eeb90",
+      "actual_sha256": "52f38d870b67d96cf15623127604e7b3015b91b3594c862782036abd562eeb90",
+      "bytes": 960,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2003.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2003.csv",
+      "expected_sha256": "48d31a583e047809beb69566e94798abfbbb5cee77ff4e0dce04eecd700d4d00",
+      "actual_sha256": "48d31a583e047809beb69566e94798abfbbb5cee77ff4e0dce04eecd700d4d00",
+      "bytes": 957,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2004.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2004.csv",
+      "expected_sha256": "03b33b559bfeb385b005b33a84a9bfe610a9d9802bb916feca52378bd74268cb",
+      "actual_sha256": "03b33b559bfeb385b005b33a84a9bfe610a9d9802bb916feca52378bd74268cb",
+      "bytes": 955,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2005.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2005.csv",
+      "expected_sha256": "4a1a84eb562b881ca52d715d987408f926aa81d78f4c7a3160da19355b87dcdc",
+      "actual_sha256": "4a1a84eb562b881ca52d715d987408f926aa81d78f4c7a3160da19355b87dcdc",
+      "bytes": 958,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2006.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2006.csv",
+      "expected_sha256": "a86076916aa3f0ced58249c34345f89a914cda2dfb3cd232f86f5561e0c4438c",
+      "actual_sha256": "a86076916aa3f0ced58249c34345f89a914cda2dfb3cd232f86f5561e0c4438c",
+      "bytes": 954,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2007.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2007.csv",
+      "expected_sha256": "abf3d50de680576644cae1fc8d178e587002145be3a9091e84fd26a22add0480",
+      "actual_sha256": "abf3d50de680576644cae1fc8d178e587002145be3a9091e84fd26a22add0480",
+      "bytes": 955,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2008.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2008.csv",
+      "expected_sha256": "e9afc06d995fe1cf6c25aaed3c1a786902e9a105136d5b00edacdc9052263204",
+      "actual_sha256": "e9afc06d995fe1cf6c25aaed3c1a786902e9a105136d5b00edacdc9052263204",
+      "bytes": 946,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2009.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2009.csv",
+      "expected_sha256": "0f857443ebbcc374c9c443697d8c9a6c8ea15c031a59dfc0468f52176e9ddc0c",
+      "actual_sha256": "0f857443ebbcc374c9c443697d8c9a6c8ea15c031a59dfc0468f52176e9ddc0c",
+      "bytes": 959,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2010.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2010.csv",
+      "expected_sha256": "814b448fc7538e8dad758b71aa7ecc310ea087c6a8c466c311c96860e32d9552",
+      "actual_sha256": "814b448fc7538e8dad758b71aa7ecc310ea087c6a8c466c311c96860e32d9552",
+      "bytes": 957,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2011.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2011.csv",
+      "expected_sha256": "5f8e77affc9c952c27e3bf7657a3fd2b0d16c602a45797daa075a2565696567e",
+      "actual_sha256": "5f8e77affc9c952c27e3bf7657a3fd2b0d16c602a45797daa075a2565696567e",
+      "bytes": 998,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2012.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2012.csv",
+      "expected_sha256": "edf09f4a2bc8ddf99d2fcb414bed117c4dd7f23eae5e2493ad3272cf75f3e149",
+      "actual_sha256": "edf09f4a2bc8ddf99d2fcb414bed117c4dd7f23eae5e2493ad3272cf75f3e149",
+      "bytes": 1044,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2013.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2013.csv",
+      "expected_sha256": "169d34829bfc6a9aae6ae38ed347c08309225ee495876d068d6da94e0a357212",
+      "actual_sha256": "169d34829bfc6a9aae6ae38ed347c08309225ee495876d068d6da94e0a357212",
+      "bytes": 1046,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2014.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2014.csv",
+      "expected_sha256": "4054abbe652501bc7b449be765bd9506883b19282eb4c7d1f135df1ee2b062d6",
+      "actual_sha256": "4054abbe652501bc7b449be765bd9506883b19282eb4c7d1f135df1ee2b062d6",
+      "bytes": 1057,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2015.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2015.csv",
+      "expected_sha256": "96e0f5953fb5fcb9f10eff2b7e67045afe92fae5d939f7a3b3aa18aefff289da",
+      "actual_sha256": "96e0f5953fb5fcb9f10eff2b7e67045afe92fae5d939f7a3b3aa18aefff289da",
+      "bytes": 1048,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2016.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2016.csv",
+      "expected_sha256": "790119beae71f30711063d13061b5c7dd845fe023ab040db79b2207ab482b393",
+      "actual_sha256": "790119beae71f30711063d13061b5c7dd845fe023ab040db79b2207ab482b393",
+      "bytes": 1061,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2017.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2017.csv",
+      "expected_sha256": "e1104cdef220df6567c32db9c5158c2bf5ede91a00cc9e1396b9e6fffbfa47bf",
+      "actual_sha256": "e1104cdef220df6567c32db9c5158c2bf5ede91a00cc9e1396b9e6fffbfa47bf",
+      "bytes": 1059,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2018.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2018.csv",
+      "expected_sha256": "485df148b2f2d894e597ab31e3fcea40835366ccd6a68da4a406dde21a2fa54e",
+      "actual_sha256": "485df148b2f2d894e597ab31e3fcea40835366ccd6a68da4a406dde21a2fa54e",
+      "bytes": 1054,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2019.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2019.csv",
+      "expected_sha256": "352b1d481b72ab7b198218f2e094b08af08bf7a286845068d2ff7a19a4698dc0",
+      "actual_sha256": "352b1d481b72ab7b198218f2e094b08af08bf7a286845068d2ff7a19a4698dc0",
+      "bytes": 1058,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2020.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2020.csv",
+      "expected_sha256": "c8ce25ed5f966dc4932b54f2938b8d629ba42697794774204aae7a02cff17652",
+      "actual_sha256": "c8ce25ed5f966dc4932b54f2938b8d629ba42697794774204aae7a02cff17652",
+      "bytes": 1044,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2021.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2021.csv",
+      "expected_sha256": "a414b79744e639799400e82fa15c1911b930b3aa93c41e18501e7f32c2e285e0",
+      "actual_sha256": "a414b79744e639799400e82fa15c1911b930b3aa93c41e18501e7f32c2e285e0",
+      "bytes": 1062,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2022.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2022.csv",
+      "expected_sha256": "edd1707cddd555c6f287c05505d84494675b0b19361b59d3bad588dbdaa0d8f4",
+      "actual_sha256": "edd1707cddd555c6f287c05505d84494675b0b19361b59d3bad588dbdaa0d8f4",
+      "bytes": 1056,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2023.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2023.csv",
+      "expected_sha256": "9ce0dd41318a2e83d262e216d854491761ce440ab32ca22c7083c752f3c27d60",
+      "actual_sha256": "9ce0dd41318a2e83d262e216d854491761ce440ab32ca22c7083c752f3c27d60",
+      "bytes": 1056,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2024.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2024.csv",
+      "expected_sha256": "5f042b3e2e6296e8d07ec1dff07a333ecc0e619e4e35bc3913f4c23c8bf61dcd",
+      "actual_sha256": "5f042b3e2e6296e8d07ec1dff07a333ecc0e619e4e35bc3913f4c23c8bf61dcd",
+      "bytes": 1056,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2025.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2025.csv",
+      "expected_sha256": "dac0aa8310b425664bd36a99257b60b436b172ffff0c59e5328e8093a95fd569",
+      "actual_sha256": "dac0aa8310b425664bd36a99257b60b436b172ffff0c59e5328e8093a95fd569",
+      "bytes": 1059,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\data\\sources\\afltables\\fitzroy_core\\c2-2026-final-ladder-v1\\ladder_2026.csv",
+      "relative_path": "data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1/ladder_2026.csv",
+      "expected_sha256": "9f0358243a76d11a3db514933981fcbb49000d7ac950cf277bb278a32beb42ff",
+      "actual_sha256": "9f0358243a76d11a3db514933981fcbb49000d7ac950cf277bb278a32beb42ff",
+      "bytes": 1015,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\docs\\rebuild-manifests\\afltables_fitzroy_core\\c2-2026-final-core-v1.json",
+      "relative_path": "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json",
+      "expected_sha256": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988",
+      "actual_sha256": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988",
+      "bytes": 236674,
+      "status": "PASS"
+    },
+    {
+      "path": "D:\\tmp\\afldb-i316-J2-20261023T2317Z\\local\\dryrun-2-pinned\\docs\\rebuild-manifests\\afltables_fitzroy_core\\c2-2026-final-ladder-v1.json",
+      "relative_path": "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-ladder-v1.json",
+      "expected_sha256": "65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34",
+      "actual_sha256": "65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34",
+      "bytes": 54293,
+      "status": "PASS"
+    }
+  ],
+  "findings": [],
+  "copied": [
+    {
+      "state": "source-P",
+      "files": 264,
+      "all_copies_hash_verified": true
+    },
+    {
+      "state": "state-B",
+      "files": 264,
+      "all_copies_hash_verified": true
+    },
+    {
+      "state": "state-C",
+      "files": 264,
+      "all_copies_hash_verified": true
+    }
+  ],
+  "historical_censuses": [
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\census-afldb_prod.json",
+      "sha256": "18b201662caa37ed0c0169e5d8f5f5a505b34f666cf5ea30a0a63a584653ffa2",
+      "captured_at_utc": "2026-10-23T03:28:51Z",
+      "production_freshness": "EXPIRED; offline reproduction only; no connection"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\census-afldb_dev.json",
+      "sha256": "7a000b93a83e846772d512eea0c25d0234d6662ede7349aca7517a86b6c963af",
+      "captured_at_utc": "2026-10-23T03:28:40Z",
+      "production_freshness": "EXPIRED; offline reproduction only; no connection"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\census-afldb_test.json",
+      "sha256": "9eb203a6e521305cd043450bab0a13b2e97337498c78625b527e76fd363fbdb1",
+      "captured_at_utc": "2026-10-23T03:28:41Z",
+      "production_freshness": "EXPIRED; offline reproduction only; no connection"
+    }
+  ],
+  "external_material_modified": false
+}

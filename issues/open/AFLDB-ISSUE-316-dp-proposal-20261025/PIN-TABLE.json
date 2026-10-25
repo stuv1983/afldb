@@ -1,0 +1,133 @@
+{
+  "source_commit": "def676517da3955aa18db3606785463aac464188",
+  "previous_source_commit": "876dadbfa024de7d66cdb16cefb4f769d9fdd709",
+  "date": "2026-10-27",
+  "old_change_set_sha256": "85b5f05af179c83fa0fcc4898263204a6d92e6ed99069cb8bb8384f2cb1886a1",
+  "new_change_set_sha256": "d55875cbfa686ac47511eca2e2ac7026cfadefd1fd4e7ab1b31c322f7359644b",
+  "tuple_sha256": "a78d36ee7e689b7bb5978335bff5e6bdd54f368572df5f2f01d10caf35a373aa",
+  "files": [
+    {
+      "path": "data/reference/afltables-network.json",
+      "base_at_P_sha256": "19721801ac4df60e78299b461c97e87d252ad65d5fd394643448be54c3b5c838",
+      "accepted_J2_final_sha256": "3d03022267745316dd71d27580f9c4d369bfc6f03e4da332e302965d3c40d2eb",
+      "proposed_final_sha256": "04e2a269559cbc09a590e22e46207cd199d78eb60dbdc49c605bb2e724d3b897"
+    },
+    {
+      "path": "tools/rebuild/afl_api/afl-api-contract.json",
+      "base_at_P_sha256": "8ed96ed4cca6fe4fb8da63c05a383af4dc8bbdc4b9dacfca5c490cf74ea5e208",
+      "accepted_J2_final_sha256": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148",
+      "proposed_final_sha256": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148"
+    },
+    {
+      "path": "tools/rebuild/afltables/afltables-contract.json",
+      "base_at_P_sha256": "5d29e7d255de2b49d38d06eafe1841bf66fe936a63ec7dd0db167d8580debeca",
+      "accepted_J2_final_sha256": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f",
+      "proposed_final_sha256": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f"
+    },
+    {
+      "path": "data/reference/fitzroy-accepted-baselines.json",
+      "base_at_P_sha256": "c68083aed64e894566054404b93032698e9664d79db377080ad795724d032eef",
+      "accepted_J2_final_sha256": "6a2a4b8681c2d3d89388abbdfe9aa7569f55014ce2be151788b1d80d67e5a049",
+      "proposed_final_sha256": "0d4f7b3067112d8cf7fb3acc97b73ffb909b51cee09d8c4f59c326beb7e4f05f"
+    },
+    {
+      "path": "data/reference/seasons.json",
+      "base_at_P_sha256": "8c6462713cb0489d0aa2938c6b735ad65e9f7794f0665fccc3a951065a0004f9",
+      "accepted_J2_final_sha256": "1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0",
+      "proposed_final_sha256": "1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0"
+    },
+    {
+      "path": "tools/rebuild/fitzroy/fitzroy-contract.json",
+      "base_at_P_sha256": "39689ddfd252a358026fb9e3b0d32f1f2383cc00116016f89ee8366b7f773de2",
+      "accepted_J2_final_sha256": "fef594af13b977e60d847f0a692837ce32c61cb2315c8ce6844a44898ac512cd",
+      "proposed_final_sha256": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5"
+    },
+    {
+      "path": "data/reference/stat-availability.json",
+      "base_at_P_sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8",
+      "accepted_J2_final_sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8",
+      "proposed_final_sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8"
+    }
+  ],
+  "rebuild": {
+    "accepted_J2_active_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338",
+    "inactive_at_P_sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8",
+    "projected_active_at_P_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338"
+  },
+  "base_comparison_to_J2": "PASS: all seven base pins byte-identical to 876dadbf",
+  "authorities": {
+    "old": "None: accepted J2 used coupled apply/activation",
+    "new": [
+      {
+        "action": "activate",
+        "authority_sha256": "1d133580f526131cf31136df042b372047b170e9925db525a21ef80c5658f65f",
+        "simulated_head": "06e882277644731d665c148970b96ab214f42701",
+        "from": "applied-inactive",
+        "to": "activated",
+        "path": "tools/db/rebuild-test.ts",
+        "before_sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8",
+        "after_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338"
+      },
+      {
+        "action": "deactivate",
+        "authority_sha256": "fc45063484cfd6a07b0c716345898399298d2cc62d6b4c406846f554b96dee8c",
+        "simulated_head": "75df67dbed56ecd2d3906d561bbdafd53fff9f12",
+        "from": "activated",
+        "to": "applied-inactive",
+        "path": "tools/db/rebuild-test.ts",
+        "before_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338",
+        "after_sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8"
+      }
+    ]
+  },
+  "simulations": {
+    "old_coupled_apply_commit": "a1e16e674a1c3f552e5299883650602f3db36a2b",
+    "old_post_restatement_commit": "87da156357b55f42176f5128a9be49a386c9a6a3",
+    "new_B": {
+      "tree": "a8ce0f34c48766e03c7f4443d53520c494a9e64e",
+      "commit": "06e882277644731d665c148970b96ab214f42701",
+      "paths": [
+        "data/reference/afltables-network.json",
+        "tools/rebuild/afl_api/afl-api-contract.json",
+        "tools/rebuild/afltables/afltables-contract.json",
+        "data/reference/fitzroy-accepted-baselines.json",
+        "data/reference/seasons.json",
+        "tools/rebuild/fitzroy/fitzroy-contract.json",
+        "data/reference/stat-availability.json",
+        "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json",
+        "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-ladder-v1.json"
+      ]
+    },
+    "new_C": {
+      "tree": "4d520565cbe6269cfc9ddc0951a10b8cab44e4cc",
+      "commit": "75df67dbed56ecd2d3906d561bbdafd53fff9f12",
+      "paths_relative_to_B": [
+        "tools/db/rebuild-test.ts"
+      ]
+    },
+    "limits": "New trees are distinct B/C reference/activation projections, before regenerated B/C test restatements"
+  },
+  "bundles": [
+    {
+      "path": "bundles/source-P.bundle",
+      "sha256": "246d49362e1ccec6b89791597caa9386421de101406f6c87470bc430643f064b",
+      "bytes": 780621,
+      "prerequisite": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+      "refs": [
+        "refs/heads/source-P"
+      ]
+    },
+    {
+      "path": "bundles/proposed-BC.bundle",
+      "sha256": "a4f633e946383a7ed40913cdfce7ee3a96fd204b5db1c3ffebf69e56b04b60ce",
+      "bytes": 32262,
+      "prerequisite": "def676517da3955aa18db3606785463aac464188",
+      "refs": [
+        "refs/heads/proposed-B",
+        "refs/heads/proposed-C"
+      ]
+    }
+  ],
+  "successor_tuple_file_sha256": "b95d07e1ac0bc6163f83e23678eb0e5ade11e4c03dd4ce53d81db27dcdb5525e",
+  "tuple_sha256_semantics": "SHA-256 of canonical JSON.stringify(assertSuccessorLadderTuple(tuple)) exactly as serialised into the activation table; not pretty-printed file bytes"
+}

@@ -1,0 +1,56 @@
+{
+  "$comment": [
+    "Reviewed for c2-2026-final-core-v1 (AFLDB-ISSUE-316 owner decisions recorded in docs/v2/issue316-c2-preparation-2026-10-21.md, approved successor input decisions).",
+    "NOT inherited: the rollover reads the outgoing list for its category names only. Differences from full-history-20260902: the ladder-scoped North Melbourne 1999-2007 -> Kangaroos rule is listed explicitly (contract source_club_normalisation, AFLDB-ISSUE-095 D5); the profile_url_continuity effects now span 2025-2026 (52/31/42/25 rows, 150 rows, 4 players); the display-name fallback touches the same 150 rows. The two 1909 Jim Stewart row drops and the Brisbane Lions rule are unchanged.",
+    "A change to any of them is a new acceptance decision, not an edit to this one."
+  ],
+  "source_normalisation": [
+    {
+      "kind": "source_club_normalisation",
+      "rule": "Brisbane Lions 1987-1996 -> Brisbane Bears",
+      "dataset_scope": "all datasets"
+    },
+    {
+      "kind": "source_club_normalisation",
+      "rule": "North Melbourne 1999-2007 -> Kangaroos",
+      "dataset_scope": "results"
+    },
+    {
+      "kind": "source_club_normalisation",
+      "rule": "North Melbourne 1999-2007 -> Kangaroos",
+      "dataset_scope": "ladder"
+    }
+  ],
+  "source_data": [
+    {
+      "kind": "source_row_corrections",
+      "rule": "two spurious 1909 Jim Stewart Cartesian-product rows dropped under tracked row fingerprints",
+      "rows_dropped": 2
+    }
+  ],
+  "import_transformation": [
+    {
+      "kind": "display_name_fallback",
+      "rule": "blank Player falls back to First.name + ' ' + Surname only when both are present; a non-blank Player always wins; neither present still fails closed",
+      "rows_affected": 150,
+      "players_affected": 4
+    }
+  ],
+  "identity_continuity": [
+    {
+      "kind": "profile_url_continuity",
+      "added": "2026-09-04",
+      "issue": "AFLDB-ISSUE-136",
+      "rule": "a renumbered AFL Tables profile (blank fitzRoy ID, live 2025 url) folds into its continuing player only under a tracked rule binding the continuing ID, both profiles' seasons, the renumbered row count and AFL Tables' career-game numbering continuing by exactly one; both urls register to the one player; a blank-ID profile no rule names is refused unless it debuts at career game 1",
+      "rule_ids": [
+        "2025-charlie-cameron-renumbered-profile",
+        "2025-jack-graham-renumbered-profile",
+        "2025-jack-ross-renumbered-profile",
+        "2025-jack-williams-renumbered-profile"
+      ],
+      "rows_affected": 150,
+      "players_affected": 4,
+      "not_folded": "players/B/Billy_Wilson2.html — genuine 2025 debutant (career game 1), stays a distinct player"
+    }
+  ]
+}

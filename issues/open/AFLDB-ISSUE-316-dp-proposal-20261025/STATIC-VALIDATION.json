@@ -1,0 +1,398 @@
+{
+  "source_commit": "def676517da3955aa18db3606785463aac464188",
+  "status": "PASS",
+  "limits": "Static assembly from accepted J2 proof blobs, not a new three-gate Python dry run or raw-input validation",
+  "transition_parse_and_prepare": "PASS",
+  "write_set_count": 7,
+  "all_final_pins_match": true,
+  "inherited_predecessor_rows": 1622,
+  "projected_active": {
+    "acceptedLabel": "c2-2026-final-core-v1",
+    "ladderProfile": "c2-2026-successor",
+    "expectedRows": 1640,
+    "finalChecks": [
+      {
+        "key": "matches",
+        "expected": 17056
+      },
+      {
+        "key": "matches_with_player_rows",
+        "expected": 17056
+      },
+      {
+        "key": "seasons_first",
+        "expected": 1897
+      },
+      {
+        "key": "seasons_last",
+        "expected": 2026
+      },
+      {
+        "key": "venues",
+        "expected": 52
+      },
+      {
+        "key": "attendance_known",
+        "expected": 15405
+      },
+      {
+        "key": "club_identities",
+        "expected": 24
+      },
+      {
+        "key": "players",
+        "expected": 13363
+      },
+      {
+        "key": "players_with_renumbered_profile",
+        "expected": 4
+      },
+      {
+        "key": "player_match_rows",
+        "expected": 695499
+      },
+      {
+        "key": "brownlow_round_vote_rows",
+        "expected": 320861
+      },
+      {
+        "key": "matches_after_accepted_last_season",
+        "expected": 0
+      },
+      {
+        "key": "draft_persons",
+        "expected": 5057
+      },
+      {
+        "key": "draft_picks",
+        "expected": 6810
+      },
+      {
+        "key": "club_seasons_rows",
+        "expected": 1640
+      },
+      {
+        "key": "club_seasons_identity_era_violations",
+        "expected": 0
+      },
+      {
+        "key": "club_seasons_duplicate_identity_seasons",
+        "expected": 0
+      },
+      {
+        "key": "club_seasons_unranked_rows",
+        "expected": 0
+      },
+      {
+        "key": "club_seasons_brisbane_lions_first_season",
+        "expected": 1997
+      },
+      {
+        "key": "club_seasons_after_accepted_last_season",
+        "expected": 0
+      },
+      {
+        "key": "completed_scope_missing_or_in_progress",
+        "expected": 0
+      },
+      {
+        "key": "completed_scope_latest_decided_grand_final",
+        "expected": 1
+      },
+      {
+        "key": "coleman_rows",
+        "expected": 47
+      },
+      {
+        "key": "coleman_seasons",
+        "expected": 47
+      },
+      {
+        "key": "coleman_first_season",
+        "expected": 1980
+      },
+      {
+        "key": "coleman_unlinked_rows",
+        "expected": 0
+      },
+      {
+        "key": "coleman_rows_not_derived_from_afltables",
+        "expected": 0
+      },
+      {
+        "key": "coleman_rows_keyed_on_a_numeric_id",
+        "expected": 0
+      },
+      {
+        "key": "coleman_after_accepted_last_season",
+        "expected": 0
+      },
+      {
+        "key": "honour_team_members_rows",
+        "expected": 113
+      },
+      {
+        "key": "hall_of_fame_rows",
+        "expected": 343
+      },
+      {
+        "key": "captaincies_rows",
+        "expected": 1781
+      },
+      {
+        "key": "rising_star_nomination_rows",
+        "expected": 766
+      },
+      {
+        "key": "rising_star_winner_rows",
+        "expected": 33
+      },
+      {
+        "key": "all_australian_rows",
+        "expected": 1244
+      },
+      {
+        "key": "club_best_and_fairest_rows",
+        "expected": 752
+      },
+      {
+        "key": "named_medal_rows",
+        "expected": 1307
+      },
+      {
+        "key": "under_22_rows",
+        "expected": 330
+      },
+      {
+        "key": "award_definitions_rows",
+        "expected": 46
+      },
+      {
+        "key": "award_winners_without_a_source",
+        "expected": 0
+      },
+      {
+        "key": "award_winners_after_accepted_last_season",
+        "expected": 0
+      },
+      {
+        "key": "brownlow_season_rows",
+        "expected": 16120
+      },
+      {
+        "key": "brownlow_season_votes_total",
+        "expected": 79113
+      },
+      {
+        "key": "brownlow_season_winners",
+        "expected": 112
+      },
+      {
+        "key": "brownlow_season_seasons",
+        "expected": 98
+      },
+      {
+        "key": "brownlow_season_first_season",
+        "expected": 1924
+      },
+      {
+        "key": "brownlow_season_last_season",
+        "expected": 2025
+      },
+      {
+        "key": "brownlow_season_rows_not_sourced_from_afltables",
+        "expected": 0
+      },
+      {
+        "key": "brownlow_season_rows_not_keyed_by_profile_path",
+        "expected": 0
+      },
+      {
+        "key": "brownlow_season_after_accepted_last_season",
+        "expected": 0
+      },
+      {
+        "key": "players_with_height",
+        "expected": 12579
+      },
+      {
+        "key": "height_without_evidence",
+        "expected": 0
+      },
+      {
+        "key": "height_conflicts_open",
+        "expected": 0
+      },
+      {
+        "key": "players_with_afl_api_height_evidence",
+        "expected": 1916
+      },
+      {
+        "key": "players_with_wikipedia_height_evidence",
+        "expected": 84
+      },
+      {
+        "key": "players_with_dob_after_birth_dates",
+        "expected": 13347
+      },
+      {
+        "key": "dob_without_evidence",
+        "expected": 0
+      },
+      {
+        "key": "players_with_club_list_birth_evidence",
+        "expected": 13347
+      },
+      {
+        "key": "club_list_birth_conflict_players",
+        "expected": 0
+      },
+      {
+        "key": "dob_disagreeing_with_club_list",
+        "expected": 2
+      },
+      {
+        "key": "coaches",
+        "expected": 386
+      },
+      {
+        "key": "coaches_linked_to_players",
+        "expected": 368
+      },
+      {
+        "key": "coaches_unlinked",
+        "expected": 18
+      },
+      {
+        "key": "coaches_linked_outside_unique",
+        "expected": 0
+      },
+      {
+        "key": "match_coaches",
+        "expected": 32470
+      },
+      {
+        "key": "matches_with_both_coaches",
+        "expected": 16035
+      },
+      {
+        "key": "matches_with_one_coach",
+        "expected": 400
+      },
+      {
+        "key": "matches_without_coach",
+        "expected": 621
+      },
+      {
+        "key": "father_son_selections",
+        "expected": 127
+      },
+      {
+        "key": "father_son_sons_linked",
+        "expected": 99
+      },
+      {
+        "key": "father_son_fathers_linked",
+        "expected": 123
+      },
+      {
+        "key": "father_son_distinct_fathers",
+        "expected": 107
+      },
+      {
+        "key": "father_son_links_outside_trusted_status",
+        "expected": 0
+      },
+      {
+        "key": "player_relationships_parent_child",
+        "expected": 127
+      },
+      {
+        "key": "player_relationships_sibling",
+        "expected": 498
+      },
+      {
+        "key": "sibling_pairs_both_linked",
+        "expected": 389
+      },
+      {
+        "key": "sibling_unlinked_sides",
+        "expected": 154
+      },
+      {
+        "key": "sibling_brother_pairs_linked",
+        "expected": 389
+      },
+      {
+        "key": "sibling_players_with_brother",
+        "expected": 658
+      },
+      {
+        "key": "sibling_self_pairs",
+        "expected": 0
+      },
+      {
+        "key": "sibling_duplicate_pairs",
+        "expected": 0
+      },
+      {
+        "key": "after_siren_kicks",
+        "expected": 126
+      },
+      {
+        "key": "after_siren_premiership_rows",
+        "expected": 121
+      },
+      {
+        "key": "after_siren_other_competition_rows",
+        "expected": 5
+      },
+      {
+        "key": "after_siren_qualifying_rows",
+        "expected": 64
+      },
+      {
+        "key": "after_siren_duplicate_events",
+        "expected": 0
+      },
+      {
+        "key": "after_siren_rows_missing_provenance",
+        "expected": 0
+      },
+      {
+        "key": "first_kick_goal_rows",
+        "expected": 334
+      },
+      {
+        "key": "first_kick_goal_id_set_mismatch",
+        "expected": 0
+      },
+      {
+        "key": "first_kick_goal_duplicate_ids",
+        "expected": 0
+      },
+      {
+        "key": "first_kick_goal_rows_missing_provenance",
+        "expected": 0
+      }
+    ],
+    "pendingDatabase": [
+      "91 final-validation SQL checks built from the proposal were NOT executed; every measured count in them is a claim until the isolated rebuild measures it",
+      "the ladder witness --compare cross-check against the rebuilt club_seasons",
+      "club_seasons = 1640 rows and the completed-scope season status/grand-final checks"
+    ]
+  },
+  "inactive_refusal": "The proposed successor state fails the rebuild's own validators: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+  "change_set_sha256": "d55875cbfa686ac47511eca2e2ac7026cfadefd1fd4e7ab1b31c322f7359644b",
+  "tuple_sha256": "a78d36ee7e689b7bb5978335bff5e6bdd54f368572df5f2f01d10caf35a373aa",
+  "rebuild_sha256": {
+    "inactive": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8",
+    "active": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338"
+  },
+  "migrations": {
+    "count": 117,
+    "last": "117_brownlow_provider_eligibility_unknown.sql",
+    "setSha256": "647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72"
+  },
+  "raw_successor_inputs_present_in_repository": false
+}

@@ -1,0 +1,48 @@
+{
+  "state": "C",
+  "mode": "broader",
+  "started_at": "2026-10-25T06:58:57.136Z",
+  "completed_at": "2026-10-25T06:59:55.105Z",
+  "tests": [
+    "tests/afl-api-cutover.test.ts",
+    "tests/afl-api-settle-cli-gate.test.ts",
+    "tests/db-promotion-check.test.ts",
+    "tests/db-test-rebuild.test.ts",
+    "tests/first-kick-goal-source.test.ts",
+    "tests/fitzroy-acquisition.test.ts",
+    "tests/fitzroy-core-import.test.ts",
+    "tests/reference-data.test.ts",
+    "tests/season-rollover.test.ts",
+    "tests/v2-admin-operations-ui.test.ts",
+    "tests/v2-admin-operations.test.ts",
+    "tests/v2-coverage-registry.test.ts",
+    "tests/v2-historical-manifest.test.ts",
+    "tests/v2-season-seal.test.ts"
+  ],
+  "exit_code": 1,
+  "error": null,
+  "passed": 1839,
+  "skipped": 4,
+  "failed": 0,
+  "suite_failures": 1,
+  "expected_skips_match": false,
+  "skips": [
+    "AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate prepare-promotion-source: the run (fake settles, no database) ISSUE-314: --record-out is checked before anything is verified, opened or written recordOutProblems refuses a dangling symbolic link, which the exclusive write also refuses",
+    "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process (POSIX): SIGTERM alone ends a default process, reported by its signal",
+    "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process that ignores SIGTERM (POSIX): SIGKILL ends it after the grace",
+    "curated player alias reference (AFLDB-ISSUE-110 Stage 2) loads through external identity into player_name_aliases: normalised, idempotent, preserving, fail-closed (rolled back)"
+  ],
+  "failures": [],
+  "network_audit": {
+    "guarded_processes": 174,
+    "blocked_attempts": 0,
+    "local_tsx_ipc": 13
+  },
+  "protected_files": {
+    "files": 1574,
+    "mismatches": []
+  },
+  "accepted_product_or_assertion_edits": false,
+  "proposal_assertion_edits": true,
+  "result_file": "validation/restatement-repair/state-C-broader-1.results.json"
+}

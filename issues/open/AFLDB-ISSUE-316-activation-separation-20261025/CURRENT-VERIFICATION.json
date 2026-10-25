@@ -8,7 +8,7 @@
   "candidate_inventory_sha256": "5e90c8e7d7cdde45e0f91c3f4ab0421e70ffcffa770a9f45837ef9d46c8ff2bc",
   "admitted_disk_and_index_hashes": "PASS: 42 files",
   "excluded_staged": 0,
-  "total_staged_paths": 354,
+  "total_staged_paths": 0,
   "additional_staged_metadata": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/.gitattributes",
   "historical_entries": 771,
   "exact_matching_entries": 768,
@@ -52,8 +52,8 @@
     },
     "log": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-VITEST.log"
   },
-  "evidence_tracking_commit": null,
-  "structural_gate": "CONDITIONALLY ACCEPTED / NOT YET CLOSED",
+  "evidence_tracking_commit": "def676517da3955aa18db3606785463aac464188",
+  "structural_gate": "CLOSED / ACCEPTED",
   "production": "NO-GO",
   "execution_guard": {
     "volume": "C:",
@@ -66,5 +66,30 @@
     "normal_temp_unchanged": true,
     "cleanup_performed": false
   },
-  "final_reverification": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-REVERIFICATION.json"
+  "final_reverification": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-REVERIFICATION.json",
+  "closure_receipt": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/STRUCTURAL-CLOSURE.json",
+  "dp_preparation": {
+    "status": "PARTIAL / NOT EXECUTION-READY",
+    "source_commit": "def676517da3955aa18db3606785463aac464188",
+    "proposed_rollover_date": "2026-10-27",
+    "proposal": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/PROPOSAL.md",
+    "P_db_free": {
+      "passed": 11318,
+      "skipped": 31,
+      "failed": 0,
+      "typecheck_exit_code": 0
+    },
+    "rollover_state_B": {
+      "passed": 395,
+      "failed": 0
+    },
+    "rollover_state_C": {
+      "passed": 395,
+      "failed": 0
+    },
+    "pending": [
+      "Explicit access to named retained J2 package outside repository, then real offline three-gate validation",
+      "Broader separate B/C restatement validation and final consumer hash reconciliation"
+    ]
+  }
 }

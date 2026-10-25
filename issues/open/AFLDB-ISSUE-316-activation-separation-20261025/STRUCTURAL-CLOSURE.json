@@ -1,0 +1,19 @@
+{
+  "schema": "afldb.issue316.structural-closure/1",
+  "status": "CLOSED / ACCEPTED",
+  "closed_at": "2026-10-25T03:19:16.039Z",
+  "implementation_commit": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+  "evidence_tracking_commit": "def676517da3955aa18db3606785463aac464188",
+  "authority": "Existing owner authority: automatic closure after final focused PASS and evidence/admission/hash/link/diff checks",
+  "final_vitest": {
+    "passed": 1539,
+    "skipped": 5,
+    "failed": 0,
+    "exit_code": 0
+  },
+  "U3": "CONFIRMED",
+  "U4": "Route B",
+  "Brownlow": "untouched",
+  "production": "NO-GO",
+  "next": "Offline D/P proposal preparation only; return for owner adjudication before any freshness-sensitive production work"
+}

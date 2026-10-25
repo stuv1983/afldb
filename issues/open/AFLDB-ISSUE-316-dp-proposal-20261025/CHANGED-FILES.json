@@ -1,0 +1,1756 @@
+{
+  "classification": "Complete evidence commit membership plus post-commit authored/generated proposal and tracking files; no product checkout edits",
+  "implementation_candidate": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+  "evidence_tracking_commit": "def676517da3955aa18db3606785463aac464188",
+  "evidence_commit_files": [
+    "CHANGELOG.md",
+    "IssuesIndex.md",
+    "blockers.md",
+    "docs/v2/issue316-production-readiness-decision-2026-10-24.md",
+    "docs/v2/issue316-u3-player-row-evidence-2026-10-24.md",
+    "issues.md",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/.gitattributes",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/COMMITTED-EVIDENCE.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/CURRENT-VERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/EVIDENCE-COMMIT-FILES.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-REVERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-VITEST-PREFLIGHT.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-VITEST.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-VITEST.log",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/HISTORICAL-NARRATIVE-DRIFT.md",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/IGNORED-U3-ADMISSION.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/SESSION-CHANGES.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/SHA256SUMS",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/U3-ADMISSION-MANIFEST.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/U3-HASH-AUDIT.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/U3-MATERIALISATION-VERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/activation-separation.patch",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/blind-credential-scan.cjs",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/legacy-c438f844/README.md",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/legacy-c438f844/SHA256SUMS",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/legacy-c438f844/activation-separation.patch",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/reverify-local.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/.gitattributes",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/ADJUDICATION-ASSESSMENT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/ADJUDICATION-READONLY-REPORT.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/DECISION_NOTE.authorised-pending.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/EVIDENCE-NAVIGATION.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/FREEZE-V5.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-PROPOSAL.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-REVIEW-20261024.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V2-RECORD.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V3-RECORD.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V4-RECORD.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V5-RECORD.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/PATCH-V4.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/POSTCHECK-ASSESSMENT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/PREPARE-V4.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/PREPARE-V5.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/RECORD.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v2.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v3.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v4-validation.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v4.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-review.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/TRACK-V4.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V4-FINAL-FREEZE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V4-STATE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V5-FREEZE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V5-RULING-SECTION.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/audit-workflow-source-search.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/browser-availability.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/browser-inspection.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/browser-inspection.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/deployed-derived-read.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/deployed-derived-read.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/expected-row.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/ACTOR-EVIDENCE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/MANIFEST.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/OWNER-RULING.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/PRIOR-NO-GO.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/README.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/REVIEW.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/REVIEW.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/assert-post.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/audit-log-source.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/audit-schema-source.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/binding.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/canonical-gates.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/checks.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/identity.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/locks.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/note.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/postcheck.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/preflight.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/protected.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/repair-body.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/repair.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/run.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/runtime.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/schema-evidence.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/snapshot.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/validate.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/ACTOR-EVIDENCE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/OWNER-RULING.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PRIOR-NO-GO.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/README.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/REVIEW.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/REVIEW.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/SEMANTICS.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/V2-NO-GO.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/assert-post.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/audit-log-source.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/audit-schema-source.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/binding.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/canonical-gates.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/checks.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/identity.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/lock-assert.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/locks.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/note.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/postcheck.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/preflight.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/protected.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/repair-body.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/repair.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/run.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/runtime.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/schema-evidence.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/snapshot.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-order.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-pg.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-remote.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/DRIVER-STOP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EVIDENCE-HASHES.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EXECUTION-STATE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/HASH-VERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/MANIFEST.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/OWNER-EXECUTION-AUTHORITY.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REPORT.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REVIEW.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REVIEW.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/SESSION-FILES.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/execute-authorised-once.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/final-package-verify.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/observation-launch.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.transport.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/RECORD.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/observe-only.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/operational-observation-v2.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/EVIDENCE-HASHES.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/OBSERVATION-STOP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation-launch.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.transport.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-CLEANUP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-CLUSTER-COMMANDS.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-SERVER.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/TRANSFER-INVENTORY.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/CANDIDATE-BEFORE.manifest.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/CANDIDATE-FINAL.manifest.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/METADATA-REPAIR-V4-RECORD.before.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/PARENT-SHA256SUMS.before",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/TRANSFER-PLANNED.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/validate-pg.cjs.before",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/validate-remote.cjs.before",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/ACTOR-EVIDENCE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/DERIVATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/MANIFEST.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/OWNER-RULING.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/README.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/REVIEW.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/REVIEW.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/SEMANTICS.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/V3-NO-GO.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/WRAPPER-VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/assert-post.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/audit-log-source.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/audit-schema-source.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/binding.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/canonical-gates.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/checks.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/expected-migrations.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/identity.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/lock-assert.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/locks.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/migration-guard.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/note.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/operational-guard.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/operational-host.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/postcheck.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/preflight.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/protected.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/repair-body.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/repair.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/run.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/runtime.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/schema-evidence.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/snapshot.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-order.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-pg.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-remote.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-wrapper.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-2RK1Lx/PG-CLEANUP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-2RK1Lx/PG-CLUSTER-COMMANDS.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-2RK1Lx/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-2RK1Lx/TRANSFER-INVENTORY.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-CLEANUP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-CLUSTER-COMMANDS.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-SERVER.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/TRANSFER-INVENTORY.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-GFhNS5/PG-CLEANUP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-GFhNS5/PG-CLUSTER-COMMANDS.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-GFhNS5/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-GFhNS5/TRANSFER-INVENTORY.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-HgahMt/PG-CLEANUP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-HgahMt/PG-CLUSTER-COMMANDS.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-HgahMt/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-HgahMt/TRANSFER-INVENTORY.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-NABjAE/PG-CLEANUP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-NABjAE/PG-CLUSTER-COMMANDS.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-NABjAE/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-NABjAE/TRANSFER-INVENTORY.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/ACTOR-EVIDENCE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/ATTEMPT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/DERIVATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/MANIFEST.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/OWNER-RULING.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/README.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/REVIEW.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/REVIEW.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/SEMANTICS.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/V3-NO-GO.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/V4-REVIEW.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/V5-DELTA.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/V5-DELTA.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION-EVIDENCE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/WRAPPER-VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/assert-post.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/audit-log-source.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/audit-schema-source.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/binding.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/canonical-gates.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/checks.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/EVIDENCE-HASHES.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/result.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/submitted.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/expected-migrations.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/identity.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/lock-assert.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/locks.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/migration-guard.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/note.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/operational-guard.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/operational-host.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/operational-observation.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/postcheck.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/preflight.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/PREREQUISITE-RESULT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.transport.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.transport.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/submitted.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/principal.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/protected.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/repair-body.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/repair.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/run.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/runtime.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/schema-evidence.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/snapshot.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/transport.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-order.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-pg.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-remote.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-wrapper.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.exit.txt",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/run-readonly.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/sandbox-precheck.exit.txt",
+    "issues/open/AFLDB-ISSUE-316.md"
+  ],
+  "post_commit_changed_tracking_files": [
+    "CHANGELOG.md",
+    "IssuesIndex.md",
+    "blockers.md",
+    "docs/v2/issue316-production-readiness-decision-2026-10-24.md",
+    "issues.md",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/CURRENT-VERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-REVERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/SESSION-CHANGES.json",
+    "issues/open/AFLDB-ISSUE-316.md"
+  ],
+  "proposal_files": [
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/.gitattributes",
+      "sha256": "ce4740fbc62d70e8b53c2a5bd34f034d5d05cfae39185a07a4e30bfb59655590"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/.gitignore",
+      "sha256": "50fbb2f384b27f6c361eb459dcfe97e48570faa1f0a163970494b66ececc92f0"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/BUNDLES.json",
+      "sha256": "b8f67d4e63267f344ba097a850114c9f5f2779edc174b4a757f21e958ad69546"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/PIN-TABLE.json",
+      "sha256": "1ceafac36ea804b8634872ade7bc154f3865dbb6025c3902eb2c4d33130835e6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/PROPOSAL.md",
+      "sha256": "16779f2ce6a4bc15c4bc4d1b25bab0ef45d929faeda0a4c990d0cbe73b344706"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/RESTATEMENT-PLAN.json",
+      "sha256": "8f37e266a15f7710cdf7964fa9447f63da9d68d50d8375bdc23a6f06e568090f"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/SEMANTIC-DIFF.json",
+      "sha256": "74ae4219b29526798893e93fbda8e98f19edfaf2bb4397e5eea1246bfdd48871"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/SIMULATED-TREES-AND-AUTHORITIES.json",
+      "sha256": "970ef06e66beab1d8544d9063095fd35b329547981fe25084174ef18bd1080dd"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/SOURCE-P.json",
+      "sha256": "64a2ba23c966ce7a3e16cf5a7008ee2231dca827d342a994140ec46f1624c59d"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/STATIC-VALIDATION.json",
+      "sha256": "19038cbe95214b376fba52f507988e310d790da51c041ea430aee2b3d9003239"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/STOP-RECORD.md",
+      "sha256": "2fa475ff55457e00640dfa1bd7adacbb97d159621be4b870ead4f0bc36222312"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/accepted-J2-restatements.patch",
+      "sha256": "831a6b578b5d253e454ba4d713f60154e9aaae3a3e0f495cfd55ac60b8554c0f"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/activate-authority.PROPOSED.json",
+      "sha256": "1d133580f526131cf31136df042b372047b170e9925db525a21ef80c5658f65f"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/build-restatement-map.cjs",
+      "sha256": "883454d85e2e59fe6135a898753275b943e9211158c1bd6f996566b089ed7662"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/bundles/proposed-BC.bundle",
+      "sha256": "a4f633e946383a7ed40913cdfce7ee3a96fd204b5db1c3ffebf69e56b04b60ce"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/bundles/source-P.bundle",
+      "sha256": "246d49362e1ccec6b89791597caa9386421de101406f6c87470bc430643f064b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/deactivate-authority.PROPOSED.json",
+      "sha256": "fc45063484cfd6a07b0c716345898399298d2cc62d6b4c406846f554b96dee8c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finalize-restatement-package.cjs",
+      "sha256": "cd08cf294998d9c0ff9ea5d4c39121d43af9214e805ba2cabb16347e51fdd0a3"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finalize-stopped-validation.cjs",
+      "sha256": "7ea8d4184a4f3a0ad4d8eddd299bac1a5b085f069a70f74e4443bfc646a43514"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/data/reference/afltables-network.json",
+      "sha256": "04e2a269559cbc09a590e22e46207cd199d78eb60dbdc49c605bb2e724d3b897"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/data/reference/fitzroy-accepted-baselines.json",
+      "sha256": "0d4f7b3067112d8cf7fb3acc97b73ffb909b51cee09d8c4f59c326beb7e4f05f"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/data/reference/seasons.json",
+      "sha256": "1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/data/reference/stat-availability.json",
+      "sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/tools/rebuild/afl_api/afl-api-contract.json",
+      "sha256": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/tools/rebuild/afltables/afltables-contract.json",
+      "sha256": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/tools/rebuild/fitzroy/fitzroy-contract.json",
+      "sha256": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finish-audit.cjs",
+      "sha256": "e00da8e6f1bfeccbe554f5b559089d51374667b1706773f8158d1561c0f401f4"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/accepted-corrections.json",
+      "sha256": "3a938b52b8a26342d3455edd792b39cf23a21966a45d1e37c910ea23d025715f"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json",
+      "sha256": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-ladder-v1.json",
+      "sha256": "65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/fitzroy-contract-base.json",
+      "sha256": "f2e75cc0e6a64d6fbb9539bd99f60aacbf7b2bb7d5186a7672468d4735af4624"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/ladder-coverage.json",
+      "sha256": "00a4957e08da19b6aeb7c2b85e9682f6253552688b999cac9fb9f17c9ec86f30"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/stat-availability.json",
+      "sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inspect-restatement-map.cjs",
+      "sha256": "42e2224da9097152291eab539bf23c0ed840edf15ab4eb875e8fdf021f9d3832"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/load-retained-inputs.cjs",
+      "sha256": "a3707f75f75b54fe62dbc11418e90f96c85516ac1721d634c815f000a64754ad"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/migration-binding.json",
+      "sha256": "ab067616868d833b5e0d9c7464ce2a7716ff2ab04d7567d1f3e00844bffe09cd"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/offline-network-guard.cjs",
+      "sha256": "2c059884a16f49a2ea852b178512bcee08f7290b37cd2b7c4dc6763500f9b39a"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/pins/rebuild-test.inactive.ts.txt",
+      "sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/pins/rebuild-test.projected-active.ts.txt",
+      "sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-authorities.cjs",
+      "sha256": "d548da68db648f146abf8699104bd5bd923ce51210f78574c4b65288db99f986"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-proposal.cjs",
+      "sha256": "f3d4e0a7dcbfbf83a192d36014cf857767085a6bbd1db2302d9d135cbeda1e52"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-repaired-C.cjs",
+      "sha256": "2df65e70f99f0326803b14e7b9ab27b4ff055d663a5abdbd9dc9bbc615cbf07b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-restatement-previews.cjs",
+      "sha256": "7f7a543e82d6ae6d8505cbe8f9e9ee2b8aaee00b0f6569d17793386d4eb56dd1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/python-guard/sitecustomize.py",
+      "sha256": "716b4f9212e881b2f9d4063b904b5fc3c42aaf7d385fb090b860192b9f973c44"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/ACCEPTED-PRE-APPROVAL-FINAL.json",
+      "sha256": "650828042ae264bfad0ff87a04e0b0999fb43b236f066136406e2a1dc35f5171"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/APPROVAL.json",
+      "sha256": "f34817cd64d9a73a4ead2afc8d387037fa6ce4a6e2206830fae47a49c3209bea"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/APPROVED-PACKAGE.sha256",
+      "sha256": "b708d8eb0b1fe198a1fd7677e0ba5a3b739c93a48f6883d710217f77126fb8b6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/LOCAL-DOCUMENTATION-CHECK.json",
+      "sha256": "ac768d66cb9117e76c983044d83c2252043f08d3821fc965dafa148802684f4a"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/READINESS-RUNBOOK.md",
+      "sha256": "4df5bcb938cfdcbd93e3b8e0c643f7ff6b26c902abd7a0a77a8bfd62c3ee893c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/STATUS.json",
+      "sha256": "f764850648168b63e218d3094c49b5c45a50d31a659677c5adc9d4d9b77eb96c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/reconcile-offline-proof.cjs",
+      "sha256": "0a9488fbaf71c943469846207942fcf716bdb098d6c6405230f31061e7000602"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/record-readiness-approval.cjs",
+      "sha256": "b8585bd782bdb618bc8f2f1b903839b39a8b8a117edd6e6965db4e9e58d59de1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/refresh-readiness-evidence.cjs",
+      "sha256": "90dcbf28c558a69064105c2e3db40f3041732d3f8aac569daa2ccfe651bc4b24"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/relocate-validation.cjs",
+      "sha256": "1aa0e6d2ca36979243376973556d46c1e63bc840ca63bf79a75e361b88770e9a"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/repair-restatements.cjs",
+      "sha256": "9e89a8aec9fda7bebd4176afdd743c7c1bdb35d02e921bb5618d4270c03b4a93"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatement-network-guard.cjs",
+      "sha256": "6024ef6f7bd9eccdc8f58cbeff1e737dcc09f2739f775ec6a123d5e0a4015742"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/MERGE-STATUS.json",
+      "sha256": "701fb363475448832686f3bcb212968b5f556f414c1e33b9c6f80685d853eb05"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/README.md",
+      "sha256": "6e2505711951d25c8092899491a67a4e15ec694d0442176ee924914d96f72908"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/REPAIR-RECORD.md",
+      "sha256": "77fbeefa8ab3614fb4b7f7d70634ffd3aff0e1968eef700c979be3ff501b91d3"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/RESTATEMENT-MAP.json",
+      "sha256": "3b588edf735e23653b7db224ce664cdcc10c46217798046787d28cf9960fc486"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/docs/v2/coverage-matrix.md",
+      "sha256": "a005f89612e0ee3ce7538712d57a463848a9b8576f3a9852aacac63f8e28da70"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/packages/domain/src/coverage-registry.ts.txt",
+      "sha256": "010793ca5d3ca4f9dee4a420d4a5bab135a9e17c81255bcf4279e3d568ddc715"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/afl-api-cutover.test.ts.txt",
+      "sha256": "0c9379fcfd07b4c398a205a7088bed03b989ce28c50ac57363ecfeaecc978459"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/afl-api-settle-cli-gate.test.ts.txt",
+      "sha256": "225defd940f6d602b571cbd3eca150c3b66d911476cabefd6927cd856d0c6971"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/db-promotion-check.test.ts.txt",
+      "sha256": "efd9ed907f1cb3345fe10c62e17252d7f625df3e381d312a802eb67626ceb290"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/db-test-rebuild.test.ts.txt",
+      "sha256": "c9484c0a93adf78c7960991f4bc290851066201b706427f3782dc0a90b74ead6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/first-kick-goal-source.test.ts.txt",
+      "sha256": "e0d379cc5678b1235bec807bc5de89135c8e380096c9d7127012aebab4fa4dc6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/fitzroy-acquisition.test.ts.txt",
+      "sha256": "97212adb0ab041198e9cb961f175b05290cbbbf2689eb0f678e899470b9a7311"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/fitzroy-core-import.test.ts.txt",
+      "sha256": "9d5c2e527c8c4020a33f0d2b4b6da0cd15b73c54a8005071d58a4dec982511f4"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/reference-data.test.ts.txt",
+      "sha256": "850abdd6c57c70249679adef244a4ba42bac55536b1f82a0c1862cdb110667a1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/season-rollover.test.ts.txt",
+      "sha256": "7fdd303e2575f7fc9273f3e26d5f8c04e1e79827fe908c7afed08368f47f9318"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-admin-operations-ui.test.ts.txt",
+      "sha256": "b11ac0fadf823f18ccc10b8f001a97fa78e460b28cc19b5dadf0a616bbc4905b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-admin-operations.test.ts.txt",
+      "sha256": "3825376535bfee8db2a6c9819a6ec5e63e57fe49a03c208aaf3fcc0e80c9e87c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-coverage-registry.test.ts.txt",
+      "sha256": "f25d7b28f053dcfcedcbc0f16a028fdd5cfe6531d40d8a3c2d0999d68cada073"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-historical-manifest.test.ts.txt",
+      "sha256": "8080622b575b7f88bb4853d19217a974ced416ff4b5312b1bbb31d19a0d9a9d6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-season-seal.test.ts.txt",
+      "sha256": "3898ed9086811818ea18f04e17d630c073a0aa40e56a1aad204162f6650ae843"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/docs/v2/coverage-matrix.md",
+      "sha256": "a005f89612e0ee3ce7538712d57a463848a9b8576f3a9852aacac63f8e28da70"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/packages/domain/src/coverage-registry.ts.txt",
+      "sha256": "010793ca5d3ca4f9dee4a420d4a5bab135a9e17c81255bcf4279e3d568ddc715"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/afl-api-cutover.test.ts.txt",
+      "sha256": "0c9379fcfd07b4c398a205a7088bed03b989ce28c50ac57363ecfeaecc978459"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/afl-api-settle-cli-gate.test.ts.txt",
+      "sha256": "225defd940f6d602b571cbd3eca150c3b66d911476cabefd6927cd856d0c6971"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/db-promotion-check.test.ts.txt",
+      "sha256": "efd9ed907f1cb3345fe10c62e17252d7f625df3e381d312a802eb67626ceb290"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/db-test-rebuild.test.ts.txt",
+      "sha256": "3a0f1e15521b82da86af9c049245dd63f831f2c10ad8774ddf626849236124be"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/first-kick-goal-source.test.ts.txt",
+      "sha256": "e0d379cc5678b1235bec807bc5de89135c8e380096c9d7127012aebab4fa4dc6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/fitzroy-acquisition.test.ts.txt",
+      "sha256": "97212adb0ab041198e9cb961f175b05290cbbbf2689eb0f678e899470b9a7311"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/fitzroy-core-import.test.ts.txt",
+      "sha256": "9d5c2e527c8c4020a33f0d2b4b6da0cd15b73c54a8005071d58a4dec982511f4"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/reference-data.test.ts.txt",
+      "sha256": "850abdd6c57c70249679adef244a4ba42bac55536b1f82a0c1862cdb110667a1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/season-rollover.test.ts.txt",
+      "sha256": "b62197070847b7ea4eda2e3cfcc01395eb2efb50e1d6dad6ddbdb1b09cf19ff4"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-admin-operations-ui.test.ts.txt",
+      "sha256": "b11ac0fadf823f18ccc10b8f001a97fa78e460b28cc19b5dadf0a616bbc4905b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-admin-operations.test.ts.txt",
+      "sha256": "3825376535bfee8db2a6c9819a6ec5e63e57fe49a03c208aaf3fcc0e80c9e87c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-coverage-registry.test.ts.txt",
+      "sha256": "f25d7b28f053dcfcedcbc0f16a028fdd5cfe6531d40d8a3c2d0999d68cada073"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-historical-manifest.test.ts.txt",
+      "sha256": "8080622b575b7f88bb4853d19217a974ced416ff4b5312b1bbb31d19a0d9a9d6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-season-seal.test.ts.txt",
+      "sha256": "3898ed9086811818ea18f04e17d630c073a0aa40e56a1aad204162f6650ae843"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/run-repaired-restatements.cjs",
+      "sha256": "8e7afb927a09106a046683e87e1ab035285332cc7e6f1e5c9312655ccebce818"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/run-retained-validator.cjs",
+      "sha256": "0e79cac7e3cedccf352cc944a02574838dd728ccff018b0cdce761cc3eba747c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/successor-tuple.json",
+      "sha256": "b95d07e1ac0bc6163f83e23678eb0e5ade11e4c03dd4ce53d81db27dcdb5525e"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/transition-change-set.json",
+      "sha256": "d55875cbfa686ac47511eca2e2ac7026cfadefd1fd4e7ab1b31c322f7359644b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validate-broader-restatements.cjs",
+      "sha256": "14e22b248df70bf8fdf2156cd6c65f0494502575ad8bb06678f4bd0c52d323e0"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validate-state-previews.cjs",
+      "sha256": "783f1d62a901308d17bd63435751e503d10eccf5875ff83ec3b0fcf0e42da9bc"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/DB-FREE-MATRIX.json",
+      "sha256": "e4d532d8f319fbf565ab8f1f9b7c12dff7571913afd02be616021086517d8dc9"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/EXTERNAL-IMMUTABILITY.json",
+      "sha256": "fb31768ebc3ae2c211d266f6b9fc4fa9691c88c1332e3cb0df5ba02a4e105161"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/FINAL-PACKAGE-CHECKS.json",
+      "sha256": "2bd8cd43f17701b0a95ab717e73b95fddc7a93f1591d957bb275c4a991bba3ac"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/FINAL-PACKAGE-CHECKS.pre-restatement-repair.json",
+      "sha256": "1bfd64361a766273bad89586a8c971e521b1f09df0079223f80f2a8aa338ddbd"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/FINAL-PACKAGE-CHECKS.pre-retained-inputs.json",
+      "sha256": "569b6343157fdc0c3ebf2c55a84cdca598d454c454f57496836515ed315961ac"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/OFFLINE-RECONCILIATION.json",
+      "sha256": "26b5a5fbd4c7631e904f5f8e4f89873b4d254a11bf420209b988571fd5dd0920"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/STOPPING-FINDINGS.json",
+      "sha256": "c1ae3065f500924a849fffb0c4da4c124260a6554af72ad44725832ac68ce297"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/coach-raw-input.json",
+      "sha256": "30aefbe988eec87eeffbeaa2188765bfe3a1be17c5199ec3a2c31345f3b3c9c1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/coach-replay.exit.json",
+      "sha256": "708592c15e2ff3532d0a880cacf516bd29f3252aa6b3937f934d4f31af04f73d"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/coach-replay.log",
+      "sha256": "ccd5753033d9dec712a03e81e6093dc385326a3113151851182c56cdae76b829"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/coach-replay.results.json",
+      "sha256": "74a2822b165f15db5956e100106c2ae2817fd4cbd880e6a288c44ad090767419"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/external-inputs.json",
+      "sha256": "01bfe0612cc98366034beb4308911a9ce0822d56afbfb45684026e0d841c24f6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/fixture-inputs.json",
+      "sha256": "937b6d2ef1be9e19ebe4e20c5b76a044e0a8caa8f6d0f655a561dff851f4df13"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/full-db-free.exit.json",
+      "sha256": "bcfa4146740abab712fbd1e1f0b6f8b954fb04f37b2fbca37c65b37401ae6d4d"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/full-db-free.log",
+      "sha256": "8b55929ef367be0d2319aba3162a88c1cf96f4795b7d67c7cb7e5311841f0b6e"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/full-db-free.results.json",
+      "sha256": "d6e21ed880adca770a5386b163ddae82be078ebae9c7a96ec44eafa3699ea00f"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/offline-network-audit.attempt-2.jsonl",
+      "sha256": "005f114f24d92ea643df5509ec8ba66681e50b7fd0c4dcfb571dcf42b1119169"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/offline-network-audit.attempt-3.jsonl",
+      "sha256": "d7819c95a02c612e6692a87211ea19ef17ef4f3bd4a86aaab354d90870b3fec4"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/offline-network-audit.jsonl",
+      "sha256": "36e046d052d196945a3b1b7f7d30f63e189d7844947698704d0d7a5e0300125a"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/REVIEW.json",
+      "sha256": "ef3d46bb9ea7e168f125fe3a0cd329608dd796d6469d21b5cf148881c7b00aa7"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/REVIEW.md",
+      "sha256": "2bcc403560cd8388ed55a39f40c486ba1bfdc77f7edec34b9b9f1295b22c44c5"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/invariant-fragments.json",
+      "sha256": "cd6586a4ab9bd26c271706d4347713791c42f6fa889e1f2a96b2da153ff0be25"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/docs/v2/coverage-matrix.md",
+      "sha256": "a005f89612e0ee3ce7538712d57a463848a9b8576f3a9852aacac63f8e28da70"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/packages/domain/src/coverage-registry.ts.txt",
+      "sha256": "010793ca5d3ca4f9dee4a420d4a5bab135a9e17c81255bcf4279e3d568ddc715"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/afl-api-cutover.test.ts.txt",
+      "sha256": "0c9379fcfd07b4c398a205a7088bed03b989ce28c50ac57363ecfeaecc978459"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/afl-api-settle-cli-gate.test.ts.txt",
+      "sha256": "225defd940f6d602b571cbd3eca150c3b66d911476cabefd6927cd856d0c6971"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/db-promotion-check.test.ts.txt",
+      "sha256": "efd9ed907f1cb3345fe10c62e17252d7f625df3e381d312a802eb67626ceb290"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/db-test-rebuild.test.ts.txt",
+      "sha256": "1eb642b2821d3371f9ec554e294d1da020322b3af55d9e60050a7ed6f3bdf576"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/first-kick-goal-source.test.ts.txt",
+      "sha256": "e0d379cc5678b1235bec807bc5de89135c8e380096c9d7127012aebab4fa4dc6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/fitzroy-acquisition.test.ts.txt",
+      "sha256": "97212adb0ab041198e9cb961f175b05290cbbbf2689eb0f678e899470b9a7311"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/fitzroy-core-import.test.ts.txt",
+      "sha256": "9d5c2e527c8c4020a33f0d2b4b6da0cd15b73c54a8005071d58a4dec982511f4"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/reference-data.test.ts.txt",
+      "sha256": "850abdd6c57c70249679adef244a4ba42bac55536b1f82a0c1862cdb110667a1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/season-rollover.test.ts.txt",
+      "sha256": "7fdd303e2575f7fc9273f3e26d5f8c04e1e79827fe908c7afed08368f47f9318"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-admin-operations-ui.test.ts.txt",
+      "sha256": "b11ac0fadf823f18ccc10b8f001a97fa78e460b28cc19b5dadf0a616bbc4905b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-admin-operations.test.ts.txt",
+      "sha256": "3825376535bfee8db2a6c9819a6ec5e63e57fe49a03c208aaf3fcc0e80c9e87c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-coverage-registry.test.ts.txt",
+      "sha256": "f25d7b28f053dcfcedcbc0f16a028fdd5cfe6531d40d8a3c2d0999d68cada073"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-historical-manifest.test.ts.txt",
+      "sha256": "8080622b575b7f88bb4853d19217a974ced416ff4b5312b1bbb31d19a0d9a9d6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-season-seal.test.ts.txt",
+      "sha256": "3898ed9086811818ea18f04e17d630c073a0aa40e56a1aad204162f6650ae843"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/docs/v2/coverage-matrix.md",
+      "sha256": "a005f89612e0ee3ce7538712d57a463848a9b8576f3a9852aacac63f8e28da70"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/packages/domain/src/coverage-registry.ts.txt",
+      "sha256": "010793ca5d3ca4f9dee4a420d4a5bab135a9e17c81255bcf4279e3d568ddc715"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/afl-api-cutover.test.ts.txt",
+      "sha256": "0c9379fcfd07b4c398a205a7088bed03b989ce28c50ac57363ecfeaecc978459"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/afl-api-settle-cli-gate.test.ts.txt",
+      "sha256": "225defd940f6d602b571cbd3eca150c3b66d911476cabefd6927cd856d0c6971"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/db-promotion-check.test.ts.txt",
+      "sha256": "efd9ed907f1cb3345fe10c62e17252d7f625df3e381d312a802eb67626ceb290"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/db-test-rebuild.test.ts.txt",
+      "sha256": "0497b23072360a60ec0ce13f1cbd0479f2262da828cdb6a9abf9b9f7b61fdfb7"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/first-kick-goal-source.test.ts.txt",
+      "sha256": "e0d379cc5678b1235bec807bc5de89135c8e380096c9d7127012aebab4fa4dc6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/fitzroy-acquisition.test.ts.txt",
+      "sha256": "97212adb0ab041198e9cb961f175b05290cbbbf2689eb0f678e899470b9a7311"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/fitzroy-core-import.test.ts.txt",
+      "sha256": "9d5c2e527c8c4020a33f0d2b4b6da0cd15b73c54a8005071d58a4dec982511f4"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/reference-data.test.ts.txt",
+      "sha256": "850abdd6c57c70249679adef244a4ba42bac55536b1f82a0c1862cdb110667a1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/season-rollover.test.ts.txt",
+      "sha256": "5030f004dfd4b5deeba798264f36e800ee6433c3e4a4e40dd605216e161559dd"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-admin-operations-ui.test.ts.txt",
+      "sha256": "b11ac0fadf823f18ccc10b8f001a97fa78e460b28cc19b5dadf0a616bbc4905b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-admin-operations.test.ts.txt",
+      "sha256": "3825376535bfee8db2a6c9819a6ec5e63e57fe49a03c208aaf3fcc0e80c9e87c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-coverage-registry.test.ts.txt",
+      "sha256": "f25d7b28f053dcfcedcbc0f16a028fdd5cfe6531d40d8a3c2d0999d68cada073"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-historical-manifest.test.ts.txt",
+      "sha256": "8080622b575b7f88bb4853d19217a974ced416ff4b5312b1bbb31d19a0d9a9d6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-season-seal.test.ts.txt",
+      "sha256": "3898ed9086811818ea18f04e17d630c073a0aa40e56a1aad204162f6650ae843"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/protected-before.json",
+      "sha256": "2a30742993231292e0830f51895b4eb1129ed6a8207b8e88ee040785f0a06ee1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-1.exit.json",
+      "sha256": "7b3b39fec242613354a7c5dd978d141992cf68280bd449d0f382a905cdb7ad10"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-1.log",
+      "sha256": "9820ca87d23efc8026620acc1ab65fd1c548346947ff22981f533ae652ea6dcb"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-1.network.jsonl",
+      "sha256": "6fdd2a6b6f4389bdda925bf9974f6f53297bb7d742678c3fd92e4ed886eb16ba"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-1.results.json",
+      "sha256": "97c9e21638792449bc67f1ad1cda320c51d2131eb1b8d550ee505e942ee7f3cc"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-2.exit.json",
+      "sha256": "c3c9d0fa94a575ba6a52cc0b0a89deb4db8beb2dc4992af568bbf1d5c9287665"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-2.log",
+      "sha256": "abce575f5eb58a41e37a888f28b3b9e64c205cc9a6d63aa00d3a9c582fea854a"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-2.network.jsonl",
+      "sha256": "35a6ef42cb322563a4ad5f7da925bf1318fe22aa3936b933f53684a6de0ccd2b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-2.results.json",
+      "sha256": "7bd7159ed029d4392af2043323d33b4b7201fef7f70ba3d0846e2f2bc435d35e"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-final.exit.json",
+      "sha256": "c3c9d0fa94a575ba6a52cc0b0a89deb4db8beb2dc4992af568bbf1d5c9287665"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-1.exit.json",
+      "sha256": "5c427723ce8bc9db5a833234cfcd1f45e4f02f99af911f7b591041b3df3e20d2"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-1.log",
+      "sha256": "0e9f758f6692aad5103dfbf26e60ae73c1f55b4293ca6264f48dab13f168bfe5"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-1.network.jsonl",
+      "sha256": "ae6eb417a2855c7951a4ff24b5b7479fdda4314b15fe2a065032898cd822c74b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-1.results.json",
+      "sha256": "24aea459c9c7484dedb18e956c8f35f39825c9fa165697d22eacc3ed5391e7df"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-final.exit.json",
+      "sha256": "5c427723ce8bc9db5a833234cfcd1f45e4f02f99af911f7b591041b3df3e20d2"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-1.exit.json",
+      "sha256": "a307f2f0885d5a64d14cc83179555a596a4105e36e962f18f8a1f327c03fb3e7"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-1.log",
+      "sha256": "37503214ccbade28e9ce69b399bc8cb34c4783c93e1dc745fc4cb2d068809bc4"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-1.network.jsonl",
+      "sha256": "6b7dca8572ab80c9015b873d22e908fa8c281817d6cf3311ca83932d2d9f81b7"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-1.results.json",
+      "sha256": "b073bc9762e39d0f57c6e84b4d9ad715f97319662efd1a3d42d1ade33b9c1c4f"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-2.exit.json",
+      "sha256": "097f4328a1628e207ca709986767e982b64b6d8bd192f9e3cd7d97a4ee0f66ca"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-2.log",
+      "sha256": "1f7442910fcffe699a630f855d3a3812783da25b61ab419b86a7d164dfbc814e"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-2.network.jsonl",
+      "sha256": "7f4f4ad10f9090e781fe83d9795eb2b4ba5211a53fb8d74bc34a3abe4d5a10f5"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-2.results.json",
+      "sha256": "61a524c79388ebc75a6df4175131d34ccc389c64e3b1cea35a27cfc79de480bf"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-final.exit.json",
+      "sha256": "097f4328a1628e207ca709986767e982b64b6d8bd192f9e3cd7d97a4ee0f66ca"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-1.exit.json",
+      "sha256": "abf2ad645d085335143df755a3734ffb7d1f345efbf06382abfe36482d307399"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-1.log",
+      "sha256": "19ad9abc43f9e491926addbc12b94745bffa00b7c006c56dff5a75599274d001"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-1.network.jsonl",
+      "sha256": "adca27056ebdd82510f60c7af2c0586a6be4b9e3bd28a19096ae9f071928cd94"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-1.results.json",
+      "sha256": "52990b1ce7d041bc93e279627dcf11e58f260fab14c7dbd4718c8242c4ff8271"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-final.exit.json",
+      "sha256": "abf2ad645d085335143df755a3734ffb7d1f345efbf06382abfe36482d307399"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-J2-integrity.json",
+      "sha256": "b8cc2fad955d9dfbd8db4e39d7a8b9d7c3053e7beb7b73a9e236480138e940d7"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-suites.exit.json",
+      "sha256": "f17a21a7922900293ddf7f731400446e537cac69ccbd850917ba1af03e197759"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-suites.log",
+      "sha256": "ef0705080c81d127eaf47e2a658ec98d7cadcba2ec18fa2432e56861cb270410"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-suites.results.json",
+      "sha256": "e6be6f6c956b4fb12d0a29ee2125f854d252005584407280d2afc993ec0d8926"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.attempt-2.json",
+      "sha256": "906aed1d40ad65010f871ec2349bdf369212a7d4100c7099c180b88795a712d6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.attempt-2.log",
+      "sha256": "10f5001fe8f94d6db52a5a5ba87bb90b2bec20fc98ded9377c391765f1afcdbf"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.attempt-3.json",
+      "sha256": "1825bc88db80daf5fdf154dc2b92de33521272de72c2b52d4c3b4852db864181"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.attempt-3.log",
+      "sha256": "9aa0c4351578a0082d142ba737b87641d61b0e1c52cf8fca9162f9868b8080eb"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.json",
+      "sha256": "c018f6fc13590867ac8c928aa7409725adb5878ac32a13bcb56d4feb1318bbe5"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.log",
+      "sha256": "f6b3bba444f2c0b0922f4d6f3ae3b60cf9aa025f7476ad11dae3310dff0abe85"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/source-P-integrity.json",
+      "sha256": "0dc53c9f82124c77758af4fb60a1f8281ed448005e8f815df15fd84c92191ec1"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-broader.exit.json",
+      "sha256": "428a6ee4348829bf726b7c641edbd740274a5b3553e8038a788258e44992f45c"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-broader.log",
+      "sha256": "3d2b905487df86228e2775a00476038662d17e398a1f6c7653aaddd694c2ec45"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-broader.network.jsonl",
+      "sha256": "5f25b220cc33eb39950e25c960d58608efc322e46213235c5b2cc458ec797bad"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-broader.results.json",
+      "sha256": "235eadf09d9f77b569c0c75d98ad8f6004e5d641666a9a21c82fb478f8083c20"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-rollover-final.exit.json",
+      "sha256": "48298cdaf4685f9bbd930fc2e3b215453566a2d84c73be826b21bae24e605ef3"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-rollover-final.log",
+      "sha256": "0a6b4a73162ad56ffcd6ac1ee82908bb09b985a32a137d80183f6d9a6b985f95"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-rollover-final.results.json",
+      "sha256": "c47a3da9c4cc832fd69a80c7f9aa1f38ca7f6a9ad6d610f8406b35764f500782"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B.exit.json",
+      "sha256": "15708cd22f89b410caf9051abd34fbc3bcfa053e1dde7631603deeec33de79ac"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B.log",
+      "sha256": "91648fa931c18c9c9c50200b67706f2e5cc60730d005e265cf72f2f9d323d737"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B.results.json",
+      "sha256": "5c4c3cc1d00f419e8e3564fef366ffcedd932d081d7260f9f00decb2c7350174"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-C.exit.json",
+      "sha256": "57317f79514ec82ee5febc52cf45438a7c13958762766e10f7e29293ffb65e0d"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-C.log",
+      "sha256": "537141b669d9bd90c9dfd7cc33d1fbe6b2bd3daf167291f6af5297a5fd49f5d5"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-C.results.json",
+      "sha256": "a0b9e92aec48bb4c1ecc79e15db7af027531c2bee8a690070ea3b9c04beab8d5"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/typecheck.exit.json",
+      "sha256": "34cafc88c7a1dcd09b3a48bddab457e641785fce5c2a2043dfa572e84684a9e2"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/typecheck.log",
+      "sha256": "e87e08601e6e4c7012187750b5dea8bf304aabf5b4fd71be33cd6bb81ea8bd13"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/verify-retained-j2.cjs",
+      "sha256": "40d89330aa6c8371cdb10dd00f340ec328d40ba931e4f01742400000bb1cd50b"
+    }
+  ],
+  "separate_closure_receipt": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/STRUCTURAL-CLOSURE.json",
+  "generated_validation_copies": {
+    "root": ".local-release/issue316-dp-20261025",
+    "source_commit": "def676517da3955aa18db3606785463aac464188",
+    "source_P_files": 2687,
+    "fixture_inventory": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/fixture-inputs.json",
+    "state_B_C": "Excluded generated copies with proposed restatement overlays; no real branch/index/checkout changes"
+  },
+  "self": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/CHANGED-FILES.json",
+  "self_hash_omitted": true,
+  "retained_input_validation_session": {
+    "date": "2026-10-25",
+    "status": "STOP — owner adjudication required",
+    "changed_or_added_proposal_files": [
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/PROPOSAL.md",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/RESTATEMENT-PLAN.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/STOP-RECORD.md",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finalize-stopped-validation.cjs",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/load-retained-inputs.cjs",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/offline-network-guard.cjs",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/python-guard/sitecustomize.py",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/reconcile-offline-proof.cjs",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/README.md",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/run-retained-validator.cjs",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validate-broader-restatements.cjs",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/EXTERNAL-IMMUTABILITY.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/FINAL-PACKAGE-CHECKS.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/FINAL-PACKAGE-CHECKS.pre-retained-inputs.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/OFFLINE-RECONCILIATION.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/STOPPING-FINDINGS.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/external-inputs.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/offline-network-audit.attempt-2.jsonl",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/offline-network-audit.attempt-3.jsonl",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/offline-network-audit.jsonl",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-J2-integrity.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.attempt-2.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.attempt-2.log",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.attempt-3.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.attempt-3.log",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/retained-input-validator.log",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-broader.exit.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-broader.log",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-broader.network.jsonl",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/state-B-broader.results.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/verify-retained-j2.cjs"
+    ],
+    "tracking_files": [
+      {
+        "path": "IssuesIndex.md",
+        "sha256": "f14a0060077e5310397df7152b11cacbefbcadbe976890a947b91c790630c82c"
+      },
+      {
+        "path": "issues.md",
+        "sha256": "57dfca1edde46135bb31a00cedd8663a18d478ea8b7cfc0ab6ecc7da0bc3fefd"
+      },
+      {
+        "path": "blockers.md",
+        "sha256": "3020d066774f427bec1f32a6f11c01f285d3962c93a26bf9621751367558abb8"
+      },
+      {
+        "path": "CHANGELOG.md",
+        "sha256": "c3346a310b0546c8307d49db6a05fa8498a80443f39ed9c5dee4992e2921f93f"
+      }
+    ],
+    "also_updated": [
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/CHANGED-FILES.json",
+      "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/SHA256SUMS"
+    ],
+    "generated_validation_copies": ".local-release/issue316-dp-20261025/{source-P,state-B,state-C}: retained successor inputs copied; product checkout and restatement previews unchanged",
+    "no_git_commands_executed": true,
+    "no_product_or_accepted_assertion_edits": true
+  },
+  "restatement_repair_session": {
+    "verified_at": "2026-10-25T07:06:56.724Z",
+    "status": "COMPLETE FOR OWNER D/P ADJUDICATION",
+    "proposal_owner_approved": false,
+    "source_P": "def676517da3955aa18db3606785463aac464188",
+    "proposed_D": "2026-10-27",
+    "proposed_window_UTC": "02:00–04:00",
+    "structural_gate": "CLOSED / ACCEPTED",
+    "retained_proof": {
+      "accepted_reused_not_rerun": true,
+      "package": "167/167 PASS",
+      "inputs": "264/264 PASS",
+      "real_offline_validator": "exit 0 / 3-of-3 / pins match",
+      "state_C_projection": "1640 rows / 91 definitions"
+    },
+    "checks": {
+      "B_broader": {
+        "passed": 2966,
+        "skipped": 7,
+        "failed": 0,
+        "exit_code": 0,
+        "result": "validation/restatement-repair/state-B-broader-final.exit.json",
+        "full_results": "validation/restatement-repair/state-B-broader-2.results.json"
+      },
+      "B_focused": {
+        "passed": 395,
+        "skipped": 0,
+        "failed": 0,
+        "exit_code": 0,
+        "result": "validation/restatement-repair/state-B-focused-final.exit.json",
+        "full_results": "validation/restatement-repair/state-B-focused-1.results.json"
+      },
+      "C_broader": {
+        "passed": 2992,
+        "skipped": 7,
+        "failed": 0,
+        "exit_code": 0,
+        "result": "validation/restatement-repair/state-C-broader-final.exit.json",
+        "full_results": "validation/restatement-repair/state-C-broader-2.results.json"
+      },
+      "C_focused": {
+        "passed": 396,
+        "skipped": 0,
+        "failed": 0,
+        "exit_code": 0,
+        "result": "validation/restatement-repair/state-C-focused-final.exit.json",
+        "full_results": "validation/restatement-repair/state-C-focused-1.results.json"
+      }
+    },
+    "fresh_read_only_review": "validation/restatement-repair/REVIEW.json",
+    "restatement_map": "restatements/RESTATEMENT-MAP.json",
+    "map_summary": {
+      "declarations": 4364,
+      "changed_from_P": 155,
+      "B": 6,
+      "C": 14,
+      "invariant": 4344,
+      "unmatched_P": 0,
+      "runtime_title_unmatched": 0
+    },
+    "protected_files": {
+      "count": 1574,
+      "mismatches": []
+    },
+    "product_or_accepted_assertion_edits": false,
+    "structural_artifact_edits": false,
+    "production_contact": false,
+    "database_connection": false,
+    "disposable_rebuild": false,
+    "Git_commands": false,
+    "root_tracking_this_session": "Unchanged under proposal-only authority; current ruling/result tracked in this package; ISSUE-316 OPEN",
+    "U3": "CONFIRMED",
+    "U4": "Route B",
+    "Brownlow": "untouched",
+    "production": "NO-GO",
+    "next_action": "Owner adjudicates D/P; no production execution authorised",
+    "changed_or_added_proposal_files": [
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/PROPOSAL.md",
+        "sha256": "0c422cc78e64168a05e7885e3d0448474700955c33fd28a44a9e8ecd24d3b95a"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/RESTATEMENT-PLAN.json",
+        "sha256": "e3eac8b5e227390b72ae9aa4c87ae2ac56e61f27088af32438800779e46248b3"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/STOP-RECORD.md",
+        "sha256": "2fa475ff55457e00640dfa1bd7adacbb97d159621be4b870ead4f0bc36222312"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/build-restatement-map.cjs",
+        "sha256": "883454d85e2e59fe6135a898753275b943e9211158c1bd6f996566b089ed7662"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finalize-restatement-package.cjs",
+        "sha256": "cd08cf294998d9c0ff9ea5d4c39121d43af9214e805ba2cabb16347e51fdd0a3"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inspect-restatement-map.cjs",
+        "sha256": "42e2224da9097152291eab539bf23c0ed840edf15ab4eb875e8fdf021f9d3832"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-repaired-C.cjs",
+        "sha256": "2df65e70f99f0326803b14e7b9ab27b4ff055d663a5abdbd9dc9bbc615cbf07b"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/repair-restatements.cjs",
+        "sha256": "9e89a8aec9fda7bebd4176afdd743c7c1bdb35d02e921bb5618d4270c03b4a93"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatement-network-guard.cjs",
+        "sha256": "6024ef6f7bd9eccdc8f58cbeff1e737dcc09f2739f775ec6a123d5e0a4015742"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/README.md",
+        "sha256": "6e2505711951d25c8092899491a67a4e15ec694d0442176ee924914d96f72908"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/REPAIR-RECORD.md",
+        "sha256": "77fbeefa8ab3614fb4b7f7d70634ffd3aff0e1968eef700c979be3ff501b91d3"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/RESTATEMENT-MAP.json",
+        "sha256": "3b588edf735e23653b7db224ce664cdcc10c46217798046787d28cf9960fc486"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/db-test-rebuild.test.ts.txt",
+        "sha256": "c9484c0a93adf78c7960991f4bc290851066201b706427f3782dc0a90b74ead6"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/db-test-rebuild.test.ts.txt",
+        "sha256": "3a0f1e15521b82da86af9c049245dd63f831f2c10ad8774ddf626849236124be"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/season-rollover.test.ts.txt",
+        "sha256": "b62197070847b7ea4eda2e3cfcc01395eb2efb50e1d6dad6ddbdb1b09cf19ff4"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/run-repaired-restatements.cjs",
+        "sha256": "8e7afb927a09106a046683e87e1ab035285332cc7e6f1e5c9312655ccebce818"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/FINAL-PACKAGE-CHECKS.json",
+        "sha256": "650828042ae264bfad0ff87a04e0b0999fb43b236f066136406e2a1dc35f5171"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/FINAL-PACKAGE-CHECKS.pre-restatement-repair.json",
+        "sha256": "1bfd64361a766273bad89586a8c971e521b1f09df0079223f80f2a8aa338ddbd"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/REVIEW.json",
+        "sha256": "ef3d46bb9ea7e168f125fe3a0cd329608dd796d6469d21b5cf148881c7b00aa7"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/REVIEW.md",
+        "sha256": "2bcc403560cd8388ed55a39f40c486ba1bfdc77f7edec34b9b9f1295b22c44c5"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/invariant-fragments.json",
+        "sha256": "cd6586a4ab9bd26c271706d4347713791c42f6fa889e1f2a96b2da153ff0be25"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/docs/v2/coverage-matrix.md",
+        "sha256": "a005f89612e0ee3ce7538712d57a463848a9b8576f3a9852aacac63f8e28da70"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/packages/domain/src/coverage-registry.ts.txt",
+        "sha256": "010793ca5d3ca4f9dee4a420d4a5bab135a9e17c81255bcf4279e3d568ddc715"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/afl-api-cutover.test.ts.txt",
+        "sha256": "0c9379fcfd07b4c398a205a7088bed03b989ce28c50ac57363ecfeaecc978459"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/afl-api-settle-cli-gate.test.ts.txt",
+        "sha256": "225defd940f6d602b571cbd3eca150c3b66d911476cabefd6927cd856d0c6971"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/db-promotion-check.test.ts.txt",
+        "sha256": "efd9ed907f1cb3345fe10c62e17252d7f625df3e381d312a802eb67626ceb290"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/db-test-rebuild.test.ts.txt",
+        "sha256": "1eb642b2821d3371f9ec554e294d1da020322b3af55d9e60050a7ed6f3bdf576"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/first-kick-goal-source.test.ts.txt",
+        "sha256": "e0d379cc5678b1235bec807bc5de89135c8e380096c9d7127012aebab4fa4dc6"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/fitzroy-acquisition.test.ts.txt",
+        "sha256": "97212adb0ab041198e9cb961f175b05290cbbbf2689eb0f678e899470b9a7311"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/fitzroy-core-import.test.ts.txt",
+        "sha256": "9d5c2e527c8c4020a33f0d2b4b6da0cd15b73c54a8005071d58a4dec982511f4"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/reference-data.test.ts.txt",
+        "sha256": "850abdd6c57c70249679adef244a4ba42bac55536b1f82a0c1862cdb110667a1"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/season-rollover.test.ts.txt",
+        "sha256": "7fdd303e2575f7fc9273f3e26d5f8c04e1e79827fe908c7afed08368f47f9318"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-admin-operations-ui.test.ts.txt",
+        "sha256": "b11ac0fadf823f18ccc10b8f001a97fa78e460b28cc19b5dadf0a616bbc4905b"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-admin-operations.test.ts.txt",
+        "sha256": "3825376535bfee8db2a6c9819a6ec5e63e57fe49a03c208aaf3fcc0e80c9e87c"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-coverage-registry.test.ts.txt",
+        "sha256": "f25d7b28f053dcfcedcbc0f16a028fdd5cfe6531d40d8a3c2d0999d68cada073"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-historical-manifest.test.ts.txt",
+        "sha256": "8080622b575b7f88bb4853d19217a974ced416ff4b5312b1bbb31d19a0d9a9d6"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-B/tests/v2-season-seal.test.ts.txt",
+        "sha256": "3898ed9086811818ea18f04e17d630c073a0aa40e56a1aad204162f6650ae843"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/docs/v2/coverage-matrix.md",
+        "sha256": "a005f89612e0ee3ce7538712d57a463848a9b8576f3a9852aacac63f8e28da70"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/packages/domain/src/coverage-registry.ts.txt",
+        "sha256": "010793ca5d3ca4f9dee4a420d4a5bab135a9e17c81255bcf4279e3d568ddc715"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/afl-api-cutover.test.ts.txt",
+        "sha256": "0c9379fcfd07b4c398a205a7088bed03b989ce28c50ac57363ecfeaecc978459"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/afl-api-settle-cli-gate.test.ts.txt",
+        "sha256": "225defd940f6d602b571cbd3eca150c3b66d911476cabefd6927cd856d0c6971"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/db-promotion-check.test.ts.txt",
+        "sha256": "efd9ed907f1cb3345fe10c62e17252d7f625df3e381d312a802eb67626ceb290"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/db-test-rebuild.test.ts.txt",
+        "sha256": "0497b23072360a60ec0ce13f1cbd0479f2262da828cdb6a9abf9b9f7b61fdfb7"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/first-kick-goal-source.test.ts.txt",
+        "sha256": "e0d379cc5678b1235bec807bc5de89135c8e380096c9d7127012aebab4fa4dc6"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/fitzroy-acquisition.test.ts.txt",
+        "sha256": "97212adb0ab041198e9cb961f175b05290cbbbf2689eb0f678e899470b9a7311"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/fitzroy-core-import.test.ts.txt",
+        "sha256": "9d5c2e527c8c4020a33f0d2b4b6da0cd15b73c54a8005071d58a4dec982511f4"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/reference-data.test.ts.txt",
+        "sha256": "850abdd6c57c70249679adef244a4ba42bac55536b1f82a0c1862cdb110667a1"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/season-rollover.test.ts.txt",
+        "sha256": "5030f004dfd4b5deeba798264f36e800ee6433c3e4a4e40dd605216e161559dd"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-admin-operations-ui.test.ts.txt",
+        "sha256": "b11ac0fadf823f18ccc10b8f001a97fa78e460b28cc19b5dadf0a616bbc4905b"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-admin-operations.test.ts.txt",
+        "sha256": "3825376535bfee8db2a6c9819a6ec5e63e57fe49a03c208aaf3fcc0e80c9e87c"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-coverage-registry.test.ts.txt",
+        "sha256": "f25d7b28f053dcfcedcbc0f16a028fdd5cfe6531d40d8a3c2d0999d68cada073"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-historical-manifest.test.ts.txt",
+        "sha256": "8080622b575b7f88bb4853d19217a974ced416ff4b5312b1bbb31d19a0d9a9d6"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/original/state-C/tests/v2-season-seal.test.ts.txt",
+        "sha256": "3898ed9086811818ea18f04e17d630c073a0aa40e56a1aad204162f6650ae843"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/protected-before.json",
+        "sha256": "2a30742993231292e0830f51895b4eb1129ed6a8207b8e88ee040785f0a06ee1"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-1.exit.json",
+        "sha256": "7b3b39fec242613354a7c5dd978d141992cf68280bd449d0f382a905cdb7ad10"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-1.log",
+        "sha256": "9820ca87d23efc8026620acc1ab65fd1c548346947ff22981f533ae652ea6dcb"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-1.network.jsonl",
+        "sha256": "6fdd2a6b6f4389bdda925bf9974f6f53297bb7d742678c3fd92e4ed886eb16ba"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-1.results.json",
+        "sha256": "97c9e21638792449bc67f1ad1cda320c51d2131eb1b8d550ee505e942ee7f3cc"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-2.exit.json",
+        "sha256": "c3c9d0fa94a575ba6a52cc0b0a89deb4db8beb2dc4992af568bbf1d5c9287665"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-2.log",
+        "sha256": "abce575f5eb58a41e37a888f28b3b9e64c205cc9a6d63aa00d3a9c582fea854a"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-2.network.jsonl",
+        "sha256": "35a6ef42cb322563a4ad5f7da925bf1318fe22aa3936b933f53684a6de0ccd2b"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-2.results.json",
+        "sha256": "7bd7159ed029d4392af2043323d33b4b7201fef7f70ba3d0846e2f2bc435d35e"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-broader-final.exit.json",
+        "sha256": "c3c9d0fa94a575ba6a52cc0b0a89deb4db8beb2dc4992af568bbf1d5c9287665"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-1.exit.json",
+        "sha256": "5c427723ce8bc9db5a833234cfcd1f45e4f02f99af911f7b591041b3df3e20d2"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-1.log",
+        "sha256": "0e9f758f6692aad5103dfbf26e60ae73c1f55b4293ca6264f48dab13f168bfe5"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-1.network.jsonl",
+        "sha256": "ae6eb417a2855c7951a4ff24b5b7479fdda4314b15fe2a065032898cd822c74b"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-1.results.json",
+        "sha256": "24aea459c9c7484dedb18e956c8f35f39825c9fa165697d22eacc3ed5391e7df"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-B-focused-final.exit.json",
+        "sha256": "5c427723ce8bc9db5a833234cfcd1f45e4f02f99af911f7b591041b3df3e20d2"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-1.exit.json",
+        "sha256": "a307f2f0885d5a64d14cc83179555a596a4105e36e962f18f8a1f327c03fb3e7"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-1.log",
+        "sha256": "37503214ccbade28e9ce69b399bc8cb34c4783c93e1dc745fc4cb2d068809bc4"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-1.network.jsonl",
+        "sha256": "6b7dca8572ab80c9015b873d22e908fa8c281817d6cf3311ca83932d2d9f81b7"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-1.results.json",
+        "sha256": "b073bc9762e39d0f57c6e84b4d9ad715f97319662efd1a3d42d1ade33b9c1c4f"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-2.exit.json",
+        "sha256": "097f4328a1628e207ca709986767e982b64b6d8bd192f9e3cd7d97a4ee0f66ca"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-2.log",
+        "sha256": "1f7442910fcffe699a630f855d3a3812783da25b61ab419b86a7d164dfbc814e"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-2.network.jsonl",
+        "sha256": "7f4f4ad10f9090e781fe83d9795eb2b4ba5211a53fb8d74bc34a3abe4d5a10f5"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-2.results.json",
+        "sha256": "61a524c79388ebc75a6df4175131d34ccc389c64e3b1cea35a27cfc79de480bf"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-broader-final.exit.json",
+        "sha256": "097f4328a1628e207ca709986767e982b64b6d8bd192f9e3cd7d97a4ee0f66ca"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-1.exit.json",
+        "sha256": "abf2ad645d085335143df755a3734ffb7d1f345efbf06382abfe36482d307399"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-1.log",
+        "sha256": "19ad9abc43f9e491926addbc12b94745bffa00b7c006c56dff5a75599274d001"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-1.network.jsonl",
+        "sha256": "adca27056ebdd82510f60c7af2c0586a6be4b9e3bd28a19096ae9f071928cd94"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-1.results.json",
+        "sha256": "52990b1ce7d041bc93e279627dcf11e58f260fab14c7dbd4718c8242c4ff8271"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/restatement-repair/state-C-focused-final.exit.json",
+        "sha256": "abf2ad645d085335143df755a3734ffb7d1f345efbf06382abfe36482d307399"
+      }
+    ],
+    "generated_copies": ".local-release/issue316-dp-20261025/state-{B,C}; existing excluded projections only"
+  },
+  "owner_readiness_approval_session": {
+    "D": "2026-10-27",
+    "P": "def676517da3955aa18db3606785463aac464188",
+    "approval": "readiness/APPROVAL.json",
+    "readiness_status": "readiness/STATUS.json",
+    "changed_or_added_package_files": [
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/PROPOSAL.md",
+        "sha256": "16779f2ce6a4bc15c4bc4d1b25bab0ef45d929faeda0a4c990d0cbe73b344706"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/RESTATEMENT-PLAN.json",
+        "sha256": "8f37e266a15f7710cdf7964fa9447f63da9d68d50d8375bdc23a6f06e568090f"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/ACCEPTED-PRE-APPROVAL-FINAL.json",
+        "sha256": "650828042ae264bfad0ff87a04e0b0999fb43b236f066136406e2a1dc35f5171"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/APPROVAL.json",
+        "sha256": "f34817cd64d9a73a4ead2afc8d387037fa6ce4a6e2206830fae47a49c3209bea"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/APPROVED-PACKAGE.sha256",
+        "sha256": "b708d8eb0b1fe198a1fd7677e0ba5a3b739c93a48f6883d710217f77126fb8b6"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/LOCAL-DOCUMENTATION-CHECK.json",
+        "sha256": "ac768d66cb9117e76c983044d83c2252043f08d3821fc965dafa148802684f4a"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/READINESS-RUNBOOK.md",
+        "sha256": "4df5bcb938cfdcbd93e3b8e0c643f7ff6b26c902abd7a0a77a8bfd62c3ee893c"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/STATUS.json",
+        "sha256": "f764850648168b63e218d3094c49b5c45a50d31a659677c5adc9d4d9b77eb96c"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/record-readiness-approval.cjs",
+        "sha256": "b8585bd782bdb618bc8f2f1b903839b39a8b8a117edd6e6965db4e9e58d59de1"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/refresh-readiness-evidence.cjs",
+        "sha256": "90dcbf28c558a69064105c2e3db40f3041732d3f8aac569daa2ccfe651bc4b24"
+      },
+      {
+        "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/FINAL-PACKAGE-CHECKS.json",
+        "sha256": "2bd8cd43f17701b0a95ab717e73b95fddc7a93f1591d957bb275c4a991bba3ac"
+      }
+    ],
+    "synchronized_tracking_and_prior_closure_files": [
+      "CHANGELOG.md",
+      "IssuesIndex.md",
+      "issues.md",
+      "blockers.md",
+      "docs/v2/issue316-production-readiness-decision-2026-10-24.md",
+      "issues/open/AFLDB-ISSUE-316.md",
+      "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/CURRENT-VERIFICATION.json",
+      "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-REVERIFICATION.json",
+      "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md",
+      "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/SESSION-CHANGES.json",
+      "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/STRUCTURAL-CLOSURE.json"
+    ],
+    "local_documentation_commit": "authorised; its HEAD is not P",
+    "production": "NO-GO",
+    "product_test_or_structural_edits": false
+  }
+}

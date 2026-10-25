@@ -1,0 +1,72 @@
+{
+  "started_at": "2026-10-25T03:51:12.659Z",
+  "completed_at": "2026-10-25T03:51:14.323Z",
+  "source_P": "def676517da3955aa18db3606785463aac464188",
+  "proposed_D": "2026-10-27",
+  "classification": "Offline Windows dry run; historical census inputs confer no production freshness",
+  "cwd": "D:\\dev\\afldbV2\\.local-release\\issue316-dp-20261025\\source-P",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "--require",
+    "tsx/cjs",
+    "tools/db/rollover-season.ts",
+    "--season",
+    "2026",
+    "--acknowledge-season-complete",
+    "--rollover-date",
+    "2026-10-27",
+    "--retire-status",
+    "retired",
+    "--core-manifest",
+    "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json",
+    "--ladder-manifest",
+    "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-ladder-v1.json",
+    "--ladder-coverage",
+    "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/ladder-coverage.json",
+    "--stat-availability",
+    "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/stat-availability.json",
+    "--accepted-corrections",
+    "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/accepted-corrections.json",
+    "--afl-api-ownership-census",
+    "artifacts/rollover/census/afldb_prod.json",
+    "--afl-api-ownership-census",
+    "artifacts/rollover/census/afldb_dev.json",
+    "--afl-api-ownership-census",
+    "artifacts/rollover/census/afldb_test.json",
+    "--afltables-retirement-decision",
+    "D-316-1",
+    "--expected-club-season-rows",
+    "1640",
+    "--transition-change-set",
+    "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/transition-change-set.json"
+  ],
+  "python": "C:/Users/stuar/AppData/Local/Programs/Python/Python312/python.exe",
+  "exit_code": 1,
+  "error": null,
+  "checks": {
+    "exit_zero": false,
+    "three_real_gates": false,
+    "all_final_pins_match": false,
+    "dry_run": false,
+    "root_unchanged": true,
+    "python_three_guarded_processes": false,
+    "no_connection_attempts": true
+  },
+  "status": "STOP",
+  "inventory_files": 3520,
+  "log_sha256": "10f5001fe8f94d6db52a5a5ba87bb90b2bec20fc98ded9377c391765f1afcdbf",
+  "tracked_or_input_changes": [],
+  "network_audit": {
+    "file": "validation/offline-network-audit.attempt-2.jsonl",
+    "events": [
+      {
+        "runtime": "node",
+        "pid": 32160,
+        "event": "guard-loaded"
+      }
+    ]
+  },
+  "production_contact": false,
+  "database_connection": false,
+  "apply_or_activation": false
+}

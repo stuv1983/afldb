@@ -1,0 +1,51 @@
+{
+  "state": "B",
+  "mode": "broader",
+  "started_at": "2026-10-25T06:57:02.967Z",
+  "completed_at": "2026-10-25T06:58:23.507Z",
+  "tests": [
+    "tests/afl-api-cutover.test.ts",
+    "tests/afl-api-settle-cli-gate.test.ts",
+    "tests/db-promotion-check.test.ts",
+    "tests/db-test-rebuild.test.ts",
+    "tests/first-kick-goal-source.test.ts",
+    "tests/fitzroy-acquisition.test.ts",
+    "tests/fitzroy-core-import.test.ts",
+    "tests/reference-data.test.ts",
+    "tests/season-rollover.test.ts",
+    "tests/v2-admin-operations-ui.test.ts",
+    "tests/v2-admin-operations.test.ts",
+    "tests/v2-coverage-registry.test.ts",
+    "tests/v2-historical-manifest.test.ts",
+    "tests/v2-season-seal.test.ts"
+  ],
+  "exit_code": 0,
+  "error": null,
+  "passed": 2966,
+  "skipped": 7,
+  "failed": 0,
+  "suite_failures": 0,
+  "expected_skips_match": true,
+  "skips": [
+    "AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate prepare-promotion-source: the run (fake settles, no database) ISSUE-314: --record-out is checked before anything is verified, opened or written recordOutProblems refuses a dangling symbolic link, which the exclusive write also refuses",
+    "AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm run become bound node) the esbuild native-binary exception and the whole node_modules walk npm .bin link chains: every hop stays inside the checkout node_modules (F-J01) real symbolic links: an inside chain is admitted, a leave-and-return chain refuses (skipped only where file links cannot be created)",
+    "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process (POSIX): SIGTERM alone ends a default process, reported by its signal",
+    "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process that ignores SIGTERM (POSIX): SIGKILL ends it after the grace",
+    "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) refuses a dangling symlink named like the startup zip (exists() is false, lexists() is true)",
+    "ISSUE-316 ladder-season-scope package-provenance runtime record version 2: inert links, absent landmarks, bound executables, hard-link groups absent Python startup landmarks reviewed start-up layout landmarks (prefix, venv, build and ._pth selection) derives exactly the reviewed set for an interpreter at /usr/bin/python3.12",
+    "curated player alias reference (AFLDB-ISSUE-110 Stage 2) loads through external identity into player_name_aliases: normalised, idempotent, preserving, fail-closed (rolled back)"
+  ],
+  "failures": [],
+  "network_audit": {
+    "guarded_processes": 189,
+    "blocked_attempts": 0,
+    "local_tsx_ipc": 37
+  },
+  "protected_files": {
+    "files": 1574,
+    "mismatches": []
+  },
+  "accepted_product_or_assertion_edits": false,
+  "proposal_assertion_edits": true,
+  "result_file": "validation/restatement-repair/state-B-broader-2.results.json"
+}

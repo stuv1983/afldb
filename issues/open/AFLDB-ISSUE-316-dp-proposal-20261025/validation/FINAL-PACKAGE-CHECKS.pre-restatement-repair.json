@@ -1,0 +1,41 @@
+{
+  "verified_at": "2026-10-25T03:57:53.293Z",
+  "status": "STOP — owner adjudication required",
+  "proposal": "INCOMPLETE / NOT EXECUTION-READY",
+  "source_P": "def676517da3955aa18db3606785463aac464188",
+  "proposed_D": "2026-10-27",
+  "proposed_window_UTC": "02:00–04:00",
+  "values_owner_approved": false,
+  "retained_J2": "167/167 PASS",
+  "retained_successor_inputs": "264/264 PASS",
+  "real_offline_validator": "exit 0 / 3-of-3 / all pins match",
+  "candidate_reconciliation": "PASS; seven-file apply shape, B inactivity, C 1640/91 and both proposed authority bindings unchanged",
+  "state_B_broader": {
+    "exit_code": 1,
+    "passed": 2956,
+    "skipped": 7,
+    "failed": 32
+  },
+  "state_C_broader": "NOT RUN after B stopping finding",
+  "existing_focused_rollover_evidence": "395/395 per state, previous run; does not complete broader validation",
+  "external_evidence_unchanged": true,
+  "current_local_links_checked": 33,
+  "tracking_updated": [
+    "IssuesIndex.md",
+    "issues.md",
+    "blockers.md",
+    "CHANGELOG.md"
+  ],
+  "previous_source_index_and_diff_checks": "Retained in FINAL-PACKAGE-CHECKS.pre-retained-inputs.json; no new Git command/check claimed",
+  "product_or_accepted_assertion_edits": false,
+  "production_contact": false,
+  "database_connection": false,
+  "external_material_modified": false,
+  "structural_gate": "CLOSED / ACCEPTED",
+  "U3": "CONFIRMED",
+  "U4": "Route B",
+  "Brownlow": "untouched",
+  "issue_316": "OPEN",
+  "production": "NO-GO",
+  "next_action": "Owner adjudicates the material B restatement failure before repair/resumption. No production or other execution authority inferred."
+}

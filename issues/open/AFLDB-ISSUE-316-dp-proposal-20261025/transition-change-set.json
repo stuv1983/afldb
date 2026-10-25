@@ -1,0 +1,141 @@
+{
+  "schema": "afldb.rollover.transition_change_set/1",
+  "season": 2026,
+  "inputs": [
+    {
+      "role": "core_manifest",
+      "path": "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json",
+      "sha256": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988"
+    },
+    {
+      "role": "ladder_manifest",
+      "path": "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-ladder-v1.json",
+      "sha256": "65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34"
+    },
+    {
+      "role": "ladder_coverage",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/ladder-coverage.json",
+      "sha256": "00a4957e08da19b6aeb7c2b85e9682f6253552688b999cac9fb9f17c9ec86f30"
+    },
+    {
+      "role": "stat_availability",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/stat-availability.json",
+      "sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8"
+    },
+    {
+      "role": "accepted_corrections",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/accepted-corrections.json",
+      "sha256": "3a938b52b8a26342d3455edd792b39cf23a21966a45d1e37c910ea23d025715f"
+    }
+  ],
+  "base": {
+    "path": "tools/rebuild/fitzroy/fitzroy-contract.json",
+    "old_sha256": "39689ddfd252a358026fb9e3b0d32f1f2383cc00116016f89ee8366b7f773de2",
+    "proposed": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/fitzroy-contract-base.json",
+    "proposed_sha256": "f2e75cc0e6a64d6fbb9539bd99f60aacbf7b2bb7d5186a7672468d4735af4624"
+  },
+  "replace": [
+    {
+      "path": "tools/rebuild/afl_api/afl-api-contract.json",
+      "old_sha256": "8ed96ed4cca6fe4fb8da63c05a383af4dc8bbdc4b9dacfca5c490cf74ea5e208",
+      "proposed": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/tools/rebuild/afl_api/afl-api-contract.json",
+      "proposed_sha256": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148"
+    },
+    {
+      "path": "tools/rebuild/afltables/afltables-contract.json",
+      "old_sha256": "5d29e7d255de2b49d38d06eafe1841bf66fe936a63ec7dd0db167d8580debeca",
+      "proposed": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finals/tools/rebuild/afltables/afltables-contract.json",
+      "proposed_sha256": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f"
+    }
+  ],
+  "register_patches": [
+    {
+      "pointer": "/acquisition/$comment",
+      "old": [
+        "manifest_sha256 covers the acquisition manifest byte-for-byte, so the artefact",
+        "hash list inside it cannot be edited to cover for a tampered artefact without",
+        "breaking this binding.",
+        "",
+        "The manifest is the adapter's own Pass 19 output with exactly two byte ranges",
+        "changed for the new label: `snapshot_label` and `working_directory`, then newline-",
+        "normalised from CRLF to LF. Nothing else differs - not one filename, hash, row",
+        "count, column list or observation - and the importer re-hashes all 131 artefacts",
+        "against it regardless.",
+        "",
+        "The LF normalisation is MANDATORY, not cosmetic: .gitattributes pins",
+        "docs/rebuild-manifests/** to eol=lf precisely because manifest_sha256 above binds",
+        "the manifest FILE bytes (AFLDB-ISSUE-108). A CRLF manifest would be rewritten on",
+        "checkout and would break this binding on one platform only.",
+        "",
+        "Its self-declared `full_history: false` / `completeness: unvalidated` are INERT,",
+        "like every acquisition verdict field. This adapter build correctly declines to",
+        "self-assess; the verdict below came from the independent validator."
+      ],
+      "new": [
+        "manifest_sha256 covers the acquisition manifest byte-for-byte, so the artefact hash list inside it cannot be edited to cover for a tampered artefact without breaking this binding.",
+        "The manifest is the acquisition adapter's own output for label c2-2026-final-core-v1 (extraction 2026-10-21T04:34:37Z, fitzRoy 1.8.0, seasons 1897-2026, 132 artefacts) and is stored with LF endings (0 CR bytes): .gitattributes pins docs/rebuild-manifests/** to eol=lf because this hash binds the file bytes (AFLDB-ISSUE-108).",
+        "Its self-declared `full_history: false` / `completeness: unvalidated` are INERT, like every acquisition verdict field; the verdict is the importer's (`verdict_authority`)."
+      ]
+    },
+    {
+      "pointer": "/measured/$comment",
+      "old": [
+        "Drift gates. Re-derived from the snapshot on every validate and compared exactly.",
+        "Every value is identical to retired baseline full-history-20260827's EXCEPT",
+        "players (13275 -> 13271) and the added players_with_renumbered_profile, both from",
+        "the AFLDB-ISSUE-136 amendment above."
+      ],
+      "new": [
+        "Drift gates. Re-derived from the snapshot on every validate and compared exactly.",
+        "Values for c2-2026-final-core-v1 are the importer's own snapshot-scan summary from the retained isolated C2 rehearsal (rebuild.log, attempt 2) and equal the rehearsal register; the executed full-history gate at rollover re-derives them and is the authority."
+      ]
+    },
+    {
+      "pointer": "/identity_scan/$comment",
+      "old": [
+        "Canonical identity is the AFL Tables profile URL. The fitzRoy numeric ID is",
+        "optional: 83 recent-2025 rows carry none, and distinct_urls - distinct_ids = 5",
+        "is exactly the five profile paths that have no ID anywhere in the snapshot.",
+        "AFLDB-ISSUE-136 (2026-09-04): those five paths are FOUR renumbered profiles of",
+        "continuing players (79 rows) plus ONE genuine 2025 debutant (Billy Wilson, 4 rows),",
+        "so they denote 13271 players, not 13275 — see measured.players and the amendment.",
+        "Identical to retired baseline full-history-20260827's scan."
+      ],
+      "new": [
+        "Canonical identity is the AFL Tables profile URL. The fitzRoy numeric ID is optional: 171 rows carry none (83 in 2025, 88 in 2026).",
+        "distinct_urls - distinct_ids = 5: the profile paths with no ID anywhere in the snapshot (players/B/Billy_Wilson2.html, players/C/Charlie_Cameron3.html, players/J/Jack_Graham2.html, players/J/Jack_Ross3.html, players/J/Jack_Williams3.html).",
+        "AFLDB-ISSUE-136 continuity folds the four renumbered profiles into their continuing players, so these denote fewer players than distinct URLs; see measured.players."
+      ]
+    }
+  ],
+  "write_set": [
+    "data/reference/afltables-network.json",
+    "tools/rebuild/afl_api/afl-api-contract.json",
+    "tools/rebuild/afltables/afltables-contract.json",
+    "data/reference/fitzroy-accepted-baselines.json",
+    "data/reference/seasons.json",
+    "tools/rebuild/fitzroy/fitzroy-contract.json",
+    "data/reference/stat-availability.json"
+  ],
+  "ladder_successor_tuple": {
+    "profile": "c2-2026-successor",
+    "supersedes": "predecessor-1897-2025",
+    "core_snapshot_label": "c2-2026-final-core-v1",
+    "core_manifest_sha256": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988",
+    "core_artefact_set_sha256": "817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e",
+    "witness_snapshot_label": "c2-2026-final-ladder-v1",
+    "witness_manifest_sha256": "65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34",
+    "first_season": 1897,
+    "last_season": 2026,
+    "expected_rows": 1640
+  },
+  "final_sha256": {
+    "data/reference/afltables-network.json": "04e2a269559cbc09a590e22e46207cd199d78eb60dbdc49c605bb2e724d3b897",
+    "tools/rebuild/afl_api/afl-api-contract.json": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148",
+    "tools/rebuild/afltables/afltables-contract.json": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f",
+    "data/reference/fitzroy-accepted-baselines.json": "0d4f7b3067112d8cf7fb3acc97b73ffb909b51cee09d8c4f59c326beb7e4f05f",
+    "data/reference/seasons.json": "1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0",
+    "tools/rebuild/fitzroy/fitzroy-contract.json": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5",
+    "data/reference/stat-availability.json": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8"
+  }
+}

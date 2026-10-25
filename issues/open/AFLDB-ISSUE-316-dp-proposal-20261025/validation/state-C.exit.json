@@ -1,0 +1,11 @@
+{
+  "state": "C",
+  "tests": [
+    "tests/season-rollover.test.ts"
+  ],
+  "exit_code": 0,
+  "passed": 395,
+  "skipped": 0,
+  "failed": 0,
+  "failures": []
+}

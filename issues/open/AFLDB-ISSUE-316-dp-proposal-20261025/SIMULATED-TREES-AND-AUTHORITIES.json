@@ -1,0 +1,50 @@
+{
+  "classification": "Offline simulations only; no branch, HEAD, real index or worktree mutation; no production authority granted",
+  "source_commit": "def676517da3955aa18db3606785463aac464188",
+  "proposed_date": "2026-10-27",
+  "state_B": {
+    "tree": "a8ce0f34c48766e03c7f4443d53520c494a9e64e",
+    "commit": "06e882277644731d665c148970b96ab214f42701",
+    "paths": [
+      "data/reference/afltables-network.json",
+      "tools/rebuild/afl_api/afl-api-contract.json",
+      "tools/rebuild/afltables/afltables-contract.json",
+      "data/reference/fitzroy-accepted-baselines.json",
+      "data/reference/seasons.json",
+      "tools/rebuild/fitzroy/fitzroy-contract.json",
+      "data/reference/stat-availability.json",
+      "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json",
+      "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-ladder-v1.json"
+    ]
+  },
+  "state_C": {
+    "tree": "4d520565cbe6269cfc9ddc0951a10b8cab44e4cc",
+    "commit": "75df67dbed56ecd2d3906d561bbdafd53fff9f12",
+    "paths_relative_to_B": [
+      "tools/db/rebuild-test.ts"
+    ]
+  },
+  "authority_validation": [
+    {
+      "action": "activate",
+      "authority_sha256": "1d133580f526131cf31136df042b372047b170e9925db525a21ef80c5658f65f",
+      "simulated_head": "06e882277644731d665c148970b96ab214f42701",
+      "from": "applied-inactive",
+      "to": "activated",
+      "path": "tools/db/rebuild-test.ts",
+      "before_sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8",
+      "after_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338"
+    },
+    {
+      "action": "deactivate",
+      "authority_sha256": "fc45063484cfd6a07b0c716345898399298d2cc62d6b4c406846f554b96dee8c",
+      "simulated_head": "75df67dbed56ecd2d3906d561bbdafd53fff9f12",
+      "from": "activated",
+      "to": "applied-inactive",
+      "path": "tools/db/rebuild-test.ts",
+      "before_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338",
+      "after_sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8"
+    }
+  ],
+  "execution_limit": "Draft authorities bind simulated commits. Actual approved apply/activation commits must be matched or authorities regenerated and reviewed; a PROPOSED decision is not owner permission."
+}

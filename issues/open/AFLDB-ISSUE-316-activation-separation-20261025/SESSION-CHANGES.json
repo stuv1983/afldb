@@ -108,8 +108,8 @@
   "pre_existing_historical_evidence_modified": false,
   "ignored_evidence_force_added": 42,
   "product_files_changed": [],
-  "separate_evidence_commit": null,
-  "updated_at": "2026-10-25T03:17:41.627Z",
+  "separate_evidence_commit": "def676517da3955aa18db3606785463aac464188",
+  "updated_at": "2026-10-25T03:44:09.097Z",
   "admission_manifest": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/U3-ADMISSION-MANIFEST.json",
   "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
   "excluded_files_remain_excluded": 20,
@@ -145,5 +145,7 @@
     "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/legacy-c438f844/activation-separation.patch",
     "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/reverify-local.cjs",
     "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-VITEST.log"
-  ]
+  ],
+  "structural_gate": "CLOSED / ACCEPTED",
+  "dp_preparation": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/PROPOSAL.md"
 }

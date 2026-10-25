@@ -1,0 +1,205 @@
+{
+  "status": "STOP",
+  "owner_adjudication_required": true,
+  "state": "B",
+  "passed": 2956,
+  "skipped": 7,
+  "failed": 32,
+  "findings": [
+    {
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process: the tsx loader runs the script in the spawned PID itself, where the tsx CLI does not",
+      "classification": "Additional child-process/runtime failure; cause not fully adjudicated",
+      "error": "AssertionError: expected 1 to be +0 // Object.is equality",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/afl-api-cutover.test.ts:2956:33"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope resolves and plans the actual contract, the adopted c2-2026-successor, without injecting an expectation",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:240:15"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state states A and B (before activation): ships an empty successor table, so no binding, however faithful, is an adopted successor",
+      "classification": "Material restatement defect: undefined fixture",
+      "error": "ReferenceError: fabricated is not defined",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:273:14"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses the fabricated successor binding at the real preflight, before any child runs",
+      "classification": "Material restatement defect: undefined fixture",
+      "error": "ReferenceError: fabricated is not defined",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:278:17"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an unsupported tuple name at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong core manifest fingerprint at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong core artefact-set fingerprint at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong witness manifest fingerprint at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong witness label at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong core label at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered pair row count at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered expected row count at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered season range at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered census scope at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a mismatched source label at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a partial source at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an extra pair field at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a preflight whose source is not the adopted binding's own",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over a wrong core manifest pin in the register",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over a wrong witness manifest pin in the contract",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over core manifest bytes that do not hash to the tuple",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over witness manifest bytes that do not hash to the tuple",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over an unsupported expectation block",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over a reopened 2026",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over the explicit predecessor documents",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered, copied or retargeted plan even with the adopted binding",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a successor that claims rehearsal provenance, at resolution and at both boundaries",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "AssertionError: expected [Function] to throw error including 'A successor profile cannot claim cand…' but got 'Unsupported ladder expectation schema…'",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:348:10"
+    },
+    {
+      "name": "final validation takes its expected values from the tracked register, not from this file",
+      "classification": "Material B/C restatement conflict: inactive B used as adopted successor",
+      "error": "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:5691:20"
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage db:privileges (direct run): runs its work, refusing rather than skipping",
+      "classification": "Additional child-process/runtime failure; cause not fully adjudicated",
+      "error": "AssertionError: expected 'D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSU…' to contain 'unknown privileges target \\'no-such-t…'",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7096:32"
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the ownership census CLI refuses before reading its evidence or launching psql",
+      "classification": "Additional child-process/runtime failure; cause not fully adjudicated",
+      "error": "AssertionError: expected 1 to be 2 // Object.is equality",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7113:28"
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the reset proof CLI refuses before opening a session or launching psql",
+      "classification": "Additional child-process/runtime failure; cause not fully adjudicated",
+      "error": "AssertionError: expected 'D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSU…' to contain 'REFUSED: AFLDB_TEST_DATABASE_URL cann…'",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7122:28"
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the convergence rehearsal refuses before connecting or seeding anything",
+      "classification": "Additional child-process/runtime failure; cause not fully adjudicated",
+      "error": "AssertionError: expected 'D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSU…' to contain 'REFUSED: The owner DSN cannot be used…'",
+      "location": "at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7135:30"
+    }
+  ],
+  "state_C": "NOT RUN after material State B failure",
+  "product_or_assertion_edits": false,
+  "stopping_record": "STOP-RECORD.md"
+}

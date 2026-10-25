@@ -1,0 +1,12 @@
+{
+  "command": [
+    "node",
+    "D:\\dev\\afldbV2\\node_modules\\vitest\\vitest.mjs",
+    "run",
+    "tests/coach-reconciliation.test.ts",
+    "--reporter=json",
+    "--outputFile=D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSUE-316-dp-proposal-20261025\\validation\\coach-replay.results.json"
+  ],
+  "exit_code": 0,
+  "source_commit": "def676517da3955aa18db3606785463aac464188"
+}

@@ -1,0 +1,30 @@
+{
+  "state": "C",
+  "mode": "focused",
+  "started_at": "2026-10-25T07:02:27.014Z",
+  "completed_at": "2026-10-25T07:02:29.548Z",
+  "tests": [
+    "tests/season-rollover.test.ts"
+  ],
+  "exit_code": 0,
+  "error": null,
+  "passed": 396,
+  "skipped": 0,
+  "failed": 0,
+  "suite_failures": 0,
+  "expected_skips_match": true,
+  "skips": [],
+  "failures": [],
+  "network_audit": {
+    "guarded_processes": 2,
+    "blocked_attempts": 0,
+    "local_tsx_ipc": 0
+  },
+  "protected_files": {
+    "files": 1574,
+    "mismatches": []
+  },
+  "accepted_product_or_assertion_edits": false,
+  "proposal_assertion_edits": true,
+  "result_file": "validation/restatement-repair/state-C-focused-1.results.json"
+}

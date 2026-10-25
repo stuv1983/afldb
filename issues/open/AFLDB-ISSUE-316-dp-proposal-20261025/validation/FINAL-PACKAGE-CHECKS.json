@@ -1,0 +1,81 @@
+{
+  "verified_at": "2026-10-25T07:06:56.724Z",
+  "status": "D/P APPROVED; AWAITING READINESS WINDOW",
+  "proposal_owner_approved": true,
+  "source_P": "def676517da3955aa18db3606785463aac464188",
+  "proposed_D": "2026-10-27",
+  "proposed_window_UTC": "02:00–04:00",
+  "structural_gate": "CLOSED / ACCEPTED",
+  "retained_proof": {
+    "accepted_reused_not_rerun": true,
+    "package": "167/167 PASS",
+    "inputs": "264/264 PASS",
+    "real_offline_validator": "exit 0 / 3-of-3 / pins match",
+    "state_C_projection": "1640 rows / 91 definitions"
+  },
+  "checks": {
+    "B_broader": {
+      "passed": 2966,
+      "skipped": 7,
+      "failed": 0,
+      "exit_code": 0,
+      "result": "validation/restatement-repair/state-B-broader-final.exit.json",
+      "full_results": "validation/restatement-repair/state-B-broader-2.results.json"
+    },
+    "B_focused": {
+      "passed": 395,
+      "skipped": 0,
+      "failed": 0,
+      "exit_code": 0,
+      "result": "validation/restatement-repair/state-B-focused-final.exit.json",
+      "full_results": "validation/restatement-repair/state-B-focused-1.results.json"
+    },
+    "C_broader": {
+      "passed": 2992,
+      "skipped": 7,
+      "failed": 0,
+      "exit_code": 0,
+      "result": "validation/restatement-repair/state-C-broader-final.exit.json",
+      "full_results": "validation/restatement-repair/state-C-broader-2.results.json"
+    },
+    "C_focused": {
+      "passed": 396,
+      "skipped": 0,
+      "failed": 0,
+      "exit_code": 0,
+      "result": "validation/restatement-repair/state-C-focused-final.exit.json",
+      "full_results": "validation/restatement-repair/state-C-focused-1.results.json"
+    }
+  },
+  "fresh_read_only_review": "validation/restatement-repair/REVIEW.json",
+  "restatement_map": "restatements/RESTATEMENT-MAP.json",
+  "map_summary": {
+    "declarations": 4364,
+    "changed_from_P": 155,
+    "B": 6,
+    "C": 14,
+    "invariant": 4344,
+    "unmatched_P": 0,
+    "runtime_title_unmatched": 0
+  },
+  "protected_files": {
+    "count": 1574,
+    "mismatches": []
+  },
+  "product_or_accepted_assertion_edits": false,
+  "structural_artifact_edits": false,
+  "production_contact": false,
+  "database_connection": false,
+  "disposable_rebuild": false,
+  "Git_commands": "Owner-authorised read-only local inspection and separate local documentation/evidence commit; no push",
+  "root_tracking_this_session": "Synchronized under owner documentation/evidence commit authority; ISSUE-316 OPEN",
+  "U3": "CONFIRMED",
+  "U4": "Route B",
+  "Brownlow": "untouched",
+  "production": "NO-GO",
+  "next_action": "Fresh read-only proof at 2026-10-27 02:00–04:00 UTC; no apply/activation/deployment/push",
+  "owner_DP_approval": "APPROVED FOR READINESS PROOF ONLY",
+  "readiness_approval": "readiness/APPROVAL.json",
+  "approval_recorded_at_utc": "2026-10-25T07:57:18.040Z",
+  "readiness_status": "readiness/STATUS.json"
+}

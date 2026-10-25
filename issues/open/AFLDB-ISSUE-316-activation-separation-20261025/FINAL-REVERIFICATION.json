@@ -1,7 +1,7 @@
 {
-  "verified_at": "2026-10-25T03:18:23.736Z",
+  "verified_at": "2026-10-25T03:44:10.894Z",
   "implementation_candidate": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
-  "head": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+  "head": "def676517da3955aa18db3606785463aac464188",
   "admitted_worktree_and_index_hashes": 42,
   "excluded_staged": 0,
   "candidate_inventory_sha256": "5e90c8e7d7cdde45e0f91c3f4ab0421e70ffcffa770a9f45837ef9d46c8ff2bc",
@@ -12,7 +12,7 @@
   "product_or_assertion_changes": [],
   "current_links": {
     "status": "PASS",
-    "count": 41,
+    "count": 44,
     "scope": [
       "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md",
       "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/HISTORICAL-NARRATIVE-DRIFT.md",
@@ -27,6 +27,6 @@
     "cached": "PASS",
     "worktree": "PASS"
   },
-  "staged_count": 354,
+  "staged_count": 0,
   "status": "PASS"
 }

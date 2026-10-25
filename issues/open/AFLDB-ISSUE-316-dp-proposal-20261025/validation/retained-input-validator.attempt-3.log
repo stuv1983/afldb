@@ -1,0 +1,170 @@
+
+PRE-APPLY GATE 1/3 — full-history validation against the successor contract (this is the verdict authority, and the source of measured + identity_scan)
+  C:/Users/stuar/AppData/Local/Programs/Python/Python312/python.exe tools/migration/import_fitzroy_core.py --label c2-2026-final-core-v1 --snapshot-dir data/sources/afltables/fitzroy_core/c2-2026-final-core-v1 --manifest docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json --validate-only --require-full-history --contract C:\Users\stuar\AppData\Local\Temp\afldb-rollover-6nnb0Y\fitzroy-contract.json --stat-availability D:\dev\afldbV2\.local-release\issue316-dp-20261025\source-P\issues\open\AFLDB-ISSUE-316-dp-proposal-20261025\inputs\stat-availability.json
+  exit 0
+
+PRE-APPLY GATE 2/3 — acceptance binding + fingerprint drift gate against the successor register
+  C:/Users/stuar/AppData/Local/Programs/Python/Python312/python.exe tools/migration/import_fitzroy_core.py --label c2-2026-final-core-v1 --snapshot-dir data/sources/afltables/fitzroy_core/c2-2026-final-core-v1 --manifest docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json --validate-only --require-accepted-baseline --contract C:\Users\stuar\AppData\Local\Temp\afldb-rollover-6nnb0Y\fitzroy-contract.json --stat-availability D:\dev\afldbV2\.local-release\issue316-dp-20261025\source-P\issues\open\AFLDB-ISSUE-316-dp-proposal-20261025\inputs\stat-availability.json --accepted-baselines C:\Users\stuar\AppData\Local\Temp\afldb-rollover-6nnb0Y\fitzroy-accepted-baselines.json
+  exit 0
+
+PRE-APPLY GATE 3/3 — offline ladder witness validation against the successor contract (--compare is deliberately absent: it needs the rebuilt database)
+  C:/Users/stuar/AppData/Local/Programs/Python/Python312/python.exe tools/rebuild/fitzroy/validate_ladder_witness.py --label c2-2026-final-ladder-v1 --contract C:\Users\stuar\AppData\Local\Temp\afldb-rollover-6nnb0Y\fitzroy-contract.json --manifest-dir docs/rebuild-manifests/afltables_fitzroy_core
+  exit 0
+
+All three pre-apply gates PASSED against the computed successor state.
+
+AFLDB-ISSUE-101 — season rollover DRY RUN
+  completing season          2026
+  new in-progress season     2027
+  baseline retired           full-history-20260902
+  baseline accepted          c2-2026-final-core-v1
+  ladder witness accepted    c2-2026-final-ladder-v1
+  club_seasons expected      1622 -> 1640
+
+measured fingerprint (from the validator, not entered by hand)
+  matches                      17056
+  matches_with_player_rows     17056
+  seasons_first                1897
+  seasons_last                 2026
+  venues                       52
+  attendance_known             15405
+  club_identities              24
+  players                      13363
+  players_with_renumbered_profile 4
+  players_with_dob             947
+  players_with_dob_conflict    0
+  player_match_rows            695499
+  brownlow_round_vote_rows     320861
+identity scan (measured by the executed full-history gate)
+  rows                         695501
+  missing_id                   171
+  missing_url                  0
+  malformed_url                0
+  distinct_ids                 13362
+  distinct_urls                13367
+
+files
+  data/reference/fitzroy-accepted-baselines.json  (JSON reformatted)
+  data/reference/seasons.json  (JSON reformatted)
+  tools/rebuild/fitzroy/fitzroy-contract.json  (JSON reformatted)
+  data/reference/stat-availability.json
+
+notes
+  - afl_api ownership census (AFLDB-ISSUE-233 D-233-3): afldb_prod, captured 2026-10-23T03:28:51Z, artifacts/rollover/census/afldb_prod.json (sha256 18b201662caa37ed0c0169e5d8f5f5a505b34f666cf5ea30a0a63a584653ffa2): 0 afl_api-owned canonical matches in 1897..2026.
+  - afl_api ownership census (AFLDB-ISSUE-233 D-233-3): afldb_dev, captured 2026-10-23T03:28:40Z, artifacts/rollover/census/afldb_dev.json (sha256 7a000b93a83e846772d512eea0c25d0234d6662ede7349aca7517a86b6c963af): 0 afl_api-owned canonical matches in 1897..2026.
+  - afl_api ownership census (AFLDB-ISSUE-233 D-233-3): afldb_test, captured 2026-10-23T03:28:41Z, artifacts/rollover/census/afldb_test.json (sha256 9eb203a6e521305cd043450bab0a13b2e97337498c78625b527e76fd363fbdb1): 0 afl_api-owned canonical matches in 1897..2026.
+  - The post-rollover rebuild re-runs this census against its own target before the capture and the reset (stage afl-api-ownership-census) and refuses on any non-zero season.
+  - stat-availability: 24 stat key(s) declare no coverage for 2027 (behinds, bounces, brownlow_match_votes, brownlow_round_votes, brownlow_season_total, clangers, clearances, contested, contested_marks, disposals, frees_against, frees_for, goal_assists, goals, handballs, hitouts, inside50s, kicks, marks, marks_i50, one_percenters, rebounds, tackles, uncontested). That is legal and may be correct; it is reported so the omission is a decision, not an oversight.
+  - seasons.json: season_notes for 2026 removed and carried verbatim to 2027 ("Season in progress at time of import.").
+  - acceptance register: accepted_corrections were REVIEWED for c2-2026-final-core-v1 — 6 entries across [identity_continuity, import_transformation, source_data, source_normalisation]. Nothing was inherited from full-history-20260902; its entries were not read.
+  - successor activation NOT performed: tools/db/rebuild-test.ts is not written by this apply and its successor table stays as it is, so "c2-2026-successor" stays INACTIVE (every rebuild refuses the installed profile) until a separately authorised `tools/db/successor-activation.ts --apply` appends exactly this tuple.
+  - Whitespace will be normalised to deterministic 2-space JSON in: data/reference/fitzroy-accepted-baselines.json, data/reference/seasons.json, tools/rebuild/fitzroy/fitzroy-contract.json. These files are hand-formatted with inline arrays that no serialiser reproduces, so a rewrite expands them. Key order, line endings and every value are preserved; the test suite proves the only SEMANTIC changes are the intended ones. Read the diff for content, not for shape.
+  - Pre-apply verdict (1/3): tools/migration/import_fitzroy_core.py --validate-only --require-full-history EXECUTED and exited 0 against docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json and data/sources/afltables/fitzroy_core/c2-2026-final-core-v1, with --contract and --stat-availability pointed at the successor documents this plan computed, in a temporary directory. It re-hashed every artefact, checked every CSV shape, resolved identity and measured identity coverage; both the measured fingerprint and the identity scan above are its output, not an operator statement. identity_scan is MEASURED by the executed --require-full-history gate, run against the computed successor contract in a temporary directory before any tracked file is written. It is never an operator input.
+  - Pre-apply gates (2/3 and 3/3), both executed against the same temporary successor state before anything is written: tools/migration/import_fitzroy_core.py --label c2-2026-final-core-v1 --validate-only --require-accepted-baseline (the acceptance binding + measured fingerprint + identity-scan drift gate, run against the successor register this plan computed), and tools/rebuild/fitzroy/validate_ladder_witness.py --label c2-2026-final-ladder-v1 (the offline witness proof: manifest binding, per-file hashes, per-season structure and identity resolution). Any failure means zero tracked writes.
+  - Post-REBUILD: tools/rebuild/fitzroy/validate_ladder_witness.py --label c2-2026-final-ladder-v1 --compare is the D7 club_seasons cross-check and genuinely needs the rebuilt database, so it is the one proof that stays part of the afldb_test rebuild rather than gating the write. tools/migration/import_fitzroy_core.py --require-accepted-baseline also runs again in the rebuild's PRECHECK, that time against the landed tracked documents.
+  - No canonical row is written by this tool. Completed-history supersession happens when `npm run db:test:rebuild` next rebuilds from the newly accepted baseline; stage 9 will then gate `matches_after_accepted_last_season` at season > 2026 automatically, because it derives that boundary from accepted.measured.seasons_last.
+  data/reference/afltables-network.json  (AFLDB-ISSUE-316: written first)
+  - data/reference/afltables-network.json: status active -> retired (last_season 2026 kept; decision D-316-1; changed_at 2026-10-27). Written BEFORE the other files, so an interrupted write leaves AFL Tables retired, never fetching 2027; a commit that carries seasons.json [2027] without it leaves the switch out of bounds, and every gate refuses. Every AFL Tables network path refuses from the deploy of this commit.
+
+PROPOSED-STATE VALIDATION - the rebuild's own validators over the proposed bytes (nothing written; no database)
+  accepted baseline          c2-2026-final-core-v1
+  ladder profile (selector)  c2-2026-successor (resolves only once separately activated; INACTIVE after this apply)
+  club_seasons expected      1640
+  final-validation checks    91 built from the proposal
+  PENDING - needs the isolated database phase; not proven here:
+    - 91 final-validation SQL checks built from the proposal were NOT executed; every measured count in them is a claim until the isolated rebuild measures it
+    - the ladder witness --compare cross-check against the rebuilt club_seasons
+    - club_seasons = 1640 rows and the completed-scope season status/grand-final checks
+  Continuity and the ladder witness were judged by the executed gates above, against these same contract bytes.
+
+transition change set (every file, old -> new bytes; validated together)
+  - transition base: tools/rebuild/fitzroy/fitzroy-contract.json derived from reviewed bytes f2e75cc0e6a64d6fbb9539bd99f60aacbf7b2bb7d5186a7672468d4735af4624 (current 39689ddfd252a358026fb9e3b0d32f1f2383cc00116016f89ee8366b7f773de2); the planner then applies its own edits on top.
+  - transition replace: tools/rebuild/afl_api/afl-api-contract.json 8ed96ed4cca6fe4fb8da63c05a383af4dc8bbdc4b9dacfca5c490cf74ea5e208 -> 1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148 (verbatim).
+  - transition replace: tools/rebuild/afltables/afltables-contract.json 5d29e7d255de2b49d38d06eafe1841bf66fe936a63ec7dd0db167d8580debeca -> ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f (verbatim).
+  data/reference/afltables-network.json
+    19721801ac4df60e78299b461c97e87d252ad65d5fd394643448be54c3b5c838 (1920 B) -> 04e2a269559cbc09a590e22e46207cd199d78eb60dbdc49c605bb2e724d3b897 (1934 B); 3 change(s)
+      /status  "active" => "retired"
+      /decision  null => "D-316-1"
+      /changed_at  null => "2026-10-27"
+  tools/rebuild/afl_api/afl-api-contract.json
+    8ed96ed4cca6fe4fb8da63c05a383af4dc8bbdc4b9dacfca5c490cf74ea5e208 (10332 B) -> 1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148 (10705 B); 2 change(s)
+      /roster/accepted_snapshot/measured/$comment  "Measured on afldb_test (dry run, 2026-09-05) over the accepted fitzRoy baseline's players and match facts:... => "Measured on afldb_test (dry run, 2026-09-05) over the accepted fitzRoy baseline's players and match facts:...
+      /roster/accepted_snapshot/measured/players_with_afl_api_evidence  1824 => 1916
+  tools/rebuild/afltables/afltables-contract.json
+    5d29e7d255de2b49d38d06eafe1841bf66fe936a63ec7dd0db167d8580debeca (18833 B) -> ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f (21207 B); 7 change(s)
+      /club_player_lists/accepted_snapshot/measured/$comment  "What the rebuild's `birth-dates` stage must reproduce on the accepted fitzRoy baseline + this snapshot; th... => "What the rebuild's `birth-dates` stage must reproduce on the accepted fitzRoy baseline + this snapshot; th...
+      /club_player_lists/accepted_snapshot/measured/players_with_dob  13255 => 13347
+      /club_player_lists/accepted_snapshot/measured/players_with_club_list_birth_evidence  13255 => 13347
+      /coaches/accepted_snapshot/evidence  "386 index rows, 386 pages (extraction 2026-09-05T06:36:13Z), 386 distinct names; 368 pages link a Player S... => "386 index rows, 386 pages (extraction 2026-09-05T06:36:13Z), 386 distinct names; 368 pages link a Player S...
+      /coaches/accepted_snapshot/measured/$comment  "What the rebuild's `coaches` stage must reproduce on the accepted fitzRoy baseline + pinned supplement + t... => "What the rebuild's `coaches` stage must reproduce on the accepted fitzRoy baseline (baseline_only, no supp...
+      /coaches/accepted_snapshot/measured/match_coaches  32034 => 32470
+      /coaches/accepted_snapshot/measured/matches_with_both_coaches  15817 => 16035
+  data/reference/fitzroy-accepted-baselines.json
+    c68083aed64e894566054404b93032698e9664d79db377080ad795724d032eef (22706 B) -> 0d4f7b3067112d8cf7fb3acc97b73ffb909b51cee09d8c4f59c326beb7e4f05f (30992 B); 2 change(s)
+      /baselines/1/acceptance_status  "accepted" => "retired"
+      /baselines/2  + {"snapshot_label":"c2-2026-final-core-v1","acceptance_status":"accepted","accepted_on":"2026-10-27","issue"...
+  data/reference/seasons.json
+    8c6462713cb0489d0aa2938c6b735ad65e9f7794f0665fccc3a951065a0004f9 (891 B) -> 1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0 (943 B); 4 change(s)
+      /last_season  2026 => 2027
+      /in_progress_seasons/0  2026 => 2027
+      /season_notes/2026  - "Season in progress at time of import."
+      /season_notes/2027  + "Season in progress at time of import."
+  tools/rebuild/fitzroy/fitzroy-contract.json
+    39689ddfd252a358026fb9e3b0d32f1f2383cc00116016f89ee8366b7f773de2 (44311 B) -> 4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5 (47089 B); 41 change(s)
+      /profile_url_continuity/rules/0/expect/renumbered_last_season  2025 => 2026
+      /profile_url_continuity/rules/0/expect/renumbered_rows  25 => 52
+      /profile_url_continuity/rules/1/expect/renumbered_last_season  2025 => 2026
+      /profile_url_continuity/rules/1/expect/renumbered_rows  18 => 31
+      /profile_url_continuity/rules/2/expect/renumbered_last_season  2025 => 2026
+      /profile_url_continuity/rules/2/expect/renumbered_rows  23 => 42
+      /profile_url_continuity/rules/3/expect/renumbered_last_season  2025 => 2026
+      /profile_url_continuity/rules/3/expect/renumbered_rows  13 => 25
+      /full_history/season_range/last_season  2025 => 2026
+      /full_history/season_range/last_season_rule  "the latest COMPLETED season: data/reference/seasons.json last_season (2026) minus every entry in in_progre... => "the latest COMPLETED season: data/reference/seasons.json last_season (2027) minus every entry in in_progre...
+      /full_history/season_range/resolved_on  "2026-08-27" => "2026-10-27"
+      /full_history/current_season_excluded/seasons/0  2026 => 2027
+      /full_history/current_season_excluded/reason  "2026 is declared in-progress by data/reference/seasons.json and is owned by the separate current-season pi... => "2027 is declared in-progress by data/reference/seasons.json and is not loaded by this full-history contrac...
+      /datasets/player_details/height_enrichment/$comment  "AFLDB-ISSUE-118 Stage H4 durability binding for the rebuild's HEIGHTS stage (tools/migration/enrich_height... => "AFLDB-ISSUE-118 Stage H4 durability binding for the rebuild's HEIGHTS stage (tools/migration/enrich_height...
+      /datasets/player_details/height_enrichment/register_captured_on  "2026-09-02" => "2026-10-21"
+      /datasets/player_details/height_enrichment/supplements/0  - {"snapshot_label":"issue129-t7-20260903","manifest":"docs/rebuild-manifests/afltables_fitzroy_core/issue129...
+      /datasets/player_details/height_enrichment/measured/$comment  "Measured on afldb_test (batch 165, 2026-09-05) from exactly these inputs over the accepted baseline's iden... => "Final persisted SQL values of the isolated C2 rehearsal (attempt 2, 5643f5c2) over exactly the frozen c2-2...
+      /datasets/player_details/height_enrichment/measured/players_with_height  12487 => 12579
+      /datasets/player_details/height_enrichment/stats_input_mode  + "baseline_only"
+      /datasets/player_details/height_enrichment/baseline_snapshot_label  + "c2-2026-final-core-v1"
+      /datasets/ladder/accepted_witness/$comment  "AFLDB-ISSUE-095 durability binding. The raw witness CSVs are gitignored like every other acquired snapshot... => "AFLDB-ISSUE-095 durability binding. The raw witness CSVs are gitignored like every other acquired snapshot...
+      /datasets/ladder/accepted_witness/snapshot_label  "ladder-20260828" => "c2-2026-final-ladder-v1"
+      /datasets/ladder/accepted_witness/manifest  "docs/rebuild-manifests/afltables_fitzroy_core/ladder-20260828.json" => "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-ladder-v1.json"
+      /datasets/ladder/accepted_witness/manifest_sha256  "604a8a162543e19060f426bd189222d32d07726a0b134bdf4f910175cb7a8d3f" => "65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34"
+      /datasets/ladder/accepted_witness/files  129 => 130
+      /datasets/ladder/accepted_witness/rows  1622 => 1640
+      /datasets/ladder/accepted_witness/acquired_on  "2026-08-28" => "2026-10-21"
+      /datasets/ladder/accepted_witness/validator  "tools/rebuild/fitzroy/validate_ladder_witness.py --label ladder-20260828" => "tools/rebuild/fitzroy/validate_ladder_witness.py --label c2-2026-final-ladder-v1"
+      /datasets/ladder/rebuild_expectation/profile  "predecessor-1897-2025" => "c2-2026-successor"
+      /datasets/ladder/rebuild_expectation/core_snapshot_label  "full-history-20260902" => "c2-2026-final-core-v1"
+      /datasets/ladder/rebuild_expectation/core_manifest_sha256  "2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1" => "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988"
+      /datasets/ladder/rebuild_expectation/core_artefact_set_sha256  "15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c" => "817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e"
+      /datasets/ladder/rebuild_expectation/witness_snapshot_label  "ladder-20260828" => "c2-2026-final-ladder-v1"
+      /datasets/ladder/rebuild_expectation/witness_manifest_sha256  "604a8a162543e19060f426bd189222d32d07726a0b134bdf4f910175cb7a8d3f" => "65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34"
+      /datasets/ladder/rebuild_expectation/expected_rows  1622 => 1640
+      /datasets/ladder/rebuild_expectation/evidence_ref  "tools/db/rebuild-test.ts CLUB_SEASONS_EXPECTED rationale and this contract's source_club_normalisation: in... => "tools/db/rebuild-test.ts CLUB_SEASONS_EXPECTED rationale and this contract's source_club_normalisation: in...
+      /datasets/ladder/coverage/$comment  "Exhaustive read-only probe, 1897-2025, run 2026-08-28. Zero call errors, zero zero-row seasons, zero schem... => ["Exhaustive read-only probe, 1897-2025, run 2026-08-28: zero call errors, zero zero-row seasons, zero sche...
+      /datasets/ladder/coverage/last_season  2025 => 2026
+      /datasets/ladder/coverage/seasons_returned  129 => 130
+      /datasets/ladder/coverage/club_season_rows  1622 => 1640
+      /datasets/ladder/coverage/max_rows_season/seasons  "2012-2025" => "2012-2026"
+  data/reference/stat-availability.json
+    e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8 (11357 B) -> e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8 (11357 B); 0 change(s)
+
+final_sha256 pins match this plan for every file.
+
+SUCCESSOR ACTIVATION - NOT performed by this apply (a separate, separately authorised step)
+  profile                 c2-2026-successor
+  file                    tools/db/rebuild-test.ts (not in this write set; left byte-identical)
+  tuple_sha256            a78d36ee7e689b7bb5978335bff5e6bdd54f368572df5f2f01d10caf35a373aa
+  rebuild_sha256.inactive 320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8
+  rebuild_sha256.active   ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338
+  table before            '{}'
+  table after activation  '{"c2-2026-successor":{"profile":"c2-2026-successor","supersedes":"predecessor-1897-2025","core_snapshot_label":"c2-2026-final-core-v1","core_manifest_sha256":"02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988","core_artefact_set_sha256":"817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e","witness_snapshot_label":"c2-2026-final-ladder-v1","witness_manifest_sha256":"65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34","first_season":1897,"last_season":2026,"expected_rows":1640}}'
+  Validated above as the ACTIVATED state; the apply itself leaves the profile unresolvable (inactive).
+
+DRY RUN — nothing was written. Every gate above still ran. Re-run with --apply --acknowledge-season-complete to write these files.

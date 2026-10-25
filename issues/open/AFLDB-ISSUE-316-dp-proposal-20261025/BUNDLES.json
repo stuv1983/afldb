@@ -1,0 +1,24 @@
+{
+  "classification": "Incremental offline review bundles; original repository refs/HEAD unchanged; prerequisites explicit",
+  "bundles": [
+    {
+      "path": "bundles/source-P.bundle",
+      "sha256": "246d49362e1ccec6b89791597caa9386421de101406f6c87470bc430643f064b",
+      "bytes": 780621,
+      "prerequisite": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+      "refs": [
+        "refs/heads/source-P"
+      ]
+    },
+    {
+      "path": "bundles/proposed-BC.bundle",
+      "sha256": "a4f633e946383a7ed40913cdfce7ee3a96fd204b5db1c3ffebf69e56b04b60ce",
+      "bytes": 32262,
+      "prerequisite": "def676517da3955aa18db3606785463aac464188",
+      "refs": [
+        "refs/heads/proposed-B",
+        "refs/heads/proposed-C"
+      ]
+    }
+  ]
+}

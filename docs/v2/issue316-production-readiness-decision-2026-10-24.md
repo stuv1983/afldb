@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-316: production-readiness decision package (2026-10-24)
 
-**Status: for owner review. Nothing in this document is authorised.** It was prepared read-only and locally, with
+**Current status: D/P APPROVED for readiness proof only; production NO-GO.** The owner ruling in §0b supersedes the historical approval drafts and restrictions below. It was prepared read-only and locally, with
 native file reads of the tracked ledger, the ISSUE-316 runbook, the 2026-10-21 decision and release-plan documents, the
 G application and rebuild specifications and the J2 proposal. No shell, Git, SSH, SQL, census, dry run, apply, rebuild,
 activation, push or deployment was run to prepare it.
@@ -13,7 +13,33 @@ part of whole-rollover recovery. The design is
 [`issue316-successor-activation-separation-2026-10-25.md`](issue316-successor-activation-separation-2026-10-25.md);
 the owner rulings are in §0a. The J2 pins in §1 describe the **old coupled shape** and are proof evidence only.
 
-**Local gate update 2026-10-25:** final focused validation PASS (1,539 passed / 5 skipped / 0 failed, exit 0) with normal C: temp and 85.183609008789063 GiB free immediately before execution; no source/assertion modification. [Exact preflight, output and evidence reverification](../../issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md). Candidate `c438f844` unchanged. Structural closure follows the separate authorised evidence/tracking commit. Evidence/admission gates remain accepted; no owner re-adjudication. Then prepare the D/P structural proposal for owner adjudication. U3 CONFIRMED; U4 Route B; Brownlow untouched; production NO-GO.
+**Local gate update 2026-10-25:** final focused validation PASS (1,539 passed / 5 skipped / 0 failed, exit 0) with normal C: temp and 85.183609008789063 GiB free immediately before execution; no source/assertion modification. [Exact preflight, output and evidence reverification](../../issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md). Candidate `c438f844` unchanged. Structural gate **CLOSED / ACCEPTED**; implementation `c438f8449e65c28cf9f00879aaa045131b5f0d3a`, evidence/tracking `def676517da3955aa18db3606785463aac464188`. Evidence/admission gates remain accepted; no owner re-adjudication. Then prepare the D/P structural proposal for owner adjudication. U3 CONFIRMED; U4 Route B; Brownlow untouched; production NO-GO.
+
+**D/P evidence accepted (2026-10-25):** retained J2 167/167 and inputs 264/264; real offline validator exit 0 / 3-of-3 PASS / all pins match; seven-file apply shape; B inactive/rebuild-ineligible; projected C 1,640 rows / 91 checks; exact-P DB-free validation and typecheck PASS. Proposal-only repair supersedes the earlier B 2,956/7/32 failure: broader B **2,966/7/0**, C **2,992/7/0**; focused B **395/0/0**, C **396/0/0**, all exit 0. Fresh-context restatement review GO, no findings. No accepted product/test assertions changed; no new rebuild required. Fresh proof is **NOT RUN**, awaiting the approved day-D window. [Approved readiness runbook](../../issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/READINESS-RUNBOOK.md).
+
+## 0b. D/P and read-only readiness authority (owner, 2026-10-25)
+
+**Current owner ruling (2026-10-25):** structural gate **CLOSED / ACCEPTED**; D/P **APPROVED for readiness proof**. **D = 2026-10-27**, window **02:00–04:00 UTC / 13:00–15:00 AEDT (Melbourne)**; exact **P = `def676517da3955aa18db3606785463aac464188`**, implementation `c438f8449e65c28cf9f00879aaa045131b5f0d3a`. A later documentation/evidence commit never becomes P. Authorised in that window: current read-only host/native-policy proof, fresh three-target censuses, required nightly/canonical check and enforced dry run without `--apply`. No apply, activation, deactivation, deployment, disposable rebuild, push or Brownlow work. U3 **CONFIRMED**; U4 **Route B**; ISSUE-316 **OPEN**; production **NO-GO pending separate apply approval**.
+
+**D/P evidence accepted (2026-10-25):** retained J2 167/167 and inputs 264/264; real offline validator exit 0 / 3-of-3 PASS / all pins match; seven-file apply shape; B inactive/rebuild-ineligible; projected C 1,640 rows / 91 checks; exact-P DB-free validation and typecheck PASS. Proposal-only repair supersedes the earlier B 2,956/7/32 failure: broader B **2,966/7/0**, C **2,992/7/0**; focused B **395/0/0**, C **396/0/0**, all exit 0. Fresh-context restatement review GO, no findings. No accepted product/test assertions changed; no new rebuild required. Fresh proof is **NOT RUN**, awaiting the approved day-D window.
+
+The exact frozen hashes and the complete authorised procedure are in the
+[approval record](../../issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/APPROVAL.json) and
+[day-D runbook](../../issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/READINESS-RUNBOOK.md).
+No approved input is silently regenerated. P remains exact even after the local
+documentation commit. Candidate-affecting canonical drift, date/P drift, any
+CRIT/HIGH, or MED affecting native completeness/visibility/provenance/isolation
+stops and returns to the owner. Ordinary native version drift fully captured by
+a fresh policy, normal enforcement/self-check and independent review GO may proceed
+without another owner round-trip. J2 policy and censuses remain expired.
+
+The historical combined dry-run/apply drafts below grant no apply authority.
+Only the enforced dry run without `--apply` is authorised. No package hold,
+installation or timer mutation is authorised. Three censuses are read-only, on
+D, preferably within six hours; the production census must be no older than six
+hours when the dry run begins. After proof, return the full decision package
+and request the separate production-apply decision. State B must later be
+validated before a separate activation decision. Brownlow stays Route B.
 
 ## 0a. Ruling recorded with the activation separation (owner, 2026-10-25)
 

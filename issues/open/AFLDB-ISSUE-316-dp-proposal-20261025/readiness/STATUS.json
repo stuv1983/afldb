@@ -1,0 +1,19 @@
+{
+  "schema": "afldb.issue316.readiness-status/1",
+  "observed_at_utc": "2026-10-25T07:57:18.041Z",
+  "state": "AWAITING APPROVED READINESS WINDOW",
+  "D": "2026-10-27",
+  "P": "def676517da3955aa18db3606785463aac464188",
+  "readiness_window": {
+    "start_utc": "2026-10-27T02:00:00Z",
+    "end_utc": "2026-10-27T04:00:00Z",
+    "Melbourne_AEDT": "2026-10-27 13:00–15:00"
+  },
+  "fresh_host_native_proof": "NOT RUN",
+  "fresh_censuses": "NOT RUN",
+  "nightly_canonical_check": "NOT RUN",
+  "enforced_dry_run": "NOT RUN",
+  "reason": "Current UTC is before 2026-10-27T02:00:00Z. Fresh proof must be obtained in the approved window on D, not reused from today or J2.",
+  "production": "NO-GO pending separate apply approval",
+  "next_action": "At approved window follow READINESS-RUNBOOK.md; return full proof package for separate production-apply decision."
+}

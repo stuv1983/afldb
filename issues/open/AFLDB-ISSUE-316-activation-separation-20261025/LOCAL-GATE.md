@@ -1,7 +1,9 @@
 # ISSUE-316 activation-separation local gate (2026-10-25)
 
 Candidate: **`c438f8449e65c28cf9f00879aaa045131b5f0d3a`**, accepted unchanged.
-Structural gate: **CONDITIONALLY ACCEPTED / NOT YET CLOSED**.
+Structural gate: **CLOSED / ACCEPTED**.
+Evidence/tracking commit: **`def676517da3955aa18db3606785463aac464188`**.
+[Closure receipt](STRUCTURAL-CLOSURE.json).
 U3 **CONFIRMED**; U4 **Route B**; Brownlow untouched; production **NO-GO**.
 
 ## Execution guard and accepted validation
@@ -103,21 +105,28 @@ byte-identical**, including all hash-listed files and the two unpinned original
 discovery logs. This supporting proof establishes byte preservation through Git
 materialisation; owner-adjudicated drift is documented separately.
 
-## Remaining closure and next phase
+## Completed closure and next phase
 
 1. Disk guard and clean final validation **PASS**, as recorded above.
-2. Historical drift documented and credential/admission gates PASS; preserve these
-   results and reverify admission hashes before committing.
-3. Current local link targets and worktree/index `git diff --check` PASS; preserve
-   these results and recheck after any further tracking edit. The index currently
-   holds the 42 admitted files plus the later U3 preservation `.gitattributes`.
-4. Make the separately authorized local documentation/evidence commit, with no
-   unrelated product code. No amend, squash, recreation or push.
-5. Confirm no substantive post-review product-code/assertion/activation/apply change.
+2. Historical drift documented and credential/admission gates PASS; all 42
+   admitted disk/index hashes and the accepted blind-scan inventory reverified.
+3. Current local link targets and worktree/index `git diff --check` PASS; zero
+   excluded files staged. The evidence commit is complete; the index is now empty.
+4. Separately authorized local evidence/tracking commit created without product
+   edits, amend, squash, candidate recreation or push.
+5. No substantive post-review product-code/assertion/activation/apply change.
 
 Then automatically record **CLOSED / ACCEPTED**, without another owner decision
 merely to close. Record implementation SHA and the separate evidence/tracking SHA.
-The evidence/tracking commit has **not** been created yet.
+The evidence/tracking commit is **`def676517da3955aa18db3606785463aac464188`**.
+All required conditions passed; structural closure was automatic under existing owner authority.
+
+[D/P proposal preparation](../AFLDB-ISSUE-316-dp-proposal-20261025/PROPOSAL.md)
+is partial and not execution-ready. P is the evidence commit above; proposed D is
+2026-10-27. Exact P DB-free matrix: 11,318 passed / 31 declared skips / 0 failed;
+typecheck exit 0. The real local three-gate successor validation awaits access to
+named retained inputs outside the repository; B/C restatement text previews are
+prepared but require separate semantic reconciliation and validation.
 
 After closure only, prepare the real production-window proposal: D, structural P
 descended from the candidate, 7-file apply write set, transition and tuple hashes,
