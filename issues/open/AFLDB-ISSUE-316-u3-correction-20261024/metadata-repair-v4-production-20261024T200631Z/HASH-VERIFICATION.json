@@ -1,0 +1,222 @@
+{
+  "checked_utc": "2026-10-24T20:06:31.441Z",
+  "manifest_sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+  "review_sha256": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2",
+  "report_sha256": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+  "members": [
+    {
+      "path": "ACTOR-EVIDENCE.json",
+      "sha256": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50"
+    },
+    {
+      "path": "DERIVATION.json",
+      "sha256": "f237a2648655c566601551d081ff8edce2476671b5318ec25e56618b308556c0"
+    },
+    {
+      "path": "OWNER-RULING.md",
+      "sha256": "6fa796dea27103fecda4026fb03ed07ec95bd7ecc1aab3a22365ba615081a6ae"
+    },
+    {
+      "path": "PG-TRANSPORT.json",
+      "sha256": "e3cc01d7a86834d7d2ad8b24635bf58435d9dfb598b05b619bdabb713dfb949a"
+    },
+    {
+      "path": "PG-TRANSPORT.stderr.log",
+      "sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925"
+    },
+    {
+      "path": "PG-TRANSPORT.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "README.md",
+      "sha256": "9986bfe3746752902af4ece329d2f76dd3a08128c17d5f81ff3d8ee17bb4a2a3"
+    },
+    {
+      "path": "SEMANTICS.md",
+      "sha256": "e98199018ee40a7c6c1612daf051d53f04602293860a74b78d87c95165980b51"
+    },
+    {
+      "path": "V3-NO-GO.md",
+      "sha256": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4"
+    },
+    {
+      "path": "VALIDATION-EVIDENCE.json",
+      "sha256": "ae2553846b4b8d6cbce2fd958fca60c648316d4124d285cbc79ddcdf695752cd"
+    },
+    {
+      "path": "VALIDATION.json",
+      "sha256": "dd7986cb6a648ec061f582c6bebb0b454a737ad3b389aa28ecef605d17116c7e"
+    },
+    {
+      "path": "WRAPPER-VALIDATION.json",
+      "sha256": "26f59f9a25567c62b9415cb5bdcc0957b04d8a7a971997599b236796ee099ee3"
+    },
+    {
+      "path": "assert-post.sql",
+      "sha256": "6ff903c74f78317f97de2e8ede4c328b5f4c65ab4daa6cd134f54ddf7cabc1fd"
+    },
+    {
+      "path": "audit-log-source.txt",
+      "sha256": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644"
+    },
+    {
+      "path": "audit-schema-source.txt",
+      "sha256": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720"
+    },
+    {
+      "path": "binding.json",
+      "sha256": "e91761ab61301c191639bc03ce35ee8812c36b7d2ba5eabb79dd81bc3af2a4fd"
+    },
+    {
+      "path": "canonical-gates.sql",
+      "sha256": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3"
+    },
+    {
+      "path": "checks.sql",
+      "sha256": "53b02b5c6ef5fd7d1fbf1b9a87c787cb44989e9fc2f5ebe34bf74c311455002d"
+    },
+    {
+      "path": "expected-migrations.json",
+      "sha256": "ed2a6ad4ee8e914349768682fccddd577b97e5765587e036f2d3fbc837f803a5"
+    },
+    {
+      "path": "identity.sql",
+      "sha256": "0acad1249c6af37cac1f95454cc1ecf7b463bf93b16fe177416181f394752ff6"
+    },
+    {
+      "path": "lock-assert.sql",
+      "sha256": "3c8c458dd38d988a416c8522662bf07daf0b6d39d74f9e1d647cdfcfd5fcdbb4"
+    },
+    {
+      "path": "locks.sql",
+      "sha256": "5ac97832452d0cddf86cbf65ab5749e9fe3cec56b57608321d12afe511d927f8"
+    },
+    {
+      "path": "migration-guard.sql",
+      "sha256": "4d211262c64cd356987f57937abae522ba09a771cc3f3355a50460c2662de305"
+    },
+    {
+      "path": "note.txt",
+      "sha256": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d"
+    },
+    {
+      "path": "operational-guard.sql",
+      "sha256": "375358733a87c036b69b3f1827c228f43c0df2d4085be8a3c6e428820079189f"
+    },
+    {
+      "path": "operational-host.sh",
+      "sha256": "b8dc2ed8b0abe39b0beb7a83a731d68c6dcadf87ae034e9f0affbf2086903f2d"
+    },
+    {
+      "path": "postcheck.sql",
+      "sha256": "86c6d4656afc78392c29670e66d90c97259a63f345368b898eeaebd9df482cb0"
+    },
+    {
+      "path": "preflight.sql",
+      "sha256": "9c53ad4146631da96f10d560047f6aa4897e98f7e0c5e6b5fe853afd8544798d"
+    },
+    {
+      "path": "protected.json",
+      "sha256": "5c19db42754a5968f4838bd7b7ffa672958cb5b3474d30554045f82f35eed2dc"
+    },
+    {
+      "path": "repair-body.sql",
+      "sha256": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b"
+    },
+    {
+      "path": "repair.sql",
+      "sha256": "c0f8c47e103b81347afcbd2b10be557d73ac36e36f7c30117d356f34bec7ce55"
+    },
+    {
+      "path": "run.cjs",
+      "sha256": "992afeac58dd2e5d4790d5ab67f2600f7c694746248a41dc230905a57d9e16c7"
+    },
+    {
+      "path": "runtime.json",
+      "sha256": "812eb905158bb59ce9e7f0b6e5bb89142697d49901628531bd185f6afc548c37"
+    },
+    {
+      "path": "schema-evidence.json",
+      "sha256": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593"
+    },
+    {
+      "path": "snapshot.sql",
+      "sha256": "314185b65033d63dd158e08b6be4af32ef7ac9aeeea7d7d8b54c22fe64cf158b"
+    },
+    {
+      "path": "validate-order.cjs",
+      "sha256": "ce5e0cbf96786213d5f7bd2de6e8021b3de329bf3fd53bd6b1eb69c3eb8d28e6"
+    },
+    {
+      "path": "validate-pg.cjs",
+      "sha256": "713476baf65087260e7f172979795f80526fa469275f2414bc8e319a963c62ee"
+    },
+    {
+      "path": "validate-remote.cjs",
+      "sha256": "2733cde0d1940e3f4ca9a0c81ec86c561f853f22823be45f1153c656db5080e2"
+    },
+    {
+      "path": "validate-wrapper.cjs",
+      "sha256": "5ff138390083c17505cb24b962743e3d0533bbf9e1c44d5e35704ef96592396c"
+    },
+    {
+      "path": "validate.cjs",
+      "sha256": "78b6f16dca542f574024bc996fb8499959e4a7cae5183b68fb6e714fee2a7025"
+    }
+  ],
+  "external_evidence": [
+    {
+      "path": "../metadata-repair-v4-validation-2dLUSk/PG-CLEANUP.json",
+      "sha256": "35993c9715d2ecfcb493ce2cf9226a131d05b8f43f2d0e88ccdcc6f63ed51a22"
+    },
+    {
+      "path": "../metadata-repair-v4-validation-2dLUSk/PG-CLUSTER-COMMANDS.json",
+      "sha256": "b6629744e706dbed76aad6515c65f1a5cb33d72fc23a211cf6c098cf48681e01"
+    },
+    {
+      "path": "../metadata-repair-v4-validation-2dLUSk/PG-SERVER.log",
+      "sha256": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285"
+    },
+    {
+      "path": "../metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.json",
+      "sha256": "413a5ef5e537e916ecad8c21945d9782008110ad512f80479064f773c555d099"
+    },
+    {
+      "path": "../metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "../metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stdout.log",
+      "sha256": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a"
+    },
+    {
+      "path": "../metadata-repair-v4-validation-2dLUSk/PG-VALIDATION.json",
+      "sha256": "361e8f76f9fefcf0bae858e9b67bb0412981d2b3af18cbaafee6d0cf732b81a3"
+    },
+    {
+      "path": "../metadata-repair-v4-validation-2dLUSk/TRANSFER-INVENTORY.json",
+      "sha256": "6addba901e77b467e0404ee25eb64c7a0987af67b3e11b037b0b89c95d78c2c6"
+    }
+  ],
+  "runtime": {
+    "node": {
+      "path": "C:/Program Files/nodejs/node.exe",
+      "sha256": "47cd67453da180a39cdf5daedb89862667b8e627e60c116607874633450cd30d"
+    },
+    "ssh": {
+      "path": "C:/WINDOWS/System32/OpenSSH/ssh.exe",
+      "sha256": "98d447730047f5df91373e852d057928a921c3d1e89938700ab656ba84b19dc8"
+    },
+    "remote_trusted_system_paths": [
+      "/bin/bash",
+      "/usr/bin/sudo",
+      "/usr/bin/env",
+      "/usr/bin/psql"
+    ],
+    "boundary": "Remote installed system binaries and PostgreSQL are trusted platform, not supplied package artifacts. No remote runtime was replaced or hashed during local construction."
+  },
+  "prior_attempt": false,
+  "unexpected_members": [],
+  "status": "PASS"
+}

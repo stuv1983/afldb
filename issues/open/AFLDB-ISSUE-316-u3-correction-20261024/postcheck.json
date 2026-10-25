@@ -1,0 +1,241 @@
+{
+  "edits": [
+    {
+      "id": 94,
+      "note": null,
+      "row_id": 17214,
+      "created_at": "2026-10-24T22:28:46.203865+11:00",
+      "new_values": {
+        "players": {
+          "2121": {
+            "kind": "remove"
+          }
+        },
+        "playersCount": 46,
+        "scoreUpdated": false,
+        "authorityKeys": [
+          {
+            "action": "mint",
+            "playerId": 2121,
+            "entityKey": "2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html"
+          }
+        ]
+      },
+      "old_values": {
+        "players": {
+          "2121": {
+            "goals": 0,
+            "kicks": 0,
+            "marks": 0,
+            "behinds": 0,
+            "hitouts": 0,
+            "tackles": 0,
+            "club_slug": "essendon",
+            "disposals": 0,
+            "frees_for": 0,
+            "handballs": 0,
+            "frees_against": 0,
+            "jumper_number": "8"
+          }
+        }
+      },
+      "table_name": "matches",
+      "field_group": "match_sheet",
+      "admin_user_id": 1
+    }
+  ],
+  "counts": {
+    "pms_2026": 10028,
+    "pms_total": 695499,
+    "afltables_2026": 10028,
+    "essendon_match17214": 23
+  },
+  "snapshot": {
+    "oid": "66668",
+    "utc": "2026-10-24T11:30:11.345984",
+    "user": "afldb_backup",
+    "database": "afldb_prod",
+    "isolation": "repeatable read",
+    "read_only": "on",
+    "system_id": "7674454702926115004"
+  },
+  "authority": [
+    {
+      "id": 93,
+      "is_active": true,
+      "created_at": "2026-10-24T22:28:46.203865+11:00",
+      "entity_key": "2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html",
+      "updated_at": "2026-10-24T22:28:46.203865+11:00",
+      "entity_type": "player_match_stats",
+      "field_group": "lineup",
+      "admin_user_id": 1,
+      "override_values": {
+        "present": false
+      }
+    }
+  ],
+  "match17214": {
+    "id": 17214,
+    "notes": null,
+    "margin": 12,
+    "result": "away_win",
+    "season": 2026,
+    "is_final": false,
+    "venue_id": 14,
+    "match_key": "2026|4|2026-03-28|Essendon|North Melbourne",
+    "source_id": 10,
+    "venue_raw": "Docklands",
+    "attendance": 40154,
+    "away_goals": 12,
+    "away_score": 81,
+    "home_goals": 9,
+    "home_score": 69,
+    "match_date": "2026-03-28",
+    "match_time": "1935",
+    "round_code": "4",
+    "round_type": "home_and_away",
+    "imported_at": "2026-09-28T07:04:33.146861+10:00",
+    "match_event": null,
+    "away_behinds": 9,
+    "away_club_id": 16,
+    "home_behinds": 15,
+    "home_club_id": 6,
+    "round_number": 4,
+    "scheduled_at": null,
+    "winner_club_id": 16,
+    "import_batch_id": 29,
+    "legacy_match_id": null,
+    "is_finals_series": false,
+    "source_record_id": "2026|4|2026-03-28|Essendon|North Melbourne",
+    "attendance_status": "complete",
+    "attendance_source_id": 10
+  },
+  "target_rows": 0,
+  "fingerprints": {
+    "matches_2026": "f14607da824fd33274d6e0e1cf892bac",
+    "application20834": "368e47a922b8601373c7df3f8fbdcb3f",
+    "pms_ids_excluding_target": "1d3d87f210b84e5df40308b8af8f9e17",
+    "pms_2026_excluding_target": "21acf6b41751d4888d594e0aab68ac0c"
+  },
+  "afltables_only": [],
+  "canonical_only": [],
+  "target_derived": {
+    "clubs": [
+      {
+        "games": 2,
+        "goals": 2,
+        "club_id": 6,
+        "player_id": 2121,
+        "last_season": 2026,
+        "first_season": 2026,
+        "last_match_id": 17210,
+        "first_match_id": 17197
+      },
+      {
+        "games": 123,
+        "goals": 41,
+        "club_id": 11,
+        "player_id": 2121,
+        "last_season": 2025,
+        "first_season": 2016,
+        "last_match_id": 16835,
+        "first_match_id": 14968
+      }
+    ],
+    "career": {
+      "wins": 42,
+      "draws": 1,
+      "games": 125,
+      "goals": 43,
+      "kicks": 1532,
+      "marks": 537,
+      "finals": 2,
+      "losses": 82,
+      "behinds": 34,
+      "hitouts": 0,
+      "tackles": 438,
+      "disposals": 2562,
+      "frees_for": 80,
+      "handballs": 1030,
+      "player_id": 2121,
+      "debut_date": "2016-08-20",
+      "rebuilt_at": "2026-10-24T22:28:46.203865+11:00",
+      "clubs_played": 2,
+      "debut_season": 2016,
+      "final_season": 2026,
+      "premierships": 0,
+      "frees_against": 40,
+      "brownlow_votes": 18,
+      "seasons_played": 11,
+      "best_goals_game": 2,
+      "brownlow_medals": 0,
+      "last_match_date": "2026-03-22",
+      "best_disposals_game": 41,
+      "frees_recorded_games": 125,
+      "kicks_recorded_games": 125,
+      "marks_recorded_games": 125,
+      "behinds_recorded_games": 125,
+      "hitouts_recorded_games": 125,
+      "tackles_recorded_games": 125,
+      "disposals_recorded_games": 125,
+      "handballs_recorded_games": 125
+    },
+    "season": {
+      "wins": 0,
+      "draws": 0,
+      "games": 2,
+      "goals": 2,
+      "kicks": 12,
+      "marks": 6,
+      "finals": 0,
+      "losses": 2,
+      "season": 2026,
+      "behinds": 1,
+      "hitouts": 0,
+      "tackles": 1,
+      "disposals": 30,
+      "frees_for": 1,
+      "handballs": 18,
+      "player_id": 2121,
+      "club_count": 1,
+      "is_premier": false,
+      "frees_against": 0,
+      "brownlow_votes": null,
+      "brownlow_status": "not_applicable",
+      "primary_club_id": 6,
+      "frees_recorded_games": 2,
+      "hitouts_recorded_games": 2,
+      "tackles_recorded_games": 2,
+      "disposals_recorded_games": 2
+    },
+    "club_season": [
+      {
+        "wins": 0,
+        "draws": 0,
+        "games": 2,
+        "goals": 2,
+        "kicks": 12,
+        "marks": 6,
+        "finals": 0,
+        "losses": 2,
+        "season": 2026,
+        "behinds": 1,
+        "club_id": 6,
+        "hitouts": 0,
+        "tackles": 1,
+        "disposals": 30,
+        "frees_for": 1,
+        "handballs": 18,
+        "player_id": 2121,
+        "is_premier": false,
+        "frees_against": 0,
+        "frees_recorded_games": 2,
+        "hitouts_recorded_games": 2,
+        "tackles_recorded_games": 2,
+        "disposals_recorded_games": 2
+      }
+    ]
+  },
+  "target_key_rows": 0,
+  "write_attempted": false
+}

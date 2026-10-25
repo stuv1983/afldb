@@ -1,0 +1,5 @@
+{
+  "utc": "2026-10-24T20:07:59.245Z",
+  "reason": "Operational observation command failed STOP before frozen attempt",
+  "automatic_retry": false
+}

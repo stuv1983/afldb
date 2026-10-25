@@ -1,0 +1,74 @@
+{
+  "checks": {
+    "target_exists": true,
+    "no_afltables_keys_missing": true,
+    "retained_values_unchanged": true,
+    "sole_expected_canonical_only": true,
+    "originating_application_matches": true
+  },
+  "counts": {
+    "pms_2026": 10029,
+    "pms_total": 695500,
+    "afltables_2026": 10028,
+    "essendon_match17214": 24
+  },
+  "target": {
+    "id": 705437,
+    "goals": 0,
+    "kicks": 0,
+    "marks": 0,
+    "behinds": 0,
+    "bounces": 0,
+    "club_id": 6,
+    "hitouts": 0,
+    "tackles": 0,
+    "clangers": 0,
+    "match_id": 17214,
+    "rebounds": 0,
+    "contested": 0,
+    "disposals": 0,
+    "frees_for": 0,
+    "handballs": 0,
+    "player_id": 2121,
+    "source_id": 6,
+    "clearances": 0,
+    "inside_50s": 0,
+    "uncontested": 0,
+    "goal_assists": 0,
+    "frees_against": 0,
+    "jumper_number": "8",
+    "career_game_no": 126,
+    "one_percenters": 0,
+    "contested_marks": 0,
+    "import_batch_id": 32,
+    "marks_inside_50": 0,
+    "source_record_id": "CD_M20260140305|CD_T50|CD_I993799"
+  },
+  "snapshot": {
+    "oid": "66668",
+    "utc": "2026-10-24T11:26:57.564078",
+    "user": "afldb_backup",
+    "database": "afldb_prod",
+    "isolation": "repeatable read",
+    "read_only": "on",
+    "system_id": "7674454702926115004"
+  },
+  "afltables_only": [],
+  "canonical_only": [
+    {
+      "id": 705437,
+      "club_id": 6,
+      "match_id": 17214,
+      "match_key": "2026|4|2026-03-28|Essendon|North Melbourne",
+      "player_id": 2121
+    }
+  ],
+  "write_attempted": false,
+  "preconditions_pass": true,
+  "before_fingerprints": {
+    "matches_2026": "f14607da824fd33274d6e0e1cf892bac",
+    "application20834": "368e47a922b8601373c7df3f8fbdcb3f",
+    "pms_ids_excluding_target": "1d3d87f210b84e5df40308b8af8f9e17",
+    "pms_2026_excluding_target": "21acf6b41751d4888d594e0aab68ac0c"
+  }
+}

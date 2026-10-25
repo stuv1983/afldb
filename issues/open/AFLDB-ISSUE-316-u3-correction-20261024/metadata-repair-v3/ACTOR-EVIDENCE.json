@@ -1,0 +1,13 @@
+{
+  "sources": [
+    "../metadata-investigation.json",
+    "../browser-inspection.json"
+  ],
+  "original_edit_admin_user_id": 1,
+  "browser_current_account": "stuart.villanti@gmail.com",
+  "browser_role": "Super admin",
+  "browser_audit_operator": "stuart.villanti@gmail.com",
+  "metadata_evidence_sha256": "65d7d2f9b97c889969388b22de8531d7a9cdb1b3c7c7e83d39da2061df41ba48",
+  "browser_evidence_sha256": "db5e97556d912821df2ca0f37d538c8a057b3cd3f6872e77147ac201516fa71a",
+  "execution_delegation": "Current retained owner instruction authorises Codex to execute the reviewed metadata repair autonomously after independent GO."
+}

@@ -1,0 +1,179 @@
+{
+  "issue": "AFLDB-ISSUE-316",
+  "scope": "Every repository file created/edited during this validation-only task; exact executable SQL unchanged; no Git operations",
+  "files_changed": 35,
+  "files": [
+    "CHANGELOG.md",
+    "IssuesIndex.md",
+    "blockers.md",
+    "issues.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V4-RECORD.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v4-validation.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V4-FINAL-FREEZE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V4-STATE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-CLEANUP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-CLUSTER-COMMANDS.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-SERVER.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-VALIDATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/TRANSFER-INVENTORY.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/CANDIDATE-BEFORE.manifest.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/CANDIDATE-FINAL.manifest.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/METADATA-REPAIR-V4-RECORD.before.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/PARENT-SHA256SUMS.before",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/TRANSFER-PLANNED.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/validate-pg.cjs.before",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/validate-remote.cjs.before",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/MANIFEST.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/README.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/REVIEW.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/REVIEW.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-pg.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-remote.cjs",
+    "issues/open/AFLDB-ISSUE-316.md"
+  ],
+  "hashes": [
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "71458e45dc4fc57c9e6d7c200829fbe01b009aaacdbbd875739321947f330ecd"
+    },
+    {
+      "path": "IssuesIndex.md",
+      "sha256": "0d8b8b5582fe6691e484e97cc6833cfb8dcc7c176487656ee34e861f6564ed64"
+    },
+    {
+      "path": "blockers.md",
+      "sha256": "c7c7967656a3ae47f1e4c886763bdc9b87570c3848ef5183ce7fe9af1c05e136"
+    },
+    {
+      "path": "issues.md",
+      "sha256": "540aa05b709ae559682b4e06b9b4971219b4e37b809a286485cc99e3c64e8ae6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V4-RECORD.md",
+      "sha256": "b51c595a24b15d7cf08483f8925bfb2bdd2a11d77663a9d59c3d52eae0074c3a"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V4-FINAL-FREEZE.json",
+      "sha256": "57d83a42f4582db957448d64257108173698d6d2181c576202377dc2f989f109"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V4-STATE.json",
+      "sha256": "935989600273dd2faa2eb265192a44d6c341a0bbfdcd5119bbdf5f9942532f16"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-CLEANUP.json",
+      "sha256": "35993c9715d2ecfcb493ce2cf9226a131d05b8f43f2d0e88ccdcc6f63ed51a22"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-CLUSTER-COMMANDS.json",
+      "sha256": "b6629744e706dbed76aad6515c65f1a5cb33d72fc23a211cf6c098cf48681e01"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-SERVER.log",
+      "sha256": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.json",
+      "sha256": "413a5ef5e537e916ecad8c21945d9782008110ad512f80479064f773c555d099"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stdout.log",
+      "sha256": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-VALIDATION.json",
+      "sha256": "361e8f76f9fefcf0bae858e9b67bb0412981d2b3af18cbaafee6d0cf732b81a3"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/TRANSFER-INVENTORY.json",
+      "sha256": "6addba901e77b467e0404ee25eb64c7a0987af67b3e11b037b0b89c95d78c2c6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/CANDIDATE-BEFORE.manifest.json",
+      "sha256": "e840cd79a74ca20f523b0dfab10f9c86407f248f493ca229e12b146d09e0c021"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/CANDIDATE-FINAL.manifest.json",
+      "sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/METADATA-REPAIR-V4-RECORD.before.md",
+      "sha256": "7a629241d7538a08042ba5bdf0a9a97316ac51771cc7eb36b41627a95dff423b"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/PARENT-SHA256SUMS.before",
+      "sha256": "35d83aaf982f7b13ac283ad50df55265d9e258e719070cee1bb2070acee49140"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/TRANSFER-PLANNED.json",
+      "sha256": "8040021b8c7605321375752edee07ce7f9fa540016aa023b8278c8e16a7a5691"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/validate-pg.cjs.before",
+      "sha256": "12f5f88caf5b609905283d3f270aa55d44352dc11872a10f7f3968ebe59f4815"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/validate-remote.cjs.before",
+      "sha256": "4a7f42ec75bab5d02fcd16f95f0bba4cfd252ad222c2733c928929d709c06de5"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.json",
+      "sha256": "e1f77dc04aa5be2c454ec3b658420192bd5f7220bfc7d5eacca9616b9abe4db6"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.stderr.log",
+      "sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/MANIFEST.json",
+      "sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/README.md",
+      "sha256": "9986bfe3746752902af4ece329d2f76dd3a08128c17d5f81ff3d8ee17bb4a2a3"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/REVIEW.json",
+      "sha256": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/REVIEW.md",
+      "sha256": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+      "sha256": "ae2553846b4b8d6cbce2fd958fca60c648316d4124d285cbc79ddcdf695752cd"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-pg.cjs",
+      "sha256": "713476baf65087260e7f172979795f80526fa469275f2414bc8e319a963c62ee"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-remote.cjs",
+      "sha256": "2733cde0d1940e3f4ca9a0c81ec86c561f853f22823be45f1153c656db5080e2"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316.md",
+      "sha256": "24a3b3ce4cb280b396bfa84d35068f310ff7809e35c058bdfe9a7c40e436e32a"
+    }
+  ],
+  "hash_exclusions": "This self-referential inventory and parent SHA256SUMS; inventory is covered by parent SHA256SUMS",
+  "protected_python_changed": false,
+  "tools_migration_changed": false
+}

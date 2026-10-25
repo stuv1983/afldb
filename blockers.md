@@ -1,5 +1,26 @@
 # AFLDB Waiting and Blocker Register
 
+> **Current owner ruling (2026-10-25):** implementation candidate `c438f8449e65c28cf9f00879aaa045131b5f0d3a` accepted unchanged. Successor-activation structural gate **CONDITIONALLY ACCEPTED / NOT YET CLOSED**. The final normal-C:-temp rebuild/cutover run must wait for at least **5 GiB free on C:** (execution guard only); operator cleanup only. Post-F3 season-rollover 393/393 and typecheck exit 0 remain accepted. Canonical committed evidence is verified; legacy evidence is SUPERSEDED ? NOT CANONICAL. Blind production-credential scan and structural scans PASS; exactly 42 U3 files admitted/force-added, 20 excluded. Three narrative mismatches are documented as EXPECTED HISTORICAL VERSION DRIFT and are not blockers; immutable evidence and current manifests PASS. Final validation and the separate evidence/tracking commit remain pending. U3 **CONFIRMED**; U4 **Route B**; Brownlow untouched; production **NO-GO**. No census, apply, activation, deployment, disposable rebuild or push.
+> [Local gate](issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md).
+
+> **Scoped update 2026-10-25 — ISSUE-316/U3 CONFIRMED (current):** metadata repair v5 executed once, PASS.
+> Principal: existing non-superuser `afldb_owner` via the existing protected `.env` credential; no sudo, grant,
+> role, authentication change or new credential. v5 manifest 3e1e329f…fc06d96; fresh-context review GO, 0 stopping.
+> Observation, read-only prerequisite, marker, one write session, postcheck: all PASS. data_edits 94.note set;
+> receipt 95; authority 93 and protected data unchanged; attempt consumed. U3 blocker cleared.
+> U4 Route B; Brownlow untouched; production NO-GO.
+> [V5 record](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V5-RECORD.md).
+
+> **Scoped update 2026-10-25 — ISSUE-316/U3 (superseded):** F-005 subject to v4 detection/isolation proof.
+> Owner-authorised 19-member synthetic transfer to streamanator completed with matching hashes.
+> PostgreSQL16.15: 10/10 database cases plus static ordering PASS, including early rollback and
+> final-assertion/pre-COMMIT optional CREATE then CONCURRENT_SCHEMA_DRIFT. Cleanup PASS;
+> no private process/socket remains. SQL unchanged; 40-member manifest 829fc30a…848ecf84 frozen.
+> Fresh-context independent review GO, zero stopping findings; F-006 LOW host-pipeline observation retained.
+> Validation-only task complete; no frozen edits after review or production connection/preflight/attempt/write.
+> U3 unconfirmed; U4 Route B; Brownlow untouched; production NO-GO. Validation-only authority.
+> [V4 record](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V4-RECORD.md).
+
 > **Navigation aid, not an authority.** The runbooks under `issues/` and `issues.md` remain authoritative; where this
 > file and a runbook disagree, the runbook wins. **Update this file whenever a listed blocker or acceptance state
 > changes** (an item completes, a decision is recorded, a hold is lifted, new evidence arrives), and when an issue is

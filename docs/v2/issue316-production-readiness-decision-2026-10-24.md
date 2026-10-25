@@ -13,6 +13,8 @@ part of whole-rollover recovery. The design is
 [`issue316-successor-activation-separation-2026-10-25.md`](issue316-successor-activation-separation-2026-10-25.md);
 the owner rulings are in §0a. The J2 pins in §1 describe the **old coupled shape** and are proof evidence only.
 
+**Local gate update 2026-10-25:** final focused validation PASS (1,539 passed / 5 skipped / 0 failed, exit 0) with normal C: temp and 85.183609008789063 GiB free immediately before execution; no source/assertion modification. [Exact preflight, output and evidence reverification](../../issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md). Candidate `c438f844` unchanged. Structural closure follows the separate authorised evidence/tracking commit. Evidence/admission gates remain accepted; no owner re-adjudication. Then prepare the D/P structural proposal for owner adjudication. U3 CONFIRMED; U4 Route B; Brownlow untouched; production NO-GO.
+
 ## 0a. Ruling recorded with the activation separation (owner, 2026-10-25)
 
 - **Design accepted.** The fresh-context review GO (no CRIT/HIGH) is accepted subject to these rulings. Production stays NO-GO.
@@ -346,7 +348,7 @@ approval.
 **Destructive or production-affecting.**
 - The apply writes only to the disposable checkout. But it is the act that seals 2026 and retires AFL Tables in the
   reference state.
-- Owner prerequisite **U3**: ordinary completeness PASS is accepted, but final confirmation is withheld pending
+- **Historical U3 prerequisite (superseded by the v5 confirmation above):** ordinary completeness PASS was accepted, but final confirmation was withheld pending
   adjudication and verified disposition of the exact extra player row (PMS 705437; evidence linked in §9). After the
   seal, later 2026 changes require an audited correction. Brownlow 2026 is excluded and follows U4 Route B.
 
@@ -457,7 +459,7 @@ operations (release-plan step 10) are each separate, later approvals.
 |---|---|---|
 | U1 | Rollover date D and the pinned commit P (§3) | **Ruled 2026-10-24: not set.** Created only near the real apply window, with an old/new pin table, a semantic diff and an independent review |
 | U2 | Whether the J2 proof covers a date-only re-pin, or a new rebuild is needed (§3) | **Superseded 2026-10-25 (owner, F2): the production candidate is structural, not date-only; rebuild standing is ruled in §0a.** The earlier ruling, kept as history: **2026-10-24: (a), conditional** on six conditions (`issues.md` ISSUE-316). Static verification done: the date is stamp-only. The owner confirmed the three condition-3 points on 2026-10-24 (derived pins, the two restated test literals, harness date literals). The independent condition-2 review returned GO with no CRIT, HIGH or MED, so condition 2 is satisfied. **The owner accepted the review on 2026-10-24 and it is not re-run.** Conditions 1 and 3–6 and the semantic diff at D/P remain |
-| U3 | 2026 ordinary completeness and no further ordinary AFL API settle before the seal (§6) | **U3 unconfirmed; v4 operational gate STOP (2026-10-25).** Canonical removal and affected derived/period/aggregate checks accepted. Exact frozen v4 metadata repair authorised; package/review/runtime hashes PASS. Separate host observation confirmed afldb-prod/arm, then sudo ps failed (password required; exit 1). No process-clear inference; no database connection, frozen preflight, transaction or write; attempt unconsumed, no retry. Owner resolves/adjudicates the read-only observation privilege gate before resumption. Brownlow excluded; U4 Route B. [Execution evidence](../../issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REPORT.md) |
+| U3 | 2026 ordinary completeness and no further ordinary AFL API settle before the seal (?6) | **CONFIRMED (2026-10-25).** Canonical correction and derived/period/aggregate checks accepted; metadata repair v5 executed once, PASS, receipt 95 linked to 94, authority 93 and protected data unchanged. Attempt consumed. No further ordinary 2026 AFL API settle except an audited correction. Brownlow excluded; U4 Route B. [V5 evidence](../../issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V5-RECORD.md) |
 | U4 | Brownlow 2026: three pending keys (N9), separate from U3 | **Route B chosen (2026-10-24).** Does not block the ordinary seal. No normal production `settle-afl-api-brownlow.ts` write for 2026 after sealing; do not move ahead of C2 to preserve it. Each key needs its actual decision mapped to `brownlow_authority`, `brownlow_eligibility_decision` after migration 113, or `data_editor`, with the evidence and note required by that workflow. Routes are not interchangeable. Existing 9,522 AFL Tables round-vote rows unadjudicated and untouched |
 | U5 | Extra time: empty means unknown, never zero (N4) | Unresolved |
 | U6 | ISSUE-321 deferred source data-quality questions | Open; gates nothing |

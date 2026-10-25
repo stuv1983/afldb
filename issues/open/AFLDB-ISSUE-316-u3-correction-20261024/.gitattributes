@@ -1,0 +1,6 @@
+# Later repository metadata; not original execution evidence or a historical manifest member.
+# Frozen U3 evidence and its recorded hashes must survive Git without conversion.
+* -text !eol
+# Raw historical logs are archival byte data; preserve original whitespace.
+# SHA-256/inventory checks validate bytes; these are never regenerated for diff checks.
+*.log -diff

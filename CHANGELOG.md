@@ -15,6 +15,147 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 canonical activation-separation evidence (2026-10-25)
+
+- Retained the owner-adjudicated historical narrative drift with expected/current hashes and authority references; all immutable evidence remains verified. A blind production-credential scan and structural scans passed for the hash-bound 42-file admission inventory, then exactly those 42 ignored files were force-added; 20 obsolete outputs remain excluded. No credential, keyed comparison digest or credential length is retained. Final normal-C:-temp focused validation passed: 1,539 passed, 5 expected Windows skips, exit 0; no source/assertion modifications. The separate evidence/tracking commit is the remaining structural closure step.
+
+- Accepted implementation commit `c438f844` unchanged. Regenerated the retained full patch and per-file SHA-256 evidence directly from committed Git blobs; isolated patch reconstruction matches its exact tree. Explicit hash semantics supersede the earlier working-tree-derived record. Retained evidence is protected from Git newline conversion by later repository metadata; original legacy evidence is retained as SUPERSEDED ? NOT CANONICAL. Frozen snapshot navigation additions were withdrawn; current navigation and exact ignored-file admission/hash audits are separate from historical evidence. Final disk/temp, admission, canonical evidence, link and diff checks passed; structural closure follows the separate U3/tracking commit under existing owner authority; production NO-GO.
+
+### ISSUE-316 successor activation separated from the rollover apply (2026-10-25)
+
+- The rollover apply no longer activates a successor ladder profile.
+  - A change set carrying `ladder_successor_tuple` writes 7 files and leaves `tools/db/rebuild-test.ts` unchanged.
+    A change set or planner output naming that file is refused.
+  - The dry run validates the projected activated state and prints its pins.
+- New `tools/db/successor-activation.ts` is the only writer of the activation state, the `SUCCESSOR_LADDER_TUPLES_JSON`
+  table, and changes that one line only.
+  - Its authority binds the change set, the tuple, the date, HEAD/source commit, the migration set and both file pins.
+  - It refuses a second activation.
+  - It deactivates by the exact inverse, without touching the rollover files.
+- Rebuild resolution is unchanged.
+- An activation leftover also blocks the rollover's leftover scan.
+- Tests in `tests/season-rollover.test.ts` and `tests/db-test-rebuild.test.ts` are named by state: A (pre-apply), B
+  (applied, inactive, rebuild-ineligible), C (activated), D (deactivated, = B). Assertions are unchanged.
+
+### ISSUE-316 U3 audit metadata repaired in production (2026-10-25)
+
+- Executed hash-bound metadata repair v5 once on production: `data_edits` 94.note set from NULL to the approved
+  967-character note, with one linked audit receipt (id 95). It ran as the existing non-superuser owner role
+  `afldb_owner` through the existing protected `.env` credential: no sudo, new role, grant, authentication change
+  or credential. The repair SQL is unchanged from reviewed v4, with the principal binding exact. A no-sudo host
+  gate and a read-only prerequisite session run before the single-use marker. Validated on a private
+  PostgreSQL 16 cluster with fresh-context review GO. Authority 93 and all canonical/derived/Brownlow data are
+  unchanged. U3 confirmed; production otherwise NO-GO.
+
+### ISSUE-316 metadata repair v4 scope clarification (2026-10-25)
+
+- Prepared separately hashed v4 candidate under the owner's narrowed F-005 contract: removed broad catalog
+  locks, retained existing-data lock ordering and unchanged two-write body, added optional schema observation/
+  postcommit drift classification and bounded operational schema/version guards. U3 cannot pass on drift;
+  no automatic retry/reversal. Local PGlite19/19, wrapper14/14 and static ordering pass. Real PostgreSQL timing
+  tests completed under explicit destination approval: PostgreSQL16.15 10/10 database cases plus static PASS,
+  including early/late optional-DDL timing, protected/audit integrity, rollback and cleanup (no process/socket).
+  Restricted synthetic transport to 19 required members and retained inventory, logs and hashes. All candidate
+  SQL unchanged. Frozen 40-member manifest 829fc30a…848ecf84; fresh exact-byte independent review GO,
+  zero stopping findings. Retained F-006 LOW host-pipeline observation without editing frozen bytes.
+  V2/v3 unchanged/unexecuted; no production action or broader readiness authority.
+
+
+### ISSUE-316 audit metadata repair F-004 revision (2026-10-25)
+
+- Added separately hash-bound v3 with plain protected locks before SERIALIZABLE identity/guard reads,
+  post-lock lock-coverage checks and ordered execution markers; the two logical metadata writes are unchanged.
+  Retained 16/16 PGlite regression and 10/10 isolated PostgreSQL case expectations, including real writer timing,
+  bounded refusal, rollback and a disclosed pre-existing optional-DDL commit/precommit rollback limit.
+  Independent exact-byte review NO-GO: original F-004 closed, new F-005 MED for a pre-existing optional-DDL
+  commit after final assertions. V3 frozen without execution; v2 unchanged. No production action.
+
+### ISSUE-316 exact audit metadata repair package (2026-10-24)
+
+- Added a hash-bound metadata-only repair transaction, read-only preflight/postcheck, one-attempt wrapper, exact
+  note/target/authority/actor/approval bindings and full protected-data/audit fingerprint comparisons. Disposable
+  PostgreSQL validation passed 16/16, including atomic audit-failure rollback and repeat-execution refusal.
+  Second independent review returned NO-GO on lock/snapshot ordering (F-004 MED); package retained without
+  execution. No production contact/write, rollover or broader production authority.
+
+### ISSUE-316 U3 adjudication and retained read-only verification (2026-10-24)
+
+- Recorded owner acceptance of the canonical correction and classified audit 94's missing note as metadata only.
+  Completed read-only reconciliation of all 47 affected players, eight period rows, official score/result, both teams'
+  player totals and relevant club aggregates: PASS. Live Playwright and deployed/current source inspection establish
+  the note field/persistence path and absence of a supported metadata amendment UI; original field input is unproven.
+- Retained the exact metadata-only repair proposal, transaction/audit/rollback/review requirements and evidence under
+  `issues/open/AFLDB-ISSUE-316-u3-correction-20261024/`. No production repair or application/test change.
+  U3 unconfirmed pending note repair/adjudication; U4 Route B; production NO-GO. Earlier failed-postcondition notes
+  below are historical and superseded by this ruling; original evidence remains preserved.
+
+### ISSUE-316 production-readiness decision package (2026-10-24)
+
+- Recorded the owner's U4 **Route B** decision: Brownlow 2026 proceeds independently through the appropriate audited
+  post-seal workflow; normal production Brownlow settlement after sealing is prohibited. The 9,522 existing AFL
+  Tables round-vote rows remain unadjudicated. Added the mandatory day-D nightly/canonical-drift check and affected
+  production-material regeneration/re-pin control.
+- Retained the authorised U3 exact-row evidence and proposed decision note in
+  `docs/v2/issue316-u3-player-row-evidence-2026-10-24.md`: pre-fix ISSUE-255 unused-emergency PMS 705437, Fiorini
+  2121 in match 17214, application 20834/batch 32; one canonical-only key, J2-bound baseline checked. Ordinary
+  completeness PASS accepted, U3 unconfirmed. The owner subsequently authorised only this single audited correction;
+  its decision note and hashed before evidence are retained under
+  `issues/open/AFLDB-ISSUE-316-u3-correction-20261024/`. The operator subsequently performed the single audited
+  Match Sheet removal at 11:28:46Z after a fresh database gate passed. Postcheck: 10,028 2026 rows, Essendon 23,
+  target absent, zero extra/missing baseline keys, durable authority 93 and edit 94, but **edit 94 note is NULL**.
+  Verification failed the required decision-note condition; stopped for owner adjudication with no retry or audit
+  repair. Full independent derived/period-score verification remains incomplete. U3 unconfirmed; production NO-GO.
+
+
+- Added `docs/v2/issue316-production-readiness-decision-2026-10-24.md` for owner review. It records the owner's
+  acceptance of the J2 post-restore verification. It separates the six remaining items: rollover date and pin,
+  successor activation, the fresh census, the apply, deployment, and recovery. For each it gives the evidence, what has
+  expired, what is regenerated on the day, the stop/go conditions and the approval still required, and it lists the
+  unresolved decisions U1–U15.
+- `--rollover-date 2026-10-24` and native policy `a8e586e0…` are recorded as J2 proof-only. Nothing was executed. No
+  repository code changed. Production NO-GO.
+
+### ISSUE-316 J2 proof-window hold restored and verified on streamanator (2026-10-24)
+
+- The owner restored the J2 package/timer hold (`j2-hold-restore.sh` `dee557de…`, `HOLD RESTORED`). A read-only check
+  then confirmed 0 package holds (equal to the pre-J2 set), the four apt timers enabled and active, no dpkg activity
+  since, the single rebuild attempt still consumed and no J2 cluster running. Evidence is in
+  `D:/tmp/afldb-i316-J2-20261023T2317Z/runs/post-restore-20261024T075456Z/`.
+- Automatic apt maintenance resumes as normal host activity, and the J2 native-policy match is not preserved past the
+  restore. The J2 proof is unchanged. I325-3 is still unexecuted on Linux. No repository code changed. Production NO-GO.
+
+### ISSUE-325 resolved: J2 rebuild-harness enforcement sampler repaired as staged revision I325-3 (2026-10-24)
+
+- AFLDB-ISSUE-325 is resolved in a new, separately staged and hashed harness at
+  `D:/tmp/afldb-i316-J2-20261023T2317Z/rbstage3-I325/`. Its record `STAGE.sha256` is `6e589e77…`. It differs from the
+  frozen `rbstage2/` only in `enforcement-sampler.py`, `rb2-bootstrap.sh` and `rb-shutdown.sh`.
+- The sampler exempts an auditor-less process only when it is one of the two policy-bound esbuild objects (native
+  policy lines 21–22). It must also run the bound inode and digest, have no unbound mapping, and carry the auditor
+  environment and pin.
+- A process is identified by its PID plus its `/proc` start time, so a reused PID is always a new instance. It is
+  judged again whenever any proof-relevant state changes, and that state is cached only after its judgement completes.
+- Unreadable or malformed `/proc` state is an anomaly or a sampler error, never an exemption.
+- The policy is read once. Bootstrap readiness now requires the sampler's `logs/sampler.ready` acknowledgement, written
+  only after the policy and esbuild checks pass.
+- Validation: the focused fabricated-`/proc` test passes (45 tests). Three independent reviews ran; the last found no
+  CRIT, HIGH or MED.
+- No rebuild was run, the new harness was not executed on Linux, and the J2 proof and `rbstage2/` evidence are
+  unchanged. No repository code changed. Production NO-GO.
+
+### ISSUE-323 / ISSUE-324 resolved; ISSUE-316 revision J2 proof accepted; ISSUE-325 registered (2026-10-24)
+
+- AFLDB-ISSUE-323 and AFLDB-ISSUE-324 are resolved. The ISSUE-316 revision J2 disposable rebuild proved both fixes
+  for real. It ran the ordinary successor rebuild at pinned `876dadbf`, under streamanator's reviewed native closure
+  (policy `a8e586e0…`) with no provenance, and it passed the successor preflight and the execution boundary. It also
+  executed the constrained tsx/npm path under LD_AUDIT. Result: 30 stages, exit 0, 91 final checks, all 1,640
+  club-seasons equal, post-rebuild checks passed, 0 native refusals. No repository code changed.
+- The owner ruled that this rebuild is the J2 proof. Its 5 enforcement-sampler anomalies are an evidence-monitor
+  defect: the harness exempted only one of the two policy-bound esbuild paths. A focused review of the retained
+  evidence confirmed this. It is registered as AFLDB-ISSUE-325, to be fixed before that harness is reused; the
+  retained evidence is unchanged.
+- Nothing was pushed, deployed, applied or activated, and no census was taken. The host hold stays in place.
+  Production NO-GO.
+
 ### ISSUE-324 / ISSUE-316 - `.bin` link chains checked hop by hop; revision J2 re-pinned; streamanator native policy re-derived (2026-10-24)
 
 - `tools/db/rebuild-test.ts` (`876dadbf`), AFLDB-ISSUE-324 (F-J01): the ordinary path admits a `node_modules`

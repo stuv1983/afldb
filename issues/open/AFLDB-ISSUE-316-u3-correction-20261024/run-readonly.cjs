@@ -1,0 +1,13 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const name = process.argv[2];
+if (!/^[a-z0-9-]+$/.test(name)) throw new Error('Invalid evidence stem');
+const base = path.join(__dirname, name);
+const result = spawnSync('ssh', ['-o','BatchMode=yes','-o','ConnectTimeout=10','afldb','bash','-s'], {input:fs.readFileSync(base+'.sh'), encoding:'utf8', maxBuffer:8*1024*1024});
+fs.writeFileSync(base+'.stdout.log',result.stdout||'');
+fs.writeFileSync(base+'.stderr.log',result.stderr||String(result.error||''));
+fs.writeFileSync(base+'.exit.txt',String(result.status));
+console.log('Read-only SSH exit:',result.status);
+if(result.stderr) console.error(result.stderr);
+process.exitCode = result.status ?? 1;

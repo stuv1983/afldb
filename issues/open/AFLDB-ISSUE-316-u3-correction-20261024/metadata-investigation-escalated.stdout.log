@@ -1,0 +1,197 @@
+dsn_identity user=afldb_backup host=localhost port=5432 database=afldb_prod
+DEPLOYED_SOURCE_BEGIN
+f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644  /home/arm/projects/afldb/src/db/queries/audit-log.ts
+b8c03d94faa2f1780073922944219092c7609d208d3256e6d7a3ca8b222d3a1b  /home/arm/projects/afldb/src/db/queries/match-sheet.ts
+cc97fd0609df742c400ed389dd9109362cf5d7cf499d94b5c3553e354f4e11ee  /home/arm/projects/afldb/src/db/queries/player-derived.ts
+4efdab01589e42b7b9832254024d79b1fa135bfe71f0a2a4c786440910d52bc2  /home/arm/projects/afldb/src/app/admin/data-editor/MatchSheetEditor.tsx
+d9033e8395157130f93768288607aef934f8c03ef538ab7f4a47875353d98f64  /home/arm/projects/afldb/src/app/admin/data-editor/actions.ts
+e23e07abdcae8c66bc2a005da9c6655726b671b559d9296b708a01a478521091  /home/arm/projects/afldb/src/app/admin/audit/page.tsx
+6448329955a48831bdd48610517b82cf66bc5c720b09e1d682089bf475001a47  /home/arm/projects/afldb/src/app/admin/audit/entity/[table]/[rowId]/page.tsx
+ba9aa310e3bd1835e7ad4a319d05adf3d93277ea709155991c8bd1eca70ddb4e  /home/arm/projects/afldb/src/db/queries/audit-reader.ts
+/**
+ * Save complete match sheet (lineups and stats) from GUI (see changeLog.md).
+ */
+export async function saveMatchSheetAction(
+  _prev: MatchSheetActionState,
+  formData: FormData,
+): Promise<MatchSheetActionState> {
+  const admin = await requireCapability('data.dataEditor');
+
+  const matchId = Number(formData.get('matchId'));
+  if (!Number.isInteger(matchId) || matchId <= 0) {
+    return { error: 'Invalid match ID.' };
+  }
+
+  const syncMatchScores = formData.get('syncMatchScores') === 'true' || formData.get('syncMatchScores') === 'on';
+  const payloadRaw = String(formData.get('payload') ?? '');
+  const note = String(formData.get('note') ?? '').trim();
+  const staleToken = String(formData.get('staleToken') ?? '').trim();
+
+  let rawPayload: unknown;
+  try {
+    rawPayload = JSON.parse(payloadRaw);
+  } catch {
+    return { error: 'Invalid match sheet payload data.' };
+  }
+
+  const payload = validateMatchSheetPayload(rawPayload);
+  if (!payload.ok) return { error: payload.error };
+  if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
+
+  const result = await saveMatchSheet({
+    matchId,
+    syncMatchScores,
+    players: payload.value.players,
+    removedPlayerIds: payload.value.removedPlayerIds,
+    adminUserId: admin.id,
+    note,
+    staleToken,
+  });
+
+  if (!result.ok) {
+        }}>
+          <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+            Team scores stay separate from player totals because rushed behinds are not attributed to a player.
+            Use Match Details to edit the official team score.
+          </p>
+
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+            Verification / Audit note (optional)
+            <input
+              type="text"
+              name="note"
+              maxLength={2000}
+              placeholder="e.g. Sourced from official AFL match report"
+              style={{ maxWidth: '36rem', fontSize: '0.85rem' }}
+            />
+          </label>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginTop: '0.5rem' }}>
+            <button type="submit" disabled={isPending} style={{ padding: '0.6rem 1.25rem', fontSize: '0.95rem' }}>
+              {isPending ? 'Saving match sheet & recalculating stats…' : 'Save match sheet & update player stats'}
+import 'server-only';
+
+import type postgres from 'postgres';
+
+/**
+ * Required mutation audit (AFLDB-ISSUE-027, migration 066).
+ *
+ * CONTRACT: this helper is for REQUIRED mutation audits and must be
+ * called inside the same import-role transaction as the statistical
+ * mutation it records — pass the `sql.begin` transaction handle, never
+ * a pool. It acquires no connection of its own and deliberately has no
+ * try/catch: a failed audit INSERT propagates, aborts the transaction,
+ * and rolls the mutation back with it. That is the whole point — the
+ * database can no longer hold a mutation without its audit row.
+ *
+ * afldb_import holds INSERT (only) on data_edits via migration 066,
+ * reconciled in tools/maintenance/privileges.sql. Best-effort
+ * administrative activity logging (auth_audit_log) is a different
+ * system and stays on the auth pool; do not route it through here.
+ */
+
+/** Mirrors the data_edits_table_name_check constraint (migrations 057/058/094/095/097). */
+export type DataEditTableName =
+  | 'players'
+  | 'matches'
+  | 'draft_picks'
+  | 'award_winners'
+  | 'hall_of_fame'
+  | 'honour_team_members'
+  // Brownlow administration (migration 094, AFLDB-ISSUE-155 §27.13). The
+  // audited row is the workflow DECISION -- the entry state keyed by
+  // match_id, the season authority keyed by season -- not the fact rows
+  // it writes, which carry their own provenance quartet.
+  | 'brownlow_vote_entry_state'
+  | 'brownlow_season_authority'
+  // Coach administration (migration 095, AFLDB-ISSUE-159 §5.2). 'match_coaches'
+  // is deliberately absent: its primary key is composite (match_id, club_id)
+  // and row_id is a single bigint, so a coaching-assignment edit is audited
+  // against its match instead -- table_name 'matches', field_group
+  // 'coach_assignment'.
+  | 'coaches'
+  // Fixture administration (migration 097, AFLDB-ISSUE-162 §24). The audited
+  // row is the FIXTURE itself, which is the AFLDB-ISSUE-160 draft_picks shape
+  // rather than AFLDB-ISSUE-161's audit-on-the-parent: a season-list membership
+  // is DELETABLE, so its audit row was pointed at the player instead, but a
+  // fixture is NEVER deleted (cancelled and void keep the row) and it has no
+  // allowlisted parent -- it is deliberately not a property of a match, because
+  // the whole point is that the match may not exist. row_id = fixtures.id
+  // therefore always resolves, through the fixture_key lineage rule in
+  // tools/db/promotion-inventory.ts.
+  | 'fixtures'
+  // Club leadership administration (migration 098, AFLDB-ISSUE-163 §15). The
+  // fixtures shape again, and for the same two reasons: an appointment is NEVER
+  // deleted (ended and void keep the row), and it has no allowlisted parent row
+  // to be a property OF -- it is deliberately not a property of the player,
+  // because the row is about a club, a season and an office, and one person may
+  // hold several. row_id = club_leadership.id therefore always resolves,
+  // through the appointment_key lineage rule in tools/db/promotion-inventory.ts.
+  | 'club_leadership'
+  // The two curated special-record families (migration 102,
+  // AFLDB-ISSUE-167 §6.4). The fixtures / club_leadership shape once more:
+  // neither is ever deleted -- voiding keeps the row precisely so its audit
+  // rows stay resolvable -- and neither has an allowlisted parent to be a
+  // property of. A first-kick achievement is deliberately not audited against
+  // its player, because the row is about a source's claim rather than about
+  // the person, and its match_id is derived. row_id therefore always resolves,
+  // through the first_kick_goal_key and after_siren_key lineage rules in
+  // tools/db/promotion-inventory.ts, both of which read the durable
+  // '<sources.key>|<source_record_id>' identity rather than the integer.
+  | 'player_achievements'
+  | 'after_siren_kicks';
+
+/**
+ * The same allowlist as a runtime value, for the read side
+ * (`src/db/queries/audit-reader.ts`, AFLDB-ISSUE-157): a URL-supplied
+ * table name is accepted only if it names a member, so the filter can
+ * never bind a value the CHECK constraint would not have admitted.
+ */
+export const DATA_EDIT_TABLE_NAMES: readonly DataEditTableName[] = [
+  'players',
+  'matches',
+  'draft_picks',
+  'award_winners',
+  'hall_of_fame',
+  'honour_team_members',
+  'brownlow_vote_entry_state',
+  'brownlow_season_authority',
+  'coaches',
+  'fixtures',
+  'club_leadership',
+  'player_achievements',
+  'after_siren_kicks',
+];
+
+export function isDataEditTableName(value: string): value is DataEditTableName {
+  return (DATA_EDIT_TABLE_NAMES as readonly string[]).includes(value);
+}
+
+export type DataEditAuditInput = {
+  tableName: DataEditTableName;
+  rowId: number;
+  /** A field key ('dob'), coupled-group key ('score'), or operation key ('match_sheet'). */
+  fieldGroup: string;
+  oldValues: Record<string, unknown>;
+  newValues: Record<string, unknown>;
+  adminUserId: number;
+  note?: string | null;
+};
+
+export async function recordDataEdit(
+  tx: postgres.TransactionSql,
+  input: DataEditAuditInput,
+): Promise<void> {
+  await tx`
+    INSERT INTO data_edits
+          (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
+    VALUES (${input.tableName}, ${input.rowId}, ${input.fieldGroup},
+            ${tx.json(input.oldValues as postgres.JSONValue)},
+            ${tx.json(input.newValues as postgres.JSONValue)},
+            ${input.adminUserId},
+            ${(input.note ?? '').trim().slice(0, 2000) || null})
+  `;
+}
+DEPLOYED_SOURCE_END
+{"edit94": {"id": 94, "note": null, "row_id": 17214, "created_at": "2026-10-24T22:28:46.203865+11:00", "new_values": {"players": {"2121": {"kind": "remove"}}, "playersCount": 46, "scoreUpdated": false, "authorityKeys": [{"action": "mint", "playerId": 2121, "entityKey": "2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html"}]}, "old_values": {"players": {"2121": {"goals": 0, "kicks": 0, "marks": 0, "behinds": 0, "hitouts": 0, "tackles": 0, "club_slug": "essendon", "disposals": 0, "frees_for": 0, "handballs": 0, "frees_against": 0, "jumper_number": "8"}}}, "table_name": "matches", "field_group": "match_sheet", "admin_user_id": 1}, "columns": [{"data_type": "integer", "table_name": "club_seasons", "column_name": "id", "table_schema": "public"}, {"data_type": "smallint", "table_name": "club_seasons", "column_name": "season", "table_schema": "public"}, {"data_type": "integer", "table_name": "club_seasons", "column_name": "club_id", "table_schema": "public"}, {"data_type": "smallint", "table_name": "club_seasons", "column_name": "played", "table_schema": "public"}, {"data_type": "smallint", "table_name": "club_seasons", "column_name": "wins", "table_schema": "public"}, {"data_type": "smallint", "table_name": "club_seasons", "column_name": "draws", "table_schema": "public"}, {"data_type": "smallint", "table_name": "club_seasons", "column_name": "losses", "table_schema": "public"}, {"data_type": "integer", "table_name": "club_seasons", "column_name": "points_for", "table_schema": "public"}, {"data_type": "integer", "table_name": "club_seasons", "column_name": "points_against", "table_schema": "public"}, {"data_type": "integer", "table_name": "club_seasons", "column_name": "premiership_points", "table_schema": "public"}, {"data_type": "numeric", "table_name": "club_seasons", "column_name": "percentage", "table_schema": "public"}, {"data_type": "smallint", "table_name": "club_seasons", "column_name": "ladder_rank", "table_schema": "public"}, {"data_type": "boolean", "table_name": "club_seasons", "column_name": "wooden_spoon", "table_schema": "public"}, {"data_type": "boolean", "table_name": "club_seasons", "column_name": "is_premier", "table_schema": "public"}, {"data_type": "smallint", "table_name": "club_seasons", "column_name": "finals_played", "table_schema": "public"}, {"data_type": "smallint", "table_name": "club_seasons", "column_name": "source_id", "table_schema": "public"}, {"data_type": "bigint", "table_name": "club_seasons", "column_name": "import_batch_id", "table_schema": "public"}, {"data_type": "bigint", "table_name": "data_edits", "column_name": "id", "table_schema": "public"}, {"data_type": "text", "table_name": "data_edits", "column_name": "table_name", "table_schema": "public"}, {"data_type": "bigint", "table_name": "data_edits", "column_name": "row_id", "table_schema": "public"}, {"data_type": "text", "table_name": "data_edits", "column_name": "field_group", "table_schema": "public"}, {"data_type": "jsonb", "table_name": "data_edits", "column_name": "old_values", "table_schema": "public"}, {"data_type": "jsonb", "table_name": "data_edits", "column_name": "new_values", "table_schema": "public"}, {"data_type": "integer", "table_name": "data_edits", "column_name": "admin_user_id", "table_schema": "public"}, {"data_type": "text", "table_name": "data_edits", "column_name": "note", "table_schema": "public"}, {"data_type": "timestamp with time zone", "table_name": "data_edits", "column_name": "created_at", "table_schema": "public"}, {"data_type": "bigint", "table_name": "data_overrides", "column_name": "id", "table_schema": "public"}, {"data_type": "text", "table_name": "data_overrides", "column_name": "entity_type", "table_schema": "public"}, {"data_type": "text", "table_name": "data_overrides", "column_name": "entity_key", "table_schema": "public"}, {"data_type": "text", "table_name": "data_overrides", "column_name": "field_group", "table_schema": "public"}, {"data_type": "jsonb", "table_name": "data_overrides", "column_name": "override_values", "table_schema": "public"}, {"data_type": "boolean", "table_name": "data_overrides", "column_name": "is_active", "table_schema": "public"}, {"data_type": "integer", "table_name": "data_overrides", "column_name": "admin_user_id", "table_schema": "public"}, {"data_type": "timestamp with time zone", "table_name": "data_overrides", "column_name": "created_at", "table_schema": "public"}, {"data_type": "timestamp with time zone", "table_name": "data_overrides", "column_name": "updated_at", "table_schema": "public"}, {"data_type": "integer", "table_name": "match_period_scores", "column_name": "match_id", "table_schema": "public"}, {"data_type": "integer", "table_name": "match_period_scores", "column_name": "club_id", "table_schema": "public"}, {"data_type": "smallint", "table_name": "match_period_scores", "column_name": "period", "table_schema": "public"}, {"data_type": "smallint", "table_name": "match_period_scores", "column_name": "goals", "table_schema": "public"}, {"data_type": "smallint", "table_name": "match_period_scores", "column_name": "behinds", "table_schema": "public"}, {"data_type": "smallint", "table_name": "match_period_scores", "column_name": "points", "table_schema": "public"}, {"data_type": "smallint", "table_name": "match_period_scores", "column_name": "source_id", "table_schema": "public"}, {"data_type": "text", "table_name": "match_period_scores", "column_name": "source_record_id", "table_schema": "public"}, {"data_type": "bigint", "table_name": "match_period_scores", "column_name": "import_batch_id", "table_schema": "public"}, {"data_type": "timestamp with time zone", "table_name": "match_period_scores", "column_name": "imported_at", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "player_id", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "finals", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "premierships", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "wins", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "draws", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "losses", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "goals", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "behinds", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "kicks", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "handballs", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "disposals", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "marks", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "tackles", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "hitouts", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "behinds_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "kicks_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "handballs_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "disposals_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "marks_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "tackles_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "hitouts_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "brownlow_votes", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_career_stats", "column_name": "brownlow_medals", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_career_stats", "column_name": "clubs_played", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_career_stats", "column_name": "seasons_played", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_career_stats", "column_name": "debut_season", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_career_stats", "column_name": "final_season", "table_schema": "public"}, {"data_type": "date", "table_name": "player_career_stats", "column_name": "debut_date", "table_schema": "public"}, {"data_type": "date", "table_name": "player_career_stats", "column_name": "last_match_date", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_career_stats", "column_name": "best_goals_game", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_career_stats", "column_name": "best_disposals_game", "table_schema": "public"}, {"data_type": "timestamp with time zone", "table_name": "player_career_stats", "column_name": "rebuilt_at", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "frees_for", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "frees_against", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_career_stats", "column_name": "frees_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "player_id", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "season", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "club_id", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "games", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "finals", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "wins", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "draws", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "losses", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "goals", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "behinds", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "kicks", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "handballs", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "disposals", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "marks", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "tackles", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "hitouts", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "disposals_recorded_games", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "tackles_recorded_games", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "hitouts_recorded_games", "table_schema": "public"}, {"data_type": "boolean", "table_name": "player_club_season_stats", "column_name": "is_premier", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "frees_for", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_club_season_stats", "column_name": "frees_against", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_club_season_stats", "column_name": "frees_recorded_games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_clubs", "column_name": "player_id", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_clubs", "column_name": "club_id", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_clubs", "column_name": "games", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_clubs", "column_name": "goals", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_clubs", "column_name": "first_season", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_clubs", "column_name": "last_season", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_clubs", "column_name": "first_match_id", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_clubs", "column_name": "last_match_id", "table_schema": "public"}, {"data_type": "bigint", "table_name": "player_match_period_stats", "column_name": "id", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_match_period_stats", "column_name": "player_id", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_match_period_stats", "column_name": "match_id", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_match_period_stats", "column_name": "club_id", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "period", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "kicks", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "marks", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "handballs", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "disposals", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "goals", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "behinds", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "hitouts", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "tackles", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "rebounds", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "inside_50s", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "clearances", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "clangers", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "frees_for", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "frees_against", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "contested", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "uncontested", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "contested_marks", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "marks_inside_50", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "one_percenters", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "bounces", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "goal_assists", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_match_period_stats", "column_name": "source_id", "table_schema": "public"}, {"data_type": "bigint", "table_name": "player_match_period_stats", "column_name": "import_batch_id", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "player_id", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "season", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "primary_club_id", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "club_count", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "games", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "finals", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "wins", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "draws", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "losses", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "goals", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "behinds", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "kicks", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "handballs", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "disposals", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "marks", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "tackles", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "hitouts", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "disposals_recorded_games", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "tackles_recorded_games", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "hitouts_recorded_games", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "brownlow_votes", "table_schema": "public"}, {"data_type": "USER-DEFINED", "table_name": "player_season_stats", "column_name": "brownlow_status", "table_schema": "public"}, {"data_type": "boolean", "table_name": "player_season_stats", "column_name": "is_premier", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "frees_for", "table_schema": "public"}, {"data_type": "integer", "table_name": "player_season_stats", "column_name": "frees_against", "table_schema": "public"}, {"data_type": "smallint", "table_name": "player_season_stats", "column_name": "frees_recorded_games", "table_schema": "public"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "source_id", "table_schema": "staging"}, {"data_type": "text", "table_name": "afltables_match", "column_name": "family", "table_schema": "staging"}, {"data_type": "text", "table_name": "afltables_match", "column_name": "external_record_id", "table_schema": "staging"}, {"data_type": "integer", "table_name": "afltables_match", "column_name": "version_seq", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "season", "table_schema": "staging"}, {"data_type": "text", "table_name": "afltables_match", "column_name": "round_code", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "round_number", "table_schema": "staging"}, {"data_type": "USER-DEFINED", "table_name": "afltables_match", "column_name": "round_type", "table_schema": "staging"}, {"data_type": "boolean", "table_name": "afltables_match", "column_name": "is_final", "table_schema": "staging"}, {"data_type": "date", "table_name": "afltables_match", "column_name": "match_date", "table_schema": "staging"}, {"data_type": "text", "table_name": "afltables_match", "column_name": "match_time", "table_schema": "staging"}, {"data_type": "integer", "table_name": "afltables_match", "column_name": "venue_id", "table_schema": "staging"}, {"data_type": "text", "table_name": "afltables_match", "column_name": "venue_raw", "table_schema": "staging"}, {"data_type": "integer", "table_name": "afltables_match", "column_name": "home_club_id", "table_schema": "staging"}, {"data_type": "integer", "table_name": "afltables_match", "column_name": "away_club_id", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_score", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_score", "table_schema": "staging"}, {"data_type": "USER-DEFINED", "table_name": "afltables_match", "column_name": "result", "table_schema": "staging"}, {"data_type": "integer", "table_name": "afltables_match", "column_name": "winner_club_id", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "margin", "table_schema": "staging"}, {"data_type": "integer", "table_name": "afltables_match", "column_name": "attendance", "table_schema": "staging"}, {"data_type": "USER-DEFINED", "table_name": "afltables_match", "column_name": "attendance_status", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "attendance_source_id", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q1_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q1_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q1_points", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q2_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q2_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q2_points", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q3_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q3_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q3_points", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q4_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q4_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "home_q4_points", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q1_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q1_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q1_points", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q2_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q2_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q2_points", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q3_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q3_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q3_points", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q4_goals", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q4_behinds", "table_schema": "staging"}, {"data_type": "smallint", "table_name": "afltables_match", "column_name": "away_q4_points", "table_schema": "staging"}, {"data_type": "bigint", "table_name": "afltables_match", "column_name": "projected_by_batch_id", "table_schema": "staging"}, {"data_type": "timestamp with time zone", "table_name": "afltables_match", "column_name": "projected_at", "table_schema": "staging"}], "triggers": null, "authority93": {"id": 93, "is_active": true, "created_at": "2026-10-24T22:28:46.203865+11:00", "entity_key": "2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html", "updated_at": "2026-10-24T22:28:46.203865+11:00", "entity_type": "player_match_stats", "field_group": "lineup", "admin_user_id": 1, "override_values": {"present": false}}}
+READ_ONLY_INVESTIGATION_COMPLETED

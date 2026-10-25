@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "issue": "AFLDB-ISSUE-316",
+  "revision": "metadata-repair-v5",
+  "derived_from_v4_manifest_sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+  "files": [
+    {
+      "path": "ACTOR-EVIDENCE.json",
+      "sha256": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50"
+    },
+    {
+      "path": "DERIVATION.json",
+      "sha256": "f3422cde74f1ceb6eb65524ae05c12f92065a13aa6c73528cbf16a0321da3bee"
+    },
+    {
+      "path": "OWNER-RULING.md",
+      "sha256": "74dfd32397a8d3cc03c55df6302d32b2b5264daf1450bddfca4b2e80e3e9c07c"
+    },
+    {
+      "path": "README.md",
+      "sha256": "7184517e888367f23a20187a74997b60858a4eb5171e29fc00837826502d6ea2"
+    },
+    {
+      "path": "SEMANTICS.md",
+      "sha256": "e98199018ee40a7c6c1612daf051d53f04602293860a74b78d87c95165980b51"
+    },
+    {
+      "path": "V3-NO-GO.md",
+      "sha256": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4"
+    },
+    {
+      "path": "V4-REVIEW.md",
+      "sha256": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712"
+    },
+    {
+      "path": "V5-DELTA.json",
+      "sha256": "2522103732e10ab55b72d56371251368d8c38f7c912633cb240fd9d9faf676f9"
+    },
+    {
+      "path": "V5-DELTA.md",
+      "sha256": "80498ec1c68c4cd05c47c0e29f209e9560214f8eb2bc9377970f916920e75a75"
+    },
+    {
+      "path": "VALIDATION-EVIDENCE.json",
+      "sha256": "599cf8a34b1b159cce76bddb9c8c29ab5bc85e6b7ee92b16ffcde314ec2625b7"
+    },
+    {
+      "path": "VALIDATION.json",
+      "sha256": "76c4bbddc1dbe5532552a3102b71d4d049403edf582b88e41635f192ee91e49e"
+    },
+    {
+      "path": "WRAPPER-VALIDATION.json",
+      "sha256": "f198d9f1a268eb32fb60ead0fcc44b582243828b8f3b13f7fb3367dbf5efeb64"
+    },
+    {
+      "path": "assert-post.sql",
+      "sha256": "6ff903c74f78317f97de2e8ede4c328b5f4c65ab4daa6cd134f54ddf7cabc1fd"
+    },
+    {
+      "path": "audit-log-source.txt",
+      "sha256": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644"
+    },
+    {
+      "path": "audit-schema-source.txt",
+      "sha256": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720"
+    },
+    {
+      "path": "binding.json",
+      "sha256": "6d8faf68be186224ecd79b988dbc55989c988f3dd08cd396d761174f923f8807"
+    },
+    {
+      "path": "canonical-gates.sql",
+      "sha256": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3"
+    },
+    {
+      "path": "checks.sql",
+      "sha256": "522c4ee489083752184c50a7494bee88fc998ebd27d7f39a5bb36cb0d4ed87cf"
+    },
+    {
+      "path": "expected-migrations.json",
+      "sha256": "ed2a6ad4ee8e914349768682fccddd577b97e5765587e036f2d3fbc837f803a5"
+    },
+    {
+      "path": "identity.sql",
+      "sha256": "0f92aa39662b1bac675e22f57d6bdf659103797f0df340da984c4a285b9cd736"
+    },
+    {
+      "path": "lock-assert.sql",
+      "sha256": "3c8c458dd38d988a416c8522662bf07daf0b6d39d74f9e1d647cdfcfd5fcdbb4"
+    },
+    {
+      "path": "locks.sql",
+      "sha256": "5ac97832452d0cddf86cbf65ab5749e9fe3cec56b57608321d12afe511d927f8"
+    },
+    {
+      "path": "migration-guard.sql",
+      "sha256": "4d211262c64cd356987f57937abae522ba09a771cc3f3355a50460c2662de305"
+    },
+    {
+      "path": "note.txt",
+      "sha256": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d"
+    },
+    {
+      "path": "operational-guard.sql",
+      "sha256": "996b10dfaea99b582336554b536ec0800b182fc099b613cf358d328d2e6e9298"
+    },
+    {
+      "path": "operational-host.sh",
+      "sha256": "4681610d28aaf9233a8b54e9504aff40189f2d8673b63d5f7cfcba04d47b50be"
+    },
+    {
+      "path": "operational-observation.sh",
+      "sha256": "8ac6c6fea81743595418139bb257903ee8b2bd23881cc66615b4f49fd9e095dc"
+    },
+    {
+      "path": "postcheck.sql",
+      "sha256": "47e231e2c40e6ebf710ec9baf15fa221c19b9197499ec29315e26fbb4b8c9ed9"
+    },
+    {
+      "path": "preflight.sql",
+      "sha256": "7656a8c2b9fb45e395673482d31a810a67215413133da91452abaa857feff71a"
+    },
+    {
+      "path": "principal.sql",
+      "sha256": "33ac943417c42c15f60677d5fe52bf067e75ecf41cadd9830da44df31e1bae71"
+    },
+    {
+      "path": "protected.json",
+      "sha256": "5c19db42754a5968f4838bd7b7ffa672958cb5b3474d30554045f82f35eed2dc"
+    },
+    {
+      "path": "repair-body.sql",
+      "sha256": "966a563efbc78c16588c8bf1c4ab6a0c5ef99ada41d60729eb1e6105f710f8b4"
+    },
+    {
+      "path": "repair.sql",
+      "sha256": "4e87aa5dd6eb7254eec26ffe38c5bb3232f49a7e7f28a30be0cb0a1264d17af2"
+    },
+    {
+      "path": "run.cjs",
+      "sha256": "e4ce4a5803d79e3c292c18cf5e7835fb066d8960871f2d2f87980ba5ea25fb4d"
+    },
+    {
+      "path": "runtime.json",
+      "sha256": "9a568505f83185d7f8900a325362c1195c0198c1ca5067c9a9f902ad446b1a9a"
+    },
+    {
+      "path": "schema-evidence.json",
+      "sha256": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593"
+    },
+    {
+      "path": "snapshot.sql",
+      "sha256": "314185b65033d63dd158e08b6be4af32ef7ac9aeeea7d7d8b54c22fe64cf158b"
+    },
+    {
+      "path": "transport.sh",
+      "sha256": "e697a4824a37fd0012d25cf4f0d46e7329208aa125a68b793fd0cbea8a4ee202"
+    },
+    {
+      "path": "validate-order.cjs",
+      "sha256": "ce5e0cbf96786213d5f7bd2de6e8021b3de329bf3fd53bd6b1eb69c3eb8d28e6"
+    },
+    {
+      "path": "validate-pg.cjs",
+      "sha256": "24dfcafad3f1765416ff99d298d99ff9ecab6b73b88c171e7b199294d6bf2d91"
+    },
+    {
+      "path": "validate-remote.cjs",
+      "sha256": "ed07f4974d52f9ac1faba3f55c9c7ee69c6d7c3ed77a11916c17d452fb7cd828"
+    },
+    {
+      "path": "validate-wrapper.cjs",
+      "sha256": "da1c8782f331bfdec85aed79fbfc6617e3d6b3b4ebde2ff4619aabb56ff492a6"
+    },
+    {
+      "path": "validate.cjs",
+      "sha256": "ac890f43ae9e0e9334a84599607c838444b3fcbceb61c38887aa771736ae0123"
+    }
+  ]
+}

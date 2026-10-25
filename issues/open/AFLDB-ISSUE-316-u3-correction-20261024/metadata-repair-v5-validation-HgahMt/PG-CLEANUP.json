@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "work_directory": "/tmp/i316-v5-pg-R7Deke",
+  "socket": "/tmp/i316-v5-pg-R7Deke/socket",
+  "server_pid": 940120,
+  "stopped_utc": "2026-10-24T21:00:23.679Z",
+  "remaining_private_processes": [],
+  "credential_files_removed": true,
+  "evidence_credential_scan": "PASS",
+  "error": null,
+  "retained": "Stopped private data directory and server log; fixture credential files removed; no existing cluster touched"
+}

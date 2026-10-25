@@ -1,0 +1,34 @@
+[
+  {
+    "path": "PREREQUISITE-RESULT.json",
+    "sha256": "5af7d201d2c4cf8c548adbd28d4fd4a608949e3045b8e511e1b04f492a92b6ae"
+  },
+  {
+    "path": "observation.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "observation.stdout.log",
+    "sha256": "ffec204103bd5e23f73c009d9ba53fec559eee64a1de5f970e9cbd7231361fe4"
+  },
+  {
+    "path": "observation.transport.json",
+    "sha256": "821f5e906255a16ee2baf69836c7a79bad28ff47e8009939bf2fe72751234ab9"
+  },
+  {
+    "path": "prerequisite.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "prerequisite.stdout.log",
+    "sha256": "8d380c72f254bbe8d5744e4a1e70d630f4f24c4b7df0c0fe21c2219d940b42c8"
+  },
+  {
+    "path": "prerequisite.transport.json",
+    "sha256": "821f5e906255a16ee2baf69836c7a79bad28ff47e8009939bf2fe72751234ab9"
+  },
+  {
+    "path": "submitted.sql",
+    "sha256": "95d5aa5502115769b5c04fe9e69520306b5e21b040444bf45efea050048d498e"
+  }
+]

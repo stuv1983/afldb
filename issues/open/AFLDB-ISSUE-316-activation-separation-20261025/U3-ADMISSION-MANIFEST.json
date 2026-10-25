@@ -1,0 +1,1037 @@
+{
+  "classification": "Later admission and credential audit; not historical execution evidence",
+  "generated_at": "2026-10-25T01:57:59.540Z",
+  "implementation_candidate": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+  "source_admission_audit": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/IGNORED-U3-ADMISSION.json",
+  "source_admission_audit_sha256": "d697242858a066dbf032b47569917302fdd45a6a57017e5bf679b59320c1f0f1",
+  "candidate_inventory_sha256": "5e90c8e7d7cdde45e0f91c3f4ab0421e70ffcffa770a9f45837ef9d46c8ff2bc",
+  "result": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+  "structural_scan": "PASS",
+  "method": "Fresh random HMAC-SHA256 key via authorised SSH stdin. Protected production DSN read only on host; raw and URI-encoded password variants compared against every byte substring of corresponding lengths in every candidate. No DB connection. Key, HMACs and lengths transient and not retained.",
+  "scanner_sha256": "6465e9a1012d6d7fddca63b0077a184a378c460d5722c78e06a90164b2f631d0",
+  "admitted_candidates": 42,
+  "excluded": 20,
+  "force_add_performed": true,
+  "files": [
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.stderr.log",
+      "inclusion_reason": "Required to substantiate the accepted final aggregate/metadata postcheck",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.stdout.log",
+      "inclusion_reason": "Required to substantiate the accepted final aggregate/metadata postcheck",
+      "size": 1737,
+      "sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.stderr.log",
+      "inclusion_reason": "Required to substantiate the accepted affected-derived/period/aggregate verification",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.stdout.log",
+      "inclusion_reason": "Required to substantiate the accepted affected-derived/period/aggregate verification",
+      "size": 17014,
+      "sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.stderr.log",
+      "inclusion_reason": "Actual fresh production preflight for the accepted canonical correction; RECORD.md evidence inventory",
+      "size": 792,
+      "sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.stdout.log",
+      "inclusion_reason": "Actual fresh production preflight for the accepted canonical correction; RECORD.md evidence inventory",
+      "size": 3318,
+      "sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.stderr.log",
+      "inclusion_reason": "Actual read-only audit-metadata investigation underpinning the approved repair",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.stdout.log",
+      "inclusion_reason": "Actual read-only audit-metadata investigation underpinning the approved repair",
+      "size": 36076,
+      "sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 326,
+      "sha256": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 33,
+      "sha256": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 658,
+      "sha256": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 1126,
+      "sha256": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 867,
+      "sha256": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 2664,
+      "sha256": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 1404,
+      "sha256": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 7931,
+      "sha256": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 61,
+      "sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/MANIFEST.json",
+          "expected_sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/MANIFEST.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 29,
+      "sha256": "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 39,
+      "sha256": "6a665100485f66e43962e1235a7e454037c06887ab0469d2fac2b3fdd3764b36",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "6a665100485f66e43962e1235a7e454037c06887ab0469d2fac2b3fdd3764b36",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 11862,
+      "sha256": "9cf20dece609bf21586ee9ef280dc237b9a59263108c9cd76898227cf3e1204a",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "9cf20dece609bf21586ee9ef280dc237b9a59263108c9cd76898227cf3e1204a",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-SERVER.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 167997,
+      "sha256": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 238983,
+      "sha256": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/EVIDENCE-HASHES.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 28144,
+      "sha256": "7ca8c61c1772253e71d0464c0b6066d90a771f28c9cac1ef75f3f3fde3f6b718",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/EVIDENCE-HASHES.json",
+          "expected_sha256": "7ca8c61c1772253e71d0464c0b6066d90a771f28c9cac1ef75f3f3fde3f6b718",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 11880,
+      "sha256": "ffec204103bd5e23f73c009d9ba53fec559eee64a1de5f970e9cbd7231361fe4",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "ffec204103bd5e23f73c009d9ba53fec559eee64a1de5f970e9cbd7231361fe4",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 11375,
+      "sha256": "8d380c72f254bbe8d5744e4a1e70d630f4f24c4b7df0c0fe21c2219d940b42c8",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "8d380c72f254bbe8d5744e4a1e70d630f4f24c4b7df0c0fe21c2219d940b42c8",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.stderr.log",
+      "inclusion_reason": "Directly referenced by canonical METADATA-REPAIR-V5-RECORD.md section 1; actual original principal-discovery evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [],
+      "canonical_narrative_reference": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V5-RECORD.md",
+      "historical_pin": "None: original-byte hash recaptured; prior Git materialisation proof retained",
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.stdout.log",
+      "inclusion_reason": "Directly referenced by canonical METADATA-REPAIR-V5-RECORD.md section 1; actual original principal-discovery evidence",
+      "size": 13157,
+      "sha256": "c097dddcb41c5f81e5351612b3e7e588c8c3fef4ab66abc935491e9ad210ef51",
+      "historical_references": [],
+      "canonical_narrative_reference": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V5-RECORD.md",
+      "historical_pin": "None: original-byte hash recaptured; prior Git materialisation proof retained",
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-SERVER.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 539876,
+      "sha256": "1e439b5967dee4e7e2374643d24c4f99a7477bb86570dfed3d8e000960bc8a7b",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "1e439b5967dee4e7e2374643d24c4f99a7477bb86570dfed3d8e000960bc8a7b",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.stderr.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.stdout.log",
+      "inclusion_reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "size": 742860,
+      "sha256": "ef39b935f7b80b9abd6ab3561881b5a2ebd59b95e3998cba92a532078a5b87ad",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "ef39b935f7b80b9abd6ab3561881b5a2ebd59b95e3998cba92a532078a5b87ad",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.stderr.log",
+      "inclusion_reason": "Actual post-correction production postcheck; RECORD.md evidence inventory",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.stdout.log",
+      "inclusion_reason": "Actual post-correction production postcheck; RECORD.md evidence inventory",
+      "size": 4726,
+      "sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.stderr.log",
+      "inclusion_reason": "Original successful read-only production row precheck; RECORD.md evidence inventory",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.stdout.log",
+      "inclusion_reason": "Original successful read-only production row precheck; RECORD.md evidence inventory",
+      "size": 1655,
+      "sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+      "historical_references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        }
+      ],
+      "credential_scan": "PRODUCTION_CREDENTIAL_EXACT_BLIND_SCAN=PASS",
+      "structural_scan": "PASS"
+    }
+  ],
+  "admitted": 42,
+  "admission_reverified_at": "2026-10-25T02:00:43.428Z",
+  "git_index_verification": "PASS: exactly the 42 admitted paths staged; zero excluded paths staged"
+}

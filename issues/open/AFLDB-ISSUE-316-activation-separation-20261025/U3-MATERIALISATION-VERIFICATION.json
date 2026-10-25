@@ -1,0 +1,2379 @@
+{
+  "classification": "Later repository verification metadata, not original execution evidence",
+  "generated_at": "2026-10-25T01:05:55.487Z",
+  "method": "Git hash-object with repository path filters into isolated object directory; Git cat-file --batch materialisation to isolated files; byte-for-byte comparison. All original paths have text=unset via later preservation metadata. No real index or repository object store changed.",
+  "files": [
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/ADJUDICATION-ASSESSMENT.json",
+      "git_blob_oid": "cfc78f53e2b1ae873f4ca61dfe09041eeef82bd5",
+      "sha256_original_bytes": "2a24792b9729eae284a97b0240ffdfd233e95f5605e01ee0eaf502c7f7b83aa0",
+      "sha256_materialised_bytes": "2a24792b9729eae284a97b0240ffdfd233e95f5605e01ee0eaf502c7f7b83aa0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/ADJUDICATION-READONLY-REPORT.md",
+      "git_blob_oid": "dfab560b27cc6283a94f78af26535d917fc5b494",
+      "sha256_original_bytes": "a2288ba8a6af4d9602d8ca40e98b497acdf7ede216e2d75741d9cb31a99d1405",
+      "sha256_materialised_bytes": "a2288ba8a6af4d9602d8ca40e98b497acdf7ede216e2d75741d9cb31a99d1405",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/DECISION_NOTE.authorised-pending.txt",
+      "git_blob_oid": "59cdf4e93757cd6364382286acdddc4977b92a29",
+      "sha256_original_bytes": "8095d374775a03130cccdb74f1b0485112f2003cf9ac34e1f1896a29a74fc615",
+      "sha256_materialised_bytes": "8095d374775a03130cccdb74f1b0485112f2003cf9ac34e1f1896a29a74fc615",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-PROPOSAL.md",
+      "git_blob_oid": "9a4140f8ceffc018baa897428ba5116e447aeec0",
+      "sha256_original_bytes": "c20fba9bd5985b19fc484268a9b2a4dd2dfde4058a9941548a31fd5040ad6634",
+      "sha256_materialised_bytes": "c20fba9bd5985b19fc484268a9b2a4dd2dfde4058a9941548a31fd5040ad6634",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-REVIEW-20261024.md",
+      "git_blob_oid": "ae70f5878adcb8a5a647990b33df666ffe4605c0",
+      "sha256_original_bytes": "18ca2982b9d2629382e55a1a07004008f62eade45a49c96d650dc4e16983fb3a",
+      "sha256_materialised_bytes": "18ca2982b9d2629382e55a1a07004008f62eade45a49c96d650dc4e16983fb3a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V2-RECORD.md",
+      "git_blob_oid": "3fa2d4819585e931e5b591ab597176c7a188508d",
+      "sha256_original_bytes": "e923403e3dd37537c0e91d77cc096bbd1128f40e99aef70bfc01327afa55d662",
+      "sha256_materialised_bytes": "e923403e3dd37537c0e91d77cc096bbd1128f40e99aef70bfc01327afa55d662",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V3-RECORD.md",
+      "git_blob_oid": "f2d2feb039011b23f135b90761497671043ff18f",
+      "sha256_original_bytes": "78e1269830a0f5113b5c732525f486bf7a5ce53044639306e6e06ab4e1ebefef",
+      "sha256_materialised_bytes": "78e1269830a0f5113b5c732525f486bf7a5ce53044639306e6e06ab4e1ebefef",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V4-RECORD.md",
+      "git_blob_oid": "7d84feffb2a323002152d3dd54cb57c91e0f2c1c",
+      "sha256_original_bytes": "b8651d388b4e42bdc28c751162156e610b64e92b946198192d5e7e033c287b32",
+      "sha256_materialised_bytes": "b8651d388b4e42bdc28c751162156e610b64e92b946198192d5e7e033c287b32",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/PATCH-V4.cjs",
+      "git_blob_oid": "900230b02da38a9fe3274b5c01f5e216a474ce67",
+      "sha256_original_bytes": "582e9dc081b6cc313dc752271d1438138cff0ff171e226fffc479449da4aed3b",
+      "sha256_materialised_bytes": "582e9dc081b6cc313dc752271d1438138cff0ff171e226fffc479449da4aed3b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/POSTCHECK-ASSESSMENT.json",
+      "git_blob_oid": "51481af0e8afb0897475e425bd660705c6518a27",
+      "sha256_original_bytes": "dcba8ae7b0ce91a65eee4aa2ff80df696446a4776a39a70c885bbcf5b22b2f53",
+      "sha256_materialised_bytes": "dcba8ae7b0ce91a65eee4aa2ff80df696446a4776a39a70c885bbcf5b22b2f53",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/PREPARE-V4.cjs",
+      "git_blob_oid": "f527f1e5ec97d87e7fe77488ad872446868be48f",
+      "sha256_original_bytes": "c78a3e1d583c737eb06ba7f51eaa5bb8e9fa036658334bcb1967fd86f46a5796",
+      "sha256_materialised_bytes": "c78a3e1d583c737eb06ba7f51eaa5bb8e9fa036658334bcb1967fd86f46a5796",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/RECORD.md",
+      "git_blob_oid": "45fb3755ddef09bcc75040a9e00ad59e5625af5d",
+      "sha256_original_bytes": "efea58aacfa9da833f3bd90c9d28fbd005e3a2268514aebcfe9c940eddf2a429",
+      "sha256_materialised_bytes": "efea58aacfa9da833f3bd90c9d28fbd005e3a2268514aebcfe9c940eddf2a429",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.json",
+      "git_blob_oid": "854cdcf7d959e2d3a9177530d182b3f97c54feb0",
+      "sha256_original_bytes": "b3b709e130b95754e3a2d27f7a485d3f8317c0fdb4c29d332a983a17c790251a",
+      "sha256_materialised_bytes": "b3b709e130b95754e3a2d27f7a485d3f8317c0fdb4c29d332a983a17c790251a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v2.json",
+      "git_blob_oid": "9f3cce847b6b81771542d90ad225f43bbb1f9172",
+      "sha256_original_bytes": "25e97457594e4f30e66a27327f63261fa811cdd1fa92bcea77d072a0c90f39e0",
+      "sha256_materialised_bytes": "25e97457594e4f30e66a27327f63261fa811cdd1fa92bcea77d072a0c90f39e0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v3.json",
+      "git_blob_oid": "107d2421e9b78193433cb5adba0bacbf935ff579",
+      "sha256_original_bytes": "29f8bfd953cf84858458b657a3e8fbe59015aaf28c7f659933b91be0f7c69911",
+      "sha256_materialised_bytes": "29f8bfd953cf84858458b657a3e8fbe59015aaf28c7f659933b91be0f7c69911",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v4-validation.json",
+      "git_blob_oid": "9a62120735d9fa3db163868a9ef4d4aeaeaff4bf",
+      "sha256_original_bytes": "a08c18d89188ef37a749a2c5e350715eb49c668907081daa2cfb273dec1667cb",
+      "sha256_materialised_bytes": "a08c18d89188ef37a749a2c5e350715eb49c668907081daa2cfb273dec1667cb",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-repair-v4.json",
+      "git_blob_oid": "b8dcc0b4e7c2918915c6620be29028765b219162",
+      "sha256_original_bytes": "32b460e966efa28ff6ffd215a7015e3a80c97a2c8214f970a2611c303db2f4af",
+      "sha256_materialised_bytes": "32b460e966efa28ff6ffd215a7015e3a80c97a2c8214f970a2611c303db2f4af",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SESSION-FILES.metadata-review.json",
+      "git_blob_oid": "0ac072bc04351e4fff513e7083785bc83246f638",
+      "sha256_original_bytes": "2fa5ab02c319488de1d31cc65be3bcec05a44eafdfb065a9126d85b3040258d5",
+      "sha256_materialised_bytes": "2fa5ab02c319488de1d31cc65be3bcec05a44eafdfb065a9126d85b3040258d5",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+      "git_blob_oid": "2d0000db838d26aa1fb0aafac72861269c1cbe9e",
+      "sha256_original_bytes": "cb925a1d98cf65c2e5606b4352574a2e731fd02bbb196b02995fd4435361d740",
+      "sha256_materialised_bytes": "cb925a1d98cf65c2e5606b4352574a2e731fd02bbb196b02995fd4435361d740",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+      "git_blob_oid": "96a6a663f3762f20648c00ec5806a36faf845387",
+      "sha256_original_bytes": "1aa7130772c5bb6501d1225fa88c964f9201c1797d56bcc8589cd298593b2402",
+      "sha256_materialised_bytes": "1aa7130772c5bb6501d1225fa88c964f9201c1797d56bcc8589cd298593b2402",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+      "git_blob_oid": "42cdfbd7f0f360c6bb41d989ae7f5c21f3574782",
+      "sha256_original_bytes": "4106a471e10e0b224b4d2f7d5744216cae033c05da4fb8a62fd4f8f3a8b6e05d",
+      "sha256_materialised_bytes": "4106a471e10e0b224b4d2f7d5744216cae033c05da4fb8a62fd4f8f3a8b6e05d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+      "git_blob_oid": "3a3e7ea6f61559396fceb41313641fa02c4d32ce",
+      "sha256_original_bytes": "05f6e5f65c9070686e6af15307b8c6bae3133b0b80cb2e7d043891ffd5f08654",
+      "sha256_materialised_bytes": "05f6e5f65c9070686e6af15307b8c6bae3133b0b80cb2e7d043891ffd5f08654",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+      "git_blob_oid": "93263f9ba3961c945d089e3cf5d8872ae0575008",
+      "sha256_original_bytes": "32fadb268e20cd3d095734494883c9270b23b9cb8f704bb394fbb501992e5676",
+      "sha256_materialised_bytes": "32fadb268e20cd3d095734494883c9270b23b9cb8f704bb394fbb501992e5676",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/TRACK-V4.cjs",
+      "git_blob_oid": "0cb0da38a9c5d20080d14201e2c2839018c19d46",
+      "sha256_original_bytes": "bb81e9b0746ed452a6809ac4cfe38ddd8352be3ebb7b7c54dbabd6d020ffc5d3",
+      "sha256_materialised_bytes": "bb81e9b0746ed452a6809ac4cfe38ddd8352be3ebb7b7c54dbabd6d020ffc5d3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V4-FINAL-FREEZE.json",
+      "git_blob_oid": "ed261273fcd3098857f168c15c90054b4b59b0e9",
+      "sha256_original_bytes": "57d83a42f4582db957448d64257108173698d6d2181c576202377dc2f989f109",
+      "sha256_materialised_bytes": "57d83a42f4582db957448d64257108173698d6d2181c576202377dc2f989f109",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/V4-STATE.json",
+      "git_blob_oid": "2a9cf1658844e89b975192a92d46d25b1b3fcd88",
+      "sha256_original_bytes": "935989600273dd2faa2eb265192a44d6c341a0bbfdcd5119bbdf5f9942532f16",
+      "sha256_materialised_bytes": "935989600273dd2faa2eb265192a44d6c341a0bbfdcd5119bbdf5f9942532f16",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.exit.txt",
+      "git_blob_oid": "c227083464fb9af8955c90d2924774ee50abb547",
+      "sha256_original_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "sha256_materialised_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.json",
+      "git_blob_oid": "88ddc0b7bf345f02df68d988ef213a6b5492d462",
+      "sha256_original_bytes": "4ef529b26e4d536973eabd9978937fff832041fd9d913f8435aaeeaf5b65625a",
+      "sha256_materialised_bytes": "4ef529b26e4d536973eabd9978937fff832041fd9d913f8435aaeeaf5b65625a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.sh",
+      "git_blob_oid": "0568c8eec023461c78810a7ef0926386705569b4",
+      "sha256_original_bytes": "5e22cd926fea2c9ce13ac79a69428b14fbf0318bff6f27ceea63d51492c6e9ac",
+      "sha256_materialised_bytes": "5e22cd926fea2c9ce13ac79a69428b14fbf0318bff6f27ceea63d51492c6e9ac",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.stdout.log",
+      "git_blob_oid": "b5d09e0d5fa69e45e3571ad73e47662d288fddb1",
+      "sha256_original_bytes": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+      "sha256_materialised_bytes": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/audit-workflow-source-search.json",
+      "git_blob_oid": "c6bb7d52979359fbc4d51679800e615a5159c8b7",
+      "sha256_original_bytes": "18c6a0ed440feb98712f056f9312efa7dc4d88099de8abb489e602bb8226f2e1",
+      "sha256_materialised_bytes": "18c6a0ed440feb98712f056f9312efa7dc4d88099de8abb489e602bb8226f2e1",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/browser-availability.json",
+      "git_blob_oid": "cae5d142e34071f9d6128753848d785bccca0179",
+      "sha256_original_bytes": "f023e52b5d6e0de412d25f969cf5b9d0a9b7611446ecb2c3a6c7c5dcf5d3d682",
+      "sha256_materialised_bytes": "f023e52b5d6e0de412d25f969cf5b9d0a9b7611446ecb2c3a6c7c5dcf5d3d682",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/browser-inspection.cjs",
+      "git_blob_oid": "4a0c02b7b1a0dbe1ec913f79e086906c54c8f257",
+      "sha256_original_bytes": "d26351068c57d402480563c717416fe79b125dc9fb66e6fae9525c046affafb0",
+      "sha256_materialised_bytes": "d26351068c57d402480563c717416fe79b125dc9fb66e6fae9525c046affafb0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/browser-inspection.json",
+      "git_blob_oid": "dbc9f28b278fca36caf77833defbdb61275f83f8",
+      "sha256_original_bytes": "db5e97556d912821df2ca0f37d538c8a057b3cd3f6872e77147ac201516fa71a",
+      "sha256_materialised_bytes": "db5e97556d912821df2ca0f37d538c8a057b3cd3f6872e77147ac201516fa71a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/deployed-derived-read.exit.txt",
+      "git_blob_oid": "c227083464fb9af8955c90d2924774ee50abb547",
+      "sha256_original_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "sha256_materialised_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/deployed-derived-read.sh",
+      "git_blob_oid": "83b1437b9e0f3b2d3c3bcf6f0dcf2b01e0a27f6e",
+      "sha256_original_bytes": "08448a782e48c718234d78c0877264e8224a0d4d84a909ef830020407df679c5",
+      "sha256_materialised_bytes": "08448a782e48c718234d78c0877264e8224a0d4d84a909ef830020407df679c5",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/deployed-derived-read.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/deployed-derived-read.stdout.log",
+      "git_blob_oid": "cb583bcca017735a814ec78bd18ffa2e121bf978",
+      "sha256_original_bytes": "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93",
+      "sha256_materialised_bytes": "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.exit.txt",
+      "git_blob_oid": "c227083464fb9af8955c90d2924774ee50abb547",
+      "sha256_original_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "sha256_materialised_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.json",
+      "git_blob_oid": "7a20515845abd0b13698681239b41a7645f81f3b",
+      "sha256_original_bytes": "14a36ae40aceb23245da9f7c709df13c41fb76519cb8cabebd24483df20fa900",
+      "sha256_materialised_bytes": "14a36ae40aceb23245da9f7c709df13c41fb76519cb8cabebd24483df20fa900",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.sh",
+      "git_blob_oid": "3faa991ca57a989b6ac8efbf78a4d7e77ec691de",
+      "sha256_original_bytes": "cf53a2f71561b49bc35c7b30b58f8fbf074fffd128eef574d091453c5ddf08ac",
+      "sha256_materialised_bytes": "cf53a2f71561b49bc35c7b30b58f8fbf074fffd128eef574d091453c5ddf08ac",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.sql",
+      "git_blob_oid": "b086d0cd37ad1c5ecfe6e2c357990a302bf31fdf",
+      "sha256_original_bytes": "67a3ff1212ced033b4f00d10b3cf1970e2a8a13d33d01f3ef126f5e316fd1bc1",
+      "sha256_materialised_bytes": "67a3ff1212ced033b4f00d10b3cf1970e2a8a13d33d01f3ef126f5e316fd1bc1",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.stdout.log",
+      "git_blob_oid": "d1f144ea3ed8b97443e544d4028bf795a1e19509",
+      "sha256_original_bytes": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+      "sha256_materialised_bytes": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/expected-row.json",
+      "git_blob_oid": "bb3117d25bc837a890a32265f88254fefa217b19",
+      "sha256_original_bytes": "db12765494615e45fecf71df86b1aff0be5df7d9734856a7a158043556606e1d",
+      "sha256_materialised_bytes": "db12765494615e45fecf71df86b1aff0be5df7d9734856a7a158043556606e1d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.exit.txt",
+      "git_blob_oid": "405e057083f25e684989f485a916596125fdedc0",
+      "sha256_original_bytes": "922c7954216ccfe7a61def609305ce1dc7c67e225f873f256d30d7a8ee4f404c",
+      "sha256_materialised_bytes": "922c7954216ccfe7a61def609305ce1dc7c67e225f873f256d30d7a8ee4f404c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.json",
+      "git_blob_oid": "ee01eeb35187549fd469e57a3743c0b20140c820",
+      "sha256_original_bytes": "3baaff1c9cf322dcea2e0a20b318198a464abcab35ea073070f6a54eb4fef367",
+      "sha256_materialised_bytes": "3baaff1c9cf322dcea2e0a20b318198a464abcab35ea073070f6a54eb4fef367",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.stderr.log",
+      "git_blob_oid": "9c55e294d8e49c316f028de4b19a5a16e2cc199f",
+      "sha256_original_bytes": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+      "sha256_materialised_bytes": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.stdout.log",
+      "git_blob_oid": "3854d0fe8e0ff28ea50e57be360919d92757bba1",
+      "sha256_original_bytes": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+      "sha256_materialised_bytes": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.exit.txt",
+      "git_blob_oid": "c227083464fb9af8955c90d2924774ee50abb547",
+      "sha256_original_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "sha256_materialised_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.stdout.log",
+      "git_blob_oid": "9682d77d38775dc16e42a17f450e0cd754257c2e",
+      "sha256_original_bytes": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+      "sha256_materialised_bytes": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.exit.txt",
+      "git_blob_oid": "b8e817d4f8350da183e38145325940a42494db8a",
+      "sha256_original_bytes": "9556b82499cc0aaf86aee7f0d253e17c61b7ef73d48a295f37d98f08b04ffa7f",
+      "sha256_materialised_bytes": "9556b82499cc0aaf86aee7f0d253e17c61b7ef73d48a295f37d98f08b04ffa7f",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.json",
+      "git_blob_oid": "4060ae76958b65037d7f987a6a0800b4361d3b53",
+      "sha256_original_bytes": "65d7d2f9b97c889969388b22de8531d7a9cdb1b3c7c7e83d39da2061df41ba48",
+      "sha256_materialised_bytes": "65d7d2f9b97c889969388b22de8531d7a9cdb1b3c7c7e83d39da2061df41ba48",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.sh",
+      "git_blob_oid": "dc52203fec1ee183e496448b07dfee0b032c2d74",
+      "sha256_original_bytes": "3df1d0b5ca430b6794f59e951f25cc2b69fd08b95abf690000a85fccaac42879",
+      "sha256_materialised_bytes": "3df1d0b5ca430b6794f59e951f25cc2b69fd08b95abf690000a85fccaac42879",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.stderr.log",
+      "git_blob_oid": "5b751d29f634114bfdfb2f6925ae2614dc2785a8",
+      "sha256_original_bytes": "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d",
+      "sha256_materialised_bytes": "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.stdout.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/ACTOR-EVIDENCE.json",
+      "git_blob_oid": "0b05485a09ee4d8c6a276258b2d45da80a782014",
+      "sha256_original_bytes": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50",
+      "sha256_materialised_bytes": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/MANIFEST.json",
+      "git_blob_oid": "fc10ceb3e54213f8a8dc3af8a5251d853df300fd",
+      "sha256_original_bytes": "4315cc6b205d948e35a68209cfe32323aa9bcb3abc3fd63831dd151da68f88c0",
+      "sha256_materialised_bytes": "4315cc6b205d948e35a68209cfe32323aa9bcb3abc3fd63831dd151da68f88c0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/OWNER-RULING.md",
+      "git_blob_oid": "089ab9eb364821dddc677619cdf19a105e42dc2f",
+      "sha256_original_bytes": "936f61e9676f66f77d06eaa7f66c02efa7e12b8ac9ecd787539a9031bfdafd55",
+      "sha256_materialised_bytes": "936f61e9676f66f77d06eaa7f66c02efa7e12b8ac9ecd787539a9031bfdafd55",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/PRIOR-NO-GO.md",
+      "git_blob_oid": "ae70f5878adcb8a5a647990b33df666ffe4605c0",
+      "sha256_original_bytes": "18ca2982b9d2629382e55a1a07004008f62eade45a49c96d650dc4e16983fb3a",
+      "sha256_materialised_bytes": "18ca2982b9d2629382e55a1a07004008f62eade45a49c96d650dc4e16983fb3a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/README.md",
+      "git_blob_oid": "15d25f10f3da3b56dd116bdae3f152395810b5df",
+      "sha256_original_bytes": "30b68724618a5c8565c9ec635a0fdca6dd702a031408e741a62f9ed6cee5c832",
+      "sha256_materialised_bytes": "30b68724618a5c8565c9ec635a0fdca6dd702a031408e741a62f9ed6cee5c832",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/REVIEW.json",
+      "git_blob_oid": "bcbdaa4ad1ce274c1d2f24e2953594261a5c0b22",
+      "sha256_original_bytes": "54a1c52d8a9683a8639dcc367ccec852e81362e5f3ad28cfa5daa0872a193571",
+      "sha256_materialised_bytes": "54a1c52d8a9683a8639dcc367ccec852e81362e5f3ad28cfa5daa0872a193571",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/REVIEW.md",
+      "git_blob_oid": "ec09c69925e1d9b8ccd326fcda0120b67268f45d",
+      "sha256_original_bytes": "3eaacf8ea63c6580730229d6e89c808fb7f7de135a3dfe2027d6f2dc6235543c",
+      "sha256_materialised_bytes": "3eaacf8ea63c6580730229d6e89c808fb7f7de135a3dfe2027d6f2dc6235543c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/VALIDATION.json",
+      "git_blob_oid": "80f5228fca807c15efc783d3f7a13ea72b47163a",
+      "sha256_original_bytes": "b24e7379a79fc5a4e92c43f7d0335ae6bf2bcd5525917ffd5e0b8d9f309dbc8f",
+      "sha256_materialised_bytes": "b24e7379a79fc5a4e92c43f7d0335ae6bf2bcd5525917ffd5e0b8d9f309dbc8f",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/assert-post.sql",
+      "git_blob_oid": "0cafda214a77447f87ceab620725d0bf454a6c20",
+      "sha256_original_bytes": "5049a15237a06679a076cb048e06f37fcfd22bc5b1f5b4d209be2372e2dd4276",
+      "sha256_materialised_bytes": "5049a15237a06679a076cb048e06f37fcfd22bc5b1f5b4d209be2372e2dd4276",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/audit-log-source.txt",
+      "git_blob_oid": "d3e4117b2f6e23d0e131cc7fcfe3bba201f9c646",
+      "sha256_original_bytes": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644",
+      "sha256_materialised_bytes": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/audit-schema-source.txt",
+      "git_blob_oid": "b6f51f5492cccbee9300466c27462b2d5c671fae",
+      "sha256_original_bytes": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+      "sha256_materialised_bytes": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/binding.json",
+      "git_blob_oid": "51b6b88f458f1311c06756edd9bb9acabfb7397d",
+      "sha256_original_bytes": "045e629896451f877e0c4e15b9c051651b17038bc2fc501b75e0be0867f377da",
+      "sha256_materialised_bytes": "045e629896451f877e0c4e15b9c051651b17038bc2fc501b75e0be0867f377da",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/canonical-gates.sql",
+      "git_blob_oid": "473031da423b888e2a767822161601815d3e73e7",
+      "sha256_original_bytes": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3",
+      "sha256_materialised_bytes": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/checks.sql",
+      "git_blob_oid": "5772f57fb69f3ecdafc524b00c1a3076f9a27e63",
+      "sha256_original_bytes": "7760d80b29b71fbf63096a300354b8c2ed076cbb3e8cb688d0864b6447429ac6",
+      "sha256_materialised_bytes": "7760d80b29b71fbf63096a300354b8c2ed076cbb3e8cb688d0864b6447429ac6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/identity.sql",
+      "git_blob_oid": "6aa15c4bb53f14a57cf88eeabf47dd796394db68",
+      "sha256_original_bytes": "0acad1249c6af37cac1f95454cc1ecf7b463bf93b16fe177416181f394752ff6",
+      "sha256_materialised_bytes": "0acad1249c6af37cac1f95454cc1ecf7b463bf93b16fe177416181f394752ff6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/locks.sql",
+      "git_blob_oid": "c1eed1935510b72b1deabd5b0b63efe1316e362b",
+      "sha256_original_bytes": "90aec2c89366e43d78f2ca7f12ba70996093eb39fd2e194345bfa337b16c34f8",
+      "sha256_materialised_bytes": "90aec2c89366e43d78f2ca7f12ba70996093eb39fd2e194345bfa337b16c34f8",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/note.txt",
+      "git_blob_oid": "a1a56a949a258c5131ee6f23b1514e02317979ac",
+      "sha256_original_bytes": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d",
+      "sha256_materialised_bytes": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/postcheck.sql",
+      "git_blob_oid": "871e02fdb635986f12b6a0d8e7b951dc4077e9c2",
+      "sha256_original_bytes": "857b47eef9e9783918c736512120b56c2d77c219fca59b6b06b9420f590e4bd6",
+      "sha256_materialised_bytes": "857b47eef9e9783918c736512120b56c2d77c219fca59b6b06b9420f590e4bd6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/preflight.sql",
+      "git_blob_oid": "c3a1f48d5fe013a0f62865cc1eb800ab87a69ed4",
+      "sha256_original_bytes": "ea7197e938812490ed2774d2475fe259bb4f67b0dddbb2c2f7bc52ac63481c15",
+      "sha256_materialised_bytes": "ea7197e938812490ed2774d2475fe259bb4f67b0dddbb2c2f7bc52ac63481c15",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/protected.json",
+      "git_blob_oid": "89407a05fc6daaa3c8016e8cc2d3b972dc15ed60",
+      "sha256_original_bytes": "8def28b37848204942eaf62f0c95d98e276c915dce794307ccfdd7bde6e6f5a9",
+      "sha256_materialised_bytes": "8def28b37848204942eaf62f0c95d98e276c915dce794307ccfdd7bde6e6f5a9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/repair-body.sql",
+      "git_blob_oid": "cb29a3a9c93ac8ff678ccd4698c824921d81543b",
+      "sha256_original_bytes": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b",
+      "sha256_materialised_bytes": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/repair.sql",
+      "git_blob_oid": "54601033d80a9689711a21bb095fab4b83494685",
+      "sha256_original_bytes": "31e2e80df539d9f86947902eb316411b884c777f56ed7b8b3fe4f914706520c3",
+      "sha256_materialised_bytes": "31e2e80df539d9f86947902eb316411b884c777f56ed7b8b3fe4f914706520c3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/run.cjs",
+      "git_blob_oid": "713f36c4bbea244eb841bbfede4495cd436adfef",
+      "sha256_original_bytes": "ed276f842d8f5b9936c6616dbc9e4af08301b368951da8857761ef49f7ee5703",
+      "sha256_materialised_bytes": "ed276f842d8f5b9936c6616dbc9e4af08301b368951da8857761ef49f7ee5703",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/runtime.json",
+      "git_blob_oid": "632d7dc63beadf70c5e472cfeaafb25ee0b01f00",
+      "sha256_original_bytes": "812eb905158bb59ce9e7f0b6e5bb89142697d49901628531bd185f6afc548c37",
+      "sha256_materialised_bytes": "812eb905158bb59ce9e7f0b6e5bb89142697d49901628531bd185f6afc548c37",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/schema-evidence.json",
+      "git_blob_oid": "aa5c8b62a930466f0288feae798b6b3426ac7a1f",
+      "sha256_original_bytes": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593",
+      "sha256_materialised_bytes": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/snapshot.sql",
+      "git_blob_oid": "cfcc883e53dd46faed28c6d98e4ffe534427eabd",
+      "sha256_original_bytes": "fa0325c827bfedbfc82024b951da97249ef709bdef6844fec6e5fbf974c14761",
+      "sha256_materialised_bytes": "fa0325c827bfedbfc82024b951da97249ef709bdef6844fec6e5fbf974c14761",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/validate.cjs",
+      "git_blob_oid": "8bbba994aab3bbf3ae936c99b6d0a3bae2f7e6aa",
+      "sha256_original_bytes": "3d074eb88dbe6b98edd7f3a74503e125a0857b58c9b4bc37f98b3c16d7a9fe81",
+      "sha256_materialised_bytes": "3d074eb88dbe6b98edd7f3a74503e125a0857b58c9b4bc37f98b3c16d7a9fe81",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/ACTOR-EVIDENCE.json",
+      "git_blob_oid": "0b05485a09ee4d8c6a276258b2d45da80a782014",
+      "sha256_original_bytes": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50",
+      "sha256_materialised_bytes": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+      "git_blob_oid": "0c34a1b61cb4a96497260a371385f4a535598eff",
+      "sha256_original_bytes": "5bf642882f29731c2db95558ac12779fd97a83ccfacf3cfe36e66700ce54034d",
+      "sha256_materialised_bytes": "5bf642882f29731c2db95558ac12779fd97a83ccfacf3cfe36e66700ce54034d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/OWNER-RULING.md",
+      "git_blob_oid": "f049e0cd0083033e837377aaf0706c0edf925626",
+      "sha256_original_bytes": "6d1aa8b12bdbded700d24a6f4cebd9413ce3dfe24f1105bb5c4b82235dccc994",
+      "sha256_materialised_bytes": "6d1aa8b12bdbded700d24a6f4cebd9413ce3dfe24f1105bb5c4b82235dccc994",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.json",
+      "git_blob_oid": "0b308ce7679876c05e75d9da70be583d1728842b",
+      "sha256_original_bytes": "3bb43fe23772ff3fe362852441e7b94b5042133c0675a9f15d4434b25a649ae7",
+      "sha256_materialised_bytes": "3bb43fe23772ff3fe362852441e7b94b5042133c0675a9f15d4434b25a649ae7",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.stdout.log",
+      "git_blob_oid": "7114f1923631f52a965a2bd18dee9c313943225a",
+      "sha256_original_bytes": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+      "sha256_materialised_bytes": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.json",
+      "git_blob_oid": "596c0892f751b8c9b7a01740698a75363ed2f3cf",
+      "sha256_original_bytes": "a63f00cd80bb766a3f09082f9e2caf01ac76b551fabe96a05e05e5524852d2af",
+      "sha256_materialised_bytes": "a63f00cd80bb766a3f09082f9e2caf01ac76b551fabe96a05e05e5524852d2af",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.stderr.log",
+      "git_blob_oid": "f9623f25e7685932884c002549796912ee621f86",
+      "sha256_original_bytes": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+      "sha256_materialised_bytes": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.stdout.log",
+      "git_blob_oid": "2b6331acf1cf697c870270bfd26622f2033355f7",
+      "sha256_original_bytes": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+      "sha256_materialised_bytes": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.json",
+      "git_blob_oid": "5b560c529519192698ca03acb88fdac07b5b10e2",
+      "sha256_original_bytes": "acc65c38b2ff7f47f94e4f3d62e534cb25595a3c7400b05b26b122a13288d51e",
+      "sha256_materialised_bytes": "acc65c38b2ff7f47f94e4f3d62e534cb25595a3c7400b05b26b122a13288d51e",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.stderr.log",
+      "git_blob_oid": "ebb2282359459d265c8ec8d3290de4978be9a004",
+      "sha256_original_bytes": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+      "sha256_materialised_bytes": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.stdout.log",
+      "git_blob_oid": "be9f4ee95e9c6ff8f4b294f8e9b4623d5bf6ad95",
+      "sha256_original_bytes": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+      "sha256_materialised_bytes": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.json",
+      "git_blob_oid": "c5d7ac33d6397b1a2b47397acbe57287066a209a",
+      "sha256_original_bytes": "8af622aa6d84e69a22deca5d4576ef58f27b9a42f27c4498f55afbf6103599c8",
+      "sha256_materialised_bytes": "8af622aa6d84e69a22deca5d4576ef58f27b9a42f27c4498f55afbf6103599c8",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.stderr.log",
+      "git_blob_oid": "7ff5fc136794b19c9e4d9a2a062e5b577c6a5b76",
+      "sha256_original_bytes": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+      "sha256_materialised_bytes": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.stdout.log",
+      "git_blob_oid": "5a17687e04a08b732a22e8da1080319bf41d93e8",
+      "sha256_original_bytes": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+      "sha256_materialised_bytes": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.json",
+      "git_blob_oid": "497260bea51c4b95ada86f585c31ffa915e82333",
+      "sha256_original_bytes": "bb21d7f0d7a2f5af4ba717b139d56b6ff31aaf1a26de257aaf0361d1e89b9fbd",
+      "sha256_materialised_bytes": "bb21d7f0d7a2f5af4ba717b139d56b6ff31aaf1a26de257aaf0361d1e89b9fbd",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.stdout.log",
+      "git_blob_oid": "0481597f13de4f23979e478335eca4f157c1e1aa",
+      "sha256_original_bytes": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+      "sha256_materialised_bytes": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-VALIDATION.json",
+      "git_blob_oid": "e23e83c4251399600e9ba3d8cd34813b258a2b33",
+      "sha256_original_bytes": "06edb4e49a6dd9a79a199b35587fb5392b77a7aa553d395abccdca187bf48ba6",
+      "sha256_materialised_bytes": "06edb4e49a6dd9a79a199b35587fb5392b77a7aa553d395abccdca187bf48ba6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PRIOR-NO-GO.md",
+      "git_blob_oid": "ae70f5878adcb8a5a647990b33df666ffe4605c0",
+      "sha256_original_bytes": "18ca2982b9d2629382e55a1a07004008f62eade45a49c96d650dc4e16983fb3a",
+      "sha256_materialised_bytes": "18ca2982b9d2629382e55a1a07004008f62eade45a49c96d650dc4e16983fb3a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/README.md",
+      "git_blob_oid": "a6cad8a486da227efe3b0522a3bfb2887adf883f",
+      "sha256_original_bytes": "bf23509f92a13bb7e6ac9595f38e33db00b477d48c96d82ce572c927dc2c4c68",
+      "sha256_materialised_bytes": "bf23509f92a13bb7e6ac9595f38e33db00b477d48c96d82ce572c927dc2c4c68",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/REVIEW.json",
+      "git_blob_oid": "052c92efbbe741093fb4469fff8b8c0aa62854f9",
+      "sha256_original_bytes": "c976840f33d8b8be5fcb422efe40fbf111cfc7640d855e681bf9813c3b7f4d1f",
+      "sha256_materialised_bytes": "c976840f33d8b8be5fcb422efe40fbf111cfc7640d855e681bf9813c3b7f4d1f",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/REVIEW.md",
+      "git_blob_oid": "70ca4c950bbcfca464d3449627d9b7a3a73b884e",
+      "sha256_original_bytes": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4",
+      "sha256_materialised_bytes": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/SEMANTICS.md",
+      "git_blob_oid": "3d164aa8643be358c058fd98e1bad37d5088acba",
+      "sha256_original_bytes": "ab939558bcede79f0dbbf799670dbe7371047d7930737740a831d0d050b02d76",
+      "sha256_materialised_bytes": "ab939558bcede79f0dbbf799670dbe7371047d7930737740a831d0d050b02d76",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/V2-NO-GO.md",
+      "git_blob_oid": "ec09c69925e1d9b8ccd326fcda0120b67268f45d",
+      "sha256_original_bytes": "3eaacf8ea63c6580730229d6e89c808fb7f7de135a3dfe2027d6f2dc6235543c",
+      "sha256_materialised_bytes": "3eaacf8ea63c6580730229d6e89c808fb7f7de135a3dfe2027d6f2dc6235543c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/VALIDATION.json",
+      "git_blob_oid": "8b9df3d97f6cb7a0a601951036865d7c228a50d0",
+      "sha256_original_bytes": "8388a7c98e889e9fb75a08965467b5706d3ba0c3354ad68df3d7cd9da376f57a",
+      "sha256_materialised_bytes": "8388a7c98e889e9fb75a08965467b5706d3ba0c3354ad68df3d7cd9da376f57a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/assert-post.sql",
+      "git_blob_oid": "0cafda214a77447f87ceab620725d0bf454a6c20",
+      "sha256_original_bytes": "5049a15237a06679a076cb048e06f37fcfd22bc5b1f5b4d209be2372e2dd4276",
+      "sha256_materialised_bytes": "5049a15237a06679a076cb048e06f37fcfd22bc5b1f5b4d209be2372e2dd4276",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/audit-log-source.txt",
+      "git_blob_oid": "d3e4117b2f6e23d0e131cc7fcfe3bba201f9c646",
+      "sha256_original_bytes": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644",
+      "sha256_materialised_bytes": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/audit-schema-source.txt",
+      "git_blob_oid": "b6f51f5492cccbee9300466c27462b2d5c671fae",
+      "sha256_original_bytes": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+      "sha256_materialised_bytes": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/binding.json",
+      "git_blob_oid": "5dec22a0b4dc19222b78433fc7cdc91b1a52a706",
+      "sha256_original_bytes": "58466e4c14c24978bbb8afa58fd991e96d767def57d954b606426a0ece034c87",
+      "sha256_materialised_bytes": "58466e4c14c24978bbb8afa58fd991e96d767def57d954b606426a0ece034c87",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/canonical-gates.sql",
+      "git_blob_oid": "473031da423b888e2a767822161601815d3e73e7",
+      "sha256_original_bytes": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3",
+      "sha256_materialised_bytes": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/checks.sql",
+      "git_blob_oid": "b579c7b121c21454dced9e5215d5151b69a531ae",
+      "sha256_original_bytes": "85b7450179e7a7618394bf3f4a27e7badc32fa2656e6cad833fdab2992189fd0",
+      "sha256_materialised_bytes": "85b7450179e7a7618394bf3f4a27e7badc32fa2656e6cad833fdab2992189fd0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/identity.sql",
+      "git_blob_oid": "6aa15c4bb53f14a57cf88eeabf47dd796394db68",
+      "sha256_original_bytes": "0acad1249c6af37cac1f95454cc1ecf7b463bf93b16fe177416181f394752ff6",
+      "sha256_materialised_bytes": "0acad1249c6af37cac1f95454cc1ecf7b463bf93b16fe177416181f394752ff6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/lock-assert.sql",
+      "git_blob_oid": "5812fac4c21582b7ab69e85c35109d8beacb5f3d",
+      "sha256_original_bytes": "28286387e44f202dc7c3ebfc6deae60c3b51573c3abdef92b6633200593e36ff",
+      "sha256_materialised_bytes": "28286387e44f202dc7c3ebfc6deae60c3b51573c3abdef92b6633200593e36ff",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/locks.sql",
+      "git_blob_oid": "4ffdce462b4aa3c48fed5bb40ac02763999615e8",
+      "sha256_original_bytes": "124ad2394f6bfe431a423fe26e8440a7883c22ee0f8e31872a84fa52d1e894fb",
+      "sha256_materialised_bytes": "124ad2394f6bfe431a423fe26e8440a7883c22ee0f8e31872a84fa52d1e894fb",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/note.txt",
+      "git_blob_oid": "a1a56a949a258c5131ee6f23b1514e02317979ac",
+      "sha256_original_bytes": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d",
+      "sha256_materialised_bytes": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/postcheck.sql",
+      "git_blob_oid": "7a3f177bd84b31e987e5d76b1ad14f4949c4f504",
+      "sha256_original_bytes": "adc3d7e69dc9637b1f1133b6df61fec251f97a437a0800cb1f4ca528d792d115",
+      "sha256_materialised_bytes": "adc3d7e69dc9637b1f1133b6df61fec251f97a437a0800cb1f4ca528d792d115",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/preflight.sql",
+      "git_blob_oid": "9e94421a61f24cb326d4dfd5c4f105e6b37eaf89",
+      "sha256_original_bytes": "f65f6d6c7c95fc3859c6026af4141254c9249ea7ff2ff8da80b81974b3a23200",
+      "sha256_materialised_bytes": "f65f6d6c7c95fc3859c6026af4141254c9249ea7ff2ff8da80b81974b3a23200",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/protected.json",
+      "git_blob_oid": "89407a05fc6daaa3c8016e8cc2d3b972dc15ed60",
+      "sha256_original_bytes": "8def28b37848204942eaf62f0c95d98e276c915dce794307ccfdd7bde6e6f5a9",
+      "sha256_materialised_bytes": "8def28b37848204942eaf62f0c95d98e276c915dce794307ccfdd7bde6e6f5a9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/repair-body.sql",
+      "git_blob_oid": "cb29a3a9c93ac8ff678ccd4698c824921d81543b",
+      "sha256_original_bytes": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b",
+      "sha256_materialised_bytes": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/repair.sql",
+      "git_blob_oid": "83f1b6b41cd7f5d1a63eb84f16ab110819413b9a",
+      "sha256_original_bytes": "54104779c399d4f2105ea53f6b843599cbb075f74a4ad1d94a142a6e57bdeb1b",
+      "sha256_materialised_bytes": "54104779c399d4f2105ea53f6b843599cbb075f74a4ad1d94a142a6e57bdeb1b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/run.cjs",
+      "git_blob_oid": "8deb58d5fcf6dfd4213bece1b59ab6bd5b766a87",
+      "sha256_original_bytes": "e68dd5251822e9216092307fb738e9d6fe1a5b5693d95c4a3e1bd94762b5152d",
+      "sha256_materialised_bytes": "e68dd5251822e9216092307fb738e9d6fe1a5b5693d95c4a3e1bd94762b5152d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/runtime.json",
+      "git_blob_oid": "632d7dc63beadf70c5e472cfeaafb25ee0b01f00",
+      "sha256_original_bytes": "812eb905158bb59ce9e7f0b6e5bb89142697d49901628531bd185f6afc548c37",
+      "sha256_materialised_bytes": "812eb905158bb59ce9e7f0b6e5bb89142697d49901628531bd185f6afc548c37",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/schema-evidence.json",
+      "git_blob_oid": "aa5c8b62a930466f0288feae798b6b3426ac7a1f",
+      "sha256_original_bytes": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593",
+      "sha256_materialised_bytes": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/snapshot.sql",
+      "git_blob_oid": "cfcc883e53dd46faed28c6d98e4ffe534427eabd",
+      "sha256_original_bytes": "fa0325c827bfedbfc82024b951da97249ef709bdef6844fec6e5fbf974c14761",
+      "sha256_materialised_bytes": "fa0325c827bfedbfc82024b951da97249ef709bdef6844fec6e5fbf974c14761",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-order.cjs",
+      "git_blob_oid": "0260a2a184be3518d2bdee894ebe4509bd4b1954",
+      "sha256_original_bytes": "2d98e8bcc6e3828024bc560dd99296d54b4cee83e509c71c486c3070c1255430",
+      "sha256_materialised_bytes": "2d98e8bcc6e3828024bc560dd99296d54b4cee83e509c71c486c3070c1255430",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-pg.cjs",
+      "git_blob_oid": "895bda7ea57107a2a30c6dc64424dc5df660344d",
+      "sha256_original_bytes": "5467c4e0867d8861c8b209c9e0fc843052e0d58df6411d95c8ad17071b2e3b86",
+      "sha256_materialised_bytes": "5467c4e0867d8861c8b209c9e0fc843052e0d58df6411d95c8ad17071b2e3b86",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-remote.cjs",
+      "git_blob_oid": "bfa67462947e78a75876746d516d2d273d019141",
+      "sha256_original_bytes": "379e53c7e34ec025b2f34715d215e76f6214d8483ff868c022549884a35f00b3",
+      "sha256_materialised_bytes": "379e53c7e34ec025b2f34715d215e76f6214d8483ff868c022549884a35f00b3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate.cjs",
+      "git_blob_oid": "a22d01ab5b2d222806f59de1a2f9552b3aedf0d8",
+      "sha256_original_bytes": "84ae5689b5b6cd295e076b9aae70eb1078a339deb1b4679bd3ef78a8371039a7",
+      "sha256_materialised_bytes": "84ae5689b5b6cd295e076b9aae70eb1078a339deb1b4679bd3ef78a8371039a7",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/DRIVER-STOP.json",
+      "git_blob_oid": "5b54ef31d7c1e2cbfe18f7fdebc2d432ba1a90c0",
+      "sha256_original_bytes": "5d2c93e0963e3abf5be3c4e03cd9c75914a1dd949712d7760af9165fc9de100d",
+      "sha256_materialised_bytes": "5d2c93e0963e3abf5be3c4e03cd9c75914a1dd949712d7760af9165fc9de100d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EXECUTION-STATE.json",
+      "git_blob_oid": "513a06f75e77248566d05c333f69b9c11e18ca6c",
+      "sha256_original_bytes": "45d91416b915e3e23c89c61b74f11859ad26fa062ec2626404ea914a492f0b1e",
+      "sha256_materialised_bytes": "45d91416b915e3e23c89c61b74f11859ad26fa062ec2626404ea914a492f0b1e",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/HASH-VERIFICATION.json",
+      "git_blob_oid": "58b7fa8e188b375d0e3c5426ac544cbf789963df",
+      "sha256_original_bytes": "02625970a9579c1a69fcf8c8905d43c3865413ea3b2d6ddbeb50659997e85c1c",
+      "sha256_materialised_bytes": "02625970a9579c1a69fcf8c8905d43c3865413ea3b2d6ddbeb50659997e85c1c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/MANIFEST.json",
+      "git_blob_oid": "5c91ccf008ca30d1dfb7e34175bc327f5d2587f3",
+      "sha256_original_bytes": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+      "sha256_materialised_bytes": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/OWNER-EXECUTION-AUTHORITY.md",
+      "git_blob_oid": "ee14aa1016c3f190427e4539e3ab5f08ecbec476",
+      "sha256_original_bytes": "9937113fc816ea3e012fff2f7829888af3a32aca712ab4fcb353565b3bf2f301",
+      "sha256_materialised_bytes": "9937113fc816ea3e012fff2f7829888af3a32aca712ab4fcb353565b3bf2f301",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REPORT.md",
+      "git_blob_oid": "fa2b7b15dda45950b5d76eb3afe60f59461b04b8",
+      "sha256_original_bytes": "57c9ac2c4a4f5d92b8d2e2f6223d26c69afc81b668d85e18a8432af61b930821",
+      "sha256_materialised_bytes": "57c9ac2c4a4f5d92b8d2e2f6223d26c69afc81b668d85e18a8432af61b930821",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REVIEW.json",
+      "git_blob_oid": "d6b1006761a78c2489fdcbc4a960cdd089536684",
+      "sha256_original_bytes": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2",
+      "sha256_materialised_bytes": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REVIEW.md",
+      "git_blob_oid": "862ac9e911617cce66bb233ebe9606f537dbdb9f",
+      "sha256_original_bytes": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+      "sha256_materialised_bytes": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/SESSION-FILES.json",
+      "git_blob_oid": "098e4822b4df0d0b54cf95694120e10707f0175b",
+      "sha256_original_bytes": "6bdf68321a602d676f6182839d800744ca2e0ba62eefdc0fb54015397284010d",
+      "sha256_materialised_bytes": "6bdf68321a602d676f6182839d800744ca2e0ba62eefdc0fb54015397284010d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/execute-authorised-once.cjs",
+      "git_blob_oid": "356818932af95d2abf93d800f74061604711158b",
+      "sha256_original_bytes": "8416cc3594fd7e344b97d8a842375ba170bc39407958a99543f4134535bb9749",
+      "sha256_materialised_bytes": "8416cc3594fd7e344b97d8a842375ba170bc39407958a99543f4134535bb9749",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/final-package-verify.json",
+      "git_blob_oid": "1b49a9bd50a3812fa18fb5e6ce2c57f6a1dc76cb",
+      "sha256_original_bytes": "fa808b27532627c7f4cdfa117bad85e8c4bee0fa367d184b1b23fe124f46ccb6",
+      "sha256_materialised_bytes": "fa808b27532627c7f4cdfa117bad85e8c4bee0fa367d184b1b23fe124f46ccb6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/observation-launch.json",
+      "git_blob_oid": "9699a9a814e0c6f109de92fe97fa2d991d2f0f52",
+      "sha256_original_bytes": "b1a425957c5129b62225d55162db2028a45d0f3defa231b34d069cca3ddc6cf0",
+      "sha256_materialised_bytes": "b1a425957c5129b62225d55162db2028a45d0f3defa231b34d069cca3ddc6cf0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.sh",
+      "git_blob_oid": "3064c85f6bd6302599e1aaecebab0b8034eb0398",
+      "sha256_original_bytes": "d24641152ec41f0d6b85b66b6ccfef66711f7106f18a134c661e8d509b2a1557",
+      "sha256_materialised_bytes": "d24641152ec41f0d6b85b66b6ccfef66711f7106f18a134c661e8d509b2a1557",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.sql",
+      "git_blob_oid": "1bbb8c06028f59abb0589f89c93be05cf7c5721f",
+      "sha256_original_bytes": "53d40b28d1ac466b687cbeb964eb9302009a9d5a7a8783f3245b3b916d76992e",
+      "sha256_materialised_bytes": "53d40b28d1ac466b687cbeb964eb9302009a9d5a7a8783f3245b3b916d76992e",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stderr.log",
+      "git_blob_oid": "527c0a496786db394efcc11898b76d1d84efa946",
+      "sha256_original_bytes": "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb",
+      "sha256_materialised_bytes": "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stdout.log",
+      "git_blob_oid": "c157a131b1d056f27f660d30103899d16cac96b9",
+      "sha256_original_bytes": "6a665100485f66e43962e1235a7e454037c06887ab0469d2fac2b3fdd3764b36",
+      "sha256_materialised_bytes": "6a665100485f66e43962e1235a7e454037c06887ab0469d2fac2b3fdd3764b36",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.transport.json",
+      "git_blob_oid": "22640dd895ad068e516b595640a6172dbfeea488",
+      "sha256_original_bytes": "703f559fd141353a41081afd5c099f0156a7ad972284e828b0938e0280912b4b",
+      "sha256_materialised_bytes": "703f559fd141353a41081afd5c099f0156a7ad972284e828b0938e0280912b4b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/OBSERVATION-STOP.json",
+      "git_blob_oid": "2fb02330964c02f1e7c890b6a9807db04fc61976",
+      "sha256_original_bytes": "e1b646040279472bc4e43412949fc5ed1a0440cf0887b5fa0f9a2e7165118f03",
+      "sha256_materialised_bytes": "e1b646040279472bc4e43412949fc5ed1a0440cf0887b5fa0f9a2e7165118f03",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation-launch.json",
+      "git_blob_oid": "709e46dd481dd6554a5975bf58494f05b148dd5f",
+      "sha256_original_bytes": "189b2d7948eaca85cb929a41749dac723eb74308fcb01a4a07c5e8510937cab3",
+      "sha256_materialised_bytes": "189b2d7948eaca85cb929a41749dac723eb74308fcb01a4a07c5e8510937cab3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.stdout.log",
+      "git_blob_oid": "3008a969f9e5e6ad9320f1bb75633cf703f99203",
+      "sha256_original_bytes": "9cf20dece609bf21586ee9ef280dc237b9a59263108c9cd76898227cf3e1204a",
+      "sha256_materialised_bytes": "9cf20dece609bf21586ee9ef280dc237b9a59263108c9cd76898227cf3e1204a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.transport.json",
+      "git_blob_oid": "effd51642ad19f1e3699ac92a2665455c962ad5b",
+      "sha256_original_bytes": "7b6a54f8b82bc179db87c67bc81d86f734f4f696a6731271861921c409bde956",
+      "sha256_materialised_bytes": "7b6a54f8b82bc179db87c67bc81d86f734f4f696a6731271861921c409bde956",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-CLEANUP.json",
+      "git_blob_oid": "b5182d3574277f15ffd9c2cf286983b9971389ca",
+      "sha256_original_bytes": "35993c9715d2ecfcb493ce2cf9226a131d05b8f43f2d0e88ccdcc6f63ed51a22",
+      "sha256_materialised_bytes": "35993c9715d2ecfcb493ce2cf9226a131d05b8f43f2d0e88ccdcc6f63ed51a22",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-CLUSTER-COMMANDS.json",
+      "git_blob_oid": "6e10418c238db5ce28431ed8201c0f759e64760c",
+      "sha256_original_bytes": "b6629744e706dbed76aad6515c65f1a5cb33d72fc23a211cf6c098cf48681e01",
+      "sha256_materialised_bytes": "b6629744e706dbed76aad6515c65f1a5cb33d72fc23a211cf6c098cf48681e01",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-SERVER.log",
+      "git_blob_oid": "fc6a98d67b4e74c5f148acdec3795bf607faa846",
+      "sha256_original_bytes": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285",
+      "sha256_materialised_bytes": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.json",
+      "git_blob_oid": "25e8a5f4a1c59408f8213a2fba1dcadc6f5bbd33",
+      "sha256_original_bytes": "413a5ef5e537e916ecad8c21945d9782008110ad512f80479064f773c555d099",
+      "sha256_materialised_bytes": "413a5ef5e537e916ecad8c21945d9782008110ad512f80479064f773c555d099",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stdout.log",
+      "git_blob_oid": "389a76d3238c797b71ecc12a72e90e96bba42cbf",
+      "sha256_original_bytes": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a",
+      "sha256_materialised_bytes": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-VALIDATION.json",
+      "git_blob_oid": "e66ac012946b7fd0316df40fcebab08a46a4b80b",
+      "sha256_original_bytes": "361e8f76f9fefcf0bae858e9b67bb0412981d2b3af18cbaafee6d0cf732b81a3",
+      "sha256_materialised_bytes": "361e8f76f9fefcf0bae858e9b67bb0412981d2b3af18cbaafee6d0cf732b81a3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/TRANSFER-INVENTORY.json",
+      "git_blob_oid": "25d572c73070f507bd14406a4dc09c54dcedc599",
+      "sha256_original_bytes": "6addba901e77b467e0404ee25eb64c7a0987af67b3e11b037b0b89c95d78c2c6",
+      "sha256_materialised_bytes": "6addba901e77b467e0404ee25eb64c7a0987af67b3e11b037b0b89c95d78c2c6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/CANDIDATE-BEFORE.manifest.json",
+      "git_blob_oid": "c9c7d5e7455b457cfd68b90db4f378bd04b0e893",
+      "sha256_original_bytes": "e840cd79a74ca20f523b0dfab10f9c86407f248f493ca229e12b146d09e0c021",
+      "sha256_materialised_bytes": "e840cd79a74ca20f523b0dfab10f9c86407f248f493ca229e12b146d09e0c021",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/CANDIDATE-FINAL.manifest.json",
+      "git_blob_oid": "5c91ccf008ca30d1dfb7e34175bc327f5d2587f3",
+      "sha256_original_bytes": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+      "sha256_materialised_bytes": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/METADATA-REPAIR-V4-RECORD.before.md",
+      "git_blob_oid": "6e52395c2de93d520ab669f43041ca979836d762",
+      "sha256_original_bytes": "7a629241d7538a08042ba5bdf0a9a97316ac51771cc7eb36b41627a95dff423b",
+      "sha256_materialised_bytes": "7a629241d7538a08042ba5bdf0a9a97316ac51771cc7eb36b41627a95dff423b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/PARENT-SHA256SUMS.before",
+      "git_blob_oid": "cd95a481604eefaf64273a5a2fcfec2097782789",
+      "sha256_original_bytes": "35d83aaf982f7b13ac283ad50df55265d9e258e719070cee1bb2070acee49140",
+      "sha256_materialised_bytes": "35d83aaf982f7b13ac283ad50df55265d9e258e719070cee1bb2070acee49140",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/TRANSFER-PLANNED.json",
+      "git_blob_oid": "f2eb32d361ee00b447e592d71b4eda64cc9c00c7",
+      "sha256_original_bytes": "8040021b8c7605321375752edee07ce7f9fa540016aa023b8278c8e16a7a5691",
+      "sha256_materialised_bytes": "8040021b8c7605321375752edee07ce7f9fa540016aa023b8278c8e16a7a5691",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/validate-pg.cjs.before",
+      "git_blob_oid": "4cc224d1e9e80061f7434e842d8f85e17b9277e2",
+      "sha256_original_bytes": "12f5f88caf5b609905283d3f270aa55d44352dc11872a10f7f3968ebe59f4815",
+      "sha256_materialised_bytes": "12f5f88caf5b609905283d3f270aa55d44352dc11872a10f7f3968ebe59f4815",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-preparation-20261024T195111Z/validate-remote.cjs.before",
+      "git_blob_oid": "2aa67929bf828940a4db0685c97373b28ae70ada",
+      "sha256_original_bytes": "4a7f42ec75bab5d02fcd16f95f0bba4cfd252ad222c2733c928929d709c06de5",
+      "sha256_materialised_bytes": "4a7f42ec75bab5d02fcd16f95f0bba4cfd252ad222c2733c928929d709c06de5",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.json",
+      "git_blob_oid": "c44149dbac0cf872137fdb2baf18d08f5418218a",
+      "sha256_original_bytes": "e1f77dc04aa5be2c454ec3b658420192bd5f7220bfc7d5eacca9616b9abe4db6",
+      "sha256_materialised_bytes": "e1f77dc04aa5be2c454ec3b658420192bd5f7220bfc7d5eacca9616b9abe4db6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.stderr.log",
+      "git_blob_oid": "673f094cc06239b49c4df988287b7d3e764c1e98",
+      "sha256_original_bytes": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+      "sha256_materialised_bytes": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.stdout.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/ACTOR-EVIDENCE.json",
+      "git_blob_oid": "0b05485a09ee4d8c6a276258b2d45da80a782014",
+      "sha256_original_bytes": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50",
+      "sha256_materialised_bytes": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/DERIVATION.json",
+      "git_blob_oid": "25a94c0e767f5925b53047e801f11d41e8865b25",
+      "sha256_original_bytes": "f237a2648655c566601551d081ff8edce2476671b5318ec25e56618b308556c0",
+      "sha256_materialised_bytes": "f237a2648655c566601551d081ff8edce2476671b5318ec25e56618b308556c0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/MANIFEST.json",
+      "git_blob_oid": "5c91ccf008ca30d1dfb7e34175bc327f5d2587f3",
+      "sha256_original_bytes": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+      "sha256_materialised_bytes": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/OWNER-RULING.md",
+      "git_blob_oid": "846e8cdd02dd1437084b702021d5f328260494c0",
+      "sha256_original_bytes": "6fa796dea27103fecda4026fb03ed07ec95bd7ecc1aab3a22365ba615081a6ae",
+      "sha256_materialised_bytes": "6fa796dea27103fecda4026fb03ed07ec95bd7ecc1aab3a22365ba615081a6ae",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.json",
+      "git_blob_oid": "2d9a7d345ba3c9ee2a3efcd5b8c44cbb4d809769",
+      "sha256_original_bytes": "e3cc01d7a86834d7d2ad8b24635bf58435d9dfb598b05b619bdabb713dfb949a",
+      "sha256_materialised_bytes": "e3cc01d7a86834d7d2ad8b24635bf58435d9dfb598b05b619bdabb713dfb949a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.stderr.log",
+      "git_blob_oid": "673f094cc06239b49c4df988287b7d3e764c1e98",
+      "sha256_original_bytes": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+      "sha256_materialised_bytes": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.stdout.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/README.md",
+      "git_blob_oid": "0ef5e49d870f03ce524e5457d0d83195f4b02adf",
+      "sha256_original_bytes": "9986bfe3746752902af4ece329d2f76dd3a08128c17d5f81ff3d8ee17bb4a2a3",
+      "sha256_materialised_bytes": "9986bfe3746752902af4ece329d2f76dd3a08128c17d5f81ff3d8ee17bb4a2a3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/REVIEW.json",
+      "git_blob_oid": "d6b1006761a78c2489fdcbc4a960cdd089536684",
+      "sha256_original_bytes": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2",
+      "sha256_materialised_bytes": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/REVIEW.md",
+      "git_blob_oid": "862ac9e911617cce66bb233ebe9606f537dbdb9f",
+      "sha256_original_bytes": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+      "sha256_materialised_bytes": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/SEMANTICS.md",
+      "git_blob_oid": "b448fb31307c8401dbade6b534b9743f9d84df71",
+      "sha256_original_bytes": "e98199018ee40a7c6c1612daf051d53f04602293860a74b78d87c95165980b51",
+      "sha256_materialised_bytes": "e98199018ee40a7c6c1612daf051d53f04602293860a74b78d87c95165980b51",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/V3-NO-GO.md",
+      "git_blob_oid": "70ca4c950bbcfca464d3449627d9b7a3a73b884e",
+      "sha256_original_bytes": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4",
+      "sha256_materialised_bytes": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+      "git_blob_oid": "ed3720ccdf5fe4d731c47595ef74d462b22b92b8",
+      "sha256_original_bytes": "ae2553846b4b8d6cbce2fd958fca60c648316d4124d285cbc79ddcdf695752cd",
+      "sha256_materialised_bytes": "ae2553846b4b8d6cbce2fd958fca60c648316d4124d285cbc79ddcdf695752cd",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION.json",
+      "git_blob_oid": "01a45db5bb9b52a501827f200907e740d5da3d39",
+      "sha256_original_bytes": "dd7986cb6a648ec061f582c6bebb0b454a737ad3b389aa28ecef605d17116c7e",
+      "sha256_materialised_bytes": "dd7986cb6a648ec061f582c6bebb0b454a737ad3b389aa28ecef605d17116c7e",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/WRAPPER-VALIDATION.json",
+      "git_blob_oid": "0f3f258b3814a9920f1f3743b26d8ad9cb608eef",
+      "sha256_original_bytes": "26f59f9a25567c62b9415cb5bdcc0957b04d8a7a971997599b236796ee099ee3",
+      "sha256_materialised_bytes": "26f59f9a25567c62b9415cb5bdcc0957b04d8a7a971997599b236796ee099ee3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/assert-post.sql",
+      "git_blob_oid": "c7696978a6155768a1e421a235d6879a99f5a752",
+      "sha256_original_bytes": "6ff903c74f78317f97de2e8ede4c328b5f4c65ab4daa6cd134f54ddf7cabc1fd",
+      "sha256_materialised_bytes": "6ff903c74f78317f97de2e8ede4c328b5f4c65ab4daa6cd134f54ddf7cabc1fd",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/audit-log-source.txt",
+      "git_blob_oid": "d3e4117b2f6e23d0e131cc7fcfe3bba201f9c646",
+      "sha256_original_bytes": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644",
+      "sha256_materialised_bytes": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/audit-schema-source.txt",
+      "git_blob_oid": "b6f51f5492cccbee9300466c27462b2d5c671fae",
+      "sha256_original_bytes": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+      "sha256_materialised_bytes": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/binding.json",
+      "git_blob_oid": "35f629d47ae17875e3b920e537f3922071620ecc",
+      "sha256_original_bytes": "e91761ab61301c191639bc03ce35ee8812c36b7d2ba5eabb79dd81bc3af2a4fd",
+      "sha256_materialised_bytes": "e91761ab61301c191639bc03ce35ee8812c36b7d2ba5eabb79dd81bc3af2a4fd",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/canonical-gates.sql",
+      "git_blob_oid": "473031da423b888e2a767822161601815d3e73e7",
+      "sha256_original_bytes": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3",
+      "sha256_materialised_bytes": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/checks.sql",
+      "git_blob_oid": "1aa8f5ed29de50e2e1f4b5da721951f2e4f478d6",
+      "sha256_original_bytes": "53b02b5c6ef5fd7d1fbf1b9a87c787cb44989e9fc2f5ebe34bf74c311455002d",
+      "sha256_materialised_bytes": "53b02b5c6ef5fd7d1fbf1b9a87c787cb44989e9fc2f5ebe34bf74c311455002d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/expected-migrations.json",
+      "git_blob_oid": "55b3506162154ff618bfc9e5c6ad8e3718104575",
+      "sha256_original_bytes": "ed2a6ad4ee8e914349768682fccddd577b97e5765587e036f2d3fbc837f803a5",
+      "sha256_materialised_bytes": "ed2a6ad4ee8e914349768682fccddd577b97e5765587e036f2d3fbc837f803a5",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/identity.sql",
+      "git_blob_oid": "6aa15c4bb53f14a57cf88eeabf47dd796394db68",
+      "sha256_original_bytes": "0acad1249c6af37cac1f95454cc1ecf7b463bf93b16fe177416181f394752ff6",
+      "sha256_materialised_bytes": "0acad1249c6af37cac1f95454cc1ecf7b463bf93b16fe177416181f394752ff6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/lock-assert.sql",
+      "git_blob_oid": "673dc4e3482248f8a60bfe5149aacc6e90e93522",
+      "sha256_original_bytes": "3c8c458dd38d988a416c8522662bf07daf0b6d39d74f9e1d647cdfcfd5fcdbb4",
+      "sha256_materialised_bytes": "3c8c458dd38d988a416c8522662bf07daf0b6d39d74f9e1d647cdfcfd5fcdbb4",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/locks.sql",
+      "git_blob_oid": "cab5b507a0a31e76fe895f1f2f78f1f506fb1ab2",
+      "sha256_original_bytes": "5ac97832452d0cddf86cbf65ab5749e9fe3cec56b57608321d12afe511d927f8",
+      "sha256_materialised_bytes": "5ac97832452d0cddf86cbf65ab5749e9fe3cec56b57608321d12afe511d927f8",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/migration-guard.sql",
+      "git_blob_oid": "0423bb334596dc4f52cb95ee2974ecde5bd695c0",
+      "sha256_original_bytes": "4d211262c64cd356987f57937abae522ba09a771cc3f3355a50460c2662de305",
+      "sha256_materialised_bytes": "4d211262c64cd356987f57937abae522ba09a771cc3f3355a50460c2662de305",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/note.txt",
+      "git_blob_oid": "a1a56a949a258c5131ee6f23b1514e02317979ac",
+      "sha256_original_bytes": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d",
+      "sha256_materialised_bytes": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/operational-guard.sql",
+      "git_blob_oid": "1be4c4c450f094cee8a8bbd28ad9ba5cc0897094",
+      "sha256_original_bytes": "375358733a87c036b69b3f1827c228f43c0df2d4085be8a3c6e428820079189f",
+      "sha256_materialised_bytes": "375358733a87c036b69b3f1827c228f43c0df2d4085be8a3c6e428820079189f",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/operational-host.sh",
+      "git_blob_oid": "44c11a83340b25d396bf849bcde3c705b2c3b393",
+      "sha256_original_bytes": "b8dc2ed8b0abe39b0beb7a83a731d68c6dcadf87ae034e9f0affbf2086903f2d",
+      "sha256_materialised_bytes": "b8dc2ed8b0abe39b0beb7a83a731d68c6dcadf87ae034e9f0affbf2086903f2d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/postcheck.sql",
+      "git_blob_oid": "ea5bc219cc8c063c7007118ebcaa537e6dd7f09a",
+      "sha256_original_bytes": "86c6d4656afc78392c29670e66d90c97259a63f345368b898eeaebd9df482cb0",
+      "sha256_materialised_bytes": "86c6d4656afc78392c29670e66d90c97259a63f345368b898eeaebd9df482cb0",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/preflight.sql",
+      "git_blob_oid": "0dbc3bfd51d32ab7d7e2577bfd03b77d749ff767",
+      "sha256_original_bytes": "9c53ad4146631da96f10d560047f6aa4897e98f7e0c5e6b5fe853afd8544798d",
+      "sha256_materialised_bytes": "9c53ad4146631da96f10d560047f6aa4897e98f7e0c5e6b5fe853afd8544798d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/protected.json",
+      "git_blob_oid": "c775c4384b98d9eef3a1229bd931dc67f738ed7d",
+      "sha256_original_bytes": "5c19db42754a5968f4838bd7b7ffa672958cb5b3474d30554045f82f35eed2dc",
+      "sha256_materialised_bytes": "5c19db42754a5968f4838bd7b7ffa672958cb5b3474d30554045f82f35eed2dc",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/repair-body.sql",
+      "git_blob_oid": "cb29a3a9c93ac8ff678ccd4698c824921d81543b",
+      "sha256_original_bytes": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b",
+      "sha256_materialised_bytes": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/repair.sql",
+      "git_blob_oid": "66239e72f423bb93cf3e0d7aa39a64b36b72fea2",
+      "sha256_original_bytes": "c0f8c47e103b81347afcbd2b10be557d73ac36e36f7c30117d356f34bec7ce55",
+      "sha256_materialised_bytes": "c0f8c47e103b81347afcbd2b10be557d73ac36e36f7c30117d356f34bec7ce55",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/run.cjs",
+      "git_blob_oid": "8f032789e3cb9eb5b7f9d6af99110b8a3d2188c3",
+      "sha256_original_bytes": "992afeac58dd2e5d4790d5ab67f2600f7c694746248a41dc230905a57d9e16c7",
+      "sha256_materialised_bytes": "992afeac58dd2e5d4790d5ab67f2600f7c694746248a41dc230905a57d9e16c7",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/runtime.json",
+      "git_blob_oid": "632d7dc63beadf70c5e472cfeaafb25ee0b01f00",
+      "sha256_original_bytes": "812eb905158bb59ce9e7f0b6e5bb89142697d49901628531bd185f6afc548c37",
+      "sha256_materialised_bytes": "812eb905158bb59ce9e7f0b6e5bb89142697d49901628531bd185f6afc548c37",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/schema-evidence.json",
+      "git_blob_oid": "aa5c8b62a930466f0288feae798b6b3426ac7a1f",
+      "sha256_original_bytes": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593",
+      "sha256_materialised_bytes": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/snapshot.sql",
+      "git_blob_oid": "5b809ee19eed4090ff9cc01453f530e2ee387a72",
+      "sha256_original_bytes": "314185b65033d63dd158e08b6be4af32ef7ac9aeeea7d7d8b54c22fe64cf158b",
+      "sha256_materialised_bytes": "314185b65033d63dd158e08b6be4af32ef7ac9aeeea7d7d8b54c22fe64cf158b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-order.cjs",
+      "git_blob_oid": "e07b550273979784c819e37e7e65a6a541b8b931",
+      "sha256_original_bytes": "ce5e0cbf96786213d5f7bd2de6e8021b3de329bf3fd53bd6b1eb69c3eb8d28e6",
+      "sha256_materialised_bytes": "ce5e0cbf96786213d5f7bd2de6e8021b3de329bf3fd53bd6b1eb69c3eb8d28e6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-pg.cjs",
+      "git_blob_oid": "ab88a72da5d403f1cc9f92c036193b37998a5eaf",
+      "sha256_original_bytes": "713476baf65087260e7f172979795f80526fa469275f2414bc8e319a963c62ee",
+      "sha256_materialised_bytes": "713476baf65087260e7f172979795f80526fa469275f2414bc8e319a963c62ee",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-remote.cjs",
+      "git_blob_oid": "0af8c16c595d94232209e32b86d23b5f29d2adc4",
+      "sha256_original_bytes": "2733cde0d1940e3f4ca9a0c81ec86c561f853f22823be45f1153c656db5080e2",
+      "sha256_materialised_bytes": "2733cde0d1940e3f4ca9a0c81ec86c561f853f22823be45f1153c656db5080e2",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-wrapper.cjs",
+      "git_blob_oid": "f08eef65913cac04fa57875b1d0988e91c759f3a",
+      "sha256_original_bytes": "5ff138390083c17505cb24b962743e3d0533bbf9e1c44d5e35704ef96592396c",
+      "sha256_materialised_bytes": "5ff138390083c17505cb24b962743e3d0533bbf9e1c44d5e35704ef96592396c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate.cjs",
+      "git_blob_oid": "01e9c3b7db919ac2616c3e7bb076d77a91261139",
+      "sha256_original_bytes": "78b6f16dca542f574024bc996fb8499959e4a7cae5183b68fb6e714fee2a7025",
+      "sha256_materialised_bytes": "78b6f16dca542f574024bc996fb8499959e4a7cae5183b68fb6e714fee2a7025",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-CLEANUP.json",
+      "git_blob_oid": "77584ed783ecebeae29d9f192fa39b55d7bef8ab",
+      "sha256_original_bytes": "59f96c3f6ce0345d6668c9cf15d7394ab418f170a81710a20810a4a0383acacc",
+      "sha256_materialised_bytes": "59f96c3f6ce0345d6668c9cf15d7394ab418f170a81710a20810a4a0383acacc",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-CLUSTER-COMMANDS.json",
+      "git_blob_oid": "a19cab99413aec484aebf70d1b7221e9f77b3063",
+      "sha256_original_bytes": "1d4d91d25e30f802efa7cf577278ca6424f9ce5dce1b87d5c9360941223e944b",
+      "sha256_materialised_bytes": "1d4d91d25e30f802efa7cf577278ca6424f9ce5dce1b87d5c9360941223e944b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-SERVER.log",
+      "git_blob_oid": "a59a610f6e344adff58e922da9ed003069f8bef4",
+      "sha256_original_bytes": "1e439b5967dee4e7e2374643d24c4f99a7477bb86570dfed3d8e000960bc8a7b",
+      "sha256_materialised_bytes": "1e439b5967dee4e7e2374643d24c4f99a7477bb86570dfed3d8e000960bc8a7b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.json",
+      "git_blob_oid": "82cbf21466c5aaaa0f9faee783ddbe4aebdd9119",
+      "sha256_original_bytes": "7de624a2bfb1cf01984f8a42f633523528efbaaf3c6299fe47b5b8bcc192dd0c",
+      "sha256_materialised_bytes": "7de624a2bfb1cf01984f8a42f633523528efbaaf3c6299fe47b5b8bcc192dd0c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.stdout.log",
+      "git_blob_oid": "26a7d70c46fe6b6da4de0119ac38a1943abe29ee",
+      "sha256_original_bytes": "ef39b935f7b80b9abd6ab3561881b5a2ebd59b95e3998cba92a532078a5b87ad",
+      "sha256_materialised_bytes": "ef39b935f7b80b9abd6ab3561881b5a2ebd59b95e3998cba92a532078a5b87ad",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-VALIDATION.json",
+      "git_blob_oid": "630f604803f4995034a7b176f444635cdc94c16e",
+      "sha256_original_bytes": "59f9e2136202fd8422264c67830e340c8253943e4f48fdf7de83b66630d7561f",
+      "sha256_materialised_bytes": "59f9e2136202fd8422264c67830e340c8253943e4f48fdf7de83b66630d7561f",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/TRANSFER-INVENTORY.json",
+      "git_blob_oid": "2e7ddc01dac716de95bad170cbc9db9d951174c3",
+      "sha256_original_bytes": "6daba0c0dcb3970e0e09a89a834c4623ed59563eed1f3be10e050e713cac7452",
+      "sha256_materialised_bytes": "6daba0c0dcb3970e0e09a89a834c4623ed59563eed1f3be10e050e713cac7452",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/ACTOR-EVIDENCE.json",
+      "git_blob_oid": "0b05485a09ee4d8c6a276258b2d45da80a782014",
+      "sha256_original_bytes": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50",
+      "sha256_materialised_bytes": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/DERIVATION.json",
+      "git_blob_oid": "1895e810344060774d0c6a35dd1db843feabc46d",
+      "sha256_original_bytes": "f3422cde74f1ceb6eb65524ae05c12f92065a13aa6c73528cbf16a0321da3bee",
+      "sha256_materialised_bytes": "f3422cde74f1ceb6eb65524ae05c12f92065a13aa6c73528cbf16a0321da3bee",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/OWNER-RULING.md",
+      "git_blob_oid": "5b6418e572391b329d25299aa56a297a95f278dd",
+      "sha256_original_bytes": "74dfd32397a8d3cc03c55df6302d32b2b5264daf1450bddfca4b2e80e3e9c07c",
+      "sha256_materialised_bytes": "74dfd32397a8d3cc03c55df6302d32b2b5264daf1450bddfca4b2e80e3e9c07c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/README.md",
+      "git_blob_oid": "f0c2a8ccf8453ae65ff76d7850a090112775b31d",
+      "sha256_original_bytes": "7184517e888367f23a20187a74997b60858a4eb5171e29fc00837826502d6ea2",
+      "sha256_materialised_bytes": "7184517e888367f23a20187a74997b60858a4eb5171e29fc00837826502d6ea2",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/SEMANTICS.md",
+      "git_blob_oid": "b448fb31307c8401dbade6b534b9743f9d84df71",
+      "sha256_original_bytes": "e98199018ee40a7c6c1612daf051d53f04602293860a74b78d87c95165980b51",
+      "sha256_materialised_bytes": "e98199018ee40a7c6c1612daf051d53f04602293860a74b78d87c95165980b51",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/V3-NO-GO.md",
+      "git_blob_oid": "70ca4c950bbcfca464d3449627d9b7a3a73b884e",
+      "sha256_original_bytes": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4",
+      "sha256_materialised_bytes": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/V4-REVIEW.md",
+      "git_blob_oid": "862ac9e911617cce66bb233ebe9606f537dbdb9f",
+      "sha256_original_bytes": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+      "sha256_materialised_bytes": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/V5-DELTA.json",
+      "git_blob_oid": "fb2bde7cb37a4f94ec185c26132034bdfdcba087",
+      "sha256_original_bytes": "2522103732e10ab55b72d56371251368d8c38f7c912633cb240fd9d9faf676f9",
+      "sha256_materialised_bytes": "2522103732e10ab55b72d56371251368d8c38f7c912633cb240fd9d9faf676f9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/V5-DELTA.md",
+      "git_blob_oid": "8fe1895b13cb93184bc7593dce0c8e2de2ceabfc",
+      "sha256_original_bytes": "80498ec1c68c4cd05c47c0e29f209e9560214f8eb2bc9377970f916920e75a75",
+      "sha256_materialised_bytes": "80498ec1c68c4cd05c47c0e29f209e9560214f8eb2bc9377970f916920e75a75",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION-EVIDENCE.json",
+      "git_blob_oid": "36ace5c08b9be1c88f2df75cc69a14156cb50a96",
+      "sha256_original_bytes": "599cf8a34b1b159cce76bddb9c8c29ab5bc85e6b7ee92b16ffcde314ec2625b7",
+      "sha256_materialised_bytes": "599cf8a34b1b159cce76bddb9c8c29ab5bc85e6b7ee92b16ffcde314ec2625b7",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION.json",
+      "git_blob_oid": "ce5d12e4f7b627ccb6add420a1d7ccee7122c452",
+      "sha256_original_bytes": "76c4bbddc1dbe5532552a3102b71d4d049403edf582b88e41635f192ee91e49e",
+      "sha256_materialised_bytes": "76c4bbddc1dbe5532552a3102b71d4d049403edf582b88e41635f192ee91e49e",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/WRAPPER-VALIDATION.json",
+      "git_blob_oid": "fc28282b7341f1558a3af875ef35ad5f944b68e5",
+      "sha256_original_bytes": "f198d9f1a268eb32fb60ead0fcc44b582243828b8f3b13f7fb3367dbf5efeb64",
+      "sha256_materialised_bytes": "f198d9f1a268eb32fb60ead0fcc44b582243828b8f3b13f7fb3367dbf5efeb64",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/assert-post.sql",
+      "git_blob_oid": "c7696978a6155768a1e421a235d6879a99f5a752",
+      "sha256_original_bytes": "6ff903c74f78317f97de2e8ede4c328b5f4c65ab4daa6cd134f54ddf7cabc1fd",
+      "sha256_materialised_bytes": "6ff903c74f78317f97de2e8ede4c328b5f4c65ab4daa6cd134f54ddf7cabc1fd",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/audit-log-source.txt",
+      "git_blob_oid": "d3e4117b2f6e23d0e131cc7fcfe3bba201f9c646",
+      "sha256_original_bytes": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644",
+      "sha256_materialised_bytes": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/audit-schema-source.txt",
+      "git_blob_oid": "b6f51f5492cccbee9300466c27462b2d5c671fae",
+      "sha256_original_bytes": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+      "sha256_materialised_bytes": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/binding.json",
+      "git_blob_oid": "0029a34fc82855495ba65e926c19b66fffa905ba",
+      "sha256_original_bytes": "6d8faf68be186224ecd79b988dbc55989c988f3dd08cd396d761174f923f8807",
+      "sha256_materialised_bytes": "6d8faf68be186224ecd79b988dbc55989c988f3dd08cd396d761174f923f8807",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/canonical-gates.sql",
+      "git_blob_oid": "473031da423b888e2a767822161601815d3e73e7",
+      "sha256_original_bytes": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3",
+      "sha256_materialised_bytes": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/checks.sql",
+      "git_blob_oid": "1997d8bcbdad883e9bf56b1c63a3bb1645877518",
+      "sha256_original_bytes": "522c4ee489083752184c50a7494bee88fc998ebd27d7f39a5bb36cb0d4ed87cf",
+      "sha256_materialised_bytes": "522c4ee489083752184c50a7494bee88fc998ebd27d7f39a5bb36cb0d4ed87cf",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/result.json",
+      "git_blob_oid": "2dc22e4eda98574a6db0acd182d74fb4794c8e76",
+      "sha256_original_bytes": "5cc447c783f4b4e0bb3614133d80c297d1a678ae594f3143e48c9b588f0d25ff",
+      "sha256_materialised_bytes": "5cc447c783f4b4e0bb3614133d80c297d1a678ae594f3143e48c9b588f0d25ff",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/stdout.log",
+      "git_blob_oid": "2307095713072335283ae127f48c1fee71b735e0",
+      "sha256_original_bytes": "7ca8c61c1772253e71d0464c0b6066d90a771f28c9cac1ef75f3f3fde3f6b718",
+      "sha256_materialised_bytes": "7ca8c61c1772253e71d0464c0b6066d90a771f28c9cac1ef75f3f3fde3f6b718",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/submitted.sql",
+      "git_blob_oid": "9494f4dd658787476058baf5597f645b6f96f836",
+      "sha256_original_bytes": "e9fd36c9d882e59a8c69811f0a21d0761b2abfe55968d11320118898cdd5fb45",
+      "sha256_materialised_bytes": "e9fd36c9d882e59a8c69811f0a21d0761b2abfe55968d11320118898cdd5fb45",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/expected-migrations.json",
+      "git_blob_oid": "55b3506162154ff618bfc9e5c6ad8e3718104575",
+      "sha256_original_bytes": "ed2a6ad4ee8e914349768682fccddd577b97e5765587e036f2d3fbc837f803a5",
+      "sha256_materialised_bytes": "ed2a6ad4ee8e914349768682fccddd577b97e5765587e036f2d3fbc837f803a5",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/identity.sql",
+      "git_blob_oid": "042fec38f647c469aa634a99c9c7fe151960f35c",
+      "sha256_original_bytes": "0f92aa39662b1bac675e22f57d6bdf659103797f0df340da984c4a285b9cd736",
+      "sha256_materialised_bytes": "0f92aa39662b1bac675e22f57d6bdf659103797f0df340da984c4a285b9cd736",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/lock-assert.sql",
+      "git_blob_oid": "673dc4e3482248f8a60bfe5149aacc6e90e93522",
+      "sha256_original_bytes": "3c8c458dd38d988a416c8522662bf07daf0b6d39d74f9e1d647cdfcfd5fcdbb4",
+      "sha256_materialised_bytes": "3c8c458dd38d988a416c8522662bf07daf0b6d39d74f9e1d647cdfcfd5fcdbb4",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/locks.sql",
+      "git_blob_oid": "cab5b507a0a31e76fe895f1f2f78f1f506fb1ab2",
+      "sha256_original_bytes": "5ac97832452d0cddf86cbf65ab5749e9fe3cec56b57608321d12afe511d927f8",
+      "sha256_materialised_bytes": "5ac97832452d0cddf86cbf65ab5749e9fe3cec56b57608321d12afe511d927f8",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/migration-guard.sql",
+      "git_blob_oid": "0423bb334596dc4f52cb95ee2974ecde5bd695c0",
+      "sha256_original_bytes": "4d211262c64cd356987f57937abae522ba09a771cc3f3355a50460c2662de305",
+      "sha256_materialised_bytes": "4d211262c64cd356987f57937abae522ba09a771cc3f3355a50460c2662de305",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/note.txt",
+      "git_blob_oid": "a1a56a949a258c5131ee6f23b1514e02317979ac",
+      "sha256_original_bytes": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d",
+      "sha256_materialised_bytes": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/operational-guard.sql",
+      "git_blob_oid": "03b28fb724a12f55af47ed4936f274492cf3aed1",
+      "sha256_original_bytes": "996b10dfaea99b582336554b536ec0800b182fc099b613cf358d328d2e6e9298",
+      "sha256_materialised_bytes": "996b10dfaea99b582336554b536ec0800b182fc099b613cf358d328d2e6e9298",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/operational-host.sh",
+      "git_blob_oid": "fc89ece5c230db7870fcb0d951bc33922c09a071",
+      "sha256_original_bytes": "4681610d28aaf9233a8b54e9504aff40189f2d8673b63d5f7cfcba04d47b50be",
+      "sha256_materialised_bytes": "4681610d28aaf9233a8b54e9504aff40189f2d8673b63d5f7cfcba04d47b50be",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/operational-observation.sh",
+      "git_blob_oid": "27b17d073ab6df9dadae978507483a2062bba9bd",
+      "sha256_original_bytes": "8ac6c6fea81743595418139bb257903ee8b2bd23881cc66615b4f49fd9e095dc",
+      "sha256_materialised_bytes": "8ac6c6fea81743595418139bb257903ee8b2bd23881cc66615b4f49fd9e095dc",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/postcheck.sql",
+      "git_blob_oid": "6cfd45fbe54f4ad55ab692dfa86080e03a979edf",
+      "sha256_original_bytes": "47e231e2c40e6ebf710ec9baf15fa221c19b9197499ec29315e26fbb4b8c9ed9",
+      "sha256_materialised_bytes": "47e231e2c40e6ebf710ec9baf15fa221c19b9197499ec29315e26fbb4b8c9ed9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/preflight.sql",
+      "git_blob_oid": "2a66f722afbe1e798b01648b7adb5ca742bccd32",
+      "sha256_original_bytes": "7656a8c2b9fb45e395673482d31a810a67215413133da91452abaa857feff71a",
+      "sha256_materialised_bytes": "7656a8c2b9fb45e395673482d31a810a67215413133da91452abaa857feff71a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/PREREQUISITE-RESULT.json",
+      "git_blob_oid": "15fd0dbcb193af86ce44f59fa9f0ddb797f85f4b",
+      "sha256_original_bytes": "5af7d201d2c4cf8c548adbd28d4fd4a608949e3045b8e511e1b04f492a92b6ae",
+      "sha256_materialised_bytes": "5af7d201d2c4cf8c548adbd28d4fd4a608949e3045b8e511e1b04f492a92b6ae",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.stdout.log",
+      "git_blob_oid": "ec1b2877a3c2164b366873493b219aaaa09709e8",
+      "sha256_original_bytes": "ffec204103bd5e23f73c009d9ba53fec559eee64a1de5f970e9cbd7231361fe4",
+      "sha256_materialised_bytes": "ffec204103bd5e23f73c009d9ba53fec559eee64a1de5f970e9cbd7231361fe4",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.transport.json",
+      "git_blob_oid": "ad050126756b7e2897028bae23137093feb006eb",
+      "sha256_original_bytes": "821f5e906255a16ee2baf69836c7a79bad28ff47e8009939bf2fe72751234ab9",
+      "sha256_materialised_bytes": "821f5e906255a16ee2baf69836c7a79bad28ff47e8009939bf2fe72751234ab9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.stdout.log",
+      "git_blob_oid": "8d9c088b7c92400a6a745c913fd05c750aa78cc6",
+      "sha256_original_bytes": "8d380c72f254bbe8d5744e4a1e70d630f4f24c4b7df0c0fe21c2219d940b42c8",
+      "sha256_materialised_bytes": "8d380c72f254bbe8d5744e4a1e70d630f4f24c4b7df0c0fe21c2219d940b42c8",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.transport.json",
+      "git_blob_oid": "ad050126756b7e2897028bae23137093feb006eb",
+      "sha256_original_bytes": "821f5e906255a16ee2baf69836c7a79bad28ff47e8009939bf2fe72751234ab9",
+      "sha256_materialised_bytes": "821f5e906255a16ee2baf69836c7a79bad28ff47e8009939bf2fe72751234ab9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/submitted.sql",
+      "git_blob_oid": "2774ba907b7fd0dc004c937607eb357d3c7f5a05",
+      "sha256_original_bytes": "95d5aa5502115769b5c04fe9e69520306b5e21b040444bf45efea050048d498e",
+      "sha256_materialised_bytes": "95d5aa5502115769b5c04fe9e69520306b5e21b040444bf45efea050048d498e",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/principal.sql",
+      "git_blob_oid": "976198c027d676877e6e7a3d64ea2f6c3a4111a4",
+      "sha256_original_bytes": "33ac943417c42c15f60677d5fe52bf067e75ecf41cadd9830da44df31e1bae71",
+      "sha256_materialised_bytes": "33ac943417c42c15f60677d5fe52bf067e75ecf41cadd9830da44df31e1bae71",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/protected.json",
+      "git_blob_oid": "c775c4384b98d9eef3a1229bd931dc67f738ed7d",
+      "sha256_original_bytes": "5c19db42754a5968f4838bd7b7ffa672958cb5b3474d30554045f82f35eed2dc",
+      "sha256_materialised_bytes": "5c19db42754a5968f4838bd7b7ffa672958cb5b3474d30554045f82f35eed2dc",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/repair-body.sql",
+      "git_blob_oid": "faad4fe10c463c720d51cace2c5de367318133cb",
+      "sha256_original_bytes": "966a563efbc78c16588c8bf1c4ab6a0c5ef99ada41d60729eb1e6105f710f8b4",
+      "sha256_materialised_bytes": "966a563efbc78c16588c8bf1c4ab6a0c5ef99ada41d60729eb1e6105f710f8b4",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/repair.sql",
+      "git_blob_oid": "dee854c6fe89570a2d9a4580baed6d1429fff8bb",
+      "sha256_original_bytes": "4e87aa5dd6eb7254eec26ffe38c5bb3232f49a7e7f28a30be0cb0a1264d17af2",
+      "sha256_materialised_bytes": "4e87aa5dd6eb7254eec26ffe38c5bb3232f49a7e7f28a30be0cb0a1264d17af2",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/run.cjs",
+      "git_blob_oid": "086ff2798ebf445f090c0a2a56cf32660278c74f",
+      "sha256_original_bytes": "e4ce4a5803d79e3c292c18cf5e7835fb066d8960871f2d2f87980ba5ea25fb4d",
+      "sha256_materialised_bytes": "e4ce4a5803d79e3c292c18cf5e7835fb066d8960871f2d2f87980ba5ea25fb4d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/runtime.json",
+      "git_blob_oid": "9197ab0c4eb501ea903931d8ac0c7edbf5cc3fff",
+      "sha256_original_bytes": "9a568505f83185d7f8900a325362c1195c0198c1ca5067c9a9f902ad446b1a9a",
+      "sha256_materialised_bytes": "9a568505f83185d7f8900a325362c1195c0198c1ca5067c9a9f902ad446b1a9a",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/schema-evidence.json",
+      "git_blob_oid": "aa5c8b62a930466f0288feae798b6b3426ac7a1f",
+      "sha256_original_bytes": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593",
+      "sha256_materialised_bytes": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/snapshot.sql",
+      "git_blob_oid": "5b809ee19eed4090ff9cc01453f530e2ee387a72",
+      "sha256_original_bytes": "314185b65033d63dd158e08b6be4af32ef7ac9aeeea7d7d8b54c22fe64cf158b",
+      "sha256_materialised_bytes": "314185b65033d63dd158e08b6be4af32ef7ac9aeeea7d7d8b54c22fe64cf158b",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/transport.sh",
+      "git_blob_oid": "ff6f02cce7f31e043835c5d0532359c5f448a94b",
+      "sha256_original_bytes": "e697a4824a37fd0012d25cf4f0d46e7329208aa125a68b793fd0cbea8a4ee202",
+      "sha256_materialised_bytes": "e697a4824a37fd0012d25cf4f0d46e7329208aa125a68b793fd0cbea8a4ee202",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-order.cjs",
+      "git_blob_oid": "e07b550273979784c819e37e7e65a6a541b8b931",
+      "sha256_original_bytes": "ce5e0cbf96786213d5f7bd2de6e8021b3de329bf3fd53bd6b1eb69c3eb8d28e6",
+      "sha256_materialised_bytes": "ce5e0cbf96786213d5f7bd2de6e8021b3de329bf3fd53bd6b1eb69c3eb8d28e6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-pg.cjs",
+      "git_blob_oid": "64dc1fe0862725b4beb32e52b97bea82fb0713c9",
+      "sha256_original_bytes": "24dfcafad3f1765416ff99d298d99ff9ecab6b73b88c171e7b199294d6bf2d91",
+      "sha256_materialised_bytes": "24dfcafad3f1765416ff99d298d99ff9ecab6b73b88c171e7b199294d6bf2d91",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-remote.cjs",
+      "git_blob_oid": "fe83385cd99b023ef43bcdaa76b3e88e226898a3",
+      "sha256_original_bytes": "ed07f4974d52f9ac1faba3f55c9c7ee69c6d7c3ed77a11916c17d452fb7cd828",
+      "sha256_materialised_bytes": "ed07f4974d52f9ac1faba3f55c9c7ee69c6d7c3ed77a11916c17d452fb7cd828",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-wrapper.cjs",
+      "git_blob_oid": "a4881f92642c9641a12750a27a56404a24627a82",
+      "sha256_original_bytes": "da1c8782f331bfdec85aed79fbfc6617e3d6b3b4ebde2ff4619aabb56ff492a6",
+      "sha256_materialised_bytes": "da1c8782f331bfdec85aed79fbfc6617e3d6b3b4ebde2ff4619aabb56ff492a6",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate.cjs",
+      "git_blob_oid": "c5be9b5777c7552f616d291db74c4366a6bfa32c",
+      "sha256_original_bytes": "ac890f43ae9e0e9334a84599607c838444b3fcbceb61c38887aa771736ae0123",
+      "sha256_materialised_bytes": "ac890f43ae9e0e9334a84599607c838444b3fcbceb61c38887aa771736ae0123",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.exit.txt",
+      "git_blob_oid": "c227083464fb9af8955c90d2924774ee50abb547",
+      "sha256_original_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "sha256_materialised_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.json",
+      "git_blob_oid": "045746e396b259f52aa0f1f4e3ab9b468439a28d",
+      "sha256_original_bytes": "a9b57a2e9022dfd254af0952ca345ea5812776cba0a483b2a2eb3465bf7aaefa",
+      "sha256_materialised_bytes": "a9b57a2e9022dfd254af0952ca345ea5812776cba0a483b2a2eb3465bf7aaefa",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.sh",
+      "git_blob_oid": "18cea379d01afa9db94e171a129d14c4aa0b6bdf",
+      "sha256_original_bytes": "07c127ef7346d2c5c3b23d0d8c9e405d990d6e55ceab22a1719dcbfcaca68b2d",
+      "sha256_materialised_bytes": "07c127ef7346d2c5c3b23d0d8c9e405d990d6e55ceab22a1719dcbfcaca68b2d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.stdout.log",
+      "git_blob_oid": "9929d80cdc31ae714b5899c64fbd8bb2f51237bb",
+      "sha256_original_bytes": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+      "sha256_materialised_bytes": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.exit.txt",
+      "git_blob_oid": "c227083464fb9af8955c90d2924774ee50abb547",
+      "sha256_original_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "sha256_materialised_bytes": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.json",
+      "git_blob_oid": "4512ba467a9cbd42d073a2c465b70d12e3e6d6bc",
+      "sha256_original_bytes": "f8aab815da65151234026eb9f5382e88da0ff9d5d1ac685835836e81e47dc350",
+      "sha256_materialised_bytes": "f8aab815da65151234026eb9f5382e88da0ff9d5d1ac685835836e81e47dc350",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.sh",
+      "git_blob_oid": "cd6867e5507351c86732ed453ec51f6332795538",
+      "sha256_original_bytes": "53c5fdd28cad4da0edb5d0d84cad8b682c4a67f7e181beeaedb607a786ffbeac",
+      "sha256_materialised_bytes": "53c5fdd28cad4da0edb5d0d84cad8b682c4a67f7e181beeaedb607a786ffbeac",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.stdout.log",
+      "git_blob_oid": "756e51647d9704d4f5dbc4d06764fff9efeaeb6f",
+      "sha256_original_bytes": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+      "sha256_materialised_bytes": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/run-readonly.cjs",
+      "git_blob_oid": "96bd8a7605c6986b580a2446deff6f15defe99a1",
+      "sha256_original_bytes": "22c301ee8a33833b862c3d4164440a3684a220edd5a4c16faeb4fd440de8f36d",
+      "sha256_materialised_bytes": "22c301ee8a33833b862c3d4164440a3684a220edd5a4c16faeb4fd440de8f36d",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/sandbox-precheck.exit.txt",
+      "git_blob_oid": "b8e817d4f8350da183e38145325940a42494db8a",
+      "sha256_original_bytes": "9556b82499cc0aaf86aee7f0d253e17c61b7ef73d48a295f37d98f08b04ffa7f",
+      "sha256_materialised_bytes": "9556b82499cc0aaf86aee7f0d253e17c61b7ef73d48a295f37d98f08b04ffa7f",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/sandbox-precheck.stderr.log",
+      "git_blob_oid": "d1e901696d04197e4593b9305b0425fa1d3cf9ea",
+      "sha256_original_bytes": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+      "sha256_materialised_bytes": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/sandbox-precheck.stdout.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS"
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.stderr.log",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256_original_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_materialised_bytes": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true,
+      "status": "PASS",
+      "historical_expected_hash": null
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.stdout.log",
+      "git_blob_oid": "42acadb897db2456ee5bb2f15f369679624d4b15",
+      "sha256_original_bytes": "c097dddcb41c5f81e5351612b3e7e588c8c3fef4ab66abc935491e9ad210ef51",
+      "sha256_materialised_bytes": "c097dddcb41c5f81e5351612b3e7e588c8c3fef4ab66abc935491e9ad210ef51",
+      "byte_identical": true,
+      "status": "PASS",
+      "historical_expected_hash": null
+    }
+  ],
+  "status": "PASS",
+  "historical_expected_hash_status": "Separate U3-HASH-AUDIT.json records historical mismatches; successful byte preservation does not resolve them."
+}

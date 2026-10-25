@@ -1,0 +1,42 @@
+{
+  "status": "PASS",
+  "mode": "execute",
+  "observation": {
+    "status": "PASS",
+    "identity": {
+      "oid": "66668",
+      "user": "afldb_backup",
+      "database": "afldb_prod",
+      "read_only": "on",
+      "observed_utc": "2026-10-24T21:26:48.328Z",
+      "system_identifier": "7674454702926115004",
+      "server_version_num": "160015"
+    }
+  },
+  "prerequisite": {
+    "status": "PASS",
+    "identity": {
+      "oid": "66668",
+      "user": "afldb_owner",
+      "database": "afldb_prod",
+      "read_only": "on",
+      "system_identifier": "7674454702926115004"
+    },
+    "principal": {
+      "read_only": "on",
+      "superuser": false,
+      "current_user": "afldb_owner",
+      "session_user": "afldb_owner",
+      "database_owner": "afldb_owner"
+    },
+    "visibility": {
+      "superuser": false,
+      "read_all_stats": false,
+      "update_process_title": "on",
+      "state_redacted_sessions": 2,
+      "other_role_client_sessions": 2
+    }
+  },
+  "attempt_consumed": false,
+  "utc": "2026-10-24T21:27:33.677Z"
+}

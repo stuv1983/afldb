@@ -1,0 +1,12 @@
+{
+  "status": "FAIL",
+  "work_directory": "/tmp/i316-v5-pg-ymArGQ",
+  "socket": "/tmp/i316-v5-pg-ymArGQ/socket",
+  "server_pid": 939524,
+  "stopped_utc": "2026-10-24T20:58:52.298Z",
+  "remaining_private_processes": [],
+  "credential_files_removed": true,
+  "evidence_credential_scan": "FAIL",
+  "error": "Credential value found in retained evidence PG-SERVER.log",
+  "retained": "Stopped private data directory and server log; fixture credential files removed; no existing cluster touched"
+}

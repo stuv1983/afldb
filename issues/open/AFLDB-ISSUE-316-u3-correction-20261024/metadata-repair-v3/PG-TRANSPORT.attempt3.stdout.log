@@ -1,0 +1,11 @@
+START active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes
+PASS active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes
+START active protected writer exceeds approved two-second lock timeout: zero metadata writes
+PASS active protected writer exceeds approved two-second lock timeout: zero metadata writes
+START writers and guarded DDL after all locks are excluded until repair commit
+PASS writers and guarded DDL after all locks are excluded until repair commit
+START absent optional relation cannot be created after locks
+PASS absent optional relation cannot be created after locks
+START optional creation active before locks commits: held-lock guard refuses before metadata writes
+PRIVATE_CLUSTER_STOPPED /tmp/i316-f004-pg-dWR411
+VALIDATION_PACKAGE_RETAINED /tmp/i316-f004-package-OkfAIF

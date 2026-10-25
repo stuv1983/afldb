@@ -1,0 +1,18 @@
+[
+  {
+    "path": "result.json",
+    "sha256": "5cc447c783f4b4e0bb3614133d80c297d1a678ae594f3143e48c9b588f0d25ff"
+  },
+  {
+    "path": "stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "stdout.log",
+    "sha256": "7ca8c61c1772253e71d0464c0b6066d90a771f28c9cac1ef75f3f3fde3f6b718"
+  },
+  {
+    "path": "submitted.sql",
+    "sha256": "e9fd36c9d882e59a8c69811f0a21d0761b2abfe55968d11320118898cdd5fb45"
+  }
+]

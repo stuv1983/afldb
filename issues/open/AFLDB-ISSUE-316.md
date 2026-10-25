@@ -1,5 +1,9 @@
 # AFLDB-ISSUE-316 — AFL API cutover: retire AFL Tables network acquisition
 
+**Current owner ruling (2026-10-25):** implementation candidate `c438f8449e65c28cf9f00879aaa045131b5f0d3a` accepted unchanged. Final normal-C:-temp focused Vitest gate **PASS: 1,539 passed / 5 skipped / 0 failed, exit 0**; immediately-before free space 91,465,203,712 bytes (85.183609008789063 GiB), normal TEMP/TMP, no CLAUDE_CODE_TMPDIR override. No source/assertion changes. All 42 admitted worktree/index hashes, the unchanged blind-scan inventory, zero excluded staged paths, current links and both diff checks PASS. Canonical candidate blobs and patch remain unchanged. Structural gate **CONDITIONALLY ACCEPTED / NOT YET CLOSED**, awaiting only successful separate evidence/tracking commit; closure then automatic under existing owner authority. Evidence gates remain CLOSED / ACCEPTED. U3 **CONFIRMED**; U4 **Route B**; Brownlow untouched; production **NO-GO**. No production census, apply, activation, deployment, disposable rebuild or push.
+[Local gate and canonical evidence](AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md).
+
+
 **2026-10-22 Rehearsal milestone closed: complete isolated C2 rehearsal PASS at `5643f5c22025223916aa66cad6403a369a90c7cb` (current):**
 One agent, no subagents, native in-process hashing and read-only Git only. The retained attempt-2 evidence was verified
 independently of the producer summary; the full matrix, corrections and limits are in the
@@ -2533,3 +2537,175 @@ Package F is preserved unchanged and superseded.
 
 ISSUE-316 OPEN; production NO-GO; successor NOT ACTIVATED; Brownlow 2026 pending on all three keys; ET unresolved; all
 source-authority, eligibility and ownership restrictions unchanged.
+
+
+## 2026-10-25 — Successor activation separated from the production apply (implementation committed as `c438f844`; tracking/evidence separate)
+
+- The owner required activation to be independent of the apply. Implementation:
+  - the successor apply writes 7 files and leaves `tools/db/rebuild-test.ts` (the `SUCCESSOR_LADDER_TUPLES_JSON`
+    activation state) unwritten;
+  - `tools/db/successor-activation.ts` writes that one line under a bound authority, and deactivates by the exact
+    inverse.
+- States: A pre-apply; B applied/inactive; C activated; D = B.
+- Fresh-context review GO, no CRIT/HIGH. LOW F4–F6 fixed.
+- **Owner rulings 2026-10-25:** F1 accepted (State B = applied / installed / inactive / rebuild-ineligible, no hybrid
+  B, DB rebuild proof waits for C); F2 accepted (the U2 date-only exception is superseded; the production candidate is
+  structural, re-pinned at P with the full J2 DB-free set, never "date-only"); F3 accepted (tests classified invariant /
+  B / C and named by state). No new disposable rebuild unless rebuild semantics, inputs, reconstruction, canonical data
+  or relied-on validators change.
+- Validation: `season-rollover` 393/393; rebuild + cutover 1539 passed / 5 skipped; typecheck exit 0. After the F3
+  renames, `season-rollover` and typecheck re-ran green; the rebuild/cutover re-run hit `ENOSPC` on C:.
+- Decision package rewritten for the separation (§0a, §2, §3, §4, §6, §8, §9).
+- Full record: [comparison and review](../../docs/v2/issue316-successor-activation-separation-2026-10-25.md).
+- Production NO-GO. Nothing operational done.
+
+## 2026-10-24 — Canonical correction accepted; read-only completion PASS; audit metadata pending
+
+- **Metadata repair v5 executed: PASS; U3 CONFIRMED (2026-10-25 Sydney; 2026-10-24T21:26–21:30Z; superseded as current).**
+  The owner ruled: no sudo/NOPASSWD, no frozen v4, a separately hash-bound v5 changing only transport/principal binding.
+  Read-only discovery through the existing `afldb_backup` credential selected the existing non-superuser owner
+  `afldb_owner`. It is the only non-superuser able to update `data_edits.note`, and it was reached through the existing
+  arm-only `.env`. No role, grant, sudo rule, authentication change or credential was created.
+  - Package and review: v5 manifest 3e1e329f…fc06d96 (43 members; lock/snapshot/assertion SQL and note
+    byte-identical to v4); PGlite 20/20, VM wrapper 31/31; private PostgreSQL 16 on streamanator 21 database and
+    transport cases plus static ordering PASS. Fresh-context review GO, 0 stopping findings (decision c365eeb2…8083c;
+    F-006 closed; F-007–F-010 LOW, F-011–F-014 INFO).
+  - Execution: one run with the stages in order. Fresh observation PASS, then read-only prerequisite PASS
+    (attempt not consumed), then ATTEMPT.json, then one write session with all eight markers in order, then
+    independent postcheck PASS. Receipt `data_edits` 95 is linked to 94; the note is set; authority 93 and the
+    protected snapshot and other audit rows are unchanged; optional Brownlow schema absent. Attempt consumed;
+    no retry or reversal.
+  - Standing: U3 confirmed: "2026 is complete, and no further 2026 AFL API settle is needed or will be done only
+    through an audited correction." U4 Route B; Brownlow untouched. No census, seal/rollover, successor activation,
+    production apply, deployment, rebuild or push. Production NO-GO.
+  [V5 record](AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V5-RECORD.md).
+
+- **Unprivileged replacement observation PASS; STOP before frozen wrapper (2026-10-25 Sydney; superseded).**
+  The owner accepted the `sudo -n ps` failure as a pre-attempt harness failure. A no-sudo `arm` observation at
+  2026-10-24T20:28Z passed every remote gate: host identity; full `ps` visibility with no hidepid; 0 unsafe processes;
+  services and deploy markers clear; read-only `afldb_backup` identity; all DB activity counts 0. Query text is redacted,
+  but PostgreSQL process titles are visible. The launcher then false-stopped on its own oid type check (fixed). The frozen
+  pins reverify cleanly. STOP: the frozen `run.cjs:69` repair itself needs passwordless `sudo -n -u postgres`
+  (`identity.sql:5` requires session_user postgres) and creates `ATTEMPT.json` before SSH. No production evidence shows
+  that hop is permitted. Not invoked: no ATTEMPT.json, preflight or write; attempt unconsumed. U3 unconfirmed; U4 Route B;
+  Brownlow untouched; NO-GO. Next: owner confirms the postgres sudo hop or chooses a v5 transport.
+  [Record](AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/RECORD.md).
+
+- **V4 production execution authorised; STOP before preflight (2026-10-25 Sydney; superseded).**
+  Final frozen-byte/review/runtime verification PASS (40 manifest members; eight external evidence pins;
+  manifest 829fc30a…848ecf84; decision 39e71a77…04a913a2; report c36dc24a…2374712).
+  Separate fail-closed operational observation at 2026-10-24T20:07:59Z confirmed afldb-prod / arm, then
+  `sudo -n ps` failed: `sudo: a password is required` (SSH exit 1). No process-clear inference;
+  systemd/session checks not reached. No retry/workaround, production DB connection, frozen preflight,
+  wrapper/transaction invocation, ATTEMPT.json or production write. Attempt unconsumed. U3 unconfirmed;
+  U4 Route B; Brownlow untouched; production NO-GO. Next: owner resolves/adjudicates the failed
+  noninteractive read-only observation privilege gate; later resumption repeats all pre-execution gates.
+  [Execution stop evidence](AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REPORT.md).
+
+
+- **Owner adjudication accepted canonical correction; read-only completion PASS (2026-10-24; current).**
+  - PMS 705437 removal is accepted as successfully executed. Do not restore Fiorini, repeat removal or Save again.
+    The failure is audit metadata: data_edits 94.note is NULL; authority 93 remains active and unchanged.
+  - Authorised read-only production reconciliation at 11:46:45Z / 11:48:04Z passed: 47 career, 47 season,
+    47 club-season and 59 player-club rows agree; career numbering/spans agree; all 47 rebuild times equal commit.
+    Eight match-17214 period rows, official 69–81 result, both team player totals and relevant club aggregates agree.
+    REPEATABLE READ READ ONLY, identity gated, ROLLBACK, SSH exit 0; no production write.
+  - Live authenticated Playwright confirms the optional form input name=note. Current/deployed note pipeline agrees
+    and passes nonblank notes through; blank becomes NULL. Authority 93 has no note/reason column.
+    No supported audited note amendment workflow found; no metadata repair attempted. Original submitted field
+    value is unavailable, so application defect versus procedural omission remains unestablished; no speculative issue/test.
+  - **F-005 owner scope clarification / v4 validated and frozen (2026-10-25; current).**
+    F-005 accepted against the prior v3 contract: **Resolved by owner scope clarification, subject to v4
+    proving detection and isolation under the revised contract.** V2/v3 remain frozen and unexecuted.
+    V4 removes catalog locks/absence exclusion; existing protected-data locks and unchanged two-write body
+    remain strict. Optional presence/schema is observed internally and postcommit; drift blocks U3 without
+    retry/reversal. Added bounded operational DDL/deployment and expected migration-110 guards.
+    Static ordering PASS; inherited PGlite16 plus three drift cases **19/19 PASS**; wrapper **14/14 PASS**.
+    Owner-authorised synthetic transfer to arm@10.0.40.100 completed: 19 allowlisted members, hashes
+    matched at both ends. PostgreSQL 16.15 **10/10 database cases plus static ordering PASS**, including
+    early-DDL rollback and optional CREATE after all final assertions before COMMIT, then exact metadata/
+    authority/existing-data verification and CONCURRENT_SCHEMA_DRIFT. Private cluster cleanly stopped;
+    no process/socket remains. Harness-only transport/evidence/cleanup changes; all candidate SQL unchanged.
+    Frozen 40-member manifest **829fc30a…848ecf84**. Fresh-context exact-byte independent review
+    **GO, zero stopping findings; F-006 LOW retained** (host ps pipeline may mask producer failure).
+    F-001–F-004 closed as originally stated; revised F-005 proof accepted. No frozen edits after review.
+    Validation-only task complete; no production connection/preflight/attempt/write. U3 unconfirmed; U4 Route B;
+    Brownlow untouched; production NO-GO. No census/rollover/activation/apply/deploy/rebuild/push.
+    [V4 record](AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V4-RECORD.md).
+  - **Historical frozen-v3 review (2026-10-25; scope ruling supersedes F-005 disposition).**
+    Owner accepts F-004 as an isolation/proof-ordering finding; the accepted Fiorini correction stands.
+    V2 remains frozen and unexecuted. V3's plain lock prefix closes original F-004 protected-DML ordering.
+    Independent review returns NO-GO: a pre-existing optional-table CREATE may commit after the final
+    in-transaction assertions but before repair COMMIT; catalog SHARE locks do not exclude its commit.
+    Its absence can then be detected only by postcommit verification after metadata commit. This final
+    interleaving is derived from reviewed bytes and measured catalog-lock behaviour, not replayed live.
+    PGlite 16/16 and isolated PostgreSQL16.15 10/10 expectations PASS, but do not prove DDL exclusion.
+    Prior F-001/F-002/F-003 and original F-004 are closed; new F-005 is a stopping DDL-isolation MED.
+    Frozen manifest 5bf64288…54034d remains unchanged. No production connection, attempt or write.
+    Historical next action was owner adjudication; the v4 scope ruling above now governs.
+    [V3 record](AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V3-RECORD.md); [independent review](AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/REVIEW.md).
+    U3 remains unconfirmed; U4 Route B; Brownlow untouched; overall production NO-GO.
+    Day-D nightly and affected-material re-pin controls remain.
+    [Completed verification and limits](AFLDB-ISSUE-316-u3-correction-20261024/ADJUDICATION-READONLY-REPORT.md);
+    [metadata repair proposal](AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-PROPOSAL.md).
+
+## 2026-10-24 — Committed correction / missing note stop (historical; superseded above)
+
+Manual Match Sheet Save committed at 11:28:46.203865Z after the fresh 11:26:57.564078Z database gate passed
+all identity/value/provenance/key/count conditions. The read-only gate completed ROLLBACK and marker, then a
+PowerShell-added trailing CR produced shell exit 127; retained as an after-completion transport-wrapper error.
+Postcheck at 11:30:11.345984Z ran read-only, rolled back, SSH exit 0: target absent, 2026 10,028 / Essendon 23,
+zero extra/missing baseline keys; all other PMS IDs, other 2026 PMS, 2026 `matches` and application 20834 fingerprints
+match. Durable removal authority 93 and single-removal edit 94, actor 1, exist. **FAIL: edit 94 note is NULL.**
+The required approved decision note is not persisted; cause unknown. Career rebuild timestamp equals commit,
+career games 125 / 2026 games 2. Full independent derived and separate period-score checks stopped incomplete.
+
+**Owner adjudication required. No second removal, resubmission, audit repair or other write is authorised.**
+U3 unconfirmed; U4 Route B; no Brownlow write by Codex. Production NO-GO and every operational hold stand.
+[Complete state, evidence and limitations](AFLDB-ISSUE-316-u3-correction-20261024/RECORD.md).
+
+### Prior authorisation and preparation (historical, before submission)
+
+The owner adjudicated PMS 705437 erroneous and authorised only its audited Data Editor Match Sheet removal,
+durable authority/audit note linking ISSUE-316 and ISSUE-255, normal recomputation, preserved provenance and
+read-only pre/post checks. The 10:54:47Z identity/retained-values/key precheck passed (SSH exit 0, ROLLBACK).
+That snapshot recorded 10,029 in 2026 and 24 Essendon rows for match 17214. The owner subsequently signed in
+on the actual production application `beta.afldb.com`; Super admin access, the exact Match Sheet 17214,
+Fiorini and Essendon's 24 rows were observed. Repeated browser-URL confidence stops are an automation limitation
+only. No removal was staged, no save invoked and no fresh gate run; no partial correction or new audit/recomputation.
+The owner now requires split execution: manual UI preparation/submission, Codex read-only pre/post verification.
+No further Computer Use submission attempt. The existing authorisation remains valid and unconsumed; failed
+automation permits no alternative write path. Deployed source/version remains unverified.
+[Full retained evidence and next action](AFLDB-ISSUE-316-u3-correction-20261024/RECORD.md).
+
+Next: operator prepares only removal of player 2121 and the retained note, leaves Save unclicked and confirms
+readiness. Codex runs the fresh read-only gate immediately before submission, including counts 10,029 / Essendon 24;
+stop on any difference. Only on PASS, operator submits once, then Codex runs every required post-check even if
+UI response is unclear. Never repeat the removal; preserve failed/ambiguous state for owner adjudication.
+U3 stays **unconfirmed**; U4 Route B;
+9,522 Brownlow round-vote rows untouched; actual day-D nightly and affected-material regeneration/re-pin still
+mandatory. Production **NO-GO**. No census, seal/rollover, activation, production apply, deployment, rebuild or push.
+
+## 2026-10-24 — U4 Route B; U3 exact-row investigation (previous)
+
+The owner chose **Route B**: Brownlow 2026 is independent of the ordinary season seal. No normal production
+Brownlow settle after sealing, and no move ahead of C2 to preserve that path. Each of the three pending keys
+must be mapped by its actual decision to the appropriate audited workflow with evidence and decision note:
+`brownlow_authority`, `brownlow_eligibility_decision` after migration 113, or `data_editor`. No workflow
+interchangeability or correction execution is approved. The 9,522 AFL Tables round-vote rows are not adjudicated.
+
+The owner accepted the ordinary completeness PASS but withheld final U3 confirmation. The one further
+read-only production query identified **PMS 705437**, Brayden Fiorini (2121), Essendon (6), match **17214**,
+round 4 on 2026-03-28: API application **20834**, batch **32**, inserted 2026-09-27T21:11:30.460661Z.
+It is the known ISSUE-255 unused-emergency placeholder (EMERG, zero TOG/statistics), inserted before the
+suppression fix. It is the sole extra canonical key; no equivalent identity in the J2-bound AFL Tables source.
+An audited Data Editor Match Sheet removal with durable authority, audit and derived recomputation is proposed
+only. [Full evidence, proposed decision note and execution limitations](../../docs/v2/issue316-u3-player-row-evidence-2026-10-24.md).
+
+On actual day D, before the enforced dry run, re-check the latest AFL Tables nightly and require no unexplained
+canonical change since candidate preparation. It remains an authorised pre-seal writer until retirement/disable;
+legitimate corrections are current state. Regenerate/re-pin and review affected production material on any
+canonical change. No day-D execution is approved here.
+
+**Next:** owner adjudication/approval and verified disposition of the exact row, then final U3. ISSUE-316 OPEN;
+U3 unconfirmed; production **NO-GO**. No correction, seal, census, dry run, activation, apply, deployment or push.

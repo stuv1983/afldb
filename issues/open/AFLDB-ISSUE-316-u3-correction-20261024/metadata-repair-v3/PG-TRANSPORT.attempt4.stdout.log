@@ -1,0 +1,19 @@
+START active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes
+PASS active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes
+START active protected writer exceeds approved two-second lock timeout: zero metadata writes
+PASS active protected writer exceeds approved two-second lock timeout: zero metadata writes
+START writers and guarded DDL after all locks are excluded until repair commit
+PASS writers and guarded DDL after all locks are excluded until repair commit
+START absent optional relation cannot be created after locks
+PASS absent optional relation cannot be created after locks
+START linked-audit INSERT failure rolls back preceding note UPDATE
+PASS linked-audit INSERT failure rolls back preceding note UPDATE
+START successful two-write repair; independent postcheck; second repair refuses
+PASS successful two-write repair; independent postcheck; second repair refuses
+START Brownlow mutation after commit is detected by independent postcheck
+PASS Brownlow mutation after commit is detected by independent postcheck
+START extra audit-row mutation after commit is detected
+PASS extra audit-row mutation after commit is detected
+START counterexample: pre-existing optional DDL can commit through catalog SHARE locks
+PRIVATE_CLUSTER_STOPPED /tmp/i316-f004-pg-onVYwQ
+VALIDATION_PACKAGE_RETAINED /tmp/i316-f004-package-m0L1bF

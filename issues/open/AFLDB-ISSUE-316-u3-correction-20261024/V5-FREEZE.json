@@ -1,0 +1,73 @@
+{
+  "issue": "AFLDB-ISSUE-316",
+  "revision": "metadata-repair-v5",
+  "frozen_utc": "2026-10-24T21:08:56.381Z",
+  "manifest_sha256": "3e1e329f8d1718b3006dbec4a8076a64e552c99a1aaa35f2e66191962fc06d96",
+  "members": 43,
+  "delta": {
+    "changed": [
+      "DERIVATION.json",
+      "OWNER-RULING.md",
+      "README.md",
+      "VALIDATION-EVIDENCE.json",
+      "VALIDATION.json",
+      "WRAPPER-VALIDATION.json",
+      "binding.json",
+      "checks.sql",
+      "identity.sql",
+      "operational-guard.sql",
+      "operational-host.sh",
+      "postcheck.sql",
+      "preflight.sql",
+      "repair-body.sql",
+      "repair.sql",
+      "run.cjs",
+      "runtime.json",
+      "validate-pg.cjs",
+      "validate-remote.cjs",
+      "validate-wrapper.cjs",
+      "validate.cjs"
+    ],
+    "added": [
+      "V4-REVIEW.md",
+      "V5-DELTA.md",
+      "operational-observation.sh",
+      "principal.sql",
+      "transport.sh"
+    ],
+    "removed": [
+      "PG-TRANSPORT.json",
+      "PG-TRANSPORT.stderr.log",
+      "PG-TRANSPORT.stdout.log"
+    ],
+    "unchanged": [
+      "ACTOR-EVIDENCE.json",
+      "SEMANTICS.md",
+      "V3-NO-GO.md",
+      "assert-post.sql",
+      "audit-log-source.txt",
+      "audit-schema-source.txt",
+      "canonical-gates.sql",
+      "expected-migrations.json",
+      "lock-assert.sql",
+      "locks.sql",
+      "migration-guard.sql",
+      "note.txt",
+      "protected.json",
+      "schema-evidence.json",
+      "snapshot.sql",
+      "validate-order.cjs"
+    ]
+  },
+  "validation": {
+    "real_database_and_transport_cases": 21,
+    "pglite": 20,
+    "wrapper": 31,
+    "cleanup": "PASS",
+    "evidence": "metadata-repair-v5-validation-7z6NcG"
+  },
+  "production_contact": "read-only principal discovery only (../metadata-repair-v5-discovery/)",
+  "production_attempt": false,
+  "u3_confirmed": false,
+  "standing": "Review pending. U4 Route B; Brownlow untouched; production NO-GO."
+}

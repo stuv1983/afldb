@@ -1,0 +1,19 @@
+{
+  "inventory": {
+    "apps": [],
+    "browsers": []
+  },
+  "attempts": [
+    {
+      "browser": "iab",
+      "url": "https://afldb.com/admin/data-editor",
+      "result": "Browser is not available: iab"
+    },
+    {
+      "browser": "chrome",
+      "url": "https://afldb.com/admin/data-editor",
+      "result": "Browser is not available: chrome"
+    }
+  ],
+  "mutation_submitted": false
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "path": "OBSERVATION-STOP.json",
+    "sha256": "e1b646040279472bc4e43412949fc5ed1a0440cf0887b5fa0f9a2e7165118f03"
+  },
+  {
+    "path": "observation-launch.json",
+    "sha256": "189b2d7948eaca85cb929a41749dac723eb74308fcb01a4a07c5e8510937cab3"
+  },
+  {
+    "path": "observation.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "observation.stdout.log",
+    "sha256": "9cf20dece609bf21586ee9ef280dc237b9a59263108c9cd76898227cf3e1204a"
+  },
+  {
+    "path": "observation.transport.json",
+    "sha256": "7b6a54f8b82bc179db87c67bc81d86f734f4f696a6731271861921c409bde956"
+  }
+]

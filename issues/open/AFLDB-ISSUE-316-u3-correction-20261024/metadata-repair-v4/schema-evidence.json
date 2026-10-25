@@ -1,0 +1,122 @@
+{
+  "source": "../metadata-investigation.json and ../aggregate-metadata-final.json; captured read-only 2026-10-24",
+  "audit_columns": [
+    {
+      "data_type": "bigint",
+      "table_name": "data_edits",
+      "column_name": "id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_edits",
+      "column_name": "table_name",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "data_edits",
+      "column_name": "row_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_edits",
+      "column_name": "field_group",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "jsonb",
+      "table_name": "data_edits",
+      "column_name": "old_values",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "jsonb",
+      "table_name": "data_edits",
+      "column_name": "new_values",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "data_edits",
+      "column_name": "admin_user_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_edits",
+      "column_name": "note",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "data_edits",
+      "column_name": "created_at",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "data_overrides",
+      "column_name": "id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_overrides",
+      "column_name": "entity_type",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_overrides",
+      "column_name": "entity_key",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_overrides",
+      "column_name": "field_group",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "jsonb",
+      "table_name": "data_overrides",
+      "column_name": "override_values",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "boolean",
+      "table_name": "data_overrides",
+      "column_name": "is_active",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "data_overrides",
+      "column_name": "admin_user_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "data_overrides",
+      "column_name": "created_at",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "data_overrides",
+      "column_name": "updated_at",
+      "table_schema": "public"
+    }
+  ],
+  "audit_constraints": [
+    "CHECK (((note IS NULL) OR (length(note) <= 2000)))",
+    "CHECK ((row_id > 0))",
+    "CHECK ((table_name = ANY (ARRAY['players'::text, 'matches'::text, 'draft_picks'::text, 'award_winners'::text, 'hall_of_fame'::text, 'honour_team_members'::text, 'brownlow_vote_entry_state'::text, 'brownlow_season_authority'::text, 'coaches'::text, 'fixtures'::text, 'club_leadership'::text, 'player_achievements'::text, 'after_siren_kicks'::text])))",
+    "FOREIGN KEY (admin_user_id) REFERENCES auth_users(id)",
+    "PRIMARY KEY (id)"
+  ],
+  "triggers": null,
+  "rules": null
+}

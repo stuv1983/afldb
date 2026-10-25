@@ -1,0 +1,2011 @@
+{
+  "classification": "Later repository admission audit, not historical run evidence",
+  "generated_at": "2026-10-25T01:05:05.757Z",
+  "ignored_files": 62,
+  "admitted": 0,
+  "eligible_pending_credential_gate": 42,
+  "excluded": 20,
+  "force_add_performed": false,
+  "known_production_credential_available": false,
+  "entries": [
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Required to substantiate the accepted final aggregate/metadata postcheck",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/aggregate-metadata-final.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Required to substantiate the accepted final aggregate/metadata postcheck",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788"
+      ],
+      "actual_sha256": "9ff5ed7f025e245a1ab16f74fce0edb2f5a79194b6572d525499cad4b0213788",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/deployed-derived-read.stderr.log",
+      "disposition": "EXCLUDED",
+      "reason": "Superseded or unsuccessful exploratory output; not required to substantiate the final accepted result. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/deployed-derived-read.stdout.log",
+      "disposition": "EXCLUDED",
+      "reason": "Superseded or unsuccessful exploratory output; not required to substantiate the final accepted result. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93"
+      ],
+      "actual_sha256": "71cf102af24945b3d351581679dd1298aee030826b2cd16135ddf258b1419f93",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Required to substantiate the accepted affected-derived/period/aggregate verification",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/derived-verification.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Required to substantiate the accepted affected-derived/period/aggregate verification",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c"
+      ],
+      "actual_sha256": "6c08fa0ef2d1efc49af41d4737f764c404751789a612cef7c93fff7bacd1bc9c",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Actual fresh production preflight for the accepted canonical correction; RECORD.md evidence inventory",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171"
+      ],
+      "actual_sha256": "00dd00c86150c2421cc4814a907a438fe4b1d82308629ed0d7511eadf5d77171",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/fresh-precheck-20261024T1126Z.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Actual fresh production preflight for the accepted canonical correction; RECORD.md evidence inventory",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0"
+      ],
+      "actual_sha256": "74f062b09bd34caf4092525da66e12f83b0788099c19fb3a985cabcd0882f1b0",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Actual read-only audit-metadata investigation underpinning the approved repair",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation-escalated.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Actual read-only audit-metadata investigation underpinning the approved repair",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac"
+      ],
+      "actual_sha256": "8c63e663c71d5b3207a8121c7383bbf961c194fc7aa2c9e27a45ff5d17bf22ac",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.stderr.log",
+      "disposition": "EXCLUDED",
+      "reason": "Superseded or unsuccessful exploratory output; not required to substantiate the final accepted result. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d"
+      ],
+      "actual_sha256": "2e0e27897493f8672bac57e3a9b7dd1e800a340e8a30eb0e4b1a6efcdc5c927d",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-investigation.stdout.log",
+      "disposition": "EXCLUDED",
+      "reason": "Superseded or unsuccessful exploratory output; not required to substantiate the final accepted result. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt1.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8"
+      ],
+      "actual_sha256": "12fbde9882ca0e97a30c0c327c94c73a5751a7be64ee9f6245db38edfdccaae8",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342"
+      ],
+      "actual_sha256": "991e504f471213eea15f5aa1c2b403353bd4c72f853c0df0ff0ea6b667ec1342",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt2.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff"
+      ],
+      "actual_sha256": "105da3f442eb3be7582dfd246abf981815060f6db22b6649a1677439fab029ff",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f"
+      ],
+      "actual_sha256": "0067fa73d95744edbdcb552a8808eae4402737e214196814bfc20507dfc0e89f",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt3.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043"
+      ],
+      "actual_sha256": "92d64e53499b0cf0ce6f1cffd84ddbca35f442c22b07f31f79ae07eb00e66043",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301"
+      ],
+      "actual_sha256": "7441728eb5457386aefffaf5f3ec56acd983f0913d3a7e7fc1118c457df05301",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.attempt4.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc"
+      ],
+      "actual_sha256": "e243b82759f23861a5fb6046c5629f163cbabd2a474c69bf63080efa9676d0cc",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/PG-TRANSPORT.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/MANIFEST.json",
+          "expected_sha256": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a"
+      ],
+      "actual_sha256": "4f8b62b8832bf11b4791953b03fa49dfd5eddaed302346f301a0eeb744d4ee0a",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/MANIFEST.json",
+          "expected_sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925"
+      ],
+      "actual_sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/PG-TRANSPORT.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/MANIFEST.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb"
+      ],
+      "actual_sha256": "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "6a665100485f66e43962e1235a7e454037c06887ab0469d2fac2b3fdd3764b36",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "6a665100485f66e43962e1235a7e454037c06887ab0469d2fac2b3fdd3764b36"
+      ],
+      "actual_sha256": "6a665100485f66e43962e1235a7e454037c06887ab0469d2fac2b3fdd3764b36",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/observation.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/run-20261024T202811Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "9cf20dece609bf21586ee9ef280dc237b9a59263108c9cd76898227cf3e1204a",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "9cf20dece609bf21586ee9ef280dc237b9a59263108c9cd76898227cf3e1204a"
+      ],
+      "actual_sha256": "9cf20dece609bf21586ee9ef280dc237b9a59263108c9cd76898227cf3e1204a",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-SERVER.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285"
+      ],
+      "actual_sha256": "f48789cc7f2e288d6ea0af2e431fd28fc8134c24fb7c6ed89170da6741ed8285",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-2dLUSk/PG-TRANSPORT.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a"
+      ],
+      "actual_sha256": "30e43cc71dbd49abba8a2a02bdce88c9732f0ebb89f5422ad650f1acff47306a",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.stderr.log",
+      "disposition": "EXCLUDED",
+      "reason": "Unpinned superseded validation scratch; final v4 validation is metadata-repair-v4-validation-2dLUSk. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925"
+      ],
+      "actual_sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-validation-rsfO5W/PG-TRANSPORT.stdout.log",
+      "disposition": "EXCLUDED",
+      "reason": "Unpinned superseded validation scratch; final v4 validation is metadata-repair-v4-validation-2dLUSk. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/EVIDENCE-HASHES.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/execution/EVIDENCE-HASHES.json",
+          "expected_sha256": "7ca8c61c1772253e71d0464c0b6066d90a771f28c9cac1ef75f3f3fde3f6b718",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "7ca8c61c1772253e71d0464c0b6066d90a771f28c9cac1ef75f3f3fde3f6b718"
+      ],
+      "actual_sha256": "7ca8c61c1772253e71d0464c0b6066d90a771f28c9cac1ef75f3f3fde3f6b718",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/observation.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "ffec204103bd5e23f73c009d9ba53fec559eee64a1de5f970e9cbd7231361fe4",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "ffec204103bd5e23f73c009d9ba53fec559eee64a1de5f970e9cbd7231361fe4"
+      ],
+      "actual_sha256": "ffec204103bd5e23f73c009d9ba53fec559eee64a1de5f970e9cbd7231361fe4",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/prerequisite.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/prerequisite-20261024T212647Z/EVIDENCE-HASHES.json",
+          "expected_sha256": "8d380c72f254bbe8d5744e4a1e70d630f4f24c4b7df0c0fe21c2219d940b42c8",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "8d380c72f254bbe8d5744e4a1e70d630f4f24c4b7df0c0fe21c2219d940b42c8"
+      ],
+      "actual_sha256": "8d380c72f254bbe8d5744e4a1e70d630f4f24c4b7df0c0fe21c2219d940b42c8",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Directly referenced by canonical METADATA-REPAIR-V5-RECORD.md section 1; actual original principal-discovery evidence",
+      "inclusion_criteria": [
+        3
+      ],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS: original-byte SHA-256 recaptured and Git materialisation identical; no historical expected hash exists",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-discovery/discovery.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Directly referenced by canonical METADATA-REPAIR-V5-RECORD.md section 1; actual original principal-discovery evidence",
+      "inclusion_criteria": [
+        3
+      ],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "c097dddcb41c5f81e5351612b3e7e588c8c3fef4ab66abc935491e9ad210ef51",
+      "hash_verification": "PASS: original-byte SHA-256 recaptured and Git materialisation identical; no historical expected hash exists",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-2RK1Lx/PG-SERVER.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "4fd47f666daaff60af27498988c39e5ffa1e26e10a249f0c9a9a8368c66bb20b",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-2RK1Lx/PG-TRANSPORT.stderr.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "4a888301b03953cba02a3877cdaa0d78709c24af5ca5fe58f217eac8696f45d7",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-2RK1Lx/PG-TRANSPORT.stdout.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "4df302f5f44a929d0d19a6d49e486e06d22964d5c9c503c4bb71b406fd7f2b7c",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-SERVER.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "1e439b5967dee4e7e2374643d24c4f99a7477bb86570dfed3d8e000960bc8a7b",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "1e439b5967dee4e7e2374643d24c4f99a7477bb86570dfed3d8e000960bc8a7b"
+      ],
+      "actual_sha256": "1e439b5967dee4e7e2374643d24c4f99a7477bb86570dfed3d8e000960bc8a7b",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-7z6NcG/PG-TRANSPORT.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Member of the retained frozen manifest or bound validation/execution inventory; preserve complete historical audit evidence",
+      "inclusion_criteria": [
+        1
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/VALIDATION-EVIDENCE.json",
+          "expected_sha256": "ef39b935f7b80b9abd6ab3561881b5a2ebd59b95e3998cba92a532078a5b87ad",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "ef39b935f7b80b9abd6ab3561881b5a2ebd59b95e3998cba92a532078a5b87ad"
+      ],
+      "actual_sha256": "ef39b935f7b80b9abd6ab3561881b5a2ebd59b95e3998cba92a532078a5b87ad",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-GFhNS5/PG-SERVER.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "d89be782577adeeb6d548317a6ded116639831906084f78d1baaaf349828e451",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "FINDING",
+        "finding_categories": [
+          "password assignment/literal"
+        ],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-GFhNS5/PG-TRANSPORT.stderr.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "60dbee5058a779d38ec22836beb967b0839347fd9adb2af43da188acf0959a69",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-GFhNS5/PG-TRANSPORT.stdout.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "93c368f0f92fb26c71eaed4a4872c13cd83e7acfdd300e2af79895213ec9bdcc",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-HgahMt/PG-SERVER.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "bd7fd70bb6453abc270fbf24599fbeb424e7635a169456a95e67e5d226323349",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-HgahMt/PG-TRANSPORT.stderr.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "91635a9ac84244fde16095cd5721a34ae7326f0398706c8fa2efead6ae1278d6",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-HgahMt/PG-TRANSPORT.stdout.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "2366190145cf2eee7cd1ecc9d5e94e53cba2afce8d1d97d61734477db592a887",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-NABjAE/PG-SERVER.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "c5322f9a1bf16ed6460d4a8fafb9e16848e2eaa0a796c5b92db0ff8779c525fe",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-NABjAE/PG-TRANSPORT.stderr.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "2540e32bcd2dfa35d5942317ecaa341174e580eed943a25b00ac394b51648afb",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5-validation-NABjAE/PG-TRANSPORT.stdout.log",
+      "disposition": "EXCLUDED",
+      "reason": "Obsolete failed synthetic harness run; not the retained passing validation. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [],
+      "expected_sha256": [],
+      "actual_sha256": "caf9a13219b57845f8eba893a057977d6762c585c15329cb337bc60ae719df42",
+      "hash_verification": "NO_PRIOR_HASH; current original-byte digest recorded",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Actual post-correction production postcheck; RECORD.md evidence inventory",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/postcheck.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Actual post-correction production postcheck; RECORD.md evidence inventory",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d"
+      ],
+      "actual_sha256": "5910c12064d70baeacb3a7c98287bcf9e517542117f67eaeeabfb5277a64770d",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.stderr.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Original successful read-only production row precheck; RECORD.md evidence inventory",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/precheck.stdout.log",
+      "disposition": "ELIGIBLE_PENDING_CREDENTIAL_GATE",
+      "reason": "Original successful read-only production row precheck; RECORD.md evidence inventory",
+      "inclusion_criteria": [
+        1,
+        4
+      ],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47"
+      ],
+      "actual_sha256": "d494695f3d5204f74ce1c3433d71120ef7397726ebb4af7f2af2b9d6fc889c47",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "PENDING_KNOWN_PRODUCTION_CREDENTIAL_COMPARISON"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/sandbox-precheck.stderr.log",
+      "disposition": "EXCLUDED",
+      "reason": "Superseded or unsuccessful exploratory output; not required to substantiate the final accepted result. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c"
+      ],
+      "actual_sha256": "750a9affc7c074d2ae32fcc33a2b4e5d103ab1a347142537af70e4ba7555455c",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/sandbox-precheck.stdout.log",
+      "disposition": "EXCLUDED",
+      "reason": "Superseded or unsuccessful exploratory output; not required to substantiate the final accepted result. Preserve locally; do not commit.",
+      "inclusion_criteria": [],
+      "references": [
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-adjudication",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v2",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v3",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-repair-v4",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        },
+        {
+          "source": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/SHA256SUMS.before-metadata-review",
+          "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "criterion": 1
+        }
+      ],
+      "expected_sha256": [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "actual_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_verification": "PASS",
+      "credential_scan": {
+        "pattern_scan": "PASS",
+        "finding_categories": [],
+        "known_production_credential_comparison": "NOT_VERIFIED: known production credential unavailable locally; no production retrieval attempted",
+        "final": "NOT_ADMITTED"
+      }
+    }
+  ]
+}

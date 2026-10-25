@@ -1,0 +1,35 @@
+{
+  "snapshot": {
+    "oid": "66668",
+    "utc": "2026-10-24T11:46:45.164537",
+    "user": "afldb_backup",
+    "database": "afldb_prod",
+    "isolation": "repeatable read",
+    "read_only": "on",
+    "system_id": "7674454702926115004"
+  },
+  "checks": {
+    "affected_players": true,
+    "derived_totals": true,
+    "career_numbers": true,
+    "player_spans": true,
+    "period_rows": true,
+    "match_scores_and_result": true,
+    "match_unchanged_since_first_postcheck": true,
+    "team_player_aggregates": true,
+    "club_season_totals": true,
+    "all_rebuilt_at_commit": true,
+    "authority93_unchanged": true,
+    "audit94_unchanged": true,
+    "note_missing": true
+  },
+  "limits": [
+    "No original submitted FormData was retained; whether note was entered is unproven.",
+    "Before-model totals are reconstructed SELECT-only from current source plus retained removed row, not measured pre-save totals.",
+    "No separate period-score before snapshot was captured; current values match retained source staging.",
+    "Brownlow base tables were not written; no before/after round-vote immutability proof is available.",
+    "Graph tools unavailable; source fallback used.",
+    "Deployed checkout hashes do not alone bind every running compiled server artifact."
+  ],
+  "read_only_verification_pass": true
+}

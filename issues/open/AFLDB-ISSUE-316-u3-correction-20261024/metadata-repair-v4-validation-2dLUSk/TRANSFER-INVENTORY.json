@@ -1,0 +1,78 @@
+[
+  {
+    "name": "validate-pg.cjs",
+    "sha256": "713476baf65087260e7f172979795f80526fa469275f2414bc8e319a963c62ee"
+  },
+  {
+    "name": "validate-order.cjs",
+    "sha256": "ce5e0cbf96786213d5f7bd2de6e8021b3de329bf3fd53bd6b1eb69c3eb8d28e6"
+  },
+  {
+    "name": "validate.cjs",
+    "sha256": "78b6f16dca542f574024bc996fb8499959e4a7cae5183b68fb6e714fee2a7025"
+  },
+  {
+    "name": "binding.json",
+    "sha256": "e91761ab61301c191639bc03ce35ee8812c36b7d2ba5eabb79dd81bc3af2a4fd"
+  },
+  {
+    "name": "protected.json",
+    "sha256": "5c19db42754a5968f4838bd7b7ffa672958cb5b3474d30554045f82f35eed2dc"
+  },
+  {
+    "name": "expected-migrations.json",
+    "sha256": "ed2a6ad4ee8e914349768682fccddd577b97e5765587e036f2d3fbc837f803a5"
+  },
+  {
+    "name": "audit-schema-source.txt",
+    "sha256": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720"
+  },
+  {
+    "name": "preflight.sql",
+    "sha256": "9c53ad4146631da96f10d560047f6aa4897e98f7e0c5e6b5fe853afd8544798d"
+  },
+  {
+    "name": "repair.sql",
+    "sha256": "c0f8c47e103b81347afcbd2b10be557d73ac36e36f7c30117d356f34bec7ce55"
+  },
+  {
+    "name": "postcheck.sql",
+    "sha256": "86c6d4656afc78392c29670e66d90c97259a63f345368b898eeaebd9df482cb0"
+  },
+  {
+    "name": "operational-guard.sql",
+    "sha256": "375358733a87c036b69b3f1827c228f43c0df2d4085be8a3c6e428820079189f"
+  },
+  {
+    "name": "migration-guard.sql",
+    "sha256": "4d211262c64cd356987f57937abae522ba09a771cc3f3355a50460c2662de305"
+  },
+  {
+    "name": "checks.sql",
+    "sha256": "53b02b5c6ef5fd7d1fbf1b9a87c787cb44989e9fc2f5ebe34bf74c311455002d"
+  },
+  {
+    "name": "canonical-gates.sql",
+    "sha256": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3"
+  },
+  {
+    "name": "snapshot.sql",
+    "sha256": "314185b65033d63dd158e08b6be4af32ef7ac9aeeea7d7d8b54c22fe64cf158b"
+  },
+  {
+    "name": "locks.sql",
+    "sha256": "5ac97832452d0cddf86cbf65ab5749e9fe3cec56b57608321d12afe511d927f8"
+  },
+  {
+    "name": "lock-assert.sql",
+    "sha256": "3c8c458dd38d988a416c8522662bf07daf0b6d39d74f9e1d647cdfcfd5fcdbb4"
+  },
+  {
+    "name": "repair-body.sql",
+    "sha256": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b"
+  },
+  {
+    "name": "assert-post.sql",
+    "sha256": "6ff903c74f78317f97de2e8ede4c328b5f4c65ab4daa6cd134f54ddf7cabc1fd"
+  }
+]

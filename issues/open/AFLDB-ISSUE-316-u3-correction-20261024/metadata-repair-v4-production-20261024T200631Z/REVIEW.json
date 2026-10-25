@@ -1,0 +1,32 @@
+{
+  "verdict": "GO",
+  "stopping_findings": 0,
+  "manifest_sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+  "report_sha256": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+  "scope": "Frozen metadata-repair-v4 artifact review only; current task remains validation-only",
+  "production_authorized": false,
+  "production_connection_authorized": false,
+  "u3_confirmed": false,
+  "u4": "Route B",
+  "brownlow": "untouched",
+  "production_readiness": "NO-GO",
+  "findings": [
+    {
+      "id": "F-006",
+      "grade": "LOW",
+      "stopping": false,
+      "file": "operational-host.sh:7",
+      "summary": "Process-list pipeline can mask sudo/ps failure and emit the host gate PASS without a successful process observation."
+    }
+  ],
+  "prior_findings": {
+    "F-001": "CLOSED as originally stated",
+    "F-002": "CLOSED",
+    "F-003": "CLOSED as originally stated",
+    "F-004": "CLOSED as originally stated",
+    "F-005": "RESOLVED BY OWNER SCOPE CLARIFICATION; bounded required v4 detection/isolation evidence verified"
+  },
+  "reviewer": "/root/i316_v4_independent_review",
+  "checks_rerun": false,
+  "files_changed": []
+}

@@ -1,0 +1,51 @@
+FAIL counterexample: pre-existing optional DDL can commit through catalog SHARE locks PostgresError: I316 protected canonical/derived/history/Brownlow state changed
+    at ErrorResponse (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:815:30)
+    at handle (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:489:6)
+    at Socket.data (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:324:9)
+    at Socket.emit (node:events:517:28)
+    at addChunk (node:internal/streams/readable:368:12)
+    at readableAddChunk (node:internal/streams/readable:341:9)
+    at Readable.push (node:internal/streams/readable:278:10)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:190:23) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: 'P0001',
+  where: 'PL/pgSQL function inline_code_block line 28 at RAISE',
+  file: 'pl_exec.c',
+  line: '3897',
+  routine: 'exec_stmt_raise'
+}
+VALIDATION_FAILURE PostgresError: I316 protected canonical/derived/history/Brownlow state changed
+    at ErrorResponse (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:815:30)
+    at handle (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:489:6)
+    at Socket.data (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:324:9)
+    at Socket.emit (node:events:517:28)
+    at addChunk (node:internal/streams/readable:368:12)
+    at readableAddChunk (node:internal/streams/readable:341:9)
+    at Readable.push (node:internal/streams/readable:278:10)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:190:23) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: 'P0001',
+  where: 'PL/pgSQL function inline_code_block line 28 at RAISE',
+  file: 'pl_exec.c',
+  line: '3897',
+  routine: 'exec_stmt_raise'
+}
+PostgresError: I316 protected canonical/derived/history/Brownlow state changed
+    at ErrorResponse (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:815:30)
+    at handle (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:489:6)
+    at Socket.data (/home/arm/projects/afldb/node_modules/postgres/cjs/src/connection.js:324:9)
+    at Socket.emit (node:events:517:28)
+    at addChunk (node:internal/streams/readable:368:12)
+    at readableAddChunk (node:internal/streams/readable:341:9)
+    at Readable.push (node:internal/streams/readable:278:10)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:190:23) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: 'P0001',
+  where: 'PL/pgSQL function inline_code_block line 28 at RAISE',
+  file: 'pl_exec.c',
+  line: '3897',
+  routine: 'exec_stmt_raise'
+}

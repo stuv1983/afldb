@@ -1,0 +1,15 @@
+FAIL optional creation active before locks commits: held-lock guard refuses before metadata writes Error: Repair did not enter observable lock wait
+    at waitForRepairLock (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:63:11)
+    at async /tmp/i316-f004-package-OkfAIF/validate-pg.cjs:133:7
+    at async test (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:52:9)
+    at async main (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:130:5)
+VALIDATION_FAILURE Error: Repair did not enter observable lock wait
+    at waitForRepairLock (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:63:11)
+    at async /tmp/i316-f004-package-OkfAIF/validate-pg.cjs:133:7
+    at async test (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:52:9)
+    at async main (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:130:5)
+Error: Repair did not enter observable lock wait
+    at waitForRepairLock (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:63:11)
+    at async /tmp/i316-f004-package-OkfAIF/validate-pg.cjs:133:7
+    at async test (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:52:9)
+    at async main (/tmp/i316-f004-package-OkfAIF/validate-pg.cjs:130:5)

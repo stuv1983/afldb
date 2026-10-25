@@ -1,0 +1,294 @@
+{
+  "scope": "src/**/*.ts and src/**/*.tsx; literal data_edits; no graph tools available",
+  "filesRead": 607,
+  "results": [
+    {
+      "path": "src/app/admin/audit/entity/[table]/[rowId]/page.tsx",
+      "hits": [
+        "26: * player X, when, from what, to what -- each `data_edits` row rendered as a",
+        "29: * The route segment is validated against the `data_edits` allowlist and a"
+      ]
+    },
+    {
+      "path": "src/app/admin/audit/page.tsx",
+      "hits": [
+        "44: /** Changed fields shown inline per data_edits row before the history page takes over. */",
+        "50: * actions, written by the auth pool) and `data_edits` (every manual"
+      ]
+    },
+    {
+      "path": "src/app/admin/audit/ValueDiff.tsx",
+      "hits": [
+        "4: * A `data_edits` row's two snapshots as one field-per-row table: what the"
+      ]
+    },
+    {
+      "path": "src/app/admin/awards/actions.ts",
+      "hits": [
+        "93: * The REQUIRED audit — the `data_edits` row — is written inside the mutation's",
+        "121: * The `data_edits` row is already written INSIDE the mutation transaction"
+      ]
+    },
+    {
+      "path": "src/app/admin/awards/AwardWinnerForm.tsx",
+      "hits": [
+        "20: * and its `data_edits` row in ONE transaction, and is gated by"
+      ]
+    },
+    {
+      "path": "src/app/admin/awards/RecordHistory.tsx",
+      "hits": [
+        "18: * code rendering the same `data_edits` row. Only the most recent few are shown,",
+        "21: * `data_edits` is read on the AUTH pool, which is where `listDataEditHistory`"
+      ]
+    },
+    {
+      "path": "src/app/admin/awards/submit-helper.ts",
+      "hits": [
+        "36: * Only ever the `auth_audit_log` activity entry: the required `data_edits`"
+      ]
+    },
+    {
+      "path": "src/app/admin/data-editor/actions.ts",
+      "hits": [
+        "95: // The required data_edits audit is written inside createPlayer's",
+        "137: * data_edits row."
+      ]
+    },
+    {
+      "path": "src/app/admin/data-editor/page.tsx",
+      "hits": [
+        "37: * Every save is audited in data_edits; the CSV pipeline remains the path for bulk jobs."
+      ]
+    },
+    {
+      "path": "src/app/admin/draft/RetirePanel.tsx",
+      "hits": [
+        "12: * tombstone workflow exists or is invented here; the `data_edits` row"
+      ]
+    },
+    {
+      "path": "src/app/admin/operations/brownlow/eligibility-consequences.ts",
+      "hits": [
+        "87: durable: 'The decision ledger (actor, timestamp, verdict, citation, note and seal record), plus a required data_edits publication audit when winner flags change.',"
+      ]
+    },
+    {
+      "path": "src/app/admin/operations/consequences.ts",
+      "hits": [
+        "223: 'In ONE transaction: re-validates the proposal, passes the season seal, writes the award_winners row (with its data_overrides and data_edits rows, and recomputes the span) through the production promotion port, sets the proposal to \"approved\" and writes the ledger row.',",
+        "233: durable: 'award_proposal_decisions: one \"approve\" ledger row, plus the data_edits audit row of the award_winners write (same transaction).',",
+        "265: 'Supersedes this approved revision and records one new revision, already approved, that names the resulting winner. Writes two ledger rows (supersede_approved, revise_approved) with the data_overrides and data_edits rows of the canonical change.',",
+        "274: durable: 'award_proposal_decisions: one \"supersede_approved\" and one \"revise_approved\" ledger row (the latter records selfApproval: true), plus the data_edits and data_overrides rows of the canonical change, all in one transaction.',",
+        "298: durable: 'derived_award_results.correction (workflow derived_award_publication, you as the actor, your note, the evidence reference coleman_derivation:<season>:<input checksum>); derived_award_projections (what was inserted, updated, voided or retained); and one data_edits row per award_winners row changed.',"
+      ]
+    },
+    {
+      "path": "src/app/admin/records/actions.ts",
+      "hits": [
+        "83: * The REQUIRED audit -- the `data_edits` row -- is written inside the"
+      ]
+    },
+    {
+      "path": "src/app/admin/records/SpecialRecordLifecyclePanel.tsx",
+      "hits": [
+        "26: * whole design. The row stays: its `data_edits` history stays resolvable"
+      ]
+    },
+    {
+      "path": "src/app/admin/records/submit-helper.ts",
+      "hits": [
+        "28: * Only ever the `auth_audit_log` activity entry: the required `data_edits`"
+      ]
+    },
+    {
+      "path": "src/db/authClient.ts",
+      "hits": [
+        "15: * Required statistical-mutation audits (data_edits, linked"
+      ]
+    },
+    {
+      "path": "src/db/queries/admin-awards.ts",
+      "hits": [
+        "61: * AUDIT. Every successful mutation writes `data_edits` in the same",
+        "210: * `data_edits.row_id` through at a lineage remap. They are the same natural",
+        "791: * delete the row whose `data_edits` rows must stay resolvable at the next",
+        "1175: /** Extra keys merged into the `data_edits.new_values` audit row only (never the durable payload). */",
+        "1447: * public citation). It is the `data_edits.note` of the creation audit entry",
+        "1682: /** Extra keys merged into the replacement row's `data_edits.new_values` creation audit only. */"
+      ]
+    },
+    {
+      "path": "src/db/queries/admin-club-leadership.ts",
+      "hits": [
+        "62: * a row that should never have existed. Both keep the row so its `data_edits`",
+        "137: /** The `data_edits.field_group` of every leadership mutation (§15). */",
+        "669: * than suppressed by it — otherwise its `data_edits` rows become unresolvable",
+        "1148: * Kept — never deleted — so its `data_edits` rows stay resolvable at the next"
+      ]
+    },
+    {
+      "path": "src/db/queries/admin-draft.ts",
+      "hits": [
+        "56: * (`data_edits.table_name = 'players'`), not against `draft_picks`: a manual",
+        "337: * A monotone revision for one selection: the highest `data_edits.id` that is",
+        "342: * It reads on `authSql`, and must: `data_edits` (057) is an OPERATIONAL audit",
+        "348: * table data_edits` -- which is exactly what made every `/admin/draft/[id]`",
+        "354: * already committed -- and its `data_edits` row is visible to this read -- or",
+        "363: FROM data_edits",
+        "1592: * have existed, and the `data_edits` row carries the whole of it in"
+      ]
+    },
+    {
+      "path": "src/db/queries/admin-fixtures.ts",
+      "hits": [
+        "79: * error and was never a real event. Both keep the row, so every `data_edits`",
+        "798: * suppressed by it — otherwise its `data_edits` rows become unresolvable at",
+        "1294: /** The `data_edits.field_group` of every fixture mutation (§24). */",
+        "1410: // data_edits pointers D-229-7 relies on never existing for importer rows.",
+        "1836: * never deleted — so its `data_edits` rows stay resolvable at the next"
+      ]
+    },
+    {
+      "path": "src/db/queries/admin-season-lists.ts",
+      "hits": [
+        "79: * AUDIT SUBJECT (§17). The subject is the PLAYER (`data_edits.table_name =",
+        "82: * would need its own lineage target. `data_edits.table_name`'s CHECK is not",
+        "84: * recoverable from `data_edits` alone."
+      ]
+    },
+    {
+      "path": "src/db/queries/admin-special-records.ts",
+      "hits": [
+        "47: * The ONE thing this module does not read is the audit trail: `data_edits` is",
+        "485: //   3. one `data_edits` row   -- the append-only audit, the AFLDB-ISSUE-027",
+        "518: // `data_edits` rows stay resolvable through the next promotion's lineage remap,",
+        "630: * here so a `data_edits` entry stays resolvable after a promotion has",
+        "651: * override would delete the row whose `data_edits` rows must stay resolvable at",
+        "877: * row and no `data_edits` row -- the whole of §10.3's contract. From `apply`"
+      ]
+    },
+    {
+      "path": "src/db/queries/admin-users.ts",
+      "hits": [
+        "24: * `auth_users` -- `data_edits.admin_user_id`, `player_link_resolutions`,"
+      ]
+    },
+    {
+      "path": "src/db/queries/audit-log.ts",
+      "hits": [
+        "16: * afldb_import holds INSERT (only) on data_edits via migration 066,",
+        "115: INSERT INTO data_edits"
+      ]
+    },
+    {
+      "path": "src/db/queries/audit-reader.ts",
+      "hits": [
+        "27: *   - `auth_audit_log.id`, `data_edits.id` and `data_edits.row_id` are",
+        "31: *   - `auth_audit_log.detail` and the `data_edits` snapshots are jsonb, which",
+        "200: /** The one SELECT list for a data_edits row, as a parameter-free fragment both readers below open with. */",
+        "213: FROM data_edits e",
+        "221: /** One page of `data_edits`, newest first, with the total for the pager. */",
+        "231: FROM data_edits e"
+      ]
+    },
+    {
+      "path": "src/db/queries/award-proposals.ts",
+      "hits": [
+        "38: * the `data_edits` audit row and recomputes the award span, all on the transaction it is given. The",
+        "43: * key, revision and evidence to `data_edits.new_values`."
+      ]
+    },
+    {
+      "path": "src/db/queries/brownlow-production-correction.ts",
+      "hits": [
+        "90: 'brownlow_season_authority', 'data_edits', 'data_issues', 'auth_users', 'site_settings', 'afldb_meta.schema_migrations'] as const;"
+      ]
+    },
+    {
+      "path": "src/db/queries/coleman-award-winners.ts",
+      "hits": [
+        "40: *  - one `data_edits` row per inserted, updated or voided row (the AFLDB-ISSUE-027 audit contract),",
+        "64: /** The data_edits field group of a projection write. */"
+      ]
+    },
+    {
+      "path": "src/db/queries/data-edits.ts",
+      "hits": [
+        "32: * write access to the statistical tables. The required data_edits audit"
+      ]
+    },
+    {
+      "path": "src/db/queries/match-admin.ts",
+      "hits": [
+        "498: // row is precisely what keeps its `data_edits` history resolvable through"
+      ]
+    },
+    {
+      "path": "src/db/queries/player-achievements.ts",
+      "hits": [
+        "28: * `data_edits` history stays resolvable, and it must therefore be excluded"
+      ]
+    },
+    {
+      "path": "src/db/queries/player-identity.ts",
+      "hits": [
+        "188: * This runs inside the caller's transaction and writes its OWN `data_edits` row,",
+        "404: * the canonical edit and its own `data_edits` row (`manual_identity_record`), as"
+      ]
+    },
+    {
+      "path": "src/db/queries/players.ts",
+      "hits": [
+        "464: * required data_edits row is written inside the same import-role"
+      ]
+    },
+    {
+      "path": "src/lib/acquisition/afl-api-fixture-writer.ts",
+      "hits": [
+        "21: * `data_edits`, `canonical_applications` or `staging.source_records` row is written; provenance is"
+      ]
+    },
+    {
+      "path": "src/lib/acquisition/canonical-apply.ts",
+      "hits": [
+        "104: * `afldb_import` holds INSERT-only on `data_edits` so edit provenance is"
+      ]
+    },
+    {
+      "path": "src/lib/acquisition/manual-authority.ts",
+      "hits": [
+        "10: * `data_edits` is the append-only audit log, deliberately NOT consulted:"
+      ]
+    },
+    {
+      "path": "src/lib/acquisition/settle-afltables.ts",
+      "hits": [
+        "1420: * `data_edits` is the admin UI's ledger and `afldb_import` holds no grant on"
+      ]
+    },
+    {
+      "path": "src/lib/admin/operations-centre.ts",
+      "hits": [
+        "126: * `data_edits` via `insertAwardWinner`, for curated awards; `derived_award_results.correction` for",
+        "400: * season seal, writes the canonical `award_winners` row (with its `data_overrides` and `data_edits`"
+      ]
+    },
+    {
+      "path": "src/lib/audit-view.ts",
+      "hits": [
+        "5: * validated filters, turning a `data_edits` row's `old_values` / `new_values`",
+        "15: * never becomes SQL. A table name is accepted only from the `data_edits`"
+      ]
+    },
+    {
+      "path": "src/lib/auth/capabilities.ts",
+      "hits": [
+        "128: // operations.audit.read already gives an Admin the full data_edits trail.",
+        "144: // data_edits trail. The `specialRecords` segment rather than `records`",
+        "182: // The read-only audit viewer over auth_audit_log and data_edits",
+        "188: // own Brownlow drafts land in data_edits, so a full-scope read here"
+      ]
+    }
+  ]
+}

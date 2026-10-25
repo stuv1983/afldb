@@ -1,0 +1,167 @@
+{
+  "status": "PASS",
+  "contract": "v5: inherited v4 real-PostgreSQL cases as non-superuser afldb_owner with the exact shared principal.sql; principal substitution/attribute/membership/privilege/ownership refusals on real roles; real transport.sh+psql over loopback scram-sha-256; credential never in argv/log/evidence.",
+  "engine": "postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "identity": {
+    "db": "i316_v5_test",
+    "data": "/tmp/i316-v5-pg-VazXqP/data",
+    "cluster": "i316-v5-private",
+    "listen": "127.0.0.1",
+    "version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "upt": "on"
+  },
+  "work_directory": "/tmp/i316-v5-pg-VazXqP",
+  "scope": "Fresh private cluster (Unix socket trust for fixture setup, 127.0.0.1-only scram-sha-256 for transport) and synthetic shapes. Exact shared SQL excluding production-only identity.sql; psql client directives expanded for known fixture optional presence. No production transport/live-schema acceptance. No shared database touched.",
+  "completed_utc": "2026-10-24T21:04:21.983Z",
+  "passed": 23,
+  "results": [
+    {
+      "name": "exact pre-lock ordering and unchanged protected inventory",
+      "status": "PASS",
+      "protected_relations": 28,
+      "scope": "Static ordering/inventory only. Does not simulate locks or snapshots."
+    },
+    {
+      "name": "active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes",
+      "status": "PASS",
+      "duration_ms": 824
+    },
+    {
+      "name": "active protected writer exceeds approved two-second lock timeout: zero metadata writes",
+      "status": "PASS",
+      "duration_ms": 2443
+    },
+    {
+      "name": "writers and guarded DDL after all locks are excluded until repair commit",
+      "status": "PASS",
+      "duration_ms": 15199
+    },
+    {
+      "name": "linked-audit INSERT failure rolls back preceding note UPDATE",
+      "status": "PASS",
+      "duration_ms": 795
+    },
+    {
+      "name": "successful two-write repair as afldb_owner; independent postcheck; second repair refuses",
+      "status": "PASS",
+      "duration_ms": 1572
+    },
+    {
+      "name": "Brownlow mutation after commit is detected by independent postcheck",
+      "status": "PASS",
+      "duration_ms": 1562
+    },
+    {
+      "name": "extra audit-row mutation after commit is detected",
+      "status": "PASS",
+      "duration_ms": 1553
+    },
+    {
+      "name": "pre-existing optional DDL commit is caught by in-transaction assertion; metadata rolls back",
+      "status": "PASS",
+      "duration_ms": 1179
+    },
+    {
+      "name": "optional CREATE after final assertions before COMMIT: exact repair commits, drift detected, U3 blocked, no retry or reversal",
+      "status": "PASS",
+      "duration_ms": 1964
+    },
+    {
+      "name": "operational preflight refuses known active optional DDL and wrong schema version",
+      "status": "PASS",
+      "duration_ms": 50
+    },
+    {
+      "name": "v5 wrong session user refused: importer role and superuser",
+      "status": "PASS",
+      "duration_ms": 50
+    },
+    {
+      "name": "v5 wrong current user refused; any membership refused",
+      "status": "PASS",
+      "duration_ms": 435
+    },
+    {
+      "name": "v5 unexpected role attribute or role setting refused",
+      "status": "PASS",
+      "duration_ms": 454
+    },
+    {
+      "name": "v5 unexpected privilege state refused",
+      "status": "PASS",
+      "duration_ms": 1970
+    },
+    {
+      "name": "v5 unexpected ownership state refused",
+      "status": "PASS",
+      "duration_ms": 3528
+    },
+    {
+      "name": "v5 reduced activity visibility: other-role DDL still refused via locks; redaction tolerated only with process titles on",
+      "status": "PASS",
+      "duration_ms": 459
+    },
+    {
+      "name": "transport observation",
+      "observed": {
+        "exe": "/usr/lib/postgresql/16/bin/psql",
+        "cmdline": [
+          "/usr/lib/postgresql/16/bin/psql",
+          "-X",
+          "-qAt",
+          "-P",
+          "pager=off",
+          "-v",
+          "ON_ERROR_STOP=1",
+          "-f",
+          "-"
+        ],
+        "environ_keys": [
+          "HOME",
+          "LC_ALL",
+          "PATH",
+          "PGAPPNAME",
+          "PGCONNECT_TIMEOUT",
+          "PGDATABASE",
+          "PGHOST",
+          "PGOPTIONS",
+          "PGPASSWORD",
+          "PGPORT",
+          "PGSYSCONFDIR",
+          "PGUSER",
+          "SHLVL"
+        ],
+        "platform_added": {
+          "SHLVL": "0",
+          "PGSYSCONFDIR": "/etc/postgresql-common"
+        },
+        "environ_mode": "400"
+      }
+    },
+    {
+      "name": "v5 transport: pinned principal accepted, prerequisite session read-only, credential only in PGPASSWORD",
+      "status": "PASS",
+      "duration_ms": 1619
+    },
+    {
+      "name": "v5 transport: execute mode is write-capable with the same pinned principal",
+      "status": "PASS",
+      "duration_ms": 97
+    },
+    {
+      "name": "v5 transport: missing or non-matching credential prerequisites stop before any connection",
+      "status": "PASS",
+      "duration_ms": 135
+    },
+    {
+      "name": "v5 transport: authentication failure is a connection prerequisite failure and echoes no credential",
+      "status": "PASS",
+      "duration_ms": 93
+    },
+    {
+      "name": "v5 host gate refuses off-production before any transport; SQL stdin unread",
+      "status": "PASS",
+      "duration_ms": 11
+    }
+  ]
+}
