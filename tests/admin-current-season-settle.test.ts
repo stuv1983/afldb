@@ -92,6 +92,7 @@ import {
   AflApiSettleUnitsPanel,
   UNIT_NOT_INSTALLED,
 } from '@/app/admin/current-season/AflApiSettleUnitsPanel';
+import { sql } from '@/db/client';
 import { SETTING_KEYS } from '@/lib/site-settings';
 import {
   extractSettleCounters,
@@ -546,6 +547,149 @@ describe('AFLDB-ISSUE-228 S8 — settle unit and batch-tool tables', () => {
       afl_api: 'settle-afl-api.ts',
       afl_api_brownlow: 'settle-afl-api-brownlow.ts',
     });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-328 — the latest settle batch must be ordered numerically
+ *
+ * `getLatestSettleRun()` selected `id::text AS id` and then said bare
+ * `ORDER BY id DESC`. PostgreSQL binds a bare ORDER BY name to the OUTPUT
+ * column first, so batches sorted as TEXT: on DEV the admin page named batch 98
+ * (AFL API) and 99 (AFL Tables) while 134 and 107 were the newest.
+ *
+ * DB-free. The real function runs against a fake `sql` that applies the one
+ * PostgreSQL rule this defect turns on (bare ORDER BY name + same-named text
+ * output alias = text order; `import_batches.id` = the bigint column), so the
+ * regression fails on the original query text, not just on a source-string
+ * match. The fake's discrimination is itself asserted below.
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-328 — latest settle batch ordering', () => {
+  type FakeBatch = { id: number; tool: string; status: string; notes: string | null };
+
+  const AFL_API = SETTLE_BATCH_TOOLS.afl_api;
+  const AFL_TABLES = SETTLE_BATCH_TOOLS.afltables;
+
+  // The DEV shape: ids cross 99 -> 100 inside one tool, and the two tools'
+  // ids interleave.
+  const batch = (id: number, tool: string, status = 'completed'): FakeBatch => ({
+    id, tool, status, notes: `fixture settle; snapshot=fx-${id}; season=2026; mode=apply`,
+  });
+  const dev = (): FakeBatch[] => [
+    ...[95, 96, 98, 102, 103, 106, 109, 121, 134].map((id) => batch(id, AFL_API)),
+    ...[99, 100, 101, 107].map((id) => batch(id, AFL_TABLES)),
+  ];
+
+  /** Rows come back shaped like the real select list; the query text is kept. */
+  function fakeImportBatchesSql(table: FakeBatch[]) {
+    const issued: string[] = [];
+    const fake = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const text = strings.join('?').replace(/\s+/g, ' ').trim();
+      issued.push(text);
+      const where = /\bWHERE (.+?) ORDER BY /.exec(text);
+      const order = /\bORDER BY (\S+) DESC LIMIT 1$/.exec(text);
+      if (where === null || order === null) throw new Error(`unexpected query shape: ${text}`);
+      // The filtering contract: by tool only, never by status.
+      if (where[1] !== 'tool = ?') throw new Error(`unexpected filter: ${where[1]}`);
+
+      const textOutputAlias = /\bid::text\s+AS id\b/.test(text);
+      let rank: (r: FakeBatch) => number | string;
+      if (order[1] === 'import_batches.id') rank = (r) => r.id;
+      else if (order[1] === 'id') rank = textOutputAlias ? (r) => String(r.id) : (r) => r.id;
+      else throw new Error(`unexpected ORDER BY: ${order[1]}`);
+
+      const [row] = table
+        .filter((r) => r.tool === values[0])
+        .sort((a, b) => (rank(a) < rank(b) ? 1 : rank(a) > rank(b) ? -1 : 0));
+      return row === undefined ? [] : [{
+        id: String(row.id), status: row.status, startedAt: null, completedAt: null,
+        recordsRead: 0, recordsRejected: 0, notes: row.notes, validationResult: null,
+      }];
+    };
+    return { fake, issued };
+  }
+
+  // `@/db/client` is stubbed at the top of this file as `{ sql: vi.fn() }`.
+  // Cast narrowly: `vi.mocked(sql)` would instantiate postgres.js's deep `Sql` type.
+  function useFakeSql(fake: unknown) {
+    (sql as unknown as { mockImplementation(impl: unknown): void }).mockImplementation(fake);
+  }
+
+  async function realGetLatestSettleRun() {
+    return (await vi.importActual<typeof import('@/db/queries/settle-runs')>(
+      '@/db/queries/settle-runs',
+    )).getLatestSettleRun;
+  }
+
+  it('returns the numerically newest batch across the 98/99/100 digit boundary', async () => {
+    const { fake } = fakeImportBatchesSql(dev());
+    useFakeSql(fake);
+    const getLatestSettleRun = await realGetLatestSettleRun();
+
+    expect((await getLatestSettleRun(AFL_API))?.batchId).toBe('134');
+    expect((await getLatestSettleRun(AFL_TABLES))?.batchId).toBe('107');
+    // Default tool is unchanged: AFL Tables.
+    expect((await getLatestSettleRun())?.batchId).toBe('107');
+    // 98 < 99 < 100 inside one tool.
+    const { fake: fakeBoundary } = fakeImportBatchesSql([98, 99, 100].map((id) => batch(id, AFL_TABLES)));
+    useFakeSql(fakeBoundary);
+    expect((await getLatestSettleRun())?.batchId).toBe('100');
+  });
+
+  it('keeps the batch id as decimal text and returns null when the tool has no batch', async () => {
+    const { fake } = fakeImportBatchesSql(dev());
+    useFakeSql(fake);
+    const getLatestSettleRun = await realGetLatestSettleRun();
+
+    expect(typeof (await getLatestSettleRun(AFL_API))?.batchId).toBe('string');
+    expect(await getLatestSettleRun(SETTLE_BATCH_TOOLS.afl_api_brownlow)).toBeNull();
+  });
+
+  it('still filters by tool only: other tools never leak in and a failed run is still the latest', async () => {
+    const { fake } = fakeImportBatchesSql([...dev(), batch(108, AFL_TABLES, 'failed')]);
+    useFakeSql(fake);
+    const getLatestSettleRun = await realGetLatestSettleRun();
+
+    const tables = await getLatestSettleRun(AFL_TABLES);
+    expect(tables?.batchId).toBe('108');
+    expect(tables?.status).toBe('failed');
+    // 134 (AFL API) is higher than 108 but belongs to another tool.
+    expect((await getLatestSettleRun(AFL_API))?.batchId).toBe('134');
+  });
+
+  it('proves the fake discriminates: the original query text returns the DEV-observed 98 and 99', async () => {
+    const { fake } = fakeImportBatchesSql(dev());
+    const legacy = async (tool: string) => (await fake`
+      SELECT id::text AS id, status::text AS status
+        FROM import_batches
+       WHERE tool = ${tool}
+       ORDER BY id DESC
+       LIMIT 1
+    `)[0]?.id;
+    const fixed = async (tool: string) => (await fake`
+      SELECT id::text AS id, status::text AS status
+        FROM import_batches
+       WHERE tool = ${tool}
+       ORDER BY import_batches.id DESC
+       LIMIT 1
+    `)[0]?.id;
+
+    expect(await legacy(AFL_API)).toBe('98');
+    expect(await legacy(AFL_TABLES)).toBe('99');
+    expect(await fixed(AFL_API)).toBe('134');
+    expect(await fixed(AFL_TABLES)).toBe('107');
+  });
+
+  it('issues the qualified ORDER BY from the real function', async () => {
+    const { fake, issued } = fakeImportBatchesSql(dev());
+    useFakeSql(fake);
+    const getLatestSettleRun = await realGetLatestSettleRun();
+
+    await getLatestSettleRun();
+    expect(issued).toHaveLength(1);
+    expect(issued[0]).toMatch(/\bORDER BY import_batches\.id DESC LIMIT 1$/);
+    expect(issued[0]).toMatch(/\bid::text\s+AS id\b/);
   });
 });
 

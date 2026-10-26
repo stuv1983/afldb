@@ -185,8 +185,13 @@ type BatchRow = {
  * last run", and a run that ended `failed` is precisely what an operator who
  * just pressed the button needs to see.
  *
- * `ORDER BY id DESC` rather than by timestamp: the id is a monotonic identity
- * column, so it orders runs even when two start in the same millisecond.
+ * `ORDER BY import_batches.id DESC` rather than by timestamp: the id is a
+ * monotonic identity column, so it orders runs even when two start in the same
+ * millisecond. QUALIFIED, and it has to be: the select list below exposes
+ * `id::text AS id`, and a bare `ORDER BY id` binds to that OUTPUT alias in
+ * PostgreSQL, not to the bigint column, so batches sorted as TEXT and '99'
+ * outranked '107' and '134' (AFLDB-ISSUE-328). The same trap is documented in
+ * `settle-report.ts`'s `latestBatchOf()`.
  *
  * AFLDB-ISSUE-228 S8 (§17): `tool` selects which settle CLI's batches this
  * reads, defaulting to `SETTLE_BATCH_TOOL` (AFL Tables) so every existing
@@ -215,7 +220,7 @@ export async function getLatestSettleRun(
            validation_result         AS "validationResult"
       FROM import_batches
      WHERE tool = ${tool}
-     ORDER BY id DESC
+     ORDER BY import_batches.id DESC
      LIMIT 1
   `;
   if (!row) return null;

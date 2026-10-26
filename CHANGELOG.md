@@ -15,6 +15,10 @@ commit.
 
 ## [Unreleased]
 
+### Order the latest settle batch numerically in the admin settle panels (ISSUE-328) (2026-10-27)
+
+- `getLatestSettleRun()` (`src/db/queries/settle-runs.ts`) ordered with a bare `ORDER BY id DESC` beside an `id::text AS id` output column, which PostgreSQL binds to the text alias, so the settle panels on `/admin/current-season` (both readers in `settle-status.ts`) would name the text-sorted batch, not the numeric latest, once a tool's batch ids cross a digit boundary (the source repository's DEV showed 98/99 while 134/107 were newest). It now orders by `import_batches.id`; the text return type, tool-only filter and failed-run inclusion are unchanged. Ported from the source repository commit `6ffb893b` with five DB-free regression tests in `tests/admin-current-season-settle.test.ts` (suite 58/58; the original query fails three of them). V2 retired the on-demand settle trigger, so the source's baseline test is not ported. Local only: not deployed, no live verification, no PROD change.
+
 ### ISSUE-316 canonical activation-separation evidence (2026-10-25)
 
 - Froze pre-window readiness tooling as the separate local helper commit H, restricted to its preparation directory and the four owner-named tracking files. P remains `def676517da3955aa18db3606785463aac464188`; administrative lineage A includes accepted `ffb062675ee25650cfc1b4fa6bfe98336a23cc4f` and may include H. The opening helper requires an explicit full H and checks exact helper file membership/bytes; A never replaces P. Original 17 preparation checks plus four H-binding checks pass (21 total). The clean isolated P tree retains all 2,687 raw tracked blobs; no dependencies, credentials, CSVs or historical censuses were copied. Authority/input inventories remain bound to exact accepted documentation blobs, retaining the reviewed MED repair. Current host/native, DB, canonical/nightly and enforced dry-run proof remains NOT RUN until the approved window. No product, accepted-test or structural-artifact change; no push. Details: `issues/open/AFLDB-ISSUE-316-readiness-prep-20261025/README.md`.
