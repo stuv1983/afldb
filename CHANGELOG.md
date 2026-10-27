@@ -15,6 +15,15 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 2026 rollover and successor activation: integrated locally (2026-10-28; not pushed, production NO-GO)
+
+The State C content accepted on EXEC (D-316-APPLY-B-20261027, D-316-ACT-C-20261028) is committed on `v2/rebuild` as three separately identifiable commits: R `c7e17da2`, A `1a6de4b6` and F `955d0e85`.
+- **Rollover (R).** The six applied reference files: `data/reference/{afltables-network,fitzroy-accepted-baselines,seasons}.json` and `tools/rebuild/{afl_api,afltables,fitzroy}/*-contract.json`. Plus the two successor manifests `docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-{core,ladder}-v1.json` (`02bbcf93…`, `65c29907…`). All are byte-equal to State B commit `06e88227…`. The seasons registry now seals 2026 and declares 2027 in progress.
+- **Activation (A).** `tools/db/rebuild-test.ts` only, byte-equal to the activated pin `ab734947…` (blob `11308f06…`, tuple `a78d36ee…`, expected rows 1640). Reverting this file alone is the deactivation route.
+- **Follow-up (F).** The 16 approved State C coverage/test restatements: the regenerated `docs/v2/coverage-matrix.md` and `COVERAGE_REGISTRY` with 2027 entries; "2026 in progress" tests restated over the explicit predecessor fixture, with sealed-2026 cases added. The commit carries only the approved State C hunks of three owner-modified tests; the owner's own hunks stay uncommitted. Two owner-added V2-GAP-027 settle cases also settle 2026 as the season in progress, so their scratch projects use the predecessor seasons registry (adaptation G, no assertion changed). G stays uncommitted with that pending work.
+
+Focused checks over the owner's tree: five suites 499/499, typecheck exit 0, and the V2-GAP-027 integration case 1/1 on a disposable isolated `_test` clone. No production database, migration, rebuild, deployment or Brownlow change. The 91 SQL checks of the activated state and any successor database rebuild remain unproven. Record: `issues/open/AFLDB-ISSUE-316-integration-20261028/INTEGRATION.md`.
+
 ### Order the latest settle batch numerically in the admin settle panels (ISSUE-328) (2026-10-27)
 
 - `getLatestSettleRun()` (`src/db/queries/settle-runs.ts`) ordered with a bare `ORDER BY id DESC` beside an `id::text AS id` output column, which PostgreSQL binds to the text alias, so the settle panels on `/admin/current-season` (both readers in `settle-status.ts`) would name the text-sorted batch, not the numeric latest, once a tool's batch ids cross a digit boundary (the source repository's DEV showed 98/99 while 134/107 were newest). It now orders by `import_batches.id`; the text return type, tool-only filter and failed-run inclusion are unchanged. Ported from the source repository commit `6ffb893b` with five DB-free regression tests in `tests/admin-current-season-settle.test.ts` (suite 58/58; the original query fails three of them). V2 retired the on-demand settle trigger, so the source's baseline test is not ported. Local only: not deployed, no live verification, no PROD change.
