@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
+
+import { predecessorJson, predecessorText } from './rollover-predecessor-fixture';
 
 /**
  * AFLDB-ISSUE-093 §13.4a — canonical fitzRoy snapshot → PostgreSQL core
@@ -1158,9 +1160,15 @@ describe.skipIf(!canSpawn)('renumbered profile URL continuity (AFLDB-ISSUE-136)'
         .toBe(r.expect.continuing_last_career_game + 1);
       expect(r.expect.continuing_last_season).toBeLessThan(r.expect.renumbered_first_season);
     }
-    // 25 + 18 + 23 + 13 = the 79 blank-ID rows that are renumberings; the other 4 of the
-    // 83 are Billy Wilson's debut season, which no rule may name.
-    expect(rules.reduce((n, r) => n + r.expect.renumbered_rows, 0)).toBe(79);
+    // The same four rules now span 2025-2026 (the 2026 rollover, AFLDB-ISSUE-316 D-316-1, accepted the
+    // 1897-2026 core): 52 + 31 + 42 + 25 = 150 renumbered rows. In the explicit predecessor they spanned
+    // 2025 only: 25 + 18 + 23 + 13 = the 79 blank-ID rows that are renumberings; the other 4 of the 83 are
+    // Billy Wilson's debut season, which no rule may name.
+    expect(rules.map((r) => r.expect.renumbered_last_season)).toEqual([2026, 2026, 2026, 2026]);
+    expect(rules.reduce((n, r) => n + r.expect.renumbered_rows, 0)).toBe(150);
+    const before: ContinuityRule[] = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json').profile_url_continuity.rules;
+    expect(before.map((r) => r.id)).toEqual(rules.map((r) => r.id));
+    expect(before.reduce((n, r) => n + r.expect.renumbered_rows, 0)).toBe(79);
     expect(JSON.stringify(rules)).not.toContain('Billy_Wilson');
     expect(REAL_CONTRACT.profile_url_continuity.is_alias).toBe(false);
   });
@@ -1439,14 +1447,45 @@ function inSeason2026Snapshot(): { dir: string; manifest: string } {
   });
 }
 
+/**
+ * AFLDB-ISSUE-316: these in-season cases carry the real 2026 vocabulary, measured while 2026 was the season in
+ * progress. The 2026 rollover sealed it, and the importer reads the in-progress declaration from the tracked
+ * registry beside it, so they run against an explicit PREDECESSOR root: the unchanged importer and the reference
+ * files it reads, with the seasons, availability, register and contract of the predecessor
+ * (tests/rollover-predecessor-fixture.ts). The tracked registry refusing 2026 in-season is proven separately.
+ */
+let predecessorRootDir: string | undefined;
+function predecessorImporter(): { importer: string; cwd: string } {
+  if (!predecessorRootDir) {
+    const dir = mkdtempSync(join(tmpdir(), 'issue316-predecessor-root-'));
+    const put = (rel: string, text: string) => {
+      mkdirSync(join(dir, rel, '..'), { recursive: true });
+      writeFileSync(join(dir, rel), text, 'utf8');
+    };
+    for (const rel of ['tools/migration/import_fitzroy_core.py', 'tools/migration/common.py']) {
+      mkdirSync(join(dir, rel, '..'), { recursive: true });
+      copyFileSync(join(root, rel), join(dir, rel));
+    }
+    for (const rel of ['data/reference/clubs.json', 'data/reference/venue-canonical.json',
+      'data/reference/player-name-aliases.json', 'data/reference/seasons.json', 'data/reference/stat-availability.json',
+      'data/reference/fitzroy-accepted-baselines.json', 'tools/rebuild/fitzroy/fitzroy-contract.json']) {
+      put(rel, predecessorText(rel));
+    }
+    predecessorRootDir = dir;
+  }
+  return { importer: join(predecessorRootDir, 'tools', 'migration', 'import_fitzroy_core.py'), cwd: predecessorRootDir };
+}
+afterAll(() => { if (predecessorRootDir) rmSync(predecessorRootDir, { recursive: true, force: true }); });
+
 function emitInSeason(
   snapshot: { dir: string; manifest: string },
+  at: { importer: string; cwd: string } = predecessorImporter(),
 ): { run: ReturnType<typeof spawnSync>; bundlePath: string } {
   const bundlePath = join(snapshot.dir, 'observations.json');
-  const emitted = spawnSync(python, [importerPath,
+  const emitted = spawnSync(python, [at.importer,
     '--label', LABEL, '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
     '--require-in-season', '--on-record-error', 'reject',
-    '--emit-observations', bundlePath], { cwd: root, encoding: 'utf8' });
+    '--emit-observations', bundlePath], { cwd: at.cwd, encoding: 'utf8' });
   return { run: emitted, bundlePath };
 }
 
@@ -1693,6 +1732,14 @@ describe('AFLDB-ISSUE-128/129 — in-season source completeness is reported, not
     const bundle = JSON.parse(readFileSync(emitted.bundlePath, 'utf8'));
     expect(bundle.counts.unkeyed_rejections).toBe(0);
     for (const enumeration of bundle.enumerations) expect(enumeration.complete).toBe(true);
+  });
+
+  it.runIf(canSpawn)('the tracked registry refuses the same 2026 snapshot in-season since the 2026 rollover sealed it', () => {
+    const refused = emitInSeason(inSeason2026Snapshot(), { importer: importerPath, cwd: root });
+    expect(refused.run.status).not.toBe(0);
+    expect(String(refused.run.stderr)).toContain('season 2026 is not declared in progress by data/reference/seasons.json (in_progress_seasons: 2027)');
+    expect(String(refused.run.stderr)).toContain('A completed season is validated as a core snapshot, never in-season.');
+    expect(existsSync(refused.bundlePath)).toBe(false);
   });
 
   it.runIf(canSpawn)('is idempotent: the same input emits an identical bundle', () => {

@@ -1195,11 +1195,13 @@ describe('stage 9 re-points itself — the gate is never edited', () => {
       expectedRows, firstSeason: FIRST_SEASON, lastSeason,
       censusScope: { firstSeason: FIRST_SEASON, lastSeason, excludedSeasons: [] },
     }) as unknown as Parameters<typeof finalValidationChecks>[3];
+    // The height binding is incidental: the predecessor contract's legacy binding names no baseline label.
+    const heightContract = () => JSON.parse(predecessorText(CONTRACT_PATH));
     const before = finalValidationChecks(
-      baseRegister(), undefined, undefined, expectation(RETIRED_LABEL, 2025, ROWS_2025));
+      baseRegister(), undefined, heightContract, expectation(RETIRED_LABEL, 2025, ROWS_2025));
     const after = finalValidationChecks(
       jsonIn(plan, 'data/reference/fitzroy-accepted-baselines.json'),
-      undefined, undefined, expectation(NEW_LABEL, 2026, ROWS_2026));
+      undefined, heightContract, expectation(NEW_LABEL, 2026, ROWS_2026));
 
     const gate = (checks: ReturnType<typeof finalValidationChecks>) =>
       checks.find((c) => c.key === 'matches_after_accepted_last_season')!;
@@ -1539,30 +1541,35 @@ describe('baseline status vocabulary — never invented', () => {
     expect(retirementVocabulary(register)).not.toContain('candidate');
   });
 
-  it('the real register holds one accepted baseline beside one retired one', () => {
+  it('the real register holds one accepted baseline beside the two it retired', () => {
     // AFLDB-ISSUE-101 declared this vocabulary; AFLDB-ISSUE-112 was the first real
-    // retirement to use it. The shape asserted here is the shape the rollover produces:
-    // the outgoing baseline stays in the file as retired, and exactly one stays accepted.
+    // retirement to use it and the 2026 rollover (AFLDB-ISSUE-316 D-316-1) the second. The
+    // shape asserted here is the shape the rollover produces: each outgoing baseline stays in
+    // the file as retired, and exactly one stays accepted.
     const register = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
     const baselines = register.baselines as Record<string, unknown>[];
     const accepted = selectAccepted(register);
-    expect(baselines).toHaveLength(2);
-    expect(baselines.map((b) => b.acceptance_status)).toEqual(['retired', 'accepted']);
-    expect(accepted.snapshot_label).toBe('full-history-20260902');
-    expect((accepted.measured as Record<string, unknown>).seasons_last).toBe(2025);
+    expect(baselines).toHaveLength(3);
+    expect(baselines.map((b) => b.acceptance_status)).toEqual(['retired', 'retired', 'accepted']);
+    expect(accepted.snapshot_label).toBe('c2-2026-final-core-v1');
+    expect((accepted.measured as Record<string, unknown>).seasons_last).toBe(2026);
     expect((accepted.contract_binding as Record<string, Record<string, unknown>>)
-      .required_range).toEqual({ first_season: 1897, last_season: 2025 });
-    // AFLDB-ISSUE-108: the canonical LF hash, not the CRLF-checkout one. AFLDB-ISSUE-112
-    // re-proved that rule - the relabelled manifest was CRLF from the R adapter and had
-    // to be normalised before this binding was pinned.
+      .required_range).toEqual({ first_season: 1897, last_season: 2026 });
+    // AFLDB-ISSUE-108: the canonical LF hash, not the CRLF-checkout one.
     expect((accepted.acquisition as Record<string, unknown>).manifest_sha256)
-      .toBe('2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1');
+      .toBe('02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988');
     expect((accepted.raw_artefacts as Record<string, unknown>).artefact_set_sha256)
-      .toBe('15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c');
+      .toBe('817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e');
 
-    // The retired predecessor keeps its own bindings, untouched by the retirement.
-    const outgoing = baselines.find((b) => b.acceptance_status === 'retired')!;
+    // The 2026 rollover retired full-history-20260902 by its status alone: every binding is the predecessor's.
+    const rolled = baselines.find((b) => b.snapshot_label === 'full-history-20260902')!;
+    const before = selectAccepted(JSON.parse(predecessorText('data/reference/fitzroy-accepted-baselines.json')));
+    expect({ ...rolled, acceptance_status: 'accepted' }).toEqual(before);
+    expect(retirementVocabulary(register)).toContain(rolled.acceptance_status);
+
+    // The earlier retired predecessor keeps its own bindings, untouched by either retirement.
+    const outgoing = baselines.find((b) => b.snapshot_label === 'full-history-20260827')!;
     expect(outgoing.snapshot_label).toBe('full-history-20260827');
     expect(outgoing.superseded_by).toBe('full-history-20260902');
     expect((outgoing.acquisition as Record<string, unknown>).manifest_sha256)
@@ -2107,13 +2114,21 @@ describe('planning writes nothing', () => {
     expect(digest()).toEqual(before);
   });
 
-  it('confirms the real repository boundary is still 2025 / 2026', () => {
+  it('confirms the real repository boundary is 2026 / 2027 since the 2026 rollover (D-316-1)', () => {
     const register = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
     const seasons = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'seasons.json'), 'utf8'));
     expect((selectAccepted(register).measured as Record<string, unknown>).seasons_last)
-      .toBe(2025);
+      .toBe(2026);
+    expect(seasons.last_season).toBe(2027);
+    expect(seasons.in_progress_seasons).toEqual([2027]);
+  });
+
+  it('the explicit predecessor boundary was 2025 / 2026', () => {
+    const register = JSON.parse(predecessorText('data/reference/fitzroy-accepted-baselines.json'));
+    const seasons = JSON.parse(predecessorText('data/reference/seasons.json'));
+    expect((selectAccepted(register).measured as Record<string, unknown>).seasons_last).toBe(2025);
     expect(seasons.last_season).toBe(2026);
     expect(seasons.in_progress_seasons).toEqual([2026]);
   });
@@ -2824,10 +2839,28 @@ const acceptedOf = (d: StateDocs) =>
   d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
 
 describe("proposed-state validation — the rebuild's own validators over the proposed bytes", () => {
-  it('state A (the real repository, predecessor, pre-apply): accepts the state and names what stays pending', () => {
-    const verdict = validateState(realStateDocs());
+  it('state A (explicit predecessor fixture): accepts the state and names what stays pending', () => {
+    const verdict = validateState(predecessorStateDocs());
     expect(verdict.ladderProfile).toBe('predecessor-1897-2025');
     expect(verdict.expectedRows).toBe(1622);
+    expect(verdict.finalChecks.length).toBeGreaterThan(80);
+    expect(verdict.finalChecks.map((c) => c.key)).toEqual(expect.arrayContaining([
+      'club_seasons_rows', 'players_with_height', 'players_with_dob_after_birth_dates', 'match_coaches',
+      'players_with_afl_api_height_evidence', 'completed_scope_missing_or_in_progress',
+    ]));
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/NOT executed/);
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/--compare/);
+  });
+
+  it('state C: accepts the real repository state, the adopted c2-2026-successor, and names what stays pending', () => {
+    // Since the 2026 rollover (D-316-1) the tracked state is the successor's. Its witness manifest and the
+    // predecessor rebuild bytes it replaced are supplied explicitly, as the validator requires for a successor.
+    const real = realStateDocs();
+    const verdict = validateProposedRebuildState({ ...asProposed(real),
+      witnessManifest: repoText(ladderOf(real).accepted_witness.manifest), baseRebuild: predecessorText(REBUILD_PATH) });
+    expect(verdict.acceptedLabel).toBe('c2-2026-final-core-v1');
+    expect(verdict.ladderProfile).toBe('c2-2026-successor');
+    expect(verdict.expectedRows).toBe(1640);
     expect(verdict.finalChecks.length).toBeGreaterThan(80);
     expect(verdict.finalChecks.map((c) => c.key)).toEqual(expect.arrayContaining([
       'club_seasons_rows', 'players_with_height', 'players_with_dob_after_birth_dates', 'match_coaches',
@@ -3359,15 +3392,28 @@ const judge = (
 describe('successor ladder tuple — the pure module', () => {
   const tuple = () => successorFixture().tuple;
 
-  it('states A and B: ships an EMPTY closed table, so no successor profile is accepted until a separately authorised activation (state C)', () => {
-    expect(SUCCESSOR_LADDER_TUPLES_JSON).toBe('{}');
-    expect(SUCCESSOR_LADDER_TUPLES).toEqual({});
+  it('shipped an EMPTY closed table in the predecessor: no successor was accepted before the owner-reviewed adoption', () => {
+    expect(readSuccessorLadderTuplesJson(predecessorText(REBUILD_PATH))).toBe('{}');
+  });
+
+  it('state C: ships exactly the one separately activated tuple, c2-2026-successor (AFLDB-ISSUE-316 D-316-1), and nothing else', () => {
+    expect(Object.keys(SUCCESSOR_LADDER_TUPLES)).toEqual(['c2-2026-successor']);
+    expect(SUCCESSOR_LADDER_TUPLES['c2-2026-successor']).toEqual({
+      profile: 'c2-2026-successor', supersedes: 'predecessor-1897-2025', core_snapshot_label: 'c2-2026-final-core-v1',
+      core_manifest_sha256: '02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988',
+      core_artefact_set_sha256: '817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e',
+      witness_snapshot_label: 'c2-2026-final-ladder-v1',
+      witness_manifest_sha256: '65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34',
+      first_season: 1897, last_season: 2026, expected_rows: 1640,
+    });
     expect(Object.isFrozen(SUCCESSOR_LADDER_TUPLES)).toBe(true);
-    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe('{}');
+    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe(SUCCESSOR_LADDER_TUPLES_JSON);
+    // The adoption edited that one literal and nothing else in the runner.
+    expect(repoText(REBUILD_PATH).replace(SUCCESSOR_LADDER_TUPLES_JSON, '{}')).toBe(predecessorText(REBUILD_PATH));
   });
 
   it('appends exactly one tuple, keeps earlier entries byte-identical and round-trips', () => {
-    const base = repoText(REBUILD_PATH);
+    const base = predecessorText(REBUILD_PATH);
     const once = planSuccessorTuplesEdit(base, tuple());
     const parsed = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(once));
     expect(Object.keys(parsed)).toEqual([SYNTHETIC_SUCCESSOR]);
@@ -3381,12 +3427,12 @@ describe('successor ladder tuple — the pure module', () => {
   });
 
   it('refuses a duplicate, a missing literal and a second literal', () => {
-    const once = planSuccessorTuplesEdit(repoText(REBUILD_PATH), tuple());
+    const once = planSuccessorTuplesEdit(predecessorText(REBUILD_PATH), tuple());
     expect(() => planSuccessorTuplesEdit(once, tuple())).toThrow(/already lists/);
     expect(() => planSuccessorTuplesEdit('const x = 1;', tuple())).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
-    const doubled = `${repoText(REBUILD_PATH)}\nexport const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
+    const doubled = `${predecessorText(REBUILD_PATH)}\nexport const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
     expect(() => planSuccessorTuplesEdit(doubled, tuple())).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
-    const broken = repoText(REBUILD_PATH).replace("SUCCESSOR_LADDER_TUPLES_JSON = '{}'", "SUCCESSOR_LADDER_TUPLES_JSON = '{nope'");
+    const broken = predecessorText(REBUILD_PATH).replace("SUCCESSOR_LADDER_TUPLES_JSON = '{}'", "SUCCESSOR_LADDER_TUPLES_JSON = '{nope'");
     expect(() => planSuccessorTuplesEdit(broken, tuple())).toThrow(/not valid JSON/);
   });
 
@@ -3491,9 +3537,11 @@ describe("successor ladder tuple — a coherent synthetic transition is judged b
 
   it('judges the bytes it is given: the working-tree rebuild-test.ts is never consulted for the tuple', () => {
     const f = successorFixture();
-    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe('{}');
+    const working = readSuccessorLadderTuplesJson(repoText(REBUILD_PATH));
+    // The proposed bytes carry their own table; the working tree's (whatever it lists) is never read for it.
+    expect(readSuccessorLadderTuplesJson(f.d.rebuild)).not.toBe(working);
     expect(judge(f).ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
-    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe('{}');
+    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe(working);
   });
 
   it('needs the proposed witness manifest and never reads the working tree instead', () => {

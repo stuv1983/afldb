@@ -15,7 +15,9 @@ import {
   COVERAGE_STATUSES,
   checkCoverageEvidence,
   coverageFor,
+  isSealedSeason,
   renderCoverageMatrix,
+  sealedSeasonsFrom,
   validateCoverageRegistry,
   type CoverageEntry,
   type CoverageEvidence,
@@ -86,6 +88,11 @@ describe('the real coverage registry', () => {
     expect(coverageFor(COVERAGE_REGISTRY, 2026, 'fixtures')?.status).toBe('api_partial');
     expect(coverageFor(COVERAGE_REGISTRY, 2026, 'match_stats')?.status).toBe('api_partial');
     expect(coverageFor(COVERAGE_REGISTRY, 2026, 'brownlow')?.status).toBe('api_partial');
+    // 2027, opened by the 2026 rollover (AFLDB-ISSUE-316 D-316-1), has nothing acquired: unsupported in every
+    // family by the ADR 0011 default, which claims no value, zero or completeness for it.
+    for (const family of COVERAGE_FAMILIES) {
+      expect(coverageFor(COVERAGE_REGISTRY, 2027, family)?.status, family).toBe('unsupported');
+    }
     // Registered 2022-2025 is NOT API-verified: no match or fixture snapshot is committed.
     for (const family of COVERAGE_FAMILIES) {
       expect(coverageFor(COVERAGE_REGISTRY, 2024, family)?.status, family).toBe('historical_baseline');
@@ -96,11 +103,14 @@ describe('the real coverage registry', () => {
     expect(coverageFor(COVERAGE_REGISTRY, 1897, 'fixtures')?.status).toBe('historical_baseline');
   });
 
-  it('no manual_curated entry exists yet, and nothing is api_* for a sealed season', () => {
+  it('no manual_curated entry exists yet, and every api_* claim is 2026, resting on stored fixtures now that 2026 is sealed', () => {
     expect(COVERAGE_REGISTRY.filter((e) => e.status === 'manual_curated')).toEqual([]);
-    for (const e of COVERAGE_REGISTRY.filter((x) => x.status === 'api_verified' || x.status === 'api_partial')) {
-      expect(e.from, `${e.family} ${e.from}`).toBeGreaterThan(2025);
-    }
+    const api = COVERAGE_REGISTRY.filter((x) => x.status === 'api_verified' || x.status === 'api_partial');
+    expect(api.map((e) => `${e.family} ${e.from}-${e.through}`).sort())
+      .toEqual(COVERAGE_FAMILIES.map((f) => `${f} 2026-2026`).sort());
+    // The rollover sealed 2026 (D-316-1); a sealed api_* season must cite a stored fixture, and each does.
+    expect(isSealedSeason(sealedSeasonsFrom(seasons), 2026)).toBe(true);
+    for (const e of api) expect(e.evidence.filter((i) => i.kind === 'stored_fixture').length, e.family).toBeGreaterThan(0);
   });
 
   it('every api_verified cell cites a resolvable stored_fixture and a resolvable test', () => {
@@ -131,9 +141,11 @@ describe('the real coverage registry', () => {
     for (const e of COVERAGE_REGISTRY) counts[e.status] = (counts[e.status] ?? 0) + (e.through - e.from + 1);
     const total = COVERAGE_STATUSES.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
     expect(total).toBe(COVERAGE_FAMILIES.length * (seasons.last_season - seasons.first_season + 1));
+    expect(total).toBe(655);
     expect(counts.api_verified).toBe(1);
     expect(counts.api_partial).toBe(4);
-    expect(counts.unsupported).toBe(31);
+    // 31 Brownlow seasons with no medal, plus 2027 in each of the five families.
+    expect(counts.unsupported).toBe(36);
     expect(counts.historical_baseline).toBe(614);
   });
 });
@@ -220,9 +232,17 @@ describe('negative controls (SYNTHETIC registries, never real coverage)', () => 
     expect(problems).toEqual(['results 2000-2002: historical_baseline is only for sealed seasons; not sealed: 2002']);
   });
 
-  it('historical_baseline on the real 2026 season is a problem (it is open in data/reference/seasons.json)', () => {
-    const mutated = COVERAGE_REGISTRY.map((e) => (e.family === 'results' && e.from === 2026 ? { ...e, status: 'historical_baseline' as const } : e));
-    expect(validateCoverageRegistry(mutated, seasons)).toEqual(['results 2026-2026: historical_baseline is only for sealed seasons; not sealed: 2026']);
+  it('historical_baseline on the real 2027 season is a problem (it is open in data/reference/seasons.json)', () => {
+    const mutated = COVERAGE_REGISTRY.map((e) => (e.family === 'results' && e.from === 2027 ? { ...e, status: 'historical_baseline' as const } : e));
+    expect(validateCoverageRegistry(mutated, seasons)).toEqual(['results 2027-2027: historical_baseline is only for sealed seasons; not sealed: 2027']);
+  });
+
+  it('historical_baseline on the real 2026 season is accepted now that the rollover sealed it, but no api_* claim may drop its fixture', () => {
+    const baseline = COVERAGE_REGISTRY.map((e) => (e.family === 'results' && e.from === 2026 ? { ...e, status: 'historical_baseline' as const } : e));
+    expect(validateCoverageRegistry(baseline, seasons)).toEqual([]);
+    const unfixtured = COVERAGE_REGISTRY.map((e) => (e.family === 'results' && e.from === 2026
+      ? { ...e, evidence: e.evidence.filter((i) => i.kind !== 'stored_fixture') } : e));
+    expect(validateCoverageRegistry(unfixtured, seasons)).toContain('results 2026-2026: api_verified requires at least one stored_fixture evidence');
   });
 
   it('api_partial for a sealed season without a stored fixture is a problem', () => {

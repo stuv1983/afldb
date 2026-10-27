@@ -25,6 +25,7 @@ import { pathToFileURL } from 'node:url';
 
 const root = path.resolve(__dirname, '..');
 const read = (rel: string) => readFileSync(path.join(root, rel), 'utf8').replace(/\r\n/g, '\n');
+import { predecessorJson, predecessorText } from './rollover-predecessor-fixture';
 
 /**
  * Test-process cleanup. A bare PID read from a file or a log line is never a termination handle: once the
@@ -241,11 +242,20 @@ describe('data/reference/afltables-network.json', () => {
   const control = JSON.parse(read('data/reference/afltables-network.json'));
   const seasons = JSON.parse(read('data/reference/seasons.json'));
 
-  it('ships active and bounded to 2026, so this change alone alters no live behaviour', () => {
-    expect(control.status).toBe('active');
+  it('ships retired by D-316-1 at the 2026 rollover, still bounded to 2026 (AFLDB-ISSUE-316)', () => {
+    expect(control.status).toBe('retired');
     expect(control.last_season).toBe(2026);
-    expect(control.decision).toBeNull();
-    expect(control.changed_at).toBeNull();
+    expect(control.decision).toBe('D-316-1');
+    expect(control.changed_at).toBe('2026-10-27');
+    // Every reader sees it retired against the 2027 in-progress season, never out of bounds.
+    expect(seasons.in_progress_seasons).toEqual([2027]);
+    expect(parseAfltablesNetworkStatus(control, seasons)).toBe('retired');
+  });
+
+  it('shipped active and bounded to 2026 in the explicit predecessor, which altered no live behaviour', () => {
+    const before = JSON.parse(predecessorText('data/reference/afltables-network.json'));
+    expect(before).toMatchObject({ status: 'active', last_season: 2026, decision: null, changed_at: null });
+    expect(parseAfltablesNetworkStatus(before, predecessorJson('data/reference/seasons.json'))).toBe('active');
   });
 
   // The repository-level half of "a rollover to [2027] cannot ship with the
@@ -685,7 +695,9 @@ describe('the last_season number contract is the same in every gate', () => {
  * ------------------------------------------------------------------ */
 
 describe('rollover: AFL Tables retirement (AFLDB-ISSUE-316 C2)', () => {
-  const trackedSource = read('data/reference/afltables-network.json');
+  // The switch the 2026 rollover consumes: the explicit predecessor (active, bounded to 2026). The tracked
+  // file is its retired result since D-316-1.
+  const trackedSource = predecessorText('data/reference/afltables-network.json').replace(/\r\n/g, '\n');
   const plan = (over: Partial<Parameters<typeof planAfltablesNetworkRetirement>[0]> = {}) =>
     planAfltablesNetworkRetirement({
       completedSeason: 2026,

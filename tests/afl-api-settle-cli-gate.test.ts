@@ -54,6 +54,7 @@ import {
 import { runAflApiBrownlowSettleCli } from '../tools/current-season/settle-afl-api-brownlow';
 import { runAflApiFixturesSettleCli } from '../tools/current-season/settle-afl-api-fixtures';
 import { runAflApiSettleCli } from '../tools/current-season/settle-afl-api';
+import { predecessorText } from './rollover-predecessor-fixture';
 
 // I244-F006: only the fixture-observation RESOLVER is replaced (used solely by
 // the fixture-identity describe block at the end of this file; every other
@@ -109,6 +110,11 @@ function makeSqlStub(): { sql: postgres.Sql; touched: { value: boolean } } {
 // test, plus COPIES of the real tracked reference files so the registry and
 // identities parse exactly as production does. Nothing is ever written
 // under the real repository's own `data/` tree.
+//
+// AFLDB-ISSUE-316: these gate cases settle 2026 as the season IN PROGRESS, so
+// their seasons registry is the explicit predecessor of the 2026 rollover
+// (tests/rollover-predecessor-fixture.ts). The tracked registry, which seals
+// 2026 since D-316-1, is exercised by its own describe at the end of the file.
 // ---------------------------------------------------------------------------
 
 const scratchDirs: string[] = [];
@@ -120,12 +126,14 @@ afterEach(() => {
   else process.env.DATABASE_URL = originalControlDatabaseUrl;
 });
 
-function makeProjectRoot(prefix: string): string {
+function makeProjectRoot(prefix: string, seasons: 'predecessor' | 'tracked' = 'predecessor'): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   scratchDirs.push(root);
   mkdirSync(join(root, 'data', 'reference'), { recursive: true });
   for (const name of REFERENCE_FILES) {
-    writeFileSync(join(root, 'data', 'reference', name), readFileSync(join(REPO_ROOT, 'data', 'reference', name)));
+    writeFileSync(join(root, 'data', 'reference', name), name === 'seasons.json' && seasons === 'predecessor'
+      ? predecessorText('data/reference/seasons.json')
+      : readFileSync(join(REPO_ROOT, 'data', 'reference', name)));
   }
   return root;
 }
@@ -885,5 +893,87 @@ describe('V2-GAP-006 — the seal on historical seasons at the three AFL API set
     expect(output).toContain("SEALED SEASON 2025 admitted on basis 'test_database_backtest'");
     expect(output).toContain('not an audited correction');
     expect(boundary.reached).toBe(true);
+  });
+});
+
+describe('AFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover', () => {
+  const originalDeploymentEnv = process.env[BROWNLOW_ENABLE_ENV];
+  const SEALED_2026 = /season 2026 is sealed historical data .*never rewrite sealed history/;
+  beforeEach(() => { process.env[BROWNLOW_ENABLE_ENV] = 'true'; });
+  afterEach(() => {
+    if (originalDeploymentEnv === undefined) delete process.env[BROWNLOW_ENABLE_ENV];
+    else process.env[BROWNLOW_ENABLE_ENV] = originalDeploymentEnv;
+  });
+
+  /** A scratch root over the TRACKED seasons registry, with one manifest (and, for Brownlow, empty vote files). */
+  function trackedSnapshot(family: 'matches' | 'fixtures' | 'brownlow', season: number): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot(`afldb-issue-316-sealed-${family}-`, 'tracked');
+    const label = `sealed-${family}-snapshot`;
+    const dir = join(projectRoot, 'data', 'sources', 'afl_api', family, label);
+    mkdirSync(dir, { recursive: true });
+    const kind = family === 'matches' ? { acquisition_kind: 'afl_api_match_snapshot' }
+      : family === 'fixtures' ? { acquisition_kind: AFL_API_FIXTURE_ACQUISITION_KIND } : {};
+    writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ source_key: 'afl_api', ...kind, season, files: [] }));
+    if (family === 'brownlow') {
+      writeFileSync(join(dir, '01-brownlow-season.raw.json'),
+        JSON.stringify({ seasonId: 'CD_S2026014', status: 'IN_PROGRESS', matchVotes: [] }));
+      writeFileSync(join(dir, '02-brownlow-leaderboard.raw.json'),
+        JSON.stringify({ seasonId: 'CD_S2026014', status: 'IN_PROGRESS', teamFilter: null, leaderboard: [] }));
+    }
+    return { projectRoot, label };
+  }
+
+  it('the tracked registry declares 2027 in progress, so 2026 is sealed', () => {
+    const registry = JSON.parse(readFileSync(join(REPO_ROOT, 'data', 'reference', 'seasons.json'), 'utf8'));
+    expect(registry.in_progress_seasons).toEqual([2027]);
+    expect(JSON.parse(predecessorText('data/reference/seasons.json')).in_progress_seasons).toEqual([2026]);
+  });
+
+  it.each(['--dry-run', '--apply'])('settle-afl-api %s refuses 2026 before the DB path opens, with ingestion ENABLED', async (flag) => {
+    const { projectRoot, label } = trackedSnapshot('matches', SEASON);
+    const { sql, touched } = makeSqlStub();
+    const error = await runAflApiSettleCli(['--label', label, flag], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SealedSeasonRefusal);
+    expect(error).toMatchObject({ code: 'season_sealed', season: 2026 });
+    expect((error as Error).message).toMatch(SEALED_2026);
+    expect(touched.value).toBe(false);
+  });
+
+  it.each(['--dry-run', '--apply'])('settle-afl-api-fixtures %s refuses 2026 before the DB path opens, with ingestion ENABLED', async (flag) => {
+    const { projectRoot, label } = trackedSnapshot('fixtures', SEASON);
+    const { sql, touched } = makeSqlStub();
+    const error = await runAflApiFixturesSettleCli(['--label', label, flag], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SealedSeasonRefusal);
+    expect(error).toMatchObject({ code: 'season_sealed', season: 2026 });
+    expect(touched.value).toBe(false);
+  });
+
+  it.each(['--dry-run', '--apply', '--observe-only'])('settle-afl-api-brownlow %s refuses 2026 before the DB path opens, with BOTH Brownlow gates on', async (flag) => {
+    const { projectRoot, label } = trackedSnapshot('brownlow', SEASON);
+    const { sql, touched } = makeSqlStub();
+    const error = await runAflApiBrownlowSettleCli(['--label', label, flag],
+      { projectRoot, sql, ingestionControls: { currentSeasonEnabled: false, brownlowAdminEnabled: true } })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SealedSeasonRefusal);
+    expect(error).toMatchObject({ code: 'season_sealed', season: 2026 });
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api --validate-only on sealed 2026 still succeeds offline', async () => {
+    const { projectRoot, label } = trackedSnapshot('matches', SEASON);
+    const { sql, touched } = makeSqlStub();
+    const outcome = await runAflApiSettleCli(['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS });
+    expect(outcome.result).toBeNull();
+    expect(touched.value).toBe(false);
+  });
+
+  it('2027, the season in progress, is not sealed: settle-afl-api continues to its DB path', async () => {
+    const { projectRoot, label } = trackedSnapshot('matches', 2027);
+    const { sql, touched } = makeSqlStub();
+    await expect(runAflApiSettleCli(['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS }))
+      .rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
   });
 });

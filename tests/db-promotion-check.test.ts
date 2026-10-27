@@ -279,6 +279,7 @@ import {
 } from '../src/lib/acquisition/afl-api-adjudication';
 import type { CpcResult } from '../src/lib/acquisition/afl-api-identity-correction';
 import { canonicalJson } from '../src/lib/acquisition/observations';
+import { predecessorJson } from './rollover-predecessor-fixture';
 
 const REPO = process.cwd();
 const MIGRATIONS = join(REPO, 'src', 'db', 'migrations');
@@ -9666,7 +9667,10 @@ describe('AFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the 
     const readJson = (p: string) => JSON.parse(readFileSync(join(REPO, p), 'utf8')) as Record<string, unknown>;
     expect(promotionOwnershipCensusScope()).toEqual(rebuildCensusScope(
       readJson('tools/rebuild/fitzroy/fitzroy-contract.json'), readJson('data/reference/seasons.json')));
-    expect(promotionOwnershipCensusScope()).toEqual(SCOPE);
+    // Since the 2026 rollover (AFLDB-ISSUE-316 D-316-1) 2026 is completed and 2027 is excluded; the explicit
+    // predecessor documents still judge 1897-2025, the scope the synthetic gate cases above use.
+    expect(promotionOwnershipCensusScope()).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
+    expect(promotionOwnershipCensusScope(predecessorJson)).toEqual(SCOPE);
     expect(() => promotionOwnershipCensusScope(() => ({}))).toThrow(PromotionRefused);
     // ONE SQL definition: the rebuild/CLI stream EXECUTEs the very text the checker runs.
     const stream = buildAflApiOwnershipCensusSql(SCOPE, 'enforce');

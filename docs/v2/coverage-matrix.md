@@ -8,7 +8,7 @@ stored fixture, a test, a reference file or a document, and `tests/v2-coverage-r
 cited file exists and contains its anchor. A season is **API-rebuildable only where it is `api_verified`**;
 everything else is not, and no historical record is deleted because the API cannot reproduce it.
 
-Seasons covered: 1897-2026 (130 seasons). Sealed: 1897-2025. In progress: 2026.
+Seasons covered: 1897-2027 (131 seasons). Sealed: 1897-2026. In progress: 2027.
 
 ## Status definitions
 
@@ -22,7 +22,7 @@ Seasons covered: 1897-2026 (130 seasons). Sealed: 1897-2025. In progress: 2026.
 
 ## Summary (season-family cells)
 
-One cell is one season of one family; 5 families x 130 seasons = 650 cells.
+One cell is one season of one family; 5 families x 131 seasons = 655 cells.
 
 | Status | `fixtures` | `results` | `match_stats` | `player_stats` | `brownlow` | Total |
 |---|---:|---:|---:|---:|---:|---:|
@@ -30,8 +30,8 @@ One cell is one season of one family; 5 families x 130 seasons = 650 cells.
 | `api_partial` | 1 | 0 | 1 | 1 | 1 | 4 |
 | `historical_baseline` | 129 | 129 | 129 | 129 | 98 | 614 |
 | `manual_curated` | 0 | 0 | 0 | 0 | 0 | 0 |
-| `unsupported` | 0 | 0 | 0 | 0 | 31 | 31 |
-| **All** | 130 | 130 | 130 | 130 | 130 | 650 |
+| `unsupported` | 1 | 1 | 1 | 1 | 32 | 36 |
+| **All** | 131 | 131 | 131 | 131 | 131 | 655 |
 
 ## Fixtures (the match schedule and its states)
 
@@ -42,6 +42,7 @@ Family key: `fixtures`.
 | 1897-2021 | `historical_baseline` | document: `docs/v2/historical-baseline.md` — `The AFL API does not redefine it.`<br>fixture: `tests/fixtures/afl_api/seasons/00-compseasons.raw.json` — `"providerId":"CD_S2012014"`<br>fixture: `tests/fixtures/afl_api/seasons/00-compseasons.raw.json` — `"providerId":"CD_S2021014"` | Sealed baseline. 2012-2021 appear only in the provider compseasons listing and are unregistered (not in data/reference/afl-api-identities.json, no round vocabulary, no fixture or match snapshot). |
 | 2022-2025 | `historical_baseline` | document: `docs/v2/historical-baseline.md` — `The AFL API does not redefine it.`<br>reference: `data/reference/afl-api-identities.json` — `"2022": { "compSeasonId": 43, "providerId": "CD_S2022014" }`<br>reference: `data/reference/afl-api-identities.json` — `"2025": { "compSeasonId": 73, "providerId": "CD_S2025014" }`<br>reference: `data/reference/source-families.json` — `"afl_api_2022": {`<br>reference: `data/reference/source-families.json` — `"afl_api_2025": {` | Sealed baseline. The seasons are registered with a round vocabulary declared, but no match or fixture snapshot is committed, so they are not API-verified. |
 | 2026 | `api_partial` | fixture: `tests/fixtures/afl_api/seasons/00-season-matches-2026.raw.json` — `"providerId":"CD_S2026014","name":"2026 Toyota AFL Premiership"`<br>fixture: `tests/fixtures/afl_api/match/04-season-feed-scheduled.raw-slice.json` — `"status":"SCHEDULED"`<br>fixture: `tests/fixtures/afl_api/match/05-season-feed-unconfirmed-teams.raw-slice.json` — `"status":"UNCONFIRMED_TEAMS"`<br>test: `tests/afl-api-match.test.ts` — `the real 2026 feed is complete: 218 ids, statuses CONCLUDED 217 and SCHEDULED 1, verbatim`<br>test: `tests/afl-api-match.test.ts` — `AFLDB-ISSUE-229: today\'s match contract refuses that real SCHEDULED record as a build failure`<br>test: `tests/afl-api-match.test.ts` — `AFLDB-ISSUE-229: today\'s match contract refuses the real UNCONFIRMED_TEAMS record as a build failure` | Concluded matches only. The stored feed lists 218 matches, but today's match contract refuses the SCHEDULED and UNCONFIRMED_TEAMS records (no score block); the pre-match fixture projection is unbuilt (AFLDB-ISSUE-229 B2 open). |
+| 2027 | `unsupported` | document: `docs/v2/adr/0011-coverage-registry.md` — ``(sealed, `docs/v2/historical-baseline.md`) or `unsupported`.``<br>reference: `data/reference/seasons.json` — `"2027": "Season in progress at time of import."` | Season 2027 is in progress and nothing of it is acquired: no 2027 AFL API fixture or test is committed, so nothing is claimed and no value, zero or completeness is implied. Not API-rebuildable (the ADR 0011 default for an open season outside verified coverage). Re-grade with stored evidence once 2027 data is captured. |
 
 ## Results (final scores and match outcome)
 
@@ -51,6 +52,7 @@ Family key: `results`.
 |---|---|---|---|
 | 1897-2025 | `historical_baseline` | document: `docs/v2/historical-baseline.md` — `The AFL API does not redefine it.` | Sealed AFLDB history held in PostgreSQL. No committed AFL API fixture and test reproduces this season, so it is not API-rebuildable. |
 | 2026 | `api_verified` | fixture: `tests/fixtures/afl_api/match/01-fixture-result.json` — `"providerId": "CD_M20260142801"`<br>fixture: `tests/fixtures/afl_api/seasons/00-season-matches-2026.raw.json` — `"providerId":"CD_S2026014","name":"2026 Toyota AFL Premiership"`<br>test: `tests/afl-api-match.test.ts` — `projects the fixture-result sample into a typed match record`<br>test: `tests/afl-api-match.test.ts` — `the real 2026 feed is complete: 218 ids, statuses CONCLUDED 217 and SCHEDULED 1, verbatim` | Evidence is one concluded match (CD_M20260142801) projected through the match contract from a stored fixture, plus the stored 2026 season feed proven complete (218 entries; 217 CONCLUDED, 1 SCHEDULED). |
+| 2027 | `unsupported` | document: `docs/v2/adr/0011-coverage-registry.md` — ``(sealed, `docs/v2/historical-baseline.md`) or `unsupported`.``<br>reference: `data/reference/seasons.json` — `"2027": "Season in progress at time of import."` | Season 2027 is in progress and nothing of it is acquired: no 2027 AFL API fixture or test is committed, so nothing is claimed and no value, zero or completeness is implied. Not API-rebuildable (the ADR 0011 default for an open season outside verified coverage). Re-grade with stored evidence once 2027 data is captured. |
 
 ## Match statistics (team totals and period scores)
 
@@ -60,6 +62,7 @@ Family key: `match_stats`.
 |---|---|---|---|
 | 1897-2025 | `historical_baseline` | document: `docs/v2/historical-baseline.md` — `The AFL API does not redefine it.` | Sealed AFLDB history held in PostgreSQL. No committed AFL API fixture and test reproduces this season, so it is not API-rebuildable. |
 | 2026 | `api_partial` | fixture: `tests/fixtures/afl_api/match/03-match-roster.raw.json` — `"matchId": "CD_M20260142801"`<br>test: `tests/afl-api-match.test.ts` — `selects the recentMatchScores entry matching the requested match, never entry 0 blindly`<br>test: `tests/afl-api-match.test.ts` — `periodScores is null (never fabricated) when the match is absent from recentMatchScores` | Period scores only, from the match roster recentMatchScores. No team-totals fixture is committed. |
+| 2027 | `unsupported` | document: `docs/v2/adr/0011-coverage-registry.md` — ``(sealed, `docs/v2/historical-baseline.md`) or `unsupported`.``<br>reference: `data/reference/seasons.json` — `"2027": "Season in progress at time of import."` | Season 2027 is in progress and nothing of it is acquired: no 2027 AFL API fixture or test is committed, so nothing is claimed and no value, zero or completeness is implied. Not API-rebuildable (the ADR 0011 default for an open season outside verified coverage). Re-grade with stored evidence once 2027 data is captured. |
 
 ## Player statistics (per player per match)
 
@@ -69,6 +72,7 @@ Family key: `player_stats`.
 |---|---|---|---|
 | 1897-2025 | `historical_baseline` | document: `docs/v2/historical-baseline.md` — `The AFL API does not redefine it.` | Sealed AFLDB history held in PostgreSQL. No committed AFL API fixture and test reproduces this season, so it is not API-rebuildable. |
 | 2026 | `api_partial` | fixture: `tests/fixtures/afl_api/match/02-player-stats.raw.json` — `"playerId": "CD_I297354"`<br>test: `tests/afl-api-match.test.ts` — `projects both sides, reading playerStats.player.playerJumperNumber (never the position-bearing copy)`<br>test: `tests/afl-api-match.test.ts` — `the match, player_match_stats and brownlow fixtures project with no undeclared column` | Limitation: the evidence is one stored player-statistics sample (two sides) projected through the player_match_stats emitter; no whole-season player-statistics capture is committed, and the sample carries no match or season id (the match is paired by the test). Graded api_partial, not api_verified, by the orchestrator (Launch B, plan section 7). |
+| 2027 | `unsupported` | document: `docs/v2/adr/0011-coverage-registry.md` — ``(sealed, `docs/v2/historical-baseline.md`) or `unsupported`.``<br>reference: `data/reference/seasons.json` — `"2027": "Season in progress at time of import."` | Season 2027 is in progress and nothing of it is acquired: no 2027 AFL API fixture or test is committed, so nothing is claimed and no value, zero or completeness is implied. Not API-rebuildable (the ADR 0011 default for an open season outside verified coverage). Re-grade with stored evidence once 2027 data is captured. |
 
 ## Brownlow Medal (season totals, round and match votes)
 
@@ -81,3 +85,4 @@ Family key: `brownlow`.
 | 1942-1945 | `unsupported` | reference: `data/reference/stat-availability.json` — `"stat_key": "brownlow_season_total", "coverage": "not_applicable", "first_season": 1942, "last_season": 1945`<br>reference: `data/reference/stat-availability.json` — `no medal in 1897-1923 and the 1942-1945 war years` | The war years 1942-1945: no medal was awarded; nothing to collect. |
 | 1946-2025 | `historical_baseline` | document: `docs/v2/historical-baseline.md` — `The AFL API does not redefine it.`<br>document: `docs/architecture.md` — `season totals run 1924–2025 bar the war years`<br>document: `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` — `Result (operator-proven COMPLETE, 2026-09-21)` | Sealed baseline. A 2022-2025 AFL API Brownlow backtest is documented as an operator run, but no committed artefact reproduces it, so those seasons are not API-verified. |
 | 2026 | `api_partial` | fixture: `tests/fixtures/afl_api/brownlow/01-brownlow-season-round.json` — `"seasonId": "CD_S2026014"`<br>fixture: `tests/fixtures/afl_api/brownlow/02-brownlow-leaderboard-sample.json` — `"seasonId": "CD_S2026014"`<br>test: `tests/afl-api-match.test.ts` — `projects a valid one-match, exactly-3-row {3,2,1} vote set`<br>test: `tests/afl-api-match.test.ts` — `reconciles cleanly when match votes and leaderboard totals agree`<br>reference: `data/reference/stat-availability.json` — `"stat_key": "brownlow_season_total", "coverage": "pending"` | The vote-set and leaderboard contract is tested on stored mid-season samples (status IN_PROGRESS); the 2026 count is not complete (Brownlow pending). |
+| 2027 | `unsupported` | document: `docs/v2/adr/0011-coverage-registry.md` — ``(sealed, `docs/v2/historical-baseline.md`) or `unsupported`.``<br>reference: `data/reference/seasons.json` — `"2027": "Season in progress at time of import."` | Season 2027 is in progress and nothing of it is acquired: no 2027 AFL API fixture or test is committed, so nothing is claimed and no value, zero or completeness is implied. Not API-rebuildable (the ADR 0011 default for an open season outside verified coverage). Re-grade with stored evidence once 2027 data is captured. |

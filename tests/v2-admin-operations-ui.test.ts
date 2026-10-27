@@ -1250,7 +1250,7 @@ describe('page modules', () => {
     expect(superMarkup).toContain('name="note"');
     expect(superMarkup).toContain('Compare (read-only)');
     expect(superMarkup).toContain('coleman:2024:players/S/Synthetic_Player_A.html');
-    expect(superMarkup).toContain('value="2025"'); // the default season is the newest sealed one
+    expect(superMarkup).toContain('value="2026"'); // the default season is the newest sealed one (2026 since the 2026 rollover)
 
     session.actor = PLAIN_ADMIN;
     const adminMarkup = html(await Page());

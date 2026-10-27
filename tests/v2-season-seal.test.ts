@@ -1,7 +1,8 @@
 /**
  * AFLDB V2 Stage 3 (V2-GAP-006) — the pure seal on historical seasons: open seasons are
  * writable, sealed seasons are refused unless an audited correction is supplied, every invalid
- * correction field is refused, and the real data/reference/seasons.json seals 2025 but not 2026.
+ * correction field is refused, and the real data/reference/seasons.json seals 2026 but not 2027 (the 2026
+ * rollover, AFLDB-ISSUE-316 D-316-1; the explicit predecessor sealed 2025 but not 2026).
  * No database, no network.
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -49,15 +50,16 @@ function correction(overrides: Partial<Record<keyof AuditedCorrection, unknown>>
 }
 
 describe('the real data/reference/seasons.json', () => {
-  it('seals 2025 and does not seal 2026 (or a season past last_season)', () => {
+  it('seals 2026 and does not seal 2027 (or a season past last_season) since the 2026 rollover', () => {
     const sealed = sealedSeasonsFrom(REAL_REGISTRY);
     expect(isSealedSeason(sealed, 2025)).toBe(true);
-    expect(isSealedSeason(sealed, 2026)).toBe(false);
+    expect(isSealedSeason(sealed, 2026)).toBe(true);
     expect(isSealedSeason(sealed, 2027)).toBe(false);
-    expect(evaluateSeasonWrite({ season: 2025, sealed, correction: null })).toMatchObject({
+    expect(isSealedSeason(sealed, 2028)).toBe(false);
+    expect(evaluateSeasonWrite({ season: 2026, sealed, correction: null })).toMatchObject({
       allowed: false, code: 'season_sealed',
     });
-    expect(evaluateSeasonWrite({ season: 2026, sealed, correction: null })).toEqual({
+    expect(evaluateSeasonWrite({ season: 2027, sealed, correction: null })).toEqual({
       allowed: true, basis: 'open_season',
     });
   });

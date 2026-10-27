@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { rebuildCensusScope } from '../src/lib/rollover/afl-api-ownership-census';
+import { predecessorJson } from './rollover-predecessor-fixture';
 
 import { describe, expect, it } from 'vitest';
 
@@ -50,25 +51,33 @@ describe('ISSUE-316 ladder-season-scope reference fixtures', () => {
   const contract = (last: number, excluded: number[]) => ({ full_history: {
     season_range: { first_season: 1897, last_season: last }, current_season_excluded: { seasons: excluded },
   } });
+  // The explicit predecessor of the 2026 rollover (2026 in progress); the tracked file is the successor's.
+  const predecessorSeasons = predecessorJson('data/reference/seasons.json');
   it('keeps the predecessor out-of-range exclusion and active pending season unchanged', () => {
-    expect(rebuildCensusScope(contract(2025, [2026]), seasons)).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
-    expect(seasons.in_progress_seasons).toEqual([2026]);
+    expect(rebuildCensusScope(contract(2025, [2026]), predecessorSeasons)).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
+    expect(predecessorSeasons.in_progress_seasons).toEqual([2026]);
   });
-  it('includes all 2026 football only in explicit synthetic completed metadata', () => {
-    const candidate = { ...structuredClone(seasons), in_progress_seasons: [], _rehearsal_only: 'synthetic C2 football-complete fixture' };
+  it('included all 2026 football only in explicit synthetic completed metadata before the rollover', () => {
+    const candidate = { ...structuredClone(predecessorSeasons), in_progress_seasons: [], _rehearsal_only: 'synthetic C2 football-complete fixture' };
     expect(rebuildCensusScope(contract(2026, []), candidate)).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [] });
-    expect(seasons.in_progress_seasons).toEqual([2026]);
+    expect(predecessorSeasons.in_progress_seasons).toEqual([2026]);
+  });
+  it('includes all 2026 football in the tracked successor state, with 2027 the excluded in-progress season (D-316-1)', () => {
+    const tracked = JSON.parse(readFileSync(join(root, 'tools/rebuild/fitzroy/fitzroy-contract.json'), 'utf8'));
+    expect(seasons.in_progress_seasons).toEqual([2027]);
+    expect(rebuildCensusScope(tracked, seasons)).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
+    // Sealing 2026 football accepts no Brownlow: all three 2026 Brownlow keys stay pending.
     const pending = statAvail.coverage_ranges.filter((s: any) => /brownlow/.test(s.stat_key) && s.first_season === 2026);
     expect(pending.map((s: any) => [s.stat_key, s.coverage])).toEqual([
       ['brownlow_match_votes', 'pending'], ['brownlow_round_votes', 'pending'], ['brownlow_season_total', 'pending'],
     ]);
   });
   it.each([[true, true], [true, false], [false, true]])('refuses either in-range incomplete declaration (%s/%s)', (referencePending, excluded) => {
-    expect(() => rebuildCensusScope(contract(2026, excluded ? [2026] : []), { ...seasons, in_progress_seasons: referencePending ? [2026] : [] }))
+    expect(() => rebuildCensusScope(contract(2026, excluded ? [2026] : []), { ...predecessorSeasons, in_progress_seasons: referencePending ? [2026] : [] }))
       .toThrow(/intersects/);
   });
   it('refuses missing reference coverage and preserves historical no-GF metadata rules', () => {
-    expect(() => rebuildCensusScope(contract(2026, []), { ...seasons, last_season: 2025, in_progress_seasons: [] })).toThrow(/cover/);
+    expect(() => rebuildCensusScope(contract(2026, []), { ...predecessorSeasons, last_season: 2025, in_progress_seasons: [] })).toThrow(/cover/);
     expect(readFileSync(join(root, 'tools/migration/rebuild_derived.py'), 'utf8')).toContain("WHEN s.year = (SELECT season FROM latest)");
   });
 });

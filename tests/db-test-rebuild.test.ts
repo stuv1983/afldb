@@ -45,9 +45,9 @@ import {
   COACH_LOADER,
   afltablesClubListPin,
   afltablesCoachesPin,
-  coachChecks,
-  coachesImportArgv,
-  coachesValidateArgv,
+  coachChecks as realCoachChecks,
+  coachesImportArgv as realCoachesImportArgv,
+  coachesValidateArgv as realCoachesValidateArgv,
   COACH_RAW_REPLAY_EXEMPT_PROFILES,
   coachRawReplayPreflight,
   coachRawReplayRequired,
@@ -94,10 +94,10 @@ import {
   wikipediaHeightsValidateArgv,
   aflApiHeightsValidateArgv,
   aflApiRosterPin,
-  heightChecks,
-  heightEnrichmentPins,
-  heightsImportArgv,
-  heightsValidateArgv,
+  heightChecks as realHeightChecks,
+  heightEnrichmentPins as realHeightEnrichmentPins,
+  heightsImportArgv as realHeightsImportArgv,
+  heightsValidateArgv as realHeightsValidateArgv,
   BROWNLOW_SEASON_LOADER,
   BROWNLOW_SEASON_PREFLIGHT_FILES,
   brownlowSeasonChecks,
@@ -112,6 +112,7 @@ import {
   planStages as realPlanStages,
   resolveLadderRebuildExpectation,
   completedSeasonChecks,
+  checkRebuildBinding,
   isAdoptedSuccessorBinding,
   SUCCESSOR_LADDER_TUPLES,
   type LadderRebuildExpectation,
@@ -119,13 +120,13 @@ import {
   resolveFitzroySource,
   rehearsalChildEnv,
   resolveTarget,
-  runPreflight,
+  runPreflight as realRunPreflight,
   type Deps,
   type ResolvedTarget,
   type RunResult,
   type Stage,
 } from '../tools/db/rebuild-test';
-import { predecessorJson } from './rollover-predecessor-fixture';
+import { predecessorJson, predecessorText } from './rollover-predecessor-fixture';
 
 // Explicit synthetic predecessor expectation for domain regressions. The actual active
 // contract is exercised separately below, without this fixture's injected block. The documents
@@ -153,7 +154,19 @@ function predecessorExpectation(): LadderRebuildExpectation {
     database: 'afldb_test', adminDsn: '', importDsn: '', importIsOwnerSubstitution: false,
   }, d);
 }
-const planStages: typeof realPlanStages = (t, s, o, h) => realPlanStages(t, s, o, h, undefined, predecessorDocuments());
+/** The predecessor fitzRoy contract, for every reader that would otherwise default to the tracked one. */
+const predecessorHeightContract = () => predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json') as Record<string, unknown>;
+/** Height pins default to the predecessor contract; a case that names its own reader is unchanged. */
+const heightEnrichmentPins: typeof realHeightEnrichmentPins = (read = predecessorHeightContract, label) =>
+  realHeightEnrichmentPins(read, label);
+const heightChecks: typeof realHeightChecks = (l, read = predecessorHeightContract, a) => realHeightChecks(l, read, a);
+const coachChecks: typeof realCoachChecks = (l, read = predecessorHeightContract, a) => realCoachChecks(l, read, a);
+const heightsImportArgv: typeof realHeightsImportArgv = (l, py, read = predecessorHeightContract) => realHeightsImportArgv(l, py, read);
+const heightsValidateArgv: typeof realHeightsValidateArgv = (l, py, read = predecessorHeightContract) => realHeightsValidateArgv(l, py, read);
+const coachesImportArgv: typeof realCoachesImportArgv = (l, py, read = predecessorHeightContract, raw) => realCoachesImportArgv(l, py, read, raw);
+const coachesValidateArgv: typeof realCoachesValidateArgv = (l, py, read = predecessorHeightContract, raw) => realCoachesValidateArgv(l, py, read, raw);
+const planStages: typeof realPlanStages = (t, s, o, h) =>
+  realPlanStages(t, s, o, h ?? predecessorHeightContract, undefined, predecessorDocuments());
 const finalValidationChecks: typeof realFinalValidationChecks = (r, d, h) => {
   // Older domain-only cases intentionally use a minimal measured register; supply its
   // explicit predecessor bounds rather than changing production fallback behavior.
@@ -162,9 +175,21 @@ const finalValidationChecks: typeof realFinalValidationChecks = (r, d, h) => {
   if (b?.measured) b.measured = { seasons_first: 1897, seasons_last: 2025, ...b.measured };
   const expectation = predecessorExpectation();
   const ladder = { ...expectation, pair: { ...expectation.pair, core_snapshot_label: b?.snapshot_label } };
-  return realFinalValidationChecks(copy, d, h, ladder);
+  return realFinalValidationChecks(copy, d, h ?? predecessorHeightContract, ladder);
 };
-const finalValidationSql: typeof realFinalValidationSql = (p) => realFinalValidationSql(p, predecessorExpectation());
+const finalValidationSql: typeof realFinalValidationSql = (p) => realFinalValidationSql(p, predecessorExpectation(),
+  predecessorJson('data/reference/fitzroy-accepted-baselines.json'), predecessorHeightContract);
+const runPreflight: typeof realRunPreflight = (d, o, s, h, b) => realRunPreflight(d, o, s, h ?? predecessorHeightContract, b);
+/**
+ * Preflight of the PREDECESSOR rebuild. An unbound preflight takes its ladder profile (and with it the ISSUE-319
+ * coach raw-replay rule) from the tracked contract, which is the successor's since the 2026 rollover; these cases
+ * name the predecessor ladder instead. Its live re-check against the tracked documents is a no-op here, exactly
+ * as in the ISSUE-319 cases, because the tracked documents are not the predecessor's.
+ */
+type PreflightArgs = Parameters<typeof realRunPreflight>;
+const predecessorPreflight = (deps: Deps, opts: PreflightArgs[1], source: NonNullable<PreflightArgs[2]>, read?: PreflightArgs[3]) =>
+  runPreflight({ ...deps, checkBinding: () => {} }, opts, source, read,
+    Object.freeze({ source, target: target(), ladder: predecessorExpectation() }));
 
 describe('ISSUE-316 ladder-season-scope', () => {
   const source = () => ({ label: 'full-history-20260902', accepted: true, fullHistory: true,
@@ -177,95 +202,219 @@ describe('ISSUE-316 ladder-season-scope', () => {
     expect(Object.isFrozen(e.pair)).toBe(true);
     expect(Object.isFrozen(e.censusScope.excludedSeasons)).toBe(true);
   });
+  // The CURRENT tracked documents: since the 2026 rollover (D-316-1) they carry the adopted successor.
   const activeDocuments = () => {
     const read = (p: string) => JSON.parse(readFileSync(join(process.cwd(), p), 'utf8'));
     return { register: read('data/reference/fitzroy-accepted-baselines.json'),
       contract: read('tools/rebuild/fitzroy/fitzroy-contract.json'), seasons: read('data/reference/seasons.json') };
   };
-  it('resolves and plans the actual predecessor contract without injecting an expectation', () => {
-    const d = activeDocuments();
-    const e = resolveLadderRebuildExpectation(source(), ordinary());
-    expect(e).toEqual(resolveLadderRebuildExpectation(source(), ordinary(), d));
-    expect(e.pair).toMatchObject({ profile: 'predecessor-1897-2025', expected_rows: 1622,
-      first_season: 1897, last_season: 2025 });
-    expect(e.censusScope).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
-    const stages = realPlanStages(ordinary(), source(), { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: true });
-    expect(stages.slice(0, 4).map((s) => s.id)).toEqual(['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate']);
-    expect(stages.at(-1)?.id).toBe('fingerprints');
+  // The explicit predecessor documents exactly as they stood, with their own (not injected) expectation.
+  const rawPredecessorDocuments = () => ({ register: predecessorJson('data/reference/fitzroy-accepted-baselines.json'),
+    contract: predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json'), seasons: predecessorJson('data/reference/seasons.json') });
+  const successorSource = () => ({ ...source(), label: 'c2-2026-final-core-v1' });
+  const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
+  const expectPinsBoundToTrackedManifests = (d: ReturnType<typeof activeDocuments>, e: LadderRebuildExpectation) => {
     const b = d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
     const bytes = readFileSync(join(process.cwd(), b.acquisition.manifest_path));
-    const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
     expect(hash(bytes)).toBe(e.pair.core_manifest_sha256);
     const lines = JSON.parse(bytes.toString()).files.map((f: any) => `${f.filename} ${f.sha256} ${f.row_count}`).sort();
     expect(hash(lines.join('\n') + '\n')).toBe(e.pair.core_artefact_set_sha256);
     expect(hash(readFileSync(join(process.cwd(), d.contract.datasets.ladder.accepted_witness.manifest))))
       .toBe(e.pair.witness_manifest_sha256);
     expect(d.contract.datasets.ladder.rebuild_expectation.evidence_ref).toContain('independent results/H&A');
+  };
+  it('resolves and plans the explicit predecessor contract without injecting an expectation', () => {
+    const d = rawPredecessorDocuments();
+    const e = resolveLadderRebuildExpectation(source(), ordinary(), d);
+    expect(e.pair).toMatchObject({ profile: 'predecessor-1897-2025', expected_rows: 1622,
+      first_season: 1897, last_season: 2025 });
+    expect(e.censusScope).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
+    const stages = realPlanStages(ordinary(), source(), { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: true },
+      predecessorHeightContract, undefined, d);
+    expect(stages.slice(0, 4).map((s) => s.id)).toEqual(['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate']);
+    expect(stages.at(-1)?.id).toBe('fingerprints');
+    expectPinsBoundToTrackedManifests(d, e);
+  });
+  it('state C: resolves and plans the actual contract, the adopted c2-2026-successor, without injecting an expectation', () => {
+    const d = activeDocuments();
+    const e = resolveLadderRebuildExpectation(successorSource(), ordinary());
+    expect(e).toEqual(resolveLadderRebuildExpectation(successorSource(), ordinary(), d));
+    expect(e.pair).toMatchObject({ profile: 'c2-2026-successor', core_snapshot_label: 'c2-2026-final-core-v1',
+      witness_snapshot_label: 'c2-2026-final-ladder-v1', expected_rows: 1640, first_season: 1897, last_season: 2026 });
+    expect(e.censusScope).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
+    // The predecessor source is no longer the accepted one, so it cannot resolve the active contract.
+    expect(() => resolveLadderRebuildExpectation(source(), ordinary())).toThrow(/exactly-one accepted full-history source/);
+    const stages = realPlanStages(ordinary(), successorSource(), { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: true });
+    expect(stages.slice(0, 4).map((s) => s.id)).toEqual(['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate']);
+    expect(stages.at(-1)?.id).toBe('fingerprints');
+    expectPinsBoundToTrackedManifests(d, e);
+    // The 1622 constant stays the predecessor's measurement; the successor carries its own 1640 in its tuple.
     expect(CLUB_SEASONS_EXPECTED.rows).toBe(1622);
   });
-  // AFLDB-ISSUE-323 at the PREDECESSOR state. The successor table ships empty, so no binding is an adopted successor
-  // and every c2-2026-final-* path still demands candidate provenance at the REAL preflight and execution boundaries.
-  // The adopted state's positive path is proven on the post-transition tree (the ISSUE-316 commit 2 suite).
-  describe('AFLDB-ISSUE-323 adopted-successor guard, predecessor state', () => {
-    const successorSource = () => ({ ...source(), label: 'c2-2026-final-core-v1' });
-    // The reviewed tuple's exact values (the transition change set's ladder_successor_tuple), typed here so the
-    // fabrication is as faithful as an attacker could make it; the closed table, not these values, decides.
-    const tuplePair = () => ({ profile: 'c2-2026-successor', core_snapshot_label: 'c2-2026-final-core-v1',
-      core_manifest_sha256: '02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988',
-      core_artefact_set_sha256: '817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e',
-      witness_snapshot_label: 'c2-2026-final-ladder-v1',
-      witness_manifest_sha256: '65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34',
-      first_season: 1897, last_season: 2026, expected_rows: 1640 });
-    const fabricated = (provenance?: { specPath: string; specSha256: string }): RebuildBinding => Object.freeze({
-      source: successorSource(), target: target(), provenance,
-      ladder: { pair: tuplePair(), expectedRows: 1640, firstSeason: 1897, lastSeason: 2026,
-        censusScope: { firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] } } });
-    const predecessorBinding = (): RebuildBinding => {
-      const t = target();
-      return Object.freeze({ source: source(), target: t, ladder: resolveLadderRebuildExpectation(source(), t) });
+  // AFLDB-ISSUE-323 (resolved): the ordinary rebuild of the ADOPTED successor, at the REAL preflight and execution
+  // boundaries over the tracked post-transition state. Exactly the binding that re-derives from the closed successor
+  // table and the tracked documents passes; every other shape still refuses as a candidate without provenance.
+  describe('AFLDB-ISSUE-323 adopted-successor guard, successor state', () => {
+    const opts = { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: false };
+    const adopted = (): RebuildBinding => {
+      const t = target(), s = successorSource();
+      return Object.freeze({ source: s, target: t, ladder: resolveLadderRebuildExpectation(s, t) });
+    };
+    const variant = (change: (b: any) => void): RebuildBinding => {
+      const b = structuredClone(adopted()) as any;
+      change(b);
+      return Object.freeze(b);
     };
     const stubStop = (deps: Deps): Deps => ({ ...deps, runCommand: () => { throw new Error('stub stop'); } });
+    const preflightRefusal = 'Candidate preflight requires external rehearsal provenance.';
+    const executionRefusal = 'Candidate execution requires original external provenance.';
 
-    it('states A and B (before activation): ships an empty successor table, so no binding, however faithful, is an adopted successor', () => {
-      expect(SUCCESSOR_LADDER_TUPLES).toEqual({});
-      expect(isAdoptedSuccessorBinding(undefined)).toBe(false);
-      expect(isAdoptedSuccessorBinding(fabricated())).toBe(false);
-      expect(isAdoptedSuccessorBinding(fabricated({ specPath: '/spec', specSha256: 'a'.repeat(64) }))).toBe(false);
-      expect(isAdoptedSuccessorBinding(predecessorBinding())).toBe(false);
+    it('state C: lets the adopted successor reach every stage of its real bound plan without rehearsal provenance', () => {
+      const b = adopted();
+      expect(Object.keys(SUCCESSOR_LADDER_TUPLES)).toEqual(['c2-2026-successor']);
+      expect(isAdoptedSuccessorBinding(b)).toBe(true);
+      const stages = realPlanStages(b.target, b.source, opts, undefined, b);
+      expect(stages.some((s) => s.argv?.includes('c2-2026-final-core-v1'))).toBe(true);
+      let preflight: unknown;
+      try { realRunPreflight(fakeDeps().deps, opts, b.source, undefined, b); } catch (error) { preflight = error; }
+      expect(String(preflight ?? '')).not.toMatch(/provenance/);
+      // Every stage of the exact plan runs (stub dependencies): no guard stops it, and nothing is mocked into a pass
+      // that the real run would refuse; the real run is the separately recorded disposable rebuild.
+      const f = fakeDeps();
+      const report = executeRebuild(stages, b.target, f.deps, { binding: b });
+      expect(report).toEqual({ executed: stages.map((s) => s.id), ok: true });
+      expect(f.commands.length).toBeGreaterThan(0);
     });
-    it('refuses the fabricated successor binding at the real preflight, before any child runs', () => {
-      const b = fabricated(), f = fakeDeps();
-      expect(() => runPreflight(f.deps, OPTS, b.source, undefined, b)).toThrow('Candidate preflight requires external rehearsal provenance.');
-      expect(() => runPreflight(f.deps, OPTS, b.source)).toThrow('Candidate preflight requires external rehearsal provenance.');
+    it('refuses with no binding at both boundaries, before any child or stage', () => {
+      const b = adopted(), f = fakeDeps();
+      expect(() => realRunPreflight(f.deps, opts, b.source)).toThrow(preflightRefusal);
+      const unbound = realPlanStages(b.target, b.source, opts);
+      expect(() => executeRebuild(unbound, b.target, f.deps)).toThrow(executionRefusal);
+      expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+    });
+    it('refuses the rehearsal-only candidate profile and the candidate pair without provenance', () => {
+      const candidatePair = { profile: 'c2-2026-rehearsal-only', core_snapshot_label: 'c2-2026-final-core-v1',
+        core_manifest_sha256: '02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988',
+        core_artefact_set_sha256: '817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e',
+        witness_snapshot_label: 'c2-2026-final-ladder-v1',
+        witness_manifest_sha256: '65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34',
+        first_season: 1897, last_season: 2026, expected_rows: 1640 };
+      const b = variant((v) => { v.ladder.pair = candidatePair; });
+      expect(isAdoptedSuccessorBinding(b)).toBe(false);
+      const f = fakeDeps();
+      expect(() => realRunPreflight(f.deps, opts, b.source, undefined, b)).toThrow(preflightRefusal);
+      const g = adopted();
+      const stages = realPlanStages(g.target, g.source, opts, undefined, g);
+      expect(() => executeRebuild(stages, g.target, f.deps, { binding: b })).toThrow(executionRefusal);
+      expect(() => checkRebuildBinding(b, 'test')).toThrow('Missing candidate provenance.');
+      // The tracked contract naming the rehearsal-only profile is refused without provenance, whatever the binding.
+      const d = activeDocuments();
+      d.contract.datasets.ladder.rebuild_expectation.profile = 'c2-2026-rehearsal-only';
+      expect(isAdoptedSuccessorBinding(adopted(), d)).toBe(false);
+      expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+    });
+    it.each([
+      ['an unsupported tuple name', (v: any) => { v.ladder.pair.profile = 'c2-2026-successor-unreviewed'; }],
+      ['a wrong core manifest fingerprint', (v: any) => { v.ladder.pair.core_manifest_sha256 = '0'.repeat(64); }],
+      ['a wrong core artefact-set fingerprint', (v: any) => { v.ladder.pair.core_artefact_set_sha256 = '0'.repeat(64); }],
+      ['a wrong witness manifest fingerprint', (v: any) => { v.ladder.pair.witness_manifest_sha256 = '0'.repeat(64); }],
+      ['a wrong witness label', (v: any) => { v.ladder.pair.witness_snapshot_label = 'ladder-20260828'; }],
+      ['a wrong core label', (v: any) => { v.ladder.pair.core_snapshot_label = 'full-history-20260902'; }],
+      ['an altered pair row count', (v: any) => { v.ladder.pair.expected_rows = 1622; }],
+      ['an altered expected row count', (v: any) => { v.ladder.expectedRows = 1622; }],
+      ['an altered season range', (v: any) => { v.ladder.pair.last_season = 2025; v.ladder.lastSeason = 2025; }],
+      ['an altered census scope', (v: any) => { v.ladder.censusScope.excludedSeasons = []; }],
+      ['a mismatched source label', (v: any) => { v.source.label = 'full-history-20260902'; }],
+      ['a partial source', (v: any) => { v.source.acknowledgedPartial = true; }],
+      ['an extra pair field', (v: any) => { v.ladder.pair.supersedes = 'predecessor-1897-2025'; }],
+    ])('refuses %s at both boundaries', (_name, change) => {
+      const b = variant(change), f = fakeDeps();
+      expect(isAdoptedSuccessorBinding(b)).toBe(false);
+      expect(() => realRunPreflight(f.deps, opts, successorSource(), undefined, b)).toThrow(preflightRefusal);
+      // The real plan bound to the genuine binding, executed with the altered one.
+      const g = adopted();
+      const stages = realPlanStages(g.target, g.source, opts, undefined, g);
+      expect(() => executeRebuild(stages, g.target, f.deps, { binding: b })).toThrow(executionRefusal);
+      expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+    });
+    it('refuses a preflight whose source is not the adopted binding\'s own', () => {
+      const b = adopted(), f = fakeDeps();
+      expect(() => realRunPreflight(f.deps, opts, { ...b.source, selection: 'explicit-label' as any }, undefined, b))
+        .toThrow(preflightRefusal);
+      expect(() => realRunPreflight(f.deps, { ...opts, rehearsalLaunchSpec: '/spec', rehearsalLaunchSpecSha256: 'a'.repeat(64) },
+        b.source, undefined, b)).toThrow(preflightRefusal);
       expect(f.commands).toEqual([]);
     });
-    it('refuses a c2-2026-final-* plan with the fabricated binding or none at the real execution, before any stage', () => {
-      const plan = planStages(target(), source(), OPTS);
-      const candidate: Stage[] = JSON.parse(JSON.stringify(plan).replaceAll('full-history-20260902', 'c2-2026-final-core-v1'));
-      expect(candidate.some((s) => s.argv?.includes('c2-2026-final-core-v1'))).toBe(true);
-      for (const binding of [fabricated(), undefined]) {
-        const f = fakeDeps();
-        expect(() => executeRebuild(candidate, target(), f.deps, { binding }))
-          .toThrow('Candidate execution requires original external provenance.');
-        expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
-      }
+    it.each([
+      ['a wrong core manifest pin in the register', (d: any) => { d.register.baselines.find((b: any) => b.acceptance_status === 'accepted').acquisition.manifest_sha256 = '0'.repeat(64); }],
+      ['a wrong witness manifest pin in the contract', (d: any) => { d.contract.datasets.ladder.accepted_witness.manifest_sha256 = '0'.repeat(64); }],
+      ['core manifest bytes that do not hash to the tuple', (d: any) => { d.register.baselines.find((b: any) => b.acceptance_status === 'accepted').acquisition.manifest_path = 'docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json'; }],
+      ['witness manifest bytes that do not hash to the tuple', (d: any) => { d.contract.datasets.ladder.accepted_witness.manifest = 'docs/rebuild-manifests/afltables_fitzroy_core/ladder-20260828.json'; }],
+      ['an unsupported expectation block', (d: any) => { d.contract.datasets.ladder.rebuild_expectation.expected_rows = 1641; }],
+      ['a reopened 2026', (d: any) => { d.seasons.in_progress_seasons = [2026]; }],
+      ['the explicit predecessor documents', (d: any) => { Object.assign(d, rawPredecessorDocuments()); }],
+    ])('is not an adopted successor over %s', (_name, change) => {
+      const d = activeDocuments();
+      change(d);
+      expect(isAdoptedSuccessorBinding(adopted(), d)).toBe(false);
+      expect(isAdoptedSuccessorBinding(adopted(), activeDocuments())).toBe(true);
     });
-    it('keeps the ordinary predecessor rebuild unchanged: guards pass and the real plan reaches its first stage', () => {
-      const b = predecessorBinding();
+    it('refuses an altered, copied or retargeted plan even with the adopted binding', () => {
+      const b = adopted();
+      const plan = () => realPlanStages(b.target, b.source, opts, undefined, b);
+      const copied: Stage[] = JSON.parse(JSON.stringify(plan()));
+      expect(() => executeRebuild(copied, b.target, fakeDeps().deps, { binding: b })).toThrow(executionRefusal);
+      const altered = plan();
+      altered[0] = { ...altered[0], name: `${altered[0].name} (altered)` };
+      expect(() => executeRebuild(altered, b.target, stubStop(fakeDeps().deps), { binding: b }))
+        .toThrow('Rebuild target/plan changed or required full topology omitted.');
+      expect(() => executeRebuild(plan(), target(), stubStop(fakeDeps().deps), { binding: b }))
+        .toThrow('Rebuild target/plan changed or required full topology omitted.');
+      // A plan bound to a structurally equal but different binding object is not this binding's plan.
+      const other = adopted();
+      expect(() => executeRebuild(realPlanStages(other.target, other.source, opts, undefined, other), b.target,
+        fakeDeps().deps, { binding: b })).toThrow(executionRefusal);
+    });
+    it('refuses a successor that claims rehearsal provenance, at resolution and at both boundaries', () => {
+      const provenance = { specPath: join(tmpdir(), 'no-such-spec.json'), specSha256: 'a'.repeat(64) };
+      expect(() => resolveLadderRebuildExpectation(successorSource(), target(), undefined, provenance))
+        .toThrow('A successor profile cannot claim candidate rehearsal purpose.');
+      const b = variant((v) => { v.provenance = provenance; }), f = fakeDeps();
+      expect(isAdoptedSuccessorBinding(b)).toBe(false);
+      // A claimed provenance is held to the candidate's fixed isolated invocation, which an ordinary run is not.
+      expect(() => realRunPreflight(f.deps, opts, b.source, undefined, b))
+        .toThrow('Candidate invocation does not match the reviewed fixed full-runner options/source.');
+      const g = adopted();
+      expect(() => executeRebuild(realPlanStages(g.target, g.source, opts, undefined, g), g.target, f.deps, { binding: b }))
+        .toThrow('Rebuild target/plan changed or required full topology omitted.');
+      expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+    });
+    it('leaves the predecessor unable to borrow the exemption: its pair is no successor tuple', () => {
+      const d = rawPredecessorDocuments();
+      const t = target();
+      const b: RebuildBinding = Object.freeze({ source: source(), target: t, ladder: resolveLadderRebuildExpectation(source(), t, d) });
       expect(b.ladder.pair.profile).toBe('predecessor-1897-2025');
-      const stages = realPlanStages(b.target, b.source, OPTS, undefined, b);
-      let preflight: unknown;
-      try { runPreflight(fakeDeps().deps, OPTS, b.source, undefined, b); } catch (error) { preflight = error; }
-      expect(String(preflight ?? '')).not.toMatch(/provenance/);
-      expect(() => executeRebuild(stages, b.target, stubStop(fakeDeps().deps), { binding: b })).toThrow('stub stop');
+      expect(isAdoptedSuccessorBinding(b, d)).toBe(false);
     });
   });
-  it.each([undefined, null, [], {}, 'predecessor-1897-2025'])('refuses an absent or invalid actual-contract block: %s', (block) => {
+  it('invariant: explicit predecessor plan reaches its first stage with predecessor documents', () => {
+    const s = source(), t = target(), d = rawPredecessorDocuments();
+    const binding = Object.freeze({ source: s, target: t, ladder: resolveLadderRebuildExpectation(s, t, d) });
+    expect(binding.ladder.pair.profile).toBe('predecessor-1897-2025');
+    const check: typeof checkRebuildBinding = (b, checkpoint) => checkRebuildBinding(b, checkpoint, d);
+    const stages = realPlanStages(t, s, OPTS, predecessorHeightContract, binding, d, check);
+    let preflight: unknown;
+    try { realRunPreflight({ ...fakeDeps().deps, checkBinding: check }, OPTS, s, predecessorHeightContract, binding); } catch (error) { preflight = error; }
+    expect(String(preflight ?? '')).not.toMatch(/provenance/);
+    expect(() => executeRebuild(stages, t, { ...fakeDeps().deps, checkBinding: check,
+      runCommand: () => { throw new Error('stub stop'); } }, { binding })).toThrow('stub stop');
+  });
+  it.each([undefined, null, [], {}, 'c2-2026-successor'])('refuses an absent or invalid actual-contract block: %s', (block) => {
     const d = activeDocuments();
     if (block === undefined) delete d.contract.datasets.ladder.rebuild_expectation;
     else d.contract.datasets.ladder.rebuild_expectation = block;
-    expect(() => resolveLadderRebuildExpectation(source(), ordinary(), d)).toThrow(/Missing explicit|Unsupported/);
-    expect(() => realPlanStages(ordinary(), source(), { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: true }, undefined, undefined, d))
+    expect(() => resolveLadderRebuildExpectation(successorSource(), ordinary(), d)).toThrow(/Missing explicit|Unsupported/);
+    expect(() => realPlanStages(ordinary(), successorSource(), { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: true }, undefined, undefined, d))
       .toThrow(/Missing explicit|Unsupported/);
   });
   it.each([undefined, 0, -1, 1.5, '1622', NaN, Number.MAX_SAFE_INTEGER + 1, 1623, 1639, 1640, 1641])('refuses unsupported expected_rows %s', (value) => {
@@ -3577,20 +3726,26 @@ describe('fitzRoy source selection', () => {
     expect(source.selection).toBe('accepted-baseline');
   });
 
-  it('accepts exactly full-history-20260902 from the REAL tracked register', () => {
+  it('accepts exactly c2-2026-final-core-v1 from the REAL tracked register (AFLDB-ISSUE-316 D-316-1)', () => {
     const real = resolveFitzroySource({});
-    expect(real.label).toBe('full-history-20260902');
+    expect(real.label).toBe('c2-2026-final-core-v1');
     expect(real.accepted).toBe(true);
     expect(real.selection).toBe('accepted-baseline');
-    // AFLDB-ISSUE-112: full-history-20260827 is still IN the register, retired. Selection
-    // must come from acceptance_status, never from label order, date or filename.
-    expect(real.label).not.toBe('full-history-20260827');
+    // Both earlier baselines are still IN the register, retired. Selection must come from
+    // acceptance_status, never from label order, date or filename.
+    expect(['full-history-20260827', 'full-history-20260902']).not.toContain(real.label);
   });
 
-  it('refuses the retired predecessor by label on the normal path', () => {
-    // The retired baseline is historical evidence, not a selectable source.
-    expect(() => resolveFitzroySource({ fitzroyLabel: 'full-history-20260827' }))
-      .toThrow(/is not the accepted canonical baseline \('full-history-20260902'\)/);
+  it('accepted exactly full-history-20260902 from the predecessor register', () => {
+    const before = resolveFitzroySource({}, { readAcceptedRegister: () => predecessorJson('data/reference/fitzroy-accepted-baselines.json') });
+    expect(before.label).toBe('full-history-20260902');
+    expect(before.accepted).toBe(true);
+  });
+
+  it.each(['full-history-20260827', 'full-history-20260902'])('refuses the retired %s by label on the normal path', (label) => {
+    // A retired baseline is historical evidence, not a selectable source.
+    expect(() => resolveFitzroySource({ fitzroyLabel: label }))
+      .toThrow(/is not the accepted canonical baseline \('c2-2026-final-core-v1'\)/);
   });
 
   it('never selects trial-2024 on the normal path', () => {
@@ -3745,9 +3900,10 @@ describe('fitzRoy preflight', () => {
  * fingerprint. It never blesses: the independent validator remains the sole authority, and
  * these tests prove the binding cannot be satisfied by a hand-edited record.
  */
-describe('accepted canonical baseline', () => {
-  const REGISTER_PATH = join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json');
-  const registerText = readFileSync(REGISTER_PATH, 'utf8');
+// The register AS IT WAS ACCEPTED before the 2026 rollover: the explicit predecessor fixture. Its acceptance
+// history is retained evidence; the adopted successor is proven by the describe that follows.
+describe('accepted canonical baseline (the predecessor register, before the 2026 rollover)', () => {
+  const registerText = predecessorText('data/reference/fitzroy-accepted-baselines.json');
   const registerJson = JSON.parse(registerText);
   const accepted = registerJson.baselines
     .filter((b: any) => b.acceptance_status === 'accepted');
@@ -3891,8 +4047,7 @@ describe('accepted canonical baseline', () => {
   });
 
   it('binds acceptance to the contract and adapter versions', () => {
-    const contract = JSON.parse(readFileSync(
-      join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const contract = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
     const b = accepted[0].contract_binding;
     expect(b.contract_version).toBe(contract.contract_version);
     expect(b.contract_full_history_version)
@@ -3940,8 +4095,7 @@ describe('accepted canonical baseline', () => {
     expect(c.import_transformation[0].players_affected).toBe(4);
     // AFLDB-ISSUE-136: the four renumbered-profile continuity rules are an accepted
     // identity correction of this baseline, bound by rule id to the contract.
-    const contract = JSON.parse(readFileSync(
-      join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const contract = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
     const ruleIds = (contract.profile_url_continuity.rules as { id: string }[])
       .map((r) => r.id).sort();
     expect(c.identity_continuity[0].kind).toBe('profile_url_continuity');
@@ -3990,6 +4144,82 @@ describe('accepted canonical baseline', () => {
       expect(src).not.toContain('AFLDB_LEGACY_SQLITE]');
     }
     expect(registerText).not.toContain('sqlite');
+  });
+});
+
+/*
+ * AFLDB-ISSUE-316 D-316-1 — the register AFTER the 2026 rollover. The rollover accepted
+ * c2-2026-final-core-v1 and retired full-history-20260902 by moving its status alone: every hash,
+ * measurement and comment of both earlier entries is byte-identical to the predecessor register.
+ */
+describe('accepted canonical baseline after the 2026 rollover (AFLDB-ISSUE-316 D-316-1)', () => {
+  const registerJson = JSON.parse(readFileSync(join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+  const predecessor = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
+  const byLabel = (r: any, label: string) => r.baselines.find((b: any) => b.snapshot_label === label);
+  const accepted = registerJson.baselines.filter((b: any) => b.acceptance_status === 'accepted');
+  const manifestBytes = readFileSync(join(root, 'docs', 'rebuild-manifests', 'afltables_fitzroy_core', 'c2-2026-final-core-v1.json'));
+  const manifest = JSON.parse(manifestBytes.toString('utf8'));
+  const lfSha = (bytes: Buffer) => createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+  const setDigest = (files: any[]) => createHash('sha256')
+    .update(`${files.map((f) => `${f.filename} ${f.sha256} ${f.row_count}`).sort().join('\n')}\n`).digest('hex');
+
+  it('accepts exactly one baseline, c2-2026-final-core-v1, beside two retired ones', () => {
+    expect(registerJson.baselines.map((b: any) => [b.snapshot_label, b.acceptance_status])).toEqual([
+      ['full-history-20260827', 'retired'], ['full-history-20260902', 'retired'], ['c2-2026-final-core-v1', 'accepted'],
+    ]);
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]).toMatchObject({ accepted_on: '2026-10-27',
+      snapshot_dir: 'data/sources/afltables/fitzroy_core/c2-2026-final-core-v1' });
+    expect(registerJson.selection_policy).toEqual(predecessor.selection_policy);
+  });
+
+  it('retired full-history-20260902 by its status alone and left full-history-20260827 untouched', () => {
+    const { acceptance_status: was, ...before } = byLabel(predecessor, 'full-history-20260902');
+    const { acceptance_status: now, ...after } = byLabel(registerJson, 'full-history-20260902');
+    expect([was, now]).toEqual(['accepted', 'retired']);
+    expect(after).toEqual(before);
+    expect(byLabel(registerJson, 'full-history-20260827')).toEqual(byLabel(predecessor, 'full-history-20260827'));
+  });
+
+  it('binds the acceptance to the tracked manifest bytes and its artefact set', () => {
+    expect(accepted[0].acquisition.manifest_path).toBe('docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json');
+    expect(accepted[0].acquisition.manifest_sha256).toBe(lfSha(manifestBytes));
+    expect(accepted[0].acquisition.manifest_sha256).toBe('02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988');
+    expect(accepted[0].raw_artefacts.artefact_set_sha256).toBe(setDigest(manifest.files));
+    expect(accepted[0].raw_artefacts.artefact_set_sha256).toBe('817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e');
+    expect(accepted[0].raw_artefacts.file_count).toBe(manifest.files.length);
+    expect(accepted[0].raw_artefacts.file_count).toBe(132);
+    expect(accepted[0].raw_artefacts.total_rows).toBe(manifest.files.reduce((n: number, f: any) => n + f.row_count, 0));
+    // The manifest's self-declared verdict fields stay inert, as for every earlier acceptance.
+    expect([manifest.full_history, manifest.completeness, manifest.snapshot_label]).toEqual([false, 'unvalidated', 'c2-2026-final-core-v1']);
+  });
+
+  it('binds the completed range 1897-2026 to the tracked contract and its pinned versions', () => {
+    const contract = JSON.parse(readFileSync(join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const b = accepted[0].contract_binding;
+    expect(b.required_range).toEqual({ first_season: 1897, last_season: 2026 });
+    expect(b.contract_version).toBe(contract.contract_version);
+    expect(b.contract_full_history_version).toBe(contract.full_history.contract_full_history_version);
+    expect(b.required_datasets).toEqual(contract.full_history.required_datasets);
+    expect(accepted[0].acquisition.fitzroy_version_pinned).toBe(contract.pinned_version);
+    expect(accepted[0].acquisition.adapter_schema_version).toBe(manifest.adapter_schema_version);
+  });
+
+  it('records the validator verdict, the drift gates and the corrections by contract rule id', () => {
+    expect(accepted[0].validation).toMatchObject({ verdict: 'PASSED', database_accessed: false,
+      authority: 'tools/migration/import_fitzroy_core.py' });
+    expect(accepted[0].validation.command).toContain('--require-full-history');
+    expect(accepted[0].measured).toMatchObject({ seasons_first: 1897, seasons_last: 2026, matches: 17056,
+      players_with_renumbered_profile: 4, brownlow_round_vote_rows: 320861 });
+    const contract = JSON.parse(readFileSync(join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const ruleIds = (contract.profile_url_continuity.rules as { id: string }[]).map((r) => r.id).sort();
+    const c = accepted[0].accepted_corrections;
+    expect(c.source_data[0].rows_dropped).toBe(2);
+    // The same four ISSUE-136 players, now over the 2026 rows too: 79 rows in 2025 became 150.
+    expect([c.import_transformation[0].rows_affected, c.import_transformation[0].players_affected]).toEqual([150, 4]);
+    expect([c.identity_continuity[0].rows_affected, c.identity_continuity[0].players_affected]).toEqual([150, 4]);
+    expect([...c.identity_continuity[0].rule_ids].sort()).toEqual(ruleIds);
+    expect(ruleIds).toHaveLength(4);
   });
 });
 
@@ -4049,7 +4279,9 @@ describe('acquisition contract', () => {
 
   it('keeps the current season and AFLW out of this snapshot', () => {
     const fh = contract.full_history;
-    expect(fh.current_season_excluded.reason).toMatch(/current-season pipeline/);
+    // The reason names the excluded in-progress season and the current-season owner that holds it.
+    expect(fh.current_season_excluded.reason).toMatch(/current-season (pipeline|path)/);
+    for (const season of fh.current_season_excluded.seasons) expect(fh.current_season_excluded.reason).toContain(String(season));
     expect(fh.aflw_excluded.reason).toMatch(/aflwstats\.com|staging_aflw/);
   });
 
@@ -4157,7 +4389,7 @@ describe('stage graph', () => {
         } } },
       });
       const accepted = () => {
-        const doc = JSON.parse(readFileSync(join(root, 'data/reference/fitzroy-accepted-baselines.json'), 'utf8'));
+        const doc = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
         doc.baselines.find((b: { acceptance_status: string }) => b.acceptance_status === 'accepted').snapshot_label = FULL_LABEL;
         return doc;
       };
@@ -4198,7 +4430,7 @@ describe('stage graph', () => {
             expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
           }
           const run = passing();
-          runPreflight(run.deps, OPTS, fitzroy(), read);
+          predecessorPreflight(run.deps, OPTS, fitzroy(), read);
           expect(run.commands).toContainEqual([...h, '--validate-only']);
           expect(run.commands).toContainEqual([...c, '--validate-only']);
           expect(run.sqlRuns).toEqual([]);
@@ -4221,7 +4453,7 @@ describe('stage graph', () => {
         });
 
       it('preserves legacy supplemented argv, order, manifest proofs and final expectations', () => {
-        const real = JSON.parse(readFileSync(join(root, 'tools/rebuild/fitzroy/fitzroy-contract.json'), 'utf8'));
+        const real = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
         const explicit = structuredClone(real);
         explicit.datasets.player_details.height_enrichment.stats_input_mode = 'supplemented_baseline';
         const read = () => explicit;
@@ -4313,7 +4545,7 @@ describe('stage graph', () => {
                 ? { status: 1, stdout: '', stderr: 'fixture manifest/hash failure' }
                 : run.deps.runCommand(argv, env) };
             let error: unknown;
-            try { runPreflight(deps, OPTS, fitzroy(), read); } catch (e) { error = e; }
+            try { predecessorPreflight(deps, OPTS, fitzroy(), read); } catch (e) { error = e; }
             expect(error).toBeInstanceOf(RebuildRefused);
             expect(String(error)).toMatch(message);
             expect(String(error)).toContain('Nothing has been destroyed');
@@ -4362,8 +4594,7 @@ describe('stage graph', () => {
     it('refuses a contract with no height pin, and a pin whose manifest does not hash to its binding', () => {
       expect(() => heightEnrichmentPins(() => ({ datasets: { player_details: {} } })))
         .toThrow(/records no height enrichment binding/);
-      const real = JSON.parse(readFileSync(
-        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const real = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
       const tampered = structuredClone(real);
       tampered.datasets.player_details.height_enrichment.supplements[0].manifest_sha256 = '0'.repeat(64);
       expect(() => heightEnrichmentPins(() => tampered)).toThrow(/hashes to/);
@@ -4406,8 +4637,7 @@ describe('stage graph', () => {
       expect(keys).toEqual(['players_with_height', 'height_without_evidence',
                             'height_conflicts_open', 'players_with_afl_api_height_evidence',
                             'players_with_wikipedia_height_evidence']);
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       expect(finalValidationChecks(register).map((c) => c.key)).toEqual(expect.arrayContaining(keys));
       expect(heightChecks().find((c) => c.key === 'players_with_height')!.expected).toBeGreaterThan(12000);
     });
@@ -4489,8 +4719,7 @@ describe('stage graph', () => {
       expect(byKey.club_list_birth_conflict_players.sql).toMatch(/count\(DISTINCT e\.dob\) > 1/);
       expect(byKey.dob_disagreeing_with_club_list.sql).toMatch(/p\.dob <> e\.dob/);
       for (const c of checks) expect(c.sql).not.toMatch(/'afltables_club_list'.*'wikipedia'/);
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the height gates, in stage order.
@@ -4556,10 +4785,10 @@ describe('stage graph', () => {
           return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
         },
       });
-      runPreflight(withFailing(), OPTS, fitzroy());
+      predecessorPreflight(withFailing(), OPTS, fitzroy());
       const validate = commands.filter((a) => a.includes('--validate-only'));
       expect(validate.some((a) => a.includes(COACH_LOADER) && a.includes(afltablesCoachesPin().label) && a.includes(FULL_LABEL))).toBe(true);
-      expect(() => runPreflight(withFailing(COACH_LOADER), OPTS, fitzroy()))
+      expect(() => predecessorPreflight(withFailing(COACH_LOADER), OPTS, fitzroy()))
         .toThrow(/Coaches preflight failed[\s\S]*Nothing has been destroyed/);
       // The predecessor keeps its reviewed parsed-only behaviour: no raw replay flag.
       expect(commands.filter((a) => a.includes(COACH_LOADER)).every((a) => !a.includes('--require-raw-bundle'))).toBe(true);
@@ -4571,7 +4800,7 @@ describe('stage graph', () => {
         afltablesCoachesPin().rawBundle!.filename);
       // The predecessor's own resolved expectation, relabelled: only the profile decides the requirement.
       const swapped = (profile: string): RebuildBinding => {
-        const ladder = resolveLadderRebuildExpectation(fitzroy(), target());
+        const ladder = predecessorExpectation();
         return { source: fitzroy(), target: target(), ladder: { ...ladder, pair: { ...ladder.pair, profile } } };
       };
       const recording = (opts: { failCoach?: boolean; missing?: string } = {}) => {
@@ -4678,8 +4907,7 @@ describe('stage graph', () => {
       expect(byKey.coaches_linked_to_players.sql).toMatch(/link_status_value = 'unique'/);
       expect(byKey.matches_without_coach.sql).toMatch(/LEFT JOIN match_coaches/);
       for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|name_key/); // never a name
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the birth-date gates, in stage order.
@@ -4768,8 +4996,7 @@ describe('stage graph', () => {
       expect(byKey.father_son_links_outside_trusted_status.expected).toBe(0);
       expect(byKey.player_relationships_parent_child.expected).toBe(m.selections);
       for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|_name_raw|drafted_player_name|father_name/); // never a name
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the coach gates, in stage order.
@@ -4865,8 +5092,7 @@ describe('stage graph', () => {
       expect(byKey.sibling_self_pairs.expected).toBe(0);
       expect(byKey.sibling_duplicate_pairs.expected).toBe(0);
       for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|_name_raw|person_a_name|person_b_name|family_key/); // never a name or a family
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the father–son gates, in stage order.
@@ -4963,8 +5189,7 @@ describe('stage graph', () => {
       expect(byKey.after_siren_duplicate_events.expected).toBe(0);
       expect(byKey.after_siren_rows_missing_provenance.expected).toBe(0);
       for (const c of checks) expect(c.sql).not.toMatch(/player_name|club_name_raw|opponent_name_raw/); // never a name
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the sibling gates, in stage order.
@@ -5055,8 +5280,7 @@ describe('stage graph', () => {
         expect(c.sql).toContain("s.key = 'wikipedia_first_kick_goal' AND a.achievement_type = 'first_kick_goal'");
         expect(c.sql).not.toMatch(/player_name|club_name_raw/);
       }
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       expect(all.indexOf('first_kick_goal_rows')).toBeGreaterThan(all.indexOf('after_siren_kicks'));
@@ -5172,8 +5396,7 @@ describe('stage graph', () => {
     });
 
     it('cross-checks against the label the tracked contract accepts', () => {
-      const contract = JSON.parse(readFileSync(
-        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const contract = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
       const accepted = contract.datasets.ladder.accepted_witness;
       expect(witness.argv).toContain(accepted.snapshot_label);
       expect(witness.argv).toContain('--compare');
@@ -5194,8 +5417,7 @@ describe('stage graph', () => {
       // as the core register at :425-427: .gitattributes renders these bytes LF on
       // every checkout, so the canonical LF hash is the only binding that can pass,
       // and the assertion itself must not depend on the working copy's endings.
-      const contract = JSON.parse(readFileSync(
-        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const contract = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
       const accepted = contract.datasets.ladder.accepted_witness;
 
       // The validator derives the manifest as `<manifest_dir>/<label>.json`, so a
@@ -5505,12 +5727,30 @@ describe('final validation', () => {
     expect(report.failedStage).toBe('fingerprints');
   });
 
-  it('takes its expected values from the tracked register, not from this file', () => {
+  it('invariant: takes predecessor final-check values from its explicit register fixture', () => {
+    const tracked = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
+    const accepted = tracked.baselines.find((b: Record<string, unknown>) => b.acceptance_status === 'accepted');
+    const checks = finalValidationChecks(tracked);
+    for (const [key, value] of Object.entries(accepted.measured)) {
+      if (key.startsWith('$')) continue;
+      const check = checks.find((c) => c.key === key);
+      if (check) expect(check.expected).toBe(value);
+    }
+    for (const key of ['matches', 'player_match_rows', 'brownlow_round_vote_rows']) {
+      expect(checks.map((c) => c.key)).toContain(key);
+    }
+  });
+
+  it('state C: takes its expected values from the tracked register, not from this file', () => {
+    // Since the 2026 rollover (D-316-1) the tracked register, contract and ladder are the adopted successor's.
     const tracked = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
     const accepted = tracked.baselines.find((b: Record<string, unknown>) =>
       b.acceptance_status === 'accepted');
-    const checks = finalValidationChecks(tracked);
+    const ladder = resolveLadderRebuildExpectation({ label: accepted.snapshot_label, accepted: true, fullHistory: true,
+      acknowledgedPartial: false, selection: 'accepted-baseline' }, target());
+    expect(ladder.pair.profile).toBe('c2-2026-successor');
+    const checks = realFinalValidationChecks(tracked, undefined, undefined, ladder);
     for (const [key, value] of Object.entries(accepted.measured)) {
       if (key.startsWith('$')) continue;
       const check = checks.find((c) => c.key === key);
@@ -14188,7 +14428,8 @@ describe('AFLDB-ISSUE-233 D-233-3 — afl_api ownership census before the reset'
     const census = planStages(target(), fitzroy(), OPTS)[1];
     expect(census).toMatchObject({ kind: 'validation', run: 'validate' });
     expect(census.argv).toBeUndefined();
-    expect(census.sql).toBe(aflApiOwnershipCensusSql());
+    // The plan is the predecessor's, so its census judges the predecessor's completed scope.
+    expect(census.sql).toBe(aflApiOwnershipCensusSql(predecessorExpectation().censusScope));
   });
 
   it('is in every plan, whatever the options: there is no way to leave it out', () => {
@@ -14223,11 +14464,14 @@ describe('AFLDB-ISSUE-233 D-233-3 — afl_api ownership census before the reset'
     const scope = aflApiOwnershipCensusScope();
     expect(scope).toEqual(rebuildCensusScope(
       readJson('tools/rebuild/fitzroy/fitzroy-contract.json'), readJson('data/reference/seasons.json')));
-    expect(scope).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
+    // Since the 2026 rollover (D-316-1) 2026 is completed and 2027 is the in-progress season.
+    expect(scope).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
     const sql = aflApiOwnershipCensusSql(scope);
     expect(sql).toContain('first_season int := 1897;');
-    expect(sql).toContain('last_season  int := 2025;');
-    expect(sql).toContain('excluded     int[] := ARRAY[2026]::int[];');
+    expect(sql).toContain('last_season  int := 2026;');
+    expect(sql).toContain('excluded     int[] := ARRAY[2027]::int[];');
+    // The predecessor documents judged 1897-2025 with 2026 excluded, exactly as before.
+    expect(aflApiOwnershipCensusScope(predecessorJson)).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
   });
 
   it('never treats an in-progress season as completed, even if the documents disagree', () => {

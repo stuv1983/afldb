@@ -102,6 +102,20 @@ const BASELINE_NOTE =
   'Sealed AFLDB history held in PostgreSQL. No committed AFL API fixture and test reproduces this season, so it is not API-rebuildable.';
 
 /**
+ * AFLDB-ISSUE-316: 2027, the season the 2026 rollover (D-316-1) opened. Nothing of it is acquired or committed,
+ * so ADR 0011's default for a season outside verified coverage applies: an open season can never be
+ * historical_baseline, and no stored fixture or test supports an api_* claim, so every family is unsupported
+ * until stored evidence re-grades it. This is a statement about evidence only: it records no value, no zero and
+ * no completeness for 2027.
+ */
+const OPEN_2027 = [
+  documentEvidence('docs/v2/adr/0011-coverage-registry.md', '(sealed, `docs/v2/historical-baseline.md`) or `unsupported`.'),
+  referenceEvidence('data/reference/seasons.json', '"2027": "Season in progress at time of import."'),
+];
+const OPEN_2027_NOTE =
+  'Season 2027 is in progress and nothing of it is acquired: no 2027 AFL API fixture or test is committed, so nothing is claimed and no value, zero or completeness is implied. Not API-rebuildable (the ADR 0011 default for an open season outside verified coverage). Re-grade with stored evidence once 2027 data is captured.';
+
+/**
  * The coverage claims. Anything not listed as api_verified or api_partial is NOT API-rebuildable.
  * Update this list, then run `npx tsx tools/v2/coverage-matrix.ts --write`, in the same change.
  */
@@ -139,6 +153,11 @@ export const COVERAGE_REGISTRY: readonly CoverageEntry[] = [
     ],
     note: 'Concluded matches only. The stored feed lists 218 matches, but today\'s match contract refuses the SCHEDULED and UNCONFIRMED_TEAMS records (no score block); the pre-match fixture projection is unbuilt (AFLDB-ISSUE-229 B2 open).',
   },
+  {
+    family: 'fixtures', from: 2027, through: 2027, status: 'unsupported',
+    evidence: OPEN_2027,
+    note: OPEN_2027_NOTE,
+  },
 
   // --- results ----------------------------------------------------------------------------------
   {
@@ -156,6 +175,11 @@ export const COVERAGE_REGISTRY: readonly CoverageEntry[] = [
     ],
     note: 'Evidence is one concluded match (CD_M20260142801) projected through the match contract from a stored fixture, plus the stored 2026 season feed proven complete (218 entries; 217 CONCLUDED, 1 SCHEDULED).',
   },
+  {
+    family: 'results', from: 2027, through: 2027, status: 'unsupported',
+    evidence: OPEN_2027,
+    note: OPEN_2027_NOTE,
+  },
 
   // --- match_stats ------------------------------------------------------------------------------
   {
@@ -172,6 +196,11 @@ export const COVERAGE_REGISTRY: readonly CoverageEntry[] = [
     ],
     note: 'Period scores only, from the match roster recentMatchScores. No team-totals fixture is committed.',
   },
+  {
+    family: 'match_stats', from: 2027, through: 2027, status: 'unsupported',
+    evidence: OPEN_2027,
+    note: OPEN_2027_NOTE,
+  },
 
   // --- player_stats -----------------------------------------------------------------------------
   {
@@ -187,6 +216,11 @@ export const COVERAGE_REGISTRY: readonly CoverageEntry[] = [
       testEvidence(MATCH_TEST, 'the match, player_match_stats and brownlow fixtures project with no undeclared column'),
     ],
     note: 'Limitation: the evidence is one stored player-statistics sample (two sides) projected through the player_match_stats emitter; no whole-season player-statistics capture is committed, and the sample carries no match or season id (the match is paired by the test). Graded api_partial, not api_verified, by the orchestrator (Launch B, plan section 7).',
+  },
+  {
+    family: 'player_stats', from: 2027, through: 2027, status: 'unsupported',
+    evidence: OPEN_2027,
+    note: OPEN_2027_NOTE,
   },
 
   // --- brownlow ---------------------------------------------------------------------------------
@@ -231,6 +265,11 @@ export const COVERAGE_REGISTRY: readonly CoverageEntry[] = [
       referenceEvidence(STAT_AVAILABILITY, '"stat_key": "brownlow_season_total", "coverage": "pending"'),
     ],
     note: 'The vote-set and leaderboard contract is tested on stored mid-season samples (status IN_PROGRESS); the 2026 count is not complete (Brownlow pending).',
+  },
+  {
+    family: 'brownlow', from: 2027, through: 2027, status: 'unsupported',
+    evidence: OPEN_2027,
+    note: OPEN_2027_NOTE,
   },
 ];
 

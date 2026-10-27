@@ -169,7 +169,8 @@ const CONTRIBUTOR_USER: AdminUser = { id: 3, email: 'contributor@example.invalid
 const NOW = () => new Date('2026-10-19T12:00:00Z');
 const OPTIONS = { now: NOW };
 // SYNTHETIC sealed range 1897-1899: curated fixtures in 1990 are OPEN under it. REAL_SEALED is the
-// committed registry: 1990 and 2024 are sealed in it, 2026 is in progress.
+// committed registry: 1990, 2024 and (since the 2026 rollover, AFLDB-ISSUE-316 D-316-1) 2026 are sealed
+// in it, and 2027 is in progress.
 const SYNTHETIC_OPEN = { from: 1897, through: 1899, open: [] as number[] };
 const REAL_SEALED = sealedSeasonsFrom(REGISTRY);
 
@@ -1140,10 +1141,18 @@ describe('Coleman: server callers on PGlite', () => {
 
   it('publish refuses a season that is not sealed (in progress): the derivation refuses, nothing is written', async () => {
     const { deps } = makeDeps();
-    const result = await publishColemanSeason(SUPER_USER, { season: 2026, settled: true, note: NOTE }, deps);
+    expect(REGISTRY.in_progress_seasons).toEqual([2027]);
+    const result = await publishColemanSeason(SUPER_USER, { season: 2027, settled: true, note: NOTE }, deps);
     expect(result).toMatchObject({ ok: false, code: 'derivation_refused', derivationCode: 'season_not_complete' });
     expect(await count('derived_award_results')).toBe(0);
     expect(auditMock.mock.calls[0][1]).toMatchObject({ code: 'derivation_refused', derivationCode: 'season_not_complete' });
+  });
+
+  it('sealed 2026 is no longer refused as in progress: it reaches the derivation, which refuses this stub on its rounds', async () => {
+    const { deps } = makeDeps();
+    const result = await publishColemanSeason(SUPER_USER, { season: 2026, settled: true, note: NOTE }, deps);
+    expect(result).toMatchObject({ ok: false, code: 'derivation_refused', derivationCode: 'incomplete_rounds' });
+    expect(await count('derived_award_results')).toBe(0);
   });
 
   it('publish refuses a NULL goal in a home-and-away row (not recorded is not zero) and writes nothing', async () => {
@@ -1584,7 +1593,7 @@ describe('Server Actions: the Coleman workflow end to end', () => {
     expect(repeat).toMatchObject({ ok: true, publication: { outcome: 'unchanged', id: 1 } });
     expect(await count('derived_award_results')).toBe(1);
 
-    expect(await publishColemanSeasonAction({}, form({ season: '2026', settled: 'on', note: LONG_NOTE })))
+    expect(await publishColemanSeasonAction({}, form({ season: '2027', settled: 'on', note: LONG_NOTE })))
       .toMatchObject({ code: 'derivation_refused', derivationCode: 'season_not_complete' });
     expect(JSON.parse(JSON.stringify(published))).toEqual(published);
   });

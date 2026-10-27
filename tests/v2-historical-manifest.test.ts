@@ -37,6 +37,7 @@ import {
 } from '@afldb/domain';
 
 import { parseCliArgs, runCompare, CliUsageError } from '../tools/v2/historical-manifest';
+import { predecessorJson } from './rollover-predecessor-fixture';
 
 const ROOT = process.cwd();
 const FIXTURE = join(ROOT, 'tests/fixtures/v2/historical-manifest/before.synthetic.json');
@@ -113,9 +114,13 @@ describe('HISTORICAL_TABLES against the migrations', () => {
 });
 
 describe('sealed seasons', () => {
-  it('reads 1897-2025 from the real seasons registry (2026 in progress)', () => {
+  it('reads 1897-2026 from the real seasons registry (2027 in progress since the 2026 rollover)', () => {
     const registry = JSON.parse(readFileSync(join(ROOT, 'data/reference/seasons.json'), 'utf8'));
-    expect(sealedSeasonsFrom(registry)).toEqual({ from: 1897, through: 2025, open: [] });
+    expect(sealedSeasonsFrom(registry)).toEqual({ from: 1897, through: 2026, open: [] });
+  });
+
+  it('read 1897-2025 from the explicit predecessor registry (2026 in progress)', () => {
+    expect(sealedSeasonsFrom(predecessorJson('data/reference/seasons.json'))).toEqual({ from: 1897, through: 2025, open: [] });
   });
 
   it('keeps an in-progress season inside the range open, and refuses nonsense', () => {
