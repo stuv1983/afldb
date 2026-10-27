@@ -16,10 +16,10 @@ and 021 and 028 are closed locally; 016 has its publication and 98-season eviden
 open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
 not technical inspection. Gap 026 now requires the host/production-data rehearsal, not local
 application rollback. The historical Launch F counts below are retained as history.
-Current register: **33 total / 15 closed / 18 open**, including the separately tracked strict
+Current register: **34 total / 16 closed / 18 open**, including the separately tracked strict
 historical-source/membership verification gap 029. Gap 020 was closed on 2026-10-27 as an accepted product constraint
-(owner decision). Gaps 032 and 033 were found and closed locally on 2026-10-28 (the R43b NL inspection and the
-R32/ISSUE-208 cross-domain analysis). No remaining failed test is treated as green.
+(owner decision). Gaps 032, 033 and 034 were found and closed locally on 2026-10-28 (the R43b NL inspection, the
+R32/ISSUE-208 cross-domain analysis and the R32/ISSUE-090 D4 item). No remaining failed test is treated as green.
 
 `V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
 close it. A gap is marked CLOSED only when its closing evidence exists; closed entries are kept
@@ -70,6 +70,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-031 | High | Brownlow ingestion | operational | open: all 207 2025 vote sets refuse `ownership_indeterminate` (source-less legacy rows); canonical ingestion verified on a clean target; reviewed reversible legacy-ownership adoption demonstrated on a clone only (207/207 sets, 621 rows); production adoption unapplied | OD-BROWNLOW-OWNERSHIP-1 approved as policy only; guarded runner/schema review and fresh execution approval pending ([package](brownlow-production-approval-package-2026-10-20.md)) |
 | V2-GAP-032 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: an unclaimed bare number is a leftover token (parser v67), so `<club> <stat> 200 40` declines and `in 1980 to 1989` is the inclusive range, not 1980 alone; whole malformed_input population (10,179) declines; 17 NL suites 1,638/1,638; typecheck exit 0. Not deployed | none |
 | V2-GAP-033 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: "played N games for <club> and also coached <club>" no longer counts career games at every club; `validatePlan` refuses a games condition when the played club is a builder parameter; the cross-domain opponent window is kept wide on purpose; 17 NL suites 1,641/1,641; typecheck exit 0. Not deployed | none |
+| V2-GAP-034 | Low | Birth-date enrichment | no | **CLOSED locally (2026-10-28)**: `enrich_birth_dates.py` no longer files a new open `external_identity_conflict` on every re-run; scoped delete-then-refile over the run's asserted profiles (ISSUE-090 §18 idiom), resolved history and other sources untouched; integration test 28 failed before (2 rows) and the file passes 28/28 on a disposable local `_test` copy. Not deployed | none |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -914,3 +915,25 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
 - **Validation (DB-free).** 17 NL suites 1,641/1,641, with 3 new cases in `tests/nl-parser.test.ts`
   and `tests/nl-plan.test.ts`. `npm run typecheck` exit 0. No retained corpus expects the composition
   to answer. Not run: PostgreSQL answers.
+
+## V2-GAP-034 — The birth-date enricher filed a new open `external_identity_conflict` on every re-run
+
+- **CLOSED locally, 2026-10-28** (the ISSUE-090 D4 item of `blockers.md` R32; recorded at ISSUE-090
+  §18 as "not raised as a tracked issue"). Not deployed.
+- **What.** `tools/migration/enrich_birth_dates.py` wrote `external_identity_conflict` (a stored AFL
+  Tables profile link that disagrees with the register) with an unconditional `INSERT` and no
+  clearing step. Each re-run of a still-conflicting profile added another open `data_issues` row,
+  and a conflict that had cleared stayed open. This was reproduced on a disposable local database:
+  two runs gave 2 open rows for one profile.
+- **Fix.** This is the ISSUE-090 §18 idiom that the same file already uses for
+  `dob_internal_conflict`. Before refiling, the run deletes the unresolved
+  `external_identity_conflict` rows for the profiles it asserts, and new rows record `source_id` in
+  `details`. Resolved rows are never touched, and a row naming another `source_id` is not this run's
+  to delete. Older rows carry no `source_id` and are treated as the running source's.
+- **Validation.** `tests/integration/dob-enrichment-issues.test.ts` test 28 (new) covers four things:
+  two runs leave one open row; a resolved row is kept while the still-holding conflict is refiled; a
+  cleared conflict is withdrawn; another source's row is untouched. It failed before the fix (2
+  rows) and passes after. The whole file passed 28/28 on the disposable `afldb_v2_d4_test`, created
+  from the isolated `afldb_v2_rb_final_test` (cluster `afldb_v2_isolated`, 127.0.0.1:55433), and that
+  database was dropped afterwards. `py_compile` passed. `draftguru-import` and `fitzroy-core-import`
+  passed 162 (1 skipped). Not run: Linux, `release-gates`.

@@ -597,6 +597,21 @@ def main() -> int:
                     f"    profile {external_id} already maps to player {stored}, "
                     f"not {wanted}; left unchanged"
                 )
+            # D4 (AFLDB-ISSUE-090 §18): scoped delete-then-refile over the
+            # profiles this run asserts, the dob_internal_conflict idiom, so a
+            # re-run never files a second open row and a cleared conflict is
+            # withdrawn. Resolved rows are history and are never touched; a
+            # row naming another source_id is not this run's (older rows
+            # carry none and are treated as this source's).
+            cur.execute(
+                """DELETE FROM data_issues
+                    WHERE entity_type = 'player'
+                      AND issue_type = 'external_identity_conflict'
+                      AND resolved_at IS NULL
+                      AND details->>'external_id' = ANY(%s)
+                      AND COALESCE(details->>'source_id', %s) = %s""",
+                (list(intended), str(source_id), str(source_id)),
+            )
             cur.executemany(
                 """INSERT INTO data_issues
                      (entity_type, entity_id, issue_type, severity,
@@ -613,6 +628,7 @@ def main() -> int:
                             "external_id": external_id,
                             "stored_player_id": stored,
                             "asserted_player_id": wanted,
+                            "source_id": source_id,
                         }),
                     )
                     for external_id, stored, wanted in identity_conflicts

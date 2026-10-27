@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Birth-date enrichment no longer duplicates open identity-conflict issues (V2-GAP-034, ISSUE-090 D4) (2026-10-28)
+
+- `enrich_birth_dates.py` filed a new open `external_identity_conflict` data issue on every re-run
+  of a still-conflicting AFL Tables profile, and never withdrew one that had cleared. It now
+  deletes the unresolved rows for the profiles it asserts and refiles them, the idiom it already
+  uses for `dob_internal_conflict`. New rows carry `source_id`. Resolved history and other sources'
+  rows are untouched.
+- Validation: a new integration test reproduced 2 open rows before the fix, and
+  `tests/integration/dob-enrichment-issues.test.ts` passes 28/28 on a disposable local `_test` copy.
+  Not deployed.
+
 ### AFL API identity correction: DP-5 debut report no longer depends on the session DateStyle (ISSUE-238 S8 LOW-2) (2026-10-28)
 
 - The post-transaction DP-5 report orders career matches by date text, but read it with
