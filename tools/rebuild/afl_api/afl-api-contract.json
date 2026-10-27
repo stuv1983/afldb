@@ -75,10 +75,24 @@
       "current_false": "`current = FALSE` expands season to 2012:S and then fails inside dplyr::mutate for every S > 2012 ('`season` must be size 45 or 1, not 4'). Unusable in the pinned version; never called.",
       "team_labels": "team = NULL enumerates every club the API lists for the compSeason (18 in every measured season). The labels are the API's own ('Adelaide Crows', 'GWS GIANTS', 'Sydney Swans', ...) and are recorded verbatim; mapping them to AFLDB club identity is the consumer's job."
     },
-    "required_columns": ["providerId", "firstName", "surname", "season", "team", "heightInCm"],
+    "required_columns": [
+      "providerId",
+      "firstName",
+      "surname",
+      "season",
+      "team",
+      "heightInCm"
+    ],
     "required_columns_rule": "The identity fields, the season and the one fact this family is acquired for. Every other P4 column is recorded as observed and is not a refusal condition.",
-    "external_key": ["providerId", "season", "team"],
-    "zero_is_missing_columns": ["heightInCm", "weightInKg"],
+    "external_key": [
+      "providerId",
+      "season",
+      "team"
+    ],
+    "zero_is_missing_columns": [
+      "heightInCm",
+      "weightInKg"
+    ],
     "zero_is_missing_rule": "P4 measured weightInKg = 0 on every row; the 2026-09-05 probe measured heightInCm = 0 on 1 of 841 rows in 2012. Both are zero-as-missing and map to NULL, never 0.",
     "identity": "providerId is stable across seasons and shared with the lineup family (P4). It is NOT an AFLDB player identity: no external_identities row is written by this family, and a consumer that needs players.id must reconcile through canonical facts (club, season, name as the source spells it) and fail closed on ambiguity, exactly as the H2 register reconciliation does.",
     "never_admissible_for": [
@@ -91,10 +105,13 @@
       "snapshot_label": "rosters-20260905",
       "manifest": "docs/rebuild-manifests/afl_api/rosters-20260905.json",
       "manifest_sha256": "61aff99a8b14e08823821b23e68817c30604dabf33399b437ad3bf7fbe6369a7",
-      "seasons": { "from": 2012, "to": 2026 },
+      "seasons": {
+        "from": 2012,
+        "to": 2026
+      },
       "measured": {
-        "$comment": "Measured on afldb_test (dry run, 2026-09-05) over the accepted fitzRoy baseline's players and match facts: providerIds reconciled to a canonical player (1,751 by name + shared club-season, 73 by surname + shared club-season + guernsey; 0 ambiguous), which is the number of players that receive AFL API height evidence rows. A rebuild from the same inputs must reproduce it exactly.",
-        "players_with_afl_api_evidence": 1824
+        "$comment": "Measured on afldb_test (dry run, 2026-09-05) over the accepted fitzRoy baseline's players and match facts: providerIds reconciled to a canonical player (1,751 by name + shared club-season, 73 by surname + shared club-season + guernsey; 0 ambiguous), which is the number of players that receive AFL API height evidence rows. A rebuild from the same inputs must reproduce it exactly. C2 SUCCESSOR (proposed, AFLDB-ISSUE-316): 1,916 distinct evidence players over the frozen 2012-2026 rosters-20260905 capture, persisted SQL of the isolated rehearsal at 5643f5c2; successor applicability of that capture is unproven and 479 provider ids stay unmapped.",
+        "players_with_afl_api_evidence": 1916
       }
     },
     "promotion_policy": "corroborating_evidence_only",
