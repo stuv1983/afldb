@@ -2361,6 +2361,14 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
       || coachedClubAxes[0].params.club !== String(raw.crossDomainClubs.coached.organizationId)) {
       return { error: 'The clubs named do not match the clubs the played-and-coached question filters on.' };
     }
+    // The played club is a builder parameter here, never scope.clubFor, and
+    // player_career holds a games condition to a club only through
+    // scope.clubFor. "Played 200 games for Richmond and also coached
+    // Richmond" would count career games at every club: refused, not
+    // answered with the wider count.
+    if (raw.careerConditions.some((condition) => condition.kind === 'column' && condition.column === 'games')) {
+      return { error: 'A played-and-coached question cannot yet count games at the club it names.' };
+    }
   } else if (coachedClubAxes.length > 0) {
     return { error: 'A question about coaching a club must say which club.' };
   }

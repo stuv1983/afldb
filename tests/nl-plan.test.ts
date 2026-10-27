@@ -1314,6 +1314,15 @@ describe('validatePlan — played and also coached (AFLDB-ISSUE-152 Phase F)', (
     expect(validatePlan(x1({ scope: { matchType: 'finals' } }))).toHaveProperty('error');
   });
 
+  // The played club is a builder parameter, not scope.clubFor, so a games
+  // condition would count career games at every club, never games for it.
+  it('a games condition is refused when the played club is a builder parameter', () => {
+    const games = { kind: 'column' as const, column: 'games' as const, op: 'gte' as const, value: 200 };
+    expect(validatePlan(x2({ careerConditions: [games] }))).toHaveProperty('error');
+    // Without a named club there is nothing to hold the count to.
+    expect(validatePlan(x1({ careerConditions: [games] }))).not.toHaveProperty('error');
+  });
+
   it('V5: the club-scoped and unscoped coaching predicates never coexist', () => {
     expect(validatePlan(x2({
       careerPredicates: [playedRichmond, coachedRichmond, hasCoached],

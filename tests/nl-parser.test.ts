@@ -3936,6 +3936,32 @@ describe('played and also coached (AFLDB-ISSUE-152 Phase F)', () => {
       if (parsed.status !== 'plan') return;
       expect(validatePlan(parsed.plan), question).toHaveProperty('error');
     });
+
+    // The played club becomes a builder parameter, so the games count would
+    // be career-wide: a player with 150 Richmond games and 60 elsewhere
+    // would qualify for "200 games for richmond".
+    it('a games count held to the played club is refused at validatePlan', async () => {
+      const p = await plan('players who played 200 games for richmond and also coached richmond');
+      expect(p.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 200 }]);
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(validatePlan(p)).toHaveProperty('error');
+    });
+
+    // The 20-character opponent window is a refusal guard and stays wide on
+    // purpose: an against-like word anywhere in it declines ("over 200 games
+    // for richmond" is a false positive, but still a decline), where the
+    // nearest-token test extractClubs uses would let "coached against arch
+    // rival carlton" bind Carlton as the coached club.
+    it('the opponent guard keeps its wide window', async () => {
+      for (const question of [
+        'players who played and also coached against arch rival carlton',
+        'players who played over 200 games for richmond and also coached richmond',
+      ]) {
+        const parsed = await parse(question);
+        expect(parsed.status, question).toBe('none');
+        expect(parsed.report.notes.join(' '), question).toContain('cannot also be scoped to an opponent');
+      }
+    });
   });
 
   // ----------------------------------------------------- boundaries kept

@@ -16,9 +16,10 @@ and 021 and 028 are closed locally; 016 has its publication and 98-season eviden
 open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
 not technical inspection. Gap 026 now requires the host/production-data rehearsal, not local
 application rollback. The historical Launch F counts below are retained as history.
-Current register: **32 total / 14 closed / 18 open**, including the separately tracked strict
+Current register: **33 total / 15 closed / 18 open**, including the separately tracked strict
 historical-source/membership verification gap 029. Gap 020 was closed on 2026-10-27 as an accepted product constraint
-(owner decision). Gap 032 was found and closed locally on 2026-10-28 (the R43b NL inspection). No remaining failed test is treated as green.
+(owner decision). Gaps 032 and 033 were found and closed locally on 2026-10-28 (the R43b NL inspection and the
+R32/ISSUE-208 cross-domain analysis). No remaining failed test is treated as green.
 
 `V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
 close it. A gap is marked CLOSED only when its closing evidence exists; closed entries are kept
@@ -68,6 +69,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-030 | Medium | Brownlow data | migration | open, rehearsed: every archived `brownlow_round_votes.match_id` is NULL because migration 094 ran over an empty table; reviewed reversible backfill built and verified on a clone (330,383/330,383 repairable, 0 excluded, idempotent, exact reversal); 1984–2025 policy approved under D-V2-BROWNLOW-MATCH-BACKFILL-1; 2026 excluded; execution pending | fresh counts/unique mapping plan, owner review of the guarded production runner, migration 116 and exact execution approval ([package](brownlow-production-approval-package-2026-10-20.md)) |
 | V2-GAP-031 | High | Brownlow ingestion | operational | open: all 207 2025 vote sets refuse `ownership_indeterminate` (source-less legacy rows); canonical ingestion verified on a clean target; reviewed reversible legacy-ownership adoption demonstrated on a clone only (207/207 sets, 621 rows); production adoption unapplied | OD-BROWNLOW-OWNERSHIP-1 approved as policy only; guarded runner/schema review and fresh execution approval pending ([package](brownlow-production-approval-package-2026-10-20.md)) |
 | V2-GAP-032 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: an unclaimed bare number is a leftover token (parser v67), so `<club> <stat> 200 40` declines and `in 1980 to 1989` is the inclusive range, not 1980 alone; whole malformed_input population (10,179) declines; 17 NL suites 1,638/1,638; typecheck exit 0. Not deployed | none |
+| V2-GAP-033 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: "played N games for <club> and also coached <club>" no longer counts career games at every club; `validatePlan` refuses a games condition when the played club is a builder parameter; the cross-domain opponent window is kept wide on purpose; 17 NL suites 1,641/1,641; typecheck exit 0. Not deployed | none |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -891,3 +893,24 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
   exactly the 40 range rows, which stay plans with the range corrected. The 17 parser-dependent
   suites pass 1,638/1,638, including 7 new cases in `tests/nl-parser.test.ts`. `npm run typecheck`
   exited 0. Not run: the browser NL stress runner, PostgreSQL answers and the frozen V5 corpus.
+
+## V2-GAP-033 — A played-and-coached question counted career games for "N games for <club>"
+
+- **CLOSED locally, 2026-10-28** (found while analysing the ISSUE-208 item of `blockers.md` R32). Not
+  deployed.
+- **What.** The cross-domain reading (AFLDB-ISSUE-152 Phase F) turns the played club into a
+  `played_for_club` builder parameter and clears `scope.clubFor`. `player_career` holds a `games`
+  condition to a club only through `scope.clubFor` (`conditionSql`,
+  `src/db/queries/nl/player-career.ts:107-108`). So "players who played 200 games for richmond and
+  also coached richmond" planned with career games ≥ 200 at every club. A player with 150 Richmond
+  games and 60 elsewhere would qualify. That is a silent wrong answer, against Phase F's own rule
+  that every rule refuses and none drops a filter.
+- **Fix** (`src/search/nl/plan.ts`). `validatePlan` refuses a `games` career condition when
+  `crossDomainClubs` names the played club. Without a named club (X1) the condition is unchanged.
+- **Not changed, deliberately.** `assignCrossDomainClubs` keeps its 20-character opponent window. It
+  is a refusal guard, so its false positives ("over 200 games for richmond") only decline. The
+  nearest-token test that ISSUE-208 gave `extractClubs` would let "coached against arch rival
+  carlton" bind Carlton as the coached club. A test pins both.
+- **Validation (DB-free).** 17 NL suites 1,641/1,641, with 3 new cases in `tests/nl-parser.test.ts`
+  and `tests/nl-plan.test.ts`. `npm run typecheck` exit 0. No retained corpus expects the composition
+  to answer. Not run: PostgreSQL answers.

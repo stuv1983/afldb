@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### NL: "played N games for a club and also coached it" is refused, not answered with career games (V2-GAP-033) (2026-10-28)
+
+- The played-and-coached reading makes the played club a builder parameter, which no `games` count
+  is held to. So "players who played 200 games for Richmond and also coached Richmond" counted career
+  games at every club. `validatePlan` now refuses a `games` condition when the played club is named.
+  Without a named club the condition is unchanged.
+- The cross-domain opponent guard keeps its wide window on purpose: its false positives only decline,
+  and narrowing it would let "coached against arch rival Carlton" bind Carlton. A test pins both.
+- Validation: 17 NL suites 1,641/1,641; typecheck exit 0. DB-free only. Not deployed.
+
 ### Club page counts captaincy seasons, not appointments (blockers R37) (2026-10-28)
 
 - The Captains note "N recorded captaincy seasons" now counts distinct seasons. It counted rows, one
