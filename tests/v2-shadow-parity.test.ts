@@ -7,14 +7,26 @@
  * (invented counts and digests); the Coleman and Brownlow inputs are built here from invented
  * clubs, players, goals and votes (`Synthetic_Player_*`, `SYN_*`, season 2090 / the label 2024) and are
  * not any real season's result; the coverage export is built from the real committed registry and
- * its real evidence files (offline). Nothing here is AFL data.
+ * its real evidence files (offline). Nothing here is AFL data, except that the V2-GAP-027 block
+ * replays the committed AFL API provider fixtures (tests/afl-api-snapshot-fixture.ts) under SYNTHETIC
+ * settle run results.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
+
+import {
+  AFL_API_COUNTER_KEYS,
+  buildAflApiReconciliationReport,
+  parseAflApiIdentities,
+  parseSourceFamilyRegistry,
+  replayAflApiSnapshot,
+  serialiseAflApiReconciliationReport,
+  validateAflApiReconciliationReport,
+} from '@afldb/acquisition';
 
 import {
   COVERAGE_REGISTRY,
@@ -30,7 +42,9 @@ import {
 import {
   COLEMAN_DERIVATION_VERSION,
   SHADOW_PARITY_CHECK_IDS,
+  SHADOW_PARITY_CHECK_IDS_BY_POLICY,
   SHADOW_PARITY_POLICY_VERSION,
+  SHADOW_PARITY_POLICY_VERSIONS,
   SHADOW_PARITY_REPORT_FORMAT,
   SHADOW_PARITY_THRESHOLDS,
   buildColemanComparisonReport,
@@ -65,7 +79,9 @@ import {
   type ShadowParityInputs,
   type ShadowParityReport,
 } from '@afldb/derived';
+import { buildAflApiSettleBundle } from '@/lib/acquisition/settle-afl-api';
 
+import { committedUnit, FIXTURE_SEASON, makeScratchProject, referenceJson } from './afl-api-snapshot-fixture';
 import { USAGE, defaultDeps, parseCliArgs, runCli, type CliDeps } from '../tools/v2/shadow-parity';
 import { APPROVED_BROWNLOW_ALTERNATIVE, comparePreservation, digest, releaseGates, REQUIRED_PUBLIC_QUERIES,
   REQUIRED_PRESERVED_TABLES, type PreservationSnapshot } from '../tools/v2/migration-preservation';
@@ -1203,6 +1219,184 @@ describe('validateTableRowCounts / parseTableRowCounts', () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * 6. afl_api_reconciliation — policy v2.parity.2 (V2-GAP-027)
+ *
+ * DATA. The bundle is replayed from the hash-bound snapshot built from the committed provider
+ * fixtures (tests/afl-api-snapshot-fixture.ts). The settle RUN RESULTS are SYNTHETIC (no settle
+ * runs here); they exist to exercise the comparison rules, never to evidence a settle.
+ * ------------------------------------------------------------------ */
+
+const aflScratch: string[] = [];
+afterAll(() => {
+  for (const dir of aflScratch.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+const AFL_REPLAY = (() => {
+  const made = makeScratchProject('parity-afl-api', [committedUnit()]);
+  aflScratch.push(made.projectRoot);
+  return replayAflApiSnapshot({
+    snapshotDir: made.snapshotDir,
+    registry: parseSourceFamilyRegistry(referenceJson('source-families.json')),
+    identities: parseAflApiIdentities(referenceJson('afl-api-identities.json')),
+    buildBundle: buildAflApiSettleBundle,
+  });
+})();
+
+/** A SYNTHETIC dry-run report over the replayed bundle; `over` edits the run before it is built. */
+function aflReport(over: (run: Loose) => void = () => undefined, season = FIXTURE_SEASON): Loose {
+  const counters: Loose = {};
+  for (const key of AFL_API_COUNTER_KEYS) counters[key] = key === 'recordsDeferred' || key === 'seasonFeedStatusCounts' ? {} : 0;
+  counters.snapshotMatches = AFL_REPLAY.bundle.units.length;
+  const run: Loose = {
+    applied: false, batchId: null, counters, halt: null, rollbackReason: 'dry_run', refusalEvidence: [],
+  };
+  over(run);
+  return JSON.parse(serialiseAflApiReconciliationReport(buildAflApiReconciliationReport({
+    generatedAt: NOW, mode: run.applied ? 'apply' : 'dry_run',
+    bundle: { ...AFL_REPLAY.bundle, season }, manifestSha256: AFL_REPLAY.manifestSha256,
+    run: run as never, exceptions: null,
+  })));
+}
+
+const AFL_SYNTHETIC_REFUSAL = {
+  family: 'match', externalRecordId: 'CD_M20260142801', targetTable: 'matches',
+  refusal: 'no_canonical_match', matchKey: '2026-R1-SYN', renderedFields: ['attendance'], ownerSourceKey: null,
+};
+
+const V2_OPTIONS = { policyVersion: 'v2.parity.2', validateAflApiReport: validateAflApiReconciliationReport } as const;
+const runV2 = (aflApi: ShadowParityInputs['aflApi'], over: InputsOverride = {}): ShadowParityReport =>
+  buildShadowParityReport({ ...passingInputs(), ...over, aflApi }, NOW, V2_OPTIONS);
+function aflRun(before: Loose[], after: Loose[]): ShadowParityCheck {
+  return checkOf(runV2({
+    before: before.map((d, i) => file(`afl-b${i}.json`, d)), after: after.map((d, i) => file(`afl-a${i}.json`, d)),
+  }), 'afl_api_reconciliation');
+}
+
+describe('policy compatibility: v2.parity.1 stays the default and unchanged', () => {
+  it('an explicit v2.parity.1 gives byte-identical output to the default; v2.parity.2 adds exactly one check', () => {
+    const v1 = serialiseShadowParityReport(run());
+    expect(serialiseShadowParityReport(buildShadowParityReport(passingInputs(), NOW, { policyVersion: 'v2.parity.1' }))).toBe(v1);
+    expect(serialiseShadowParityReport(buildShadowParityReport({ ...passingInputs(), aflApi: { before: [], after: [] } }, NOW))).toBe(v1);
+    expect(SHADOW_PARITY_POLICY_VERSIONS).toEqual(['v2.parity.1', 'v2.parity.2']);
+    expect(SHADOW_PARITY_CHECK_IDS_BY_POLICY['v2.parity.1']).toEqual([...SHADOW_PARITY_CHECK_IDS]);
+    const v2 = runV2({ before: [file('b.json', aflReport())], after: [file('a.json', aflReport())] });
+    expect(v2.policyVersion).toBe('v2.parity.2');
+    expect(v2.checks.map((c) => c.id)).toEqual([...SHADOW_PARITY_CHECK_IDS, 'afl_api_reconciliation']);
+    expect(v2.checks.slice(0, 5)).toEqual(run().checks);
+    expect(v2.verdict).toBe('PASS');
+    expect(v2.summary).toEqual({ pass: 6, fail: 0, incomplete: 0 });
+    expect(validateShadowParityReport(JSON.parse(serialiseShadowParityReport(v2)))).toEqual([]);
+  });
+
+  it('the retained real v2.parity.1 report still validates unchanged', () => {
+    const evidence = JSON.parse(readFileSync(join(ROOT, 'docs/v2/evidence/fresh-rehearsal-acceptance-2026-10-21.json'), 'utf8'));
+    expect(evidence.retainedOriginalParityReport.policyVersion).toBe('v2.parity.1');
+    expect(validateShadowParityReport(evidence.retainedOriginalParityReport)).toEqual([]);
+  });
+
+  it('refuses AFL API reports under v2.parity.1, v2.parity.2 without the validator, and an unknown policy', () => {
+    const one = { before: [file('b.json', aflReport())], after: [file('a.json', aflReport())] };
+    expect(() => buildShadowParityReport({ ...passingInputs(), aflApi: one }, NOW)).toThrow(/only under policy v2.parity.2/);
+    expect(() => buildShadowParityReport(passingInputs(), NOW, { policyVersion: 'v2.parity.2' })).toThrow(/needs the AFL API reconciliation report validator/);
+    expect(() => buildShadowParityReport(passingInputs(), NOW, { policyVersion: 'v9' as never })).toThrow(RangeError);
+  });
+
+  it('the validator holds each policy to its own check list', () => {
+    const v2 = JSON.parse(serialiseShadowParityReport(runV2({ before: [file('b.json', aflReport())], after: [file('a.json', aflReport())] })));
+    const asV1 = { ...clone(v2), policyVersion: 'v2.parity.1' };
+    expect(validateShadowParityReport(asV1).join(' | ')).toContain('exactly the 5 required checks');
+    const v1 = JSON.parse(serialiseShadowParityReport(run()));
+    expect(validateShadowParityReport({ ...v1, policyVersion: 'v2.parity.2' }).join(' | ')).toContain('exactly the 6 required checks');
+  });
+});
+
+describe('afl_api_reconciliation (policy v2.parity.2)', () => {
+  it('passes identical reports; generatedAt and batchId are ignored', () => {
+    const later = aflReport((r) => { r.applied = true; r.batchId = '7'; r.rollbackReason = null; });
+    const earlier = aflReport((r) => { r.applied = true; r.batchId = '6'; r.rollbackReason = null; });
+    later.generatedAt = '2030-01-01T00:00:00Z';
+    const c = aflRun([earlier], [later]);
+    expect(c.status).toBe('pass');
+    expect(c.findings).toEqual([]);
+    expect(c.counts).toMatchObject({ seasonsBefore: 1, seasonsAfter: 1, seasonsCompared: 1 });
+    expect(c.thresholds).toBe(SHADOW_PARITY_THRESHOLDS.afl_api_reconciliation);
+  });
+
+  it('is INCOMPLETE when a side is missing or a file fails the injected validator, never PASS', () => {
+    expect(aflRun([], []).status).toBe('incomplete');
+    expect(codes(aflRun([aflReport()], []))).toEqual(['INPUT_MISSING']);
+    const broken = aflReport();
+    delete broken.counters;
+    const c = aflRun([aflReport()], [broken]);
+    expect(c.status).toBe('incomplete');
+    expect(c.findings[0]).toMatchObject({ code: 'INPUT_INVALID', subject: 'after:afl-a0.json' });
+    expect(c.findings[0].detail).toContain('report.counters is required');
+    expect(aflRun([aflReport()], [B_RECONCILED]).findings[0].code).toBe('INPUT_INVALID');
+    const twice = aflRun([aflReport(), aflReport()], [aflReport()]);
+    expect(twice.findings.map((f) => f.detail).join(' ')).toContain('one report per season per side');
+  });
+
+  it('FAILS a changed counter, naming the counter', () => {
+    const c = aflRun([aflReport()], [aflReport((r) => { r.counters.canonicalRowsInserted = 2; })]);
+    expect(c.status).toBe('fail');
+    expect(c.findings).toEqual([{ code: 'COUNTER_CHANGED', severity: 'fail', subject: `season ${FIXTURE_SEASON} canonicalRowsInserted`, detail: '0 -> 2' }]);
+  });
+
+  it('FAILS a different snapshot, an unidentified snapshot, mode, applied and rollback changes', () => {
+    const relabelled = aflReport();
+    relabelled.source.snapshotLabel = 'another-snapshot';
+    expect(codes(aflRun([aflReport()], [relabelled]))).toEqual(['SNAPSHOT_DIFFERS']);
+    const unidentified = aflReport();
+    unidentified.source.manifestSha256 = null;
+    expect(codes(aflRun([aflReport()], [unidentified]))).toEqual(['SNAPSHOT_UNIDENTIFIED']);
+    const applied = aflReport((r) => { r.applied = true; r.batchId = '9'; r.rollbackReason = null; });
+    expect(codes(aflRun([aflReport()], [applied]))).toEqual(['APPLIED_CHANGED', 'MODE_DIFFERS', 'ROLLBACK_REASON_CHANGED']);
+  });
+
+  it('FAILS a HALT that appears; a HALT unchanged in both is info', () => {
+    const halted = aflReport((r) => { r.halt = { reason: 'synthetic_halt', detail: {} }; r.rollbackReason = null; });
+    const appeared = aflRun([aflReport()], [halted]);
+    expect(codes(appeared, 'fail')).toEqual(['HALT_CHANGED', 'ROLLBACK_REASON_CHANGED']);
+    const both = aflRun([halted], [halted]);
+    expect(both.status).toBe('pass');
+    expect(codes(both, 'info')).toEqual(['PREEXISTING_HALT']);
+  });
+
+  it('FAILS changed refusals, season feed or build failures; unchanged refusals are info', () => {
+    const refused = aflReport((r) => { r.refusalEvidence = [AFL_SYNTHETIC_REFUSAL]; r.counters.canonicalApplyRefusals = 1; });
+    expect(codes(aflRun([aflReport()], [refused]), 'fail')).toEqual(['COUNTER_CHANGED', 'REFUSALS_CHANGED']);
+    expect(codes(aflRun([refused], [refused]), 'info')).toEqual(['PREEXISTING_REFUSALS']);
+    const feed = aflReport();
+    feed.seasonFeed.gaps = [];
+    feed.seasonFeed.complete = true;
+    expect(codes(aflRun([aflReport()], [feed]))).toEqual(['SEASON_FEED_CHANGED']);
+    const failed = aflReport();
+    failed.buildFailures = [{ providerMatchId: 'CD_M20260142802', error: 'synthetic' }];
+    expect(codes(aflRun([aflReport()], [failed]))).toEqual(['BUILD_FAILURES_CHANGED']);
+  });
+
+  it('FAILS an exception report on one side only or with changed finding counts', () => {
+    const exceptions = {
+      sourceKey: 'afl_api', season: FIXTURE_SEASON, latestBatch: { id: '1' }, unresolvedRecords: [],
+      candidates: { active: [], moot: [] }, applyFailures: [], disagreements: [], findingsTruncated: false, deferredRecords: {},
+    };
+    const withExceptions = { ...aflReport(), exceptions };
+    expect(codes(aflRun([aflReport()], [withExceptions]))).toEqual(['EXCEPTIONS_CHANGED']);
+    const otherBatch = { ...aflReport(), exceptions: { ...exceptions, latestBatch: { id: '2' } } };
+    expect(aflRun([withExceptions], [otherBatch]).status).toBe('pass'); // batch identity never compared
+    const moreCandidates = { ...aflReport(), exceptions: { ...exceptions, candidates: { active: [{}], moot: [] } } };
+    expect(codes(aflRun([withExceptions], [moreCandidates]))).toEqual(['EXCEPTIONS_CHANGED']);
+  });
+
+  it('FAILS a season missing after; a season only after is info', () => {
+    expect(codes(aflRun([aflReport(), aflReport(undefined, 2091)], [aflReport()]))).toEqual(['SEASON_MISSING']);
+    const added = aflRun([aflReport()], [aflReport(), aflReport(undefined, 2091)]);
+    expect(added.status).toBe('pass');
+    expect(codes(added, 'info')).toEqual(['SEASON_ADDED']);
+  });
+});
+
+/* ------------------------------------------------------------------ *
  * The CLI
  * ------------------------------------------------------------------ */
 
@@ -1416,4 +1610,40 @@ describe('tools/v2/shadow-parity.ts', () => {
     const again = cli(['compare', ...flags, '--out', reportOut]);
     expect(again.status).toBe(3);
   }, 120_000);
+  it('V2-GAP-027: --policy v2.parity.2 compares the AFL API reports as a sixth check; without it they are refused', () => {
+    const dir = scratch();
+    const inputs = writeSet(dir);
+    const afl = ['--afl-api-before', put(dir, 'afl-b.json', aflReport()), '--afl-api-after', put(dir, 'afl-a.json', aflReport())];
+    const out = join(dir, 'v2.json');
+    const result = runCli(['compare', ...inputs, ...afl, '--policy', 'v2.parity.2', '--out', out], deps());
+    expect(result.code, result.lines.join('\n')).toBe(0);
+    const report = JSON.parse(readFileSync(out, 'utf8'));
+    expect(validateShadowParityReport(report)).toEqual([]);
+    expect(report.policyVersion).toBe('v2.parity.2');
+    expect(report.checks[5]).toMatchObject({ id: 'afl_api_reconciliation', status: 'pass', inputs: { before: ['afl-b.json'], after: ['afl-a.json'] } });
+
+    const changed = put(dir, 'afl-a2.json', aflReport((r) => { r.counters.canonicalRowsInserted = 1; }));
+    const failed = runCli(['compare', ...inputs, '--policy', 'v2.parity.2', '--afl-api-before', afl[1], '--afl-api-after', changed,
+      '--out', join(dir, 'v2-fail.json')], deps());
+    expect(failed.code).toBe(1);
+    expect(failed.lines.join('\n')).toContain('COUNTER_CHANGED');
+
+    const missing = runCli(['compare', ...inputs, '--policy', 'v2.parity.2', '--out', join(dir, 'v2-missing.json')], deps());
+    expect(missing.code).toBe(2); // the sixth check is required under v2.parity.2: no reports, never a pass
+
+    const v1 = join(dir, 'v1.json');
+    expect(runCli(['compare', ...inputs, '--policy', 'v2.parity.1', '--out', v1], deps()).code).toBe(0);
+    runCli(['compare', ...inputs, '--out', join(dir, 'v1-default.json')], deps());
+    expect(readFileSync(v1, 'utf8')).toBe(readFileSync(join(dir, 'v1-default.json'), 'utf8'));
+
+    for (const argv of [
+      ['compare', ...inputs, ...afl, '--out', join(dir, 'r1.json')],
+      ['compare', ...inputs, ...afl, '--policy', 'v2.parity.1', '--out', join(dir, 'r2.json')],
+      ['compare', ...inputs, '--policy', 'v2.parity.9', '--out', join(dir, 'r3.json')],
+    ]) {
+      const refused = runCli(argv, deps());
+      expect(refused.code, argv.join(' ')).toBe(3);
+      expect(existsSync(argv[argv.length - 1])).toBe(false);
+    }
+  });
 });

@@ -7,6 +7,11 @@
  *       --coleman-before F --coleman-after F \
  *       --brownlow-before F [--brownlow-before F ...] --brownlow-after F [--brownlow-after F ...] \
  *       --coverage-before F --coverage-after F --out REPORT.json [--summary SUMMARY.txt]
+ *       [--policy v2.parity.2 --afl-api-before F [...] --afl-api-after F [...]]
+ *
+ *   The default policy is v2.parity.1 (five checks, unchanged). `--policy v2.parity.2` adds the
+ *   `afl_api_reconciliation` check over the AFL API settle's `--report-out` files (V2-GAP-027);
+ *   AFL API reports are refused under v2.parity.1 rather than silently ignored.
  *
  *   coverage-export  (reads data/reference/seasons.json and the registry's evidence files,
  *                     relative to the repository root = the current directory):
@@ -24,8 +29,11 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
+import { validateAflApiReconciliationReport } from '@afldb/acquisition';
 import { COVERAGE_REGISTRY, type SeasonRegistry } from '@afldb/domain';
 import {
+  SHADOW_PARITY_POLICY_VERSION,
+  SHADOW_PARITY_POLICY_VERSIONS,
   buildCoverageRegistryExport,
   buildShadowParityReport,
   renderShadowParitySummary,
@@ -35,6 +43,7 @@ import {
   validateShadowParityReport,
   type ShadowParityInput,
   type ShadowParityInputFile,
+  type ShadowParityPolicyVersion,
 } from '@afldb/derived';
 
 import { SEASONS_REGISTRY, readRepoFile } from './coverage-matrix';
@@ -45,6 +54,7 @@ export const USAGE = [
   '      --coleman-before F --coleman-after F --brownlow-before F [--brownlow-before F ...]',
   '      --brownlow-after F [--brownlow-after F ...] --coverage-before F --coverage-after F',
   '      --out REPORT.json [--summary SUMMARY.txt]',
+  '      [--policy v2.parity.2 --afl-api-before F [--afl-api-before F ...] --afl-api-after F [--afl-api-after F ...]]',
   '  shadow-parity.ts coverage-export --out F',
   'exit codes: 0 PASS, 1 FAIL, 2 INCOMPLETE, 3 ERROR (usage, existing output file, write failure)',
 ];
@@ -58,12 +68,20 @@ export class CliUsageError extends Error {
 
 const SINGLE_FLAGS = [
   'manifest-before', 'manifest-after', 'row-counts-before', 'row-counts-after',
-  'coleman-before', 'coleman-after', 'coverage-before', 'coverage-after', 'out', 'summary',
+  'coleman-before', 'coleman-after', 'coverage-before', 'coverage-after', 'out', 'summary', 'policy',
 ] as const;
-const REPEATABLE_FLAGS = ['brownlow-before', 'brownlow-after'] as const;
+const REPEATABLE_FLAGS = ['brownlow-before', 'brownlow-after', 'afl-api-before', 'afl-api-after'] as const;
 
 export type CliArgs =
-  | { mode: 'compare'; single: ReadonlyMap<string, string>; brownlowBefore: string[]; brownlowAfter: string[] }
+  | {
+    mode: 'compare';
+    single: ReadonlyMap<string, string>;
+    brownlowBefore: string[];
+    brownlowAfter: string[];
+    policyVersion: ShadowParityPolicyVersion;
+    aflApiBefore: string[];
+    aflApiAfter: string[];
+  }
   | { mode: 'coverage-export'; out: string };
 
 export function parseCliArgs(argv: readonly string[]): CliArgs {
@@ -93,7 +111,25 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (mode === 'coverage-export') return { mode, out };
   const summary = single.get('summary');
   if (summary !== undefined && summary === out) throw new CliUsageError('--summary must differ from --out');
-  return { mode, single, brownlowBefore: repeated.get('brownlow-before') ?? [], brownlowAfter: repeated.get('brownlow-after') ?? [] };
+  const policy = single.get('policy') ?? SHADOW_PARITY_POLICY_VERSION;
+  if (!(SHADOW_PARITY_POLICY_VERSIONS as readonly string[]).includes(policy)) {
+    throw new CliUsageError(`--policy must be one of ${SHADOW_PARITY_POLICY_VERSIONS.join(', ')}`);
+  }
+  const policyVersion = policy as ShadowParityPolicyVersion;
+  const aflApiBefore = repeated.get('afl-api-before') ?? [];
+  const aflApiAfter = repeated.get('afl-api-after') ?? [];
+  if (policyVersion === 'v2.parity.1' && (aflApiBefore.length > 0 || aflApiAfter.length > 0)) {
+    throw new CliUsageError('--afl-api-before/--afl-api-after are compared only under --policy v2.parity.2');
+  }
+  return {
+    mode,
+    single,
+    brownlowBefore: repeated.get('brownlow-before') ?? [],
+    brownlowAfter: repeated.get('brownlow-after') ?? [],
+    policyVersion,
+    aflApiBefore,
+    aflApiAfter,
+  };
 }
 
 export interface CliDeps {
@@ -199,7 +235,10 @@ export function runCli(argv: readonly string[], deps: CliDeps = defaultDeps()): 
       coleman: { before: pick('coleman-before'), after: pick('coleman-after') },
       brownlow: { before: readInputs(deps, args.brownlowBefore), after: readInputs(deps, args.brownlowAfter) },
       coverage: { before: pick('coverage-before'), after: pick('coverage-after') },
-    }, deps.now());
+      aflApi: { before: readInputs(deps, args.aflApiBefore), after: readInputs(deps, args.aflApiAfter) },
+    }, deps.now(), args.policyVersion === 'v2.parity.2'
+      ? { policyVersion: args.policyVersion, validateAflApiReport: validateAflApiReconciliationReport }
+      : {});
   } catch (error) {
     return errorResult(`the parity report could not be built: ${error instanceof Error ? error.message : 'unknown failure'}`);
   }

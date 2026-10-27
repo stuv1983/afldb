@@ -39,13 +39,14 @@
  */
 import './guard';
 
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import postgres from 'postgres';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { aflApiSnapshotManifestSha256, validateAflApiReconciliationReport } from '@afldb/acquisition';
 import {
   linkAflApiProvider,
   revokeAflApiLink,
@@ -100,6 +101,9 @@ import {
   type ReinstateReport,
 } from '../../tools/migration/rebuild_afl_api_adjudications';
 import { RESET_SQL } from '../../tools/db/rebuild-test';
+import { runAflApiSettleCli } from '../../tools/current-season/settle-afl-api';
+import { writeSnapshot } from '../afl-api-snapshot-fixture';
+import { predecessorText } from '../rollover-predecessor-fixture';
 import {
   AflApiReplayAbort,
   assertAflApiAdjudicationBijection,
@@ -335,6 +339,8 @@ const CASE_IDS = {
   nonParticipant: `${NS}N255`,
   // AFLDB-ISSUE-257 (§17.8/F-S9-03): a Match Sheet correction over an afl_api-owned stat row.
   matchSheetAuthority: `${NS}N257`,
+  // V2-GAP-027: the settle CLI's `--report-out`, driven end to end over a real snapshot directory.
+  reportOut: `${NS}W027`,
 } as const;
 const ALL_PROVIDER_IDS = Object.values(CASE_IDS);
 
@@ -414,6 +420,8 @@ const CASE_DATES: Readonly<Record<string, string>> = {
   [CASE_IDS.nonParticipant]: '2026-06-02',
   // AFLDB-ISSUE-257: the June Wednesday after it (AEST), used by no other case.
   [CASE_IDS.matchSheetAuthority]: '2026-06-03',
+  // V2-GAP-027: the June Monday after it (AEST), used by no other case.
+  [CASE_IDS.reportOut]: '2026-06-08',
   // I244-F001 H&A cases: deliberately the LATEST dates in the suite (every
   // other case is <= 2026-09-30) so seasons.last_match_date/
   // data_through_date/last_loaded_round can be proven to reflect THIS
@@ -2477,6 +2485,67 @@ describe('AFLDB-ISSUE-228 S6 — settle-afl-api.ts against afldb_test', () => {
       SELECT id FROM matches WHERE match_key = ${matchKeyFor(providerId)}
     `;
     expect(afterDryRun).toBeUndefined();
+  });
+
+  it('V2-GAP-027: the settle CLI writes a valid reconciliation report for a real dry-run and a real apply', async () => {
+    const providerId = CASE_IDS.reportOut;
+    const label = `issue228-integration-${providerId}-gap027`;
+    // A scratch project root: the tracked registry, the seasons registry and the tracked identities
+    // with this suite's two synthetic team identities (exactly what `identities` above carries).
+    // AFLDB-ISSUE-316: the case settles 2026 as the season IN PROGRESS, so the seasons registry is
+    // the explicit predecessor of the 2026 rollover (the tracked one seals 2026).
+    const projectRoot = mkdtempSync(join(tmpdir(), 'afldb-gap027-'));
+    try {
+      const reference = join(projectRoot, 'data', 'reference');
+      mkdirSync(reference, { recursive: true });
+      writeFileSync(join(reference, 'source-families.json'), readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json')));
+      writeFileSync(join(reference, 'seasons.json'), predecessorText('data/reference/seasons.json'));
+      const identityJson = JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'afl-api-identities.json'), 'utf8'));
+      identityJson.teams.CD_T80 = { ...identityJson.teams.CD_T80, hist: HOME_HIST };
+      identityJson.teams.CD_T20 = { ...identityJson.teams.CD_T20, hist: AWAY_HIST };
+      writeFileSync(join(reference, 'afl-api-identities.json'), JSON.stringify(identityJson));
+      const source = unitSourceFor(providerId);
+      const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'matches', label);
+      writeSnapshot(snapshotDir, [{
+        id: providerId, fixture: source.fixtureRaw as RawJson, roster: source.rosterRaw as RawJson,
+        playerStats: source.playerStatsRaw as RawJson,
+      }]);
+      const deps = {
+        projectRoot, sql, log: () => {}, now: () => '2026-10-27T00:00:00.000Z',
+        ingestionControls: { currentSeasonEnabled: true, brownlowAdminEnabled: false },
+      };
+
+      const dryOut = join(projectRoot, 'dry-run.json');
+      const dry = await runAflApiSettleCli(['--label', label, '--dry-run', '--auto-apply', '--report-out', dryOut], deps);
+      expect(dry.result).toMatchObject({ applied: false, rollbackReason: 'dry_run', halt: null });
+      expect(dry.reconciliationReport).toEqual({ path: dryOut, written: true, error: null });
+      expect(await batchesLabelled(label)).toBe(0);
+      const dryReport = JSON.parse(readFileSync(dryOut, 'utf8'));
+      expect(validateAflApiReconciliationReport(dryReport)).toEqual([]);
+      expect(dryReport.source).toEqual({
+        sourceKey: 'afl_api', season: SEASON, snapshotLabel: label, manifestSha256: aflApiSnapshotManifestSha256(snapshotDir),
+      });
+      expect(dryReport.run).toEqual({ mode: 'dry_run', batchId: null, applied: false, halt: null, rollbackReason: 'dry_run' });
+      expect(dryReport.counters).toEqual(dry.result!.counters);
+      expect(dryReport.counters.canonicalRowsInserted).toBeGreaterThan(0);
+      expect(dryReport.refusals).toHaveLength(dry.result!.refusalEvidence.length);
+      expect(dryReport.exceptions).toBeNull();
+
+      const applyOut = join(projectRoot, 'apply.json');
+      const applied = await runAflApiSettleCli(['--label', label, '--apply', '--auto-apply', '--report-out', applyOut], deps);
+      expect(applied.result).toMatchObject({ applied: true, halt: null, rollbackReason: null });
+      const applyReport = JSON.parse(readFileSync(applyOut, 'utf8'));
+      expect(validateAflApiReconciliationReport(applyReport)).toEqual([]);
+      expect(applyReport.run).toEqual({ mode: 'apply', batchId: applied.result!.batchId, applied: true, halt: null, rollbackReason: null });
+      expect(applyReport.counters).toEqual(applied.result!.counters);
+      // The real post-commit exception report, as the CLI read it, carried whole.
+      expect(applyReport.exceptions).toEqual(JSON.parse(JSON.stringify(applied.report)));
+      expect(await batchesLabelled(label)).toBe(1);
+      // The dry-run executed the same write path: its counters are the apply's.
+      expect(dryReport.counters).toEqual(applyReport.counters);
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 
   it('I244-F008: a failure while finalising the batch rolls the whole run back — no batch, no canonical row, no spine row', async () => {

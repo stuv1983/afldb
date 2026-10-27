@@ -217,8 +217,11 @@ Gate 7a: the settle preflight proves the control and writer DSNs name the same d
 in-progress season); the second `--apply` prints 0 for `canonicalRowsInserted`,
 `canonicalRowsUpdated` and `canonicalApplicationsLogged` (as `docs/deployment.md` §7b step 8
 requires of a rerun); `unresolvedIdentityPlayer` is 0 or every unit it names is refused (never a
-placeholder). The machine-readable V2 reconciliation report has no producer in the CLI yet
-(V2-GAP-027): keep the printed counters and the `--report` output as the evidence. A sealed season
+placeholder). Add `--report-out "$E/<step>.afl-api.json"` to a `--dry-run` or `--apply` to keep the
+machine-readable `afldb.v2.afl-api-reconciliation-report` (V2-GAP-027) beside the printed counters and
+the `--report` output. The file is checked and created before any connection opens (its directory
+must exist, it must not exist, and it may not lie inside the snapshots) and is never overwritten.
+Exit 3 means the run finished exactly as printed but its report was not written. A sealed season
 label must be refused before any connection opens (`tests/afl-api-settle-cli-gate.test.ts`); try
 one `--dry-run` with a 2025 label if one is retained, and record the refusal.
 
@@ -270,7 +273,15 @@ and embeds the thresholds below.
 | `coleman` | per season present before: `SEASON_MISSING`, `CATEGORY_CHANGED`, `STORED_WINNERS_CHANGED`, `DERIVED_WINNERS_CHANGED`, `INPUT_CHANGED`, `REFUSAL_CHANGED`; `STORED_SEASONS_WITHOUT_OUTCOME_CHANGED` | `PREEXISTING_DISAGREEMENT`, `PREEXISTING_NOT_DERIVABLE` (listed for owner reconciliation, V2-GAP-015), `SEASON_ADDED` |
 | `brownlow` | for a season complete before: `SEASON_MISSING`, `SEASON_STATE_CHANGED`, `OUTCOME_CHANGED`, `PLAYER_TOTALS_CHANGED`, `AWARD_PRESENTATION_CHANGED`, `FINDINGS_CHANGED` | `PREEXISTING_DISCREPANCIES`, `PREEXISTING_REFUSED`, `IN_PROGRESS_SEASON_CHANGED`, `SEASON_ADDED` |
 | `coverage` | `COVERAGE_REGISTRY_INVALID`, `COVERAGE_CELL_MISSING`, `COVERAGE_CHANGED` | — |
+| `afl_api_reconciliation` (policy `v2.parity.2` only) | for a season present before: `SEASON_MISSING`, `SNAPSHOT_DIFFERS`, `SNAPSHOT_UNIDENTIFIED`, `MODE_DIFFERS`, `APPLIED_CHANGED`, `HALT_CHANGED`, `ROLLBACK_REASON_CHANGED`, `COUNTER_CHANGED` (per counter), `SEASON_FEED_CHANGED`, `BUILD_FAILURES_CHANGED`, `REFUSALS_CHANGED`, `EXCEPTIONS_CHANGED` (finding counts only); `generatedAt` and `batchId` are never compared | `PREEXISTING_HALT`, `PREEXISTING_REFUSALS`, `SEASON_ADDED` |
 | every check | — (`INPUT_MISSING`, `INPUT_INVALID` make the check incomplete) | — |
+
+**Policy `v2.parity.2` (V2-GAP-027) is opt-in.** `--policy v2.parity.2` adds the sixth check over
+`--afl-api-before F [...]` and `--afl-api-after F [...]` (the settle's `--report-out` files, one per
+season per side); the sixth check is then required, so missing reports make the verdict INCOMPLETE.
+Without `--policy`, the comparison is `v2.parity.1`, byte-for-byte as before, and AFL API reports are
+refused rather than ignored. Adopting `v2.parity.2` for a rehearsal, and choosing where its before
+report is captured, is an owner decision; this document does not make it.
 
 Changing a threshold needs a new policy version and the owner's agreement; a FAIL is reconciled by
 the owner (explained and accepted in writing in §10), never by editing the policy to pass.

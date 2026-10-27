@@ -61,7 +61,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | open: no operations-centre view of AFL API settle refusals | none (V2 follow-up) |
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 passes on a populated copy (2026-10-20); populated-ledger DB reversal and archive recovery restore everything exactly on a synthetic copy | approve host backup/rollback and production-dump rehearsal |
-| V2-GAP-027 | Low | AFL API reconciliation report | no | open (Stage 6): the Stage 3 report format has no producer wired into the settle CLIs | none (V2 follow-up) |
+| V2-GAP-027 | Low | AFL API reconciliation report | no | **CLOSED locally (2026-10-27)**: `settle-afl-api.ts --report-out` writes the report (destination checked before any connection, never overwritten, outcome preserved on a write failure); opt-in parity policy `v2.parity.2` compares it, `v2.parity.1` unchanged; real-PostgreSQL dry-run and apply 1/1 on a disposable isolated `_test` copy. Not deployed | decide whether a rehearsal adopts `v2.parity.2` |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
 | V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived) | approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
 | V2-GAP-030 | Medium | Brownlow data | migration | open, rehearsed: every archived `brownlow_round_votes.match_id` is NULL because migration 094 ran over an empty table; reviewed reversible backfill built and verified on a clone (330,383/330,383 repairable, 0 excluded, idempotent, exact reversal); 1984–2025 policy approved under D-V2-BROWNLOW-MATCH-BACKFILL-1; 2026 excluded; execution pending | fresh counts/unique mapping plan, owner review of the guarded production runner, migration 116 and exact execution approval ([package](brownlow-production-approval-package-2026-10-20.md)) |
@@ -602,6 +602,43 @@ award results must be shown reconcilable before production; **no** — not a pro
   `docs/v2/shadow-rehearsal.md` §10 is filled in.
 
 ## V2-GAP-027 — The AFL API reconciliation report has no producer in the settle CLIs
+
+- **CLOSED locally, 2026-10-27.** Both close conditions are met. Not deployed.
+  - **Producer.** `tools/current-season/settle-afl-api.ts --report-out <file>` (with `--dry-run` or
+    `--apply`; refused with `--validate-only`/`--report`) writes
+    `afldb.v2.afl-api-reconciliation-report` v1 through the Stage 3 builder, serialiser and
+    validator. `manifestSha256` is the snapshot's manifest hash, taken around its verification.
+    The format is unchanged.
+  - **Before any mutation.** After the offline verification, the seal and the gate refusals, and
+    before a database client exists, the destination is validated and created exclusively. Its
+    directory must exist, the file must not exist, and it may not lie inside the acquired snapshots.
+    A refusal or an error before the run finishes removes the reservation.
+  - **Outcome preservation.** The report is written only after the transaction outcome is known
+    (HALT, completeness rollback, dry-run or commit). A build, validation or write failure is logged
+    with the committed batch, never thrown; the CLI returns the full outcome and exits 3 only when
+    nothing else failed. If the post-commit exception read throws, the committed run is recorded
+    first (no exception section) and the error then propagates as before.
+  - **Parity (new policy version).** `v2.parity.2` = `v2.parity.1` plus a required
+    `afl_api_reconciliation` check (pair by season; FAIL on snapshot, mode, applied, HALT, rollback,
+    any counter, season feed, build failures, refusals or exception counts changing; `generatedAt`
+    and `batchId` ignored). Opt-in through `--policy v2.parity.2 --afl-api-before/--afl-api-after`.
+    `v2.parity.1` stays the default and is byte-identical; AFL API inputs are refused under it.
+    The validator accepts both policies against their own check lists, and the retained real
+    v2.parity.1 report (`evidence/fresh-rehearsal-acceptance-2026-10-21.json`) still validates.
+    `@afldb/derived` receives the report validator from the CLI (plan D1).
+  - **Evidence.** `tests/afl-api-settle-cli-gate.test.ts` +12 (destination refusals before any
+    connection, sealed-season precedence, reservation release, dry-run/apply/HALT reports, write and
+    validator failures preserving a committed outcome, exception-read failure; run results are
+    SYNTHETIC over the committed provider fixture snapshot). `tests/v2-shadow-parity.test.ts` +13.
+    The five focused suites pass 331/331; `tsc --noEmit` and focused ESLint pass. Real PostgreSQL:
+    a new case in `tests/integration/settle-afl-api.test.ts` drives the CLI through a real dry-run
+    and a real apply. Both reports validate and carry the run's counters, and the apply carries its
+    batch and the real exception report. It ran on disposable `afldb_v2_gap027_test` (a template
+    copy of `afldb_v2_rb_release_test`, at migration 115, loopback 55433, `isolated-pg run`): 1/1,
+    residue 0, then dropped. Port 55432 (an `ssh.exe` listener) was not contacted.
+  - **Not done.** No rehearsal or production run uses the report yet. Adopting `v2.parity.2` for a
+    rehearsal, and where its before report is captured, is an owner decision
+    (`shadow-rehearsal.md` §8).
 
 - **What.** `packages/acquisition/src/reconciliation-report.ts` (Stage 3) defines the
   machine-readable `afldb.v2.afl-api-reconciliation-report` with a builder, validator and JSON

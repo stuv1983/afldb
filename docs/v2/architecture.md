@@ -161,8 +161,8 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | reconcile | `src/lib/acquisition/afl-api-brownlow.ts:1397` | `reconcileAflApiBrownlowSeason` | nothing |
 | reconcile | `packages/acquisition/src/reconciliation-report.ts:136` | `buildAflApiReconciliationReport` | nothing |
 | reconcile | `packages/acquisition/src/reconciliation-report.ts:248` | `validateAflApiReconciliationReport` | nothing |
-| promote | `tools/current-season/settle-afl-api.ts:123` | `loadAflApiSettleBundle` | canonical |
-| promote | `tools/current-season/settle-afl-api.ts:225` | `runAflApiSettleCli` | canonical |
+| promote | `tools/current-season/settle-afl-api.ts:152` | `loadAflApiSettleBundle` | canonical |
+| promote | `tools/current-season/settle-afl-api.ts:356` | `runAflApiSettleCli` | canonical |
 | promote | `tools/current-season/settle-season-seal.ts:30` | `refuseSealedSeasonForSettle` | canonical |
 | promote | `packages/domain/src/season-seal.ts:124` | `evaluateSeasonWrite` | canonical |
 | promote | `packages/domain/src/season-seal.ts:170` | `assertSeasonWritable` | canonical |
@@ -204,7 +204,7 @@ Offline comparison and shadow-only capture for the operator-run rehearsal in
 | shadow target policy | `packages/domain/src/shadow-target.ts` (`@afldb/domain`) | only `afldb_v2_shadow[_<tag>]_test` is a target; reserved names refused by name; pure (plan §7 R-044) |
 | row-count format | `packages/domain/src/table-row-counts.ts` | `afldb.v2.table-row-counts` v1 and `V2_ADDED_TABLES` (migrations 111/112) |
 | row-count producer | `packages/db/src/table-row-counts-producer.ts` (`@afldb/db`) | read-only census over an injected query function, with the manifest producer's discipline |
-| parity core | `packages/derived/src/shadow-parity.ts` (`@afldb/derived`) | policy `v2.parity.1`: five checks; report `afldb.v2.shadow-parity-report` v1; coverage export `afldb.v2.coverage-registry-export` v1 (plan §7 R-045) |
+| parity core | `packages/derived/src/shadow-parity.ts` (`@afldb/derived`) | policy `v2.parity.1` (default, unchanged): five checks; opt-in `v2.parity.2` adds `afl_api_reconciliation` over the settle's `--report-out` files (V2-GAP-027); report `afldb.v2.shadow-parity-report` v1; coverage export `afldb.v2.coverage-registry-export` v1 (plan §7 R-045) |
 | CLIs | `tools/v2/shadow-parity.ts` (offline `compare`, `coverage-export`), `tools/v2/shadow-capture.ts` (`row-counts`), `tools/v2/shadow-award-reports.ts` (`coleman`, `brownlow`; run with `--conditions=react-server` because it reuses the server-only Stage 5 loaders), `tools/v2/shadow-guard.ts` (`check`) | thin, testable entry points; the capture tools refuse every non-shadow target and have no override flag |
 
 The parity core lives in `@afldb/derived` because that is the only module allowed to see both the

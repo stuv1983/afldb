@@ -12,6 +12,11 @@
  *   3. `coleman`             — two `afldb.v2.coleman-comparison-report` files;
  *   4. `brownlow`            — `afldb.v2.brownlow-reconciliation-report` files, paired by season;
  *   5. `coverage`            — two `afldb.v2.coverage-registry-export` files (format defined here).
+ * Policy v2.parity.2 (V2-GAP-027) adds a sixth, `afl_api_reconciliation` — Stage 3
+ * `afldb.v2.afl-api-reconciliation-report` files from the AFL API settle's `--report-out`, paired by
+ * season. v2.parity.1 stays the default and is unchanged: the same inputs give the same bytes.
+ * This package may not import @afldb/acquisition (plan D1), so the caller injects that format's
+ * validator.
  *
  * Fail-closed: an input that is not supplied makes its check `incomplete` (INPUT_MISSING); an
  * input that cannot be read or fails its validator makes its check `incomplete` (INPUT_INVALID,
@@ -46,11 +51,27 @@ import { validateColemanComparisonReport, type ColemanComparisonReport } from '.
 
 export const SHADOW_PARITY_REPORT_FORMAT = 'afldb.v2.shadow-parity-report';
 export const SHADOW_PARITY_REPORT_VERSION = 1;
-/** Versions the thresholds below. Bump it whenever a rule, a code or a severity changes. */
+/**
+ * Versions the thresholds below. Bump it whenever a rule, a code or a severity changes. This is the
+ * DEFAULT policy; every earlier report and accepted assertion names it, so it never changes meaning.
+ */
 export const SHADOW_PARITY_POLICY_VERSION = 'v2.parity.1';
+/** v2.parity.2 = v2.parity.1 plus the `afl_api_reconciliation` check (V2-GAP-027); opt-in. */
+export const SHADOW_PARITY_POLICY_VERSIONS = [SHADOW_PARITY_POLICY_VERSION, 'v2.parity.2'] as const;
+export type ShadowParityPolicyVersion = (typeof SHADOW_PARITY_POLICY_VERSIONS)[number];
 
+/** The required checks of policy v2.parity.1, in report order. */
 export const SHADOW_PARITY_CHECK_IDS = ['historical_manifest', 'table_row_counts', 'coleman', 'brownlow', 'coverage'] as const;
-export type ShadowParityCheckId = (typeof SHADOW_PARITY_CHECK_IDS)[number];
+export type ShadowParityCheckId = (typeof SHADOW_PARITY_CHECK_IDS)[number] | 'afl_api_reconciliation';
+
+/** The required checks of each policy, in report order. */
+export const SHADOW_PARITY_CHECK_IDS_BY_POLICY: Readonly<Record<ShadowParityPolicyVersion, readonly ShadowParityCheckId[]>> = {
+  'v2.parity.1': SHADOW_PARITY_CHECK_IDS,
+  'v2.parity.2': [...SHADOW_PARITY_CHECK_IDS, 'afl_api_reconciliation'],
+};
+
+const isPolicyVersion = (value: unknown): value is ShadowParityPolicyVersion =>
+  (SHADOW_PARITY_POLICY_VERSIONS as readonly unknown[]).includes(value);
 
 export const SHADOW_PARITY_STATUSES = ['pass', 'fail', 'incomplete'] as const;
 export type ShadowParityStatus = (typeof SHADOW_PARITY_STATUSES)[number];
@@ -85,7 +106,7 @@ export interface ShadowParityCheck {
 export interface ShadowParityReport {
   readonly format: typeof SHADOW_PARITY_REPORT_FORMAT;
   readonly formatVersion: typeof SHADOW_PARITY_REPORT_VERSION;
-  readonly policyVersion: typeof SHADOW_PARITY_POLICY_VERSION;
+  readonly policyVersion: ShadowParityPolicyVersion;
   /** Caller-supplied ISO-8601 UTC instant. Never a clock read. */
   readonly generatedAt: string;
   readonly verdict: ShadowParityVerdict;
@@ -93,7 +114,7 @@ export interface ShadowParityReport {
   readonly summary: { readonly pass: number; readonly fail: number; readonly incomplete: number };
 }
 
-/** The embedded, versioned thresholds (policy v2.parity.1), one line per check. */
+/** The embedded, versioned thresholds, one line per check (the first five are policy v2.parity.1's, unchanged). */
 export const SHADOW_PARITY_THRESHOLDS: Readonly<Record<ShadowParityCheckId, string>> = {
   historical_manifest: 'Zero tolerance on sealed history: every comparator violation, unverified and review finding FAILS '
     + '(including METADATA_CHANGED on a sealed bucket, REFERENCE_CHANGED, REFERENCE_ROWS_DECREASED, METADATA_COLUMNS_CHANGED, '
@@ -112,6 +133,11 @@ export const SHADOW_PARITY_THRESHOLDS: Readonly<Record<ShadowParityCheckId, stri
     + 'only after is info.',
   coverage: 'Either registry export with registry problems FAILS; a coverage cell missing on either side FAILS; any status change '
     + 'FAILS (claims never move during a rehearsal).',
+  afl_api_reconciliation: 'Policy v2.parity.2 only. Reports pair by season (a duplicate season on one side is an invalid input). For a '
+    + 'season present before: missing after, a different or unidentified snapshot (label and manifest sha256), mode, applied, HALT, '
+    + 'rollback reason, any counter, the season feed, build failures, canonical refusals or the exception-report finding counts changed '
+    + 'all FAIL; generatedAt and batchId are ignored; a HALT or refusals unchanged in both are info for owner review; a season only '
+    + 'after is info.',
 };
 
 /* ------------------------------------------------------------------ *
@@ -133,6 +159,18 @@ export interface ShadowParityInputs {
   /** One report per season on each side. */
   readonly brownlow: { readonly before: readonly ShadowParityInputFile[]; readonly after: readonly ShadowParityInputFile[] };
   readonly coverage: { readonly before: ShadowParityInput; readonly after: ShadowParityInput };
+  /** Policy v2.parity.2 only: one AFL API reconciliation report per season on each side. */
+  readonly aflApi?: { readonly before: readonly ShadowParityInputFile[]; readonly after: readonly ShadowParityInputFile[] };
+}
+
+export interface ShadowParityOptions {
+  /** Defaults to v2.parity.1. */
+  readonly policyVersion?: ShadowParityPolicyVersion;
+  /**
+   * Required by v2.parity.2: `validateAflApiReconciliationReport` from @afldb/acquisition (every
+   * problem found; empty = a valid report). Injected because @afldb/derived may not import it.
+   */
+  readonly validateAflApiReport?: (value: unknown) => string[];
 }
 
 const codeUnitCompare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -664,6 +702,176 @@ function checkCoverage(before: ShadowParityInput, after: ShadowParityInput): Sha
 }
 
 /* ------------------------------------------------------------------ *
+ * 6. afl_api_reconciliation (policy v2.parity.2; V2-GAP-027)
+ * ------------------------------------------------------------------ */
+
+const AFL_API_RECONCILIATION_FORMAT = 'afldb.v2.afl-api-reconciliation-report';
+
+/** The fields of the Stage 3 report this check reads. The injected validator proves the whole shape. */
+interface AflApiReconciliationView {
+  readonly format: string;
+  readonly source: { readonly season: number; readonly snapshotLabel: string; readonly manifestSha256: string | null };
+  readonly run: {
+    readonly mode: string;
+    readonly applied: boolean;
+    readonly halt: { readonly reason: string; readonly detail: Readonly<Record<string, unknown>> } | null;
+    readonly rollbackReason: string | null;
+  };
+  readonly counters: Readonly<Record<string, unknown>>;
+  readonly seasonFeed: {
+    readonly complete: boolean;
+    readonly matches: number;
+    readonly statusCounts: Readonly<Record<string, number>>;
+    readonly gaps: readonly unknown[];
+  };
+  readonly buildFailures: readonly unknown[];
+  readonly refusals: readonly unknown[];
+  readonly exceptions: {
+    readonly unresolvedRecords: readonly unknown[];
+    readonly candidates: { readonly active: readonly unknown[]; readonly moot: readonly unknown[] };
+    readonly applyFailures: readonly unknown[];
+    readonly disagreements: readonly unknown[];
+    readonly findingsTruncated: boolean;
+    readonly deferredRecords: Readonly<Record<string, number>>;
+  } | null;
+}
+
+function aflApiParser(validate: (value: unknown) => string[]) {
+  return (text: string, label: string): AflApiReconciliationView => {
+    const value = parseJson(text, label);
+    const problems = validate(value);
+    if (problems.length > 0) throw new InputProblem(`${label}: ${summariseProblems(problems)}`);
+    if (!isRecord(value) || value.format !== AFL_API_RECONCILIATION_FORMAT) {
+      throw new InputProblem(`${label}: not an ${AFL_API_RECONCILIATION_FORMAT}`);
+    }
+    return value as unknown as AflApiReconciliationView;
+  };
+}
+
+interface AflApiSide {
+  readonly labels: string[];
+  readonly bySeason: Map<number, AflApiReconciliationView>;
+  readonly usable: boolean;
+}
+
+function loadAflApiSide(
+  c: Collector,
+  slot: string,
+  files: readonly ShadowParityInputFile[],
+  parse: (text: string, label: string) => AflApiReconciliationView,
+): AflApiSide {
+  const what = 'AFL API reconciliation report';
+  const labels = files.map((f) => basenameOf(f.label)).sort(codeUnitCompare);
+  const bySeason = new Map<number, AflApiReconciliationView>();
+  let usable = true;
+  if (files.length === 0) {
+    add(c, 'INPUT_MISSING', 'fail', slot, `no ${what} was supplied for ${slot}`);
+    return { labels, bySeason, usable: false };
+  }
+  const ordered = [...files].sort((x, y) => codeUnitCompare(basenameOf(x.label), basenameOf(y.label)));
+  const seasonLabel = new Map<number, string>();
+  for (const file of ordered) {
+    const loaded = load<AflApiReconciliationView>(c, slot, what, file, parse);
+    if (!loaded.ok) {
+      usable = false;
+      continue;
+    }
+    const season = loaded.value.source.season;
+    if (bySeason.has(season)) {
+      add(c, 'INPUT_INVALID', 'fail', `${slot}:${loaded.label}`,
+        `${what}: season ${season} is also reported by ${seasonLabel.get(season)}; one report per season per side`);
+      usable = false;
+      continue;
+    }
+    bySeason.set(season, loaded.value);
+    seasonLabel.set(season, loaded.label);
+  }
+  return { labels, bySeason, usable };
+}
+
+/** Counts only: an exception report's batch ids, timestamps and record content never take part. */
+function exceptionSummary(r: AflApiReconciliationView): string {
+  const e = r.exceptions;
+  return e === null ? 'null' : canon({
+    unresolvedRecords: e.unresolvedRecords.length,
+    candidatesActive: e.candidates.active.length,
+    candidatesMoot: e.candidates.moot.length,
+    applyFailures: e.applyFailures.length,
+    disagreements: e.disagreements.length,
+    findingsTruncated: e.findingsTruncated,
+    deferredRecords: e.deferredRecords,
+  });
+}
+
+function checkAflApiReconciliation(
+  before: readonly ShadowParityInputFile[],
+  after: readonly ShadowParityInputFile[],
+  validate: (value: unknown) => string[],
+): ShadowParityCheck {
+  const c: Collector = { findings: [] };
+  const parse = aflApiParser(validate);
+  const b = loadAflApiSide(c, 'before', before, parse);
+  const a = loadAflApiSide(c, 'after', after, parse);
+  const counts: Record<string, number> = { seasonsAfter: 0, seasonsBefore: 0, seasonsCompared: 0 };
+  if (b.usable && a.usable) {
+    counts.seasonsBefore = b.bySeason.size;
+    counts.seasonsAfter = a.bySeason.size;
+    for (const season of [...b.bySeason.keys()].sort((x, y) => x - y)) {
+      const x = b.bySeason.get(season) as AflApiReconciliationView;
+      const y = a.bySeason.get(season);
+      const subject = `season ${season}`;
+      if (y === undefined) {
+        add(c, 'SEASON_MISSING', 'fail', subject, 'in the before reports, absent from the after reports');
+        continue;
+      }
+      counts.seasonsCompared += 1;
+      if (x.source.manifestSha256 === null || y.source.manifestSha256 === null) {
+        add(c, 'SNAPSHOT_UNIDENTIFIED', 'fail', subject, 'a report carries no manifest sha256; the replayed snapshot cannot be shown to be the same');
+      } else if (x.source.snapshotLabel !== y.source.snapshotLabel || x.source.manifestSha256 !== y.source.manifestSha256) {
+        add(c, 'SNAPSHOT_DIFFERS', 'fail', subject, safeText(`snapshot ${x.source.snapshotLabel} -> ${y.source.snapshotLabel}`
+          + `${x.source.manifestSha256 === y.source.manifestSha256 ? '' : ' (manifest sha256 differs)'}; parity replays one snapshot`));
+      }
+      if (x.run.mode !== y.run.mode) add(c, 'MODE_DIFFERS', 'fail', subject, `${x.run.mode} -> ${y.run.mode}`);
+      if (x.run.applied !== y.run.applied) add(c, 'APPLIED_CHANGED', 'fail', subject, `applied ${x.run.applied} -> ${y.run.applied}`);
+      if (canon(x.run.halt) !== canon(y.run.halt)) {
+        add(c, 'HALT_CHANGED', 'fail', subject, safeText(`HALT ${x.run.halt?.reason ?? 'none'} -> ${y.run.halt?.reason ?? 'none'}`));
+      } else if (x.run.halt !== null) {
+        add(c, 'PREEXISTING_HALT', 'info', subject, safeText(`HALT ${x.run.halt.reason} in both; listed for owner review`));
+      }
+      if (x.run.rollbackReason !== y.run.rollbackReason) {
+        add(c, 'ROLLBACK_REASON_CHANGED', 'fail', subject, `${x.run.rollbackReason ?? 'none'} -> ${y.run.rollbackReason ?? 'none'}`);
+      }
+      const counterNames = [...new Set([...Object.keys(x.counters), ...Object.keys(y.counters)])].sort(codeUnitCompare);
+      for (const name of counterNames) {
+        const from = canon(x.counters[name] ?? null);
+        const to = canon(y.counters[name] ?? null);
+        if (from !== to) add(c, 'COUNTER_CHANGED', 'fail', `${subject} ${name}`, safeText(`${from} -> ${to}`));
+      }
+      if (canon(x.seasonFeed) !== canon(y.seasonFeed)) {
+        add(c, 'SEASON_FEED_CHANGED', 'fail', subject,
+          `complete ${x.seasonFeed.complete} -> ${y.seasonFeed.complete}, matches ${x.seasonFeed.matches} -> ${y.seasonFeed.matches}, `
+          + `gaps ${x.seasonFeed.gaps.length} -> ${y.seasonFeed.gaps.length}`);
+      }
+      if (canon(x.buildFailures) !== canon(y.buildFailures)) {
+        add(c, 'BUILD_FAILURES_CHANGED', 'fail', subject, `${x.buildFailures.length} -> ${y.buildFailures.length} build failure(s)`);
+      }
+      if (canon(x.refusals) !== canon(y.refusals)) {
+        add(c, 'REFUSALS_CHANGED', 'fail', subject, `${x.refusals.length} -> ${y.refusals.length} canonical refusal(s), or their content`);
+      } else if (x.refusals.length > 0) {
+        add(c, 'PREEXISTING_REFUSALS', 'info', subject, `${x.refusals.length} canonical refusal(s) in both, unchanged; listed for owner review`);
+      }
+      if (exceptionSummary(x) !== exceptionSummary(y)) {
+        add(c, 'EXCEPTIONS_CHANGED', 'fail', subject, 'the exception report is present on one side only, or its finding counts changed');
+      }
+    }
+    for (const season of [...a.bySeason.keys()].sort((x, y) => x - y)) {
+      if (!b.bySeason.has(season)) add(c, 'SEASON_ADDED', 'info', `season ${season}`, 'only in the after reports');
+    }
+  }
+  return finish('afl_api_reconciliation', { before: b.labels.length ? b.labels : null, after: a.labels.length ? a.labels : null }, c, counts);
+}
+
+/* ------------------------------------------------------------------ *
  * The report
  * ------------------------------------------------------------------ */
 
@@ -677,9 +885,25 @@ export function shadowParityVerdict(checks: readonly Pick<ShadowParityCheck, 'st
 export const shadowParityExitCode = (verdict: ShadowParityVerdict): 0 | 1 | 2 =>
   (verdict === 'PASS' ? 0 : verdict === 'FAIL' ? 1 : 2);
 
-/** Pure and deterministic: the same inputs and `generatedAt` yield a deep-equal report. */
-export function buildShadowParityReport(inputs: ShadowParityInputs, generatedAt: string): ShadowParityReport {
+/**
+ * Pure and deterministic: the same inputs, `generatedAt` and options yield a deep-equal report.
+ * Without options (policy v2.parity.1) the report is exactly the one this module always built.
+ */
+export function buildShadowParityReport(
+  inputs: ShadowParityInputs,
+  generatedAt: string,
+  options: ShadowParityOptions = {},
+): ShadowParityReport {
   if (!isIsoInstant(generatedAt)) throw new RangeError('shadow parity: generatedAt must be an ISO-8601 UTC instant');
+  const policyVersion = options.policyVersion ?? SHADOW_PARITY_POLICY_VERSION;
+  if (!isPolicyVersion(policyVersion)) throw new RangeError(`shadow parity: unknown policy version ${String(policyVersion)}`);
+  const aflApi = inputs.aflApi ?? { before: [], after: [] };
+  if (policyVersion === 'v2.parity.1' && (aflApi.before.length > 0 || aflApi.after.length > 0)) {
+    throw new RangeError('shadow parity: AFL API reconciliation reports are compared only under policy v2.parity.2');
+  }
+  if (policyVersion === 'v2.parity.2' && options.validateAflApiReport === undefined) {
+    throw new RangeError('shadow parity: policy v2.parity.2 needs the AFL API reconciliation report validator');
+  }
   const checks: ShadowParityCheck[] = [
     checkHistoricalManifest(inputs.manifest.before, inputs.manifest.after),
     checkTableRowCounts(inputs.rowCounts.before, inputs.rowCounts.after),
@@ -687,10 +911,13 @@ export function buildShadowParityReport(inputs: ShadowParityInputs, generatedAt:
     checkBrownlow(inputs.brownlow.before, inputs.brownlow.after),
     checkCoverage(inputs.coverage.before, inputs.coverage.after),
   ];
+  if (policyVersion === 'v2.parity.2') {
+    checks.push(checkAflApiReconciliation(aflApi.before, aflApi.after, options.validateAflApiReport as (value: unknown) => string[]));
+  }
   return {
     format: SHADOW_PARITY_REPORT_FORMAT,
     formatVersion: SHADOW_PARITY_REPORT_VERSION,
-    policyVersion: SHADOW_PARITY_POLICY_VERSION,
+    policyVersion,
     generatedAt,
     verdict: shadowParityVerdict(checks),
     checks,
@@ -720,9 +947,11 @@ export function validateShadowParityReport(value: unknown): string[] {
   if ('formatVersion' in value && value.formatVersion !== SHADOW_PARITY_REPORT_VERSION) {
     problems.push(`report.formatVersion must be ${SHADOW_PARITY_REPORT_VERSION}.`);
   }
-  if ('policyVersion' in value && value.policyVersion !== SHADOW_PARITY_POLICY_VERSION) {
-    problems.push(`report.policyVersion must be '${SHADOW_PARITY_POLICY_VERSION}'.`);
+  if ('policyVersion' in value && !isPolicyVersion(value.policyVersion)) {
+    problems.push(`report.policyVersion must be one of ${SHADOW_PARITY_POLICY_VERSIONS.map((v) => `'${v}'`).join(', ')}.`);
   }
+  // An unknown policy is already a problem; its checks are then held to v2.parity.1's list.
+  const checkIds = SHADOW_PARITY_CHECK_IDS_BY_POLICY[isPolicyVersion(value.policyVersion) ? value.policyVersion : SHADOW_PARITY_POLICY_VERSION];
   if ('generatedAt' in value && !isIsoInstant(value.generatedAt)) problems.push('report.generatedAt must be an ISO-8601 UTC instant.');
   const verdictValid = 'verdict' in value && (SHADOW_PARITY_VERDICTS as readonly unknown[]).includes(value.verdict);
   if ('verdict' in value && !verdictValid) problems.push(`report.verdict must be one of ${SHADOW_PARITY_VERDICTS.join(', ')}.`);
@@ -734,8 +963,8 @@ export function validateShadowParityReport(value: unknown): string[] {
       problems.push('report.checks must be an array.');
       checksOk = false;
     } else {
-      if (value.checks.length !== SHADOW_PARITY_CHECK_IDS.length) {
-        problems.push(`report.checks must list exactly the ${SHADOW_PARITY_CHECK_IDS.length} required checks in order.`);
+      if (value.checks.length !== checkIds.length) {
+        problems.push(`report.checks must list exactly the ${checkIds.length} required checks in order.`);
         checksOk = false;
       }
       value.checks.forEach((raw: unknown, i: number) => {
@@ -745,8 +974,8 @@ export function validateShadowParityReport(value: unknown): string[] {
           checksOk = false;
           return;
         }
-        if (raw.id !== SHADOW_PARITY_CHECK_IDS[i]) {
-          problems.push(`${path}.id must be '${SHADOW_PARITY_CHECK_IDS[i] ?? '(none)'}'.`);
+        if (raw.id !== checkIds[i]) {
+          problems.push(`${path}.id must be '${checkIds[i] ?? '(none)'}'.`);
           checksOk = false;
         }
         if (raw.required !== true) problems.push(`${path}.required must be true.`);

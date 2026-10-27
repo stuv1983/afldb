@@ -21,7 +21,7 @@
  * registry/identities parse exactly as production does.
  */
 import {
-  mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -51,9 +51,21 @@ import {
   readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '@/lib/acquisition/afl-api-ingestion-control';
+import {
+  AFL_API_COUNTER_KEYS,
+  aflApiSnapshotManifestSha256,
+  validateAflApiReconciliationReport,
+} from '@afldb/acquisition';
+import {
+  runSettleAflApi,
+  type AflApiSettleCounters,
+  type AflApiSettleRunResult,
+} from '@/lib/acquisition/settle-afl-api';
+import { buildSettleExceptionReport, type SettleExceptionReport } from '@/lib/acquisition/settle-report';
 import { runAflApiBrownlowSettleCli } from '../tools/current-season/settle-afl-api-brownlow';
 import { runAflApiFixturesSettleCli } from '../tools/current-season/settle-afl-api-fixtures';
-import { runAflApiSettleCli } from '../tools/current-season/settle-afl-api';
+import { parseAflApiSettleArgs, runAflApiSettleCli } from '../tools/current-season/settle-afl-api';
+import { committedUnit, makeScratchProject } from './afl-api-snapshot-fixture';
 import { predecessorText } from './rollover-predecessor-fixture';
 
 // I244-F006: only the fixture-observation RESOLVER is replaced (used solely by
@@ -64,6 +76,17 @@ vi.mock('@/lib/acquisition/afl-api-fixture-identity', async (importOriginal) => 
   ...(await importOriginal<typeof import('@/lib/acquisition/afl-api-fixture-identity')>()),
   resolveAflApiMatchViaFixtureObservation: vi.fn(),
 }));
+
+// V2-GAP-027: the settle itself and the post-commit exception read are spies that run the REAL
+// implementation unless a test in the `--report-out` block below supplies a SYNTHETIC result.
+vi.mock('@/lib/acquisition/settle-afl-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/acquisition/settle-afl-api')>();
+  return { ...actual, runSettleAflApi: vi.fn(actual.runSettleAflApi) };
+});
+vi.mock('@/lib/acquisition/settle-report', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/acquisition/settle-report')>();
+  return { ...actual, buildSettleExceptionReport: vi.fn(actual.buildSettleExceptionReport) };
+});
 
 const REPO_ROOT = join(__dirname, '..');
 const REFERENCE_FILES =['source-families.json', 'afl-api-identities.json', 'seasons.json'] as const;
@@ -893,6 +916,258 @@ describe('V2-GAP-006 — the seal on historical seasons at the three AFL API set
     expect(output).toContain("SEALED SEASON 2025 admitted on basis 'test_database_backtest'");
     expect(output).toContain('not an audited correction');
     expect(boundary.reached).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// V2-GAP-027 — `--report-out`: the machine-readable reconciliation report.
+//
+// DATA. The snapshot is the hash-bound one built from the committed provider fixtures
+// (tests/afl-api-snapshot-fixture.ts). Every RUN RESULT and EXCEPTION REPORT below is SYNTHETIC:
+// `runSettleAflApi` and `buildSettleExceptionReport` are replaced per test, so no settle runs and
+// no database exists here. They prove the CLI's ordering and failure handling, never a settle.
+// ---------------------------------------------------------------------------
+
+describe('V2-GAP-027 — settle-afl-api --report-out', () => {
+  const NOW = '2026-10-27T01:02:03.000Z';
+  const LABEL = 'gap027-snapshot';
+  const settle = vi.mocked(runSettleAflApi);
+  const exceptionRead = vi.mocked(buildSettleExceptionReport);
+
+  beforeEach(() => {
+    settle.mockClear();
+    exceptionRead.mockClear();
+  });
+
+  function setup(): { projectRoot: string; outDir: string } {
+    const { projectRoot } = makeScratchProject(LABEL, [committedUnit()]);
+    scratchDirs.push(projectRoot);
+    // AFLDB-ISSUE-316: the snapshot settles 2026 as the season IN PROGRESS, so the registry is the explicit
+    // predecessor of the 2026 rollover (the tracked one seals 2026; see the describe at the end of the file).
+    writeFileSync(join(projectRoot, 'data', 'reference', 'seasons.json'), predecessorText('data/reference/seasons.json'));
+    const outDir = join(projectRoot, 'evidence');
+    mkdirSync(outDir);
+    return { projectRoot, outDir };
+  }
+
+  function syntheticCounters(): AflApiSettleCounters {
+    const counters: Record<string, unknown> = {};
+    for (const key of AFL_API_COUNTER_KEYS) {
+      counters[key] = key === 'recordsDeferred' || key === 'seasonFeedStatusCounts' ? {} : 0;
+    }
+    counters.snapshotMatches = 1;
+    counters.canonicalRowsInserted = 3;
+    return counters as unknown as AflApiSettleCounters;
+  }
+
+  function syntheticResult(over: Partial<AflApiSettleRunResult> = {}): AflApiSettleRunResult {
+    return {
+      applied: false, batchId: null, counters: syntheticCounters(), halt: null, rollbackReason: 'dry_run',
+      sourceCompleteness: null, absenceFindings: null, refusalEvidence: [], ...over,
+    };
+  }
+
+  const SYNTHETIC_EXCEPTIONS: SettleExceptionReport = {
+    sourceKey: 'afl_api', season: SEASON, latestBatch: null, unresolvedRecords: [],
+    candidates: { active: [], moot: [] }, applyFailures: [], disagreements: [],
+    findingsTruncated: false, deferredRecords: {},
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const readReport = (path: string): Record<string, any> => JSON.parse(readFileSync(path, 'utf8'));
+
+  it('parses --report-out and refuses it without a path, twice, or outside --dry-run / --apply', () => {
+    expect(parseAflApiSettleArgs(['--label', 'x', '--dry-run']).reportOut).toBeNull();
+    expect(parseAflApiSettleArgs(['--label', 'x', '--report-out', 'r.json', '--apply']).reportOut).toBe('r.json');
+    expect(parseAflApiSettleArgs(['--label', 'x', '--report-out', 'r.json']).reportOut).toBe('r.json'); // default dry run
+    expect(() => parseAflApiSettleArgs(['--label', 'x', '--dry-run', '--report-out'])).toThrow(/needs a file path/);
+    expect(() => parseAflApiSettleArgs(['--label', 'x', '--report-out', '--apply'])).toThrow(/needs a file path/);
+    expect(() => parseAflApiSettleArgs(['--label', 'x', '--report-out', 'a', '--report-out', 'b'])).toThrow(/given twice/);
+    for (const mode of ['--validate-only', '--report']) {
+      expect(() => parseAflApiSettleArgs(['--label', 'x', mode, '--report-out', 'r.json']))
+        .toThrow(/applies only to --dry-run or --apply/);
+    }
+  });
+
+  it.each([
+    ['an existing file (never overwritten)', 'exists', /already exists; reports are never overwritten/],
+    ['a missing parent directory', 'missing-parent', /the parent directory does not exist/],
+    ['a path inside the acquired snapshots', 'in-snapshot', /lies inside the acquired AFL API snapshots/],
+  ])('refuses %s before any connection opens or the settle runs', async (_name, kind, message) => {
+    const { projectRoot, outDir } = setup();
+    const target = kind === 'exists' ? join(outDir, 'report.json')
+      : kind === 'missing-parent' ? join(outDir, 'absent', 'report.json')
+        : join(projectRoot, 'data', 'sources', 'afl_api', 'matches', LABEL, 'report.json');
+    if (kind === 'exists') writeFileSync(target, 'operator file');
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(message);
+
+    expect(touched.value).toBe(false);
+    expect(settle).not.toHaveBeenCalled();
+    if (kind === 'exists') expect(readFileSync(target, 'utf8')).toBe('operator file');
+    else expect(existsSync(target)).toBe(false);
+  });
+
+  it('a sealed-season refusal still comes first and leaves no report file behind', async () => {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-027-sealed-');
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'matches', LABEL);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({
+      source_key: 'afl_api', acquisition_kind: 'afl_api_match_snapshot', season: 2025, files: [],
+    }));
+    const target = join(projectRoot, 'report.json');
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', LABEL, '--dry-run', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(SealedSeasonRefusal);
+    expect(touched.value).toBe(false);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('releases the reserved file when the run fails before it finishes (the real settle on the stub)', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'report.json');
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', LABEL, '--dry-run', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {} },
+    )).rejects.toThrow(SqlStubTouched);
+
+    expect(touched.value).toBe(true);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('writes a valid dry-run report bound to the snapshot manifest, the clock supplied by the caller', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'dry-run.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult());
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--dry-run', '--auto-apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => NOW },
+    );
+
+    expect(outcome.reconciliationReport).toEqual({ path: target, written: true, error: null });
+    const report = readReport(target);
+    expect(validateAflApiReconciliationReport(report)).toEqual([]);
+    expect(report.generatedAt).toBe(NOW);
+    expect(report.source).toEqual({
+      sourceKey: 'afl_api', season: SEASON, snapshotLabel: LABEL,
+      manifestSha256: aflApiSnapshotManifestSha256(join(projectRoot, 'data', 'sources', 'afl_api', 'matches', LABEL)),
+    });
+    expect(report.run).toEqual({ mode: 'dry_run', batchId: null, applied: false, halt: null, rollbackReason: 'dry_run' });
+    expect(report.counters.canonicalRowsInserted).toBe(3);
+    expect(report.exceptions).toBeNull();
+  });
+
+  it('writes an apply report carrying the committed batch and the exception report', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'apply.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult({ applied: true, batchId: '4242', rollbackReason: null }));
+    exceptionRead.mockResolvedValueOnce(SYNTHETIC_EXCEPTIONS);
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--auto-apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => NOW },
+    );
+
+    expect(outcome.report).toEqual(SYNTHETIC_EXCEPTIONS);
+    const report = readReport(target);
+    expect(validateAflApiReconciliationReport(report)).toEqual([]);
+    expect(report.run).toEqual({ mode: 'apply', batchId: '4242', applied: true, halt: null, rollbackReason: null });
+    expect(report.exceptions).toEqual(SYNTHETIC_EXCEPTIONS);
+  });
+
+  it('records a HALT as a run that committed nothing', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'halt.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult({
+      halt: { reason: 'synthetic_halt', detail: { providerMatchId: 'CD_M20260142801' } }, rollbackReason: null,
+    }));
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => NOW },
+    );
+
+    expect(outcome.result?.halt?.reason).toBe('synthetic_halt');
+    const report = readReport(target);
+    expect(validateAflApiReconciliationReport(report)).toEqual([]);
+    expect(report.run).toEqual({
+      mode: 'apply', batchId: null, applied: false,
+      halt: { reason: 'synthetic_halt', detail: { providerMatchId: 'CD_M20260142801' } }, rollbackReason: null,
+    });
+  });
+
+  it('a report that cannot be produced after a commit preserves and states the committed outcome', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'unwritable.json');
+    const { sql } = makeSqlStub();
+    const lines: string[] = [];
+    settle.mockResolvedValueOnce(syntheticResult({ applied: true, batchId: '4243', rollbackReason: null }));
+    exceptionRead.mockResolvedValueOnce(SYNTHETIC_EXCEPTIONS);
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--auto-apply', '--report-out', target],
+      {
+        projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: (line) => lines.push(line),
+        now: () => { throw new Error('synthetic clock failure'); },
+      },
+    );
+
+    expect(outcome.result).toMatchObject({ applied: true, batchId: '4243' });
+    expect(outcome.report).toEqual(SYNTHETIC_EXCEPTIONS);
+    expect(outcome.reconciliationReport).toEqual({ path: target, written: false, error: 'synthetic clock failure' });
+    expect(existsSync(target)).toBe(false);
+    const output = lines.join('\n');
+    expect(output).toContain('Applied as import batch 4243');
+    expect(output).toContain('RECONCILIATION REPORT NOT WRITTEN (synthetic clock failure)');
+    expect(output).toContain('committed import batch 4243 and that commit stands');
+  });
+
+  it('a report that fails its own validator is not written and the outcome is still returned', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'invalid.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult());
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--dry-run', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => 'not-an-instant' },
+    );
+
+    expect(outcome.result).toMatchObject({ applied: false, rollbackReason: 'dry_run' });
+    expect(outcome.reconciliationReport?.written).toBe(false);
+    expect(outcome.reconciliationReport?.error).toMatch(/failed its own validator \(report\.generatedAt/);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('when the post-commit exception read fails, the committed run is still recorded before the error propagates', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'exceptions-failed.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult({ applied: true, batchId: '4244', rollbackReason: null }));
+    exceptionRead.mockRejectedValueOnce(new Error('synthetic exception-read failure'));
+
+    await expect(runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--auto-apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => NOW },
+    )).rejects.toThrow('synthetic exception-read failure');
+
+    const report = readReport(target);
+    expect(validateAflApiReconciliationReport(report)).toEqual([]);
+    expect(report.run).toMatchObject({ mode: 'apply', batchId: '4244', applied: true });
+    expect(report.exceptions).toBeNull();
   });
 });
 
