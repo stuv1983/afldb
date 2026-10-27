@@ -5454,7 +5454,7 @@ async function main(argv: readonly string[]): Promise<number> {
 }
 
 /** Close the pool. After a COMMIT a close failure is a warning, never "nothing was written". */
-async function closeCorrectionConnection(sql: Db, afterCommit: boolean): Promise<void> {
+export async function closeCorrectionConnection(sql: Db, afterCommit: boolean): Promise<void> {
   if (!afterCommit) {
     await sql.end({ timeout: 5 });
     return;
