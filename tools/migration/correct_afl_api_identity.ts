@@ -4272,10 +4272,12 @@ export function dbImpactReportReader(sql: Db): ImpactReportReader {
     `),
     // `(match_date, match_id)` is the derived career order (player-derived.ts); a NULL date sorts
     // last there (ASC NULLS LAST), which the '9999-12-31' stand-in reproduces for string order.
+    // to_char, not ::text: ::text follows the session DateStyle, which this connection does not
+    // pin, and under 'SQL, DMY' string order is no longer date order (ISSUE-238 S8 LOW-2).
     careers: (playerIds) => readOnlyReport(sql, async (tx) => {
       const rows = await tx<(CareerMatch & { playerId: number })[]>`
         SELECT pms.player_id AS "playerId", pms.match_id AS "matchId",
-               COALESCE(m.match_date::text, '9999-12-31') AS "matchDate", m.season::int AS season
+               COALESCE(to_char(m.match_date, 'YYYY-MM-DD'), '9999-12-31') AS "matchDate", m.season::int AS season
           FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
          WHERE pms.player_id = ANY(${tx.array([...playerIds])}::int[])
       `;
@@ -4284,7 +4286,7 @@ export function dbImpactReportReader(sql: Db): ImpactReportReader {
       return out;
     }),
     matchCareerFacts: (matchIds) => readOnlyReport(sql, (tx) => tx<CareerMatch[]>`
-      SELECT id AS "matchId", COALESCE(match_date::text, '9999-12-31') AS "matchDate", season::int AS season
+      SELECT id AS "matchId", COALESCE(to_char(match_date, 'YYYY-MM-DD'), '9999-12-31') AS "matchDate", season::int AS season
         FROM matches WHERE id = ANY(${tx.array([...matchIds])}::int[])
     `),
   };

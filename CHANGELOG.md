@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### AFL API identity correction: DP-5 debut report no longer depends on the session DateStyle (ISSUE-238 S8 LOW-2) (2026-10-28)
+
+- The post-transaction DP-5 report orders career matches by date text, but read it with
+  `match_date::text`, which follows the session DateStyle. Nothing pins DateStyle on this connection
+  (a DSN `?datestyle=` or a role or database setting passes straight through). Under `SQL, DMY` 475 of
+  500 real careers on the isolated test copy got the wrong debut match. Both reads now use
+  `to_char(match_date, 'YYYY-MM-DD')`, and a NULL date still sorts last. Report-only: the correction,
+  its fingerprint and the replay paths are unchanged.
+- Validation: the same reproduction gives 0 of 500 wrong under both styles; three suites pass at
+  1,907 (4 skipped); typecheck exit 0. Not deployed.
+
 ### NL: "played N games for a club and also coached it" is refused, not answered with career games (V2-GAP-033) (2026-10-28)
 
 - The played-and-coached reading makes the played club a builder parameter, which no `games` count

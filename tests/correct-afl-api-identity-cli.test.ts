@@ -2129,6 +2129,29 @@ describe('Slice 8: the post-transaction report lifecycle and content', () => {
     expect(report.cache?.unresolved).toContain('player 10: slug unavailable (/players/<slug>-10)');
   });
 
+  // ISSUE-238 S8 LOW-2: careerDebut orders matchDate as a string, so the DP-5 reads must emit ISO
+  // whatever the session DateStyle. Under 'SQL, DMY' match_date::text misordered 475 of 500 real
+  // careers (isolated afldb_v2_rb_final_test, 2026-10-28); to_char does not follow DateStyle.
+  it('the DP-5 career reads format match_date with to_char, never the DateStyle-dependent ::text', async () => {
+    const texts: string[] = [];
+    const tx = Object.assign(
+      (strings: TemplateStringsArray) => { texts.push(strings.join('?')); return Promise.resolve([]); },
+      { array: (values: unknown[]) => values },
+    );
+    const fakeDb = {
+      begin: async (_opts: string, read: (t: unknown) => Promise<unknown>) => read(tx),
+    } as unknown as Parameters<typeof dbImpactReportReader>[0];
+    const reader = dbImpactReportReader(fakeDb);
+    await reader.careers([10, 11]);
+    await reader.matchCareerFacts([1]);
+    expect(texts).toHaveLength(2);
+    for (const text of texts) {
+      expect(text).toContain("COALESCE(to_char(");
+      expect(text).toContain("'YYYY-MM-DD'), '9999-12-31') AS \"matchDate\"");
+      expect(text).not.toContain('match_date::text');
+    }
+  });
+
   it('dry-run (ROLLED_BACK) and validate-only (PLANNED) render a prospective "would affect" report, never "affected"', async () => {
     const planned: CorrectionOutcome = {
       kind: 'PLANNED', fingerprint: 'f'.repeat(64), reports: [], impact: impactInput,
