@@ -743,7 +743,18 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // the AFLDB-ISSUE-218 §3 residual note), team_checkpoint_collision,
 // q3_comeback_near_miss, club_season_rank (the AFLDB-ISSUE-214 residual) and
 // team_streak.
-export const PARSER_VERSION = 66;
+// v67 -- V2-GAP-032 (blockers R43b): a bare number no extractor claimed is
+// now a leftover token. meaningfulTokens() keeps digits out of the ledger,
+// so a residual number cost nothing: the exploratory malformed_input form
+// "Adelaide goals 200 40" executed at confidence 1 as the club's goals
+// leaderboard with both numbers discarded. strayNumberTokens() reads the
+// residual text, the numbers count against the ratio and as leftovers, and
+// the question declines. extractMarqueeMatches now strips the digit count
+// it reads ("3+ anzac day games"), since it had relied on digits being
+// invisible. The same gap hid a real-user wrong answer: "most goals in 1980
+// to 1989" answered 1980 alone with 1989 dropped. YEAR_TO_YEAR_RE now reads
+// it as the inclusive range BETWEEN_RE already gives "between X and Y".
+export const PARSER_VERSION = 67;
 
 // ------------------------------------------------------------------ grain
 

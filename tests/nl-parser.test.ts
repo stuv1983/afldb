@@ -2039,6 +2039,37 @@ describe('regression: every year in an executed question reaches the plan scope'
 });
 
 /**
+ * V2-GAP-032 (blockers R43b). Digits are outside meaningfulTokens(), so a
+ * number no extractor claimed used to cost nothing: the exploratory
+ * malformed_input form "<club> <stat> 200 40" answered the club's
+ * leaderboard at confidence 1, and the real-user range "in 1980 to 1989"
+ * answered 1980 alone.
+ */
+describe('regression: no number in a question is silently discarded (V2-GAP-032)', () => {
+  it.each([
+    ['most goals in 1980 to 1989', 1980, 1989],
+    ['who had the most kicks in 2020 to 2025', 2020, 2025],
+    ['most goals in 1989 to 1980', 1980, 1989],
+  ])('%s -> the inclusive range', async (question, seasonMin, seasonMax) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('player_season');
+    expect(p.scope.seasonMin).toBe(seasonMin);
+    expect(p.scope.seasonMax).toBe(seasonMax);
+  });
+
+  it.each([
+    ['Adelaide goals 200 40', ['200', '40']],
+    ['Richmond disposals 200 40 in 2017', ['200', '40']],
+    ['Collingwood marks 200 40 during the 2010s', ['200', '40']],
+    ['most goals in 1980 and 1989', ['1989']],
+  ])('%s -> declines, naming the stray numbers', async (question, stray) => {
+    const result = await parse(question);
+    expect(result.status).toBe('none');
+    for (const n of stray) expect(result.report.unsupportedTerms).toContain(n);
+  });
+});
+
+/**
  * A bare "most <career column>" with no player named. Found broken for
  * everything except games/goals/brownlow_votes/finals: the fallback that
  * reads a leftover career-subject word only ever hand-listed those three,

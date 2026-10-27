@@ -16,9 +16,9 @@ and 021 and 028 are closed locally; 016 has its publication and 98-season eviden
 open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
 not technical inspection. Gap 026 now requires the host/production-data rehearsal, not local
 application rollback. The historical Launch F counts below are retained as history.
-Current register: **31 total / 13 closed / 18 open**, including the separately tracked strict
+Current register: **32 total / 14 closed / 18 open**, including the separately tracked strict
 historical-source/membership verification gap 029. Gap 020 was closed on 2026-10-27 as an accepted product constraint
-(owner decision). No remaining failed test is treated as green.
+(owner decision). Gap 032 was found and closed locally on 2026-10-28 (the R43b NL inspection). No remaining failed test is treated as green.
 
 `V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
 close it. A gap is marked CLOSED only when its closing evidence exists; closed entries are kept
@@ -67,6 +67,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived) | approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
 | V2-GAP-030 | Medium | Brownlow data | migration | open, rehearsed: every archived `brownlow_round_votes.match_id` is NULL because migration 094 ran over an empty table; reviewed reversible backfill built and verified on a clone (330,383/330,383 repairable, 0 excluded, idempotent, exact reversal); 1984–2025 policy approved under D-V2-BROWNLOW-MATCH-BACKFILL-1; 2026 excluded; execution pending | fresh counts/unique mapping plan, owner review of the guarded production runner, migration 116 and exact execution approval ([package](brownlow-production-approval-package-2026-10-20.md)) |
 | V2-GAP-031 | High | Brownlow ingestion | operational | open: all 207 2025 vote sets refuse `ownership_indeterminate` (source-less legacy rows); canonical ingestion verified on a clean target; reviewed reversible legacy-ownership adoption demonstrated on a clone only (207/207 sets, 621 rows); production adoption unapplied | OD-BROWNLOW-OWNERSHIP-1 approved as policy only; guarded runner/schema review and fresh execution approval pending ([package](brownlow-production-approval-package-2026-10-20.md)) |
+| V2-GAP-032 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: an unclaimed bare number is a leftover token (parser v67), so `<club> <stat> 200 40` declines and `in 1980 to 1989` is the inclusive range, not 1980 alone; whole malformed_input population (10,179) declines; 17 NL suites 1,638/1,638; typecheck exit 0. Not deployed | none |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -862,3 +863,31 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
   separately approved schema, fresh target/backup/baseline and exact execution approval. The 207 `afl_api_brownlow_settle` data issues are
   not auto-resolved by a successful settle.
   [brownlow-legacy-ownership-transition-2026-10-20.md](brownlow-legacy-ownership-transition-2026-10-20.md).
+
+## V2-GAP-032 — NL search silently discarded numbers no extractor claimed
+
+- **CLOSED locally, 2026-10-28** (found by the R43b inspection in `blockers.md`). Parser v67. Not deployed.
+- **What.** `meaningfulTokens()` keeps bare numbers out of the confidence ledger, so a number that no
+  extractor read cost the parse nothing. Two silent wrong answers resulted:
+  - the exploratory `malformed_input` template 3, `<club> <stat> 200 40 [time]`, executed at
+    confidence 1.00 as the club's leaderboard with both numbers discarded;
+  - the real-user corpus's `user_range_leaders` form `most <stat> in 1980 to 1989` (40 rows) answered
+    1980 alone, because `BARE_YEAR_RE` took the first year and the second was dropped.
+- **Case set (R43b).** The ISSUE-206 V1 corpus CSV is held only on the host, and no V5 baseline is
+  retained locally. A replay of the unchanged generator without V5 gives a different digest
+  (`ee0ae7c0…`, not `45c4dabb…`), so the exact 550 rows and the 114 accepted ones cannot be
+  reconstructed here. The family is five templates over fixed pools, so the whole population, 10,179
+  distinct questions, was inspected instead. It contains every original row. Under the v66 parser,
+  templates 0, 1, 2 and 4 declined throughout, and template 3 was accepted in all 3,042 cases. That
+  is consistent with 114/550 being about one template in five.
+- **Fix** (`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`). `strayNumberTokens()` reads the
+  bare numbers left in the residual text once every extractor has run. They count against the token
+  ratio and as leftover tokens, exactly as an unexplained word does. `extractMarqueeMatches` now
+  strips the digit count it reads ("3+ anzac day games"); it had relied on digits being invisible.
+  `YEAR_TO_YEAR_RE` reads "1980 to 1989" as the inclusive range `BETWEEN_RE` already gives
+  "between 1980 and 1989".
+- **Validation (DB-free, Windows workstation).** All 10,179 population questions now decline. A
+  differential of the v66 and v67 parsers over the 1,844 retained UI-corpus questions changes
+  exactly the 40 range rows, which stay plans with the range corrected. The 17 parser-dependent
+  suites pass 1,638/1,638, including 7 new cases in `tests/nl-parser.test.ts`. `npm run typecheck`
+  exited 0. Not run: the browser NL stress runner, PostgreSQL answers and the frozen V5 corpus.

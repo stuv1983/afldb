@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### NL search no longer discards numbers it did not read (V2-GAP-032, parser v67) (2026-10-28)
+
+- A bare number that no extractor claimed is now a leftover token: it counts against the token ratio
+  and declines the question, as an unexplained word does. Before, "Adelaide goals 200 40" answered
+  Adelaide's goals leaderboard at full confidence. This was the exploratory `malformed_input` form
+  that the R43b inspection found accepted.
+- "most goals in 1980 to 1989" is now the inclusive 1980–1989 range, the same as "between 1980 and
+  1989". It previously answered 1980 alone. This is the real-user corpus's `user_range_leaders` form.
+- The marquee count ("3+ anzac day games") is stripped once read, so it is not mistaken for a stray
+  number.
+- Validation: the whole `malformed_input` template population (10,179 questions) declines; on the
+  retained UI corpora only the 40 range rows change, and they stay plans with the range corrected;
+  17 NL suites pass 1,638/1,638; typecheck exit 0. DB-free only. Not deployed.
+
 ### ISSUE-316 2026 rollover and successor activation: integrated locally (2026-10-28; not pushed, production NO-GO)
 
 The State C content accepted on EXEC (D-316-APPLY-B-20261027, D-316-ACT-C-20261028) is committed on `v2/rebuild` as three separately identifiable commits: R `c7e17da2`, A `1a6de4b6` and F `955d0e85`.
