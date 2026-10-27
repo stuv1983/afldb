@@ -16,8 +16,9 @@ and 021 and 028 are closed locally; 016 has its publication and 98-season eviden
 open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
 not technical inspection. Gap 026 now requires the host/production-data rehearsal, not local
 application rollback. The historical Launch F counts below are retained as history.
-Current register: **29 total / 9 closed / 20 open**, including the separately tracked strict
-historical-source/membership verification gap 029. No remaining failed test is treated as green.
+Current register: **31 total / 13 closed / 18 open**, including the separately tracked strict
+historical-source/membership verification gap 029. Gap 020 was closed on 2026-10-27 as an accepted product constraint
+(owner decision). No remaining failed test is treated as green.
 
 `V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
 close it. A gap is marked CLOSED only when its closing evidence exists; closed entries are kept
@@ -54,7 +55,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-017 | Medium | Stage 4-5 SQL | no | **CLOSED (Launch F)**: 111-114 applied, privileges run, `privileges` and awards integration suites pass, operations pages rendered (isolated PG16) | none |
 | V2-GAP-018 | Low | curated awards | no | **CLOSED (Launch F)**: `reviseApprovedProposal` (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
-| V2-GAP-020 | Low | curated awards | no | open: winners without a resolved player identity cannot be approved | none |
+| V2-GAP-020 | Low | curated awards | no | **CLOSED (2026-10-27, owner decision): accepted product constraint.** A winner still needs a resolved durable player identity before approval; the supported workflow is to link the player first, then propose. No identity was resolved and identity-less approval is not built | none |
 | V2-GAP-021 | Medium | Coleman | no | **CLOSED locally**: explicit guarded offline bootstrap refuses publisher-owned seasons; session locks survive batch commits; 27/27 publication tests | production comparison remains gap 015 |
 | V2-GAP-022 | Medium | admin UI | rehearsal | open, narrowed: 26 images technically inspected; four Brownlow replacements recaptured/inspected after material wording/status fixes | owner acceptance per screen |
 | V2-GAP-023 | Low | Brownlow | no | **CLOSED in code, verified on a disposable clone of the authentic 2025 data (2026-10-20)**: the settle stages the API leaderboard on the observation spine and the reconciliation derives the 18-team provider-team-to-club mapping from the committed identities, corroborated by the fixtures; the operations centre shows both. Production staging still needs one operator-run settle with this code (owner action; nothing was run against production) | none for migration; the stage runs when the operator next settles a Brownlow snapshot |
@@ -453,6 +454,11 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-020 — Curated winners need a resolved player identity
 
+- **CLOSED, 2026-10-27, as an accepted product constraint (owner decision).** The owner kept the
+  requirement that a winner have a resolved durable player identity before approval. The
+  supported workflow is to link the player first, then propose the winner. Closing the gap does
+  not claim that any outstanding identity was resolved, and identity-less approval is not
+  implemented. Documentation only: no code, test or data changed.
 - **What.** A proposal whose player has no durable identity (`afltables:` or `manual_admin_edit:`)
   is refused at validation, so an identity-less legacy player cannot be approved as a winner.
 - **Close.** Link the player first through the existing identity tools, then propose.

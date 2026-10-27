@@ -78,9 +78,9 @@ Notes:
   the new approved revision (`revise_approved`); a note of 20-2000 characters is required. Any failure rolls all
   of it back. Audit: two ledger rows plus the replace/correct `data_edits` and `data_overrides` rows;
   activity row `admin.curated_award_revised`.
-- **Identity first (V2-GAP-020):** a winner without a durable player identity cannot be approved (re-validation
-  refuses with `player_unresolved`). Link the player through the existing identity tools (player links), then
-  propose again.
+- **Identity first (V2-GAP-020, closed 2026-10-27 as an accepted product constraint):** a winner without a durable
+  player identity cannot be approved (re-validation refuses with `player_unresolved`). This is the supported
+  workflow: link the player through the existing identity tools (player links), then propose again.
 - Coleman **publish** needs the operator's "settled" attestation (every promotion and settle for
   the season has concluded; plan §7 R-022) and a note of 20 to 2000 characters. The evidence
   reference stored with it is `coleman_derivation:<season>:<inputChecksum>`. A season with a goal
