@@ -61,8 +61,11 @@ const NAMED_MEDALS_DEFS_CSV = join(
 );
 
 // The dev host keeps psycopg in the repo virtualenv; a bare python3 there
-// cannot import it.
-const venvPython = join(root, '.venv', 'bin', 'python');
+// cannot import it. .venv layout differs by platform: POSIX venvs put the
+// interpreter under bin/, Windows venvs under Scripts/ with a .exe suffix.
+const venvPython = process.platform === 'win32'
+  ? join(root, '.venv', 'Scripts', 'python.exe')
+  : join(root, '.venv', 'bin', 'python');
 const python = process.env.AFLDB_PYTHON
   ?? (existsSync(venvPython)
     ? venvPython
