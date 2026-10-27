@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### Club page counts captaincy seasons, not appointments (blockers R37) (2026-10-28)
+
+- The Captains note "N recorded captaincy seasons" now counts distinct seasons. It counted rows, one
+  per appointment, so co-captains and re-appointments inflated it: Gold Coast read 21 for 16 seasons.
+  The table still lists every appointment. A read-only check of the unchanged query on the isolated
+  rebuilt history confirmed 21 → 16 and found the figure overstated for 19 of 21 clubs. Typecheck and
+  lint clean. Not rendered (VISUAL: UNVERIFIED). Not deployed.
+
 ### NL search no longer discards numbers it did not read (V2-GAP-032, parser v67) (2026-10-28)
 
 - A bare number that no extractor claimed is now a leftover token: it counts against the token ratio
