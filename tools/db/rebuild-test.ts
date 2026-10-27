@@ -1188,7 +1188,7 @@ const LADDER_PAIRS: Readonly<Record<string, RehearsalPair>> = freezeBinding({
  * any other count. A tuple is judged only together with the register, contract, witness and `seasons.json`
  * it must agree with (`assertSuccessorTransition`); its name alone grants nothing.
  */
-export const SUCCESSOR_LADDER_TUPLES_JSON = '{}';
+export const SUCCESSOR_LADDER_TUPLES_JSON = '{"c2-2026-successor":{"profile":"c2-2026-successor","supersedes":"predecessor-1897-2025","core_snapshot_label":"c2-2026-final-core-v1","core_manifest_sha256":"02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988","core_artefact_set_sha256":"817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e","witness_snapshot_label":"c2-2026-final-ladder-v1","witness_manifest_sha256":"65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34","first_season":1897,"last_season":2026,"expected_rows":1640}}';
 export const SUCCESSOR_LADDER_TUPLES: Readonly<Record<string, SuccessorLadderTuple>> =
   freezeBinding(parseSuccessorLadderTuples(SUCCESSOR_LADDER_TUPLES_JSON));
 export type LadderRebuildExpectation = Readonly<{
