@@ -1,8 +1,8 @@
 # ISSUE-316 local integration candidate (2026-10-28)
 
 **Status: INTEGRATED as three local commits on `v2/rebuild` (2026-10-28; not pushed; see §6).** R `c7e17da2…`, A
-`1a6de4b6…`, F `955d0e85…` on top of `e91fae88…`; the tracking/record commit follows them. G and the owner's other work stay
-uncommitted. Focused checks passed (§4.1).
+`1a6de4b6…`, F `955d0e85…` on top of `e91fae88…`; the tracking/record commit `d504932c` follows them. G was later committed
+with the owner's V2-GAP-027 work in `2d0971c7`. Focused checks passed (§4.1). Proof standing: §3.
 
 **Preparation (as first recorded).** Branch `v2/rebuild`, HEAD
 `e91fae88765c5d6d74d4b2c61ee2c4d599fe5d26` (A). Native edits plus read-only Git only. Nothing was staged or committed.
@@ -60,12 +60,19 @@ fixture uses synthetic dates. None needs adaptation.
 ## 3. Validation carried forward (content unchanged)
 
 - R and A bytes: day-D enforced dry run 43/43; apply-B A–F; activate-C V0–V7 (EXEC State C `75df67db…`, deactivation
-  dry run proven). Accepted J2 rebuild evidence (167/167, inputs 264/264) stands.
+  dry run proven).
+- Successor rebuild: the accepted J2 Linux rebuild (2026-10-24, streamanator, pinned `876dadbf`: runner exit 0,
+  `AFLDB-FINAL-VALIDATION PASSED: 91 checks`, all 1,640 comparable club-seasons agree; evidence 167/167, inputs 264/264)
+  carries forward.
 - F content: accepted State C broader 2992 pass / 7 skip / 0 fail and focused 396/0/0 (exit 0); fresh restatement review GO.
 - The committed tree after R+A+F (`§5`) equals the validated State C tree plus only H/D-P documents and ISSUE-328.
 
-Not proven anywhere: the 91 SQL checks of the activated state, any successor database rebuild, and integration suites
-against State C (the accepted matrix was DB-free).
+Readiness, apply, activation, the recovery dry run and this integration executed no further rebuild and not the 91 SQL
+checks; none was required (D/P acceptance 2026-10-25). Remaining release verification, not run: integration suites other
+than the GAP-027 case against the integrated State C tree (the accepted matrix was DB-free), and Linux execution of that tree.
+
+_Corrected 2026-10-28: this section first read "Not proven anywhere: the 91 SQL checks of the activated state, any successor
+database rebuild, and integration suites against State C". That omitted the accepted J2 rebuild, which ran both._
 
 ## 4. Required focused checks (user-executed)
 
@@ -105,7 +112,8 @@ guard repeated the cluster and marker check in-process (`AFLDB_V2_ISOLATED_PG=1`
 and cleanup ran there. Cleanup: the clone was dropped (`drop-db --acknowledge-destroy`), and the cluster was stopped with no
 listener left on 55433. The template and every other retained database were only read. No credential or DSN was printed.
 
-Still not proven by this: Linux execution, the other integration suites against State C, and the §3 items.
+Not covered by these checks (remaining release verification, §3): Linux execution and the other integration suites against
+State C.
 
 ## 5. Selective Git integration proposal (operator-executed; not run)
 
