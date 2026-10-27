@@ -368,8 +368,9 @@ stage `id` is what `--plan` prints and what a failure names.
 | 24 | `brownlow-season` | Brownlow season totals — tracked artefact, plus any season-scoped AFL API artefact `data/brownlow/season-votes-afl_api-<season>.csv` for a season `stat-availability.json` marks complete (AFLDB-ISSUE-233 D-233-2) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 25 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 26 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 27 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 28 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
+| 27 | `first-kick-goal` | first-kick goal records — pinned curated extract + tracked manifest (`data/records/first-kick-goal.source.json`), via the unchanged importer under `--provenance` (AFLDB-ISSUE-249) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 28 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 29 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
 
 Stages 8–16 are the AFLDB-ISSUE-118 additions (§23.19, §23.24, §23.27, §23.29, §23.31,
 §23.33–§23.35). Every one reads a tracked, manifest-pinned artefact, contacts no network, and
