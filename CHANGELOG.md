@@ -82,6 +82,20 @@ Focused checks over the owner's tree: five suites 499/499, typecheck exit 0, and
 - V2-GAP-025 is closed locally. Windows and synthetic data only; not deployed, and no DEV or
   production acceptance is claimed.
 
+### V2 closure of 13 issues under owner decision D-V2-SCOPE-20261027 (2026-10-27; tracking only)
+
+The owner approved D-V2-SCOPE-20261027 with amendments. It supersedes the earlier closure conditions **for V2 only**,
+and the V2 open count falls from 16 to 3 (229, 316, 321).
+
+- **Resolved, V2 engineering complete:** ISSUE-267, 269, 270, 274, 275, 276, 279 and 328.
+- **Resolved, superseded by retired V2 runtime paths:** ISSUE-266, 268, 271, 272 and 273. V2 refuses CSV upload,
+  submission review and promotion, and email intake. The fixed code is retained.
+- **Nothing deployed or accepted:** no application behaviour changed, and no deployment, DEV acceptance or PROD
+  acceptance is claimed. The outstanding live requirements are kept in the decision's checklist.
+- **ISSUE-279:** `window-279.sh` is withdrawn as unsafe.
+- **ISSUE-272:** the venue-season draft registration is dropped in favour of the source repository's parked ISSUE-327.
+- **Files moved:** the 13 runbooks, their companions and the decision record are now in `issues/closed/`.
+
 ### Order the latest settle batch numerically in the admin settle panels (ISSUE-328) (2026-10-27)
 
 - `getLatestSettleRun()` (`src/db/queries/settle-runs.ts`) ordered with a bare `ORDER BY id DESC` beside an `id::text AS id` output column, which PostgreSQL binds to the text alias, so the settle panels on `/admin/current-season` (both readers in `settle-status.ts`) would name the text-sorted batch, not the numeric latest, once a tool's batch ids cross a digit boundary (the source repository's DEV showed 98/99 while 134/107 were newest). It now orders by `import_batches.id`; the text return type, tool-only filter and failed-run inclusion are unchanged. Ported from the source repository commit `6ffb893b` with five DB-free regression tests in `tests/admin-current-season-settle.test.ts` (suite 58/58; the original query fails three of them). V2 retired the on-demand settle trigger, so the source's baseline test is not ported. Local only: not deployed, no live verification, no PROD change.

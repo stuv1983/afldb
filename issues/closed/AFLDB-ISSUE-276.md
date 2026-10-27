@@ -1,5 +1,11 @@
 # AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 
+> **RESOLVED 2026-10-27, V2 engineering complete (owner decision D-V2-SCOPE-20261027, approved with amendments; V2
+> only).** The fix (`3ec76f28`) is in V2 `v2/rebuild` and validated as recorded below, including V2's 20 Oct local run
+> (`settle-afl-api-issue276` 4/4, `afl-api-settle-plan` 55/55). The §17.4 items are met. No deployment or PROD
+> acceptance is claimed. The guard branch stays NOT OBSERVED on live data. The unmet live requirement is carried into
+> checklist item 4 of [the decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md).
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). Implemented locally 2026-10-12 on `opus/issue-276-period-score-guard` (base `6f99b58d`); **committed locally as `5b0ab6dc0674b9a3daaf8c3fbbb78675fb04210d`** (12 October 2026; earlier "uncommitted" wording in this runbook is dated history), not merged, pushed, installed on DEV or deployed. Focused `afldb_test` acceptance is **SUPPORTED** (2026-10-12, operator-run): after a first run that passed 3 and failed 1 on a test-reader type mismatch (§17.6), the corrected file passed **4/4** (§17.7), with the residue query showing zero owned/unproven rows and the shared 2026 digests identical to the pre-run baseline. This is not whole-suite, restricted-role, live-provider, DEV or PROD acceptance. A static-review correction pass (2026-10-12) reworked the file's shared-state restoration, ownership proof and payload cleanup; see §17.5. See §17.

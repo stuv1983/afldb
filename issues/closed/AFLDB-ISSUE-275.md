@@ -1,5 +1,11 @@
 # AFLDB-ISSUE-275 — A settle can insert period scores under a match it refused because a foreign owner created it concurrently
 
+> **RESOLVED 2026-10-27, V2 engineering complete (owner decision D-V2-SCOPE-20261027, approved with amendments; V2
+> only).** The fix (`24ca412b`) is in V2 `v2/rebuild` and validated as recorded below, including V2's 20 Oct local run
+> (`current-season-import` and `settle-afltables` ISSUE-275 cases passed). No deployment or PROD acceptance is claimed.
+> The PROD split-ownership census is already done (§34). The unmet live requirement is carried into checklist items 4–5
+> of [the decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md). S-D stays parked.
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). **Implemented locally 2026-10-13** on `opus/issue-275` (worktree `D:\dev\afldb-issue-275`, base `e315c1d3`): *(at that date uncommitted and unmerged; since committed as `24ca412b` and on `origin/main`, verified 2026-10-14; installed on DEV 2026-10-14 13:52 AEDT, section 30; acceptance NOT met)*. DB-free validation passed (§19, §23). **Focused PostgreSQL validation PASSED on `afldb_test` 2026-10-13 (§26): 3 selected tests passed, exit 0, 79 cases excluded by the filter, `CENSUS IDENTICAL`**; it is a same-transaction planted-row witness, not two-session concurrency, and gives no DEV, PROD or State B evidence. The full-diff review (§27) found no CRIT/HIGH/MED defect. Remaining requirements: §28. §1-§17 are dated history; §18-§21 are current as amended in place; **§22-§25 (revision 2, 2026-10-13) supersede any §18-§21 sentence they contradict, and §26-§28 supersede every "NOT RUN" statement below**; the amended sentences say so.

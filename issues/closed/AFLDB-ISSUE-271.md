@@ -1,5 +1,11 @@
 # AFLDB-ISSUE-271 — Legacy `match_results` promotion overwrites Data Editor corrections on `matches`
 
+> **RESOLVED 2026-10-27, superseded by a retired V2 runtime path (owner decision D-V2-SCOPE-20261027, approved with
+> amendments; V2 only).** The owner-accepted local engineering and local acceptance ruling stands as the engineering
+> record. The V2 applicability is in §17.14. V2 refuses `match_results` promotion at runtime, so the DEV acceptance of
+> the authority refusal and PROD acceptance lapse for V2 and are not claimed. F4 and F5 lapse with the path. Historical
+> impact stays unassessed. [Decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md).
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). Nothing implemented.
@@ -364,3 +370,63 @@ No past promotion has been assessed for a reverted correction.
 read-only DEV census (unrun, not syntax-checked) run and reviewed **before** DEV deployment; then DEV deployment and the
 applicable acceptance. PROD installation and acceptance stay behind the unchanged ISSUE-265 hold. DEV acceptance alone does
 not close this issue.
+
+### 17.13 Local/test tunnel attempt (2026-10-26; acceptance blocked before database access)
+
+The owner authorised a temporary localhost-only forward and test-only acceptance for this issue, with a separate
+read-only identity gate for every owner/import/auth test DSN before any fixture write. No DEV/PROD access, rebuild,
+deployment, push or ISSUE-316 change was authorised.
+
+- **Configuration blocker:** `D:\dev\afldbV2` contains `.env.example`, but no `.env`. The process environment has none of
+  `AFLDB_TEST_DATABASE_URL`, `AFLDB_TEST_IMPORT_DATABASE_URL`, `AFLDB_TEST_AUTH_DATABASE_URL` or
+  `AFLDB_AUTH_DATABASE_URL`. No credentials were printed, substituted or read from another checkout. The owner was asked
+  where the existing test credentials are configured. `.env` was not created or edited.
+- **SSH identity and tunnel:** the name `streamanator` did not resolve locally. The runbook's recorded endpoint
+  `arm@10.0.40.100` returned hostname `streamanator`, using batch authentication and strict existing-host-key checking.
+  An SSH process (PID 33480) established `127.0.0.1:55432 -> streamanator/127.0.0.1:5432`, with
+  `ExitOnForwardFailure=yes`. OS listener inspection proved the sole listening address was `127.0.0.1:55432`, owned by
+  that `ssh` process. No remote service/configuration, firewall or persistent SSH configuration was changed. This proves
+  SSH host identity and local forwarding only; it does not prove PostgreSQL identity or reachability.
+- **Database identity gate:** owner **NOT RUN**, import **NOT RUN**, auth **NOT RUN** (test DSNs unavailable). This is not
+  an identity PASS or an observed database-identity FAIL. **No PostgreSQL connection or operation was attempted.** No
+  database fallback, fixture/schema/data write, orphan investigation or rebuild occurred; test-target guards are unchanged.
+- **Acceptance:** real `saveEdit`/promotion race **NOT RUN**; database-backed manual-attendance citation **NOT RUN**;
+  affected integration and neighbouring database-backed regressions **NOT RUN**. Their existing evidence gaps remain.
+- **Independent checks (Windows):** `node node_modules/vitest/vitest.mjs run tests/ingest-datasets.test.ts` passed
+  **305/305**, zero failed/skipped (11:33:53 AEDT); `npm.cmd run typecheck` (`next typegen && tsc --noEmit`) passed, exit 0;
+  `git diff --check` passed, exit 0. These checks do not establish database or Linux acceptance.
+- **Cleanup:** the tunnel's PID, executable name and exact forward/host arguments were checked before stopping only that
+  process. OS inspection then confirmed **no listener on local port 55432**. There were no DB sessions, locks or fixtures
+  to clean up. PostgreSQL on `streamanator` was not stopped.
+
+No application/test implementation changed. **ISSUE-271 remains OPEN.** Next: obtain the configured existing test DSNs
+from the owner, reopen the same temporary tunnel, validate each DSN without exposing credentials (exact `afldb_test`,
+expected purpose role, localhost port 55432, no redirecting URL/libpq parameters), then make each connection's first DB
+operation a read-only identity transaction. Record each result and refuse any database other than `afldb_test`. Only
+after every required DSN passes may the existing test-only state be inspected and the scoped acceptance fixtures run.
+
+### 17.14 V2 applicability (2026-10-27; documentation only)
+
+**Owner ruling, respected.** The owner stated, in the 2026-10-27 closure-audit instruction, that ISSUE-271's local
+engineering and local acceptance are **accepted**. That ruling's own text and evidence are not recorded in this checkout.
+Its proofs are **not repeated** here, so §17.13's next step (test credentials, identity gates, race and citation proofs
+in V2) is **withdrawn, not run**.
+
+**V2 facts (read-only Git and native inspection; no command touched a database or host).**
+- `src/lib/ingest/datasets.ts` blob `91d0114305df…` and `src/lib/ingest/pipeline.ts` blob `52fddc8e1803…` are identical
+  at V2 `HEAD` and at the V2 fork point `ff100dc2`. No V2 commit touches either file. `d37c1422` is an ancestor of
+  `ff100dc2`.
+- V2's own local delivery run (`docs/v2/evidence/local-supported-tests-delivered.json`, 20 Oct 2026, an isolated local
+  database) passed `tests/integration/match-results-promotion.test.ts` 46/46, including 6 ISSUE-271 cases, and
+  `tests/ingest-datasets.test.ts` 305/305, including 43. The run as a whole is not green (9 failures elsewhere).
+- V2 runtime does not reach `match_results` validation or promotion (`docs/v2/legacy-disposition.md` L1–L3):
+  - `runValidation`, `decideSubmission` and `runPromotion` refuse (`src/app/admin/submissions/[id]/actions.ts:27-39`).
+  - The CSV upload and email-intake routes answer 410 without reading the body.
+  - `pipeline.ts` has no non-test importer. The only non-test importer of `datasets.ts` is
+    `tools/records/import-first-kick-goal.ts:78` (`resolveClub`, `resolvePlayer`).
+
+**Consequence.** The open DEV acceptance of the Data Editor authority refusal, and PROD acceptance, cannot be performed
+against V2. Whether they lapse for V2 is the owner's decision. It is proposed as Class B of
+`issues/closed/AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md` and not decided *(approved 2026-10-27; see the
+closure note at the top)*. Exposure on pre-V2 PROD code stays listed
+there (checklist item 10). **ISSUE-271 remains OPEN.**

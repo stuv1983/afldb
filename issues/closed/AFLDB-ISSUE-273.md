@@ -1,5 +1,12 @@
 # AFLDB-ISSUE-273 — Submission validation overwrites a concurrent approve, promote or reject
 
+> **RESOLVED 2026-10-27, superseded by a retired V2 runtime path (owner decision D-V2-SCOPE-20261027, approved with
+> amendments; V2 only).** V2 refuses submission validation, review and promotion, and the email-intake route answers
+> 410 (`docs/v2/legacy-disposition.md` L2–L3). The fixed code (`a34f0721`) is retained, and V2's 20 Oct local run
+> passed its cases (`submission-promotion` 13, `submission-review-actions` 17). The DEV acceptance (§22.4) stays as
+> recorded. PROD acceptance lapses for V2 and is not claimed.
+> [Decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md).
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). Fix implemented 2026-10-11 on `opus/issue-273`. Integration passed on

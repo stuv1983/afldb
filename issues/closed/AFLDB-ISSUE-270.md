@@ -1,5 +1,11 @@
 # AFLDB-ISSUE-270 — A delegated admin manager can take over a peer admin account through a spare invite
 
+> **RESOLVED 2026-10-27, V2 engineering complete (owner decision D-V2-SCOPE-20261027, approved with amendments; V2
+> only).** The fix (`b239e0ac`) is in V2 `v2/rebuild` and validated as recorded below, including V2's 20 Oct local run
+> (`admin-lifecycle` integration 37/37, `auth` 203/203). No deployment or PROD acceptance is claimed. The unmet live
+> requirement is carried into checklist item 3 of [the decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md). D-270-1
+> stays undecided and is not a gate. The §19.6 follow-ups stay recorded.
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). **Implemented 2026-10-09 in `sonnet/issue-270` (worktree `afldb-issue-270`, base

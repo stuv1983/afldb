@@ -1,5 +1,13 @@
 # AFLDB-ISSUE-272 — Legacy `match_results` builds the match key from the raw round code and creates duplicate matches
 
+> **RESOLVED 2026-10-27, superseded by a retired V2 runtime path (owner decision D-V2-SCOPE-20261027, approved with
+> amendments; V2 only).** V2 refuses `match_results` promotion at runtime. The fixed code (`d37c1422`) is retained, and
+> V2's 20 Oct local run passed its 22 `ingest-datasets` cases. The qualified DEV acceptance (§17.18, D-272-5) stays as
+> recorded. PROD acceptance and the optional PROD census lapse for V2 and are not claimed. **The drafted 2026
+> venue-season defect registration is dropped (owner amendment 5).** That subject is the source repository's
+> ISSUE-327, already tracked and parked in the source checkout, so V2 makes no duplicate investigation. The owner's
+> housekeeping stays in checklist item 11 of [the decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md).
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). Nothing implemented.

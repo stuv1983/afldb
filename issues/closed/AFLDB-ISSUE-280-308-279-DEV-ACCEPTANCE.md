@@ -1,5 +1,9 @@
 # Combined DEV deployment and acceptance: ISSUE-280 and ISSUE-308 (ISSUE-279 PARKED, no executable procedure)
 
+> **Archived 2026-10-27.** ISSUE-280 and ISSUE-308 were already resolved. ISSUE-279 was resolved V2-scoped under owner
+> decision D-V2-SCOPE-20261027. **The §6 ISSUE-279 window procedure and `window-279.sh` are WITHDRAWN / UNSAFE (owner
+> amendment 3). No settings-window authority is granted, and nothing in §6 may be run.** History below is unchanged.
+
 ## EXECUTION RECORD (2026-10-15, 22:00-22:12 AEDT; added after the live work, D-REC-1)
 
 The text below this record is the r2 preparation, kept as it was sealed (its "NOTHING EXECUTED" wording describes the state when it was written). Owner decisions D-DEV-280-308-1, D-DEV-280-308-CLEAN, D-308-1, D-308-2 (declined), D-308-3, D-280-1, D-280-2 and D-REC-1 were recorded verbatim in the run folder before anything ran. ISSUE-279 stayed parked.

@@ -1,5 +1,12 @@
 # AFLDB-ISSUE-268 — Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd
 
+> **RESOLVED 2026-10-27, superseded by a retired V2 runtime path (owner decision D-V2-SCOPE-20261027, approved with
+> amendments; V2 only).** V2 refuses CSV upload, submission review and promotion (`docs/v2/legacy-disposition.md`
+> L1–L2). The fixed code (`5659f789`) is retained, and V2's 20 Oct local run passed its cases (`ingest-datasets` 82,
+> `match-results-promotion` 7). DEV and PROD acceptance lapse for V2 and are not claimed. D-268-1 and D-268-3 lapse
+> with the path. Historical impact stays unassessed.
+> [Decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md).
+
 ## 0. Status
 
 - **Status (2026-10-09, current):** Open. **Committed (`5659f789`), merged to `main` and pushed, and deployed to DEV (installation and

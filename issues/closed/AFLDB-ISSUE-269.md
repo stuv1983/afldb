@@ -1,5 +1,11 @@
 # AFLDB-ISSUE-269 — `replay_admin_overrides('matches')` applies only one of a match's active override rows
 
+> **RESOLVED 2026-10-27, V2 engineering complete (owner decision D-V2-SCOPE-20261027, approved with amendments; V2
+> only).** The fix (`86e2d19f`, shared with ISSUE-267) is in V2 `v2/rebuild` and validated as recorded below, including
+> V2's 20 Oct local run (`data-editor` ISSUE-269 case passed). No deployment or PROD acceptance is claimed. The unmet live
+> requirement is carried into checklist item 2 of [the decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md).
+> Historical impact stays unassessed.
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). **Implemented 2026-10-09 together with AFLDB-ISSUE-267 (worktree

@@ -1,5 +1,12 @@
 # AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 
+> **RESOLVED 2026-10-27, V2 engineering complete (owner decision D-V2-SCOPE-20261027, approved with amendments; V2
+> only).** The fix (`cf1d49c3`) is in V2 `v2/rebuild` (`src/app/sitemap.ts:64` awaits the segment id) and DB-free
+> validated (§17.1). No deployment or PROD acceptance is claimed. **`window-279.sh` (§20; combined procedure
+> `AFLDB-ISSUE-280-308-279-DEV-ACCEPTANCE.md` §6) is WITHDRAWN / UNSAFE, and no settings-window authority is granted.**
+> The live sitemap check stays outstanding, by a method yet to be proposed and approved: checklist item 6 of
+> [the decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md).
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). Implemented 2026-10-14 (§17), DB-free validated (§17.1), merged to `main` as `cf1d49c3` (§18); **installed on DEV in `f07c2a74` on 2026-10-15, not on PROD** (§19). **Open** until the §14 item 2 DEV check passes; that check is parked (§19).

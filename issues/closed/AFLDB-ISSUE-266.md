@@ -1,5 +1,12 @@
 # AFLDB-ISSUE-266 — Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin
 
+> **RESOLVED 2026-10-27, superseded by a retired V2 runtime path (owner decision D-V2-SCOPE-20261027, approved with
+> amendments; V2 only).** In V2, `tools/email_intake/fetch_and_stage.py` is a refusing shim, and the email-intake route
+> answers 410 without reading the request (`docs/v2/legacy-disposition.md` L3). The fixed code (`077af7ee`) is
+> retained offline. DEV and PROD acceptance lapse for V2 and are not claimed. Kept: disable
+> `afldb-email-intake.timer` on every host at or before the V2 release, and no intake activation on a pre-V2 host
+> without §18.6. That is checklist item 9 of [the decision](AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md).
+
 ## 0. Status
 
 - **Status:** Open (2026-10-08). D-266-1 and D-266-2 decided 2026-10-09. Implemented (§18; pre-commit review fixes
