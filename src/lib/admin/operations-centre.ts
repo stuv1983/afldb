@@ -87,6 +87,13 @@ import {
   type BrownlowEligibilityRefusalCode,
   type BrownlowPlayerIdentityView,
 } from '@/db/queries/brownlow-eligibility';
+import {
+  AFL_API_FINDING_SECTIONS,
+  isAflApiFindingCursor,
+  readAflApiSettleFindings,
+  type AflApiFindingSection,
+  type AflApiFindingsPage,
+} from '@/db/queries/afl-api-settle-findings';
 import { colemanAwardWinnerProjection, type ColemanAwardWinnerProjectionPort } from '@/db/queries/coleman-award-winners';
 import {
   listColemanPublications,
@@ -973,6 +980,39 @@ export async function reconcileBrownlowSeasonForAdmin(
         ? staging
         : { ...staging, teamMapping: { state: 'not_attempted', reason: 'identities_unavailable', error: identities.error } },
     };
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * AFL API settle refusals (V2-GAP-025)
+ * ------------------------------------------------------------------ */
+
+/**
+ * One page of the open AFL API settle refusals or settle findings (`operations.centre.read`).
+ * READ-ONLY: one repeatable-read READ ONLY transaction, no audit row, no retry and no control that
+ * resolves anything (a finding is closed only by the settle that owns it). See
+ * `src/db/queries/afl-api-settle-findings.ts` for the scope and what is never returned.
+ */
+export async function listAflApiSettleFindingsForAdmin(
+  admin: AdminUser,
+  input: { section: AflApiFindingSection; before: string | null },
+  deps?: Partial<OperationsDeps>,
+): Promise<OperationResult<{ page: AflApiFindingsPage }>> {
+  const d = resolveDeps(deps);
+  return runRead(async () => {
+    if (!hasCapability(admin, 'operations.centre.read')) {
+      throw new OperationRefusal('forbidden', 'Reading AFL API settle refusals needs the operations.centre.read capability.');
+    }
+    if (!(AFL_API_FINDING_SECTIONS as readonly string[]).includes(input.section)) {
+      throw new OperationRefusal('invalid_input', `The section must be one of ${AFL_API_FINDING_SECTIONS.join(', ')}.`);
+    }
+    if (input.before !== null && !isAflApiFindingCursor(input.before)) {
+      throw new OperationRefusal('invalid_input', 'The page cursor must be a positive whole number.');
+    }
+    const page = await d.withExecutor((executor) => readAflApiSettleFindings(executor, {
+      section: input.section, before: input.before,
+    }));
+    return { page };
   });
 }
 

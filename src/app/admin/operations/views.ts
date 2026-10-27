@@ -15,6 +15,7 @@ import {
   type SeasonRegistry,
 } from '@afldb/domain';
 
+import type { AflApiFindingSection } from '@/db/queries/afl-api-settle-findings';
 import type { SettleRunRecord } from '@/db/queries/settle-runs';
 import { hasCapability, type Capability, type CapabilityViewer } from '@/lib/auth/capabilities';
 import { parseSeason } from '@/lib/params';
@@ -252,6 +253,7 @@ const INSPECTION_LINKS: readonly OperationsLink[] = [
   { href: '/admin/player-links', label: 'Unresolved identities (player links)', description: 'Provider and source identities that are not yet linked to a stable player id.', capability: 'data.playerLinks' },
   { href: '/admin/brownlow', label: 'Brownlow administration', description: 'Match-by-match Brownlow votes: drafts, finalise and publish.', capability: 'data.brownlow.read' },
   { href: '/admin/current-season', label: 'Current season', description: 'AFL API ingestion controls and settle unit status for the current season.', capability: 'acquisition.currentSeason' },
+  { href: '/admin/operations/afl-api-refusals', label: 'AFL API settle refusals', description: 'Open refused canonical applications and open findings of the AFL API settles. Read-only.', capability: 'operations.centre.read' },
 ];
 
 const CURATED_LINKS: readonly OperationsLink[] = [
@@ -315,6 +317,35 @@ export function parseRouteId(value: string): number | null {
   if (!/^[1-9]\d{0,9}$/.test(value)) return null;
   const id = Number(value);
   return Number.isSafeInteger(id) ? id : null;
+}
+
+/* ------------------------------------------------------------------ *
+ * AFL API settle refusals (V2-GAP-025)
+ * ------------------------------------------------------------------ */
+
+export const AFL_API_FINDINGS_HREF = '/admin/operations/afl-api-refusals';
+
+export const AFL_API_FINDING_SECTION_LABELS: Readonly<Record<AflApiFindingSection, string>> = {
+  refusals: 'Refused canonical applications',
+  findings: 'Open settle findings',
+};
+
+export type AflApiFindingsQuery = { section: AflApiFindingSection; before: string | null; cursorError: string | null };
+
+/** `?section=findings&before=123`. An unknown section is the default; a bad cursor is reported, never guessed. */
+export function parseAflApiFindingsQuery(params: Record<string, string | string[] | undefined>): AflApiFindingsQuery {
+  const section: AflApiFindingSection = params.section === 'findings' ? 'findings' : 'refusals';
+  const rawBefore = typeof params.before === 'string' ? params.before : '';
+  if (rawBefore === '') return { section, before: null, cursorError: null };
+  return /^[1-9]\d{0,18}$/.test(rawBefore) && BigInt(rawBefore) <= 9223372036854775807n
+    ? { section, before: rawBefore, cursorError: null }
+    : { section, before: null, cursorError: 'The page cursor was not a valid id, so the newest page is shown.' };
+}
+
+export function aflApiFindingsHref(section: AflApiFindingSection, before: string | null = null): string {
+  const query = new URLSearchParams({ section });
+  if (before !== null) query.set('before', before);
+  return `${AFL_API_FINDINGS_HREF}?${query.toString()}`;
 }
 
 /* ------------------------------------------------------------------ *

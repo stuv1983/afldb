@@ -46,6 +46,16 @@ import {
 import { compareColemanSeasonAction, publishColemanSeasonAction } from '@/app/admin/operations/coleman/actions';
 import { parseCreateForm, parseProposalId, parseSeason } from '@/app/admin/operations/form';
 import {
+  AFL_API_FINDINGS_PAGE_SIZE,
+  AFL_API_FINDINGS_SOURCE_KEY,
+  AFL_API_FINDING_DESCRIPTION_LIMIT,
+  AFL_API_FINDING_FIELD_LIMIT,
+  AFL_API_REFUSAL_ISSUE_OWNER,
+  AFL_API_REFUSAL_ISSUE_TYPE,
+  AFL_API_SETTLE_FINDING_OWNERS,
+  readAflApiSettleFindings,
+} from '@/db/queries/afl-api-settle-findings';
+import {
   BrownlowInputError,
   loadBrownlowReconciliationInput,
   loadBrownlowReconciliationInputWithEvidence,
@@ -61,6 +71,7 @@ import {
   approveCurated,
   compareColemanSeason,
   createCuratedFromFile,
+  listAflApiSettleFindingsForAdmin,
   listColemanPublicationsForAdmin,
   listCuratedQueue,
   publishColemanSeason,
@@ -246,7 +257,17 @@ const STUB_PREREQUISITES = `
     current_version_seq integer NOT NULL, absent_since timestamptz,
     PRIMARY KEY (source_id, family, external_record_id));
 
+  -- STUB data_issues (V2-GAP-025): the columns of migration 001 plus 076's issue_key, nothing else.
+  CREATE TYPE issue_severity AS ENUM ('info', 'warning', 'error');
+  CREATE TABLE data_issues (
+    id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY, entity_type text NOT NULL, entity_id bigint,
+    issue_type text NOT NULL, severity issue_severity NOT NULL DEFAULT 'warning', description text NOT NULL,
+    details jsonb, detected_at timestamptz NOT NULL DEFAULT now(), resolved_at timestamptz, resolution text,
+    issue_key text);
+
   -- STUB grants: what the real import-writable registry / staging blanket grants give afldb_import.
+  -- data_issues is registered import-writable (migration 045); the V2-GAP-025 reader only SELECTs it.
+  GRANT SELECT ON data_issues TO afldb_import;
   GRANT USAGE ON SCHEMA staging TO afldb_import;
   GRANT SELECT ON stat_availability, brownlow_season_authority TO afldb_import;
   GRANT SELECT ON staging.afl_api_brownlow_vote, staging.source_payloads, staging.source_record_versions,
@@ -422,7 +443,8 @@ beforeEach(async () => {
   await db.exec(`TRUNCATE award_proposal_decisions, award_proposals, award_winners, derived_award_projections,
                           derived_award_results, brownlow_eligibility_decisions,
                           player_match_stats, matches, brownlow_season_votes, staging.afl_api_brownlow_vote,
-                          staging.source_records, staging.source_record_versions, staging.source_payloads RESTART IDENTITY CASCADE`);
+                          staging.source_records, staging.source_record_versions, staging.source_payloads,
+                          data_issues RESTART IDENTITY CASCADE`);
   await db.exec('DELETE FROM external_identities WHERE player_id >= 11');
   session.actor = null;
   auditMock.mockReset();
@@ -1460,6 +1482,182 @@ describe('Brownlow reconciliation: server caller on PGlite', () => {
     await db.query(`UPDATE staging.afl_api_brownlow_vote SET api_round_number = 2 WHERE provider_player_id = 'SYN_P12'`);
     const { deps } = makeDeps();
     expect(await reconcileBrownlowSeasonForAdmin(SUPER_USER, { season: 2024 }, deps)).toMatchObject({ ok: false, code: 'brownlow_input_inconsistent' });
+  });
+});
+
+/* =============================================================================================
+ * 6b. AFL API settle refusals (V2-GAP-025): server caller and reader on PGlite, stub data_issues
+ * =========================================================================================== */
+describe('AFL API settle refusals: server caller on PGlite (V2-GAP-025)', () => {
+  /** One SYNTHETIC data_issues row; `details` is written single-encoded as the settles write it. */
+  async function issue(row: {
+    type: string; severity?: string; description?: string; details: Record<string, unknown>;
+    resolved?: boolean; entityType?: string;
+  }): Promise<string> {
+    const written = await one<{ id: string }>(
+      `INSERT INTO data_issues (entity_type, issue_type, severity, description, details, resolved_at)
+       VALUES ($1, $2, $3::issue_severity, $4, $5::text::jsonb, CASE WHEN $6 THEN now() END)
+       RETURNING id::text AS id`,
+      [row.entityType ?? 'player_match_stats', row.type, row.severity ?? 'warning',
+        row.description ?? `SYNTHETIC finding of type ${row.type}`, JSON.stringify(row.details), row.resolved === true],
+    );
+    return written.id;
+  }
+
+  const refusal = (over: Record<string, unknown> = {}) => ({
+    owner: 'AFLDB-ISSUE-122', source_key: 'afl_api', family: 'player_match_stats',
+    external_record_id: 'SYN-REC-1', target_table: 'player_match_stats', refusal: 'foreign_source_owner',
+    match_key: 'SYN-MATCH-1', fields: ['kicks', 'marks'], ...over,
+  });
+
+  async function seedMixed(): Promise<Record<string, string>> {
+    return {
+      refused: await issue({ type: 'canonical_apply_failed', details: refusal() }),
+      failed: await issue({
+        type: 'canonical_apply_failed', severity: 'error',
+        description: 'SYNTHETIC: the automatic canonical application failed and was rolled back.',
+        details: refusal({ refusal: undefined, error: 'SECRET-SQL-DETAIL duplicate key value violates', failed_target_table: 'matches' }),
+      }),
+      afltables: await issue({ type: 'canonical_apply_failed', details: refusal({ source_key: 'afltables' }) }),
+      resolved: await issue({ type: 'canonical_apply_failed', details: refusal(), resolved: true }),
+      disagreement: await issue({
+        type: 'afl_api_settle', entityType: 'matches',
+        details: { owner: 'settle-afl-api.ts', source_key: 'afl_api', family: 'match', external_record_id: 'SYN-M-9',
+          target_table: 'matches', conflicts: [{ field: 'home_score', values: 'SECRET-CONFLICT-VALUE' }] },
+      }),
+      brownlow: await issue({
+        type: 'afl_api_brownlow_settle', severity: 'error', entityType: 'brownlow_round_votes',
+        details: { owner: 'settle-afl-api-brownlow.ts', source_key: 'afl_api', provider_match_id: 'SYN-PM-3', reason: 'ownership_indeterminate' },
+      }),
+      bridge: await issue({ type: 'afl_api_identity_contradiction', details: { kind: 'provider_already_linked', source_key: 'afl_api', external_id: 'SYN-X' } }),
+      afltablesDisagreement: await issue({ type: 'source_disagreement', details: { owner: 'AFLDB-ISSUE-099', source_key: 'afltables' } }),
+    };
+  }
+
+  it('the scope constants are the writers\' own stamps (drift guard)', async () => {
+    const shared = await import('@/lib/acquisition/settle-shared');
+    const settle = await import('@/lib/acquisition/settle-afl-api');
+    const brownlow = await import('@/lib/acquisition/afl-api-brownlow');
+    const absence = await import('@/lib/acquisition/afl-api-match-absence');
+    expect(AFL_API_REFUSAL_ISSUE_TYPE).toBe(shared.CANONICAL_APPLY_ISSUE_TYPE);
+    expect(AFL_API_REFUSAL_ISSUE_OWNER).toBe(shared.CANONICAL_APPLY_ISSUE_OWNER);
+    expect(AFL_API_FINDINGS_SOURCE_KEY).toBe(settle.SETTLE_SOURCE_KEY);
+    expect(AFL_API_FINDINGS_SOURCE_KEY).toBe(brownlow.SETTLE_SOURCE_KEY);
+    expect([...AFL_API_SETTLE_FINDING_OWNERS]).toEqual([settle.SETTLE_ISSUE_OWNER, brownlow.SETTLE_ISSUE_OWNER]);
+    expect(AFL_API_SETTLE_FINDING_OWNERS).toContain(absence.AFL_API_MATCH_ABSENCE_ISSUE_OWNER);
+  });
+
+  it('scopes to open afl_api rows: refusals and settle findings split, AFL Tables, resolved and non-settle rows excluded', async () => {
+    const ids = await seedMixed();
+    const { deps, spies } = makeDeps();
+    const refusals = await listAflApiSettleFindingsForAdmin(PLAIN_ADMIN, { section: 'refusals', before: null }, deps);
+    expect(refusals.ok).toBe(true);
+    if (!refusals.ok) return;
+    expect(refusals.page.rows.map((row) => row.id)).toEqual([ids.failed, ids.refused]);
+    expect(refusals.page.counts).toEqual({
+      refusals: { total: 2, bySeverity: { warning: 1, error: 1 } },
+      findings: { total: 2, bySeverity: { warning: 1, error: 1 } },
+    });
+    expect(refusals.page.nextBefore).toBeNull();
+    expect(refusals.page.rows[1]).toMatchObject({
+      issueType: 'canonical_apply_failed', severity: 'warning', family: 'player_match_stats',
+      externalRecordId: 'SYN-REC-1', targetTable: 'player_match_stats', reason: 'foreign_source_owner',
+      matchKey: 'SYN-MATCH-1', fields: ['kicks', 'marks'], fieldsOmitted: 0, descriptionTruncated: false,
+    });
+    expect(refusals.page.rows[1].detectedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect(refusals.page.rows[0].reason).toBeNull();
+
+    const findings = await listAflApiSettleFindingsForAdmin(PLAIN_ADMIN, { section: 'findings', before: null }, deps);
+    expect(findings.ok && findings.page.rows.map((row) => row.id)).toEqual([ids.brownlow, ids.disagreement]);
+    if (findings.ok) {
+      expect(findings.page.rows[0]).toMatchObject({ externalRecordId: 'SYN-PM-3', reason: 'ownership_indeterminate', targetTable: null, entityType: 'brownlow_round_votes' });
+    }
+
+    // Never details, the failure error text or conflicting values; reads write nothing and audit nothing.
+    const everything = JSON.stringify([refusals, findings]);
+    // ("error" is also a severity value, so the absent thing is an `error` KEY carrying text.)
+    for (const secret of ['SECRET-SQL-DETAIL', 'SECRET-CONFLICT-VALUE', '"details"', '"error":"', 'conflicts']) {
+      expect(everything, secret).not.toContain(secret);
+    }
+    expect(auditMock).not.toHaveBeenCalled();
+    expect(spies.withExecutor).toHaveBeenCalledTimes(2);
+    expect(await count('data_issues')).toBe(Object.keys(ids).length);
+    expect(await one<{ n: number }>('SELECT count(*)::int AS n FROM data_issues WHERE resolved_at IS NOT NULL')).toEqual({ n: 1 });
+  });
+
+  it('an honest empty state: no rows and zero counts, not an error', async () => {
+    const { deps } = makeDeps();
+    expect(await listAflApiSettleFindingsForAdmin(PLAIN_ADMIN, { section: 'refusals', before: null }, deps)).toEqual({
+      ok: true,
+      page: {
+        section: 'refusals', before: null, rows: [], nextBefore: null, pageSize: AFL_API_FINDINGS_PAGE_SIZE,
+        counts: { refusals: { total: 0, bySeverity: {} }, findings: { total: 0, bySeverity: {} } },
+      },
+    });
+  });
+
+  it('keyset pages are newest first, bounded, and never repeat or skip a row when a newer one arrives', async () => {
+    const seeded: string[] = [];
+    for (let n = 1; n <= 5; n += 1) seeded.push(await issue({ type: 'canonical_apply_failed', details: refusal({ external_record_id: `SYN-REC-${n}` }) }));
+    const read = (before: string | null) => asImportExecutor((executor) => readAflApiSettleFindings(executor, { section: 'refusals', before, pageSize: 2 }));
+
+    const first = await read(null);
+    expect(first.rows.map((row) => row.id)).toEqual([seeded[4], seeded[3]]);
+    expect(first.nextBefore).toBe(seeded[3]);
+    await issue({ type: 'canonical_apply_failed', details: refusal({ external_record_id: 'SYN-REC-NEW' }) });
+    const second = await read(first.nextBefore);
+    expect(second.rows.map((row) => row.id)).toEqual([seeded[2], seeded[1]]);
+    const third = await read(second.nextBefore);
+    expect(third.rows.map((row) => row.id)).toEqual([seeded[0]]);
+    expect(third.nextBefore).toBeNull();
+    expect(third.counts.refusals.total).toBe(6);
+  });
+
+  it('bounds the description and the field names it returns', async () => {
+    const fields = Array.from({ length: AFL_API_FINDING_FIELD_LIMIT + 5 }, (_, index) => `field_${index}`);
+    await issue({ type: 'canonical_apply_failed', description: 'x'.repeat(AFL_API_FINDING_DESCRIPTION_LIMIT + 50), details: refusal({ fields }) });
+    const page = await asImportExecutor((executor) => readAflApiSettleFindings(executor, { section: 'refusals', before: null }));
+    expect(page.rows[0].description).toHaveLength(AFL_API_FINDING_DESCRIPTION_LIMIT);
+    expect(page.rows[0].descriptionTruncated).toBe(true);
+    expect(page.rows[0].fields).toHaveLength(AFL_API_FINDING_FIELD_LIMIT);
+    expect(page.rows[0].fieldsOmitted).toBe(5);
+  });
+
+  it('reads in one READ ONLY repeatable-read transaction, with parameterised SQL only', async () => {
+    const statements: Array<{ text: string; params: readonly unknown[] }> = [];
+    await asImportExecutor((executor) => readAflApiSettleFindings({
+      query: executor.query.bind(executor),
+      transaction: (work) => executor.transaction((tx) => work({
+        query: <R extends object>(text: string, params: readonly unknown[] = []) => {
+          statements.push({ text, params });
+          return tx.query<R>(text, params);
+        },
+      })),
+    }, { section: 'findings', before: '9007199254740993' }));
+    expect(statements[0].text).toBe('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+    expect(statements.slice(1).every((statement) => /^\s*SELECT\b/.test(statement.text))).toBe(true);
+    // The cursor travels as text, so an id beyond 2^53 is not rounded.
+    expect(statements.at(-1)?.params).toContain('9007199254740993');
+    expect(statements.map((statement) => statement.text).join('\n')).not.toContain('9007199254740993');
+  });
+
+  it('the caller refuses a contributor before any connection, and a bad section or cursor as invalid_input', async () => {
+    const { deps, spies } = makeDeps();
+    expect(await listAflApiSettleFindingsForAdmin(CONTRIBUTOR_USER, { section: 'refusals', before: null }, deps)).toMatchObject({ ok: false, code: 'forbidden' });
+    expect(await listAflApiSettleFindingsForAdmin(PLAIN_ADMIN, { section: 'everything' as never, before: null }, deps)).toMatchObject({ ok: false, code: 'invalid_input' });
+    for (const before of ['0', '-1', '1.5', 'abc', "1'; DROP TABLE data_issues; --", '99999999999999999999']) {
+      expect(await listAflApiSettleFindingsForAdmin(PLAIN_ADMIN, { section: 'refusals', before }, deps), before).toMatchObject({ ok: false, code: 'invalid_input' });
+    }
+    expect(spies.withExecutor).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it('an unexpected read failure is code "unexpected" with generic text', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { deps } = makeDeps({ withExecutor: (async () => { throw new Error('SECRET connection refused 10.0.0.1'); }) as OperationsDeps['withExecutor'] });
+    const result = await listAflApiSettleFindingsForAdmin(PLAIN_ADMIN, { section: 'refusals', before: null }, deps);
+    expect(result).toMatchObject({ ok: false, code: 'unexpected' });
+    expect(JSON.stringify(result)).not.toContain('SECRET');
   });
 });
 

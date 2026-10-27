@@ -29,6 +29,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkDecisionNote } from '@afldb/admin';
 import { COVERAGE_REGISTRY, CORRECTION_NOTE_MAX_LENGTH, CORRECTION_NOTE_MIN_LENGTH } from '@afldb/domain';
 
+import { AflApiFindingsNav, AflApiFindingsPager, AflApiFindingsTable } from '@/app/admin/operations/_components/AflApiFindingsViews';
 import {
   ProposalEvidence,
   ProposalHistoryView,
@@ -73,6 +74,7 @@ import {
   COVERAGE_UNAVAILABLE,
   READ_UNAVAILABLE,
   SEASON_REGISTRY_UNAVAILABLE,
+  loadAflApiFindings,
   loadAwardsQueue,
   loadBrownlowReport,
   loadColemanPage,
@@ -82,6 +84,8 @@ import {
   type PageDeps,
 } from '@/app/admin/operations/page-data';
 import {
+  aflApiFindingsHref,
+  parseAflApiFindingsQuery,
   parseBrownlowQuery,
   parseQueueFilter,
   parseRouteId,
@@ -99,6 +103,8 @@ import {
   SYNTHETIC_SEASON_REGISTRY,
   SYNTHETIC_SUPER_ADMIN,
   SYNTHETIC_UNIT_STATUSES,
+  syntheticAflApiFinding,
+  syntheticAflApiFindingsPage,
   syntheticBrownlowReport,
   syntheticColemanComparison,
   syntheticHistory,
@@ -133,6 +139,7 @@ vi.mock('@/lib/admin/operations-centre', () => ({
   readCuratedHistory: vi.fn(),
   listColemanPublicationsForAdmin: vi.fn(),
   reconcileBrownlowSeasonForAdmin: vi.fn(),
+  listAflApiSettleFindingsForAdmin: vi.fn(),
   approveCurated: vi.fn(),
   createCuratedFromFile: vi.fn(),
   rejectCurated: vi.fn(),
@@ -399,11 +406,13 @@ describe('overview sections', () => {
 
   it('a Super Admin sees every inspection tool; a plain Admin sees only those its capabilities open', () => {
     const superMarkup = sections(syntheticOverview(SYNTHETIC_SUPER_ADMIN));
-    for (const href of ['/admin/audit', '/admin/db-health', '/admin/app-health', '/admin/query-builder', '/admin/player-links', '/admin/brownlow', '/admin/current-season']) {
+    for (const href of ['/admin/audit', '/admin/db-health', '/admin/app-health', '/admin/query-builder', '/admin/player-links', '/admin/brownlow', '/admin/current-season', '/admin/operations/afl-api-refusals']) {
       expect(superMarkup, href).toContain(`href="${href}"`);
     }
     const adminMarkup = sections(syntheticOverview(SYNTHETIC_PLAIN_ADMIN));
     expect(adminMarkup).toContain('href="/admin/audit"');
+    // V2-GAP-025: the refusal view needs only the overview's own capability.
+    expect(adminMarkup).toContain('href="/admin/operations/afl-api-refusals"');
     expect(adminMarkup).toContain('href="/admin/brownlow"');
     expect(adminMarkup).toContain('href="/admin/operations/awards"');
     for (const href of ['/admin/db-health', '/admin/app-health', '/admin/query-builder', '/admin/player-links', '/admin/current-season']) {
@@ -942,7 +951,7 @@ describe('page loaders (fakes)', () => {
     expect(overview.aflApiRuns).toMatchObject({ ok: true });
     expect(overview.aflTablesRun).toMatchObject({ ok: true });
     expect(overview.pending).toMatchObject({ ok: true, value: { count: 3, atLeast: false } });
-    expect(overview.inspectionLinks.length).toBe(7);
+    expect(overview.inspectionLinks.length).toBe(8);
   });
 
   it('one failing read fails only its own section, with generic text that never carries the thrown message', async () => {
@@ -1042,6 +1051,89 @@ describe('page loaders (fakes)', () => {
 });
 
 /* =============================================================================================
+ * 4b. AFL API settle refusals (V2-GAP-025): query parsing, views and loader, from SYNTHETIC props
+ * =========================================================================================== */
+describe('AFL API settle refusals view (V2-GAP-025)', () => {
+  const views = (page = syntheticAflApiFindingsPage()): string => html(createElement('div', null,
+    createElement(AflApiFindingsNav, { page }),
+    createElement(AflApiFindingsTable, { page }),
+    createElement(AflApiFindingsPager, { page }),
+  ));
+
+  it('parses ?section and ?before strictly: an unknown section is the default, a bad cursor is reported, never guessed', () => {
+    expect(parseAflApiFindingsQuery({})).toEqual({ section: 'refusals', before: null, cursorError: null });
+    expect(parseAflApiFindingsQuery({ section: 'findings', before: '42' })).toEqual({ section: 'findings', before: '42', cursorError: null });
+    expect(parseAflApiFindingsQuery({ section: ['findings', 'refusals'] }).section).toBe('refusals');
+    expect(parseAflApiFindingsQuery({ section: 'everything' }).section).toBe('refusals');
+    for (const bad of ['0', '-1', '1.5', 'abc', ' 5', '99999999999999999999', "1' OR '1'='1"]) {
+      expect(parseAflApiFindingsQuery({ before: bad }), bad).toMatchObject({ before: null, cursorError: expect.stringMatching(/not a valid id/) });
+    }
+    expect(aflApiFindingsHref('findings', '9000')).toBe('/admin/operations/afl-api-refusals?section=findings&before=9000');
+    expect(aflApiFindingsHref('refusals')).toBe('/admin/operations/afl-api-refusals?section=refusals');
+  });
+
+  it('renders the rows, both section counts and their identity, with no control that changes or retries anything', () => {
+    const markup = views();
+    expect(markup).toContain('data-findings-section="refusals"');
+    expect(markup).toContain('Refused canonical applications: 2 open (1 error, 1 warning)');
+    expect(markup).toContain('href="/admin/operations/afl-api-refusals?section=findings"');
+    expect(markup).toContain('Open settle findings: none open');
+    expect(markup).toContain('data-finding-id="9001"');
+    expect(markup).toContain('foreign_source_owner');
+    expect(markup).toContain('kicks, marks');
+    expect(markup).toContain('SYN-MATCH-1');
+    expect(markup).toContain('2026-10-19 12:00 UTC');
+    expect(markup).toContain('badge badge-danger');
+    expect(markup).not.toContain('<form');
+    expect(markup).not.toContain('<button');
+    expect(markup).not.toMatch(/retry|resolve this|dismiss/i);
+    // One page, nothing older: no pager.
+    expect(markup).not.toContain('Older');
+  });
+
+  it('pages by keyset links only, and says when a description or a field list was shortened', () => {
+    const page = syntheticAflApiFindingsPage({
+      before: '9500', nextBefore: '9000',
+      rows: [syntheticAflApiFinding({ descriptionTruncated: true, fields: ['a', 'b'], fieldsOmitted: 3 })],
+    });
+    const markup = views(page);
+    expect(markup).toContain('href="/admin/operations/afl-api-refusals?section=refusals&amp;before=9000"');
+    expect(markup).toContain('href="/admin/operations/afl-api-refusals?section=refusals"');
+    expect(markup).toContain('(shortened)');
+    expect(markup).toContain('and 3 more');
+  });
+
+  it('an honest empty state: none open, and "no older entries" past the last page', () => {
+    const empty = views(syntheticAflApiFindingsPage({
+      section: 'findings', rows: [],
+      counts: { refusals: { total: 0, bySeverity: {} }, findings: { total: 0, bySeverity: {} } },
+    }));
+    expect(empty).toContain('data-findings-empty="true"');
+    expect(empty).toContain('No AFL API settle finding is open.');
+    expect(empty).not.toContain('<table');
+    const pastEnd = views(syntheticAflApiFindingsPage({ before: '12', rows: [] }));
+    expect(pastEnd).toContain('No older entries.');
+  });
+
+  it('the loader passes the query to the caller, keeps a typed refusal, and never renders a thrown message', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const deps = { operations: async () => opsMocks } as Partial<PageDeps>;
+    opsMocks.listAflApiSettleFindingsForAdmin.mockReset();
+    opsMocks.listAflApiSettleFindingsForAdmin.mockResolvedValue({ ok: true, page: syntheticAflApiFindingsPage() });
+    const ok = await loadAflApiFindings(PLAIN_ADMIN, { section: 'findings', before: '77', cursorError: null }, deps);
+    expect(ok).toMatchObject({ ok: true, value: { section: 'refusals' } });
+    expect(opsMocks.listAflApiSettleFindingsForAdmin).toHaveBeenCalledWith(PLAIN_ADMIN, { section: 'findings', before: '77' });
+
+    opsMocks.listAflApiSettleFindingsForAdmin.mockResolvedValue({ ok: false, code: 'forbidden', error: 'Reading AFL API settle refusals needs the operations.centre.read capability.' });
+    expect(await loadAflApiFindings(PLAIN_ADMIN, { section: 'refusals', before: null, cursorError: null }, deps)).toMatchObject({ ok: false, code: 'forbidden' });
+
+    opsMocks.listAflApiSettleFindingsForAdmin.mockRejectedValue(new Error('SECRET-DETAIL password=hunter2'));
+    const failed = await loadAflApiFindings(PLAIN_ADMIN, { section: 'refusals', before: null, cursorError: null }, deps);
+    expect(failed).toEqual({ ok: false, error: READ_UNAVAILABLE });
+  });
+});
+
+/* =============================================================================================
  * 5. The page modules: exports, guard first, role refusal, inline failures
  * =========================================================================================== */
 type PageModule = {
@@ -1082,12 +1174,18 @@ const PAGES: PageCase[] = [
     load: () => import('@/app/admin/operations/brownlow/page') as unknown as Promise<PageModule>,
     props: () => ({ searchParams: Promise.resolve({ season: '2090' }) }),
   },
+  {
+    name: '/admin/operations/afl-api-refusals', file: 'src/app/admin/operations/afl-api-refusals/page.tsx', capability: 'operations.centre.read',
+    load: () => import('@/app/admin/operations/afl-api-refusals/page') as unknown as Promise<PageModule>,
+    props: () => ({ searchParams: Promise.resolve({}) }),
+  },
 ];
 
 /** Every ops mock the pages can reach, so "nothing was read" is one assertion. */
 const everyRead = () => [
   opsMocks.listCuratedQueue, opsMocks.readCuratedHistory, opsMocks.listColemanPublicationsForAdmin,
-  opsMocks.reconcileBrownlowSeasonForAdmin, settleMocks.readSettleUnitTableStatus, settleMocks.readSettleRunStatus,
+  opsMocks.reconcileBrownlowSeasonForAdmin, opsMocks.listAflApiSettleFindingsForAdmin,
+  settleMocks.readSettleUnitTableStatus, settleMocks.readSettleRunStatus,
 ];
 
 function primeHealthyReads(): void {
@@ -1095,6 +1193,7 @@ function primeHealthyReads(): void {
   opsMocks.readCuratedHistory.mockResolvedValue({ ok: true, history: syntheticHistory(syntheticProposal({ id: 501, status: 'validated' })) });
   opsMocks.listColemanPublicationsForAdmin.mockResolvedValue({ ok: true, publications: [SYNTHETIC_PUBLICATION] });
   opsMocks.reconcileBrownlowSeasonForAdmin.mockResolvedValue({ ok: true, report: syntheticBrownlowReport('reconciled'), staging: syntheticStaging('derived') });
+  opsMocks.listAflApiSettleFindingsForAdmin.mockResolvedValue({ ok: true, page: syntheticAflApiFindingsPage() });
   // The synthetic statuses carry the structural subset the views read (UnitStatusLike), not every
   // field of the real settle records, so they are cast to the mocked functions' return types.
   settleMocks.readSettleUnitTableStatus.mockResolvedValue(
@@ -1172,6 +1271,24 @@ describe('page modules', () => {
     expect(markup).toContain('>Data health</h');
     expect(markup).toContain('>Inspection tools</h');
     expect(markup).not.toContain('<form');
+  });
+
+  it('AFL API settle refusals: a plain Admin reads it; a failed read is an inline notice; a bad cursor is said, not guessed', async () => {
+    const { default: Page } = await PAGES[5].load();
+    session.actor = PLAIN_ADMIN;
+    const markup = html(await Page({ searchParams: Promise.resolve({ section: 'findings', before: 'nonsense' }) } as never));
+    expect(opsMocks.listAflApiSettleFindingsForAdmin).toHaveBeenLastCalledWith(PLAIN_ADMIN, { section: 'findings', before: null });
+    expect(markup).toContain('not a valid id');
+    expect(markup).toContain('data-finding-id="9001"');
+    expect(markup).toContain('href="/admin/operations"');
+    expect(markup).not.toContain('<form');
+    expect(markup).not.toContain('<button');
+
+    opsMocks.listAflApiSettleFindingsForAdmin.mockRejectedValue(new Error('SECRET-DETAIL'));
+    const failed = html(await Page({ searchParams: Promise.resolve({}) } as never));
+    expect(failed).toContain('data-load-failure="true"');
+    expect(failed).not.toContain('SECRET-DETAIL');
+    expect(failed).toContain('>AFL API settle refusals</h1>');
   });
 
   it('awards queue: a Super Admin gets the create form; a plain Admin reads the queue and is told creation is not theirs', async () => {

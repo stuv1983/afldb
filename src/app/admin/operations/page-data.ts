@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { ProposalHistory, ProposalRecord } from '@afldb/admin';
 import type { BrownlowReconciliationReport } from '@afldb/derived';
+import type { AflApiFindingsPage } from '@/db/queries/afl-api-settle-findings';
 import type { BrownlowStagingEvidence } from '@/db/queries/brownlow-reconciliation-inputs';
 import {
   COVERAGE_REGISTRY,
@@ -29,6 +30,7 @@ import {
   summarisePending,
   summariseCoverage,
   unitRowView,
+  type AflApiFindingsQuery,
   type BrownlowQuery,
   type CoverageHealth,
   type Loaded,
@@ -74,6 +76,7 @@ export type PageDeps = {
     | 'listColemanPublicationsForAdmin'
     | 'reconcileBrownlowSeasonForAdmin'
     | 'determineBrownlowSeasonForAdmin'
+    | 'listAflApiSettleFindingsForAdmin'
   >>;
 };
 
@@ -284,6 +287,23 @@ export async function loadColemanPage(
     }),
   ]);
   return { publications, sealed };
+}
+
+/* ------------------------------------------------------------------ *
+ * /admin/operations/afl-api-refusals (V2-GAP-025)
+ * ------------------------------------------------------------------ */
+
+/** One page of the open AFL API settle refusals or findings. READ-ONLY; a failure is an inline notice. */
+export async function loadAflApiFindings(
+  admin: AdminUser,
+  query: AflApiFindingsQuery,
+  overrides?: Partial<PageDeps>,
+): Promise<Loaded<AflApiFindingsPage>> {
+  const deps = resolve(overrides);
+  return viaOperations(deps, 'AFL API settle refusals', async (api) => fromResult(
+    await api.listAflApiSettleFindingsForAdmin(admin, { section: query.section, before: query.before }),
+    (value) => value.page,
+  ));
 }
 
 /* ------------------------------------------------------------------ *

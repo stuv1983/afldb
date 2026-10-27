@@ -23,6 +23,7 @@ import {
 import { COVERAGE_REGISTRY, sealedSeasonsFrom, type SeasonRegistry } from '@afldb/domain';
 
 import type { OperationsActionState } from '@/app/admin/operations/action-state';
+import type { AflApiFindingRow, AflApiFindingSection, AflApiFindingsPage } from '@/db/queries/afl-api-settle-findings';
 import type { BrownlowStagingEvidence } from '@/db/queries/brownlow-reconciliation-inputs';
 import type { ColemanComparisonView, ColemanPublicationView } from '@/lib/admin/operations-centre';
 
@@ -199,6 +200,39 @@ export const SYNTHETIC_REFUSED_STATE: OperationsActionState = {
   code: 'season_sealed_correction_invalid',
   fieldErrors: { decisionNote: 'A decision note of 20 to 2000 characters is required to approve into a sealed season.' },
 };
+
+/* ------------------------------------------------------------------ *
+ * AFL API settle refusals (V2-GAP-025)
+ * ------------------------------------------------------------------ */
+
+export function syntheticAflApiFinding(over: Partial<AflApiFindingRow> = {}): AflApiFindingRow {
+  return {
+    id: '9001', issueType: 'canonical_apply_failed', severity: 'warning', detectedAt: '2026-10-19T12:00:00Z',
+    entityType: 'player_match_stats',
+    description: "SYNTHETIC: the automatic canonical application of player_match_stats 'SYN-REC-1' was refused (foreign_source_owner).",
+    descriptionTruncated: false, family: 'player_match_stats', externalRecordId: 'SYN-REC-1',
+    targetTable: 'player_match_stats', reason: 'foreign_source_owner', matchKey: 'SYN-MATCH-1',
+    fields: ['kicks', 'marks'], fieldsOmitted: 0,
+    ...over,
+  };
+}
+
+export function syntheticAflApiFindingsPage(
+  over: Partial<AflApiFindingsPage> & { section?: AflApiFindingSection } = {},
+): AflApiFindingsPage {
+  return {
+    section: 'refusals', before: null, nextBefore: null, pageSize: 50,
+    rows: [
+      syntheticAflApiFinding(),
+      syntheticAflApiFinding({
+        id: '9000', severity: 'error', reason: null, fields: [], matchKey: null,
+        description: "SYNTHETIC: the automatic canonical application of matches 'SYN-REC-0' failed and was rolled back.",
+      }),
+    ],
+    counts: { refusals: { total: 2, bySeverity: { warning: 1, error: 1 } }, findings: { total: 0, bySeverity: {} } },
+    ...over,
+  };
+}
 
 /* ------------------------------------------------------------------ *
  * Coleman

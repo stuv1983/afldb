@@ -59,7 +59,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-022 | Medium | admin UI | rehearsal | open, narrowed: 26 images technically inspected; four Brownlow replacements recaptured/inspected after material wording/status fixes | owner acceptance per screen |
 | V2-GAP-023 | Low | Brownlow | no | **CLOSED in code, verified on a disposable clone of the authentic 2025 data (2026-10-20)**: the settle stages the API leaderboard on the observation spine and the reconciliation derives the 18-team provider-team-to-club mapping from the committed identities, corroborated by the fixtures; the operations centre shows both. Production staging still needs one operator-run settle with this code (owner action; nothing was run against production) | none for migration; the stage runs when the operator next settles a Brownlow snapshot |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
-| V2-GAP-025 | Low | admin UI | no | open: no operations-centre view of AFL API settle refusals | none (V2 follow-up) |
+| V2-GAP-025 | Low | admin UI | no | **CLOSED locally (2026-10-27)**: read-only `/admin/operations/afl-api-refusals` linked from the overview; real-PostgreSQL test 2/2 as `afldb_import` on a disposable isolated `_test` database; page rendered signed in at 1280x800 and 390x844 (populated, empty, second page, failed read). Not deployed | optional owner eyeball of `docs/v2/evidence/gap025-visual/` |
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 passes on a populated copy (2026-10-20); populated-ledger DB reversal and archive recovery restore everything exactly on a synthetic copy | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | **CLOSED locally (2026-10-27)**: `settle-afl-api.ts --report-out` writes the report (destination checked before any connection, never overwritten, outcome preserved on a write failure); opt-in parity policy `v2.parity.2` compares it, `v2.parity.1` unchanged; real-PostgreSQL dry-run and apply 1/1 on a disposable isolated `_test` copy. Not deployed | decide whether a rehearsal adopts `v2.parity.2` |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
@@ -565,6 +565,67 @@ award results must be shown reconcilable before production; **no** — not a pro
   reports) have no read-only view in the operations centre.
 - **Close.** A read-only, capability-guarded view over the refused `canonical_applications` rows
   and the open settle `data_issues`, linked from the overview.
+- **CLOSED locally, 2026-10-27.** Implemented, then verified on real PostgreSQL and rendered (below).
+  Not deployed; no shared DEV or production acceptance is claimed.
+  `/admin/operations/afl-api-refusals` (`operations.centre.read`, the overview's own capability;
+  "AFL API settle refusals" under Inspection tools). The guard is the page's first statement and
+  `listAflApiSettleFindingsForAdmin` (`src/lib/admin/operations-centre.ts`) checks the capability
+  again before it opens a connection. The reader is `src/db/queries/afl-api-settle-findings.ts`.
+  - **Scope correction.** `canonical_applications` records only writes that happened
+    (verb insert/update/delete). A refused or rolled-back application leaves no row there. The settle
+    records it as an open `data_issues` finding of type `canonical_apply_failed`, owned by
+    `AFLDB-ISSUE-122` (I244-F009). So the "refused canonical applications" section reads those
+    findings where `details.source_key = 'afl_api'`. AFL Tables' findings share the type and owner
+    and are excluded.
+  - **Open settle findings.** Every other open finding owned by `settle-afl-api.ts` or
+    `settle-afl-api-brownlow.ts` with source `afl_api`.
+  - **What it shows and never shows.** It shows named columns only: id, type, severity, first
+    detection, the writer's description (truncated to 500 characters), record and target identity,
+    the refusal or reason code, and up to 20 field names. It never shows `details`, the failure
+    `error` text, conflicting or proposed values, or payloads.
+  - **Order and paging.** Newest first by `id`, with a keyset cursor and 50 rows per page. The counts
+    and the page come from one `REPEATABLE READ, READ ONLY` transaction.
+  - **Read-only.** No form, no button, no retry and no audit row.
+  - **Evidence.** `tests/v2-admin-operations.test.ts` (PGlite: stub `data_issues` as `afldb_import`)
+    covers scoping and exclusions, an honest empty state, keyset stability when a newer row arrives,
+    bounds, the read-only transaction, a contributor refused before any connection, bad section and
+    cursor values refused, and a drift guard against the writers' constants. A negative control
+    passed: with the `source_key` filter removed, the scoping test fails.
+    `tests/v2-admin-operations-ui.test.ts` covers parsing, views, empty, failure and pager states, the
+    page guard-first contract, and the overview link. Both suites plus `tests/auth.test.ts`: 396/396.
+    `tsc --noEmit` and focused ESLint pass.
+  - **Real PostgreSQL (2026-10-27).** `tests/integration/v2-afl-api-settle-findings.test.ts` first
+    hardened: both test DSNs required, the `afldb_owner`/`afldb_import` role-parity validation always
+    runs (no owner-role fallback for the reader), `verifyIsolatedIntegrationDatabase` runs on the
+    fixture connection and the reader's connection before any write, fixtures carry a per-run marker,
+    and teardown deletes only the ids its own INSERTs returned and writes nothing unless identity
+    passed. No startup purge. Target: port 55432 was still `ssh.exe` and was not contacted. The
+    preserved local cluster (`D:\tmp\afldb-v2-pg16`, `afldb_v2_isolated`) was started on loopback
+    55433. The runner proved the postmaster owned the listener before sending credentials. A new
+    disposable `afldb_v2_gap025_test` was created and migrated 001-117. Through
+    `isolated-pg run`: **2/2 passed**. That proves the `afldb_import` SELECT on `data_issues`, the
+    NULL and decimal-text cursors, the jsonb field list and `READ ONLY` inside `sql.begin`. Fixture
+    residue afterwards: 0.
+  - **Rendered (2026-10-27).** A loopback-only `next dev` (127.0.0.1:3100) ran through the same
+    runner against that database, signed in through `/admin/login` (password + TOTP) as a
+    synthetic `admin` created there. The repository's Playwright 1.62.1 was used; no Playwright MCP
+    was available in the session. Captures at 1280x800 and 390x844 are in
+    `docs/v2/evidence/gap025-visual/` with `capture-log.txt`:
+    - both sections empty, with honest empty text and "none open" counts;
+    - 60 refusals plus 3 findings. Page 1 had 50 rows (ids 64→15), and Older → went to
+      `before=15`. Page 2 had the remaining 10 (14→5) and ← Newest, with no row repeated or skipped.
+      The AFL Tables decoy was not shown and not counted;
+    - a failed read, with `afldb_import`'s SELECT revoked and then restored. It shows only the
+      generic inline notice: no nav, no pager and no false empty claim. The server log has the real
+      `42501`.
+
+    No state showed the planted `error` text, a permission/SQL message, a horizontal page overflow
+    or a page-level form or button. The disposable database (and the synthetic admin) was dropped
+    and the cluster stopped afterwards.
+  - **Limitations.** Windows only (Linux remains gap 003). Synthetic rows only, not real settle
+    output. The 9-column table scrolls inside its `.table-wrap` at both widths; the right-hand
+    columns were captured scrolled (`07`, `08`). The site-wide cookie banner and the dev-only Next
+    indicator overlay part of some captures; neither belongs to this page.
 
 ## V2-GAP-026 — The shadow rehearsal, the parity and capture tools on real data, and both rollback paths have never run
 

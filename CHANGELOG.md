@@ -52,6 +52,36 @@ Focused checks over the owner's tree: five suites 499/499, typecheck exit 0, and
 - V2-GAP-027 is closed locally. Not deployed. Whether a rehearsal adopts `v2.parity.2` is an
   owner decision.
 
+### Read-only AFL API settle refusals view in the operations centre (V2-GAP-025) (2026-10-27)
+
+- New `/admin/operations/afl-api-refusals`, guarded by `operations.centre.read` and linked from the
+  overview's Inspection tools. The server caller checks the capability again before it connects.
+- The page has two sections:
+  - **Refused canonical applications:** open `canonical_apply_failed` findings, owner
+    `AFLDB-ISSUE-122`, source `afl_api`. A refused application never writes a
+    `canonical_applications` row; the settle records it as this finding instead.
+  - **Open settle findings:** findings owned by `settle-afl-api.ts` or `settle-afl-api-brownlow.ts`.
+  - AFL Tables findings are excluded.
+- **Order and paging:** newest first, with a keyset cursor and 50 rows per page. The counts and the
+  page come from one `REPEATABLE READ, READ ONLY` transaction.
+- **Data shown:** named columns only. Never `details`, failure error text, values or payloads.
+- **Read-only:** no form, no button, no retry and no audit row.
+- **Validation:** focused DB-free and PGlite suites plus `tests/auth.test.ts` pass 396/396.
+  `tsc --noEmit` and focused ESLint pass.
+- **Integration test hardened:** both test DSNs are required and the role-parity validation always
+  runs, so the reader never falls back to the owner role. The isolated proof runs on the fixture
+  connection before any write. Fixtures are run-owned and teardown deletes only their returned ids.
+  The startup purge is removed.
+- **Real PostgreSQL:** on a disposable isolated `afldb_v2_gap025_test` (loopback 55433, listener
+  ownership proven before authentication; migrated 001-117), run through `isolated-pg run`:
+  2/2 passed. No residue.
+- **Rendered:** signed in on a loopback-only dev server against that database. Captures at
+  1280x800 and 390x844 are in `docs/v2/evidence/gap025-visual/`: empty, populated (60 → 50 + 10
+  across two pages, AFL Tables excluded) and a failed read (generic notice only). The repository's
+  Playwright was used.
+- V2-GAP-025 is closed locally. Windows and synthetic data only; not deployed, and no DEV or
+  production acceptance is claimed.
+
 ### Order the latest settle batch numerically in the admin settle panels (ISSUE-328) (2026-10-27)
 
 - `getLatestSettleRun()` (`src/db/queries/settle-runs.ts`) ordered with a bare `ORDER BY id DESC` beside an `id::text AS id` output column, which PostgreSQL binds to the text alias, so the settle panels on `/admin/current-season` (both readers in `settle-status.ts`) would name the text-sorted batch, not the numeric latest, once a tool's batch ids cross a digit boundary (the source repository's DEV showed 98/99 while 134/107 were newest). It now orders by `import_batches.id`; the text return type, tool-only filter and failed-run inclusion are unchanged. Ported from the source repository commit `6ffb893b` with five DB-free regression tests in `tests/admin-current-season-settle.test.ts` (suite 58/58; the original query fails three of them). V2 retired the on-demand settle trigger, so the source's baseline test is not ported. Local only: not deployed, no live verification, no PROD change.

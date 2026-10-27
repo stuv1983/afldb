@@ -11,6 +11,7 @@ PGlite over labelled stubs (V2-GAP-017). Roles and capabilities are the existing
 | Area | Route | Read | Mutate |
 |---|---|---|---|
 | Operations centre (overview) | `/admin/operations` | `operations.centre.read` (Admin, Super Admin) | none: the page has no form and no button |
+| AFL API settle refusals (V2-GAP-025) | `/admin/operations/afl-api-refusals` | `operations.centre.read` | none: read-only; a finding is closed only by the settle that owns it |
 | Award proposals (queue) | `/admin/operations/awards` | `data.awards.read` (Admin, Super Admin) | create from a local file: `data.awards.edit` (Super Admin) |
 | Award proposal (one) | `/admin/operations/awards/[id]` | `data.awards.read` | validate / approve / reject: `data.awards.edit` |
 | Coleman Medal derivation | `/admin/operations/coleman` | `data.awards.read` (includes the read-only compare) | publish: `data.awards.edit` |
@@ -38,8 +39,11 @@ to every Admin and Super Admin; the retired "Legacy file intake" link is gone.
   viewer holding `data.awards.read`.
 - **Inspection tools:** links shown only to a viewer holding each tool's capability: audit trail,
   database health, application health, data QA search, player links (unresolved identities),
-  Brownlow administration, current season. There is no view of AFL API settle refusals yet
-  (V2-GAP-025).
+  Brownlow administration, current season, and AFL API settle refusals (V2-GAP-025). The refusals
+  page lists the open `data_issues` the AFL API settles wrote: refused or rolled-back canonical
+  applications (`canonical_apply_failed`, source `afl_api`), and the settles' other open findings.
+  It is newest first, 50 per page, with identity and refusal codes only, never values, payloads or
+  error text.
 - **Maintenance:** there is no "run everything" control. Each explicit operation lives on its own
   page and shows its consequences before it runs.
 
@@ -146,3 +150,4 @@ one wrapping fix; no agent or person has inspected the images, and no real page 
 6. `/admin/current-season`: only the AFL API switches and the AFL API settle units remain.
 7. `/admin/upload` (retirement notice), `/admin/submissions/[id]` (read-only history), `/admin` (no review notice, read-only submissions log).
 8. The admin sidebar for Admin and Super Admin.
+9. `/admin/operations/afl-api-refusals` (V2-GAP-025): both sections populated and empty, a second page, and a failed read.
