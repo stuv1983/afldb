@@ -43,7 +43,9 @@ This amendment supersedes stale claims in the historical rows below:
 - RISK-11: Brownlow publishes atomically and reconciles 98/98 local seasons; Coleman 46/46 local
   comparison retained. Offline Coleman cannot overwrite publisher-owned seasons. Production
   data and missing API leaderboard/team mapping remain separate evidence gaps.
-- RISK-12: final repo-wide debt is 234 errors/131 warnings, not the older ceiling below.
+- RISK-12: repo-wide debt re-measured 2026-10-29 at `461f4372`: **508 errors/136 warnings** (was 234/131 on
+  2026-10-20; the 279 additions are all in tests, tools and retained issue evidence, none in `src/`/`packages/`).
+  Recorded as a known, open residual by D-V2-RESIDUALS-1 ([record](release-residuals-2026-10-29.md)), not waived.
   Changed-file comparison reports zero new findings while retaining existing lint errors.
 - RISK-22: acquisition implementations physically quarantined; historical replay preserved.
 - RISK-26: original 14 historical failures are repaired and individually tracked in the release

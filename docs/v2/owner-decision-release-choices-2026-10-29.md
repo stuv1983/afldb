@@ -39,7 +39,7 @@ window (steps 3–8). A choice may be approved early, but it cannot be **execute
 
 | # | Choice | Prerequisites | An approval would authorise | It would not authorise |
 |---|---|---|---|---|
-| 1 | **D-V2-RESIDUALS-1** *(new)*: accept the known residuals at artifact lock (gate 2, plan step 1) | None for the decision. Before recording, the lint debt is re-measured at the candidate commit: the last count is 234 errors / 131 warnings, from 2026-10-20, and is stale | Recording these as **known and open** for the release artifact: the 3 strict Gridley failures (V2-GAP-029); the re-measured lint debt; `external-grids-import` NOT RUN because the archive is unavailable. Also the local lint measurement itself | Any waiver, skip, restatement or test change. GAP-029 stays open. A residual is not a pass |
+| 1 | **D-V2-RESIDUALS-1** *(new)*: accept the known residuals at artifact lock (gate 2, plan step 1). **APPROVED and recorded 2026-10-29** ([record](release-residuals-2026-10-29.md)): lint re-measured 508 / 136 | None for the decision. Before recording, the lint debt is re-measured at the candidate commit: the last count is 234 errors / 131 warnings, from 2026-10-20, and is stale | Recording these as **known and open** for the release artifact: the 3 strict Gridley failures (V2-GAP-029); the re-measured lint debt; `external-grids-import` NOT RUN because the archive is unavailable. Also the local lint measurement itself | Any waiver, skip, restatement or test change. GAP-029 stays open. A residual is not a pass |
 | 1a | **X-GRIDS-1** (optional; [package §3.3](release-decision-package-2026-10-28.md)): a separately versioned fixture for the later Gridley snapshot `a56fef4e…` | Choice 1 is not blocked by it. Only needed if that coverage is wanted | A new opt-in test case pinned to that file by hash, with an independent, reviewed SQLite oracle. The owner also states whether its one board gap is accepted | Any change to the original 1,123-board case, which stays NOT RUN until the rescued archive is supplied |
 | 2 | **D-V2-VISUAL-1** *(new)*: owner visual acceptance (V2-GAP-022, gate 3) | The owner reviews `docs/v2/evidence/launchF-visual/` against [admin-operations §6](admin-operations.md), screen by screen | Recording the owner's per-screen verdicts and closing or narrowing V2-GAP-022 accordingly. A rejected screen becomes a tracked defect | Any visual claim not made by the owner. Prose approval is not evidence |
 | 3 | **D-V2-PUSH-1** *(new)*: push and merge `v2/rebuild` and lock the execution commit (gate 3) | Choices 1 and 2. The commit is named in the approval | Pushing `v2/rebuild` to `origin`; merging it into `main` by the stated method; recording the exact execution commit; one production-configured build of that commit to record its build hash | Deployment, DEV sync, any host or production action, or a rebuild of data. Any later code change re-opens this lock and its affected checks |
@@ -71,6 +71,11 @@ window (steps 3–8). A choice may be approved early, but it cannot be **execute
 | 14 | **Brownlow operations**: observe, backfill, adopt, eligibility, resolve (gate 13; V2-GAP-030/031) | Choice 11; fresh post-schema baselines; authentic API vote, identity and leaderboard reconciliation | Each operation separately, with its own plan digest. There is no shared batch approval, and 2026 stays excluded |
 
 ## 3. The next concrete decision
+
+> **Update 2026-10-29:** choice 1 is approved and recorded ([record](release-residuals-2026-10-29.md)). The
+> remaining owner actions, a dependency review, the visual checklist and the read-only host-inspection
+> approval are consolidated in the [owner action sheet](owner-action-sheet-2026-10-29.md). The text below is
+> kept as prepared.
 
 **D-V2-RESIDUALS-1 (choice 1).** It is the first item of plan step 1, needs no production access and has no
 unmet prerequisite. Choice 2 (visual acceptance) can be given in the same message; choice 3 needs both.

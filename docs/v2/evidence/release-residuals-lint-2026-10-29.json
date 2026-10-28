@@ -1,0 +1,6684 @@
+{
+ "record": "D-V2-RESIDUALS-1 repository lint measurement",
+ "measuredAt": "2026-10-28T23:47:46.631Z",
+ "commit": "461f43726c828f0240a4fc12d9bb79b5f40e2a25",
+ "branch": "v2/rebuild",
+ "workingTree": "tracked files identical to the commit; only the pre-existing untracked .codex/ (3 files linted, 0 findings)",
+ "command": "node node_modules/eslint/bin/eslint.js . --format json  (the package.json \"lint\" script is \"eslint .\"; installed ESLint, eslint.config.mjs unchanged, no --fix, no rule or ignore change)",
+ "eslintVersion": "v9.39.5",
+ "exitCode": 1,
+ "totals": {
+  "filesLinted": 1221,
+  "filesWithFindings": 156,
+  "errors": 508,
+  "warnings": 136,
+  "fatal": 0
+ },
+ "baseline": {
+  "file": "docs/v2/evidence/local-repository-lint-complete.json",
+  "date": "2026-10-20",
+  "errors": 234,
+  "warnings": 131,
+  "fatal": 0,
+  "method": "per file, findings matched by rule + severity + message (line numbers ignored); unmatched current findings are counted as not in the baseline",
+  "notInBaseline": {
+   "errors": 274,
+   "warnings": 5,
+   "byArea": {
+    "issues/ (retained evidence scripts)": {
+     "errors": 226,
+     "warnings": 3
+    },
+    "tests/": {
+     "errors": 41,
+     "warnings": 2
+    },
+    "tools/": {
+     "errors": 7,
+     "warnings": 0
+    }
+   }
+  },
+  "baselineFindingsNoLongerPresent": 0
+ },
+ "mainMergeBase": "ff100dc2b8da8523f550ef45a9eaa3ef96d9d840 (= the deployed production checkout)",
+ "byArea": {
+  ".phaneslight/": {
+   "errors": 12,
+   "warnings": 6,
+   "files": 4
+  },
+  "issues/ (retained evidence scripts)": {
+   "errors": 226,
+   "warnings": 3,
+   "files": 56
+  },
+  "runtime (src/, packages/)": {
+   "errors": 17,
+   "warnings": 73,
+   "files": 51
+  },
+  "tests/": {
+   "errors": 245,
+   "warnings": 38,
+   "files": 34
+  },
+  "tools/": {
+   "errors": 8,
+   "warnings": 16,
+   "files": 11
+  }
+ },
+ "byReleaseChange": {
+  "unchanged vs main merge-base: .phaneslight/": {
+   "errors": 12,
+   "warnings": 6,
+   "files": 4
+  },
+  "changed vs main merge-base: issues/ (retained evidence scripts)": {
+   "errors": 226,
+   "warnings": 3,
+   "files": 56
+  },
+  "unchanged vs main merge-base: runtime (src/, packages/)": {
+   "errors": 17,
+   "warnings": 62,
+   "files": 43
+  },
+  "changed vs main merge-base: runtime (src/, packages/)": {
+   "errors": 0,
+   "warnings": 11,
+   "files": 8
+  },
+  "unchanged vs main merge-base: tests/": {
+   "errors": 52,
+   "warnings": 20,
+   "files": 21
+  },
+  "changed vs main merge-base: tests/": {
+   "errors": 193,
+   "warnings": 18,
+   "files": 13
+  },
+  "unchanged vs main merge-base: tools/": {
+   "errors": 0,
+   "warnings": 7,
+   "files": 7
+  },
+  "changed vs main merge-base: tools/": {
+   "errors": 8,
+   "warnings": 9,
+   "files": 4
+  }
+ },
+ "byRule": {
+  "@typescript-eslint/no-explicit-any error": 252,
+  "@typescript-eslint/no-require-imports error": 240,
+  "@typescript-eslint/no-unused-vars warning": 123,
+  "react-hooks/set-state-in-effect error": 11,
+  "(unused eslint-disable directive) warning": 6,
+  "import/no-anonymous-default-export warning": 4,
+  "react-hooks/exhaustive-deps warning": 3,
+  "react/no-children-prop error": 3,
+  "react/no-unescaped-entities error": 1,
+  "@next/next/no-assign-module-variable error": 1
+ },
+ "files": [
+  {
+   "file": ".phaneslight/scripts/api-diff.js",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 17,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 18,
+     "column": 13,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": ".phaneslight/scripts/cli.js",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 9,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 10,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": ".phaneslight/scripts/regen-registry.js",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 17,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 18,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 19,
+     "column": 13,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": ".phaneslight/scripts/registry-lib.js",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 5,
+   "warnings": 6,
+   "messages": [
+    {
+     "line": 14,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 15,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 16,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 17,
+     "column": 26,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 40,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 41,
+     "column": 12,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 53,
+     "column": 12,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 60,
+     "column": 45,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 73,
+     "column": 76,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 100,
+     "column": 16,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 171,
+     "column": 14,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/blind-credential-scan.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 4,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 7,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 103,
+     "column": 37,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'bytes' is defined but never used.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/reverify-local.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 26,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/build-restatement-map.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finalize-restatement-package.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 7,
+     "column": 7,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'rel' is assigned a value but never used.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finalize-stopped-validation.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/finish-audit.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inspect-restatement-map.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/load-retained-inputs.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/offline-network-guard.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 14,
+     "column": 1,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 15,
+     "column": 1,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 16,
+     "column": 1,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-authorities.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 5,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 10,
+     "column": 13,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 11,
+     "column": 11,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-proposal.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 7,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 12,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 13,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 14,
+     "column": 20,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 15,
+     "column": 15,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-repaired-C.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/prepare-restatement-previews.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/reconcile-offline-proof.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 6,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 8,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 9,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 10,
+     "column": 20,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 11,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/record-readiness-approval.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/refresh-readiness-evidence.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/relocate-validation.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/repair-restatements.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatement-network-guard.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 7,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 9,
+     "column": 18,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 10,
+     "column": 1,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 23,
+     "column": 1,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 24,
+     "column": 1,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/run-repaired-restatements.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/run-retained-validator.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validate-broader-restatements.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validate-state-previews.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/verify-retained-j2.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-readiness-prep-20261025/check-preparation.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 6,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 7,
+     "column": 99,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-readiness-prep-20261025/check-source.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-readiness-prep-20261025/prepare-local.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 21,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-readiness-prep-20261025/refresh-manifest.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/FREEZE-V5.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/PATCH-V4.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 2,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/PREPARE-V4.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/PREPARE-V5.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/TRACK-V4.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/browser-inspection.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 1,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 2,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 18,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/run.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v2/validate.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 7,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/run.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-order.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-pg.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 8,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 7,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 8,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 9,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 10,
+     "column": 35,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 11,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate-remote.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/validate.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 18,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/execute-authorised-once.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 2,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 2,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 2,
+     "column": 97,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/observe-only.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 6,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 97,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/run.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-order.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-pg.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 8,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 7,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 8,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 9,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 10,
+     "column": 35,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 11,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-remote.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate-wrapper.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 6,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 88,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 114,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 45,
+     "column": 149,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4/validate.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 19,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/run.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 7,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-order.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 2,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-pg.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 9,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 6,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 7,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 8,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 9,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 10,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 11,
+     "column": 25,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 12,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 13,
+     "column": 35,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 14,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-remote.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 3,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate-wrapper.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 7,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 6,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 88,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 114,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 96,
+     "column": 76,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 145,
+     "column": 9,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'h' is assigned a value but never used.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 146,
+     "column": 67,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v5/validate.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 4,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 4,
+     "column": 10,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 6,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 21,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/run-readonly.cjs",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 1,
+     "column": 12,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 2,
+     "column": 14,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "src/app/admin/AdminNav.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 85,
+     "column": 53,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\app\\admin\\AdminNav.tsx:85:53\n  83 |       // Default to collapsed on a narrow screen, where a 15rem sidebar above\n  84 |       // the page would push the actual work off the first screenful.\n> 85 |       if (stored === 'open' || stored === 'closed') setOpen(stored === 'open');\n     |                                                     ^^^^^^^ Avoid calling setState() directly within an effect\n  86 |       else setOpen(window.innerWidth > 760);\n  87 |     } catch {\n  88 |       // Private browsing, or storage disabled. The default stands.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/admin/AdminSection.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 48,
+     "column": 53,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\app\\admin\\AdminSection.tsx:48:53\n  46 |     try {\n  47 |       const stored = window.localStorage.getItem(STORAGE_PREFIX + id);\n> 48 |       if (stored === 'open' || stored === 'closed') setOpen(stored === 'open');\n     |                                                     ^^^^^^^ Avoid calling setState() directly within an effect\n  49 |     } catch {\n  50 |       // Storage unavailable; the default stands.\n  51 |     }",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/admin/content/actions.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 101,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_previous' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 102,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_formData' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/admin/data-editor/page.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 18,
+     "column": 10,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'formatDate' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 18,
+     "column": 22,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'formatRoundShort' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/admin/nl-search/ClearTelemetryForm.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 37,
+     "column": 7,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\app\\admin\\nl-search\\ClearTelemetryForm.tsx:37:7\n  35 |   useEffect(() => {\n  36 |     if (state.counts) {\n> 37 |       setIsConfirming(false);\n     |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  38 |       setConfirmation('');\n  39 |     }\n  40 |   }, [state.counts]);",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/admin/player-links/ResolveControls.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 137,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'linkStatus' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/admin/player-links/actions.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 465,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_prev' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 466,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_formData' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/admin/settings/SearchPlaceholderSettings.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 2,
+   "warnings": 4,
+   "messages": [
+    {
+     "line": 37,
+     "column": 9,
+     "severity": "warning",
+     "rule": "react-hooks/exhaustive-deps",
+     "message": "The 'effectiveList' conditional could make the dependencies of useEffect Hook (at line 87) change on every render. To fix this, wrap the initialization of 'effectiveList' in its own useMemo() Hook.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 41,
+     "column": 10,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'isTyping' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 41,
+     "column": 20,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'setIsTyping' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 44,
+     "column": 5,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\app\\admin\\settings\\SearchPlaceholderSettings.tsx:44:5\n  42 |\n  43 |   useEffect(() => {\n> 44 |     setPreviewIndex(0);\n     |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  45 |     setPreviewText(effectiveList[0] ?? '');\n  46 |   }, [previewScope, aflText, aflwText]);\n  47 |",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 46,
+     "column": 6,
+     "severity": "warning",
+     "rule": "react-hooks/exhaustive-deps",
+     "message": "React Hook useEffect has a missing dependency: 'effectiveList'. Either include it or remove the dependency array.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 81,
+     "column": 7,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\app\\admin\\settings\\SearchPlaceholderSettings.tsx:81:7\n  79 |       return () => clearTimeout(timeoutId);\n  80 |     } else {\n> 81 |       setPreviewText(target);\n     |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  82 |       const timer = setTimeout(() => {\n  83 |         setPreviewIndex((prev) => (prev + 1) % effectiveList.length);\n  84 |       }, Math.max(1000, interval * 1000));",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/aflw/matches/[key]/page.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 69,
+     "column": 9,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'periods' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/awards/[slug]/page.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 40,
+     "column": 7,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'ALL_AUSTRALIAN' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/beta/actions.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 53,
+     "column": 3,
+     "severity": "warning",
+     "rule": null,
+     "message": "Unused eslint-disable directive (no problems were reported from 'no-control-regex').",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/draft/[year]/page.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 11,
+     "column": 25,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'getDraftYears' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/players/[slug]/page.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 87,
+     "column": 9,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'span' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/players/compare/page.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 3,
+   "messages": [
+    {
+     "line": 14,
+     "column": 26,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'PlayerProfile' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 22,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'NOT_RECORDED' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 27,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'ERA_LIMITED_STATS' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/seasons/[year]/page.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 37,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'isNonPlayerHallOfFameCategory' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/app/seasons/page.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 44,
+     "column": 19,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_from' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 44,
+     "column": 30,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_to' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/components/CoachOpponentHistoryClient.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 55,
+     "column": 7,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\components\\CoachOpponentHistoryClient.tsx:55:7\n  53 |   useEffect(() => {\n  54 |     if (!requested) {\n> 55 |       setSelection({ kind: 'none' });\n     |       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  56 |       return;\n  57 |     }\n  58 |     let cancelled = false;",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/components/ConsentBanner.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 46,
+     "column": 5,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\components\\ConsentBanner.tsx:46:5\n  44 |\n  45 |   useEffect(() => {\n> 46 |     setAnswered(isConsentChoice(readConsentCookie()));\n     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  47 |   }, []);\n  48 |\n  49 |   // Awaited, not raced: the banner goes away because the choice was",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/components/JsonLd.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 18,
+     "column": 7,
+     "severity": "warning",
+     "rule": null,
+     "message": "Unused eslint-disable directive (no problems were reported from 'react/no-danger').",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/components/NlAnswerFeedbackControls.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 83,
+     "column": 23,
+     "severity": "error",
+     "rule": "react/no-unescaped-entities",
+     "message": "`'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/components/PlayerPicker.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 55,
+     "column": 7,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\components\\PlayerPicker.tsx:55:7\n  53 |     const term = query.trim();\n  54 |     if (term.length < MIN_QUERY_LENGTH) {\n> 55 |       setSuggestions([]);\n     |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  56 |       setOpen(false);\n  57 |       return;\n  58 |     }",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/components/ReorderableSections.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 77,
+     "column": 5,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\components\\ReorderableSections.tsx:77:5\n  75 |     if (next.join() === defaultOrder.join()) return;\n  76 |     reanchorFor.current = next;\n> 77 |     setState({ signature, order: next });\n     |     ^^^^^^^^ Avoid calling setState() directly within an effect\n  78 |     // Re-read whenever the page or its section list changes; `signature`\n  79 |     // covers both, and `defaultOrder` is derived from it.\n  80 |     // eslint-disable-next-line react-hooks/exhaustive-deps",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/components/SearchBox.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 2,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 58,
+     "column": 9,
+     "severity": "warning",
+     "rule": "react-hooks/exhaustive-deps",
+     "message": "The 'candidateList' conditional could make the dependencies of useEffect Hook (at line 114) change on every render. To fix this, wrap the initialization of 'candidateList' in its own useMemo() Hook.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 67,
+     "column": 7,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\components\\SearchBox.tsx:67:7\n  65 |   useEffect(() => {\n  66 |     if (candidateList.length <= 1) {\n> 67 |       setDisplayedPlaceholder(candidateList[0] || '');\n     |       ^^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  68 |       return;\n  69 |     }\n  70 |",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 119,
+     "column": 7,
+     "severity": "error",
+     "rule": "react-hooks/set-state-in-effect",
+     "message": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:\n* Update external systems with the latest state from React.\n* Subscribe for updates from some external system, calling setState in a callback function when external state changes.\n\nCalling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).\n\nD:\\dev\\afldbV2\\src\\components\\SearchBox.tsx:119:7\n  117 |     const term = query.trim();\n  118 |     if (term.length < MIN_QUERY_LENGTH) {\n> 119 |       setSuggestions([]);\n      |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect\n  120 |       setOpen(false);\n  121 |       return;\n  122 |     }",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 189,
+     "column": 11,
+     "severity": "warning",
+     "rule": null,
+     "message": "Unused eslint-disable directive (no problems were reported from 'jsx-a11y/no-autofocus').",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/components/SortableTable.tsx",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 19,
+     "column": 24,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/authClient.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 30,
+     "column": 3,
+     "severity": "warning",
+     "rule": null,
+     "message": "Unused eslint-disable directive (no problems were reported from 'no-var').",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 70,
+     "column": 8,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_args' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/client.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 14,
+     "column": 3,
+     "severity": "warning",
+     "rule": null,
+     "message": "Unused eslint-disable directive (no problems were reported from 'no-var').",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/advanced-search.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 83,
+     "column": 30,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/afl-api-player-links.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 27,
+     "column": 8,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'AflApiDecision' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 432,
+     "column": 12,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'providerMatchId' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/aflw.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 3,
+   "messages": [
+    {
+     "line": 342,
+     "column": 32,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 513,
+     "column": 32,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 806,
+     "column": 32,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/brownlow.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 128,
+     "column": 30,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/club-comparison.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 1076,
+     "column": 40,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_ignored' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/data-edits.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 264,
+     "column": 71,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 269,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/draft.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 134,
+     "column": 30,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/match-search.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 140,
+     "column": 20,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/after-siren.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 4,
+   "messages": [
+    {
+     "line": 216,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 300,
+     "column": 38,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 317,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 317,
+     "column": 49,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_rnk' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/club-season.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 3,
+   "messages": [
+    {
+     "line": 85,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 108,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 108,
+     "column": 45,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/coach-record.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 144,
+     "column": 29,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 239,
+     "column": 43,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_rnk' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/family.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 98,
+     "column": 29,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 98,
+     "column": 42,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_rnk' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/player-career.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 3,
+   "messages": [
+    {
+     "line": 274,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 302,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 302,
+     "column": 45,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/player-game.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 215,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 215,
+     "column": 45,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/player-season.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 4,
+   "messages": [
+    {
+     "line": 138,
+     "column": 46,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 138,
+     "column": 55,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 160,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 160,
+     "column": 45,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/team-match.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 4,
+   "messages": [
+    {
+     "line": 249,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 249,
+     "column": 45,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 299,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 350,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/nl/team-streak.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 114,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 114,
+     "column": 45,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/players.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 155,
+     "column": 32,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 698,
+     "column": 32,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/search.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 651,
+     "column": 32,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/db/queries/venues.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 485,
+     "column": 32,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_total' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/lib/acquisition/afl-api-bundle.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 673,
+     "column": 7,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'goals' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 674,
+     "column": 7,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'behinds' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/lib/auth/session.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 155,
+     "column": 58,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'email' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/lib/sorting.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 9,
+     "column": 6,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 10,
+     "column": 6,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/search/nl/parser.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 159,
+     "column": 10,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'consume' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "src/search/query-builder-spec.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 783,
+     "column": 27,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_old' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/afl-api-adjudication-recovery.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 234,
+     "column": 96,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_p' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 282,
+     "column": 28,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/afl-api-brownlow-acquire.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 54,
+     "column": 50,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_init' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/afl-api-lineup.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 4,
+   "messages": [
+    {
+     "line": 221,
+     "column": 21,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_omitted' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 259,
+     "column": 26,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_absent' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 306,
+     "column": 26,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_gone' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 539,
+     "column": 36,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_omitted' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/afl-api-match.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 1303,
+     "column": 42,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1703,
+     "column": 50,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1703,
+     "column": 90,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/afl-api-settle-plan.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 51,
+     "column": 40,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 59,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 60,
+     "column": 18,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/award-definitions-source.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 39,
+     "column": 27,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/captaincies-source.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 141,
+     "column": 7,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'VALID_ROW_2' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/club-best-and-fairest-source.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 136,
+     "column": 7,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'DEFINITIONS_HEADER' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/coach-profile-route.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 56,
+     "column": 35,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_playerId' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/coleman-derivation.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 30,
+     "column": 21,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 64,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/db-promotion-check.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 4554,
+     "column": 30,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_dropped' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 4702,
+     "column": 30,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_dropped' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/db-test-rebuild.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 46,
+   "warnings": 14,
+   "messages": [
+    {
+     "line": 140,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 173,
+     "column": 38,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 174,
+     "column": 39,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 217,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 220,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 263,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 264,
+     "column": 47,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 317,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 318,
+     "column": 49,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 319,
+     "column": 53,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 320,
+     "column": 52,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 321,
+     "column": 37,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 322,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 323,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 324,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 325,
+     "column": 39,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 326,
+     "column": 39,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 327,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 328,
+     "column": 32,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 329,
+     "column": 35,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 342,
+     "column": 97,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 349,
+     "column": 57,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 349,
+     "column": 97,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 350,
+     "column": 60,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 351,
+     "column": 65,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 351,
+     "column": 105,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 352,
+     "column": 68,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 353,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 354,
+     "column": 31,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 355,
+     "column": 50,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 436,
+     "column": 73,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 450,
+     "column": 47,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 841,
+     "column": 29,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_first' is assigned a value but never used.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 841,
+     "column": 50,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_last' is assigned a value but never used.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 1695,
+     "column": 11,
+     "severity": "error",
+     "rule": "@next/next/no-assign-module-variable",
+     "message": "Do not assign to the variable `module`. See: https://nextjs.org/docs/messages/no-assign-module-variable",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3909,
+     "column": 17,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3914,
+     "column": 17,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3937,
+     "column": 29,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3982,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 3983,
+     "column": 15,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'$comment' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 4021,
+     "column": 50,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4158,
+     "column": 23,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4158,
+     "column": 67,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4159,
+     "column": 54,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4163,
+     "column": 29,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4167,
+     "column": 43,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4192,
+     "column": 92,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5444,
+     "column": 53,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 5446,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 8954,
+     "column": 30,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_payload' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 8955,
+     "column": 69,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_p' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 9042,
+     "column": 23,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_p' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 9042,
+     "column": 40,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_a' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 9042,
+     "column": 56,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_e' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 9042,
+     "column": 71,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 9119,
+     "column": 25,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_p' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 9119,
+     "column": 42,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_a' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 9119,
+     "column": 58,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_e' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 9119,
+     "column": 73,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_r' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 10867,
+     "column": 25,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_capturedAt' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/draftguru-acquisition.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 49,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 81,
+     "column": 35,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 873,
+     "column": 42,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 912,
+     "column": 64,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 914,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 942,
+     "column": 72,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1110,
+     "column": 52,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1118,
+     "column": 52,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1128,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1129,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1133,
+     "column": 21,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1133,
+     "column": 54,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1232,
+     "column": 44,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1294,
+     "column": 39,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1296,
+     "column": 42,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1297,
+     "column": 25,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1299,
+     "column": 43,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1321,
+     "column": 77,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1321,
+     "column": 92,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1393,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1418,
+     "column": 53,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1421,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1616,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1625,
+     "column": 37,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1657,
+     "column": 49,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1735,
+     "column": 44,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1812,
+     "column": 59,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1812,
+     "column": 74,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1907,
+     "column": 51,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1909,
+     "column": 56,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1912,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1928,
+     "column": 53,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1931,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1990,
+     "column": 32,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2006,
+     "column": 43,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2007,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2072,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2073,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2084,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2119,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2203,
+     "column": 56,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2255,
+     "column": 11,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2341,
+     "column": 28,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2423,
+     "column": 43,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2432,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2433,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2473,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2474,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2485,
+     "column": 25,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2502,
+     "column": 53,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/expandable-table-frame.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 31,
+     "column": 7,
+     "severity": "error",
+     "rule": "react/no-children-prop",
+     "message": "Do not pass children as props. Instead, pass them as additional arguments to React.createElement.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 40,
+     "column": 7,
+     "severity": "error",
+     "rule": "react/no-children-prop",
+     "message": "Do not pass children as props. Instead, pass them as additional arguments to React.createElement.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 49,
+     "column": 7,
+     "severity": "error",
+     "rule": "react/no-children-prop",
+     "message": "Do not pass children as props. Instead, pass them as additional arguments to React.createElement.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/fitzroy-acquisition.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 6,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 88,
+     "column": 40,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 94,
+     "column": 36,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 108,
+     "column": 35,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 109,
+     "column": 21,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 109,
+     "column": 47,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 128,
+     "column": 67,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/fitzroy-core-import.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 35,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 199,
+     "column": 31,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 212,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 240,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 459,
+     "column": 26,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 705,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 706,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 712,
+     "column": 50,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 721,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 723,
+     "column": 27,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 724,
+     "column": 53,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 726,
+     "column": 32,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 729,
+     "column": 11,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 738,
+     "column": 39,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 747,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 779,
+     "column": 25,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 830,
+     "column": 37,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 843,
+     "column": 38,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 916,
+     "column": 25,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1810,
+     "column": 36,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1811,
+     "column": 49,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1849,
+     "column": 32,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1962,
+     "column": 27,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1966,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1974,
+     "column": 49,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1980,
+     "column": 42,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1981,
+     "column": 44,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1986,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1988,
+     "column": 27,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2128,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2174,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2184,
+     "column": 58,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2383,
+     "column": 38,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2411,
+     "column": 28,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2580,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 2586,
+     "column": 31,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/integration/club-comparison.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 2491,
+     "column": 3,
+     "severity": "warning",
+     "rule": null,
+     "message": "Unused eslint-disable directive (no problems were reported from 'no-console').",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/integration/dob-enrichment-issues.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 15,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 451,
+     "column": 58,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 477,
+     "column": 58,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 565,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 592,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 593,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 594,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 861,
+     "column": 59,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 884,
+     "column": 59,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 903,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 904,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 937,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 943,
+     "column": 46,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 970,
+     "column": 60,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1145,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1146,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/integration/player-link-concurrency.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 15,
+   "warnings": 3,
+   "messages": [
+    {
+     "line": 157,
+     "column": 24,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 158,
+     "column": 24,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 159,
+     "column": 28,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 173,
+     "column": 47,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 179,
+     "column": 56,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 192,
+     "column": 18,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'e' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 215,
+     "column": 24,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 216,
+     "column": 24,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 217,
+     "column": 28,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 231,
+     "column": 43,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 242,
+     "column": 60,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 250,
+     "column": 18,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'e' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 271,
+     "column": 25,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 272,
+     "column": 25,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 273,
+     "column": 28,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 287,
+     "column": 47,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 293,
+     "column": 61,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 301,
+     "column": 18,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'e' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/integration/settle-afl-api-brownlow-backtest.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 93,
+     "column": 82,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 94,
+     "column": 83,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 95,
+     "column": 82,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/integration/settle-afl-api-brownlow-reschedule.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 127,
+     "column": 82,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 128,
+     "column": 83,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 129,
+     "column": 82,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/integration/settle-afl-api-brownlow.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 3,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 180,
+     "column": 82,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 181,
+     "column": 83,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 182,
+     "column": 82,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/integration/settle-afl-api-fixtures.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 3,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 60,
+     "column": 10,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'resolveAflApiSourceId' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 131,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 132,
+     "column": 82,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 180,
+     "column": 42,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/named-medals-source.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 135,
+     "column": 7,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'DEFINITIONS_HEADER' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/nl-finals-without-premiership-corpus-fix.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 210,
+     "column": 46,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_t' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/nl-plan.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 1008,
+     "column": 25,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_omitted' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/nl-search-log.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 2,
+   "messages": [
+    {
+     "line": 139,
+     "column": 18,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_strings' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 139,
+     "column": 53,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_values' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/nl-ui-corpus.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 2,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 849,
+     "column": 30,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 850,
+     "column": 22,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-require-imports",
+     "message": "A `require()` style import is forbidden.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/nl-ui/nl-stress.spec.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 1102,
+     "column": 24,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_network' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/player-identity-source.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 43,
+     "column": 65,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/player-link-mutations.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 20,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 99,
+     "column": 7,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 109,
+     "column": 9,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 115,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 117,
+     "column": 49,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1797,
+     "column": 77,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1800,
+     "column": 62,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1805,
+     "column": 11,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1808,
+     "column": 11,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1811,
+     "column": 77,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1814,
+     "column": 96,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1818,
+     "column": 88,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1822,
+     "column": 102,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1829,
+     "column": 81,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1830,
+     "column": 66,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1831,
+     "column": 68,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1832,
+     "column": 75,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1851,
+     "column": 38,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1853,
+     "column": 52,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1854,
+     "column": 52,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 3637,
+     "column": 33,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/reference-data.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 31,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 37,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 70,
+     "column": 58,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 71,
+     "column": 28,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 87,
+     "column": 42,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 124,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 129,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 131,
+     "column": 34,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 135,
+     "column": 40,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 136,
+     "column": 40,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 137,
+     "column": 46,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 140,
+     "column": 38,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 141,
+     "column": 45,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 142,
+     "column": 41,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 151,
+     "column": 29,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 151,
+     "column": 72,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 160,
+     "column": 19,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 161,
+     "column": 16,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 179,
+     "column": 47,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 200,
+     "column": 58,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 220,
+     "column": 13,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 259,
+     "column": 56,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 665,
+     "column": 21,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 666,
+     "column": 27,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 666,
+     "column": 68,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 667,
+     "column": 28,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 668,
+     "column": 35,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 710,
+     "column": 36,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1192,
+     "column": 35,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1192,
+     "column": 53,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1201,
+     "column": 36,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 1208,
+     "column": 36,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  },
+  {
+   "file": "tests/rising-star-source.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 150,
+     "column": 7,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'VALID_ROW_2' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tests/rising-star-winners-source.test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 41,
+     "column": 27,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/current-season/emit-afl-api-player-bridge.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 806,
+     "column": 30,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_ignored' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/db/catalog-fingerprint.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 196,
+     "column": 1,
+     "severity": "warning",
+     "rule": "import/no-anonymous-default-export",
+     "message": "Assign object to a variable before exporting as module default",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/db/prove-reset.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 829,
+     "column": 1,
+     "severity": "warning",
+     "rule": "import/no-anonymous-default-export",
+     "message": "Assign object to a variable before exporting as module default",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/db/psql.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 358,
+     "column": 1,
+     "severity": "warning",
+     "rule": "import/no-anonymous-default-export",
+     "message": "Assign object to a variable before exporting as module default",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/db/rebuild-test.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 7,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 1198,
+     "column": 51,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1198,
+     "column": 82,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 1198,
+     "column": 112,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 1237,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 1319,
+     "column": 58,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 1761,
+     "column": 69,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 2688,
+     "column": 57,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    },
+    {
+     "line": 4798,
+     "column": 1,
+     "severity": "warning",
+     "rule": "import/no-anonymous-default-export",
+     "message": "Assign object to a variable before exporting as module default",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/migration/afl_api_identity_rebuild_rehearsal_fixture.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 932,
+     "column": 53,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_audit' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/migration/correct_afl_api_identity.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 4,
+   "messages": [
+    {
+     "line": 131,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'compareSubstantiveBrownlow' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 132,
+     "column": 3,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'compareSubstantivePlayerMatchStats' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 174,
+     "column": 8,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'DeleteLineageEvidence' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 183,
+     "column": 8,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'MoveLineageEvidence' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/migration/rebuild_afl_api_adjudications.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 0,
+   "warnings": 4,
+   "messages": [
+    {
+     "line": 908,
+     "column": 25,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_email' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 908,
+     "column": 44,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_role' is assigned a value but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1648,
+     "column": 49,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_email' is defined but never used.",
+     "notIn20261020Baseline": false
+    },
+    {
+     "line": 1648,
+     "column": 68,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'_role' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/migration/recover_afl_api_adjudications.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 90,
+     "column": 32,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'LifecycleRole' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/nl/v2-runner.ts",
+   "tracked": true,
+   "changedVsMainMergeBase": false,
+   "errors": 0,
+   "warnings": 1,
+   "messages": [
+    {
+     "line": 27,
+     "column": 70,
+     "severity": "warning",
+     "rule": "@typescript-eslint/no-unused-vars",
+     "message": "'readFileSync' is defined but never used.",
+     "notIn20261020Baseline": false
+    }
+   ]
+  },
+  {
+   "file": "tools/v2/rehearsal-package.d.mts",
+   "tracked": true,
+   "changedVsMainMergeBase": true,
+   "errors": 1,
+   "warnings": 0,
+   "messages": [
+    {
+     "line": 50,
+     "column": 48,
+     "severity": "error",
+     "rule": "@typescript-eslint/no-explicit-any",
+     "message": "Unexpected any. Specify a different type.",
+     "notIn20261020Baseline": true
+    }
+   ]
+  }
+ ]
+}

@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### Known release residuals recorded; owner review and host inspection prepared (2026-10-29; production NO-GO)
+
+- D-V2-RESIDUALS-1 (approved) records three residuals as **known and open** for the V2 release artifact,
+  waiving nothing: the 3 strict Gridley failures (V2-GAP-029, 149 / 99 / 50), the repository lint debt and
+  `external-grids-import` NOT RUN (rescued archive unavailable). Record: `docs/v2/release-residuals-2026-10-29.md`.
+  - Lint re-measured once at `461f4372` with the installed ESLint 9.39.5 and unchanged configuration:
+    **508 errors / 136 warnings / 0 fatal** (was 234 / 131 on 2026-10-20). The 279 additions are all in tests,
+    tools and retained issue evidence; shipped `src/`/`packages/` code has no new finding. Evidence:
+    `docs/v2/evidence/release-residuals-lint-2026-10-29.json`.
+- Prepared, not executed: the owner visual checklist for V2-GAP-022 (`docs/v2/owner-visual-review-2026-10-29.md`;
+  screens 01/02/08/09 stale, the refusals page uncaptured), a read-only production-host inspection procedure
+  and script for gate 9 (`docs/v2/host-prerequisites-inspection-2026-10-29.md`, not run), and the owner action
+  sheet with the dependency review (`docs/v2/owner-action-sheet-2026-10-29.md`). Nothing was pushed, built or
+  deployed and no host or database was accessed.
+
 ### Current-production rehearsal acceptance measured (2026-10-29; production NO-GO)
 
 - D-V2-CURRENT-ACCEPTANCE-RUN-1 ran the committed `D-V2-CURRENT-REHEARSAL-1` binding (`241c105e`) over a new,
