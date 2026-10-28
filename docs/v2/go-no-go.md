@@ -1,5 +1,10 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
+**Current decision package, 2026-10-28:** [release decision package](release-decision-package-2026-10-28.md).
+It separates stages A (inert V2 installation), B (schema/data acceptance), C (source retirement and
+AFL API cutover) and D (first 2027 fixture ingestion), and holds the reviewed current-production
+shadow capture awaiting D-V2-CURRENT-SHADOW-CAPTURE-1. Production remains **NO-GO**.
+
 **Current scoped acceptance, 2026-10-21:** [owner decisions and measured result](owner-decision-fresh-rehearsal-2026-10-21.md)
 supersede historical pending-rehearsal statements below for archive `7fefcd9b…6dea6599`, baseline
 110 through exactly 111–117 and reviewed source `a6400e7d…`. Migration compatibility and backend

@@ -1,5 +1,11 @@
 # Production-data shadow: Linux execution package
 
+**Current production (2026-10-28):** for a fresh capture of current production, use
+[the release decision package §2](release-decision-package-2026-10-28.md) and its scripts in
+`evidence/current-production-shadow/`. Its migration set is exactly **111–117**, with the expected
+116/117 deltas stated, so it supersedes the 111–115 assumptions below. The contract and layout
+below remain the reference; they are historical for 111–115.
+
 Executed in fresh local isolation on 2026-10-20: see
 [the sanitised rehearsal record](linux-rehearsal-2026-10-20.md). Preservation passed;
 the staged Brownlow comparator remains INCOMPLETE (no authentic staged evidence). The owner has since
