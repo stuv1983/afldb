@@ -86,7 +86,8 @@ import { USAGE, defaultDeps, parseCliArgs, runCli, type CliDeps } from '../tools
 import { APPROVED_BROWNLOW_ALTERNATIVE, comparePreservation, digest, releaseGates, REQUIRED_PUBLIC_QUERIES,
   REQUIRED_PRESERVED_TABLES, type PreservationSnapshot } from '../tools/v2/migration-preservation';
 import { runReleaseGates } from '../tools/v2/release-gates';
-import { assessFreshAcceptance, FRESH_ACCEPTANCE, verifyFreshEvidence } from '../tools/v2/fresh-rehearsal-acceptance';
+import { ACCEPTANCE_BINDINGS, assessFreshAcceptance, CURRENT_ACCEPTANCE, FRESH_ACCEPTANCE, runFreshAcceptance, verifyCurrentEvidence,
+  verifyCurrentCapture, verifyFreshEvidence, verifyManifestLines } from '../tools/v2/fresh-rehearsal-acceptance';
 
 const ROOT = process.cwd();
 const NOW = '2026-10-20T00:00:00Z';
@@ -151,6 +152,202 @@ describe('owner migration separation: synthetic preservation policy', () => {
         writeFileSync(join(dir, 'evidence-manifest.sha256'), `${digest('made up')}  after.schema.sql\n`);
         expect(verifyFreshEvidence(dir, ROOT)).toBe('FAIL');
       } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
+  });
+  describe('current a4641ca0… 111–117 acceptance (D-V2-CURRENT-*): second approved binding', () => {
+    // The parity report and focused-check results are the committed real files; snapshots stay synthetic
+    // because the preservation snapshots are retained only on the isolated host.
+    const SHADOW = join(ROOT, 'docs/v2/evidence/current-production-shadow');
+    const real = (path: string): Loose => JSON.parse(readFileSync(join(SHADOW, path), 'utf8'));
+    const focused = () => ({ units: real('followup-20261029/unit-focused.json'),
+      eligibility: real('followup-20261029/it-v2-brownlow-eligibility.json'), privileges: real('followup-20261029/it-privileges.json') });
+    const inputs = () => {
+      const before = snapshot(); before.scope.backupSha256 = CURRENT_ACCEPTANCE.archiveSha256;
+      before.tables['staging.afl_api_brownlow_vote'] = { definition: digest('NOT NULL'), rows: [] };
+      const after = clone(before);
+      after.tables['staging.afl_api_brownlow_vote'].definition = digest('nullable');
+      after.tables['public.brownlow_correction_receipts'] = { definition: digest('receipt'), rows: [] };
+      after.tables['afldb_meta.schema_migrations'].rows.push(...Object.keys(CURRENT_ACCEPTANCE.migrations).map(digest));
+      return { integrity: 'PASS' as const, before, after, parity: real('run-20261028T192336Z/migration.parity.json'),
+        archiveSha256: CURRENT_ACCEPTANCE.archiveSha256 as string, sourceRevision: CURRENT_ACCEPTANCE.sourceRevision as string,
+        baseline: 110, migrations: Object.keys(CURRENT_ACCEPTANCE.migrations), focused: focused() as Record<string, Loose> };
+    };
+    it('accepts only its own binding, records the privileges FAIL unwaived and keeps production NO-GO', () => {
+      const report = assessFreshAcceptance(inputs(), CURRENT_ACCEPTANCE);
+      expect(report.reasons).toEqual([]);
+      expect(report.migrationCompatibility).toBe('PASS');
+      expect(report.decision).toBe('D-V2-CURRENT-REHEARSAL-1');
+      expect(report.ownerApprovedSchemaDifferences.decision).toBe('D-V2-CURRENT-SCHEMA-1');
+      expect(report.ownerApprovedSchemaDifferences.boundary).toContain('PUBLIC EXECUTE');
+      expect(report.alternativeBrownlowEvidence).toMatchObject({ decision: 'D-V2-BROWNLOW-ALT-3', authenticStagedReconciliationEstablished: false });
+      expect(report.originalStrict.migrationCompatibility).toBe('FAIL');
+      expect(report.stagedBrownlowComparator).toBe('INCOMPLETE');
+      expect(report.productionOperational).toBe('INCOMPLETE');
+      expect(report.productionDecision).toBe('NO-GO');
+      expect(report.productionPrivileges.productionExecutionAuthorized).toBe(false);
+      expect('privilegesIntegration' in report && report.privilegesIntegration).toEqual({ result: 'FAIL', passed: 42, total: 43,
+        failing: [...CURRENT_ACCEPTANCE.focusedChecks.privileges.failing], waived: false,
+        requirement: expect.stringContaining('staging default privileges absent') });
+    });
+    it('keeps the original binding as the default and refuses each archive under the other binding', () => {
+      expect(ACCEPTANCE_BINDINGS).toEqual({ 'D-V2-FRESH-REHEARSAL-1': FRESH_ACCEPTANCE, 'D-V2-CURRENT-REHEARSAL-1': CURRENT_ACCEPTANCE });
+      expect(FRESH_ACCEPTANCE.archiveSha256).toBe('7fefcd9b791520ccc939f7f9d0ca1ddacd5fe99d2cca33d53ea1aa9c6dea6599');
+      expect(CURRENT_ACCEPTANCE.migrations).toEqual(FRESH_ACCEPTANCE.migrations);
+      const current = assessFreshAcceptance(inputs());
+      expect(current.decision).toBe('D-V2-FRESH-REHEARSAL-1');
+      expect(current.migrationCompatibility).toBe('FAIL');
+      expect(current.reasons).toContain('Unapproved archive, source or migration scope');
+      const crossed = { ...inputs(), archiveSha256: FRESH_ACCEPTANCE.archiveSha256 as string, sourceRevision: FRESH_ACCEPTANCE.sourceRevision as string };
+      crossed.before.scope.backupSha256 = crossed.after.scope.backupSha256 = FRESH_ACCEPTANCE.archiveSha256;
+      expect(assessFreshAcceptance(crossed, CURRENT_ACCEPTANCE).reasons).toEqual(['Unapproved archive, source or migration scope', 'Snapshot archive differs']);
+      const forged = { ...CURRENT_ACCEPTANCE, archiveSha256: digest('substituted archive') } as unknown as typeof CURRENT_ACCEPTANCE;
+      const substituted = inputs(); substituted.archiveSha256 = forged.archiveSha256; substituted.before.scope.backupSha256 = substituted.after.scope.backupSha256 = forged.archiveSha256;
+      expect(assessFreshAcceptance(substituted, forged).reasons).toContain('Unapproved acceptance binding');
+    });
+    it.each(['archive', 'source', 'baseline', 'range', 'file', 'missing', 'hash', 'schema', 'table', 'row', 'added row', 'new row', 'output',
+      'brownlow', 'units', 'eligibility', 'privileges pass', 'privileges other failure', 'skipped', 'no focused'])('rejects %s outside the approval', kind => {
+      const input = inputs();
+      const f = input.focused;
+      if (kind === 'archive') input.archiveSha256 = digest('other archive');
+      if (kind === 'source') input.sourceRevision = FRESH_ACCEPTANCE.sourceRevision;
+      if (kind === 'baseline') input.baseline = 109;
+      if (kind === 'range') input.migrations.push('118_unreviewed.sql');
+      if (kind === 'file') input.migrations[0] = '111_changed.sql';
+      if (kind === 'missing') Object.assign(input, { integrity: 'INCOMPLETE' });
+      if (kind === 'hash') Object.assign(input, { integrity: 'FAIL' });
+      if (kind === 'schema') input.after.tables['public.matches'].definition = digest('unreviewed schema');
+      if (kind === 'table') input.after.tables['public.unreviewed'] = { definition: digest('new'), rows: [] };
+      if (kind === 'row') input.after.tables['public.brownlow_round_votes'].rows = [digest('changed vote')];
+      if (kind === 'added row') input.after.tables['public.players'].rows.push(digest('unapproved player'));
+      if (kind === 'new row') input.after.tables['public.brownlow_correction_receipts'].rows.push(digest('receipt row'));
+      if (kind === 'output') input.after.queries.brownlow_raw = digest('different result');
+      if (kind === 'brownlow') { (checkOf(input.parity as ShadowParityReport, 'brownlow') as Loose).status = 'fail'; input.parity.summary = { pass: 3, fail: 2, incomplete: 0 }; }
+      if (kind === 'units') f.units.numPassedTests = 507;
+      if (kind === 'eligibility') f.eligibility.testResults[0].assertionResults.pop();
+      if (kind === 'privileges pass') {
+        for (const s of f.privileges.testResults) for (const a of s.assertionResults) a.status = 'passed';
+        f.privileges.numPassedTests = 43; f.privileges.numFailedTests = 0;
+      }
+      if (kind === 'privileges other failure') {
+        const results = f.privileges.testResults.flatMap((s: Loose) => s.assertionResults);
+        results.find((a: Loose) => a.status !== 'passed').status = 'passed';
+        results.find((a: Loose) => a.fullName.includes('afldb_app')).status = 'failed';
+      }
+      if (kind === 'skipped') f.units.numPendingTests = 1;
+      if (kind === 'no focused') delete (input as Partial<typeof input>).focused;
+      const report = assessFreshAcceptance(input, CURRENT_ACCEPTANCE);
+      expect(report.migrationCompatibility).toBe('FAIL');
+      expect(report.productionDecision).toBe('NO-GO');
+    });
+    it('pins exactly the committed record: manifests, sidecar, measured results and the local grant check', () => {
+      const runManifest = readFileSync(join(SHADOW, 'run-20261028T192336Z/evidence-sha256.txt'), 'utf8');
+      const followManifest = readFileSync(join(SHADOW, 'followup-20261029/evidence-sha256.txt'), 'utf8');
+      expect(digest(runManifest)).toBe(CURRENT_ACCEPTANCE.manifestSha256);
+      expect(digest(followManifest)).toBe(CURRENT_ACCEPTANCE.followupManifestSha256);
+      expect(runManifest.trimEnd().split('\n')).toHaveLength(CURRENT_ACCEPTANCE.manifestFiles);
+      expect(followManifest.trimEnd().split('\n')).toHaveLength(CURRENT_ACCEPTANCE.followupManifestFiles);
+      const { path, recorded } = CURRENT_ACCEPTANCE.disclosedManifestEntry;
+      expect(runManifest).toContain(`${recorded}  ./${path}\n`);
+      for (const [file, sha] of Object.entries(CURRENT_ACCEPTANCE.measured)) {
+        const [manifest, name] = file.startsWith('evidence/') ? [runManifest, file.slice(9)] : [followManifest, file.slice(18)];
+        expect(manifest, file).toContain(`${sha}  ./${name}\n`);
+      }
+      const sidecar = readFileSync(join(SHADOW, 'run-20261028T192336Z/afldb_prod-20261028T192336Z.provenance.json'));
+      expect(digest(sidecar.toString('utf8'))).toBe(CURRENT_ACCEPTANCE.sidecarSha256);
+      expect(JSON.parse(sidecar.toString('utf8'))).toMatchObject({ archive_sha256: CURRENT_ACCEPTANCE.archiveSha256,
+        observed_ledger_digest: CURRENT_ACCEPTANCE.ledgerDigest, archive: CURRENT_ACCEPTANCE.archive.slice(5) });
+      for (const [file, sha] of Object.entries(CURRENT_ACCEPTANCE.repositoryMeasured)) expect(digest(readFileSync(join(ROOT, file), 'utf8'))).toBe(sha);
+    });
+    it('verifies manifest lines strictly; only the disclosed live-log entry in its final state may differ', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'current-manifest-'));
+      try {
+        writeFileSync(join(dir, 'a.json'), 'a'); writeFileSync(join(dir, 'shadow.log'), 'final');
+        const live = { path: 'shadow.log', recorded: digest('partial'), final: digest('final') };
+        const manifest = `${digest('a')}  ./a.json\n${live.recorded}  ./shadow.log\n`;
+        expect(verifyManifestLines(dir, manifest, 2, live)).toBe('PASS');
+        expect(verifyManifestLines(dir, manifest, 2)).toBe('FAIL');
+        expect(verifyManifestLines(dir, manifest, 2, { ...live, final: digest('other') })).toBe('FAIL');
+        expect(verifyManifestLines(dir, `${digest('a')}  ./a.json\n${digest('final')}  ./shadow.log\n`, 2, live)).toBe('FAIL');
+        expect(verifyManifestLines(dir, manifest, 3, live)).toBe('FAIL');
+        expect(verifyManifestLines(dir, `${digest('b')}  ./a.json\n${live.recorded}  ./shadow.log\n`, 2, live)).toBe('FAIL');
+        expect(verifyManifestLines(dir, `${digest('a')}  ./a.json\n${digest('a')}  ./a.json\n`, 2)).toBe('FAIL');
+        expect(verifyManifestLines(dir, `${digest('a')}  ./../a.json\n${live.recorded}  ./shadow.log\n`, 2, live)).toBe('FAIL');
+        expect(verifyManifestLines(dir, `${digest('a')}  a.json\n${live.recorded}  ./shadow.log\n`, 2, live)).toBe('FAIL');
+        expect(verifyManifestLines(dir, `${digest('a')}  ./absent.json\n${live.recorded}  ./shadow.log\n`, 2, live)).toBe('INCOMPLETE');
+        // A changed file still FAILs when another listed file is missing, whatever the order.
+        expect(verifyManifestLines(dir, `${digest('a')}  ./absent.json\n${digest('b')}  ./a.json\n`, 2)).toBe('FAIL');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
+    it('is INCOMPLETE without the retained host evidence and FAIL on a substituted manifest, measured file, sidecar, archive or migration', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'current-acceptance-'));
+      const repo = mkdtempSync(join(tmpdir(), 'current-repository-'));
+      try {
+        expect(verifyCurrentEvidence(dir, ROOT)).toBe('INCOMPLETE');
+        // The committed manifests and the committed subset of their files are genuine; the host-only files are absent.
+        mkdirSync(join(dir, 'xfer')); mkdirSync(join(dir, 'evidence')); mkdirSync(join(dir, 'followup/evidence'), { recursive: true });
+        const copyCommitted = (from: string, to: string) => {
+          const manifest = readFileSync(join(SHADOW, from, 'evidence-sha256.txt'), 'utf8');
+          writeFileSync(join(dir, to, 'evidence-sha256.txt'), manifest);
+          for (const line of manifest.trimEnd().split('\n')) {
+            const name = line.slice(68);
+            if (existsSync(join(SHADOW, from, name))) writeFileSync(join(dir, to, name), readFileSync(join(SHADOW, from, name)));
+          }
+        };
+        copyCommitted('run-20261028T192336Z', 'evidence'); copyCommitted('followup-20261029', 'followup/evidence');
+        expect(verifyCurrentEvidence(dir, ROOT)).toBe('INCOMPLETE');
+        // Each manifest is checked by digest before any listed file is read.
+        writeFileSync(join(dir, 'followup/evidence/evidence-sha256.txt'), `${readFileSync(join(SHADOW, 'followup-20261029/evidence-sha256.txt'), 'utf8')}\n`);
+        expect(verifyCurrentEvidence(dir, ROOT)).toBe('FAIL');
+        copyCommitted('followup-20261029', 'followup/evidence');
+        // A committed file listed in a manifest, but with changed bytes, fails before the host-only files are reached.
+        writeFileSync(join(dir, 'evidence/linux-version.txt'), 'changed\n');
+        expect(verifyCurrentEvidence(dir, ROOT)).toBe('FAIL');
+        writeFileSync(join(dir, 'evidence/linux-version.txt'), readFileSync(join(SHADOW, 'run-20261028T192336Z/linux-version.txt')));
+        expect(verifyCurrentEvidence(dir, ROOT)).toBe('INCOMPLETE');
+        // The disclosed live log is accepted only in its final state.
+        writeFileSync(join(dir, 'evidence/shadow.log'), 'still being written\n');
+        expect(verifyCurrentEvidence(dir, ROOT)).toBe('FAIL');
+        writeFileSync(join(dir, 'evidence/shadow.log'), readFileSync(join(SHADOW, 'run-20261028T192336Z/shadow.log')));
+        // Sidecar and archive: the genuine sidecar alone is INCOMPLETE; a wrong archive or changed sidecar FAILs.
+        const sidecar = 'afldb_prod-20261028T192336Z.provenance.json';
+        const realSidecar = readFileSync(join(SHADOW, 'run-20261028T192336Z', sidecar));
+        expect(verifyCurrentCapture(dir)).toBe('INCOMPLETE');
+        writeFileSync(join(dir, 'xfer', sidecar), realSidecar);
+        expect(verifyCurrentCapture(dir)).toBe('INCOMPLETE');
+        writeFileSync(join(dir, 'xfer/afldb_prod-20261028T192336Z.dump'), 'not the archive');
+        expect(verifyCurrentCapture(dir)).toBe('FAIL');
+        expect(verifyCurrentEvidence(dir, ROOT)).toBe('FAIL');
+        rmSync(join(dir, 'xfer/afldb_prod-20261028T192336Z.dump'));
+        writeFileSync(join(dir, 'xfer', sidecar), `${realSidecar.toString('utf8')} `);
+        expect(verifyCurrentCapture(dir)).toBe('FAIL');
+        // A migration that differs from the pinned canonical-LF checksum is refused before any host evidence is read.
+        mkdirSync(join(repo, 'src/db/migrations'), { recursive: true });
+        for (const name of Object.keys(CURRENT_ACCEPTANCE.migrations)) {
+          writeFileSync(join(repo, 'src/db/migrations', name), readFileSync(join(ROOT, 'src/db/migrations', name)));
+        }
+        mkdirSync(join(repo, 'docs/v2/evidence/current-production-shadow/followup-20261029'), { recursive: true });
+        for (const file of Object.keys(CURRENT_ACCEPTANCE.repositoryMeasured)) writeFileSync(join(repo, file), readFileSync(join(ROOT, file)));
+        expect(verifyCurrentEvidence(join(dir, 'absent'), repo)).toBe('INCOMPLETE');
+        writeFileSync(join(repo, 'src/db/migrations/116_brownlow_correction_receipts.sql'), '-- changed\n', { flag: 'a' });
+        expect(verifyCurrentEvidence(join(dir, 'absent'), repo)).toBe('FAIL');
+      } finally { rmSync(dir, { recursive: true, force: true }); rmSync(repo, { recursive: true, force: true }); }
+    });
+    it.each(['D-V2-UNAPPROVED-1', 'constructor', '__proto__', 'toString'])('refuses the unknown binding %s before reading any evidence', name => {
+      expect(() => runFreshAcceptance(join(tmpdir(), 'absent'), join(tmpdir(), 'never-written.json'), ROOT, name)).toThrow('Unapproved acceptance binding');
+    });
+    it('freezes both bindings and leaves the default report fields equal to the committed 2026-10-21 result', () => {
+      expect(Object.isFrozen(CURRENT_ACCEPTANCE) && Object.isFrozen(CURRENT_ACCEPTANCE.measured) && Object.isFrozen(FRESH_ACCEPTANCE.migrations)).toBe(true);
+      const committed = JSON.parse(readFileSync(join(ROOT, 'docs/v2/evidence/fresh-rehearsal-acceptance-2026-10-21.json'), 'utf8'));
+      const fresh = assessFreshAcceptance({ integrity: 'PASS', archiveSha256: FRESH_ACCEPTANCE.archiveSha256, sourceRevision: FRESH_ACCEPTANCE.sourceRevision,
+        baseline: 110, migrations: Object.keys(FRESH_ACCEPTANCE.migrations) });
+      expect(JSON.parse(JSON.stringify(fresh.binding))).toEqual(committed.binding);
+      expect(fresh.ownerApprovedSchemaDifferences).toEqual(committed.ownerApprovedSchemaDifferences);
+      expect(fresh.alternativeBrownlowEvidence).toEqual(committed.alternativeBrownlowEvidence);
+      expect(fresh.productionPrivileges).toEqual(committed.productionPrivileges);
+      expect(Object.keys(fresh)).toEqual(Object.keys(committed).filter(k => !['recomputedStrict', 'retainedOriginalParityReport', 'backendFunctional', 'backendAcceptance'].includes(k)));
+      expect('privilegesIntegration' in fresh).toBe(false);
+      // The disclosed live-log pair equals the committed final copy and the recorded manifest line.
+      expect(digest(readFileSync(join(SHADOW, 'run-20261028T192336Z/shadow.log'), 'utf8'))).toBe(CURRENT_ACCEPTANCE.disclosedManifestEntry.final);
     });
   });
   it('accepts identical rows, additive V2 tables and retained existing rows', () => {

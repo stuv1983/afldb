@@ -6,6 +6,12 @@ semantic difference was found.** The strict results of the original run are unch
 parity FAIL (3/1/1), `migrationCompatibility` FAIL, staged Brownlow INCOMPLETE, `productionDecision` NO-GO.
 No acceptance is recorded and no binding was added. **Production remains NO-GO.**
 
+> **Approved, 2026-10-29:** the owner approved the three §9 decisions exactly as scoped, with their limits
+> (D-V2-CURRENT-REHEARSAL-1, D-V2-CURRENT-SCHEMA-1, D-V2-BROWNLOW-ALT-3; migration evidence for `a4641ca0…`
+> only). They are recorded, and bound in `tools/v2/fresh-rehearsal-acceptance.ts`, in
+> [the owner decision record](owner-decision-current-rehearsal-2026-10-29.md). The measured run of that binding
+> over the retained evidence is still pending. This record is kept as written. Production remains NO-GO.
+
 Executed under the owner's approval D-V2-CURRENT-SHADOW-FOLLOWUP-1 (Claude Code session, 2026-10-29 AEDT). It
 completes the bounded follow-up recommended in [the shadow report](current-production-shadow-2026-10-29.md) §9.
 Starting HEAD `33547c26` on `v2/rebuild`.
@@ -322,6 +328,9 @@ only. No database item needed a re-run.
    file, not verified (§1).
 
 ## 9. Proposed archive-bound acceptance (for owner decision; NOT approved, nothing bound in code)
+
+> **APPROVED 2026-10-29 exactly as scoped below** and bound in code since; see
+> [the owner decision record](owner-decision-current-rehearsal-2026-10-29.md). The text below is kept as proposed.
 
 ### Binding for all three decisions
 

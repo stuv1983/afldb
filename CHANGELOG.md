@@ -15,6 +15,35 @@ commit.
 
 ## [Unreleased]
 
+### Current-production rehearsal acceptance: three archive-bound decisions approved and bound (2026-10-29; production NO-GO)
+
+- The owner approved D-V2-CURRENT-REHEARSAL-1, D-V2-CURRENT-SCHEMA-1 and D-V2-BROWNLOW-ALT-3 exactly as
+  scoped in the follow-up record §9. They accept migration evidence for archive `a4641ca0…` only, 110 through
+  exactly 111–117. They grant no production release, schema or grant change, Brownlow publication or
+  operational acceptance. The recorded limits are accepted as stated:
+  - unattributed +18 drift;
+  - stored ACLs only, without ownership or effective permissions;
+  - PUBLIC EXECUTE on the receipt function;
+  - no end-of-run data remeasurement;
+  - stored reports, not API reconciliation;
+  - privileges integration 42/43, **not waived**.
+- `tools/v2/fresh-rehearsal-acceptance.ts` gains a second binding, `CURRENT_ACCEPTANCE`, selected only by
+  `--binding D-V2-CURRENT-REHEARSAL-1`. The original `7fefcd9b…` binding stays the default and is unchanged.
+  The new verifier re-hashes:
+  - the archive, with its sidecar fields;
+  - both pinned manifests, file by file; only the disclosed `shadow.log` pair may differ;
+  - every named measured result;
+  - the seven migrations.
+
+  ALT-3 accepts the focused checks only exactly as measured, and the report carries the privileges FAIL as
+  `waived: false`. Unknown, prototype-named or substituted bindings are refused, and the bindings are frozen.
+  30 new regression cases; `v2-shadow-parity` 201/201, typecheck and lint pass. One independent review found no
+  CRIT/HIGH; its two MED and four LOW were corrected before commit.
+- Not yet measured: the binding has not been run over the retained host evidence. A local run over the
+  committed subset reports INCOMPLETE/FAIL, as it should. The next decision, D-V2-CURRENT-ACCEPTANCE-RUN-1, is
+  prepared in `docs/v2/owner-decision-current-rehearsal-2026-10-29.md` §8.
+- The `docs/v2/known-gaps.md` summary is reconciled from its rows: 35 total / 19 closed / 16 open.
+
 ### Current-production shadow follow-up: the missing evidence produced; nothing accepted (2026-10-29; production NO-GO)
 
 - Under D-V2-CURRENT-SHADOW-FOLLOWUP-1 the stopped streamanator cluster was restarted once, on the retained
