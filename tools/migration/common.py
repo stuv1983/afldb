@@ -1924,7 +1924,7 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str, *,
             # code's separate derived-score UPDATE computed home_score/away_score/margin as NULL for
             # the same match and failed on their NOT NULL (migration 003). Merging only ADDS
             # values, so every match refused here also failed before, whichever single row the
-            # old join picked. Census section 4 (issues/open/AFLDB-ISSUE-267-269-override-census.sql)
+            # old join picked. Census section 4 (issues/closed/AFLDB-ISSUE-267-269-override-census.sql)
             # runs this same evaluation; keep the two in step.
             cur.execute("WITH " + merged_overrides_cte + """
                 SELECT m.match_key,
