@@ -400,6 +400,17 @@ with patch.dict(os.environ, {
             check_raises("9b refuses " + name, exporter.BridgeExportError, exporter.resolve_target_dsn, "isolated", None)
     with patch.dict(os.environ, {"AFLDB_V2_ISOLATED_PG": "0"}):
         check_raises("9c refuses absent runner", exporter.BridgeExportError, exporter.resolve_target_dsn, "isolated", None)
+    # The guarded cluster's port is whatever the runner declares (55433 on the workstation, a
+    # dedicated port on a Linux verification host), never a literal; the DSN must still match it.
+    with patch.dict(os.environ, {"AFLDB_V2_ISOLATED_PORT": "55461",
+                                 "AFLDB_TEST_DATABASE_URL": "postgresql://fixture@127.0.0.1:55461/afldb_v2_contract_test"}):
+        check("9d the runner-declared port is admitted", exporter.resolve_target_dsn("isolated", None)[0].endswith("/afldb_v2_contract_test"))
+        with patch.dict(os.environ, {"AFLDB_TEST_DATABASE_URL": "postgresql://fixture@127.0.0.1:55432/afldb_v2_contract_test"}):
+            check_raises("9e refuses a DSN port other than the runner's", exporter.BridgeExportError, exporter.resolve_target_dsn, "isolated", None)
+    for port in ("5432", "80", "not-a-port", ""):
+        with patch.dict(os.environ, {"AFLDB_V2_ISOLATED_PORT": port,
+                                     "AFLDB_TEST_DATABASE_URL": f"postgresql://fixture@127.0.0.1:{port or '55432'}/afldb_v2_contract_test"}):
+            check_raises(f"9f refuses runner port {port!r}", exporter.BridgeExportError, exporter.resolve_target_dsn, "isolated", None)
 
 print()
 if failures:

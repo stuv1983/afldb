@@ -311,6 +311,19 @@ def build_source_evidence(contract: dict, *, label: str, snapshot_root: Path | N
 # --resolve-against (read-only, rolled-back registration export)
 # ---------------------------------------------------------------------------
 
+def isolated_run_port() -> int | None:
+    """The isolated cluster's port when this is an isolated run (AFLDB_V2_ISOLATED_PG=1 and a valid
+    unprivileged AFLDB_V2_ISOLATED_PORT other than 5432, as tools/v2/isolated-pg.ts run sets them),
+    else None. Mirrors isolatedRunPort() in tools/db/rebuild-test.ts: the cluster is not always on
+    55432 (the Windows workstation runs it on 55433, the Linux verification on its own port)."""
+    import os
+    port_text = os.environ.get("AFLDB_V2_ISOLATED_PORT", "")
+    if os.environ.get("AFLDB_V2_ISOLATED_PG") != "1" or not re.fullmatch(r"[0-9]{4,5}", port_text):
+        return None
+    port = int(port_text)
+    return port if 1024 <= port <= 65535 and port != 5432 else None
+
+
 def resolve_target_dsn(target: str, dsn_env_override: str | None) -> tuple[str, str]:
     """Return (dsn, required_db_name). A test may override the env var name that carries
     the DSN (--dsn-env) so it can point resolution at an isolated _test database without
@@ -328,10 +341,10 @@ def resolve_target_dsn(target: str, dsn_env_override: str | None) -> tuple[str, 
         raise BridgeExportError(f"{env_name} is not set -- refusing to resolve against {target!r}")
     if target == "isolated":
         parsed = urlparse(dsn)
-        if (os.environ.get("AFLDB_V2_ISOLATED_PG") != "1"
+        port = isolated_run_port()
+        if (port is None
                 or parsed.hostname not in ("127.0.0.1", "::1", "localhost")
-                or parsed.port != 55432
-                or os.environ.get("AFLDB_V2_ISOLATED_PORT") != "55432"
+                or parsed.port != port
                 or not re.fullmatch(r"afldb_v2_[a-z0-9_]+_test", parsed.path.lstrip("/"))
                 or parsed.query or parsed.fragment):
             raise BridgeExportError("REFUSED: isolated bridge target must be the guarded local V2 test cluster")
@@ -387,7 +400,7 @@ def read_target_registration(dsn: str) -> dict[str, int]:
                 db, cluster, marker, host, port = cur.fetchone()
                 if (db != urlparse(dsn).path.lstrip("/")
                         or cluster != "afldb_v2_isolated" or marker != "afldb-v2-isolated-test"
-                        or host not in ("127.0.0.1", "::1") or port != 55432):
+                        or host not in ("127.0.0.1", "::1") or port != isolated_run_port()):
                     raise BridgeExportError("REFUSED: isolated cluster identity or database marker mismatch")
             cur.execute("SELECT current_setting('transaction_read_only'), "
                         "current_setting('default_transaction_read_only')")
