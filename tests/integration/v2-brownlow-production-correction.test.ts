@@ -21,6 +21,10 @@ import { loadSeasonRegistry } from '@/lib/seasons/sealed-seasons';
 import { loadSnapshot } from '../../tools/current-season/settle-afl-api-brownlow';
 
 const DB = 'afldb_v2_brownlow_policy_final_test';
+// Each case re-fingerprints 22 tables, player_match_stats included, several times. On the workstation WSL the slowest
+// case takes about 156 s; on the Linux verification host the suite runs about 2.7x slower, past the old 120-240 s
+// budgets. One timed-out case leaves the shared clone part-changed and the rest then fail. No assertion depends on this.
+const CASE_BUDGET_MS = 600_000;
 const sql = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1, onnotice: () => {} });
 const executor = postgresExecutor(sql);
 const revision = 'a'.repeat(40); // synthetic approval; NEVER a production execution authority
@@ -66,7 +70,7 @@ describe.sequential('guarded Brownlow production entry logic on a dedicated isol
     try { await expect(apply(backfill)).rejects.toThrow(/baseline drift/); }
     finally { await sql`UPDATE brownlow_round_votes SET imported_at = imported_at - interval '1 second' WHERE id = ${r.id}`; }
     expect(await correctionBaseline(executor)).toBe(before);
-  }, 180_000);
+  }, CASE_BUDGET_MS);
 
   it('rolls a failed backfill back, then applies/replays/reverses preserving all vote values and provenance', async () => {
     const before = await raw();
@@ -87,7 +91,7 @@ describe.sequential('guarded Brownlow production entry logic on a dedicated isol
     await apply(reverse);
     expect((await apply(reverse) as { replay: boolean }).replay).toBe(true);
     expect((await sql`SELECT count(*)::int AS n FROM brownlow_round_votes WHERE season = 2025 AND match_id IS NOT NULL`)[0].n).toBe(0);
-  }, 180_000);
+  }, CASE_BUDGET_MS);
 
   it('adopts exactly 621 positives, preserves 8901 zero rows, replays and reverses; refuses subsequent-write reversal', async () => {
     adoption = await plan({ operation: 'adopt', seasons: [2025] });
@@ -113,14 +117,14 @@ describe.sequential('guarded Brownlow production entry logic on a dedicated isol
     const reverse = await plan({ operation: 'reverse-adopt', seasons: [2025], reversal: { originalPlanDigest: adoption.digest, export: exported } });
     await apply(reverse);
     expect(await raw()).toBe(before);
-  }, 180_000);
+  }, CASE_BUDGET_MS);
 
   it('refuses premature issue resolution and unapproved or ambiguous eligibility', async () => {
     await expect(plan({ operation: 'resolve', seasons: [2025], issueIds: [999999999], resolution: 'Synthetic issue resolution must never be accepted' })).rejects.toThrow();
     await expect(plan({ operation: 'eligibility', seasons: [2025], actorId: 1, rulings: [{ playerId: 12446,
       identity: 'afltables:players/T/Somebody_Else.html', verdict: 'ineligible', citation: 'https://www.afl.com.au/news/1427225',
       note: 'Synthetic wrong identity refusal, not an approved ruling', expectedCurrentDecisionId: null }] })).rejects.toThrow(/identity/);
-  }, 120_000);
+  }, CASE_BUDGET_MS);
 
   it('records and replays an authentic observe-only snapshot in the outer transaction', async () => {
     const root = process.env.AFLDB_BROWNLOW_REHEARSAL_SOURCE_ROOT;
@@ -146,7 +150,7 @@ describe.sequential('guarded Brownlow production entry logic on a dedicated isol
     await applyBrownlowCorrection(executor, p, approval(p), { ...context(), observe });
     expect((await applyBrownlowCorrection(executor, p, approval(p), { ...context(), observe }) as { replay: boolean }).replay).toBe(true);
     expect(await raw()).toBe(before);
-  }, 180_000);
+  }, CASE_BUDGET_MS);
 
   it('rolls all eligibility decisions/publication back on partial failure, then records an approved subset through the audited service', async () => {
     const [actor] = await sql`INSERT INTO auth_users (email, role) VALUES ('brownlow-package-synthetic@example.invalid', 'super_admin') RETURNING id`;
@@ -169,7 +173,7 @@ describe.sequential('guarded Brownlow production entry logic on a dedicated isol
     const decisions = await sql`SELECT verdict,basis FROM brownlow_eligibility_decisions WHERE decided_by = ${actor.id}`;
     expect(decisions).toHaveLength(2);
     expect(decisions.every((d) => d.verdict === 'ineligible' && d.basis === 'audited_correction')).toBe(true);
-  }, 180_000);
+  }, CASE_BUDGET_MS);
 
   it('resolves only a genuinely healed ownership issue, atomically with its receipt and with replay', async () => {
     await apply(await plan({ operation: 'backfill', seasons: [2025] }));
@@ -191,7 +195,7 @@ describe.sequential('guarded Brownlow production entry logic on a dedicated isol
     await apply(p);
     expect((await apply(p) as { replay: boolean }).replay).toBe(true);
     expect((await sql`SELECT resolved_at FROM data_issues WHERE id = ${issue.id}`)[0].resolved_at).not.toBeNull();
-  }, 240_000);
+  }, CASE_BUDGET_MS);
 
   it('requires a fresh restored baseline and re-proves live identity before a historical-only correction', async () => {
     const baselineDigest = await correctionBaseline(executor);
@@ -214,5 +218,5 @@ describe.sequential('guarded Brownlow production entry logic on a dedicated isol
     await expect(sql`UPDATE brownlow_correction_receipts SET operation = operation`).rejects.toThrow(/append-only/);
     await expect(sql`DELETE FROM brownlow_correction_receipts WHERE false`).rejects.toThrow(/append-only/);
     await expect(sql`TRUNCATE brownlow_correction_receipts`).rejects.toThrow(/append-only/);
-  }, 240_000);
+  }, CASE_BUDGET_MS);
 });
