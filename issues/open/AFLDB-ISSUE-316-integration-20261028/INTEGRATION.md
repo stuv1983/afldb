@@ -70,6 +70,7 @@ fixture uses synthetic dates. None needs adaptation.
 Readiness, apply, activation, the recovery dry run and this integration executed no further rebuild and not the 91 SQL
 checks; none was required (D/P acceptance 2026-10-25). Remaining release verification, not run: integration suites other
 than the GAP-027 case against the integrated State C tree (the accepted matrix was DB-free), and Linux execution of that tree.
+_Done 2026-10-28: both, in §4.2 (fresh Linux verification; no rebuild)._
 
 _Corrected 2026-10-28: this section first read "Not proven anywhere: the 91 SQL checks of the activated state, any successor
 database rebuild, and integration suites against State C". That omitted the accepted J2 rebuild, which ran both._
@@ -114,6 +115,22 @@ listener left on 55433. The template and every other retained database were only
 
 Not covered by these checks (remaining release verification, §3): Linux execution and the other integration suites against
 State C.
+
+### 4.2 Linux execution and the other integration suites (2026-10-28; owner-authorised; fresh verification, not a rebuild)
+
+Done on streamanator; see [`docs/v2/linux-verification-2026-10-28.md`](../../../docs/v2/linux-verification-2026-10-28.md).
+
+- **Trees and target.** The integrated tree `c39d2130` and the corrected `c3dea709` were verified blob for blob.
+  The cluster was a new isolated one, `afldb_v2_isolated` on 127.0.0.1:55461. The databases were disposable clones
+  of the approved test baseline `afldb_v2_rb_final_test`, migrated to 117.
+- **Full workflow.** At `c39d2130`: 14,856 / 7 / 63. At `c3dea709`: **14,860 / 3 / 63**, plus Coleman 28/28.
+  The 3 remaining failures are the V2-GAP-029 Gridley gates.
+- **Ported files (S1F, Linux).** `settle-afl-api` 74/74 (including the GAP-027 case),
+  `afl-api-settle-cli-gate` 76/76, `admin-current-season-settle` 58/58, `v2-admin-operations` 95/95,
+  `v2-admin-operations-ui` 99/99, `v2-shadow-parity` 171/171, `season-rollover` 396/396 and
+  `db-test-rebuild` 1,155/1,155.
+- **Not run.** The Brownlow dedicated-clone suites and the opt-in suites.
+- **Not touched.** EXEC, P/H, authorities and the retained proof roots. J2 was not re-run.
 
 ## 5. Selective Git integration proposal (operator-executed; not run)
 

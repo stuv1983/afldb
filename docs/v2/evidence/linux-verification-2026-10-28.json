@@ -1,0 +1,714 @@
+{
+ "generated": "2026-10-28",
+ "kind": "fresh Linux verification of integrated V2 code (not a rebuild; J2 2026-10-24 rebuild evidence carried forward, not re-run)",
+ "productionRelease": "NO-GO",
+ "source": {
+  "tested": {
+   "commit": "c39d21305b7cdf3f0bf5ae5c9bd7a7dc8947c763",
+   "tree": "1510c67d753afb040a321fb1449efe8a170d84d9"
+  },
+  "corrected": {
+   "commit": "c3dea70908f7cb69f019a6e8e0af536d52e7a85a",
+   "tree": "0d47903271b817869f466e107014f645b3cb05a0",
+   "commits": [
+    "26a089a7496355d1d72a6a60852a91751bd9321c",
+    "a0c87fb5b56bf795769a3a7446dae90cc1198c0b",
+    "c3dea70908f7cb69f019a6e8e0af536d52e7a85a"
+   ]
+  },
+  "preGap032": {
+   "commit": "b91e44b3f030ae742390f64ee3bf12be5e973c36",
+   "tree": "be6feac886f8715e1c2fcfaac52bfb27a862077d"
+  },
+  "treeVerification": "every blob id and mode against git ls-tree; 2937/2937, bad 0, no extras, for each tree",
+  "fileManifests": {
+   "c39d2130": "26ab0dc88b5e04a2040d91557bb285521df349937210609473006c701fe0b1ce",
+   "c3dea709": "593859481b0bb950ccb68895808330ae7ed2a26f892f55b80e3882b765580116",
+   "patchedFiles": "e58eaa1ceb30c4c700894d88e7e4287c445f24296bbfef05cfe8b2f6366ad98a"
+  },
+  "uploads": {
+   "src-c39d2130.tar": "5b4d7962f9c50f67eafab45774cfe19927217d59e88a4d695819c25e8851c490",
+   "src-b91e44b3.tar": "79cbbc9bf9334644d93bb69dbf532d244dfd9b4b86613f1084cd43bb97ff1998",
+   "src-c3dea709.tar": "646115e952b501b15b01d47b849fa3c42a68113679d3ef38d8885159fbece00e",
+   "inputs.tar": "42822c7590a05e4ff8dc2066d33fbee0d7bdbc48b626099c5603b363607dac42",
+   "pglite.tar": "d6140e770c03c9e993a105530b9d56a034ed7b4829319a8a2b1bd0186290f8a4",
+   "baseline-rb_final.dump": "659e471beb990aecfb276c13a010630e02d50184d2b121c0e0ae2497a819345f",
+   "draftguru-final.json": "bdb150f94a605e64574137ff26f44f4d82946ebac15b754b7d703f33461c34ff"
+  }
+ },
+ "runtime": {
+  "host": "streamanator",
+  "os": "Ubuntu 24.04.5 LTS",
+  "kernel": "6.8.0-147-generic",
+  "cores": 24,
+  "node": "v22.23.2",
+  "nodeSha256": "3517c2df0b2f8cd7f422b4b8450ef81c6889f08eb03e281d6de9079b15e6a327",
+  "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "python": "3.12.3",
+  "vitest": "4.1.10",
+  "next": "16.3.1",
+  "playwright": "1.62.1"
+ },
+ "database": {
+  "cluster": "afldb_v2_isolated",
+  "listen": "127.0.0.1:55461",
+  "marker": "afldb-v2-isolated-test",
+  "baseline": {
+   "source": "afldb_v2_rb_final_test (approved local test baseline, PG 16.14, ledger 115)",
+   "dumpBytes": 20555339,
+   "dumpSha256": "659e471beb990aecfb276c13a010630e02d50184d2b121c0e0ae2497a819345f"
+  },
+  "base": "afldb_v2_rb_lvbase_test (restored, analysed, migrations 116-117 -> ledger 117, privileges)",
+  "disposable": [
+   "afldb_v2_rb_lvfull_test",
+   "afldb_v2_lvschema_test",
+   "afldb_v2_rb_lvnl_test",
+   "afldb_v2_rb_lvui_test",
+   "afldb_v2_rb_lvfocus_test",
+   "afldb_v2_rb_lvgap029_test",
+   "afldb_v2_rb_lvfinal_test",
+   "afldb_v2_lvschemafinal_test"
+  ],
+  "rolesSuperuser": false
+ },
+ "check1_suites": {
+  "s1_c39d2130": {
+   "files": 303,
+   "total": 14926,
+   "passed": 14856,
+   "failed": 7,
+   "skipped": 63,
+   "success": false,
+   "failedOrRefusedFiles": {
+    "tests/integration/data-editor.test.ts": {
+     "passed": 49,
+     "failed": 2,
+     "skipped": 1,
+     "status": "failed"
+    },
+    "tests/integration/draftguru-import.test.ts": {
+     "passed": 23,
+     "failed": 1,
+     "skipped": 0,
+     "status": "failed"
+    },
+    "tests/integration/gridley-corpus.test.ts": {
+     "passed": 1207,
+     "failed": 3,
+     "skipped": 0,
+     "status": "failed"
+    },
+    "tests/integration/gridley-height-oracle.test.ts": {
+     "passed": 58,
+     "failed": 1,
+     "skipped": 1,
+     "status": "failed"
+    },
+    "tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts": {
+     "passed": 0,
+     "failed": 0,
+     "skipped": 3,
+     "status": "failed"
+    },
+    "tests/integration/v2-brownlow-production-correction.test.ts": {
+     "passed": 0,
+     "failed": 0,
+     "skipped": 8,
+     "status": "failed"
+    }
+   },
+   "failedTests": [
+    "tests/integration/data-editor.test.ts :: AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period a score component neither the source nor the override records is refused, never written as zero",
+    "tests/integration/data-editor.test.ts :: AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period a component the source lacks but another active group supplies is derived from the merge: the replay succeeds and census section 4 agrees",
+    "tests/integration/draftguru-import.test.ts :: DraftGuru supported importer (afldb_test) bridge interface export_person_bridge --resolve-against withholds an unregistered identity, and the filtered deployment dataset imports with 0 HALTs",
+    "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode",
+    "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells",
+    "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode",
+    "tests/integration/gridley-height-oracle.test.ts :: Gridley corpus fixture carries a non-empty answer key for every one of the 10,287 cells"
+   ],
+   "sha256": "3f1f6d3a55e3f2ffe717908e57f4c64c5435b23aebeb3412d67ef57840ab6ae9"
+  },
+  "s2_c39d2130": {
+   "files": 1,
+   "total": 28,
+   "passed": 28,
+   "failed": 0,
+   "skipped": 0,
+   "success": true,
+   "failedOrRefusedFiles": {},
+   "failedTests": [],
+   "sha256": "0abde87139d5882465635fbbe0f837c69dcae2d8b78a075f07e90398d36bf86d"
+  },
+  "focused_patched": {
+   "f1_gridley": {
+    "files": 3,
+    "total": 1329,
+    "passed": 1322,
+    "failed": 6,
+    "skipped": 1,
+    "success": false,
+    "failedOrRefusedFiles": {
+     "tests/gridley-compat.test.ts": {
+      "passed": 58,
+      "failed": 1,
+      "skipped": 0,
+      "status": "failed"
+     },
+     "tests/integration/gridley-corpus.test.ts": {
+      "passed": 1206,
+      "failed": 4,
+      "skipped": 0,
+      "status": "failed"
+     },
+     "tests/integration/gridley-height-oracle.test.ts": {
+      "passed": 58,
+      "failed": 1,
+      "skipped": 1,
+      "status": "failed"
+     }
+    },
+    "failedTests": [
+     "tests/gridley-compat.test.ts :: Gridley corpus fixture carries a non-empty answer key for every one of the 10,287 cells",
+     "tests/integration/gridley-corpus.test.ts :: Gridley corpus fixture carries a non-empty answer key for every one of the 10,287 cells",
+     "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode",
+     "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells",
+     "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode",
+     "tests/integration/gridley-height-oracle.test.ts :: Gridley corpus fixture carries a non-empty answer key for every one of the 10,287 cells"
+    ],
+    "sha256": "d69a6863c4b49f04d540ae7f70e39630234846301708d1cc7a14122d01139277"
+   },
+   "f2_draftguru_dataeditor": {
+    "files": 2,
+    "total": 76,
+    "passed": 75,
+    "failed": 0,
+    "skipped": 1,
+    "success": true,
+    "failedOrRefusedFiles": {},
+    "failedTests": [],
+    "sha256": "1adf7fd41c1c3f9fa6e2b9d21a97358413d954b244e6ee47658d57552f445bb5"
+   },
+   "f3_height_oracle": {
+    "files": 1,
+    "total": 60,
+    "passed": 59,
+    "failed": 0,
+    "skipped": 1,
+    "success": true,
+    "failedOrRefusedFiles": {},
+    "failedTests": [],
+    "sha256": "e9689af1d69ae0581fefbfc416be7897c6168839ea1674787a6f9c11db40432b"
+   }
+  },
+  "s1f_c3dea709": {
+   "files": 303,
+   "total": 14926,
+   "passed": 14860,
+   "failed": 3,
+   "skipped": 63,
+   "success": false,
+   "failedOrRefusedFiles": {
+    "tests/integration/gridley-corpus.test.ts": {
+     "passed": 1207,
+     "failed": 3,
+     "skipped": 0,
+     "status": "failed"
+    },
+    "tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts": {
+     "passed": 0,
+     "failed": 0,
+     "skipped": 3,
+     "status": "failed"
+    },
+    "tests/integration/v2-brownlow-production-correction.test.ts": {
+     "passed": 0,
+     "failed": 0,
+     "skipped": 8,
+     "status": "failed"
+    }
+   },
+   "failedTests": [
+    "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode",
+    "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells",
+    "tests/integration/gridley-corpus.test.ts :: Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode"
+   ],
+   "sha256": "f0958645b802e81c2d63710041ae6674a1625c9eb923eda866c18e1be07ab746"
+  },
+  "s2f_c3dea709": {
+   "files": 1,
+   "total": 28,
+   "passed": 28,
+   "failed": 0,
+   "skipped": 0,
+   "success": true,
+   "failedOrRefusedFiles": {},
+   "failedTests": [],
+   "sha256": "3a27a4ce9615f6f61fb599deb29106a8d17a0d519212e8376aa53d13eb515361"
+  },
+  "gap029": {
+   "unreplayedBase": {
+    "strict": 172,
+    "approved": 99,
+    "unapproved": 73,
+    "sha256": "4fdf872e20e302cf37b52c027279090709d185c1f8b1bcbca95bdcdc20ed1532"
+   },
+   "afterRookieReplay": {
+    "strict": 149,
+    "approved": 99,
+    "unapproved": 50,
+    "sha256": "4e44aeb58b15a6e5e1c33a165c0cfa58c2d5bc88de9c21573ca5a6e5d5d36178"
+   },
+   "acceptedReference": "docs/v2/evidence/gap-029-acceptance-strict.json (149/99/50)",
+   "afterReplayIdenticalToReference": true
+  }
+ },
+ "check2_nl": {
+  "probe": {
+   "head": "7c893e4487b7c5dc7c48c8b887a62c120f215f24ed602a605c38ced9f9a4622b",
+   "pre032": "cf8dd38c580ecbdca1d650bbc25668fa3b8d19a53803dae75742e0969bbb36fa"
+  },
+  "stress": {
+   "v5-head": {
+    "parserVersion": 67,
+    "inputRows": 12000,
+    "auditRequired": 0,
+    "scored": 12000,
+    "clean": 12000,
+    "soft": 0,
+    "failed": 0,
+    "byClass": {},
+    "sha256": "e979dc3bd07fffd0659899a9bfc499de4c20f92efe99128d7f93e88c547952db"
+   },
+   "v5-pre032": {
+    "parserVersion": 66,
+    "inputRows": 12000,
+    "auditRequired": 0,
+    "scored": 12000,
+    "clean": 12000,
+    "soft": 0,
+    "failed": 0,
+    "byClass": {},
+    "sha256": "5abafec60f9e99462f76a2f2d95180457dc74187dabc3295a0be4dd24d202d57"
+   },
+   "v6-head": {
+    "parserVersion": 67,
+    "inputRows": 12000,
+    "auditRequired": 0,
+    "scored": 12000,
+    "clean": 11997,
+    "soft": 0,
+    "failed": 3,
+    "byClass": {
+     "WRONG_TIE_COUNT": 3
+    },
+    "sha256": "38c9b2e72a839dd7d60c693838b17a1b0beb92560331950a84770fee2c3d70b9"
+   },
+   "v6-pre032": {
+    "parserVersion": 66,
+    "inputRows": 12000,
+    "auditRequired": 0,
+    "scored": 12000,
+    "clean": 11997,
+    "soft": 0,
+    "failed": 3,
+    "byClass": {
+     "WRONG_TIE_COUNT": 3
+    },
+    "sha256": "984935bf7348bc0a6712db86562eba2789a8fec5605b57addb5d68f6ac409ac3"
+   },
+   "xv1-head": {
+    "parserVersion": 67,
+    "inputRows": 29030,
+    "auditRequired": 1500,
+    "scored": 27530,
+    "clean": 19761,
+    "soft": 6654,
+    "failed": 1115,
+    "byClass": {
+     "UNEXPECTED_DECLINE": 6654,
+     "WRONG_RESULT_SIDE": 569,
+     "WRONG_CLUB": 569,
+     "WRONG_OPPONENT": 569,
+     "DROPPED_FILTER": 1092
+    },
+    "sha256": "171447eb2877863ebc4bfd32e079be677b6eb809a3930a9a540d53127bafe9a8"
+   },
+   "xv1-pre032": {
+    "parserVersion": 66,
+    "inputRows": 29030,
+    "auditRequired": 1500,
+    "scored": 27530,
+    "clean": 19761,
+    "soft": 6654,
+    "failed": 1115,
+    "byClass": {
+     "UNEXPECTED_DECLINE": 6654,
+     "WRONG_RESULT_SIDE": 569,
+     "WRONG_CLUB": 569,
+     "WRONG_OPPONENT": 569,
+     "DROPPED_FILTER": 1092
+    },
+    "sha256": "20e356fb27de020f0680f9eafcb68eb99af6905e18bc5e4568cc8bc2c417c076"
+   },
+   "xv2c-head": {
+    "parserVersion": 67,
+    "inputRows": 29030,
+    "auditRequired": 1500,
+    "scored": 27530,
+    "clean": 20876,
+    "soft": 6654,
+    "failed": 0,
+    "byClass": {
+     "UNEXPECTED_DECLINE": 6654
+    },
+    "sha256": "5fa094aa63c550cbb342c1e6f16141e5f8b775c94a26ac5518ccf1aadbbd5793"
+   },
+   "xv2c-pre032": {
+    "parserVersion": 66,
+    "inputRows": 29030,
+    "auditRequired": 1500,
+    "scored": 27530,
+    "clean": 20876,
+    "soft": 6654,
+    "failed": 0,
+    "byClass": {
+     "UNEXPECTED_DECLINE": 6654
+    },
+    "sha256": "f0603c68c3fd6aaed6048035916ae266c9606064d8494a54a9bb138247448527"
+   }
+  },
+  "rowDiffHeadVsPre032": {
+   "v5": {
+    "changed": 0,
+    "byCategory": {}
+   },
+   "v6": {
+    "changed": 0,
+    "byCategory": {}
+   },
+   "xv1": {
+    "changed": 151,
+    "byCategory": {
+     "malformed_input | head=decline/unsupported_term pre=success": 121,
+     "relationship_conditions | head=decline/coverage_unavailable pre=success": 23,
+     "relationship_conditions | head=decline/coverage_unavailable pre=no_results": 6,
+     "malformed_input | head=decline/unsupported_term pre=no_results": 1
+    }
+   },
+   "xv2c": {
+    "changed": 151,
+    "byCategory": {
+     "malformed_input | head=decline/unsupported_term pre=success": 121,
+     "relationship_conditions | head=decline/coverage_unavailable pre=success": 23,
+     "relationship_conditions | head=decline/coverage_unavailable pre=no_results": 6,
+     "malformed_input | head=decline/unsupported_term pre=no_results": 1
+    }
+   }
+  },
+  "v6TieRows": "rows 41-43: V2 data ends 2025 (Rampe 23 finals, Dal Santo 24); DEV key is a 2026 tie at 24"
+ },
+ "check3_ui": {
+  "playwright": "20/20 passed",
+  "corpusRows": 1844,
+  "corpusSha256": "e0fde997a68f202cce0a494f66843d97d67bfc66606fb9a5d79f456ea67080f0",
+  "summary": {
+   "total": 1844,
+   "pass": 1815,
+   "fail": 29,
+   "unscored": 0,
+   "byOutcome": {
+    "answered": 1668,
+    "unanswerable": 112,
+    "absent": 64,
+    "http_error": 0,
+    "page_error": 0
+   },
+   "failuresByCategory": [
+    [
+     "user_player_career",
+     27
+    ],
+    [
+     "rel_decline_family_grain",
+     1
+    ],
+    [
+     "rel_decline_family_size",
+     1
+    ]
+   ],
+   "metamorphic": 0,
+   "clientErrors": 0
+  },
+  "failures": [
+   {
+    "id": "user_1122",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1125",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1128",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1131",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1134",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1137",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1140",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1143",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1146",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1149",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1152",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1155",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1158",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1161",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1164",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1167",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1170",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1173",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1176",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1179",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1182",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1185",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1188",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1191",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1194",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1197",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "user_1200",
+    "category": "user_player_career",
+    "expected": "plan",
+    "outcome": "unanswerable"
+   },
+   {
+    "id": "rel_dec_001",
+    "category": "rel_decline_family_grain",
+    "expected": "decline",
+    "outcome": "answered"
+   },
+   {
+    "id": "rel_dec_002",
+    "category": "rel_decline_family_size",
+    "expected": "decline",
+    "outcome": "answered"
+   }
+  ],
+  "sameAtPre032": true,
+  "summarySha256": "8a9973a695382ae965464bce979806f565e1d872c53f4af29ec4a9d0223d7c27"
+ },
+ "check4_r34": {
+  "xv2c-head": {
+   "Jnr -> 4701": 330,
+   "Snr -> 4700": 351,
+   "Snr -> none(decline/unsupported_term)": 53,
+   "Jnr -> none(decline/unsupported_term)": 51
+  },
+  "xv2c-pre032": {
+   "Jnr -> 4701": 330,
+   "Snr -> 4700": 351,
+   "Snr -> none(decline/unsupported_term)": 53,
+   "Jnr -> none(decline/unsupported_term)": 51
+  },
+  "xv1-head": {
+   "Jnr -> 4701": 330,
+   "Snr -> 4700": 351,
+   "Snr -> none(decline/unsupported_term)": 53,
+   "Jnr -> none(decline/unsupported_term)": 51
+  },
+  "database": {
+   "db": "afldb_v2_rb_lvnl_test",
+   "cluster": "afldb_v2_isolated",
+   "port": 55461
+  },
+  "identities": [
+   {
+    "id": 4700,
+    "row": {
+     "id": 4700,
+     "dob": "1961-10-01",
+     "slug": "gary-ablett",
+     "notes": null,
+     "surname": "Ablett",
+     "height_cm": 185,
+     "sort_name": "Ablett, Gary",
+     "weight_kg": null,
+     "birth_year": 1961,
+     "given_name": "Gary",
+     "search_name": "gary ablett",
+     "search_rank": 248,
+     "debut_season": 1982,
+     "display_name": "Gary Ablett",
+     "dob_disputed": false,
+     "final_season": 1996,
+     "birth_year_max": 1961,
+     "birth_year_min": 1961,
+     "dob_confidence": "sourced",
+     "dob_evidence_id": 1294,
+     "legacy_player_id": null,
+     "height_evidence_id": 5702,
+     "birth_year_confidence": "sourced"
+    },
+    "first_season": 1982,
+    "last_season": 1996,
+    "games": 248,
+    "afltables_ids": "players/G/Gary_Ablett0.html"
+   },
+   {
+    "id": 4701,
+    "row": {
+     "id": 4701,
+     "dob": "1984-05-14",
+     "slug": "gary-ablett",
+     "notes": null,
+     "surname": "Ablett",
+     "height_cm": 182,
+     "sort_name": "Ablett, Gary",
+     "weight_kg": null,
+     "birth_year": 1984,
+     "given_name": "Gary",
+     "search_name": "gary ablett",
+     "search_rank": 357,
+     "debut_season": 2002,
+     "display_name": "Gary Ablett",
+     "dob_disputed": false,
+     "final_season": 2020,
+     "birth_year_max": 1984,
+     "birth_year_min": 1984,
+     "dob_confidence": "sourced",
+     "dob_evidence_id": 1217,
+     "legacy_player_id": null,
+     "height_evidence_id": 5816,
+     "birth_year_confidence": "sourced"
+    },
+    "first_season": 2002,
+    "last_season": 2020,
+    "games": 357,
+    "afltables_ids": "players/G/Gary_Ablett1.html"
+   }
+  ]
+ },
+ "evidenceManifestSha256": "32114d7fddd0881b7fe34a9d195e3077eba45f576e7aa5522c13acdc4b8a43c6"
+}

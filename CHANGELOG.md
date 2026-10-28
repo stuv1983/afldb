@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### Linux verification of the integrated V2 code; three Linux regressions fixed (2026-10-28; not pushed, production NO-GO)
+
+- `tools/rebuild/draftguru/export_person_bridge.py` admitted an isolated target only on port 55432.
+  It now follows the runner's `AFLDB_V2_ISOLATED_PORT`, as `tools/db/rebuild-test.ts` already does,
+  and still refuses 5432, privileged ports and DSNs on any other port (`a0c87fb5`, with three new
+  contract cases).
+- `tests/integration/data-editor.test.ts` read the ISSUE-267/269 override census from
+  `issues/open/`; it moved to `issues/closed/` (`26a089a7`).
+- `tests/gridley-compat.test.ts`: the 1.5M-expectation answer-key test takes 27–35 s on Linux, so
+  it now has an explicit 120 s budget. No assertion changed (`c3dea709`).
+- Validation: on streamanator, against disposable `_test` clones of the approved test baseline,
+  the full workflow at `c3dea709` gives 14,860 passed / 3 failed (V2-GAP-029) / 63 skipped, plus
+  Coleman 28/28. PostgreSQL NL (GAP-032/033), frozen V5, the browser sweep and R34 are covered in
+  `docs/v2/linux-verification-2026-10-28.md`. New owner decision: V2-GAP-035.
+
 ### Birth-date enrichment no longer duplicates open identity-conflict issues (V2-GAP-034, ISSUE-090 D4) (2026-10-28)
 
 - `enrich_birth_dates.py` filed a new open `external_identity_conflict` data issue on every re-run

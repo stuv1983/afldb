@@ -16,10 +16,13 @@ and 021 and 028 are closed locally; 016 has its publication and 98-season eviden
 open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
 not technical inspection. Gap 026 now requires the host/production-data rehearsal, not local
 application rollback. The historical Launch F counts below are retained as history.
-Current register: **34 total / 16 closed / 18 open**, including the separately tracked strict
+Current register: **35 total / 18 closed / 17 open**, including the separately tracked strict
 historical-source/membership verification gap 029. Gap 020 was closed on 2026-10-27 as an accepted product constraint
 (owner decision). Gaps 032, 033 and 034 were found and closed locally on 2026-10-28 (the R43b NL inspection, the
-R32/ISSUE-208 cross-domain analysis and the R32/ISSUE-090 D4 item). No remaining failed test is treated as green.
+R32/ISSUE-208 cross-domain analysis and the R32/ISSUE-090 D4 item). The 2026-10-28
+[Linux verification](linux-verification-2026-10-28.md) closed 001 and 003 locally, narrowed 009 to the
+production-dump replay, and opened 035 (an owner decision on 29 UI-gate expectations). No remaining
+failed test is treated as green.
 
 `V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
 close it. A gap is marked CLOSED only when its closing evidence exists; closed entries are kept
@@ -37,15 +40,15 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 | ID | Severity | Area | Production blocker | State | Owner action |
 |---|---|---|---|---|---|
-| V2-GAP-001 | Medium | test safety | rehearsal | open, narrowed: live guarded local workflow demonstrated; supported Linux runtime remains separate acceptance evidence | approve Linux isolated-cluster verification (S-A5), not a literal-name bypass |
+| V2-GAP-001 | Medium | test safety | rehearsal | **CLOSED locally (2026-10-28, Linux)**: the full default workflow ran on streamanator with present `_test` DSNs and the strip active; no suite reached a non-`_test` database and no failure came from the strip ([Linux verification](linux-verification-2026-10-28.md)) | none |
 | V2-GAP-002 | Medium | frontend build | no | **CLOSED (Launch F)**: `npm run build` exit 0 against the isolated `afldb_v2_visual_test`, telemetry disabled | none |
-| V2-GAP-003 | Medium | environment | rehearsal | open, narrowed (Launch F): integration suites ran on Windows against isolated PG16; Linux/POSIX still unexercised | approve the Linux suite run (§7) |
+| V2-GAP-003 | Medium | environment | rehearsal | **CLOSED locally (2026-10-28, Linux)**: full default workflow on streamanator at `c3dea709` 14,860 passed / 3 failed / 63 skipped plus Coleman 28/28; the only failures are listed `gridley-corpus` (V2-GAP-029); three Linux regressions were fixed first. Not run: 11 Brownlow dedicated-clone tests, 45 opt-in tests ([Linux verification](linux-verification-2026-10-28.md)) | none |
 | V2-GAP-004 | Low | source worktree hygiene | no | open: owner action | fix or disable the user-level Read/Grep/Glob hook; decide whether to delete the stray `supplies` |
 | V2-GAP-005 | Low | historical baseline scope | no | open: AFLW not covered by the manifest | decide whether AFLW joins the manifest |
 | V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open | decide on database-level seal enforcement |
 | V2-GAP-007 | Medium | historical baseline | rehearsal | open, narrowed (Launch F): the producer ran repeatedly on the isolated rebuild with identical results; no real-baseline manifest | approve the shadow captures (§4), then a read-only production run (cutover runbook step 3) |
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
-| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed: the two formerly name-pinned files pass locally (6/6 and 1/1); strict isolated proofs replace the name pin | Linux/production-dump replay under the same guarded target contract |
+| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed: the two formerly name-pinned files pass locally and on Linux (2026-10-28: backtest 6/6, state-b 1/1, under the guarded isolated target); strict isolated proofs replace the name pin | production-dump replay under the same guarded target contract |
 | V2-GAP-010 | Medium | AFL API coverage | no (coverage is not claimed) | open: 2012-2025 API coverage has no committed evidence | decide which seasons to evidence |
 | V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains | approve A-AFLT (disable the timer in the window) or complete ISSUE-316 C5 |
 | V2-GAP-012 | Medium | legacy runtime | no | **CLOSED (Launch F)**: helpers moved to `settle-shared.ts`, both edges removed from the ratchet, settle integration suites pass on isolated PG16 | none |
@@ -64,16 +67,24 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-025 | Low | admin UI | no | **CLOSED locally (2026-10-27)**: read-only `/admin/operations/afl-api-refusals` linked from the overview; real-PostgreSQL test 2/2 as `afldb_import` on a disposable isolated `_test` database; page rendered signed in at 1280x800 and 390x844 (populated, empty, second page, failed read). Not deployed | optional owner eyeball of `docs/v2/evidence/gap025-visual/` |
 | V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 passes on a populated copy (2026-10-20); populated-ledger DB reversal and archive recovery restore everything exactly on a synthetic copy | approve host backup/rollback and production-dump rehearsal |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | **CLOSED locally (2026-10-27)**: `settle-afl-api.ts --report-out` writes the report (destination checked before any connection, never overwritten, outcome preserved on a write failure); opt-in parity policy `v2.parity.2` compares it, `v2.parity.1` unchanged; real-PostgreSQL dry-run and apply 1/1 on a disposable isolated `_test` copy. Not deployed | decide whether a rehearsal adopts `v2.parity.2` |
-| V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs | Linux remains separate gap 003 |
-| V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived) | approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
+| V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs; Linux 200/200 (2026-10-28) | none |
+| V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived); **Linux 2026-10-28 reproduces the accepted strict set key for key (149/99/50)** after the eight-selection rookie replay |  approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
 | V2-GAP-030 | Medium | Brownlow data | migration | open, rehearsed: every archived `brownlow_round_votes.match_id` is NULL because migration 094 ran over an empty table; reviewed reversible backfill built and verified on a clone (330,383/330,383 repairable, 0 excluded, idempotent, exact reversal); 1984–2025 policy approved under D-V2-BROWNLOW-MATCH-BACKFILL-1; 2026 excluded; execution pending | fresh counts/unique mapping plan, owner review of the guarded production runner, migration 116 and exact execution approval ([package](brownlow-production-approval-package-2026-10-20.md)) |
 | V2-GAP-031 | High | Brownlow ingestion | operational | open: all 207 2025 vote sets refuse `ownership_indeterminate` (source-less legacy rows); canonical ingestion verified on a clean target; reviewed reversible legacy-ownership adoption demonstrated on a clone only (207/207 sets, 621 rows); production adoption unapplied | OD-BROWNLOW-OWNERSHIP-1 approved as policy only; guarded runner/schema review and fresh execution approval pending ([package](brownlow-production-approval-package-2026-10-20.md)) |
-| V2-GAP-032 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: an unclaimed bare number is a leftover token (parser v67), so `<club> <stat> 200 40` declines and `in 1980 to 1989` is the inclusive range, not 1980 alone; whole malformed_input population (10,179) declines; 17 NL suites 1,638/1,638; typecheck exit 0. Not deployed | none |
-| V2-GAP-033 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: "played N games for <club> and also coached <club>" no longer counts career games at every club; `validatePlan` refuses a games condition when the played club is a builder parameter; the cross-domain opponent window is kept wide on purpose; 17 NL suites 1,641/1,641; typecheck exit 0. Not deployed | none |
-| V2-GAP-034 | Low | Birth-date enrichment | no | **CLOSED locally (2026-10-28)**: `enrich_birth_dates.py` no longer files a new open `external_identity_conflict` on every re-run; scoped delete-then-refile over the run's asserted profiles (ISSUE-090 §18 idiom), resolved history and other sources untouched; integration test 28 failed before (2 rows) and the file passes 28/28 on a disposable local `_test` copy. Not deployed | none |
+| V2-GAP-032 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: an unclaimed bare number is a leftover token (parser v67), so `<club> <stat> 200 40` declines and `in 1980 to 1989` is the inclusive range, not 1980 alone; whole malformed_input population (10,179) declines; 17 NL suites 1,638/1,638; typecheck exit 0. **PostgreSQL/Linux 2026-10-28:** 40/40 range rows equal their `between` rewrites (pre-fix: 36 different answers); V5 frozen 12,000/12,000 and V6 unchanged row for row; browser sweep 0 HTTP/page errors. Not deployed | none |
+| V2-GAP-033 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: "played N games for <club> and also coached <club>" no longer counts career games at every club; `validatePlan` refuses a games condition when the played club is a builder parameter; the cross-domain opponent window is kept wide on purpose; 17 NL suites 1,641/1,641; typecheck exit 0. **PostgreSQL/Linux 2026-10-28:** the composition is refused (pre-fix: 6 players, one with 11 Richmond games); controls 27/365/107 unchanged. Not deployed | none |
+| V2-GAP-034 | Low | Birth-date enrichment | no | **CLOSED locally (2026-10-28)**: `enrich_birth_dates.py` no longer files a new open `external_identity_conflict` on every re-run; scoped delete-then-refile over the run's asserted profiles (ISSUE-090 §18 idiom), resolved history and other sources untouched; integration test 28 failed before (2 rows) and the file passes 28/28 on a disposable local `_test` copy, and 28/28 on Linux (2026-10-28). Not deployed | none |
+| V2-GAP-035 | Low | NL browser gate | no | OPEN (found 2026-10-28, Linux verification): the rendered UI gate scores 29 rows whose tracked expectations conflict with accepted behaviour: 27 real-user "how many career <stat> did <player> have" (ISSUE-190 declines them; its optional career-total mapping was never built) and 2 family rows that ISSUE-153 made answerable but never re-pinned. Same through the engine at the pre-GAP-032 tree; the ISSUE-190 gate and both corpus files are unchanged on `main` (not executed there) | **owner decision**: restate the 29 expectations, or build the ISSUE-190 career-total mapping |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
+- **CLOSED locally, 2026-10-28 (Linux).** The full default Vitest workflow ran on streamanator.
+  Each run went through `isolated-pg run`, so `_test` DSNs were present and the policy strip was
+  active. All DSNs named disposable `afldb_v2_*_test` clones on 127.0.0.1:55461, and the live
+  identity was proved before writes. No suite reached a non-`_test` database, and no failure came
+  from the strip: all seven S1 failures are classified in
+  [the Linux verification](linux-verification-2026-10-28.md) §2. The close condition named
+  `afldb_test`; the 2026-10-20 follow-up below replaced that with the supported Linux environment.
 - **Current local follow-up (2026-10-20):** the present-DSN path runs against native isolated
   PostgreSQL with explicit owner/import/auth role DSNs and live identity proofs. The remaining
   acceptance condition is the supported Linux environment, not a database literally named
@@ -108,6 +119,15 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-003 — Integration, Linux and POSIX behaviour is not exercised on the V2 workstation
 
+- **CLOSED locally, 2026-10-28 (Linux).** On streamanator (Ubuntu 24.04.5, Node 22.23.2, PostgreSQL
+  16.15), the full default workflow at `c39d2130` gave 14,856 passed / 7 failed / 63 skipped. Three
+  of the failures were Linux regressions, fixed in `26a089a7`, `a0c87fb5` and `c3dea709`. At
+  `c3dea709` the result is **14,860 passed / 3 failed / 63 skipped**, plus Coleman 28/28. The three
+  failures are the listed `gridley-corpus` strict gates (V2-GAP-029), so the gate holds: no failure
+  outside the baseline list, no listed test weakened. Every Windows/POSIX unit case in
+  `baseline-failures.txt` passes on Linux. Not run, and not counted as passing: 11 Brownlow
+  dedicated-clone tests (the correction package was excluded) and 45 opt-in tests. See
+  [the Linux verification](linux-verification-2026-10-28.md).
 - **Launch F (2026-10-19).** The integration suites ran on Windows against isolated PG16; results are in `docs/v2/final-report.md` §3. Linux and POSIX are still unexercised.
 - **What.** 85 integration suites refuse to load without a `_test` database; 15 unit cases fail
   for Windows-checkout or POSIX-execution reasons or because git-ignored evidence is absent from a
@@ -894,6 +914,17 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
   exactly the 40 range rows, which stay plans with the range corrected. The 17 parser-dependent
   suites pass 1,638/1,638, including 7 new cases in `tests/nl-parser.test.ts`. `npm run typecheck`
   exited 0. Not run: the browser NL stress runner, PostgreSQL answers and the frozen V5 corpus.
+- **PostgreSQL, frozen V5 and browser validation (Linux, 2026-10-28;
+  [record](linux-verification-2026-10-28.md) §3–4).** These ran on a disposable clone of the approved
+  test baseline, with HEAD (v67) and the pre-fix tree (v66) on the same data:
+  - The 40 range rows now give the same scope and answer as their `between` rewrites, 40/40. Before
+    the fix, all 40 planned a single year and 36 gave a different answer.
+  - The `200 40` forms now decline; before the fix they executed.
+  - Frozen V5 is 12,000/12,000 clean and V6 is 11,997/3 (a 2025 data-scope tie), both unchanged
+    row for row.
+  - Of the exploratory corpora, exactly 151 rows changed between the trees, every one a GAP-032/033
+    decline; all 550 `malformed_input` rows decline.
+  - Browser sweep: 1,844/1,844 observed, with 0 HTTP or page errors.
 
 ## V2-GAP-033 — A played-and-coached question counted career games for "N games for <club>"
 
@@ -915,6 +946,11 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
 - **Validation (DB-free).** 17 NL suites 1,641/1,641, with 3 new cases in `tests/nl-parser.test.ts`
   and `tests/nl-plan.test.ts`. `npm run typecheck` exit 0. No retained corpus expects the composition
   to answer. Not run: PostgreSQL answers.
+- **PostgreSQL validation (Linux, 2026-10-28; [record](linux-verification-2026-10-28.md) §3).** The
+  composition is refused at `validatePlan`. Before the fix it answered 6 players, one of them with
+  11 Richmond games. The controls are unchanged at both trees: played and coached Richmond 27,
+  played and coached 365, 200 games and coached 107. Twenty-nine "played and also coached … with
+  at least/no more than N games" exploratory rows now decline (`coverage_unavailable`).
 
 ## V2-GAP-034 — The birth-date enricher filed a new open `external_identity_conflict` on every re-run
 
@@ -937,3 +973,31 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
   from the isolated `afldb_v2_rb_final_test` (cluster `afldb_v2_isolated`, 127.0.0.1:55433), and that
   database was dropped afterwards. `py_compile` passed. `draftguru-import` and `fitzroy-core-import`
   passed 162 (1 skipped). Not run: Linux, `release-gates`.
+- **Linux (2026-10-28).** `dob-enrichment-issues.test.ts` passes 28/28 in the full workflow at both
+  `c39d2130` and `c3dea709`; `release-gates` passes 59 (7 static skips)
+  ([record](linux-verification-2026-10-28.md)).
+
+## V2-GAP-035 — The rendered NL gate scores 29 rows whose expectations conflict with accepted behaviour
+
+- **OPEN, owner decision** (found 2026-10-28 by the Linux browser sweep; not a production blocker).
+- **What.** The sweep of all 12 tracked UI corpora (1,844 questions; 0 HTTP or page errors) scored
+  1,815 pass / 29 fail. Each failure behaves the same through the engine at the pre-GAP-032 tree,
+  so none comes from GAP-032/033, and none is a crash or a wrong answer:
+  - **27 rows** of `afldb-ui-questions-1440-real-user-v3-20260822.csv` ("how many career
+    <goals|games|kicks|handballs|disposals|marks> did <player> have") expect a plan. They decline at
+    `validatePlan` (`src/search/nl/plan.ts:2075-2081`, "no defined total to count"). ISSUE-190
+    (Resolved 2026-09-15, `3748e134`) introduced that refusal deliberately: a metric-bearing
+    `player_career` count used to answer with the rank-one leader. Its optional "how many <career
+    column> has <player>" → career-total mapping "was not built", and "Follow-up: none opened". The
+    corpus predates the decision. The bare forms ("Dustin Martin career goals") answer.
+  - **2 rows** of `afldb-ui-questions-relationships-decline-v1-20260909.csv` (`rel_dec_001`
+    "biggest football families", `rel_dec_002` "families with three AFL players") expect a
+    decline. They answer with "Ablett — 906 combined career games" and "43 families qualify".
+    ISSUE-153's acceptance (`issues.md:22429`) records exactly these answers as intended, but its
+    re-pin `25beb99c` moved only `rel_dec_003`–`006` to `plan`.
+- **Not done, deliberately.** No expectation was restated from observed output, and no behaviour
+  changed.
+- **Close.** The owner decides between:
+  - restating the 29 expectations, each against its owning decision (ISSUE-190, ISSUE-153);
+  - building the ISSUE-190 career-total mapping, with its own tests and a parser bump, and then
+    restating only the 2 family rows.
