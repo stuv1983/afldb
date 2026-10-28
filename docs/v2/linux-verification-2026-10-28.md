@@ -275,3 +275,203 @@ Cleanup:
 - The cluster is stopped and 55462 is free. Kept: the base (stopped), sources, capture roots and evidence (2.5 MB; manifest
   `evidence-sha256.txt` `55405e6d…`, 50 files). The root is 1.9 GB.
 - Remove the whole root when it is no longer needed. That also removes the unmarked database.
+
+## 10. Third pass: V2-GAP-035 restated, and the retained-input items (2026-10-28, owner retained-input authority)
+
+The owner decided V2-GAP-035 and authorised reading the exact retained, non-production inputs that §9 named.
+
+- Every input was copied into NEW verification storage first, and every test ran on a disposable copy.
+- Original stores, dumps, frozen rehearsal/proof roots and source databases were only read. Each one's hash or manifest
+  was taken again afterwards.
+- Nothing was fetched from a provider. Production and the shared DEV database were not touched. Nothing was pushed or
+  deployed, and no policy decision was made.
+
+This section supersedes §8–§9 where they disagree.
+
+| Item | Target (disposable, new root) | Result |
+|---|---|---|
+| V2-GAP-035 rendered gate, restated corpus (all 12 tracked UI corpora) | clone `afldb_v2_rb_lv2ui035_test`, isolated build on 127.0.0.1:3962, root of §9 | **1,844/1,844 pass, 0 fail**, 0 HTTP/page errors (before: 1,815 / 29) |
+| Brownlow `v2-brownlow-eligibility-2025-rehearsal` (B2) | `afldb_v2_brownlow_tristate_twelve_test`, port 55464 | **3/3** |
+| Brownlow `v2-brownlow-production-correction` (B1) | `afldb_v2_brownlow_policy_final_test`, port 55464 | **8/8** after the per-case budget correction `c249be86` (attempts 1–2 failed on budgets) |
+| `brownlow-pending-populated` (`AFLDB_POPULATED_REHEARSAL_STATE=1`) | `afldb_v2_c2pop_test` in a copy of the completed C2 rehearsal, port 55465 | **4/4** |
+| `settle-promotion-deadlock` Phase B, through a copy of its dedicated runner | disposable `afldb_test` in a new cluster, port 55466 | **11/11; OVERALL: PASS (Full); census CLEAN** |
+| Production-shadow report on the retained archive `a583fc7d…` | `afldb_v2_shadow_baseline_test` / `_migration_test`, port 55463 | Strict **FAIL / INCOMPLETE, as expected**; no new finding (§10.5) |
+| `external-grids-import`, real-archive case | read-only copy of the only available `afl.db` | **Not a pass**: that file is a later snapshot than the named archive (§10.6) |
+
+### 10.1 V2-GAP-035 (owner decision: restate; no career-total mapping)
+
+- **27 ISSUE-190 rows** in `afldb-ui-questions-1440-real-user-v3-20260822.csv` now expect `decline`.
+  - These are `user_1122`…`user_1200`, "how many career <stat> did <player> have". Only the status field changed.
+  - A new pin in `tests/nl-ui-corpus.test.ts` parses each one to a `player_career` count with a metric. It asserts that
+    `validatePlan` returns the exact ISSUE-190 error.
+  - The oracle is that decision's resolution (`issues.md`, ISSUE-190: "This kind of question has no defined total to
+    count…"). It was not taken from observed output.
+- **`rel_dec_001` and `rel_dec_002`** now expect `plan`.
+  - This matches ISSUE-153 Stage 6 (§11.14): C1 "biggest football families" and C5 "families with three AFL players"
+    both go to family grain.
+  - A second new pin asserts both parse to grain `family` and pass `validatePlan`.
+  - IDs, question text, categories, tags and every unrelated assertion are unchanged.
+- **Counts.** The Phase G builder's counts and the three corpus runners' header comments were restated to match: current
+  244/75, next 260/89, regression 1,408/87 scored.
+- **Checks.**
+  - Local: `nl-ui-corpus`, `nl-parser`, `nl-plan` and `nl-audit-acceptance`, 913/913.
+  - Linux, at the restated tree: those four plus `nl-describe`, 1,002/1,002.
+- **Rendered gate.**
+  - Attempt 1 stopped in `next build`: the `next/font` Google loader raised a TypeError (its font-URL regex matched
+    nothing). That was a transient Google Fonts response; a later fetch returned normal `.woff2` URLs. The logs are kept
+    as `build.attempt1.log` and `ui035.attempt1.log`.
+  - Attempt 2 re-checked every blob and the clone, then built with exit 0. The sweep (1 worker, 2,200 ms pacing, 19 batches, 1.3 h) saw 1,844 of 1,844 questions: pass 1,844, fail 0, unscored 0; answered 1,668, unanswerable 112, absent 64, HTTP 0, page errors 0, filler-variant disagreements 0. The server was stopped after its identity was verified, the clone was dropped through the guard, and the evidence manifest is `78f3dff5…` (27 files).
+
+### 10.2 Brownlow dedicated-clone suites (authentic 2025 template)
+
+- **Template source.** The stopped WSL store `AFLDB-V2-Rehearsal-20261020` was never started.
+  - Its `ext4.vhdx` (sha256 `589597c5…`, 37,885,050,880 bytes, mtime 2026-10-25T23:15:52Z) was copied to a new distro,
+    `AFLDB-V2-BrownlowExport-20261028` (`C:\afldb-v2-brownlow-export-20261028`), and the copy's hash compared.
+  - The original was re-hashed after the copy and again at the end of this pass, and was unchanged both times.
+  - Only the copy was booted. Inside it, the rehearsal cluster (no tablespaces) ran on 127.0.0.1:55471 with unix sockets
+    disabled.
+  - Template identity:
+    - ledger 115;
+    - `brownlow_round_votes` 330,383 (md5 `097a9f86…`);
+    - season votes 16,120 (`252aa832…`);
+    - staged `afl_api_brownlow_vote` 621 (2025; `48fc8ff0…`);
+    - players 13,365;
+    - matches 17,056 (1897–2026).
+  - Exports: `pg_dump` with 1,640 TOC entries (sha256 `5be45eab…`). The fixture root and the retained acquisition
+    `afl-api-brownlow-2025-2026-10-20-014218` were exported as tars (`23cc8b76…`, `3ed1b46b…`).
+  - The copy's cluster was then stopped and the copy distro terminated.
+- **Restore.** New root `/home/arm/afldb-v2-brownlowverify-20261028`, new cluster on 127.0.0.1:55464.
+  - The restored identity equals the exported identity.
+  - Each suite ran on its own fresh clone, with 116+117 applied by the normal runner and then privileges.
+  - The approvals inside the suites are the suites' own SYNTHETIC ones.
+- **B2**: 3/3. The twelve rulings applied through the guarded runner, and every rank is determinate.
+- **B1**: 8/8 on streamanator in 2,011 s (slowest case 410 s), after one test-only correction.
+  - **Attempt 1** (load ~1, alongside the rendered sweep) passed 1/8; 7 failed. Every failure sat exactly on a fixed budget (120/180/240 s).
+  - **Attempt 2** (quiet host, fresh clone) also passed 1/8; 7 failed. Test 2 timed out at 180 s and left the shared clone part-changed, so later cases refused ("fresh backup restore baseline does not equal this target baseline", "expected exactly 207 sets…").
+  - **Attempt 3**: the same tree and template, inside the WSL copy distro (the class of environment the accepted 2026-10-20 run used), on a NEW cluster with fresh credentials (127.0.0.1:55473) and a fresh clone. **8/8 in 756 s with the old budgets.** Test 1 took 53 s there against 142 s on streamanator.
+  - **The correction.** Each case re-fingerprints 22 tables, including `player_match_stats`. Since the code and test were unchanged since that accepted run, the budgets did not fit this host. `c249be86` replaces the eight literals with one explicit 600 s per-case budget; no assertion changed (precedent `c3dea709`).
+  - **Attempt 4** (streamanator, fresh clone, committed blob `0083f421`): **8/8**.
+  - All attempts' artefacts are kept (`*.attempt1.*`, `*.attempt2.*`; WSL evidence copied to `D:\tmp\afldb-v2-b1wsl-20261028\evidence`, manifest `34cf4f8e…`). Host evidence manifest: `dd1841c5…` (32 files).
+- **Disclosure.** While the copy was being inspected, a failed redaction printed the copy cluster's role passwords into the
+  operator session output.
+  - That cluster is loopback-only. The frozen original store's cluster uses the same passwords. That store is also
+    loopback-only, sits in a stopped distro, and is neither DEV nor production.
+  - The passwords were not written to the repository or to evidence.
+  - Following the `isolated-pg` convention from the ISSUE-316 credential incident (2026-10-23), the copy's cluster now
+    carries `secrets/CREDENTIALS-EXPOSED` and was not used again. Later work in the copy used a new cluster with fresh
+    credentials.
+  - The frozen original was not written. Marking it, or rotating its credentials offline, is an owner action. Deleting the
+    copy distro removes the copy's credentials.
+
+### 10.3 `brownlow-pending-populated` (copy of a completed C2 rehearsal)
+
+- **Source.** The completed C2 rehearsal of ISSUE-316's final technical validation (`dedba57f`, root
+  `afldb-c2-rehearsal-dedba57f-20261022T122727Z`, `afldb_v2_rb_c2cand3_test`) was stopped.
+- **Copy.** Its `cluster/` (2,209 files, no tablespaces) was copied to `/home/arm/afldb-v2-c2popverify-20261028`. The
+  copy's manifest equals the original's. The original manifest was taken again after the copy and at the end, and was
+  unchanged both times.
+- **Run.** Only the copy was started, with its port moved to 55465 (TCP loopback, no socket). Clone
+  `afldb_v2_c2pop_test` (marked) is at ledger 117 with 0 pending migrations, and its 2026 Brownlow availability reads
+  `pending` for match, round and season.
+- **Result.** **4/4.** Evidence manifest `1b4d9d12…` (12 files).
+
+### 10.4 `settle-promotion-deadlock` Phase B (ISSUE-265), through a copied, guard-preserving runner
+
+- **Why it ran.** The harness is byte-identical to the one that passed 11/11 on 2026-10-05 (`20507181…`). But 20 of
+  the 52 repository files in that run's provenance closure differ in the candidate, including the gate implementation
+  (`settle-core.ts`, `datasets.ts`, `settle-afl-api.ts`, `settle-afltables.ts`, `canonical-apply.ts`, `pipeline.ts`).
+  So the 10-05 result does not carry over.
+- **Runner.**
+  - The original runner, probe and tools (`D:\tmp\issue265`) were copied byte for byte to
+    `D:\tmp\afldb-v2-i265b-20261028\runner`. Both hash lists are kept.
+  - **No code was changed.** Only parameters differ: settings file, worktree (`git archive c478c31b`, no `.env`),
+    evidence root and tunnel endpoint.
+  - The original runner and its evidence were not written. The suite was armed only by the runner.
+- **Target.**
+  - A new isolated cluster on streamanator, 127.0.0.1:55466 (loopback, no socket).
+  - The approved baseline dump (`659e471b…`) was restored into the marked seed `afldb_v2_i265b_seed_test`, migrated
+    115→117, and given privileges.
+  - The unchanged runner and harness accept only the database name `afldb_test`. So `afldb_test` was cloned from the
+    seed **inside this cluster only**, owned by `afldb_owner` and commented as disposable.
+  - Role secrets came from that cluster. Windows reached it only through `ssh -L 127.0.0.1:55476:127.0.0.1:55466`.
+  - The target proof read server `127.0.0.1/32:55466`, db-oid 19883 and postmaster start `04:00:14.240404+00`. DEV in
+    §23 was `:5432`, oid 45428.
+- **Refusal controls (before Full).**
+  - SelfTest PASS: 11 skipped, no connection attempted.
+  - A wrong owner role (`afldb_app`) was REFUSED at the target proof.
+  - A session the probe could not observe was REFUSED at isolation.
+  - An active owner session holding an open transaction was REFUSED at isolation. One extra Preflight started early,
+    while that hold was still open, and was refused the same way.
+  - A positive Preflight then passed: targets, isolation, migrations 117/117 (State B), and zero residue in all 19
+    namespaces.
+- **Independent review** (read-only, separate agent) before launch: GO, no CRIT/HIGH.
+  - MED-1: the runner's provenance closure does not follow `@afldb/*` packages. The 37 package files were hashed before
+    and after Full and were unchanged. The runner was not changed.
+  - LOW: the target is identified by endpoint, so the tunnel process was re-verified immediately before launch.
+  - LOW: State B (111–117) is new coverage, not a repeat of the State A pass.
+- **Full** (`run-20261028-150940-Full`):
+  - 11/11 in 622.9 s; exit 0; 1 file passed; 0 skipped.
+  - Post-run census CLEAN: historical fingerprints equal, no residue, all 14 retained admin-upload batches explained,
+    0 teardown problems.
+  - Provenance: 61 files unchanged. **OVERALL: PASS (Full).**
+- **Afterwards.**
+  - The tunnel was closed and the cluster stopped; 55466 is free.
+  - Evidence: Windows `evidence-sha256.txt` `c0157ebf…` (67 files); host `2e476364…` (12 files).
+  - The root keeps the disposable `afldb_test`, which isolated-pg cannot drop because of its name. Remove that root as a
+    unit. The isolated-pg guard was not bypassed.
+
+### 10.5 Production-shadow report on the retained archive (historical scope only)
+
+- **Scope.** The retained archive `afldb_prod-20261019T233531867935Z.dump` (`a583fc7d…`, captured 2026-10-19) was
+  restored on a new cluster (port 55463). This shows the archive's recorded historical state, **not current
+  production**.
+- **Steps.**
+  - Ledger 110/110 matched. The first attempt of that check stopped on a harness module-resolution error; it is kept.
+  - The archive has no authentic staged Brownlow seasons.
+  - Captures were taken before migration. Then 111–117 were applied (7 pending → 0), with privileges.
+  - Captures were taken after, then parity and `release-gates.ts` ran.
+  - The archive hash was re-checked afterwards.
+- **Parity** (`v2.parity.1`): FAIL, 3 pass / 1 fail / 1 incomplete.
+  - The only failure is `UNEXPECTED_TABLE_ADDED public.brownlow_correction_receipts`.
+  - Brownlow is INCOMPLETE: no reconciliation input exists.
+  - The historical manifest, Coleman and coverage checks pass.
+- **Release gates:** `backendFunctional` PASS; `migrationCompatibility` FAIL; preservation shows exactly the two 116/117
+  deltas; D-V2-BROWNLOW-ALT-1 is NOT_APPLIED (its scope is this archive at 110→115); `productionDecision` NO-GO.
+- **Reading.**
+  - These are the same two schema deltas the owner accepted for the fresh archive `7fefcd9b…` (D-V2-FRESH-SCHEMA-1).
+    That acceptance is archive-bound, so this archive's strict result stays FAIL. Nothing is waived.
+  - Migrations 111–117 in the candidate are byte-identical (LF) to the hashes pinned by D-V2-FRESH-REHEARSAL-1. So the
+    accepted fresh-archive migration evidence describes the candidate's migration files.
+  - A report against *current* production needs a fresh production capture, which this authority does not cover.
+
+### 10.6 `external-grids-import`: the named archive is not available
+
+- **The named archive.** The case pins the rescued Gridley archive named by ISSUE-118:
+  `D:\dev\sports_data_lab\data\afl\afl.db`, with 1,123 boards (#1–#1123), dated 2023-07-17 to 2026-08-12, with no gaps.
+  - It is absent from the workstation.
+  - On streamanator, `/home/arm/projects/sports_data_lab/data/afl/afl.db` does not exist, and no `afl.db` over 400 MB
+    exists under `/home/arm`.
+- **The only available file** is the data dictionary's "local audited copy", `D:\dev\afldb\data\afl.db` (537,010,176
+  bytes, sha256 `a56fef4e…`, mtime 2026-08-14).
+  - It was hashed and copied read-only to `/home/arm/afldb-v2-extgrids-20261028`. The original was re-hashed and was
+    unchanged.
+  - It is a **later snapshot**: 1,124 boards, #1–#1125 with one gap, ending 2026-08-14. The importer's DB-free dry run
+    validates it with 0 rejections.
+- **Result.** The suite gave 46/47; the archive case failed on `boards parsed: 1123`.
+  - This is a baseline mismatch: not a pass, and not a product regression.
+  - The 1,123-board oracle was not restated, and no different baseline was substituted.
+  - Still needed: the rescued 2026-08-12 archive itself.
+
+### 10.7 State after this pass
+
+- **Clusters.** 55463, 55464, 55465 and 55466 are stopped. 55462 (the §9 root, used for the rendered gate) is stopped as well.
+- **Originals unchanged.** The original rehearsal and C2 stores, the approved dump and the archives were not changed.
+- **Retained for review** (remove when no longer needed):
+  - on streamanator: `afldb-v2-shadowreport-20261028` (3.0 GB), `afldb-v2-brownlowverify-20261028` (3.2 GB),
+    `afldb-v2-c2popverify-20261028` (2.6 GB), `afldb-v2-extgrids-20261028` (2.3 GB) and `afldb-v2-i265b-20261028`
+    (2.4 GB);
+  - on Windows: `D:\tmp\afldb-v2-i265b-20261028`, which includes a user-only `secrets\` holding the disposable cluster's
+    settings files (delete it with the root);
+  - on Windows: the copy distro `AFLDB-V2-BrownlowExport-20261028`, about 38 GB on `C:` (`wsl --unregister` removes it).
+- **Still open:** V2-GAP-029; the authentic Brownlow operational items (V2-GAP-030/031); a current-production shadow
+  report; the rescued Gridley archive; the push; and the production-release decisions. Production remains **NO-GO**.

@@ -134,6 +134,11 @@ Done on streamanator; see [`docs/v2/linux-verification-2026-10-28.md`](../../../
   receipts 7/7, import lock 1/1, populated lifecycle 17/17 and the oracle reports 120/120. The Brownlow dedicated-clone
   suites remain blocked: their template exists only in the WSL rehearsal store. Phase B, populated-pending and
   external-grids also remain blocked.
+  _Third pass, 2026-10-28 (record §10), under the owner's retained-input authority:_ Brownlow B2 3/3 and B1 **8/8** after the per-case budget correction `c249be86` (attempts 1–2 failed on budgets) on
+  clones of the authentic 2025 template exported from a verified copy of the WSL store; populated-pending 4/4 on a
+  copy of the completed C2 rehearsal; Phase B 11/11 PASS through a byte-identical copy of its runner on a disposable
+  `afldb_test` in a new cluster; V2-GAP-035 closed (`58bd9e4c`, rendered gate 1,844/1,844). external-grids stays
+  blocked: only a later `afl.db` snapshot exists, not the rescued 2026-08-12 archive.
 - **Not touched.** EXEC, P/H, authorities and the retained proof roots. J2 was not re-run.
 
 ## 5. Selective Git integration proposal (operator-executed; not run)

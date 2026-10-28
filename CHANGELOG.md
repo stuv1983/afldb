@@ -45,6 +45,13 @@ commit.
     reports 120/120.
   - Still blocked, with reasons: the Brownlow dedicated-clone suites (their template is only in the WSL rehearsal store), the
     production-dump report, `settle-promotion-deadlock` Phase B, `brownlow-pending-populated` and `external-grids-import`.
+- Third Linux pass under the owner's retained-input authority (record §10). Every input was copied first, and every test ran
+  on a disposable copy.
+  - Brownlow B2 3/3 and B1 **8/8** after the per-case budget correction `c249be86` (attempts 1–2 failed on budgets), on clones of the authentic 2025 template.
+  - `brownlow-pending-populated` 4/4.
+  - ISSUE-265 Phase B 11/11 PASS, through a byte-identical runner copy.
+  - Shadow report on the retained `a583fc7d…` archive: strict FAIL/INCOMPLETE, as expected.
+  - `external-grids-import` stays blocked: the rescued archive is unavailable.
 
 ### Birth-date enrichment no longer duplicates open identity-conflict issues (V2-GAP-034, ISSUE-090 D4) (2026-10-28)
 
