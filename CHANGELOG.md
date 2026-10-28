@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### Current-production shadow report: only the expected 116/117 deltas (2026-10-29; production NO-GO)
+
+- Under D-V2-CURRENT-SHADOW-CAPTURE-1, one read-only production capture was taken and restored once on an
+  isolated streamanator cluster. Migrations 111–117 and privileges were applied to the migration copy only.
+  - Archive `a4641ca0…`, 29.8 MB, ledger 110 unchanged, no staged Brownlow seasons.
+  - `shadow.result` SUCCEEDED.
+- Strict results unchanged:
+  - preservation FAIL, exactly the 116 receipt table and the 117 `eligible` definition;
+  - parity FAIL, 3 pass / 1 fail / 1 incomplete;
+  - `migrationCompatibility` FAIL; `productionDecision` NO-GO.
+- The classifier reported `ONLY_EXPECTED_116_117_DELTAS`. That is not an acceptance. A new archive-bound owner
+  decision is proposed, and the MED-2 evidence limits remain open.
+- Record: `docs/v2/current-production-shadow-2026-10-29.md`. Sanitised evidence is in
+  `docs/v2/evidence/current-production-shadow/run-20261028T192336Z/`; archives stay outside Git.
+
 ### NL UI corpus: the 29 V2-GAP-035 expectations restated to accepted behaviour (2026-10-28)
 
 - Owner decision: restate; the optional ISSUE-190 career-total mapping is not built.

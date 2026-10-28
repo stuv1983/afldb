@@ -1,0 +1,2438 @@
+--- /home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/before.schema.sql	2026-10-29 06:47:00.564020044 +1100
++++ /home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/postmig.schema.sql	2026-10-29 06:53:48.169401334 +1100
+@@ -2,7 +2,7 @@
+ -- PostgreSQL database dump
+ --
+ 
+-\restrict 0XMOMB2X7nVOaBc2LIGqCnshu6M4Om4JsCal2yhK4vgHFg1oCbbRePcLXebvt7q
++\restrict LJmUEXBB6whYBnpK6GPNdaX4V2ECeyZrBkXTPVjKHXyzjH4EcCM3BsfT24s0ctK
+ 
+ -- Dumped from database version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+ -- Dumped by pg_dump version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+@@ -847,6 +847,16 @@
+ 
+ 
+ --
++-- Name: refuse_brownlow_receipt_mutation(); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.refuse_brownlow_receipt_mutation() RETURNS trigger
++    LANGUAGE plpgsql
++    AS $$
++BEGIN RAISE EXCEPTION 'Brownlow correction receipts are append-only'; END $$;
++
++
++--
+ -- Name: app_readable_tables; Type: TABLE; Schema: afldb_meta; Owner: -
+ --
+ 
+@@ -2079,6 +2089,144 @@
+ 
+ 
+ --
++-- Name: award_proposal_decisions; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.award_proposal_decisions (
++    id bigint NOT NULL,
++    proposal_id bigint NOT NULL,
++    action text NOT NULL,
++    from_status text,
++    to_status text NOT NULL,
++    admin_user_id integer NOT NULL,
++    previous_values jsonb,
++    new_values jsonb,
++    note text,
++    decided_at timestamp with time zone DEFAULT now() NOT NULL,
++    CONSTRAINT award_proposal_decisions_action_ck CHECK ((action = ANY (ARRAY['create'::text, 'validate'::text, 'approve'::text, 'reject'::text, 'revise'::text, 'supersede'::text, 'supersede_approved'::text, 'revise_approved'::text]))),
++    CONSTRAINT award_proposal_decisions_note_ck CHECK (((note IS NULL) OR (length(note) <= 2000))),
++    CONSTRAINT award_proposal_decisions_reject_note_ck CHECK (((action <> 'reject'::text) OR ((note IS NOT NULL) AND (length(btrim(note)) >= 10)))),
++    CONSTRAINT award_proposal_decisions_status_ck CHECK ((((from_status IS NULL) OR (from_status = ANY (ARRAY['proposed'::text, 'validated'::text, 'validation_failed'::text, 'approved'::text, 'rejected'::text, 'superseded'::text]))) AND (to_status = ANY (ARRAY['proposed'::text, 'validated'::text, 'validation_failed'::text, 'approved'::text, 'rejected'::text, 'superseded'::text])))),
++    CONSTRAINT award_proposal_decisions_transition_ck CHECK ((((action = ANY (ARRAY['create'::text, 'revise'::text])) AND (from_status IS NULL) AND (to_status = 'proposed'::text)) OR ((action = 'validate'::text) AND (from_status IS NOT NULL) AND (from_status = ANY (ARRAY['proposed'::text, 'validated'::text, 'validation_failed'::text])) AND (to_status = ANY (ARRAY['validated'::text, 'validation_failed'::text]))) OR ((action = 'approve'::text) AND (from_status IS NOT NULL) AND (from_status = 'validated'::text) AND (to_status = 'approved'::text)) OR ((action = 'reject'::text) AND (from_status IS NOT NULL) AND (from_status = ANY (ARRAY['proposed'::text, 'validated'::text, 'validation_failed'::text])) AND (to_status = 'rejected'::text)) OR ((action = 'supersede'::text) AND (from_status IS NOT NULL) AND (from_status = ANY (ARRAY['proposed'::text, 'validated'::text, 'validation_failed'::text])) AND (to_status = 'superseded'::text)) OR ((action = 'supersede_approved'::text) AND (from_status IS NOT NULL) AND (from_status = 'approved'::text) AND (to_status = 'superseded'::text)) OR ((action = 'revise_approved'::text) AND (from_status IS NULL) AND (to_status = 'approved'::text))))
++);
++
++
++--
++-- Name: TABLE award_proposal_decisions; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON TABLE public.award_proposal_decisions IS 'AFLDB V2 curated awards (migration 111): append-only ledger of every award_proposals status transition, written in the same transaction as the change. No role ever gets UPDATE, DELETE or TRUNCATE. The transition CHECK mirrors CURATED_AWARD_TRANSITIONS in packages/admin.';
++
++
++--
++-- Name: award_proposal_decisions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
++--
++
++ALTER TABLE public.award_proposal_decisions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
++    SEQUENCE NAME public.award_proposal_decisions_id_seq
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1
++);
++
++
++--
++-- Name: award_proposals; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.award_proposals (
++    id bigint NOT NULL,
++    proposal_key uuid DEFAULT gen_random_uuid() NOT NULL,
++    revision smallint DEFAULT 1 NOT NULL,
++    revision_of_id bigint,
++    award_slug text NOT NULL,
++    season smallint NOT NULL,
++    player_identity text,
++    player_name_raw text NOT NULL,
++    club_slug text,
++    votes numeric(8,2),
++    "position" text,
++    is_captain boolean DEFAULT false NOT NULL,
++    is_vice_captain boolean DEFAULT false NOT NULL,
++    note text,
++    duplicate_confirmed boolean DEFAULT false NOT NULL,
++    source_kind text NOT NULL,
++    source_url text,
++    citation text,
++    acquired_on date NOT NULL,
++    status text DEFAULT 'proposed'::text NOT NULL,
++    validation_result jsonb,
++    validated_at timestamp with time zone,
++    approved_entity_key text,
++    approved_at timestamp with time zone,
++    created_by integer NOT NULL,
++    created_at timestamp with time zone DEFAULT now() NOT NULL,
++    updated_at timestamp with time zone DEFAULT now() NOT NULL,
++    CONSTRAINT award_proposals_approval_ck CHECK ((((status = 'approved'::text) AND (approved_entity_key IS NOT NULL) AND (approved_at IS NOT NULL)) OR ((status = 'superseded'::text) AND ((approved_entity_key IS NULL) = (approved_at IS NULL))) OR ((status <> ALL (ARRAY['approved'::text, 'superseded'::text])) AND (approved_entity_key IS NULL) AND (approved_at IS NULL)))),
++    CONSTRAINT award_proposals_award_slug_ck CHECK (((length(award_slug) >= 1) AND (length(award_slug) <= 200))),
++    CONSTRAINT award_proposals_citation_ck CHECK (((citation IS NULL) OR ((length(btrim(citation)) >= 1) AND (length(btrim(citation)) <= 2000)))),
++    CONSTRAINT award_proposals_evidence_ck CHECK (((source_url IS NOT NULL) OR (citation IS NOT NULL))),
++    CONSTRAINT award_proposals_note_ck CHECK (((note IS NULL) OR (length(note) <= 2000))),
++    CONSTRAINT award_proposals_player_identity_ck CHECK (((player_identity IS NULL) OR (player_identity ~ '^(afltables|manual_admin_edit):.+$'::text))),
++    CONSTRAINT award_proposals_player_name_ck CHECK (((length(btrim(player_name_raw)) >= 1) AND (length(btrim(player_name_raw)) <= 200))),
++    CONSTRAINT award_proposals_position_ck CHECK ((("position" IS NULL) OR (length("position") <= 200))),
++    CONSTRAINT award_proposals_revision_chain_ck CHECK (((revision = 1) = (revision_of_id IS NULL))),
++    CONSTRAINT award_proposals_revision_ck CHECK ((revision >= 1)),
++    CONSTRAINT award_proposals_season_ck CHECK (((season >= 1897) AND (season <= 2100))),
++    CONSTRAINT award_proposals_source_kind_ck CHECK ((source_kind = ANY (ARRAY['manual_entry'::text, 'offline_file'::text, 'wikipedia_offline_file'::text]))),
++    CONSTRAINT award_proposals_source_url_ck CHECK (((source_url IS NULL) OR ((source_url ~ '^https?://[^[:space:]]+$'::text) AND (length(source_url) <= 2000)))),
++    CONSTRAINT award_proposals_status_ck CHECK ((status = ANY (ARRAY['proposed'::text, 'validated'::text, 'validation_failed'::text, 'approved'::text, 'rejected'::text, 'superseded'::text]))),
++    CONSTRAINT award_proposals_validation_result_ck CHECK (((validation_result IS NULL) OR (jsonb_typeof(validation_result) = 'object'::text))),
++    CONSTRAINT award_proposals_votes_ck CHECK (((votes IS NULL) OR ((votes >= (0)::numeric) AND (votes <= 999999.99)))),
++    CONSTRAINT award_proposals_wikipedia_url_ck CHECK (((source_kind <> 'wikipedia_offline_file'::text) OR COALESCE((source_url ~* '^https://([a-z0-9-]+[.])*wikipedia[.]org/'::text), false)))
++);
++
++
++--
++-- Name: TABLE award_proposals; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON TABLE public.award_proposals IS 'AFLDB V2 curated awards (migration 111): one row per REVISION of one proposed award winner. Value columns are immutable once written; a correction is revision n+1 (revision_of_id) and the earlier revision becomes superseded. Names its award, player and club by natural identity (slug / durable player identity), never by id, so a rebuild or promotion cannot dangle it. Approval promotes through insertAwardWinner() in one transaction.';
++
++
++--
++-- Name: COLUMN award_proposals.player_identity; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.award_proposals.player_identity IS 'The durable identity string resolvePlayerIdentity() computes: afltables:<profile path> or manual_admin_edit:<token>. NULL only while unresolved; validation refuses to approve a NULL.';
++
++
++--
++-- Name: COLUMN award_proposals.source_kind; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.award_proposals.source_kind IS 'manual_entry (admin data editor), offline_file (a locally supplied file) or wikipedia_offline_file (a locally supplied file prepared offline from Wikipedia; requires a wikipedia.org source_url). Runtime code never fetches Wikipedia.';
++
++
++--
++-- Name: COLUMN award_proposals.approved_entity_key; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.award_proposals.approved_entity_key IS 'The data_overrides entity key of the award_winners row an approval created. Never an id.';
++
++
++--
++-- Name: award_proposals_id_seq; Type: SEQUENCE; Schema: public; Owner: -
++--
++
++ALTER TABLE public.award_proposals ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
++    SEQUENCE NAME public.award_proposals_id_seq
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1
++);
++
++
++--
+ -- Name: award_winners; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -2348,6 +2496,118 @@
+ 
+ 
+ --
++-- Name: brownlow_correction_receipts; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.brownlow_correction_receipts (
++    plan_digest text NOT NULL,
++    operation text NOT NULL,
++    code_revision text NOT NULL,
++    approval_reference text NOT NULL,
++    before_digest text NOT NULL,
++    after_digest text NOT NULL,
++    result jsonb NOT NULL,
++    applied_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
++    CONSTRAINT brownlow_correction_receipts_approval_reference_check CHECK ((length(approval_reference) >= 20)),
++    CONSTRAINT brownlow_correction_receipts_code_revision_check CHECK ((code_revision ~ '^[0-9a-f]{40}$'::text)),
++    CONSTRAINT brownlow_correction_receipts_operation_check CHECK ((operation = ANY (ARRAY['backfill'::text, 'adopt'::text, 'eligibility'::text, 'observe'::text, 'resolve'::text, 'reverse-backfill'::text, 'reverse-adopt'::text]))),
++    CONSTRAINT brownlow_correction_receipts_plan_digest_check CHECK ((plan_digest ~ '^[0-9a-f]{64}$'::text))
++);
++
++
++--
++-- Name: TABLE brownlow_correction_receipts; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON TABLE public.brownlow_correction_receipts IS 'Owner-operated correction receipts; commit atomically with the reviewed correction. Never an execution approval.';
++
++
++--
++-- Name: brownlow_eligibility_decisions; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.brownlow_eligibility_decisions (
++    id bigint NOT NULL,
++    season integer NOT NULL,
++    player_identity text NOT NULL,
++    player_id_at_decision integer NOT NULL,
++    verdict text NOT NULL,
++    citation text NOT NULL,
++    note text NOT NULL,
++    decided_by integer NOT NULL,
++    decided_at timestamp with time zone DEFAULT now() NOT NULL,
++    basis text NOT NULL,
++    correction jsonb,
++    supersedes_id bigint,
++    CONSTRAINT brownlow_eligibility_decisions_basis_ck CHECK ((basis = ANY (ARRAY['open_season'::text, 'audited_correction'::text]))),
++    CONSTRAINT brownlow_eligibility_decisions_citation_ck CHECK (((length(btrim(citation)) >= 1) AND (length(btrim(citation)) <= 2000))),
++    CONSTRAINT brownlow_eligibility_decisions_correction_ck CHECK ((((basis = 'open_season'::text) AND (correction IS NULL)) OR ((basis = 'audited_correction'::text) AND (correction IS NOT NULL) AND (jsonb_typeof(correction) = 'object'::text) AND COALESCE((((correction ->> 'workflow'::text) = 'brownlow_eligibility_decision'::text) AND ((correction ->> 'actorUserId'::text) = (decided_by)::text) AND ((correction ->> 'season'::text) = (season)::text) AND ((length(btrim((correction ->> 'note'::text))) >= 20) AND (length(btrim((correction ->> 'note'::text))) <= 2000)) AND (length(btrim((correction ->> 'evidenceRef'::text))) >= 1)), false)))),
++    CONSTRAINT brownlow_eligibility_decisions_note_ck CHECK (((length(btrim(note)) >= 20) AND (length(btrim(note)) <= 2000))),
++    CONSTRAINT brownlow_eligibility_decisions_player_id_ck CHECK ((player_id_at_decision > 0)),
++    CONSTRAINT brownlow_eligibility_decisions_player_identity_ck CHECK (((player_identity ~ '^(afltables|manual_admin_edit):.+$'::text) AND (length(player_identity) <= 500))),
++    CONSTRAINT brownlow_eligibility_decisions_season_ck CHECK (((season >= 1897) AND (season <= 2100))),
++    CONSTRAINT brownlow_eligibility_decisions_supersedes_ck CHECK (((supersedes_id IS NULL) OR (supersedes_id < id))),
++    CONSTRAINT brownlow_eligibility_decisions_verdict_ck CHECK ((verdict = ANY (ARRAY['eligible'::text, 'ineligible'::text])))
++);
++
++
++--
++-- Name: TABLE brownlow_eligibility_decisions; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON TABLE public.brownlow_eligibility_decisions IS 'AFLDB V2 Brownlow eligibility (migration 113): append-only ledger of administrator eligibility decisions (verdict, citation, note, actor, basis). NEW authoritative eligibility evidence that takes precedence over the flags stored on brownlow_season_votes; it never alters a raw vote. A reversal is a NEW row with supersedes_id naming its predecessor; the current decision of a (season, player_identity) is the one no other row supersedes. No role gets UPDATE, DELETE or TRUNCATE. Names its player by durable identity string, never by foreign key into players or seasons.';
++
++
++--
++-- Name: COLUMN brownlow_eligibility_decisions.player_identity; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.brownlow_eligibility_decisions.player_identity IS 'The durable identity string resolvePlayerIdentity() computes: afltables:<profile path> or manual_admin_edit:<token>. The natural identity of the decision; survives a rebuild.';
++
++
++--
++-- Name: COLUMN brownlow_eligibility_decisions.player_id_at_decision; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.brownlow_eligibility_decisions.player_id_at_decision IS 'Snapshot of players.id when the decision was made. NOT a foreign key and not durable: a rebuild or promotion renumbers players. Use player_identity.';
++
++
++--
++-- Name: COLUMN brownlow_eligibility_decisions.basis; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.brownlow_eligibility_decisions.basis IS 'open_season (the season was not sealed; correction is NULL) or audited_correction (a sealed season; correction holds the season seal audit record, workflow brownlow_eligibility_decision).';
++
++
++--
++-- Name: COLUMN brownlow_eligibility_decisions.correction; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.brownlow_eligibility_decisions.correction IS 'evaluateSeasonWrite(...).audit from packages/domain/src/season-seal.ts: season, workflow (brownlow_eligibility_decision), actorUserId (= decided_by), note and evidenceRef. NULL when basis is open_season.';
++
++
++--
++-- Name: COLUMN brownlow_eligibility_decisions.supersedes_id; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.brownlow_eligibility_decisions.supersedes_id IS 'The earlier decision this one replaces, always for the same (season, player_identity). NULL for the first decision. At most one row names any given predecessor.';
++
++
++--
++-- Name: brownlow_eligibility_decisions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
++--
++
++ALTER TABLE public.brownlow_eligibility_decisions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
++    SEQUENCE NAME public.brownlow_eligibility_decisions_id_seq
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1
++);
++
++
++--
+ -- Name: brownlow_round_votes; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -3179,6 +3439,141 @@
+ 
+ 
+ --
++-- Name: derived_award_projections; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.derived_award_projections (
++    id bigint NOT NULL,
++    derived_award_result_id bigint NOT NULL,
++    award_slug text NOT NULL,
++    season integer NOT NULL,
++    projected_by integer NOT NULL,
++    projected_at timestamp with time zone DEFAULT now() NOT NULL,
++    actions jsonb NOT NULL,
++    changed_count integer NOT NULL,
++    retained_count integer NOT NULL,
++    correction jsonb NOT NULL,
++    CONSTRAINT derived_award_projections_actions_ck CHECK ((jsonb_typeof(actions) = 'array'::text)),
++    CONSTRAINT derived_award_projections_award_slug_ck CHECK ((award_slug = 'coleman'::text)),
++    CONSTRAINT derived_award_projections_changed_count_ck CHECK ((changed_count >= 0)),
++    CONSTRAINT derived_award_projections_correction_ck CHECK (((jsonb_typeof(correction) = 'object'::text) AND COALESCE((((correction ->> 'workflow'::text) = 'derived_award_publication'::text) AND ((correction ->> 'actorUserId'::text) = (projected_by)::text) AND ((correction ->> 'season'::text) = (season)::text) AND ((length(btrim((correction ->> 'note'::text))) >= 20) AND (length(btrim((correction ->> 'note'::text))) <= 2000)) AND (length(btrim((correction ->> 'evidenceRef'::text))) >= 1)), false))),
++    CONSTRAINT derived_award_projections_counts_ck CHECK ((jsonb_array_length(actions) = (changed_count + retained_count))),
++    CONSTRAINT derived_award_projections_retained_count_ck CHECK ((retained_count >= 0)),
++    CONSTRAINT derived_award_projections_season_ck CHECK (((season >= 1897) AND (season <= 2100)))
++);
++
++
++--
++-- Name: TABLE derived_award_projections; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON TABLE public.derived_award_projections IS 'AFLDB V2 derived awards (migration 114): append-only PROVENANCE record of projecting a published derivation (derived_award_results) into the canonical award_winners table. NOT a winner store: it holds entity keys and actions (inserted, updated, voided, retained) only. Each row is an audited correction through the season seal. No role gets UPDATE, DELETE or TRUNCATE. No foreign key into awards, players, clubs or award_winners; actions[].awardWinnerId is a snapshot a rebuild renumbers, the durable identity is actions[].entityKey.';
++
++
++--
++-- Name: COLUMN derived_award_projections.actions; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.derived_award_projections.actions IS 'Array of {entityKey, action, awardWinnerId}; action is inserted, updated, voided or retained. entityKey is the durable data_overrides key; awardWinnerId is a snapshot of award_winners.id at projection time.';
++
++
++--
++-- Name: COLUMN derived_award_projections.correction; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.derived_award_projections.correction IS 'evaluateSeasonWrite(...).audit from packages/domain/src/season-seal.ts: season, workflow (derived_award_publication), actorUserId (= projected_by), note and evidenceRef.';
++
++
++--
++-- Name: derived_award_projections_id_seq; Type: SEQUENCE; Schema: public; Owner: -
++--
++
++ALTER TABLE public.derived_award_projections ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
++    SEQUENCE NAME public.derived_award_projections_id_seq
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1
++);
++
++
++--
++-- Name: derived_award_results; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.derived_award_results (
++    id bigint NOT NULL,
++    award_slug text NOT NULL,
++    season integer NOT NULL,
++    method_version integer NOT NULL,
++    derivation_version text NOT NULL,
++    input_checksum text NOT NULL,
++    result jsonb NOT NULL,
++    winners jsonb NOT NULL,
++    derived_at timestamp with time zone NOT NULL,
++    published_at timestamp with time zone DEFAULT now() NOT NULL,
++    published_by integer NOT NULL,
++    basis text NOT NULL,
++    correction jsonb NOT NULL,
++    supersedes_id bigint,
++    CONSTRAINT derived_award_results_award_slug_ck CHECK ((award_slug = 'coleman'::text)),
++    CONSTRAINT derived_award_results_basis_ck CHECK ((basis = 'audited_correction'::text)),
++    CONSTRAINT derived_award_results_correction_ck CHECK (((jsonb_typeof(correction) = 'object'::text) AND COALESCE((((correction ->> 'workflow'::text) = 'derived_award_publication'::text) AND ((correction ->> 'actorUserId'::text) = (published_by)::text) AND ((correction ->> 'season'::text) = (season)::text) AND ((length(btrim((correction ->> 'note'::text))) >= 20) AND (length(btrim((correction ->> 'note'::text))) <= 2000)) AND (length(btrim((correction ->> 'evidenceRef'::text))) >= 1)), false))),
++    CONSTRAINT derived_award_results_derivation_version_ck CHECK (((length(btrim(derivation_version)) >= 1) AND (length(btrim(derivation_version)) <= 100))),
++    CONSTRAINT derived_award_results_input_checksum_ck CHECK ((input_checksum ~ '^[0-9a-f]{64}$'::text)),
++    CONSTRAINT derived_award_results_method_version_ck CHECK ((method_version >= 1)),
++    CONSTRAINT derived_award_results_result_ck CHECK ((jsonb_typeof(result) = 'object'::text)),
++    CONSTRAINT derived_award_results_season_ck CHECK (((season >= 1897) AND (season <= 2100))),
++    CONSTRAINT derived_award_results_self_consistent_ck CHECK (COALESCE(((winners = (result -> 'winners'::text)) AND ((result ->> 'inputChecksum'::text) = input_checksum) AND ((result ->> 'derivationVersion'::text) = derivation_version) AND ((result ->> 'season'::text) = (season)::text) AND ((result ->> 'methodVersion'::text) = (method_version)::text)), false)),
++    CONSTRAINT derived_award_results_supersedes_ck CHECK (((supersedes_id IS NULL) OR (supersedes_id < id))),
++    CONSTRAINT derived_award_results_winners_ck CHECK ((jsonb_typeof(winners) = 'array'::text))
++);
++
++
++--
++-- Name: TABLE derived_award_results; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON TABLE public.derived_award_results IS 'AFLDB V2 derived awards (migration 112): append-only ledger of published derivations (today only the Coleman Medal). Each row is the full derivation result, its method and code versions, input checksum and the season seal audit record. A recompute after an authorised correction is a NEW row with supersedes_id naming its predecessor; the current row of an (award_slug, season) is the one no other row supersedes. No role gets UPDATE, DELETE or TRUNCATE. Names nothing by id outside auth_users and itself; result.inputs embeds database ids that a rebuild renumbers, the durable identity is winners[].key. NOT award_winners.';
++
++
++--
++-- Name: COLUMN derived_award_results.result; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.derived_award_results.result IS 'The full serialiseColemanDerivation() output. result.inputs and the leaderboard embed database ids (a snapshot); the durable winner identity is the profile path in winners[].key.';
++
++
++--
++-- Name: COLUMN derived_award_results.correction; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.derived_award_results.correction IS 'evaluateSeasonWrite(...).audit from packages/domain/src/season-seal.ts: season, workflow (derived_award_publication), actorUserId (= published_by), note and evidenceRef.';
++
++
++--
++-- Name: COLUMN derived_award_results.supersedes_id; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.derived_award_results.supersedes_id IS 'The earlier publication this one replaces, always for the same (award_slug, season). NULL for the first publication. At most one row names any given predecessor.';
++
++
++--
++-- Name: derived_award_results_id_seq; Type: SEQUENCE; Schema: public; Owner: -
++--
++
++ALTER TABLE public.derived_award_results ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
++    SEQUENCE NAME public.derived_award_results_id_seq
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1
++);
++
++
++--
+ -- Name: derived_rebuilds; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -5779,7 +6174,7 @@
+     api_round_number smallint NOT NULL,
+     canonical_round_number smallint NOT NULL,
+     votes smallint NOT NULL,
+-    eligible boolean NOT NULL,
++    eligible boolean,
+     match_id integer,
+     player_id integer,
+     club_id integer,
+@@ -5808,6 +6203,13 @@
+ 
+ 
+ --
++-- Name: COLUMN afl_api_brownlow_vote.eligible; Type: COMMENT; Schema: staging; Owner: -
++--
++
++COMMENT ON COLUMN staging.afl_api_brownlow_vote.eligible IS 'The provider''s explicit Brownlow eligibility boolean for this vote record. NULL = the provider value was absent, null or not a boolean (UNKNOWN); never an implicit false. BP-2025-ELIGIBILITY-v1.';
++
++
++--
+ -- Name: COLUMN afl_api_brownlow_vote.match_id; Type: COMMENT; Schema: staging; Owner: -
+ --
+ 
+@@ -6612,6 +7014,30 @@
+ 
+ 
+ --
++-- Name: award_proposal_decisions award_proposal_decisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.award_proposal_decisions
++    ADD CONSTRAINT award_proposal_decisions_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: award_proposals award_proposals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.award_proposals
++    ADD CONSTRAINT award_proposals_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: award_proposals award_proposals_proposal_revision_uq; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.award_proposals
++    ADD CONSTRAINT award_proposals_proposal_revision_uq UNIQUE (proposal_key, revision);
++
++
++--
+ -- Name: award_winners award_winners_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -6700,6 +7126,30 @@
+ 
+ 
+ --
++-- Name: brownlow_correction_receipts brownlow_correction_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.brownlow_correction_receipts
++    ADD CONSTRAINT brownlow_correction_receipts_pkey PRIMARY KEY (plan_digest);
++
++
++--
++-- Name: brownlow_eligibility_decisions brownlow_eligibility_decisions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.brownlow_eligibility_decisions
++    ADD CONSTRAINT brownlow_eligibility_decisions_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: brownlow_eligibility_decisions brownlow_eligibility_decisions_target_uq; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.brownlow_eligibility_decisions
++    ADD CONSTRAINT brownlow_eligibility_decisions_target_uq UNIQUE (id, season, player_identity);
++
++
++--
+ -- Name: brownlow_round_votes brownlow_round_uq; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -6972,6 +7422,30 @@
+ 
+ 
+ --
++-- Name: derived_award_projections derived_award_projections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.derived_award_projections
++    ADD CONSTRAINT derived_award_projections_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: derived_award_results derived_award_results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.derived_award_results
++    ADD CONSTRAINT derived_award_results_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: derived_award_results derived_award_results_target_uq; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.derived_award_results
++    ADD CONSTRAINT derived_award_results_target_uq UNIQUE (id, award_slug, season);
++
++
++--
+ -- Name: derived_rebuilds derived_rebuilds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -7866,6 +8340,13 @@
+ 
+ 
+ --
++-- Name: ix_afl_api_identity_adjudications_supersedes_id; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_afl_api_identity_adjudications_supersedes_id ON public.afl_api_identity_adjudications USING btree (supersedes_id) WHERE (supersedes_id IS NOT NULL);
++
++
++--
+ -- Name: ix_after_siren_kicks_club; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -7971,6 +8452,41 @@
+ 
+ 
+ --
++-- Name: ix_award_proposal_decisions_admin_user_id; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_award_proposal_decisions_admin_user_id ON public.award_proposal_decisions USING btree (admin_user_id);
++
++
++--
++-- Name: ix_award_proposal_decisions_proposal; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_award_proposal_decisions_proposal ON public.award_proposal_decisions USING btree (proposal_id, id);
++
++
++--
++-- Name: ix_award_proposals_created_by; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_award_proposals_created_by ON public.award_proposals USING btree (created_by);
++
++
++--
++-- Name: ix_award_proposals_status; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_award_proposals_status ON public.award_proposals USING btree (status, id);
++
++
++--
++-- Name: ix_award_proposals_target; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_award_proposals_target ON public.award_proposals USING btree (award_slug, season);
++
++
++--
+ -- Name: ix_award_winners_award; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -8041,6 +8557,20 @@
+ 
+ 
+ --
++-- Name: ix_brownlow_eligibility_decisions_decided_by; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_brownlow_eligibility_decisions_decided_by ON public.brownlow_eligibility_decisions USING btree (decided_by);
++
++
++--
++-- Name: ix_brownlow_eligibility_decisions_target; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_brownlow_eligibility_decisions_target ON public.brownlow_eligibility_decisions USING btree (season, player_identity, id);
++
++
++--
+ -- Name: ix_brownlow_player; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -8314,6 +8844,41 @@
+ 
+ 
+ --
++-- Name: ix_derived_award_projections_projected_by; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_derived_award_projections_projected_by ON public.derived_award_projections USING btree (projected_by);
++
++
++--
++-- Name: ix_derived_award_projections_result; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_derived_award_projections_result ON public.derived_award_projections USING btree (derived_award_result_id, id);
++
++
++--
++-- Name: ix_derived_award_projections_target; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_derived_award_projections_target ON public.derived_award_projections USING btree (award_slug, season, id);
++
++
++--
++-- Name: ix_derived_award_results_published_by; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_derived_award_results_published_by ON public.derived_award_results USING btree (published_by);
++
++
++--
++-- Name: ix_derived_award_results_target; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX ix_derived_award_results_target ON public.derived_award_results USING btree (award_slug, season, id);
++
++
++--
+ -- Name: ix_draft_club; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -9217,6 +9782,20 @@
+ 
+ 
+ --
++-- Name: uq_award_proposals_live_revision; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE UNIQUE INDEX uq_award_proposals_live_revision ON public.award_proposals USING btree (proposal_key) WHERE (status = ANY (ARRAY['proposed'::text, 'validated'::text, 'validation_failed'::text, 'approved'::text]));
++
++
++--
++-- Name: uq_award_proposals_revision_of; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE UNIQUE INDEX uq_award_proposals_revision_of ON public.award_proposals USING btree (revision_of_id) WHERE (revision_of_id IS NOT NULL);
++
++
++--
+ -- Name: uq_award_winners_source; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -9252,6 +9831,20 @@
+ 
+ 
+ --
++-- Name: uq_brownlow_eligibility_decisions_root; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE UNIQUE INDEX uq_brownlow_eligibility_decisions_root ON public.brownlow_eligibility_decisions USING btree (season, player_identity) WHERE (supersedes_id IS NULL);
++
++
++--
++-- Name: uq_brownlow_eligibility_decisions_supersedes; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE UNIQUE INDEX uq_brownlow_eligibility_decisions_supersedes ON public.brownlow_eligibility_decisions USING btree (supersedes_id) WHERE (supersedes_id IS NOT NULL);
++
++
++--
+ -- Name: uq_data_issues_open_by_key; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -9280,6 +9873,20 @@
+ 
+ 
+ --
++-- Name: uq_derived_award_results_root; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE UNIQUE INDEX uq_derived_award_results_root ON public.derived_award_results USING btree (award_slug, season) WHERE (supersedes_id IS NULL);
++
++
++--
++-- Name: uq_derived_award_results_supersedes; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE UNIQUE INDEX uq_derived_award_results_supersedes ON public.derived_award_results USING btree (supersedes_id) WHERE (supersedes_id IS NOT NULL);
++
++
++--
+ -- Name: uq_external_identities_afl_api_player; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -9644,6 +10251,13 @@
+ 
+ 
+ --
++-- Name: brownlow_correction_receipts brownlow_receipt_immutable; Type: TRIGGER; Schema: public; Owner: -
++--
++
++CREATE TRIGGER brownlow_receipt_immutable BEFORE DELETE OR UPDATE OR TRUNCATE ON public.brownlow_correction_receipts FOR EACH STATEMENT EXECUTE FUNCTION public.refuse_brownlow_receipt_mutation();
++
++
++--
+ -- Name: match_coaches match_coaches_club_in_match_trg; Type: TRIGGER; Schema: public; Owner: -
+ --
+ 
+@@ -9819,6 +10433,38 @@
+ 
+ 
+ --
++-- Name: award_proposal_decisions award_proposal_decisions_admin_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.award_proposal_decisions
++    ADD CONSTRAINT award_proposal_decisions_admin_user_id_fkey FOREIGN KEY (admin_user_id) REFERENCES public.auth_users(id);
++
++
++--
++-- Name: award_proposal_decisions award_proposal_decisions_proposal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.award_proposal_decisions
++    ADD CONSTRAINT award_proposal_decisions_proposal_id_fkey FOREIGN KEY (proposal_id) REFERENCES public.award_proposals(id);
++
++
++--
++-- Name: award_proposals award_proposals_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.award_proposals
++    ADD CONSTRAINT award_proposals_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.auth_users(id);
++
++
++--
++-- Name: award_proposals award_proposals_revision_of_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.award_proposals
++    ADD CONSTRAINT award_proposals_revision_of_id_fkey FOREIGN KEY (revision_of_id) REFERENCES public.award_proposals(id);
++
++
++--
+ -- Name: award_winners award_winners_award_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -9915,6 +10561,22 @@
+ 
+ 
+ --
++-- Name: brownlow_eligibility_decisions brownlow_eligibility_decisions_decided_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.brownlow_eligibility_decisions
++    ADD CONSTRAINT brownlow_eligibility_decisions_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES public.auth_users(id);
++
++
++--
++-- Name: brownlow_eligibility_decisions brownlow_eligibility_decisions_supersedes_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.brownlow_eligibility_decisions
++    ADD CONSTRAINT brownlow_eligibility_decisions_supersedes_fk FOREIGN KEY (supersedes_id, season, player_identity) REFERENCES public.brownlow_eligibility_decisions(id, season, player_identity);
++
++
++--
+ -- Name: brownlow_round_votes brownlow_round_votes_import_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -10371,6 +11033,38 @@
+ 
+ 
+ --
++-- Name: derived_award_projections derived_award_projections_projected_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.derived_award_projections
++    ADD CONSTRAINT derived_award_projections_projected_by_fkey FOREIGN KEY (projected_by) REFERENCES public.auth_users(id);
++
++
++--
++-- Name: derived_award_projections derived_award_projections_result_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.derived_award_projections
++    ADD CONSTRAINT derived_award_projections_result_fk FOREIGN KEY (derived_award_result_id, award_slug, season) REFERENCES public.derived_award_results(id, award_slug, season);
++
++
++--
++-- Name: derived_award_results derived_award_results_published_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.derived_award_results
++    ADD CONSTRAINT derived_award_results_published_by_fkey FOREIGN KEY (published_by) REFERENCES public.auth_users(id);
++
++
++--
++-- Name: derived_award_results derived_award_results_supersedes_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.derived_award_results
++    ADD CONSTRAINT derived_award_results_supersedes_fk FOREIGN KEY (supersedes_id, award_slug, season) REFERENCES public.derived_award_results(id, award_slug, season);
++
++
++--
+ -- Name: draft_persons draft_persons_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -11787,6 +12481,14 @@
+ 
+ 
+ --
++-- Name: SCHEMA aflw; Type: ACL; Schema: -; Owner: -
++--
++
++GRANT USAGE ON SCHEMA aflw TO afldb_app;
++GRANT USAGE ON SCHEMA aflw TO afldb_import;
++
++
++--
+ -- Name: SCHEMA public; Type: ACL; Schema: -; Owner: -
+ --
+ 
+@@ -11797,8 +12499,1574 @@
+ 
+ 
+ --
++-- Name: SCHEMA staging; Type: ACL; Schema: -; Owner: -
++--
++
++GRANT USAGE ON SCHEMA staging TO afldb_app;
++GRANT USAGE ON SCHEMA staging TO afldb_import;
++
++
++--
++-- Name: SCHEMA staging_aflw; Type: ACL; Schema: -; Owner: -
++--
++
++GRANT USAGE ON SCHEMA staging_aflw TO afldb_app;
++GRANT USAGE ON SCHEMA staging_aflw TO afldb_import;
++
++
++--
++-- Name: TABLE clubs; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.clubs TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.clubs TO afldb_import;
++GRANT SELECT ON TABLE public.clubs TO afldb_auth;
++
++
++--
++-- Name: FUNCTION assert_viable_super_admin_actor(p_actor_id integer); Type: ACL; Schema: public; Owner: -
++--
++
++REVOKE ALL ON FUNCTION public.assert_viable_super_admin_actor(p_actor_id integer) FROM PUBLIC;
++GRANT ALL ON FUNCTION public.assert_viable_super_admin_actor(p_actor_id integer) TO afldb_import;
++
++
++--
++-- Name: FUNCTION nl_search_telemetry_clear(); Type: ACL; Schema: public; Owner: -
++--
++
++REVOKE ALL ON FUNCTION public.nl_search_telemetry_clear() FROM PUBLIC;
++GRANT ALL ON FUNCTION public.nl_search_telemetry_clear() TO afldb_auth;
++
++
++--
++-- Name: TABLE ladders; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE staging_aflw.ladders TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging_aflw.ladders TO afldb_import;
++
++
++--
++-- Name: TABLE seasons; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE staging_aflw.seasons TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging_aflw.seasons TO afldb_import;
++
++
++--
++-- Name: TABLE clubs; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.clubs TO afldb_app;
++GRANT SELECT ON TABLE aflw.clubs TO afldb_import;
++
++
++--
++-- Name: TABLE matches; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE staging_aflw.matches TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging_aflw.matches TO afldb_import;
++
++
++--
++-- Name: TABLE matches; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.matches TO afldb_app;
++GRANT SELECT ON TABLE aflw.matches TO afldb_import;
++
++
++--
++-- Name: TABLE club_totals; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.club_totals TO afldb_app;
++GRANT SELECT ON TABLE aflw.club_totals TO afldb_import;
++
++
++--
++-- Name: TABLE fixtures; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE staging_aflw.fixtures TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging_aflw.fixtures TO afldb_import;
++
++
++--
++-- Name: TABLE fixtures; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.fixtures TO afldb_app;
++GRANT SELECT ON TABLE aflw.fixtures TO afldb_import;
++
++
++--
++-- Name: TABLE ladders; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.ladders TO afldb_app;
++GRANT SELECT ON TABLE aflw.ladders TO afldb_import;
++
++
++--
++-- Name: TABLE player_match_stats; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE staging_aflw.player_match_stats TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging_aflw.player_match_stats TO afldb_import;
++
++
++--
++-- Name: TABLE player_match_stats; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.player_match_stats TO afldb_app;
++GRANT SELECT ON TABLE aflw.player_match_stats TO afldb_import;
++
++
++--
++-- Name: TABLE player_careers; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.player_careers TO afldb_app;
++GRANT SELECT ON TABLE aflw.player_careers TO afldb_import;
++
++
++--
++-- Name: TABLE player_seasons; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.player_seasons TO afldb_app;
++GRANT SELECT ON TABLE aflw.player_seasons TO afldb_import;
++
++
++--
++-- Name: TABLE players; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.players TO afldb_app;
++GRANT SELECT ON TABLE aflw.players TO afldb_import;
++
++
++--
++-- Name: TABLE scoring_events; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE staging_aflw.scoring_events TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging_aflw.scoring_events TO afldb_import;
++
++
++--
++-- Name: TABLE scoring_events; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.scoring_events TO afldb_app;
++GRANT SELECT ON TABLE aflw.scoring_events TO afldb_import;
++
++
++--
++-- Name: TABLE player_seasons; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE staging_aflw.player_seasons TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging_aflw.player_seasons TO afldb_import;
++
++
++--
++-- Name: TABLE seasons; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.seasons TO afldb_app;
++GRANT SELECT ON TABLE aflw.seasons TO afldb_import;
++
++
++--
++-- Name: TABLE venues; Type: ACL; Schema: aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE aflw.venues TO afldb_app;
++GRANT SELECT ON TABLE aflw.venues TO afldb_import;
++
++
++--
++-- Name: TABLE admin_invites; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,UPDATE ON TABLE public.admin_invites TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE admin_invites_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.admin_invites_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE afl_api_identity_adjudications; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT ON TABLE public.afl_api_identity_adjudications TO afldb_import;
++GRANT SELECT ON TABLE public.afl_api_identity_adjudications TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE afl_api_identity_adjudications_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.afl_api_identity_adjudications_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE after_siren_kicks; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.after_siren_kicks TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.after_siren_kicks TO afldb_import;
++
++
++--
++-- Name: SEQUENCE after_siren_kicks_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.after_siren_kicks_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE app_health_events; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT ON TABLE public.app_health_events TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE app_health_events_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.app_health_events_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE auth_audit_log; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT ON TABLE public.auth_audit_log TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE auth_audit_log_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.auth_audit_log_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE auth_sessions; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,UPDATE ON TABLE public.auth_sessions TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE auth_sessions_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.auth_sessions_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE auth_users; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,UPDATE ON TABLE public.auth_users TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE auth_users_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.auth_users_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE award_nominations; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.award_nominations TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.award_nominations TO afldb_import;
++GRANT SELECT ON TABLE public.award_nominations TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE award_nominations_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.award_nominations_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE award_proposal_decisions; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.award_proposal_decisions TO afldb_auth;
++GRANT SELECT,INSERT ON TABLE public.award_proposal_decisions TO afldb_import;
++
++
++--
++-- Name: SEQUENCE award_proposal_decisions_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.award_proposal_decisions_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE award_proposals; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.award_proposals TO afldb_auth;
++GRANT SELECT,INSERT ON TABLE public.award_proposals TO afldb_import;
++
++
++--
++-- Name: COLUMN award_proposals.status; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(status) ON TABLE public.award_proposals TO afldb_import;
++
++
++--
++-- Name: COLUMN award_proposals.validation_result; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(validation_result) ON TABLE public.award_proposals TO afldb_import;
++
++
++--
++-- Name: COLUMN award_proposals.validated_at; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(validated_at) ON TABLE public.award_proposals TO afldb_import;
++
++
++--
++-- Name: COLUMN award_proposals.approved_entity_key; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(approved_entity_key) ON TABLE public.award_proposals TO afldb_import;
++
++
++--
++-- Name: COLUMN award_proposals.approved_at; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(approved_at) ON TABLE public.award_proposals TO afldb_import;
++
++
++--
++-- Name: COLUMN award_proposals.updated_at; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(updated_at) ON TABLE public.award_proposals TO afldb_import;
++
++
++--
++-- Name: SEQUENCE award_proposals_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.award_proposals_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE award_winners; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.award_winners TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.award_winners TO afldb_import;
++GRANT SELECT ON TABLE public.award_winners TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE award_winners_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.award_winners_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE awards; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.awards TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.awards TO afldb_import;
++GRANT SELECT ON TABLE public.awards TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE awards_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.awards_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE beta_access_codes; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.beta_access_codes TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE beta_access_codes_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.beta_access_codes_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE beta_allowed_emails; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,UPDATE ON TABLE public.beta_allowed_emails TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE beta_allowed_emails_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.beta_allowed_emails_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE beta_join_requests; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,UPDATE ON TABLE public.beta_join_requests TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE beta_join_requests_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.beta_join_requests_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE beta_login_tokens; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,UPDATE ON TABLE public.beta_login_tokens TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE beta_login_tokens_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.beta_login_tokens_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE brownlow_eligibility_decisions; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.brownlow_eligibility_decisions TO afldb_auth;
++GRANT SELECT,INSERT ON TABLE public.brownlow_eligibility_decisions TO afldb_import;
++
++
++--
++-- Name: SEQUENCE brownlow_eligibility_decisions_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.brownlow_eligibility_decisions_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE brownlow_round_votes; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.brownlow_round_votes TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.brownlow_round_votes TO afldb_import;
++
++
++--
++-- Name: SEQUENCE brownlow_round_votes_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.brownlow_round_votes_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE brownlow_season_authority; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.brownlow_season_authority TO afldb_app;
++GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.brownlow_season_authority TO afldb_import;
++
++
++--
++-- Name: TABLE brownlow_season_votes; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.brownlow_season_votes TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.brownlow_season_votes TO afldb_import;
++
++
++--
++-- Name: SEQUENCE brownlow_season_votes_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.brownlow_season_votes_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE brownlow_vote_entry_state; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.brownlow_vote_entry_state TO afldb_app;
++GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.brownlow_vote_entry_state TO afldb_import;
++
++
++--
++-- Name: TABLE canonical_applications; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT ON TABLE public.canonical_applications TO afldb_import;
++GRANT SELECT ON TABLE public.canonical_applications TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE canonical_applications_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.canonical_applications_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE captaincies; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.captaincies TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.captaincies TO afldb_import;
++
++
++--
++-- Name: SEQUENCE captaincies_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.captaincies_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE club_aliases; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.club_aliases TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.club_aliases TO afldb_import;
++GRANT SELECT ON TABLE public.club_aliases TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE club_aliases_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.club_aliases_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE club_leadership; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.club_leadership TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.club_leadership TO afldb_import;
++
++
++--
++-- Name: SEQUENCE club_leadership_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.club_leadership_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE club_organization_relations; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.club_organization_relations TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.club_organization_relations TO afldb_import;
++
++
++--
++-- Name: TABLE club_organizations; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.club_organizations TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.club_organizations TO afldb_import;
++
++
++--
++-- Name: SEQUENCE club_organizations_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.club_organizations_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE club_seasons; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.club_seasons TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.club_seasons TO afldb_import;
++
++
++--
++-- Name: SEQUENCE club_seasons_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.club_seasons_id_seq TO afldb_import;
++
++
++--
++-- Name: SEQUENCE clubs_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.clubs_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE coaches; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.coaches TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.coaches TO afldb_import;
++
++
++--
++-- Name: SEQUENCE coaches_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.coaches_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE data_edits; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT ON TABLE public.data_edits TO afldb_import;
++GRANT SELECT,INSERT ON TABLE public.data_edits TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE data_edits_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.data_edits_id_seq TO afldb_import;
++GRANT SELECT,USAGE ON SEQUENCE public.data_edits_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE data_issues; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.data_issues TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.data_issues TO afldb_import;
++
++
++--
++-- Name: SEQUENCE data_issues_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.data_issues_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE data_overrides; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.data_overrides TO afldb_import;
++
++
++--
++-- Name: COLUMN data_overrides.entity_type; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT INSERT(entity_type) ON TABLE public.data_overrides TO afldb_import;
++
++
++--
++-- Name: COLUMN data_overrides.entity_key; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT INSERT(entity_key) ON TABLE public.data_overrides TO afldb_import;
++
++
++--
++-- Name: COLUMN data_overrides.field_group; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT INSERT(field_group) ON TABLE public.data_overrides TO afldb_import;
++
++
++--
++-- Name: COLUMN data_overrides.override_values; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT INSERT(override_values),UPDATE(override_values) ON TABLE public.data_overrides TO afldb_import;
++
++
++--
++-- Name: COLUMN data_overrides.is_active; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT INSERT(is_active),UPDATE(is_active) ON TABLE public.data_overrides TO afldb_import;
++
++
++--
++-- Name: COLUMN data_overrides.admin_user_id; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT INSERT(admin_user_id),UPDATE(admin_user_id) ON TABLE public.data_overrides TO afldb_import;
++
++
++--
++-- Name: COLUMN data_overrides.updated_at; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT INSERT(updated_at),UPDATE(updated_at) ON TABLE public.data_overrides TO afldb_import;
++
++
++--
++-- Name: SEQUENCE data_overrides_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.data_overrides_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE data_submission_rows; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.data_submission_rows TO afldb_import;
++GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.data_submission_rows TO afldb_auth;
++
++
++--
++-- Name: TABLE data_submissions; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.data_submissions TO afldb_import;
++GRANT SELECT,INSERT,UPDATE ON TABLE public.data_submissions TO afldb_auth;
++
++
++--
++-- Name: COLUMN data_submissions.status; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(status) ON TABLE public.data_submissions TO afldb_import;
++
++
++--
++-- Name: COLUMN data_submissions.promoted_at; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(promoted_at) ON TABLE public.data_submissions TO afldb_import;
++
++
++--
++-- Name: COLUMN data_submissions.import_batch_id; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(import_batch_id) ON TABLE public.data_submissions TO afldb_import;
++
++
++--
++-- Name: COLUMN data_submissions.error; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(error) ON TABLE public.data_submissions TO afldb_import;
++
++
++--
++-- Name: SEQUENCE data_submissions_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.data_submissions_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE derived_award_projections; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.derived_award_projections TO afldb_auth;
++GRANT SELECT,INSERT ON TABLE public.derived_award_projections TO afldb_import;
++
++
++--
++-- Name: SEQUENCE derived_award_projections_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.derived_award_projections_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE derived_award_results; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.derived_award_results TO afldb_auth;
++GRANT SELECT,INSERT ON TABLE public.derived_award_results TO afldb_import;
++
++
++--
++-- Name: SEQUENCE derived_award_results_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.derived_award_results_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE derived_rebuilds; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.derived_rebuilds TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.derived_rebuilds TO afldb_import;
++
++
++--
++-- Name: SEQUENCE derived_rebuilds_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.derived_rebuilds_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE draft_persons; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.draft_persons TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.draft_persons TO afldb_import;
++
++
++--
++-- Name: SEQUENCE draft_persons_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.draft_persons_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE draft_picks; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.draft_picks TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.draft_picks TO afldb_import;
++
++
++--
++-- Name: SEQUENCE draft_picks_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.draft_picks_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE external_grid_axes; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.external_grid_axes TO afldb_app;
++GRANT SELECT,INSERT ON TABLE public.external_grid_axes TO afldb_import;
++
++
++--
++-- Name: SEQUENCE external_grid_axes_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.external_grid_axes_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE external_grid_sources; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.external_grid_sources TO afldb_app;
++GRANT SELECT ON TABLE public.external_grid_sources TO afldb_import;
++
++
++--
++-- Name: TABLE external_grids; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.external_grids TO afldb_app;
++GRANT SELECT,INSERT ON TABLE public.external_grids TO afldb_import;
++
++
++--
++-- Name: COLUMN external_grids.is_current; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(is_current) ON TABLE public.external_grids TO afldb_import;
++
++
++--
++-- Name: SEQUENCE external_grids_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.external_grids_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE external_identities; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.external_identities TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.external_identities TO afldb_import;
++
++
++--
++-- Name: SEQUENCE external_identities_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.external_identities_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE father_son_selections; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.father_son_selections TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.father_son_selections TO afldb_import;
++
++
++--
++-- Name: SEQUENCE father_son_selections_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.father_son_selections_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE fixtures; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.fixtures TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.fixtures TO afldb_import;
++
++
++--
++-- Name: SEQUENCE fixtures_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.fixtures_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE hall_of_fame; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.hall_of_fame TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.hall_of_fame TO afldb_import;
++
++
++--
++-- Name: SEQUENCE hall_of_fame_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.hall_of_fame_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE honour_team_members; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.honour_team_members TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.honour_team_members TO afldb_import;
++
++
++--
++-- Name: SEQUENCE honour_team_members_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.honour_team_members_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE import_batches; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.import_batches TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.import_batches TO afldb_import;
++GRANT SELECT ON TABLE public.import_batches TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE import_batches_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.import_batches_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE import_rejections; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.import_rejections TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.import_rejections TO afldb_import;
++
++
++--
++-- Name: SEQUENCE import_rejections_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.import_rejections_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE match_coaches; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.match_coaches TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.match_coaches TO afldb_import;
++
++
++--
++-- Name: TABLE match_period_scores; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.match_period_scores TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.match_period_scores TO afldb_import;
++
++
++--
++-- Name: TABLE matches; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.matches TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.matches TO afldb_import;
++GRANT SELECT ON TABLE public.matches TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE matches_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.matches_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE nl_search_feedback; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT ON TABLE public.nl_search_feedback TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE nl_search_feedback_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.nl_search_feedback_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE nl_search_log; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT ON TABLE public.nl_search_log TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE nl_search_log_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.nl_search_log_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE nl_search_review; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,UPDATE ON TABLE public.nl_search_review TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE nl_search_review_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.nl_search_review_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE player_achievements; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_achievements TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_achievements TO afldb_import;
++
++
++--
++-- Name: SEQUENCE player_achievements_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.player_achievements_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE player_birth_evidence; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_birth_evidence TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_birth_evidence TO afldb_import;
++
++
++--
++-- Name: SEQUENCE player_birth_evidence_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.player_birth_evidence_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE player_career_stats; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_career_stats TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_career_stats TO afldb_import;
++
++
++--
++-- Name: TABLE player_club_season_stats; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_club_season_stats TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_club_season_stats TO afldb_import;
++
++
++--
++-- Name: TABLE player_clubs; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_clubs TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_clubs TO afldb_import;
++GRANT SELECT ON TABLE public.player_clubs TO afldb_auth;
++
++
++--
++-- Name: TABLE player_height_evidence; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_height_evidence TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_height_evidence TO afldb_import;
++
++
++--
++-- Name: SEQUENCE player_height_evidence_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.player_height_evidence_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE player_link_match_candidates; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_link_match_candidates TO afldb_app;
++GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.player_link_match_candidates TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE player_link_match_candidates_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.player_link_match_candidates_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE player_link_resolutions; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT ON TABLE public.player_link_resolutions TO afldb_import;
++GRANT SELECT,INSERT ON TABLE public.player_link_resolutions TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE player_link_resolutions_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT USAGE ON SEQUENCE public.player_link_resolutions_id_seq TO afldb_import;
++GRANT SELECT,USAGE ON SEQUENCE public.player_link_resolutions_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE player_link_suggestions; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_link_suggestions TO afldb_import;
++GRANT SELECT,INSERT ON TABLE public.player_link_suggestions TO afldb_auth;
++
++
++--
++-- Name: COLUMN player_link_suggestions.status; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(status) ON TABLE public.player_link_suggestions TO afldb_auth;
++
++
++--
++-- Name: COLUMN player_link_suggestions.resolved_by; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(resolved_by) ON TABLE public.player_link_suggestions TO afldb_auth;
++
++
++--
++-- Name: COLUMN player_link_suggestions.resolved_at; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(resolved_at) ON TABLE public.player_link_suggestions TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE player_link_suggestions_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.player_link_suggestions_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE player_match_period_stats; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_match_period_stats TO afldb_import;
++
++
++--
++-- Name: TABLE player_match_stats; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_match_stats TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_match_stats TO afldb_import;
++
++
++--
++-- Name: SEQUENCE player_match_stats_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.player_match_stats_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE player_name_aliases; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_name_aliases TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_name_aliases TO afldb_import;
++
++
++--
++-- Name: SEQUENCE player_name_aliases_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.player_name_aliases_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE player_relationships; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_relationships TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_relationships TO afldb_import;
++
++
++--
++-- Name: SEQUENCE player_relationships_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.player_relationships_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE player_season_stats; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.player_season_stats TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.player_season_stats TO afldb_import;
++
++
++--
++-- Name: TABLE players; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.players TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.players TO afldb_import;
++GRANT SELECT ON TABLE public.players TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE players_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.players_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE promotion_candidates; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.promotion_candidates TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.promotion_candidates TO afldb_import;
++GRANT SELECT ON TABLE public.promotion_candidates TO afldb_auth;
++
++
++--
++-- Name: COLUMN promotion_candidates.status; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(status) ON TABLE public.promotion_candidates TO afldb_auth;
++
++
++--
++-- Name: COLUMN promotion_candidates.resolved_at; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(resolved_at) ON TABLE public.promotion_candidates TO afldb_auth;
++
++
++--
++-- Name: COLUMN promotion_candidates.resolved_decision_id; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT UPDATE(resolved_decision_id) ON TABLE public.promotion_candidates TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE promotion_candidates_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.promotion_candidates_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE promotion_decisions; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.promotion_decisions TO afldb_app;
++GRANT SELECT,INSERT ON TABLE public.promotion_decisions TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE promotion_decisions_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE public.promotion_decisions_id_seq TO afldb_auth;
++
++
++--
++-- Name: TABLE season_list_members; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.season_list_members TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.season_list_members TO afldb_import;
++
++
++--
++-- Name: SEQUENCE season_list_members_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.season_list_members_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE seasons; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.seasons TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.seasons TO afldb_import;
++GRANT SELECT ON TABLE public.seasons TO afldb_auth;
++
++
++--
++-- Name: TABLE site_media; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.site_media TO afldb_auth;
++
++
++--
++-- Name: TABLE site_settings; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.site_settings TO afldb_app;
++GRANT SELECT,INSERT,UPDATE ON TABLE public.site_settings TO afldb_auth;
++
++
++--
++-- Name: TABLE sources; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.sources TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.sources TO afldb_import;
++
++
++--
++-- Name: SEQUENCE sources_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.sources_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE stat_availability; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.stat_availability TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.stat_availability TO afldb_import;
++
++
++--
++-- Name: TABLE stat_definitions; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.stat_definitions TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.stat_definitions TO afldb_import;
++
++
++--
++-- Name: TABLE venue_aliases; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.venue_aliases TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.venue_aliases TO afldb_import;
++GRANT SELECT ON TABLE public.venue_aliases TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE venue_aliases_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.venue_aliases_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE venues; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT SELECT ON TABLE public.venues TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE public.venues TO afldb_import;
++GRANT SELECT ON TABLE public.venues TO afldb_auth;
++
++
++--
++-- Name: SEQUENCE venues_id_seq; Type: ACL; Schema: public; Owner: -
++--
++
++GRANT ALL ON SEQUENCE public.venues_id_seq TO afldb_import;
++
++
++--
++-- Name: TABLE afl_api_brownlow_vote; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.afl_api_brownlow_vote TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.afl_api_brownlow_vote TO afldb_import;
++
++
++--
++-- Name: TABLE afl_api_lineup; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.afl_api_lineup TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.afl_api_lineup TO afldb_import;
++
++
++--
++-- Name: TABLE afl_api_match; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.afl_api_match TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.afl_api_match TO afldb_import;
++
++
++--
++-- Name: TABLE afl_api_player_match; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.afl_api_player_match TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.afl_api_player_match TO afldb_import;
++
++
++--
++-- Name: TABLE afltables_match; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.afltables_match TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.afltables_match TO afldb_import;
++
++
++--
++-- Name: TABLE afltables_player_match; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.afltables_player_match TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.afltables_player_match TO afldb_import;
++
++
++--
++-- Name: TABLE external_current_matches; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.external_current_matches TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.external_current_matches TO afldb_import;
++
++
++--
++-- Name: TABLE source_payloads; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.source_payloads TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.source_payloads TO afldb_import;
++
++
++--
++-- Name: TABLE source_record_versions; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.source_record_versions TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.source_record_versions TO afldb_import;
++
++
++--
++-- Name: TABLE source_records; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.source_records TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.source_records TO afldb_import;
++
++
++--
++-- Name: TABLE team_seasons; Type: ACL; Schema: staging; Owner: -
++--
++
++GRANT SELECT ON TABLE staging.team_seasons TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging.team_seasons TO afldb_import;
++
++
++--
++-- Name: TABLE issues; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT ON TABLE staging_aflw.issues TO afldb_app;
++GRANT SELECT,INSERT,DELETE,TRUNCATE,UPDATE ON TABLE staging_aflw.issues TO afldb_import;
++
++
++--
++-- Name: SEQUENCE issues_id_seq; Type: ACL; Schema: staging_aflw; Owner: -
++--
++
++GRANT SELECT,USAGE ON SEQUENCE staging_aflw.issues_id_seq TO afldb_import;
++
++
++--
+ -- PostgreSQL database dump complete
+ --
+ 
+-\unrestrict 0XMOMB2X7nVOaBc2LIGqCnshu6M4Om4JsCal2yhK4vgHFg1oCbbRePcLXebvt7q
++\unrestrict LJmUEXBB6whYBnpK6GPNdaX4V2ECeyZrBkXTPVjKHXyzjH4EcCM3BsfT24s0ctK
+ 

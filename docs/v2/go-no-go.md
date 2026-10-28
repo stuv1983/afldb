@@ -2,8 +2,13 @@
 
 **Current decision package, 2026-10-28:** [release decision package](release-decision-package-2026-10-28.md).
 It separates stages A (inert V2 installation), B (schema/data acceptance), C (source retirement and
-AFL API cutover) and D (first 2027 fixture ingestion), and holds the reviewed current-production
-shadow capture awaiting D-V2-CURRENT-SHADOW-CAPTURE-1. Production remains **NO-GO**.
+AFL API cutover) and D (first 2027 fixture ingestion). Production remains **NO-GO**.
+
+**Current-production shadow, 2026-10-29:** [report](current-production-shadow-2026-10-29.md). Under
+D-V2-CURRENT-SHADOW-CAPTURE-1, archive `a4641ca0…` gave `shadow.result` SUCCEEDED and classification
+`ONLY_EXPECTED_116_117_DELTAS`. Strict preservation, parity and `migrationCompatibility` remain **FAIL**,
+Brownlow **INCOMPLETE**, and NO-GO. No acceptance is extended to this archive: a new archive-bound owner
+decision is proposed there, and the MED-2 evidence limits remain.
 
 **Current scoped acceptance, 2026-10-21:** [owner decisions and measured result](owner-decision-fresh-rehearsal-2026-10-21.md)
 supersede historical pending-rehearsal statements below for archive `7fefcd9b…6dea6599`, baseline

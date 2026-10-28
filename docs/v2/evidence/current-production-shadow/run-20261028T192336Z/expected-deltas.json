@@ -1,0 +1,15 @@
+{
+  "classification": "ONLY_EXPECTED_116_117_DELTAS",
+  "reasons": [],
+  "addedTables": [
+    "public.award_proposal_decisions",
+    "public.award_proposals",
+    "public.brownlow_correction_receipts",
+    "public.brownlow_eligibility_decisions",
+    "public.derived_award_projections",
+    "public.derived_award_results"
+  ],
+  "stagedBrownlowSeasons": [],
+  "strictResultsUnchanged": true,
+  "acceptance": "NONE. Classification only. D-V2-FRESH-SCHEMA-1 / D-V2-BROWNLOW-ALT-2 are bound to archive 7fefcd9b... and do not apply; a new archive-bound owner decision is required."
+}
