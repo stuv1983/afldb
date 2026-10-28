@@ -180,6 +180,11 @@ ISSUE-327 stays parked.
 
 ## 9. Proposed archive-bound acceptance (for owner review; NOT approved)
 
+> **Follow-up done, 2026-10-29 (D-V2-CURRENT-SHADOW-FOLLOWUP-1):** the bounded follow-up recommended below was
+> run. The current, fully populated proposal is in [the follow-up record](current-production-shadow-followup-2026-10-29.md) §9,
+> which supersedes the gaps listed in this table. This section is kept as originally written. Still NOT approved;
+> production remains NO-GO.
+
 These have the same shape as the 2026-10-21 decisions. Every item is bound to:
 - archive `a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc`;
 - sidecar `72f000462a2e7560afee97edf5598723a2ccfa45c9664e7d57ce7b62dddb57d4`;

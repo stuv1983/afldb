@@ -1,0 +1,89 @@
+{
+  "decision": "D-V2-CURRENT-SHADOW-FOLLOWUP-1",
+  "item": 3,
+  "inputs": {
+    "diff": "/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/src-vs-c478c31b-manifest.diff",
+    "s2Manifest": "/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/src.files.sha256",
+    "inventory": "/home/arm/afldb-v2-linuxverify-20261028T0310Z/xfer/inputs.sha256",
+    "verifiedManifest": "/home/arm/afldb-v2-linuxverify-20261028T0310Z/evidence/src-c478c31b.files.sha256",
+    "currentRehash": "/home/arm/afldb-v2-currentshadow-20261028T192336Z/followup/evidence/src-rehash.sha256"
+  },
+  "counts": {
+    "diffLines": 783,
+    "additions": 783,
+    "removalsOrChanges": 0,
+    "s2ManifestFiles": 3722,
+    "verifiedManifestFiles": 2939,
+    "inventoryEntries": 785,
+    "additionsMatchedToInventoryPathAndHash": 778,
+    "additionsHashMismatch": 0,
+    "additionsNotInInventory": 5,
+    "additionsChangedSinceS2": 0,
+    "additionsOnShadowPaths": 0,
+    "inventoryEntriesNotAmongAdditions": 7
+  },
+  "additionsByDirectory": {
+    "data/records/first-kick-goal.csv": 1,
+    "data/sources/All-Australian_team": 71,
+    "data/sources/Hall": 4,
+    "data/sources/afl_api": 16,
+    "data/sources/afltables": 311,
+    "data/sources/draftguru": 379,
+    "data/sources/representative": 1
+  },
+  "hashMismatch": [],
+  "notInInventory": [
+    "data/sources/Hall",
+    "data/sources/Hall",
+    "data/sources/Hall",
+    "data/sources/Hall",
+    "data/sources/representative"
+  ],
+  "rehashChanged": [],
+  "shadowPathHits": [],
+  "inventoryNotAdded": [
+    {
+      "path": "data/sources/Hall of Fame/Coach inductees.csv",
+      "inVerifiedManifest": false,
+      "verifiedHashEqualsInventory": false,
+      "s2HashEqualsInventory": true
+    },
+    {
+      "path": "data/sources/Hall of Fame/Legends.csv",
+      "inVerifiedManifest": false,
+      "verifiedHashEqualsInventory": false,
+      "s2HashEqualsInventory": true
+    },
+    {
+      "path": "data/sources/Hall of Fame/Player inductees.csv",
+      "inVerifiedManifest": false,
+      "verifiedHashEqualsInventory": false,
+      "s2HashEqualsInventory": true
+    },
+    {
+      "path": "data/sources/Hall of Fame/Umpires.csv",
+      "inVerifiedManifest": false,
+      "verifiedHashEqualsInventory": false,
+      "s2HashEqualsInventory": true
+    },
+    {
+      "path": "data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv",
+      "inVerifiedManifest": true,
+      "verifiedHashEqualsInventory": true,
+      "s2HashEqualsInventory": true
+    },
+    {
+      "path": "data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv",
+      "inVerifiedManifest": true,
+      "verifiedHashEqualsInventory": true,
+      "s2HashEqualsInventory": true
+    },
+    {
+      "path": "data/sources/representative teams/VFLAFL_Team_of_the_Century.csv",
+      "inVerifiedManifest": false,
+      "verifiedHashEqualsInventory": false,
+      "s2HashEqualsInventory": true
+    }
+  ],
+  "explained": false
+}

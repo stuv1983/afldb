@@ -15,6 +15,31 @@ commit.
 
 ## [Unreleased]
 
+### Current-production shadow follow-up: the missing evidence produced; nothing accepted (2026-10-29; production NO-GO)
+
+- Under D-V2-CURRENT-SHADOW-FOLLOWUP-1 the stopped streamanator cluster was restarted once, on the retained
+  root only. Retained databases were accessed only read-only or by `pg_dump`. Their schema was identical at
+  start and end, and the migration copy's receipt catalogue was byte-identical; data was not re-measured at
+  the end. Each database grew 162,312 bytes on first connection; the probable cause is the relcache init file,
+  unverified. Writes went only to two new disposable clones, both dropped. Source reused read only; S2 was not repeated.
+- Results:
+  - the 783 extra source files are the approved Linux-verification `inputs.tar` (783/783 by path and hash);
+  - receipt catalogue 25/25; 12 role denials and 3 owner trigger refusals on a clone;
+  - normalised schema sections: restore fidelity 1,194/1,194; 72 migration differences, all from 111–117;
+    all 193 archived stored ACLs equal after reconciliation; 21/21 new-object grants equal to 111–117 with
+    exact privileges; 0 unclassified; object ownership not compared;
+  - 98-season stored Brownlow reports byte-identical across 110→117, 0 findings;
+  - units 508/508, eligibility integration 47/47, privileges integration 42/43. The failure is production's
+    absent staging default ACLs, reported rather than installed.
+- Limits kept open: drift against `7fefcd9b…` is aggregate only (+18 rows), because that archive is not on
+  streamanator; stored ACLs, not effective permissions; no authentic staged reconciliation. Two file-only
+  comparators needed a disclosed attempt 2. A LOW defect was found: the original S2 diff truncates five
+  paths that contain spaces.
+- Record and fully populated archive-bound proposal: `docs/v2/current-production-shadow-followup-2026-10-29.md`.
+  Evidence: `docs/v2/evidence/current-production-shadow/followup-20261029/` (host manifest `30b1a2be…`).
+  An independent read-only review found no CRIT/HIGH; its four MED and six LOW were dispositioned in the
+  record. No acceptance binding was added.
+
 ### Current-production shadow report: only the expected 116/117 deltas (2026-10-29; production NO-GO)
 
 - Under D-V2-CURRENT-SHADOW-CAPTURE-1, one read-only production capture was taken and restored once on an

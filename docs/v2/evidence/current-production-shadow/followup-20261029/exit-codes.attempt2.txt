@@ -1,0 +1,2 @@
+EXIT inventory-compare.attempt2 = 0
+EXIT schema-sections.attempt2 = 0

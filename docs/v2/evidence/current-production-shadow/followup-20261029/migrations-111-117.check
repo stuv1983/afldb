@@ -1,0 +1,7 @@
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/111_curated_award_proposals.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/112_derived_award_results.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/113_brownlow_eligibility_decisions.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/114_award_projections_and_curated_revisions.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/115_adjudication_supersession_fk_index.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/116_brownlow_correction_receipts.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/117_brownlow_provider_eligibility_unknown.sql: OK

@@ -9,6 +9,12 @@ D-V2-CURRENT-SHADOW-CAPTURE-1, archive `a4641ca0…` gave `shadow.result` SUCCEE
 `ONLY_EXPECTED_116_117_DELTAS`. Strict preservation, parity and `migrationCompatibility` remain **FAIL**,
 Brownlow **INCOMPLETE**, and NO-GO. No acceptance is extended to this archive: a new archive-bound owner
 decision is proposed there, and the MED-2 evidence limits remain.
+**Follow-up, 2026-10-29:** [record](current-production-shadow-followup-2026-10-29.md). Under
+D-V2-CURRENT-SHADOW-FOLLOWUP-1 these were produced: the receipt probes; the normalised schema sections
+(0 unclassified, all 193 archived ACLs equal); the 98-season stored pair (byte-identical); and the focused
+checks (units 508/508, eligibility 47/47, privileges **42/43**, the one failure being the absent staging
+default ACLs). Drift against `7fefcd9b…` is aggregate only (+18 rows). The fully populated proposal awaits
+the owner. Nothing is accepted; NO-GO.
 
 **Current scoped acceptance, 2026-10-21:** [owner decisions and measured result](owner-decision-fresh-rehearsal-2026-10-21.md)
 supersede historical pending-rehearsal statements below for archive `7fefcd9b…6dea6599`, baseline

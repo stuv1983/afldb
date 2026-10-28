@@ -1,0 +1,1 @@
+GRANT UPDATE(proposed_value) ON TABLE public.award_proposals TO afldb_import;

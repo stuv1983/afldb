@@ -1,0 +1,399 @@
+{
+  "decision": "D-V2-CURRENT-SHADOW-FOLLOWUP-1",
+  "item": "4a receipt catalogue probe (read-only)",
+  "expectedDatabase": "afldb_v2_shadow_current_migration_test",
+  "expectationsFrom": [
+    "116_brownlow_correction_receipts.sql",
+    "117_brownlow_provider_eligibility_unknown.sql"
+  ],
+  "result": {
+    "state": {
+      "db": "afldb_v2_shadow_current_migration_test",
+      "usr": "afldb_owner",
+      "ro": "on",
+      "iso": "repeatable read",
+      "ledger": 117
+    },
+    "receiptTable": {
+      "owner": "afldb_owner",
+      "relkind": "r",
+      "relacl": "{afldb_owner=arwdDxt/afldb_owner}",
+      "comment": "Owner-operated correction receipts; commit atomically with the reviewed correction. Never an execution approval.",
+      "relrowsecurity": false,
+      "rows": 0,
+      "columns": [
+        {
+          "attname": "plan_digest",
+          "type": "text",
+          "attnotnull": true,
+          "default": null
+        },
+        {
+          "attname": "operation",
+          "type": "text",
+          "attnotnull": true,
+          "default": null
+        },
+        {
+          "attname": "code_revision",
+          "type": "text",
+          "attnotnull": true,
+          "default": null
+        },
+        {
+          "attname": "approval_reference",
+          "type": "text",
+          "attnotnull": true,
+          "default": null
+        },
+        {
+          "attname": "before_digest",
+          "type": "text",
+          "attnotnull": true,
+          "default": null
+        },
+        {
+          "attname": "after_digest",
+          "type": "text",
+          "attnotnull": true,
+          "default": null
+        },
+        {
+          "attname": "result",
+          "type": "jsonb",
+          "attnotnull": true,
+          "default": null
+        },
+        {
+          "attname": "applied_at",
+          "type": "timestamp with time zone",
+          "attnotnull": true,
+          "default": "clock_timestamp()"
+        }
+      ],
+      "constraints": [
+        {
+          "conname": "brownlow_correction_receipts_approval_reference_check",
+          "contype": "c",
+          "def": "CHECK ((length(approval_reference) >= 20))"
+        },
+        {
+          "conname": "brownlow_correction_receipts_code_revision_check",
+          "contype": "c",
+          "def": "CHECK ((code_revision ~ '^[0-9a-f]{40}$'::text))"
+        },
+        {
+          "conname": "brownlow_correction_receipts_operation_check",
+          "contype": "c",
+          "def": "CHECK ((operation = ANY (ARRAY['backfill'::text, 'adopt'::text, 'eligibility'::text, 'observe'::text, 'resolve'::text, 'reverse-backfill'::text, 'reverse-adopt'::text])))"
+        },
+        {
+          "conname": "brownlow_correction_receipts_pkey",
+          "contype": "p",
+          "def": "PRIMARY KEY (plan_digest)"
+        },
+        {
+          "conname": "brownlow_correction_receipts_plan_digest_check",
+          "contype": "c",
+          "def": "CHECK ((plan_digest ~ '^[0-9a-f]{64}$'::text))"
+        }
+      ],
+      "acl": [
+        {
+          "grantee": "afldb_owner",
+          "grantor": "afldb_owner",
+          "privilege_type": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "grantee": "afldb_owner",
+          "grantor": "afldb_owner",
+          "privilege_type": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "grantee": "afldb_owner",
+          "grantor": "afldb_owner",
+          "privilege_type": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "grantee": "afldb_owner",
+          "grantor": "afldb_owner",
+          "privilege_type": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "grantee": "afldb_owner",
+          "grantor": "afldb_owner",
+          "privilege_type": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "grantee": "afldb_owner",
+          "grantor": "afldb_owner",
+          "privilege_type": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "grantee": "afldb_owner",
+          "grantor": "afldb_owner",
+          "privilege_type": "UPDATE",
+          "is_grantable": false
+        }
+      ],
+      "privilegeMatrix": {
+        "afldb_owner": {
+          "SELECT": true,
+          "INSERT": true,
+          "UPDATE": true,
+          "DELETE": true,
+          "TRUNCATE": true,
+          "REFERENCES": true,
+          "TRIGGER": true
+        },
+        "afldb_app": {
+          "SELECT": false,
+          "INSERT": false,
+          "UPDATE": false,
+          "DELETE": false,
+          "TRUNCATE": false,
+          "REFERENCES": false,
+          "TRIGGER": false
+        },
+        "afldb_import": {
+          "SELECT": false,
+          "INSERT": false,
+          "UPDATE": false,
+          "DELETE": false,
+          "TRUNCATE": false,
+          "REFERENCES": false,
+          "TRIGGER": false
+        },
+        "afldb_auth": {
+          "SELECT": false,
+          "INSERT": false,
+          "UPDATE": false,
+          "DELETE": false,
+          "TRUNCATE": false,
+          "REFERENCES": false,
+          "TRIGGER": false
+        },
+        "afldb_backup": {
+          "SELECT": true,
+          "INSERT": false,
+          "UPDATE": false,
+          "DELETE": false,
+          "TRUNCATE": false,
+          "REFERENCES": false,
+          "TRIGGER": false
+        }
+      },
+      "functions": [
+        {
+          "signature": "refuse_brownlow_receipt_mutation()",
+          "owner": "afldb_owner",
+          "prosecdef": false,
+          "proacl": null,
+          "lanname": "plpgsql",
+          "returns": "trigger",
+          "provolatile": "v",
+          "def_md5": "014ea6e0a95c8f8ffba9cb54e21704c8",
+          "execute": {
+            "afldb_app": true,
+            "afldb_auth": true,
+            "afldb_owner": true,
+            "afldb_backup": true,
+            "afldb_import": true
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "tgname": "brownlow_receipt_immutable",
+          "tgenabled": "O",
+          "tgtype": 58,
+          "func": "refuse_brownlow_receipt_mutation",
+          "tgisinternal": false,
+          "def": "CREATE TRIGGER brownlow_receipt_immutable BEFORE DELETE OR UPDATE OR TRUNCATE ON public.brownlow_correction_receipts FOR EACH STATEMENT EXECUTE FUNCTION refuse_brownlow_receipt_mutation()"
+        }
+      ]
+    },
+    "eligibleColumn": {
+      "type": "boolean",
+      "attnotnull": false,
+      "default": null,
+      "comment": "The provider's explicit Brownlow eligibility boolean for this vote record. NULL = the provider value was absent, null or not a boolean (UNKNOWN); never an implicit false. BP-2025-ELIGIBILITY-v1.",
+      "rows": 0,
+      "null_rows": 0
+    },
+    "roles": [
+      {
+        "rolname": "afldb_app",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": []
+      },
+      {
+        "rolname": "afldb_auth",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": []
+      },
+      {
+        "rolname": "afldb_backup",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": [
+          "pg_read_all_data"
+        ]
+      },
+      {
+        "rolname": "afldb_import",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": []
+      },
+      {
+        "rolname": "afldb_owner",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": []
+      }
+    ]
+  },
+  "checks": [
+    {
+      "id": "116.table.owner-is-afldb_owner",
+      "ok": true,
+      "detail": "afldb_owner"
+    },
+    {
+      "id": "116.table.empty",
+      "ok": true,
+      "detail": "0 rows"
+    },
+    {
+      "id": "116.table.columns-exact",
+      "ok": true,
+      "detail": "plan_digest text NOT NULL; operation text NOT NULL; code_revision text NOT NULL; approval_reference text NOT NULL; before_digest text NOT NULL; after_digest text NOT NULL; result jsonb NOT NULL; applied_at timestamp with time zone NOT NULL DEFAULT clock_timestamp()"
+    },
+    {
+      "id": "116.table.not-null-all",
+      "ok": true,
+      "detail": "every column NOT NULL (PK + explicit NOT NULL)"
+    },
+    {
+      "id": "116.table.applied_at-default",
+      "ok": true,
+      "detail": "applied_at DEFAULT clock_timestamp()"
+    },
+    {
+      "id": "116.table.pk-plus-four-checks",
+      "ok": true,
+      "detail": "c:brownlow_correction_receipts_approval_reference_check, c:brownlow_correction_receipts_code_revision_check, c:brownlow_correction_receipts_operation_check, p:brownlow_correction_receipts_pkey, c:brownlow_correction_receipts_plan_digest_check"
+    },
+    {
+      "id": "116.table.comment-exact",
+      "ok": true,
+      "detail": "Owner-operated correction receipts; commit atomically with the reviewed correction. Never an execution approval."
+    },
+    {
+      "id": "116.acl.no-public-entry",
+      "ok": true,
+      "detail": "[{\"grantee\":\"afldb_owner\",\"grantor\":\"afldb_owner\",\"privilege_type\":\"DELETE\",\"is_grantable\":false},{\"grantee\":\"afldb_owner\",\"grantor\":\"afldb_owner\",\"privilege_type\":\"INSERT\",\"is_grantable\":false},{\"grantee\":\"afldb_owner\",\"grantor\":\"afldb_owner\",\"privilege_type\":\"REFERENCES\",\"is_grantable\":false},{\"grantee\":\"afldb_owner\",\"grantor\":\"afldb_owner\",\"privilege_type\":\"SELECT\",\"is_grantable\":false},{\"grantee\":\"afldb_owner\",\"grantor\":\"afldb_owner\",\"privilege_type\":\"TRIGGER\",\"is_grantable\":false},{\"grantee\":\"afldb_owner\",\"grantor\":\"afldb_owner\",\"privilege_type\":\"TRUNCATE\",\"is_grantable\":false},{\"grantee\":\"afldb_owner\",\"grantor\":\"afldb_owner\",\"privilege_type\":\"UPDATE\",\"is_grantable\":false}]"
+    },
+    {
+      "id": "116.acl.no-entry-afldb_app",
+      "ok": true,
+      "detail": "REVOKE ALL in 116"
+    },
+    {
+      "id": "116.effective.no-privilege-afldb_app",
+      "ok": true,
+      "detail": "{\"SELECT\":false,\"INSERT\":false,\"UPDATE\":false,\"DELETE\":false,\"TRUNCATE\":false,\"REFERENCES\":false,\"TRIGGER\":false}"
+    },
+    {
+      "id": "116.acl.no-entry-afldb_import",
+      "ok": true,
+      "detail": "REVOKE ALL in 116"
+    },
+    {
+      "id": "116.effective.no-privilege-afldb_import",
+      "ok": true,
+      "detail": "{\"SELECT\":false,\"INSERT\":false,\"UPDATE\":false,\"DELETE\":false,\"TRUNCATE\":false,\"REFERENCES\":false,\"TRIGGER\":false}"
+    },
+    {
+      "id": "116.acl.no-entry-afldb_auth",
+      "ok": true,
+      "detail": "REVOKE ALL in 116"
+    },
+    {
+      "id": "116.effective.no-privilege-afldb_auth",
+      "ok": true,
+      "detail": "{\"SELECT\":false,\"INSERT\":false,\"UPDATE\":false,\"DELETE\":false,\"TRUNCATE\":false,\"REFERENCES\":false,\"TRIGGER\":false}"
+    },
+    {
+      "id": "116.function.single",
+      "ok": true,
+      "detail": "refuse_brownlow_receipt_mutation()"
+    },
+    {
+      "id": "116.function.security-invoker",
+      "ok": true,
+      "detail": "prosecdef false"
+    },
+    {
+      "id": "116.function.default-acl",
+      "ok": true,
+      "detail": "proacl null (NULL = default PUBLIC EXECUTE; 116 grants/revokes nothing on it)"
+    },
+    {
+      "id": "116.function.plpgsql-returns-trigger",
+      "ok": true,
+      "detail": "plpgsql trigger"
+    },
+    {
+      "id": "116.trigger.single-enabled",
+      "ok": true,
+      "detail": "[[\"brownlow_receipt_immutable\",\"O\"]]"
+    },
+    {
+      "id": "116.trigger.before-statement-update-delete-truncate",
+      "ok": true,
+      "detail": "tgtype 58 -> refuse_brownlow_receipt_mutation"
+    },
+    {
+      "id": "117.eligible.type-boolean",
+      "ok": true,
+      "detail": "boolean"
+    },
+    {
+      "id": "117.eligible.default-none",
+      "ok": true,
+      "detail": "null"
+    },
+    {
+      "id": "117.eligible.nullable",
+      "ok": true,
+      "detail": "attnotnull false"
+    },
+    {
+      "id": "117.eligible.comment-exact",
+      "ok": true,
+      "detail": "The provider's explicit Brownlow eligibility boolean for this vote record. NULL = the provider value was absent, null or not a boolean (UNKNOWN); never an implicit false. BP-2025-ELIGIBILITY-v1."
+    },
+    {
+      "id": "117.eligible.no-null-rows",
+      "ok": true,
+      "detail": "0 of 0 rows NULL"
+    }
+  ],
+  "allChecksOk": true,
+  "failed": []
+}

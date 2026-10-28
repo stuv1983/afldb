@@ -1,0 +1,998 @@
+{
+  "decision": "D-V2-CURRENT-SHADOW-FOLLOWUP-1",
+  "item": "4c normalised schema sections",
+  "inputs": {
+    "archive": [
+      "/home/arm/afldb-v2-currentshadow-20261028T192336Z/followup/evidence/archive.schema.sql",
+      "fd27145968bd4903e62f6b4ee3617ffaf1a1679dfa5982bd752e118ff077db6d"
+    ],
+    "before": [
+      "/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/before.schema.sql",
+      "1b6cc28ae6b79b8b9882de4b2614e4ae114c1c32134b118f71574ca44b42cfed"
+    ],
+    "post": [
+      "/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/postmig.schema.sql",
+      "4949ceada58ec53c85cafe17e943932fdb936e313028ae7ce553d9b1a4d7efed"
+    ],
+    "migrations": [
+      [
+        "111_curated_award_proposals.sql",
+        "2ed29d9598742c74d0f9db6f7bac0bec8409733c1dace1d25356ad27edb91290"
+      ],
+      [
+        "112_derived_award_results.sql",
+        "e0aa0c7e6fd14b6885aaf43725309e82e2d9b362cf167fd57cca9b95cef401ac"
+      ],
+      [
+        "113_brownlow_eligibility_decisions.sql",
+        "79e7b9d1b839414962571ffff832b230e458273c24bd26d8474d259137ca9971"
+      ],
+      [
+        "114_award_projections_and_curated_revisions.sql",
+        "1c33324f9c7c616e998aa152fdd5fbdf20b2585694b3e6d62c2addb5f307f180"
+      ],
+      [
+        "115_adjudication_supersession_fk_index.sql",
+        "2f16efb9694f76f946543bbaca01785127b632417ad21ba1fc7b8745bb7c1852"
+      ],
+      [
+        "116_brownlow_correction_receipts.sql",
+        "c61953b71e1210b5389579342e155d367dfada5737bf3cd37f1a536b9ac61075"
+      ],
+      [
+        "117_brownlow_provider_eligibility_unknown.sql",
+        "a7dff2bddb1dd9c01ea0e69478193c5e5c50d8a531b2db448e7052b9f25e286f"
+      ]
+    ]
+  },
+  "normalisation": "drop \\restrict/\\unrestrict token lines, blank and \"--\" lines, trailing whitespace; sort lines inside ACL sections; owner ignored (all dumps --no-owner)",
+  "summary": {
+    "sections": {
+      "archive": 1388,
+      "before": 1196,
+      "post": 1475
+    },
+    "A_restoreFidelity": {
+      "equal": 1194,
+      "onlyInArchive": 0,
+      "onlyInRestored": 0,
+      "changed": 0
+    },
+    "B_migration": {
+      "unchanged": 1193,
+      "removed": 0,
+      "changed": 1,
+      "added": 71,
+      "addedByType": {
+        "FUNCTION": 1,
+        "TABLE": 6,
+        "COMMENT": 20,
+        "SEQUENCE": 5,
+        "CONSTRAINT": 9,
+        "INDEX": 19,
+        "TRIGGER": 1,
+        "FK CONSTRAINT": 10
+      },
+      "migrationSupported": 72,
+      "unclassified": 0
+    },
+    "C_acl": {
+      "beforeAclSections": 1,
+      "archiveAclSections": 193,
+      "postAclSections": 209,
+      "preexistingEqualToArchive": 192,
+      "preexistingDiffersFromArchive": 0,
+      "preexistingAbsentFromArchive": 0,
+      "archiveOnly": 0,
+      "newObjectAclSections": 17,
+      "newObjectGrantLines": 23,
+      "newObjectGrantLinesNotInPinnedMigrations": 2
+    },
+    "newTablesFromPinnedMigrations": {
+      "public.award_proposals": "111_curated_award_proposals.sql",
+      "public.award_proposal_decisions": "111_curated_award_proposals.sql",
+      "public.derived_award_results": "112_derived_award_results.sql",
+      "public.brownlow_eligibility_decisions": "113_brownlow_eligibility_decisions.sql",
+      "public.derived_award_projections": "114_award_projections_and_curated_revisions.sql",
+      "public.brownlow_correction_receipts": "116_brownlow_correction_receipts.sql"
+    }
+  },
+  "A": {
+    "equal": 1194,
+    "onlyInArchive": [],
+    "onlyInRestored": [],
+    "changed": []
+  },
+  "B": {
+    "unchanged": 1193,
+    "removed": [],
+    "changed": [
+      {
+        "key": "TABLE|staging|afl_api_brownlow_vote",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "staging.afl_api_brownlow_vote.eligible: exactly \"NOT NULL\" removed; DROP NOT NULL in 117_brownlow_provider_eligibility_unknown.sql",
+        "removed": [
+          "    eligible boolean NOT NULL,"
+        ],
+        "added": [
+          "    eligible boolean,"
+        ]
+      }
+    ],
+    "added": [
+      {
+        "key": "FUNCTION|public|refuse_brownlow_receipt_mutation()",
+        "type": "FUNCTION",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FUNCTION refuse_brownlow_receipt_mutation named in 116_brownlow_correction_receipts.sql"
+      },
+      {
+        "key": "TABLE|public|award_proposal_decisions",
+        "type": "TABLE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CREATE TABLE public.award_proposal_decisions in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "COMMENT|public|TABLE award_proposal_decisions",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.award_proposal_decisions, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "SEQUENCE|public|award_proposal_decisions_id_seq",
+        "type": "SEQUENCE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "SEQUENCE on public.award_proposal_decisions, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "TABLE|public|award_proposals",
+        "type": "TABLE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CREATE TABLE public.award_proposals in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "COMMENT|public|TABLE award_proposals",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN award_proposals.player_identity",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN award_proposals.source_kind",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN award_proposals.approved_entity_key",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "SEQUENCE|public|award_proposals_id_seq",
+        "type": "SEQUENCE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "SEQUENCE on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "TABLE|public|brownlow_correction_receipts",
+        "type": "TABLE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CREATE TABLE public.brownlow_correction_receipts in 116_brownlow_correction_receipts.sql"
+      },
+      {
+        "key": "COMMENT|public|TABLE brownlow_correction_receipts",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.brownlow_correction_receipts, created in 116_brownlow_correction_receipts.sql"
+      },
+      {
+        "key": "TABLE|public|brownlow_eligibility_decisions",
+        "type": "TABLE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CREATE TABLE public.brownlow_eligibility_decisions in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "COMMENT|public|TABLE brownlow_eligibility_decisions",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN brownlow_eligibility_decisions.player_identity",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN brownlow_eligibility_decisions.player_id_at_decision",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN brownlow_eligibility_decisions.basis",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN brownlow_eligibility_decisions.correction",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN brownlow_eligibility_decisions.supersedes_id",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "SEQUENCE|public|brownlow_eligibility_decisions_id_seq",
+        "type": "SEQUENCE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "SEQUENCE on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "TABLE|public|derived_award_projections",
+        "type": "TABLE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CREATE TABLE public.derived_award_projections in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "COMMENT|public|TABLE derived_award_projections",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN derived_award_projections.actions",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN derived_award_projections.correction",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "SEQUENCE|public|derived_award_projections_id_seq",
+        "type": "SEQUENCE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "SEQUENCE on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "TABLE|public|derived_award_results",
+        "type": "TABLE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CREATE TABLE public.derived_award_results in 112_derived_award_results.sql"
+      },
+      {
+        "key": "COMMENT|public|TABLE derived_award_results",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN derived_award_results.result",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN derived_award_results.correction",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "COMMENT|public|COLUMN derived_award_results.supersedes_id",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "SEQUENCE|public|derived_award_results_id_seq",
+        "type": "SEQUENCE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "SEQUENCE on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "COMMENT|staging|COLUMN afl_api_brownlow_vote.eligible",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT ON COLUMN staging.afl_api_brownlow_vote.eligible in 117_brownlow_provider_eligibility_unknown.sql; text identical"
+      },
+      {
+        "key": "CONSTRAINT|public|award_proposal_decisions award_proposal_decisions_pkey",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.award_proposal_decisions, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|award_proposals award_proposals_pkey",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|award_proposals award_proposals_proposal_revision_uq",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|brownlow_correction_receipts brownlow_correction_receipts_pkey",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.brownlow_correction_receipts, created in 116_brownlow_correction_receipts.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|brownlow_eligibility_decisions brownlow_eligibility_decisions_pkey",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|brownlow_eligibility_decisions brownlow_eligibility_decisions_target_uq",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|derived_award_projections derived_award_projections_pkey",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|derived_award_results derived_award_results_pkey",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|derived_award_results derived_award_results_target_uq",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "INDEX|public|ix_afl_api_identity_adjudications_supersedes_id",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX ix_afl_api_identity_adjudications_supersedes_id named in 115_adjudication_supersession_fk_index.sql (on pre-existing public.afl_api_identity_adjudications)"
+      },
+      {
+        "key": "INDEX|public|ix_award_proposal_decisions_admin_user_id",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.award_proposal_decisions, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "INDEX|public|ix_award_proposal_decisions_proposal",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.award_proposal_decisions, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "INDEX|public|ix_award_proposals_created_by",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "INDEX|public|ix_award_proposals_status",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "INDEX|public|ix_award_proposals_target",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "INDEX|public|ix_brownlow_eligibility_decisions_decided_by",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "INDEX|public|ix_brownlow_eligibility_decisions_target",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "INDEX|public|ix_derived_award_projections_projected_by",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "INDEX|public|ix_derived_award_projections_result",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "INDEX|public|ix_derived_award_projections_target",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "INDEX|public|ix_derived_award_results_published_by",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "INDEX|public|ix_derived_award_results_target",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "INDEX|public|uq_award_proposals_live_revision",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "INDEX|public|uq_award_proposals_revision_of",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "INDEX|public|uq_brownlow_eligibility_decisions_root",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "INDEX|public|uq_brownlow_eligibility_decisions_supersedes",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "INDEX|public|uq_derived_award_results_root",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "INDEX|public|uq_derived_award_results_supersedes",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "TRIGGER|public|brownlow_correction_receipts brownlow_receipt_immutable",
+        "type": "TRIGGER",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "TRIGGER on public.brownlow_correction_receipts, created in 116_brownlow_correction_receipts.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|award_proposal_decisions award_proposal_decisions_admin_user_id_fkey",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.award_proposal_decisions, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|award_proposal_decisions award_proposal_decisions_proposal_id_fkey",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.award_proposal_decisions, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|award_proposals award_proposals_created_by_fkey",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|award_proposals award_proposals_revision_of_id_fkey",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.award_proposals, created in 111_curated_award_proposals.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|brownlow_eligibility_decisions brownlow_eligibility_decisions_decided_by_fkey",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|brownlow_eligibility_decisions brownlow_eligibility_decisions_supersedes_fk",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.brownlow_eligibility_decisions, created in 113_brownlow_eligibility_decisions.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|derived_award_projections derived_award_projections_projected_by_fkey",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|derived_award_projections derived_award_projections_result_fk",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.derived_award_projections, created in 114_award_projections_and_curated_revisions.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|derived_award_results derived_award_results_published_by_fkey",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.derived_award_results, created in 112_derived_award_results.sql"
+      },
+      {
+        "key": "FK CONSTRAINT|public|derived_award_results derived_award_results_supersedes_fk",
+        "type": "FK CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FK CONSTRAINT on public.derived_award_results, created in 112_derived_award_results.sql"
+      }
+    ]
+  },
+  "C": {
+    "preexisting": {
+      "equalToArchive": [
+        "ACL|-|SCHEMA aflw",
+        "ACL|-|SCHEMA public",
+        "ACL|-|SCHEMA staging",
+        "ACL|-|SCHEMA staging_aflw",
+        "ACL|public|TABLE clubs",
+        "ACL|public|FUNCTION nl_search_telemetry_clear()",
+        "ACL|staging_aflw|TABLE ladders",
+        "ACL|staging_aflw|TABLE seasons",
+        "ACL|aflw|TABLE clubs",
+        "ACL|staging_aflw|TABLE matches",
+        "ACL|aflw|TABLE matches",
+        "ACL|aflw|TABLE club_totals",
+        "ACL|staging_aflw|TABLE fixtures",
+        "ACL|aflw|TABLE fixtures",
+        "ACL|aflw|TABLE ladders",
+        "ACL|staging_aflw|TABLE player_match_stats",
+        "ACL|aflw|TABLE player_match_stats",
+        "ACL|aflw|TABLE player_careers",
+        "ACL|aflw|TABLE player_seasons",
+        "ACL|aflw|TABLE players",
+        "ACL|staging_aflw|TABLE scoring_events",
+        "ACL|aflw|TABLE scoring_events",
+        "ACL|staging_aflw|TABLE player_seasons",
+        "ACL|aflw|TABLE seasons",
+        "ACL|aflw|TABLE venues",
+        "ACL|public|TABLE admin_invites",
+        "ACL|public|SEQUENCE admin_invites_id_seq",
+        "ACL|public|TABLE afl_api_identity_adjudications",
+        "ACL|public|SEQUENCE afl_api_identity_adjudications_id_seq",
+        "ACL|public|TABLE after_siren_kicks",
+        "ACL|public|SEQUENCE after_siren_kicks_id_seq",
+        "ACL|public|TABLE app_health_events",
+        "ACL|public|SEQUENCE app_health_events_id_seq",
+        "ACL|public|TABLE auth_audit_log",
+        "ACL|public|SEQUENCE auth_audit_log_id_seq",
+        "ACL|public|TABLE auth_sessions",
+        "ACL|public|SEQUENCE auth_sessions_id_seq",
+        "ACL|public|TABLE auth_users",
+        "ACL|public|SEQUENCE auth_users_id_seq",
+        "ACL|public|TABLE award_nominations",
+        "ACL|public|SEQUENCE award_nominations_id_seq",
+        "ACL|public|TABLE award_winners",
+        "ACL|public|SEQUENCE award_winners_id_seq",
+        "ACL|public|TABLE awards",
+        "ACL|public|SEQUENCE awards_id_seq",
+        "ACL|public|TABLE beta_access_codes",
+        "ACL|public|SEQUENCE beta_access_codes_id_seq",
+        "ACL|public|TABLE beta_allowed_emails",
+        "ACL|public|SEQUENCE beta_allowed_emails_id_seq",
+        "ACL|public|TABLE beta_join_requests",
+        "ACL|public|SEQUENCE beta_join_requests_id_seq",
+        "ACL|public|TABLE beta_login_tokens",
+        "ACL|public|SEQUENCE beta_login_tokens_id_seq",
+        "ACL|public|TABLE brownlow_round_votes",
+        "ACL|public|SEQUENCE brownlow_round_votes_id_seq",
+        "ACL|public|TABLE brownlow_season_authority",
+        "ACL|public|TABLE brownlow_season_votes",
+        "ACL|public|SEQUENCE brownlow_season_votes_id_seq",
+        "ACL|public|TABLE brownlow_vote_entry_state",
+        "ACL|public|TABLE canonical_applications",
+        "ACL|public|SEQUENCE canonical_applications_id_seq",
+        "ACL|public|TABLE captaincies",
+        "ACL|public|SEQUENCE captaincies_id_seq",
+        "ACL|public|TABLE club_aliases",
+        "ACL|public|SEQUENCE club_aliases_id_seq",
+        "ACL|public|TABLE club_leadership",
+        "ACL|public|SEQUENCE club_leadership_id_seq",
+        "ACL|public|TABLE club_organization_relations",
+        "ACL|public|TABLE club_organizations",
+        "ACL|public|SEQUENCE club_organizations_id_seq",
+        "ACL|public|TABLE club_seasons",
+        "ACL|public|SEQUENCE club_seasons_id_seq",
+        "ACL|public|SEQUENCE clubs_id_seq",
+        "ACL|public|TABLE coaches",
+        "ACL|public|SEQUENCE coaches_id_seq",
+        "ACL|public|TABLE data_edits",
+        "ACL|public|SEQUENCE data_edits_id_seq",
+        "ACL|public|TABLE data_issues",
+        "ACL|public|SEQUENCE data_issues_id_seq",
+        "ACL|public|TABLE data_overrides",
+        "ACL|public|COLUMN data_overrides.entity_type",
+        "ACL|public|COLUMN data_overrides.entity_key",
+        "ACL|public|COLUMN data_overrides.field_group",
+        "ACL|public|COLUMN data_overrides.override_values",
+        "ACL|public|COLUMN data_overrides.is_active",
+        "ACL|public|COLUMN data_overrides.admin_user_id",
+        "ACL|public|COLUMN data_overrides.updated_at",
+        "ACL|public|SEQUENCE data_overrides_id_seq",
+        "ACL|public|TABLE data_submission_rows",
+        "ACL|public|TABLE data_submissions",
+        "ACL|public|COLUMN data_submissions.status",
+        "ACL|public|COLUMN data_submissions.promoted_at",
+        "ACL|public|COLUMN data_submissions.import_batch_id",
+        "ACL|public|COLUMN data_submissions.error",
+        "ACL|public|SEQUENCE data_submissions_id_seq",
+        "ACL|public|TABLE derived_rebuilds",
+        "ACL|public|SEQUENCE derived_rebuilds_id_seq",
+        "ACL|public|TABLE draft_persons",
+        "ACL|public|SEQUENCE draft_persons_id_seq",
+        "ACL|public|TABLE draft_picks",
+        "ACL|public|SEQUENCE draft_picks_id_seq",
+        "ACL|public|TABLE external_grid_axes",
+        "ACL|public|SEQUENCE external_grid_axes_id_seq",
+        "ACL|public|TABLE external_grid_sources",
+        "ACL|public|TABLE external_grids",
+        "ACL|public|COLUMN external_grids.is_current",
+        "ACL|public|SEQUENCE external_grids_id_seq",
+        "ACL|public|TABLE external_identities",
+        "ACL|public|SEQUENCE external_identities_id_seq",
+        "ACL|public|TABLE father_son_selections",
+        "ACL|public|SEQUENCE father_son_selections_id_seq",
+        "ACL|public|TABLE fixtures",
+        "ACL|public|SEQUENCE fixtures_id_seq",
+        "ACL|public|TABLE hall_of_fame",
+        "ACL|public|SEQUENCE hall_of_fame_id_seq",
+        "ACL|public|TABLE honour_team_members",
+        "ACL|public|SEQUENCE honour_team_members_id_seq",
+        "ACL|public|TABLE import_batches",
+        "ACL|public|SEQUENCE import_batches_id_seq",
+        "ACL|public|TABLE import_rejections",
+        "ACL|public|SEQUENCE import_rejections_id_seq",
+        "ACL|public|TABLE match_coaches",
+        "ACL|public|TABLE match_period_scores",
+        "ACL|public|TABLE matches",
+        "ACL|public|SEQUENCE matches_id_seq",
+        "ACL|public|TABLE nl_search_feedback",
+        "ACL|public|SEQUENCE nl_search_feedback_id_seq",
+        "ACL|public|TABLE nl_search_log",
+        "ACL|public|SEQUENCE nl_search_log_id_seq",
+        "ACL|public|TABLE nl_search_review",
+        "ACL|public|SEQUENCE nl_search_review_id_seq",
+        "ACL|public|TABLE player_achievements",
+        "ACL|public|SEQUENCE player_achievements_id_seq",
+        "ACL|public|TABLE player_birth_evidence",
+        "ACL|public|SEQUENCE player_birth_evidence_id_seq",
+        "ACL|public|TABLE player_career_stats",
+        "ACL|public|TABLE player_club_season_stats",
+        "ACL|public|TABLE player_clubs",
+        "ACL|public|TABLE player_height_evidence",
+        "ACL|public|SEQUENCE player_height_evidence_id_seq",
+        "ACL|public|TABLE player_link_match_candidates",
+        "ACL|public|SEQUENCE player_link_match_candidates_id_seq",
+        "ACL|public|TABLE player_link_resolutions",
+        "ACL|public|SEQUENCE player_link_resolutions_id_seq",
+        "ACL|public|TABLE player_link_suggestions",
+        "ACL|public|COLUMN player_link_suggestions.status",
+        "ACL|public|COLUMN player_link_suggestions.resolved_by",
+        "ACL|public|COLUMN player_link_suggestions.resolved_at",
+        "ACL|public|SEQUENCE player_link_suggestions_id_seq",
+        "ACL|public|TABLE player_match_period_stats",
+        "ACL|public|TABLE player_match_stats",
+        "ACL|public|SEQUENCE player_match_stats_id_seq",
+        "ACL|public|TABLE player_name_aliases",
+        "ACL|public|SEQUENCE player_name_aliases_id_seq",
+        "ACL|public|TABLE player_relationships",
+        "ACL|public|SEQUENCE player_relationships_id_seq",
+        "ACL|public|TABLE player_season_stats",
+        "ACL|public|TABLE players",
+        "ACL|public|SEQUENCE players_id_seq",
+        "ACL|public|TABLE promotion_candidates",
+        "ACL|public|COLUMN promotion_candidates.status",
+        "ACL|public|COLUMN promotion_candidates.resolved_at",
+        "ACL|public|COLUMN promotion_candidates.resolved_decision_id",
+        "ACL|public|SEQUENCE promotion_candidates_id_seq",
+        "ACL|public|TABLE promotion_decisions",
+        "ACL|public|SEQUENCE promotion_decisions_id_seq",
+        "ACL|public|TABLE season_list_members",
+        "ACL|public|SEQUENCE season_list_members_id_seq",
+        "ACL|public|TABLE seasons",
+        "ACL|public|TABLE site_media",
+        "ACL|public|TABLE site_settings",
+        "ACL|public|TABLE sources",
+        "ACL|public|SEQUENCE sources_id_seq",
+        "ACL|public|TABLE stat_availability",
+        "ACL|public|TABLE stat_definitions",
+        "ACL|public|TABLE venue_aliases",
+        "ACL|public|SEQUENCE venue_aliases_id_seq",
+        "ACL|public|TABLE venues",
+        "ACL|public|SEQUENCE venues_id_seq",
+        "ACL|staging|TABLE afl_api_brownlow_vote",
+        "ACL|staging|TABLE afl_api_lineup",
+        "ACL|staging|TABLE afl_api_match",
+        "ACL|staging|TABLE afl_api_player_match",
+        "ACL|staging|TABLE afltables_match",
+        "ACL|staging|TABLE afltables_player_match",
+        "ACL|staging|TABLE external_current_matches",
+        "ACL|staging|TABLE source_payloads",
+        "ACL|staging|TABLE source_record_versions",
+        "ACL|staging|TABLE source_records",
+        "ACL|staging|TABLE team_seasons",
+        "ACL|staging_aflw|TABLE issues",
+        "ACL|staging_aflw|SEQUENCE issues_id_seq"
+      ],
+      "differsFromArchive": [],
+      "absentFromArchive": []
+    },
+    "archiveOnly": [],
+    "newObjects": [
+      {
+        "key": "ACL|public|FUNCTION assert_viable_super_admin_actor(p_actor_id integer)",
+        "lines": [
+          {
+            "line": "GRANT ALL ON FUNCTION public.assert_viable_super_admin_actor(p_actor_id integer) TO afldb_import;",
+            "class": "NOT_IN_PINNED_MIGRATIONS",
+            "files": []
+          },
+          {
+            "line": "REVOKE ALL ON FUNCTION public.assert_viable_super_admin_actor(p_actor_id integer) FROM PUBLIC;",
+            "class": "NOT_IN_PINNED_MIGRATIONS",
+            "files": []
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|TABLE award_proposal_decisions",
+        "lines": [
+          {
+            "line": "GRANT SELECT ON TABLE public.award_proposal_decisions TO afldb_auth;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          },
+          {
+            "line": "GRANT SELECT,INSERT ON TABLE public.award_proposal_decisions TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|SEQUENCE award_proposal_decisions_id_seq",
+        "lines": [
+          {
+            "line": "GRANT USAGE ON SEQUENCE public.award_proposal_decisions_id_seq TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|TABLE award_proposals",
+        "lines": [
+          {
+            "line": "GRANT SELECT ON TABLE public.award_proposals TO afldb_auth;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          },
+          {
+            "line": "GRANT SELECT,INSERT ON TABLE public.award_proposals TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|COLUMN award_proposals.status",
+        "lines": [
+          {
+            "line": "GRANT UPDATE(status) ON TABLE public.award_proposals TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|COLUMN award_proposals.validation_result",
+        "lines": [
+          {
+            "line": "GRANT UPDATE(validation_result) ON TABLE public.award_proposals TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|COLUMN award_proposals.validated_at",
+        "lines": [
+          {
+            "line": "GRANT UPDATE(validated_at) ON TABLE public.award_proposals TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|COLUMN award_proposals.approved_entity_key",
+        "lines": [
+          {
+            "line": "GRANT UPDATE(approved_entity_key) ON TABLE public.award_proposals TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|COLUMN award_proposals.approved_at",
+        "lines": [
+          {
+            "line": "GRANT UPDATE(approved_at) ON TABLE public.award_proposals TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|COLUMN award_proposals.updated_at",
+        "lines": [
+          {
+            "line": "GRANT UPDATE(updated_at) ON TABLE public.award_proposals TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|SEQUENCE award_proposals_id_seq",
+        "lines": [
+          {
+            "line": "GRANT USAGE ON SEQUENCE public.award_proposals_id_seq TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "111_curated_award_proposals.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|TABLE brownlow_eligibility_decisions",
+        "lines": [
+          {
+            "line": "GRANT SELECT ON TABLE public.brownlow_eligibility_decisions TO afldb_auth;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "113_brownlow_eligibility_decisions.sql"
+            ]
+          },
+          {
+            "line": "GRANT SELECT,INSERT ON TABLE public.brownlow_eligibility_decisions TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "113_brownlow_eligibility_decisions.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|SEQUENCE brownlow_eligibility_decisions_id_seq",
+        "lines": [
+          {
+            "line": "GRANT USAGE ON SEQUENCE public.brownlow_eligibility_decisions_id_seq TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "113_brownlow_eligibility_decisions.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|TABLE derived_award_projections",
+        "lines": [
+          {
+            "line": "GRANT SELECT ON TABLE public.derived_award_projections TO afldb_auth;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "114_award_projections_and_curated_revisions.sql"
+            ]
+          },
+          {
+            "line": "GRANT SELECT,INSERT ON TABLE public.derived_award_projections TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "114_award_projections_and_curated_revisions.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|SEQUENCE derived_award_projections_id_seq",
+        "lines": [
+          {
+            "line": "GRANT USAGE ON SEQUENCE public.derived_award_projections_id_seq TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "114_award_projections_and_curated_revisions.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|TABLE derived_award_results",
+        "lines": [
+          {
+            "line": "GRANT SELECT ON TABLE public.derived_award_results TO afldb_auth;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "112_derived_award_results.sql"
+            ]
+          },
+          {
+            "line": "GRANT SELECT,INSERT ON TABLE public.derived_award_results TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "112_derived_award_results.sql"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "ACL|public|SEQUENCE derived_award_results_id_seq",
+        "lines": [
+          {
+            "line": "GRANT USAGE ON SEQUENCE public.derived_award_results_id_seq TO afldb_import;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "112_derived_award_results.sql"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "unclassified": [],
+  "limits": "Stored ACLs only. Effective permissions (role attributes, memberships, superuser) are not compared here. The archive is production stored state at capture, not live production."
+}
