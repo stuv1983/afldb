@@ -102,8 +102,13 @@ new root on streamanator receives the archive set and the two package scripts; `
 - S5: migration copy cloned from the restored baseline, which stays unchanged. Before captures
   (preservation, manifest, row counts, Coleman 1980–2025, coverage, Brownlow per staged season).
   `--status` must list **exactly 111–117 pending**. Migrate, privileges, `0 pending.`, after captures.
-- S6: parity compare, strict `release-gates.ts`, `expected-deltas.mjs`, archive re-check.
+- S6: parity compare, strict `release-gates.ts`, `expected-deltas.mjs`, archive re-check. A parity
+  or release-gates exit of 0/1/2 (PASS/FAIL/INCOMPLETE) is kept as evidence. Any other exit, or no
+  report file, is a tool failure and stops the run.
 - S7: cluster stopped (both databases kept for review); evidence manifest.
+- Completion and success are recorded separately. `evidence/shadow.done` records only that the
+  process ended, with its exit code. `evidence/shadow.result` reads `SUCCEEDED` only for exit 0,
+  and otherwise `FAILED exit=<n> stage=<step>`.
 
 ### 2.3 Bounds and stop conditions
 
@@ -122,6 +127,21 @@ new root on streamanator receives the archive set and the two package scripts; `
 - **Isolated-side stops added after review.** A failed staged-season query; a restored season list
   that differs from production's; more or fewer than 4 excluded TOC entries; a failed schema dump;
   a script or archive hash that differs from its pin.
+- **Isolated-side failure propagation (pre-execution correction, 2026-10-29, §2.8).** These now stop
+  the run with a nonzero exit:
+  - any failed capture (preservation, manifest, row counts, Coleman, coverage, Brownlow per season),
+    stop 6 before the migration and 7 after it;
+  - a failed `--status` before or after the migration, failed privileges, or a schema-diff error
+    (stop 7);
+  - a missing, empty or unreadable verified source manifest, or any source-comparison error (stop 3);
+  - a parity or release-gates tool failure, a failed archive or `xfer` re-check, a failed cluster
+    stop, or a port still listening after the stop (stop 8).
+
+  A classification other than `ONLY_EXPECTED_116_117_DELTAS` fails the run with stop 9. It is
+  raised only after the re-checks and S7 have run, so the evidence and the stopped cluster are
+  retained. On any stop after S3 has proved that the listener is this root's cluster, only that
+  cluster is stopped. Evidence is kept and an evidence manifest is written. No database is dropped
+  and no guard is changed.
 - **Consistency.** The archive is one MVCC snapshot. Writers stay enabled, because there is no
   pause authority. The ledger is read before and after, outside the snapshot, and must be
   identical; the restored ledger is the in-snapshot value and must match.
@@ -205,6 +225,62 @@ Dispositions:
 Post-fix: bash and PowerShell parse; all four files are LF with no BOM. The classifier
 (`4f516cb8…`) gives the positive result on the §10.5 copies and correctly refuses all three
 negative controls.
+
+### 2.8 Pre-execution correction: failure propagation in `shadow-restore.sh` (2026-10-29)
+
+**Defect.** Several required commands in `shadow-restore.sh` called `rc()`. That function records
+the exit status and returns success, so a failed command did not stop the run, which went on to
+write `shadow.done`. This covered every before/after capture, `--status`, privileges, parity,
+release-gates, the classifier and the integrity re-checks.
+
+The source-manifest comparison ignored errors. A missing manifest was reported as a "shadow-path
+difference". If both manifests had failed to read, the comparison could have found no
+differences.
+
+**Correction** (`shadow-restore.sh` `f75ac6c6…` → `1530d24c…`; the other three files keep their
+pins: `capture-prod.sh` `44609914…`, `transfer.ps1` `a0073e46…`, `expected-deltas.mjs` `4f516cb8…`):
+- `req` records and stops. `report` keeps strict exit codes 0/1/2 as evidence, and stops on any
+  other exit or a missing report.
+- S2 checks the manifest's presence, reads and the `diff`/`grep`/`awk` statuses.
+- The listener-ownership proof moved ahead of `roles`.
+- An EXIT handler stops only that proven cluster on failure, writes the evidence manifest, and
+  writes `shadow.done` (completion) and `shadow.result` (success).
+
+No bypass switch exists. No strict result, classifier rule or expected-delta definition changed.
+
+**Synthetic controls.** These ran on Windows Git Bash against temporary copies, with only the host
+paths rewritten. Fake `node`/`ss`/`hostname`/`pg_restore` stood in for the tools; there was no
+database, no network and no production. The pinned classifier ran for real on synthetic reports.
+
+| Control | Corrected script | Original `f75ac6c6…` |
+|---|---|---|
+| 1. Required capture fails (`before.manifest`) | stop 6 in S5; no migration; owned cluster stopped; `FAILED` | exit 0, migration ran, `done` |
+| 2. Source manifest missing / read error (EIO) | stop 3 in S2 ("missing or empty" / "unreadable"); no cluster created | stop 3, misattributed to a shadow-path difference |
+| 3. Classifier rejects (an existing row changed) | `UNEXPECTED_DIFFERENCES`; re-checks and S7 ran; stop 9; `FAILED` | exit 0, `done` |
+| 4. Documented expected-delta case | exit 0, `SUCCEEDED`, `ONLY_EXPECTED_116_117_DELTAS`; recorded `parity = 1`, `release-gates = 1`; parity FAIL with Brownlow INCOMPLETE, `migrationCompatibility` FAIL, NO-GO all retained | exit 0, `done` |
+| Extra: parity tool error (exit 3) / release-gates exit 1 with no report | stop 8; `FAILED` | release-gates case: exit 0, `done` (parity case not run) |
+| Extra: `roles` fails after the ownership proof / privileges fail | stop 4 / stop 7; owned cluster stopped | — |
+| Extra: a shadow-path file differs | stop 3 | — |
+| Extra: a Brownlow capture fails for a staged season | stop 6 | exit 0, `done` |
+
+No control dropped a database or made an unexpected tool call.
+
+**Not exercised by the controls** (correct by reading, per the review): failing `start`, failing
+`stop`, a foreign listener, a schema-diff exit 2, and a failing `--status`.
+
+**Review** (one focused, read-only review by a separate agent): **GO**, with no CRIT/HIGH/MED.
+LOW and INFO items are accepted as stated:
+- If `start` fails after the server has come up, or the listener proof fails, the new cluster is
+  not stopped. Ownership is not yet proven at that point, so this is deliberate.
+- The failure-path stop does not re-check the port.
+- `shadow.log` is hashed while `tee` is still appending, so its manifest entry will not
+  re-verify. This was already true of the original script.
+- A `tee` failure in the ledger check is not detected.
+- A stop 9 records `stage=S7`.
+
+**MED-2 is not changed by this correction.** Its evidence limits remain open for the owner's later
+acceptance decision: no automatic classification of the schema diff, no 98-season stored-report
+pair, and no archive-to-archive drift report against `7fefcd9b…`.
 
 ## 3. Remaining release verdicts
 
@@ -369,7 +445,7 @@ a new approval.
 Pinned inputs (stop if any differs before use):
   capture-prod.sh      44609914b403ab4bdea2704f45a14c7db34c164e544914827ece0aa3d1df13c2
   transfer.ps1         a0073e466f632b75dd89621b3df511a28c8148d066987fb122a5b991b7114df4
-  shadow-restore.sh    f75ac6c661597599d2a0544a581b3e452d01ee97acc026e1393e0f5606d59061
+  shadow-restore.sh    1530d24c53e7ccc20aa14eb2952784c33470576a85c5cbe55476d7ce753915df
   expected-deltas.mjs  4f516cb8d73e6380f9d8bb5baf4b93b5cbf4f390b5ba4b0f48d2ad3e69777ec1
   (docs/v2/evidence/current-production-shadow/, branch v2/rebuild)
   Shadow source: the Linux-verified c478c31b tree on streamanator. Before S2, confirm
@@ -395,6 +471,8 @@ Pinned inputs (stop if any differs before use):
    127.0.0.1:55467, two new _test databases. One restore. Migrations exactly 111-117 and the
    privileges reconciliation, on the clone only. Captures, schema dumps, parity, release-gates,
    the expected-delta classification. Then stop the cluster and keep the databases and evidence.
+   The run succeeded only if evidence/shadow.result reads SUCCEEDED. shadow.done records only
+   that the process ended. A FAILED result is a stop: report it and do not re-run.
 
 4. RECORD. Add a sanitised result record and tracking updates to the repository; commit them
    selectively. No raw rows, archives or credentials go into Git.
