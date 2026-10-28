@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### NL UI corpus: the 29 V2-GAP-035 expectations restated to accepted behaviour (2026-10-28)
+
+- Owner decision: restate; the optional ISSUE-190 career-total mapping is not built.
+  - 27 rows in `afldb-ui-questions-1440-real-user-v3-20260822.csv` ("how many career <stat> did <player> have") now
+    expect the deliberate ISSUE-190 refusal.
+  - `rel_dec_001` and `rel_dec_002` now expect the family answers accepted under ISSUE-153 Stage 6.
+- New pins in `tests/nl-ui-corpus.test.ts` check every restated row against its owning decision through the parser and
+  `validatePlan`. No product behaviour changed.
+- The Phase G builder counts (244/75, 260/89, 1,408/87 scored) and the corpus runner headers were updated to match.
+- Validation: focused NL suites 913/913 locally and 1,002/1,002 on Linux. Rendered gate on Linux: 1,844/1,844 pass, 0 fail, 0 HTTP or page errors (before: 1,815 / 29).
+
 ### Linux verification of the integrated V2 code; three Linux regressions fixed (2026-10-28; not pushed, production NO-GO)
 
 - `tools/rebuild/draftguru/export_person_bridge.py` admitted an isolated target only on port 55432.

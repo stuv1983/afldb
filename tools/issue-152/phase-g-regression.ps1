@@ -5,10 +5,14 @@
 .DESCRIPTION
     The two pre-ISSUE-152 corpora merged, realistic then decline:
 
-      afldb-ui-questions-1440-real-user-v3-20260822.csv      1,435 plan
-      afldb-ui-questions-60-real-user-decline-v3-20260822.csv    60 decline
+      afldb-ui-questions-1440-real-user-v3-20260822.csv      1,435 rows
+      afldb-ui-questions-60-real-user-decline-v3-20260822.csv    60 rows
                                                              -----
                                                              1,495
+
+    The scored split is 1,408 plan / 87 decline: V2-GAP-035 (2026-10-28)
+    restated 27 realistic "how many career <stat> did <player> have" rows to
+    the ISSUE-190 decline in place, with no row added or moved.
 
     Neither file is modified by ISSUE-152 -- tests/nl-ui-corpus.test.ts asserts
     they are untouched and free of coaching, after-the-siren and first-kick-goal

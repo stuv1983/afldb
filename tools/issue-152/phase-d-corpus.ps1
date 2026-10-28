@@ -6,8 +6,8 @@
 .DESCRIPTION
     The Phase G P3 corpus (271 rows: coaching 99/25, after-the-siren 93/27,
     first-kick-goal 20/7) plus the two additive Phase D relationship corpora
-    (48 rows, now 30 plan / 18 decline after four ISSUE-153 in-place
-    reclassifications) -- 242 plan expectations and 77 decline expectations,
+    (48 rows, now 32 plan / 16 decline after four ISSUE-153 and two V2-GAP-035
+    in-place reclassifications) -- 244 plan expectations and 75 decline expectations,
     319 rows, driven through a real browser against the local standalone build
     on afldb_test.
 

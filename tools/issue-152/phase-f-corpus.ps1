@@ -6,8 +6,9 @@
 .DESCRIPTION
     The Phase D corpus (319 rows: Phase G's 271 plus 48 relationship rows)
     plus the two additive Phase F cross-domain corpora (30 rows, now 16 plan /
-    14 decline after the ISSUE-153 X3 reclassification) -- 258 plan
-    expectations and 91 decline expectations, 349 rows, driven through a real
+    14 decline after the ISSUE-153 X3 reclassification) -- 260 plan
+    expectations and 89 decline expectations (V2-GAP-035 moved two Phase D
+    rows), 349 rows, driven through a real
     browser against the local standalone build on afldb_test.
 
     This does NOT redefine Phase G or Phase D. Their accepted evidence is

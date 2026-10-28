@@ -74,7 +74,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-032 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: an unclaimed bare number is a leftover token (parser v67), so `<club> <stat> 200 40` declines and `in 1980 to 1989` is the inclusive range, not 1980 alone; whole malformed_input population (10,179) declines; 17 NL suites 1,638/1,638; typecheck exit 0. **PostgreSQL/Linux 2026-10-28:** 40/40 range rows equal their `between` rewrites (pre-fix: 36 different answers); V5 frozen 12,000/12,000 and V6 unchanged row for row; browser sweep 0 HTTP/page errors. Not deployed | none |
 | V2-GAP-033 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: "played N games for <club> and also coached <club>" no longer counts career games at every club; `validatePlan` refuses a games condition when the played club is a builder parameter; the cross-domain opponent window is kept wide on purpose; 17 NL suites 1,641/1,641; typecheck exit 0. **PostgreSQL/Linux 2026-10-28:** the composition is refused (pre-fix: 6 players, one with 11 Richmond games); controls 27/365/107 unchanged. Not deployed | none |
 | V2-GAP-034 | Low | Birth-date enrichment | no | **CLOSED locally (2026-10-28)**: `enrich_birth_dates.py` no longer files a new open `external_identity_conflict` on every re-run; scoped delete-then-refile over the run's asserted profiles (ISSUE-090 §18 idiom), resolved history and other sources untouched; integration test 28 failed before (2 rows) and the file passes 28/28 on a disposable local `_test` copy, and 28/28 on Linux (2026-10-28). Not deployed | none |
-| V2-GAP-035 | Low | NL browser gate | no | OPEN (found 2026-10-28, Linux verification): the rendered UI gate scores 29 rows whose tracked expectations conflict with accepted behaviour: 27 real-user "how many career <stat> did <player> have" (ISSUE-190 declines them; its optional career-total mapping was never built) and 2 family rows that ISSUE-153 made answerable but never re-pinned. Same through the engine at the pre-GAP-032 tree; the ISSUE-190 gate and both corpus files are unchanged on `main` (not executed there) | **owner decision**: restate the 29 expectations, or build the ISSUE-190 career-total mapping |
+| V2-GAP-035 | Low | NL browser gate | no | **CLOSED locally (2026-10-28, owner decision: restate)**: the 27 ISSUE-190 career-count rows now expect `decline` and `rel_dec_001`/`rel_dec_002` expect `plan` (ISSUE-153 Stage 6), each pinned against its owning decision in `tests/nl-ui-corpus.test.ts`; no behaviour changed and the optional career-total mapping was not built. Focused Linux suites 1,002/1,002; rendered gate on Linux: 1,844/1,844 pass, 0 fail, 0 HTTP or page errors (before: 1,815 / 29) | none |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -979,7 +979,9 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
 
 ## V2-GAP-035 — The rendered NL gate scores 29 rows whose expectations conflict with accepted behaviour
 
-- **OPEN, owner decision** (found 2026-10-28 by the Linux browser sweep; not a production blocker).
+- **CLOSED locally (2026-10-28).** Found by the Linux browser sweep; not a production blocker. The owner decided to
+  restate the expectations and not to build the optional career-total mapping. Record:
+  [linux-verification §10.1](linux-verification-2026-10-28.md).
 - **What.** The sweep of all 12 tracked UI corpora (1,844 questions; 0 HTTP or page errors) scored
   1,815 pass / 29 fail. Each failure behaves the same through the engine at the pre-GAP-032 tree,
   so none comes from GAP-032/033, and none is a crash or a wrong answer:
@@ -995,9 +997,14 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
     decline. They answer with "Ablett — 906 combined career games" and "43 families qualify".
     ISSUE-153's acceptance (`issues.md:22429`) records exactly these answers as intended, but its
     re-pin `25beb99c` moved only `rel_dec_003`–`006` to `plan`.
-- **Not done, deliberately.** No expectation was restated from observed output, and no behaviour
-  changed.
-- **Close.** The owner decides between:
-  - restating the 29 expectations, each against its owning decision (ISSUE-190, ISSUE-153);
-  - building the ISSUE-190 career-total mapping, with its own tests and a parser bump, and then
-    restating only the 2 family rows.
+- **Resolution.** Each restated row was checked against its owning decision, never against observed output:
+  - the 27 career-count rows expect `decline`. A pin parses each to a metric-bearing `player_career` count and asserts
+    `validatePlan` returns the exact ISSUE-190 refusal;
+  - `rel_dec_001` and `rel_dec_002` expect `plan`. A pin asserts both parse to grain `family` and validate (ISSUE-153
+    §11.14, C1/C5).
+  - IDs, question text, categories, tags and every unrelated assertion are unchanged. The Phase G builder counts and the
+    corpus runner headers were restated to match.
+- **Validation.**
+  - Locally: four NL suites 913/913.
+  - On Linux: five NL suites 1,002/1,002.
+  - Rendered gate on Linux, all 12 tracked UI corpora: 1,844/1,844 pass, 0 fail, 0 HTTP or page errors (before: 1,815 / 29).
