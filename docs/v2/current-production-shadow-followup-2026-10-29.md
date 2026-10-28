@@ -10,7 +10,8 @@ No acceptance is recorded and no binding was added. **Production remains NO-GO.*
 > (D-V2-CURRENT-REHEARSAL-1, D-V2-CURRENT-SCHEMA-1, D-V2-BROWNLOW-ALT-3; migration evidence for `a4641ca0…`
 > only). They are recorded, and bound in `tools/v2/fresh-rehearsal-acceptance.ts`, in
 > [the owner decision record](owner-decision-current-rehearsal-2026-10-29.md). The measured run of that binding
-> over the retained evidence is still pending. This record is kept as written. Production remains NO-GO.
+> over the retained evidence passed on 2026-10-29 (D-V2-CURRENT-ACCEPTANCE-RUN-1, that record §10). This record
+> is kept as written. Production remains NO-GO.
 
 Executed under the owner's approval D-V2-CURRENT-SHADOW-FOLLOWUP-1 (Claude Code session, 2026-10-29 AEDT). It
 completes the bounded follow-up recommended in [the shadow report](current-production-shadow-2026-10-29.md) §9.

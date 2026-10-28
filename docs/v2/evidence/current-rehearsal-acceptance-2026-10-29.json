@@ -1,0 +1,351 @@
+{
+  "decision": "D-V2-CURRENT-REHEARSAL-1",
+  "binding": {
+    "decision": "D-V2-CURRENT-REHEARSAL-1",
+    "schemaDecision": "D-V2-CURRENT-SCHEMA-1",
+    "brownlowDecision": "D-V2-BROWNLOW-ALT-3",
+    "archiveSha256": "a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc",
+    "sidecarSha256": "72f000462a2e7560afee97edf5598723a2ccfa45c9664e7d57ce7b62dddb57d4",
+    "ledgerDigest": "789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153",
+    "sourceRevision": "c478c31b2ad84719907e0372d1b94230d3a4c508",
+    "archive": "xfer/afldb_prod-20261028T192336Z.dump",
+    "sidecar": "xfer/afldb_prod-20261028T192336Z.provenance.json",
+    "manifestSha256": "ea197fcf40c1b27108bebb1cc9b0a6523e8d79804952f77610f5f4606ac8ac75",
+    "manifestFiles": 38,
+    "disclosedManifestEntry": {
+      "path": "shadow.log",
+      "recorded": "12e4cf941a5b5accb314a54f8a1174285c4a95a645c3fdcc5f811bb444be7d0f",
+      "final": "99b6e575e2c735caf41a0bb920b43cdb92a9518f29928490e3e7c1ffa4d745e8"
+    },
+    "followupManifestSha256": "30b1a2be9757dfca491aa6b72ade183e2237f90759babbbd6a705a950143d010",
+    "followupManifestFiles": 61,
+    "measured": {
+      "followup/evidence/schema-sections.attempt2.json": "edb83b2aa53004f26c363d040eebe5186a86e733e472f14bdcd14b7768ac431b",
+      "followup/evidence/receipt-catalog.migration.json": "f1f951a9cca05be88045e8164951ccb043ab976ed9d2f36120a4d4d52d79ce05",
+      "followup/evidence/receipt-mutation.json": "93bca1f44bbaf1f19cdc17dabc787c63eb8a865b6981e03f475fa28557ec976a",
+      "evidence/schema.diff": "b201707ba920f331349128b14e4bf79366918a38ce5fc689f2cef69e3129d230",
+      "followup/evidence/brownlow-stored.baseline.json": "e2df67aee27df89d6723681fbd0cdda1938a4311c11fd96b7df69f1a1d5c98aa",
+      "followup/evidence/brownlow-stored.migration.json": "e2df67aee27df89d6723681fbd0cdda1938a4311c11fd96b7df69f1a1d5c98aa",
+      "followup/evidence/it-v2-brownlow-eligibility.json": "7935c56a2e4072fa97f0f6081266c0799c436d001e8d249ac7176e1663af6842",
+      "followup/evidence/it-privileges.json": "63c183beec5efc024e385998c9d0923a5608f9e41d4b76331ad726fdb2e7d06e",
+      "followup/evidence/unit-focused.json": "92bcc392cc6d982b9c31edec605cbe6b63e09d3fc970b71a94d9b46fd1ef6dba",
+      "followup/evidence/inventory-comparison.attempt2.json": "d00744c697fd8ce5dc83a0e94145573824996939227378ef11f5ee6e5ad5c32d"
+    },
+    "repositoryMeasured": {
+      "docs/v2/evidence/current-production-shadow/followup-20261029/grant-exact.json": "4d41c280d0f4eaaa7787ec513d3656df73c491b6b72d356e7081a6a34508d67d"
+    },
+    "focusedChecks": {
+      "units": {
+        "total": 508,
+        "passed": 508
+      },
+      "eligibility": {
+        "total": 47,
+        "passed": 47
+      },
+      "privileges": {
+        "total": 43,
+        "passed": 42,
+        "failing": [
+          "AFL Tables settle projections are privileged like the rest of staging inherits that from migration 014, whose default privilege is pinned here"
+        ]
+      }
+    },
+    "migrations": {
+      "111_curated_award_proposals.sql": "2ed29d9598742c74d0f9db6f7bac0bec8409733c1dace1d25356ad27edb91290",
+      "112_derived_award_results.sql": "e0aa0c7e6fd14b6885aaf43725309e82e2d9b362cf167fd57cca9b95cef401ac",
+      "113_brownlow_eligibility_decisions.sql": "79e7b9d1b839414962571ffff832b230e458273c24bd26d8474d259137ca9971",
+      "114_award_projections_and_curated_revisions.sql": "1c33324f9c7c616e998aa152fdd5fbdf20b2585694b3e6d62c2addb5f307f180",
+      "115_adjudication_supersession_fk_index.sql": "2f16efb9694f76f946543bbaca01785127b632417ad21ba1fc7b8745bb7c1852",
+      "116_brownlow_correction_receipts.sql": "c61953b71e1210b5389579342e155d367dfada5737bf3cd37f1a536b9ac61075",
+      "117_brownlow_provider_eligibility_unknown.sql": "a7dff2bddb1dd9c01ea0e69478193c5e5c50d8a531b2db448e7052b9f25e286f"
+    }
+  },
+  "evidenceIntegrity": "PASS",
+  "originalStrict": {
+    "policy": "v2.migration-separation.1",
+    "backendFunctional": "PASS",
+    "migrationCompatibility": "FAIL",
+    "migrationCompatibilityBasis": "NOT_ESTABLISHED",
+    "stagedBrownlowComparator": "INCOMPLETE",
+    "brownlowAlternative": {
+      "decision": "D-V2-BROWNLOW-ALT-1",
+      "status": "NOT_APPLIED",
+      "reasons": [
+        "No Brownlow alternative attestation supplied"
+      ],
+      "scope": {
+        "archiveSha256": "a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04",
+        "migrationScope": {
+          "from": 110,
+          "to": 115
+        },
+        "seasons": 98
+      },
+      "notEstablished": "authentic AFL API vote, identity or leaderboard reconciliation"
+    },
+    "brownlowOperationalReconciliation": "OUTSTANDING: authentic provenance/checksum-verified completed-season API vote, identity and leaderboard reconciliation is still required before Brownlow operational/publication readiness",
+    "gridleyEvidence": "Retained 2026-10-20 at 12abe77f; not rerun by this offline report",
+    "strictGridley": {
+      "result": "FAIL",
+      "findings": 149
+    },
+    "adjudicationConformance": {
+      "result": "FAIL",
+      "approved": 99,
+      "unapproved": 50
+    },
+    "productionOperational": "INCOMPLETE",
+    "backendAcceptance": "FAIL",
+    "productionDecision": "NO-GO",
+    "preservation": {
+      "result": "FAIL",
+      "findings": [
+        "staging.afl_api_brownlow_vote: DEFINITION_OR_RELATIONSHIP_CHANGED",
+        "public.brownlow_correction_receipts: UNAPPROVED_TABLE_ADDED"
+      ]
+    }
+  },
+  "ownerApprovedSchemaDifferences": {
+    "decision": "D-V2-CURRENT-SCHEMA-1",
+    "findings": [
+      "staging.afl_api_brownlow_vote: DEFINITION_OR_RELATIONSHIP_CHANGED",
+      "public.brownlow_correction_receipts: UNAPPROVED_TABLE_ADDED"
+    ],
+    "boundary": "Exactly two deltas for this archive: 116 receipt table, refuse_brownlow_receipt_mutation() and brownlow_receipt_immutable with owner-only table ACL, no app/import/auth table privilege and the function's default PUBLIC EXECUTE (proacl NULL); 117 nullable eligible and its comment. 111-115 additions stay with V2_ADDED_TABLES. Stored ACLs only; production effective permissions and object ownership (except the receipt table owner) not compared. No other definition excluded."
+  },
+  "stagedBrownlowComparator": "INCOMPLETE",
+  "alternativeBrownlowEvidence": {
+    "decision": "D-V2-BROWNLOW-ALT-3",
+    "basis": "Pinned raw-vote/audit preservation, byte-identical 98-season stored reports, Linux units 508/508 + eligibility integration 47/47 + privileges integration 42/43 (one recorded FAIL: absent staging default ACLs, not waived)",
+    "authenticStagedReconciliationEstablished": false
+  },
+  "migrationCompatibility": "PASS",
+  "reasons": [],
+  "productionOperational": "INCOMPLETE",
+  "productionDecision": "NO-GO",
+  "productionPrivileges": {
+    "policyDecisions": [
+      "D-V2-STAGING-IMPORT-DEFAULT-1",
+      "D-V2-STAGING-APP-DEFAULT-1"
+    ],
+    "productionExecutionAuthorized": false,
+    "execution": "PENDING; absent in captured production"
+  },
+  "privilegesIntegration": {
+    "result": "FAIL",
+    "passed": 42,
+    "total": 43,
+    "failing": [
+      "AFL Tables settle projections are privileged like the rest of staging inherits that from migration 014, whose default privilege is pinned here"
+    ],
+    "waived": false,
+    "requirement": "Unresolved: staging default privileges absent; D-V2-STAGING-IMPORT-DEFAULT-1/APP-DEFAULT-1 execution pending at A-REL"
+  },
+  "recomputedStrict": {
+    "policy": "v2.migration-separation.1",
+    "backendFunctional": "INCOMPLETE",
+    "migrationCompatibility": "FAIL",
+    "migrationCompatibilityBasis": "NOT_ESTABLISHED",
+    "stagedBrownlowComparator": "INCOMPLETE",
+    "brownlowAlternative": {
+      "decision": "D-V2-BROWNLOW-ALT-1",
+      "status": "NOT_APPLIED",
+      "reasons": [
+        "No Brownlow alternative attestation supplied"
+      ],
+      "scope": {
+        "archiveSha256": "a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04",
+        "migrationScope": {
+          "from": 110,
+          "to": 115
+        },
+        "seasons": 98
+      },
+      "notEstablished": "authentic AFL API vote, identity or leaderboard reconciliation"
+    },
+    "brownlowOperationalReconciliation": "OUTSTANDING: authentic provenance/checksum-verified completed-season API vote, identity and leaderboard reconciliation is still required before Brownlow operational/publication readiness",
+    "gridleyEvidence": "Retained 2026-10-20 at 12abe77f; not rerun by this offline report",
+    "strictGridley": {
+      "result": "FAIL",
+      "findings": 149
+    },
+    "adjudicationConformance": {
+      "result": "FAIL",
+      "approved": 99,
+      "unapproved": 50
+    },
+    "productionOperational": "INCOMPLETE",
+    "backendAcceptance": "FAIL",
+    "productionDecision": "NO-GO",
+    "preservation": {
+      "result": "FAIL",
+      "findings": [
+        "staging.afl_api_brownlow_vote: DEFINITION_OR_RELATIONSHIP_CHANGED",
+        "public.brownlow_correction_receipts: UNAPPROVED_TABLE_ADDED"
+      ]
+    }
+  },
+  "retainedOriginalParityReport": {
+    "format": "afldb.v2.shadow-parity-report",
+    "formatVersion": 1,
+    "policyVersion": "v2.parity.1",
+    "generatedAt": "2026-10-28T20:00:29Z",
+    "verdict": "FAIL",
+    "checks": [
+      {
+        "id": "historical_manifest",
+        "required": true,
+        "status": "pass",
+        "inputs": {
+          "before": "before.manifest.json",
+          "after": "postmig.manifest.json"
+        },
+        "thresholds": "Zero tolerance on sealed history: every comparator violation, unverified and review finding FAILS (including METADATA_CHANGED on a sealed bucket, REFERENCE_CHANGED, REFERENCE_ROWS_DECREASED, METADATA_COLUMNS_CHANGED, SPEC_VERSION_DIFFERS and every definition change) and a moved seal (SEALED_RANGE_DIFFERS) FAILS; only OPEN_SEASON_CHANGED and TABLE_ADDED are info. The manifest digests stable id columns as facts and reference tables whole, so any id change surfaces as a fail finding.",
+        "counts": {
+          "comparatorInfo": 0,
+          "fail": 0,
+          "info": 0,
+          "review": 0,
+          "unverified": 0,
+          "violation": 0
+        },
+        "findings": []
+      },
+      {
+        "id": "table_row_counts",
+        "required": true,
+        "status": "fail",
+        "inputs": {
+          "before": "before.row-counts.json",
+          "after": "postmig.row-counts.json"
+        },
+        "thresholds": "Schemas must match; a dropped table FAILS; a table added after FAILS unless it is one of the V2-added tables (award_proposals, award_proposal_decisions, derived_award_results, brownlow_eligibility_decisions, derived_award_projections), which must all be present after; fewer rows in a non-V2 table FAILS; more rows in a non-V2 table and any change in a V2-added table are info.",
+        "counts": {
+          "fail": 1,
+          "info": 6,
+          "tablesAfter": 105,
+          "tablesBefore": 99
+        },
+        "findings": [
+          {
+            "code": "UNEXPECTED_TABLE_ADDED",
+            "severity": "fail",
+            "subject": "public.brownlow_correction_receipts",
+            "detail": "absent before, present after (0 rows), and not a V2-added table"
+          },
+          {
+            "code": "ROWS_INCREASED",
+            "severity": "info",
+            "subject": "afldb_meta.schema_migrations",
+            "detail": "rows 110 -> 117"
+          },
+          {
+            "code": "V2_TABLE_ADDED",
+            "severity": "info",
+            "subject": "public.award_proposal_decisions",
+            "detail": "created by the V2 migrations; 0 rows after"
+          },
+          {
+            "code": "V2_TABLE_ADDED",
+            "severity": "info",
+            "subject": "public.award_proposals",
+            "detail": "created by the V2 migrations; 0 rows after"
+          },
+          {
+            "code": "V2_TABLE_ADDED",
+            "severity": "info",
+            "subject": "public.brownlow_eligibility_decisions",
+            "detail": "created by the V2 migrations; 0 rows after"
+          },
+          {
+            "code": "V2_TABLE_ADDED",
+            "severity": "info",
+            "subject": "public.derived_award_projections",
+            "detail": "created by the V2 migrations; 0 rows after"
+          },
+          {
+            "code": "V2_TABLE_ADDED",
+            "severity": "info",
+            "subject": "public.derived_award_results",
+            "detail": "created by the V2 migrations; 0 rows after"
+          }
+        ]
+      },
+      {
+        "id": "coleman",
+        "required": true,
+        "status": "pass",
+        "inputs": {
+          "before": "before.coleman.json",
+          "after": "postmig.coleman.json"
+        },
+        "thresholds": "Per season present before: missing after, category, stored active rows, derived winners, input checksum or refusal code changed all FAIL, as does any change in stored seasons without an outcome; a season that disagrees (or is not derivable with the same refusal code) in both is info for owner reconciliation (V2-GAP-015); a season only after is info.",
+        "counts": {
+          "fail": 0,
+          "info": 0,
+          "seasonsAfter": 46,
+          "seasonsBefore": 46,
+          "seasonsCompared": 46
+        },
+        "findings": []
+      },
+      {
+        "id": "brownlow",
+        "required": true,
+        "status": "incomplete",
+        "inputs": {
+          "before": null,
+          "after": null
+        },
+        "thresholds": "Reports pair by season (a duplicate season on one side is an invalid input). For a season complete before: missing after, state, outcome, raw player totals, award presentation (status, refusal, leaders, eligibility rule) or finding counts changed all FAIL; discrepancies or refused in both, unchanged, is info; an in-progress season may change (info); a season only after is info.",
+        "counts": {
+          "fail": 2,
+          "info": 0,
+          "seasonsAfter": 0,
+          "seasonsBefore": 0,
+          "seasonsCompared": 0
+        },
+        "findings": [
+          {
+            "code": "INPUT_MISSING",
+            "severity": "fail",
+            "subject": "after",
+            "detail": "no Brownlow reconciliation report was supplied for after"
+          },
+          {
+            "code": "INPUT_MISSING",
+            "severity": "fail",
+            "subject": "before",
+            "detail": "no Brownlow reconciliation report was supplied for before"
+          }
+        ]
+      },
+      {
+        "id": "coverage",
+        "required": true,
+        "status": "pass",
+        "inputs": {
+          "before": "before.coverage.json",
+          "after": "postmig.coverage.json"
+        },
+        "thresholds": "Either registry export with registry problems FAILS; a coverage cell missing on either side FAILS; any status change FAILS (claims never move during a rehearsal).",
+        "counts": {
+          "cellsAfter": 655,
+          "cellsBefore": 655,
+          "cellsChanged": 0,
+          "fail": 0,
+          "info": 0
+        },
+        "findings": []
+      }
+    ],
+    "summary": {
+      "pass": 3,
+      "fail": 1,
+      "incomplete": 1
+    }
+  },
+  "backendFunctional": "PASS",
+  "backendAcceptance": "PASS"
+}

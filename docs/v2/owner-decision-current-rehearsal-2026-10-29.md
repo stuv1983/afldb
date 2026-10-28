@@ -1,9 +1,11 @@
 # Current-production rehearsal acceptance — 2026-10-29
 
 **Result: three archive-bound decisions APPROVED as migration evidence for archive `a4641ca0…` only, and bound
-in code as a second, explicitly selected acceptance binding.** The binding has not yet been run over the
-retained host evidence, so no measured acceptance report exists for this archive (§5). **Production remains
-NO-GO.** The privileges integration suite stays 42/43; that failure is not waived.
+in code as a second, explicitly selected acceptance binding.** The binding was then run over a verified local
+copy of the retained host evidence under D-V2-CURRENT-ACCEPTANCE-RUN-1 (§10): evidence integrity, migration
+compatibility (no reasons), backend functional and backend acceptance **PASS**, exit 0
+([report](evidence/current-rehearsal-acceptance-2026-10-29.json)). **Production remains NO-GO.** The
+privileges integration suite stays 42/43; that failure is not waived.
 
 Provenance: explicit owner instruction in the Claude Code session dated 2026-10-29, repository
 `D:\dev\afldbV2`, branch `v2/rebuild`, starting HEAD `df7a8229918b55f10c081137b54344806ba2910e`. Only
@@ -130,6 +132,8 @@ host. The cases cover:
 
 ## 5. Not yet measured: the acceptance run over the retained evidence
 
+> **Measured since, 2026-10-29:** see §10. This section is kept as written.
+
 The 2026-10-21 decisions were followed by a measured report
 ([`fresh-rehearsal-acceptance-2026-10-21.json`](evidence/fresh-rehearsal-acceptance-2026-10-21.json)). No
 such report exists for `a4641ca0…`. The 38 run files, including both preservation snapshots, and the 61
@@ -162,7 +166,7 @@ Gate numbers refer to the [release decision package](release-decision-package-20
 
 | Gate | Requirement | State |
 |---|---|---|
-| 5 | Archive-bound acceptance for the current shadow | **Decisions approved and bound in code.** The measured run over the retained evidence is still pending (§8) |
+| 5 | Archive-bound acceptance for the current shadow | **DONE.** Decisions approved and bound in code; measured run PASS, exit 0 (§10). Privileges 42/43 stays open below |
 | 2 | Accept known residuals: 3 strict Gridley failures (V2-GAP-029, 149/99/50), lint debt, and `external-grids-import` NOT RUN (archive unavailable) | Owner decision pending. Recording a residual is not a waiver |
 | 3 | Owner visual acceptance (V2-GAP-022); merge of `v2/rebuild`; exact execution commit and build hash; push | Pending |
 | 8 | A-AFLT: AFL Tables timer and polkit retirement before A/B (V2-GAP-011/013) | Pending |
@@ -175,6 +179,8 @@ Gate numbers refer to the [release decision package](release-decision-package-20
 | 14 | Credential containment (C-CRED-1) | Hygiene; owner action |
 
 ## 8. Next owner decision (prepared): D-V2-CURRENT-ACCEPTANCE-RUN-1
+
+> **APPROVED and executed 2026-10-29;** result in §10. The text below is kept as prepared.
 
 **Purpose.** Produce the measured acceptance report for the approved binding. This is the counterpart of the
 2026-10-21 report, so gate 5 rests on re-hashed evidence rather than on the record.
@@ -262,3 +268,67 @@ Re-run after the corrections (only the affected checks):
 - the focused suite: 201/201;
 - typecheck exit 0, and lint of both code files exit 0;
 - the three CLI controls, with the same results as before.
+
+## 10. Measured acceptance run (D-V2-CURRENT-ACCEPTANCE-RUN-1), 2026-10-29
+
+**Approval, verbatim:**
+
+> D-V2-CURRENT-ACCEPTANCE-RUN-1 — APPROVED as prepared in docs/v2/owner-decision-current-rehearsal-2026-10-29.md §8.
+
+The same instruction authorised the read-only `scp` of the two retained evidence directories, the restricted
+local folder, copying and verifying the archive and sidecar, the local run with installed tools only, report
+inspection, directly related tracking updates, selective staging and one local commit. It excluded production
+access, host writes, database activity, deployment, push, rebuild, activation/deactivation and Brownlow
+operations. Executed in the Claude Code session at `241c105e` on `v2/rebuild`; only untracked `.codex/` existed
+beforehand and was preserved.
+
+**Steps, as prepared in §8:**
+1. `C:\Users\stuar\backups\afldb\current-acceptance-20261029\` was created new, with the archive set's protected
+   ACL copied exactly: owner, SYSTEM and Administrators, full control, inherited by every child.
+2. `scp` (read-only on the host) of `/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/` and
+   `followup/evidence/` into `evidence/` and `followup/evidence/`. Both exited 0. Nothing was started, written
+   or removed on streamanator.
+3. The archive set's `SHA256SUMS` matched the dump and sidecar before copying. The copies in `xfer/` hash
+   `a4641ca0…` and `72f00046…`. The original set was not modified.
+4. An independent manifest check, before the tool ran:
+   - `evidence/evidence-sha256.txt` digest `ea197fcf…` matched; 37/38 lines verified, and the 38th is exactly
+     the disclosed pair (`shadow.log` recorded `12e4cf94…`, actual `99b6e575…`);
+   - `followup/evidence/evidence-sha256.txt` digest `30b1a2be…` matched; 61/61 verified;
+   - the stop condition did not fire. `evidence/` also holds the unlisted end markers `shadow.done` and
+     `shadow.result`, written after the manifest; the verifier does not read them.
+5. `npx --no-install tsx tools/v2/fresh-rehearsal-acceptance.ts --binding D-V2-CURRENT-REHEARSAL-1 <dir>
+   <dir>\current-rehearsal-acceptance-2026-10-29.json` at `241c105e`. **Exit 0.**
+
+**Result**, every field exactly as §8 expected:
+
+| Field | Expected | Measured |
+|---|---|---|
+| `evidenceIntegrity` | PASS | **PASS** |
+| `migrationCompatibility` / `reasons` | PASS / `[]` | **PASS** / `[]` |
+| `backendFunctional` / `backendAcceptance` | PASS / PASS | **PASS** / **PASS** |
+| `originalStrict` / `recomputedStrict` `migrationCompatibility` | FAIL / FAIL | FAIL / FAIL (preservation: exactly the two approved findings; Gridley 149, adjudication 99/50) |
+| `stagedBrownlowComparator` | INCOMPLETE | INCOMPLETE |
+| `privilegesIntegration` | FAIL 42/43, `waived: false` | FAIL 42/43, `waived: false`; the one failing case is the staging default-privilege case |
+| `productionOperational` / `productionDecision` | INCOMPLETE / NO-GO | INCOMPLETE / NO-GO |
+| Exit code | 0 | 0 |
+
+The retained parity report inside it is unchanged: 3 pass / 1 fail (the receipt table, 0 rows) / 1 incomplete
+(Brownlow `INPUT_MISSING`). The strict sections, including the legacy ALT-1 scope text, have the same shape as
+the 2026-10-21 report.
+
+**Report.** [`evidence/current-rehearsal-acceptance-2026-10-29.json`](evidence/current-rehearsal-acceptance-2026-10-29.json),
+15,197 bytes, sha256 `693f0d16701afb9fc4824bfa44bb7a2f903693b483b391e8e3562e602f6795e7`, byte-identical to the
+working copy. Checked before retention: it holds decision identifiers, hashes, file names, table names and
+counts only. There is no DSN, credential, host address, home path or raw row.
+
+**Gate 5 is complete.** It rests on re-hashed evidence: the archive, both manifests and every listed file, the
+measured results and the seven migrations. This changes no other gate. The permissions requirement stays open
+and unwaived, and production remains **NO-GO**.
+
+**Retained, outside Git.** The working copy `C:\Users\stuar\backups\afldb\current-acceptance-20261029\`
+holds a production archive copy (auth and audit data) and both evidence sets. It stays in place under its
+restricted ACL. Deleting it is a later owner decision; see
+[the consolidated release choices](owner-decision-release-choices-2026-10-29.md).
+
+**Not run:** tests, typecheck, any database, host or production action. None was needed, because the
+implementation is the committed `241c105e` and its validation is §6.

@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### Current-production rehearsal acceptance measured (2026-10-29; production NO-GO)
+
+- D-V2-CURRENT-ACCEPTANCE-RUN-1 ran the committed `D-V2-CURRENT-REHEARSAL-1` binding (`241c105e`) over a new,
+  restricted local copy of the retained evidence for archive `a4641ca0…`. The copy was made by read-only `scp`;
+  nothing was written on the host.
+  - Before the run, the evidence manifest verified 37/38 plus the disclosed `shadow.log` pair, and the
+    follow-up manifest 61/61.
+  - Evidence integrity, migration compatibility (`reasons: []`), backend functional and backend acceptance
+    are **PASS**, exit 0, exactly as prepared.
+  - Strict results stay FAIL and the staged Brownlow comparator INCOMPLETE. Privileges integration stays
+    **42/43, not waived**.
+- The report is retained as `docs/v2/evidence/current-rehearsal-acceptance-2026-10-29.json`, after a check for
+  sensitive content. Release gate 5 is complete; no other gate changes.
+- The remaining release choices are consolidated in `docs/v2/owner-decision-release-choices-2026-10-29.md`:
+  prerequisites, and what each approval would and would not authorise. The next decision is D-V2-RESIDUALS-1.
+
 ### Current-production rehearsal acceptance: three archive-bound decisions approved and bound (2026-10-29; production NO-GO)
 
 - The owner approved D-V2-CURRENT-REHEARSAL-1, D-V2-CURRENT-SCHEMA-1 and D-V2-BROWNLOW-ALT-3 exactly as

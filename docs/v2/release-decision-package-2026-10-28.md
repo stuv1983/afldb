@@ -1,6 +1,9 @@
 # V2 release decision package — 2026-10-28
 
 **Production: NO-GO.** This package prepares the remaining owner decisions. It authorises nothing.
+
+> **Update, 2026-10-29:** gates 4 and 5 are done. The remaining choices are consolidated in
+> [the release choices](owner-decision-release-choices-2026-10-29.md). The gate table below is kept current.
 Prepared under the standing authority of the 2026-10-28 session. Production was not accessed. No
 push, deployment, rebuild, provider fetch, migration, privilege or timer change took place. EXEC,
 P/H, the frozen stores and all retained evidence were not modified.
@@ -30,7 +33,7 @@ fixture ingestion. "Plan" means `production-release-plan-2026-10-21.md`.
 | 2 | Known residuals: the 3 strict Gridley failures, lint debt, and the env-gated cases still not run (`external-grids-import`) | A | **Owner decision pending** (plan step 1, "accept known test/lint residuals"). Recording a residual is not a waiver | A |
 | 3 | Owner visual acceptance (V2-GAP-022), merge of `v2/rebuild`, exact execution commit and production build hash | A | Pending | A |
 | 4 | **Current-production shadow capture and report** (§2) | B | **DONE** 2026-10-29: archive `a4641ca0…`, only the expected 116/117 deltas ([report](current-production-shadow-2026-10-29.md)); follow-up done ([record](current-production-shadow-followup-2026-10-29.md)) | B: production has drifted since archive `7fefcd9b…` (for example the 2026-10-24 U3 removal of PMS 705437), and step 5 says "drift requires a fresh migration rehearsal/acceptance" |
-| 5 | Archive-bound owner acceptance of the new shadow's 116/117 deltas and its Brownlow comparator | B | **APPROVED** 2026-10-29 (D-V2-CURRENT-REHEARSAL-1, D-V2-CURRENT-SCHEMA-1, D-V2-BROWNLOW-ALT-3; migration evidence for `a4641ca0…` only) and bound in code ([record](owner-decision-current-rehearsal-2026-10-29.md)). **Measured run over the retained evidence pending** (D-V2-CURRENT-ACCEPTANCE-RUN-1). Privileges integration 42/43 stays unresolved, not waived | B |
+| 5 | Archive-bound owner acceptance of the new shadow's 116/117 deltas and its Brownlow comparator | B | **APPROVED** 2026-10-29 (D-V2-CURRENT-REHEARSAL-1, D-V2-CURRENT-SCHEMA-1, D-V2-BROWNLOW-ALT-3; migration evidence for `a4641ca0…` only) and bound in code ([record](owner-decision-current-rehearsal-2026-10-29.md)). **DONE:** measured run PASS, exit 0, `reasons: []` (D-V2-CURRENT-ACCEPTANCE-RUN-1, [report](evidence/current-rehearsal-acceptance-2026-10-29.json)). Privileges integration 42/43 stays unresolved, not waived | B |
 | 6 | Window preflight; frozen, non-pruning backup with off-host copy and proven restore; comparison with the accepted shadow (A-BACKUP) | A+B window | Pending; separate window authority | A, B |
 | 7 | A-REL (111–117 plus both staging default grants), target/revision-bound 116/117 schema approval, A-ROLLBACK, A-GO | A+B | Pending. **Unresolved permissions requirement (not waived):** privileges integration is 42/43 on `a4641ca0…` because the staging defaults are absent; it must reach 43/43 against the released state after A-REL executes them. Production effective permissions and object ownership are not yet compared | A, B |
 | 8 | A-AFLT: AFL Tables timer and polkit retirement; `legacy-writers` PASS | C, but **ordered before** A/B | Pending. Plan steps 3 and 5 put it before schema and code; the cutover preflight refuses release until it is done | A, B, C |
@@ -301,8 +304,8 @@ pair, and no archive-to-archive drift report against `7fefcd9b…`.
   the installed artifact is confirmed at A-REL artifact review. 2027 evidence is **not** a
   prerequisite for A.
 - **B, production schema/data acceptance.** Required:
-  - the current shadow and its new archive-bound acceptance (rows 4–5). The capture is done and the
-    acceptance is approved, but the acceptance's measured run is pending (row 5);
+  - the current shadow and its new archive-bound acceptance (rows 4–5). Both are done: the capture, the
+    approval and, on 2026-10-29, the measured run (row 5);
   - then, in the window, the frozen backup compared with that accepted shadow (row 6). Any drift
     means a fresh rehearsal;
   - A-REL with 111–117 and both declarations, plus the 116/117 schema approval.
@@ -339,8 +342,8 @@ The evidence that met those criteria so far is **archive-bound**: `a583fc7d…` 
 current production, the criteria must be shown again from the new capture (§2). That separation
 does **not** carry forward automatically. On 2026-10-29 the owner approved it for `a4641ca0…` 110→117
 (CURRENT-REHEARSAL-1, CURRENT-SCHEMA-1, BROWNLOW-ALT-3;
-[record](owner-decision-current-rehearsal-2026-10-29.md)). Its measured run over the retained evidence is
-pending.
+[record](owner-decision-current-rehearsal-2026-10-29.md)), and its measured run over the retained evidence
+passed the same day (D-V2-CURRENT-ACCEPTANCE-RUN-1).
 
 GAP-029 also remains a known **test residual** that the plan's step 1 asks the owner to accept or
 reject at artifact lock (row 2). An acceptance would record the three failures as known and open;

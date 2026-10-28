@@ -18,9 +18,12 @@ default ACLs). Drift against `7fefcd9b…` is aggregate only (+18 rows).
 **Owner decision, 2026-10-29:** [record](owner-decision-current-rehearsal-2026-10-29.md). D-V2-CURRENT-REHEARSAL-1,
 D-V2-CURRENT-SCHEMA-1 and D-V2-BROWNLOW-ALT-3 are **APPROVED** as migration evidence for archive `a4641ca0…`
 only, with the recorded limits. They are bound in `tools/v2/fresh-rehearsal-acceptance.ts` as a second,
-explicitly selected binding. The measured run over the retained evidence is pending
-(D-V2-CURRENT-ACCEPTANCE-RUN-1, prepared). Privileges integration stays **42/43**, unresolved and not waived. They grant no
-schema, grant, Brownlow or release action. **NO-GO.**
+explicitly selected binding. **Measured 2026-10-29** (D-V2-CURRENT-ACCEPTANCE-RUN-1,
+[report](evidence/current-rehearsal-acceptance-2026-10-29.json)): evidence integrity, migration compatibility
+(no reasons), backend functional and backend acceptance **PASS**, exit 0. Strict results stay FAIL and the staged
+Brownlow comparator INCOMPLETE. Privileges integration stays **42/43**, unresolved and not waived. They grant no
+schema, grant, Brownlow or release action. **NO-GO.** Remaining choices:
+[release choices](owner-decision-release-choices-2026-10-29.md).
 
 **Current scoped acceptance, 2026-10-21:** [owner decisions and measured result](owner-decision-fresh-rehearsal-2026-10-21.md)
 supersede historical pending-rehearsal statements below for archive `7fefcd9b…6dea6599`, baseline
