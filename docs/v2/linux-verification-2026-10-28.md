@@ -215,4 +215,63 @@ Each committed blob equals the file the focused Linux checks ran on (sha256 reco
 - **V2-GAP-029** stays open (149 / 99 / 50), unchanged by this run.
 - Not run here, still required before release: the Brownlow dedicated-clone rehearsals, the
   production-dump `release-gates.ts` report, and the separate push and production-release decisions.
+  Both remain blocked after the second pass (§9).
 - Production remains **NO-GO**.
+
+## 9. Second pass: opt-in suites and the remaining items (2026-10-28, same authority)
+
+A second, separate verification root on streamanator ran the items that §2 left unrun, wherever they can run on
+disposable targets. The first root, EXEC, P/H, authorities, retained proof roots and the WSL rehearsal store
+were not touched. The first root's `xfer/` was only read, as a source of hash-verified copies.
+Nothing was downloaded, installed, fetched from a provider, pushed or deployed. No source file was edited.
+
+| Item | Value |
+|---|---|
+| Source | `c478c31b2ad84719907e0372d1b94230d3a4c508` (tree `476b6a17…`), upload sha256 `05b9fa90…`. Verified blob for blob 2,939/2,939, bad 0, no extras. It differs from the verified `c3dea709` only in the 9 documentation/tracking files of `c478c31b` |
+| Root | `/home/arm/afldb-v2-linuxverify-20261028T0310Z` |
+| Runtime | as §1: Node v22.23.2 (sha256 `3517c2df…`), PostgreSQL 16.15, Python 3.12.3. Lock check 427 ok / 125 optional absent / 0 bad. Inputs 785/785 |
+| Cluster | new `afldb_v2_isolated` on **127.0.0.1:55462**, which was free beforehand. Only 5432, 3000 and 3100 (the host's own) listened, and they were observed, never used |
+| Base | `afldb_v2_rb_lv2base_test`: the same approved dump (`659e471b…`, 1,642 TOC entries, 4 excluded), restored, analysed and migrated 115 → 117, then privileges. Probe: `afldb_owner`, not superuser, marker present |
+
+Results:
+
+| Check | Target (disposable) | Result |
+|---|---|---|
+| C1 `db-promotion-receipts` (ISSUE-322) | fresh migrated `afldb_v2_i322_base_test` plus `nonempty`/`live`/`cand` templates; no `_pre_test` | **7/7** |
+| C2 `import-role-match-lock` (ISSUE-274 D-274-2), isolated mode, import DSN of the same clone | baseline clone `afldb_v2_rb_lv2lock_test` | **1/1** |
+| C3 `isolated-populated-lifecycle` (ISSUE-316 L7), alone in its invocation, fresh capture root | fresh migrated `afldb_v2_rb_lv2liferef_test` + privileges + `load_reference_data.py` (players 0, ledger 0, sources `afl_api`/`afltables` present) | **17/17** |
+| C4 `gridley-aa-oracle` + `gridley-height-oracle` with `AFLDB_AA_REPORT`/`AFLDB_HEIGHT_REPORT` | baseline clone `afldb_v2_rb_lv2oracle_test` | **120/120**, including the two report cases. Reports retained: AA `87e58acf…`, height `704969ef…` |
+
+C3 needed two corrected attempts. **These were target-selection errors in this pass, not product failures.**
+1. A baseline clone, which has 13,273 players, was refused by the suite's `beforeAll` before any write ("the target must be a
+   fresh migrated database").
+2. A bare migrated database failed the first case's precondition ("sources 'afl_api' and 'afltables' must both exist"). The
+   remaining 14 failures cascaded from it, and 3 passed.
+
+The correct target is the state the suite itself rebuilds after `RESET_SQL`: migrations, privileges and reference data.
+
+Still not run, with the precise reason:
+
+- **Brownlow dedicated-clone suites (11).** Both need clones of `afldb_v2_rb_brownlow2025_test`, which holds the authentic 2025
+  provider snapshot. That template exists only in the stopped WSL rehearsal store `AFLDB-V2-Rehearsal-20261020`, which is not an
+  authorised target. Rebuilding it would need a provider fetch, which is excluded. Substituting another baseline is ruled out by
+  [the Brownlow verification](brownlow-isolated-verification-2026-10-20.md). Unblocking needs an owner decision either to read
+  the template from that store as a dump or to authorise a re-acquisition.
+- **Production-dump `release-gates.ts` report.** It needs production-dump inputs, and production access is excluded.
+- **`settle-promotion-deadlock` Phase B (11).** It is armed only by its dedicated Windows `afldb_test` window runner, which lives
+  outside the repository (ISSUE-265 §21–23; it passed 11/11 there on 2026-10-05). Arming it by hand on Linux would bypass that
+  runner's target guard.
+- **`brownlow-pending-populated` (4).** It needs a copy of a completed C2 rehearsal database. No such database is among the
+  authorised targets, and the approved baseline (1897–2025) is not one.
+- **`external-grids-import` (1).** It needs the legacy SQLite archive from outside the repository.
+- **Not runnable by design.** The special-records "restricted importer skipped" case is the mutually exclusive complement of the
+  restricted-importer case, which runs whenever the import DSN is set. The data-editor D-257-9 case is a data-conditioned
+  `ctx.skip`: the approved baseline has no collision-free `profile_url_continuity` rule.
+
+Cleanup:
+- Every working database was dropped through `isolated-pg drop-db`, except `afldb_v2_rb_lv2lifefresh_test`. Its marker was
+  replaced by the rebuild-pending comment when the failed second C3 attempt stopped before its reinstate stage. `drop-db`
+  correctly refused it as unmarked, and the guard was not bypassed.
+- The cluster is stopped and 55462 is free. Kept: the base (stopped), sources, capture roots and evidence (2.5 MB; manifest
+  `evidence-sha256.txt` `55405e6d…`, 50 files). The root is 1.9 GB.
+- Remove the whole root when it is no longer needed. That also removes the unmarked database.

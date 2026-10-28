@@ -29,6 +29,11 @@ commit.
   the full workflow at `c3dea709` gives 14,860 passed / 3 failed (V2-GAP-029) / 63 skipped, plus
   Coleman 28/28. PostgreSQL NL (GAP-032/033), frozen V5, the browser sweep and R34 are covered in
   `docs/v2/linux-verification-2026-10-28.md`. New owner decision: V2-GAP-035.
+- Second Linux pass at `c478c31b`, on a new root and port 55462, with disposable targets only, recorded in §9 of that record:
+  - `db-promotion-receipts` 7/7, `import-role-match-lock` 1/1, `isolated-populated-lifecycle` 17/17, and the AA/height oracle
+    reports 120/120.
+  - Still blocked, with reasons: the Brownlow dedicated-clone suites (their template is only in the WSL rehearsal store), the
+    production-dump report, `settle-promotion-deadlock` Phase B, `brownlow-pending-populated` and `external-grids-import`.
 
 ### Birth-date enrichment no longer duplicates open identity-conflict issues (V2-GAP-034, ISSUE-090 D4) (2026-10-28)
 

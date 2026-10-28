@@ -130,6 +130,10 @@ Done on streamanator; see [`docs/v2/linux-verification-2026-10-28.md`](../../../
   `v2-admin-operations-ui` 99/99, `v2-shadow-parity` 171/171, `season-rollover` 396/396 and
   `db-test-rebuild` 1,155/1,155.
 - **Not run.** The Brownlow dedicated-clone suites and the opt-in suites.
+  _Second pass, 2026-10-28 (record §9):_ the eligible opt-in suites passed on new disposable targets (port 55462):
+  receipts 7/7, import lock 1/1, populated lifecycle 17/17 and the oracle reports 120/120. The Brownlow dedicated-clone
+  suites remain blocked: their template exists only in the WSL rehearsal store. Phase B, populated-pending and
+  external-grids also remain blocked.
 - **Not touched.** EXEC, P/H, authorities and the retained proof roots. J2 was not re-run.
 
 ## 5. Selective Git integration proposal (operator-executed; not run)
