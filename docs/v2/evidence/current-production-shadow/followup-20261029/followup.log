@@ -1,0 +1,287 @@
+== follow-up start host=streamanator user=arm 2026-10-28T20:49:09Z
+e960146693324dc7c80770fbe35f544397452db89884271dee0cb05ea02e1cae  SCRIPTS.SHA256
+680bd096c46f406f9bedcce0111c0d7445f25af68631baccf0ecf1ae7ed713d3  brownlow-stored.mts
+2f39d5dc809d134affdc146a01f614cb691f67bfca317645a0b27668bb8a2ab0  drift-summary.mjs
+7439627de4f4b1047804f6f68038a627a0d9721155aec11f27a24c436f1980bf  followup.sh
+823c854c38a15169b18880f49616bc0b715d2db3eb6ed2c12c084d15a5c9393e  inventory-compare.mjs
+ef7af7e8519d8954d55ee73b8f439e3e777e172c5708092d984d79ef88e9d02c  receipt-catalog.mjs
+5967d7596b511f9ec8dff1d69108bc88d24f09b1561ae7524485188569537e91  receipt-mutation.mjs
+31408687f2083d6d90e967569cea027da721ed64a3c0f1e78e6c61b3a8f0843d  schema-sections.mjs
+04f964fa00404004c9f8cef32d4e4853f31a1dc9125c10be8b7e81ba0082e3d6  seal.sh
+brownlow-stored.mts: OK
+drift-summary.mjs: OK
+followup.sh: OK
+inventory-compare.mjs: OK
+receipt-catalog.mjs: OK
+receipt-mutation.mjs: OK
+schema-sections.mjs: OK
+seal.sh: OK
+EXIT scripts-pinned = 0
+== F0 identities and integrity (read only) 2026-10-28T20:49:09Z
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/archive/afldb_prod-20261028T192336Z.dump: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/archive/afldb_prod-20261028T192336Z.provenance.json: OK
+EXIT archive-sidecar = 0
+afldb_prod-20261028T192336Z.dump: OK
+afldb_prod-20261028T192336Z.provenance.json: OK
+archive.toc: OK
+ledger-before.tsv: OK
+ledger-after.tsv: OK
+pg-dump.stderr: OK
+EXIT xfer = 0
+EXIT original-manifest-sha = 0
+original manifest re-check non-OK lines: [./shadow.log: FAILED]
+EXIT original-manifest-only-known-exception = 0
+EXIT shadow-log-final-sha = 0
+EXIT original-run-succeeded = 0
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/111_curated_award_proposals.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/112_derived_award_results.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/113_brownlow_eligibility_decisions.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/114_award_projections_and_curated_revisions.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/115_adjudication_supersession_fk_index.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/116_brownlow_correction_receipts.sql: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/src/src/db/migrations/117_brownlow_provider_eligibility_unknown.sql: OK
+EXIT migrations-pinned = 0
+EXIT no-migration-after-117 = 0
+EXIT no-dotenv = 0
+EXIT src-rehash = 0
+EXIT src-unchanged-since-S2 = 0
+free bytes at start: 10490785792
+1537239885	/home/arm/afldb-v2-currentshadow-20261028T192336Z/cluster
+== F1 item 3: the S2 source-manifest additions against the approved input inventory (files only) 2026-10-28T20:49:14Z
+b64c8a75cb2def63702549b803d7f8aedcad6c27f64eb30f76d125763e5e056d  /home/arm/afldb-v2-linuxverify-20261028T0310Z/xfer/inputs.sha256
+42822c7590a05e4ff8dc2066d33fbee0d7bdbc48b626099c5603b363607dac42  /home/arm/afldb-v2-linuxverify-20261028T0310Z/xfer/inputs.tar
+a08b7f64192dc1efd7466c7b7d0d8fb87b9f551f4cf339ac623914670f40b958  /home/arm/afldb-v2-linuxverify-20261028T0310Z/evidence/src-c478c31b.files.sha256
+f1d5c098c6fd2e5f3ceeb3be2af07212021ee0275768413e39f6f2494c80ff9e  /home/arm/afldb-v2-linuxverify-20261028T0310Z/evidence/setup.log
+e35ba0e9490113bc2124b09ec1ff478a1986c6b457713ed850e48a3123bec05e  /home/arm/afldb-v2-linuxverify-20261028T0310Z/xfer/setup.sh
+-- setup.sh order (manifest taken, then inputs extracted into the same src):
+55:( cd "$R/src" && find . -path ./node_modules -prune -o -type f -print0 | sort -z | xargs -0 sha256sum ) > "$E/src-c478c31b.files.sha256"
+61:tar -xf "$X/inputs.tar" -C "$R/src"
+62:( cd "$R/src" && sha256sum --quiet -c "$X/inputs.sha256" ) && echo "inputs OK ($(wc -l < "$X/inputs.sha256"))"
+-- setup.log:
+13:src manifest: 2939 lines, sha256 a08b7f64192dc1efd7466c7b7d0d8fb87b9f551f4cf339ac623914670f40b958
+24:== inputs
+25:inputs OK (785)
+-- shadow-restore.sh S2 SRC_FROM/SRC_MANIFEST:
+14:SRC_FROM=/home/arm/afldb-v2-linuxverify-20261028T0310Z/src
+15:SRC_MANIFEST=/home/arm/afldb-v2-linuxverify-20261028T0310Z/evidence/src-c478c31b.files.sha256
+EXIT inventory-pins = 0
+EXIT inputs-tar-list = 0
+{
+ "counts": {
+  "diffLines": 783,
+  "additions": 783,
+  "removalsOrChanges": 0,
+  "s2ManifestFiles": 3722,
+  "verifiedManifestFiles": 2939,
+  "inventoryEntries": 785,
+  "additionsMatchedToInventoryPathAndHash": 778,
+  "additionsHashMismatch": 0,
+  "additionsNotInInventory": 5,
+  "additionsChangedSinceS2": 0,
+  "additionsOnShadowPaths": 0,
+  "inventoryEntriesNotAmongAdditions": 7
+ },
+ "explained": false,
+ "inventoryNotAdded": [
+  {
+   "path": "data/sources/Hall of Fame/Coach inductees.csv",
+   "inVerifiedManifest": false,
+   "verifiedHashEqualsInventory": false,
+   "s2HashEqualsInventory": true
+  },
+  {
+   "path": "data/sources/Hall of Fame/Legends.csv",
+   "inVerifiedManifest": false,
+   "verifiedHashEqualsInventory": false,
+   "s2HashEqualsInventory": true
+  },
+  {
+   "path": "data/sources/Hall of Fame/Player inductees.csv",
+   "inVerifiedManifest": false,
+   "verifiedHashEqualsInventory": false,
+   "s2HashEqualsInventory": true
+  },
+  {
+   "path": "data/sources/Hall of Fame/Umpires.csv",
+   "inVerifiedManifest": false,
+   "verifiedHashEqualsInventory": false,
+   "s2HashEqualsInventory": true
+  },
+  {
+   "path": "data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv",
+   "inVerifiedManifest": true,
+   "verifiedHashEqualsInventory": true,
+   "s2HashEqualsInventory": true
+  },
+  {
+   "path": "data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv",
+   "inVerifiedManifest": true,
+   "verifiedHashEqualsInventory": true,
+   "s2HashEqualsInventory": true
+  },
+  {
+   "path": "data/sources/representative teams/VFLAFL_Team_of_the_Century.csv",
+   "inVerifiedManifest": false,
+   "verifiedHashEqualsInventory": false,
+   "s2HashEqualsInventory": true
+  }
+ ]
+}
+EXIT inventory-compare = 1
+EXIT inventory-equals-tar-members = 1
+== F2 item 6a: focused unit checks (no database; generic functional tests, not archive measurements) 2026-10-28T20:49:18Z
+EXIT unit-focused = 0
+== F3 restart ONLY the owned cluster on 127.0.0.1:55467 2026-10-28T20:49:37Z
+EXIT no-postmaster-pid = 0
+EXIT credentials-not-exposed = 0
+waiting for server to start.... done
+server started
+EXIT cluster-start = 0
+listener 127.0.0.1:55467 pid 227045 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-currentshadow-20261028T192336Z/cluster/data
+EXIT listener-loopback-only = 0
+afldb_v2_shadow_current_baseline_test	marked	392962575
+afldb_v2_shadow_current_migration_test	marked	398443023
+postgres	unmarked	7683095
+EXIT list = 0
+EXIT verify-baseline = 0
+EXIT verify-migration = 0
+== F4 items 4a/5: read-only measurements on the RETAINED databases 2026-10-28T20:49:39Z
+isolated-pg: afldb_v2_shadow_current_migration_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+{"db":"afldb_v2_shadow_current_migration_test","bytes":"398605335","ro":"on"}
+EXIT db-size-migration = 0
+isolated-pg: afldb_v2_shadow_current_baseline_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+{"db":"afldb_v2_shadow_current_baseline_test","bytes":"393124887","ro":"on"}
+EXIT db-size-baseline = 0
+isolated-pg: afldb_v2_shadow_current_migration_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+{"database":"afldb_v2_shadow_current_migration_test","ledger":117,"checks":25,"failed":[]}
+EXIT receipt-catalog-migration = 0
+isolated-pg: afldb_v2_shadow_current_baseline_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+{"database":"afldb_v2_shadow_current_baseline_test","ledger":110,"checks":5,"failed":[]}
+EXIT receipt-catalog-baseline = 0
+isolated-pg: afldb_v2_shadow_current_baseline_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+{"facts":{"database":"afldb_v2_shadow_current_baseline_test","user":"afldb_owner","read_only":"on","isolation":"repeatable read","ledger":110,"last_migration":"110_match_sheet_player_match_stats_authority.sql","season_vote_rows":16120,"round_vote_rows":330383,"staged_vote_rows":0},"reportSha256":"e2df67aee27df89d6723681fbd0cdda1938a4311c11fd96b7df69f1a1d5c98aa","seasons":98,"firstSeason":1924,"lastSeason":2025,"reports":98,"errors":0,"outcomes":{"reconciled":98},"presentation":{"determined":98},"basis":{"stored_totals":98},"findings":0,"matchVoteRecords":0}
+EXIT brownlow-stored-baseline = 0
+isolated-pg: afldb_v2_shadow_current_migration_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+{"facts":{"database":"afldb_v2_shadow_current_migration_test","user":"afldb_owner","read_only":"on","isolation":"repeatable read","ledger":117,"last_migration":"117_brownlow_provider_eligibility_unknown.sql","season_vote_rows":16120,"round_vote_rows":330383,"staged_vote_rows":0},"reportSha256":"e2df67aee27df89d6723681fbd0cdda1938a4311c11fd96b7df69f1a1d5c98aa","seasons":98,"firstSeason":1924,"lastSeason":2025,"reports":98,"errors":0,"outcomes":{"reconciled":98},"presentation":{"determined":98},"basis":{"stored_totals":98},"findings":0,"matchVoteRecords":0}
+EXIT brownlow-stored-migration = 0
+EXIT brownlow-stored-byte-identical = 0
+isolated-pg: afldb_v2_shadow_current_baseline_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /usr/bin/env
+EXIT start-schema-baseline = 0
+isolated-pg: afldb_v2_shadow_current_migration_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /usr/bin/env
+EXIT start-schema-migration = 0
+EXIT baseline-schema-equals-run-before = 0
+EXIT migration-schema-equals-run-after = 0
+== F5 item 4c: normalised schema sections (files only; the archive is read, not restored) 2026-10-28T20:49:47Z
+EXIT archive-schema-text = 0
+{
+ "sections": {
+  "archive": 1388,
+  "before": 1196,
+  "post": 1475
+ },
+ "A_restoreFidelity": {
+  "equal": 1194,
+  "onlyInArchive": 0,
+  "onlyInRestored": 0,
+  "changed": 0
+ },
+ "B_migration": {
+  "unchanged": 1193,
+  "removed": 0,
+  "changed": 1,
+  "added": 71,
+  "addedByType": {
+   "FUNCTION": 1,
+   "TABLE": 6,
+   "COMMENT": 20,
+   "SEQUENCE": 5,
+   "CONSTRAINT": 9,
+   "INDEX": 19,
+   "TRIGGER": 1,
+   "FK CONSTRAINT": 10
+  },
+  "migrationSupported": 72,
+  "unclassified": 0
+ },
+ "C_acl": {
+  "beforeAclSections": 1,
+  "archiveAclSections": 193,
+  "postAclSections": 209,
+  "preexistingEqualToArchive": 192,
+  "preexistingDiffersFromArchive": 0,
+  "preexistingAbsentFromArchive": 0,
+  "archiveOnly": 0,
+  "newObjectAclSections": 17,
+  "newObjectGrantLines": 23,
+  "newObjectGrantLinesNotInPinnedMigrations": 2
+ },
+ "newTablesFromPinnedMigrations": {
+  "public.award_proposals": "111_curated_award_proposals.sql",
+  "public.award_proposal_decisions": "111_curated_award_proposals.sql",
+  "public.derived_award_results": "112_derived_award_results.sql",
+  "public.brownlow_eligibility_decisions": "113_brownlow_eligibility_decisions.sql",
+  "public.derived_award_projections": "114_award_projections_and_curated_revisions.sql",
+  "public.brownlow_correction_receipts": "116_brownlow_correction_receipts.sql"
+ }
+}
+EXIT schema-sections = 0
+== F6 item 7 (bounded): aggregate drift against the committed 7fefcd9b figures 2026-10-28T20:49:47Z
+{"current":{"archiveSha256":"a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc","baselineTables":99,"baselineRowsIncludingLedger":1659922,"ledger":110,"storedBrownlowSeasons":98},"deltas":{"baselineTables":0,"baselineRowsIncludingLedger":18,"ledger":0,"storedBrownlowSeasons":0}}
+EXIT drift-summary = 0
+== F7 space budget for the NEW disposable clones 2026-10-28T20:49:48Z
+migration copy 398605335 bytes; free 10484367360; budget 2269557829; floor 2147483648
+EXIT clone-budget-ok = 0
+== F8 item 4b: receipt actual-role probe on a NEW disposable clone 2026-10-28T20:49:48Z
+create-db: afldb_v2_shadow_current_fuprobe_test created from afldb_v2_shadow_current_migration_test and marked
+EXIT create-probe-clone = 0
+EXIT verify-probe = 0
+isolated-pg: afldb_v2_shadow_current_fuprobe_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+{"denials":12,"ownerRefusals":3,"counts":{"before":0,"after":0},"failed":[]}
+EXIT receipt-mutation = 0
+== F9 item 6b: focused integration checks on a NEW disposable clone (fixture writes) 2026-10-28T20:49:52Z
+create-db: afldb_v2_shadow_current_fuit_test created from afldb_v2_shadow_current_migration_test and marked
+EXIT create-it-clone = 0
+EXIT verify-it = 0
+EXIT it-privileges = 1
+EXIT it-v2-brownlow-eligibility = 0
+afldb_v2_shadow_current_baseline_test	marked	393124887
+afldb_v2_shadow_current_fuit_test	marked	398818327
+afldb_v2_shadow_current_fuprobe_test	marked	398629911
+afldb_v2_shadow_current_migration_test	marked	398605335
+postgres	unmarked	7683095
+drop-db: afldb_v2_shadow_current_fuprobe_test dropped
+EXIT drop-disposable-afldb_v2_shadow_current_fuprobe_test = 0
+drop-db: afldb_v2_shadow_current_fuit_test dropped
+EXIT drop-disposable-afldb_v2_shadow_current_fuit_test = 0
+== F10 the retained databases are unchanged after every item 2026-10-28T20:50:11Z
+isolated-pg: afldb_v2_shadow_current_baseline_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /usr/bin/env
+EXIT end-schema-baseline = 0
+isolated-pg: afldb_v2_shadow_current_migration_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /usr/bin/env
+EXIT end-schema-migration = 0
+EXIT end-baseline-schema-equals-run-before = 0
+EXIT end-migration-schema-equals-run-after = 0
+isolated-pg: afldb_v2_shadow_current_migration_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+{"database":"afldb_v2_shadow_current_migration_test","ledger":117,"checks":25,"failed":[]}
+EXIT receipt-catalog-migration-end = 0
+afldb_v2_shadow_current_baseline_test	marked	393124887
+afldb_v2_shadow_current_migration_test	marked	398605335
+postgres	unmarked	7683095
+== F11 stop the owned cluster; integrity re-checks 2026-10-28T20:50:14Z
+waiting for server to shut down.... done
+server stopped
+EXIT cluster-stop = 0
+55467 free
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/archive/afldb_prod-20261028T192336Z.dump: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/archive/afldb_prod-20261028T192336Z.provenance.json: OK
+EXIT archive-recheck = 0
+afldb_prod-20261028T192336Z.dump: OK
+afldb_prod-20261028T192336Z.provenance.json: OK
+archive.toc: OK
+ledger-before.tsv: OK
+ledger-after.tsv: OK
+pg-dump.stderr: OK
+EXIT xfer-recheck = 0
+EXIT original-manifest-unchanged = 0
+free bytes at end: 10448703488
+== follow-up runner done (manifest is taken by seal.sh) 2026-10-28T20:50:14Z
+followup result: SUCCEEDED
