@@ -193,7 +193,8 @@ describe('Gridley corpus fixture', () => {
     }
     expect(cells).toBe(10287);
     expect(entries).toBe(1512436);
-  });
+    // About 1.5M per-entry expectations: 27-35 s on the Linux verification host, astride the 30 s default.
+  }, 120_000);
 });
 
 describe('Gridley compatibility mapping -- exhaustive classification', () => {
