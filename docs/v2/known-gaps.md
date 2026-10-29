@@ -13,10 +13,11 @@ Earlier run counts and unapproved-sibling proposals below are historical where s
 
 Current local-release follow-up: see `local-release-review.md` for final verification. Gap 014
 and 021 and 028 are closed locally; 016 has its publication and 98-season evidence complete but remains
-open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
-not technical inspection. Gap 026 now requires the host/production-data rehearsal, not local
+open for production-dump/owner release acceptance. Gap 022 is closed by the owner's visual acceptance
+(D-V2-VISUAL-1, 2026-10-29). Gap 026 now requires the host/production-data rehearsal, not local
 application rollback. The historical Launch F counts below are retained as history.
-Current register: **38 total / 22 closed / 16 open**, counted from the table rows on 2026-10-29 after the
+Current register: **38 total / 23 closed / 15 open**, counted from the table rows on 2026-10-30 after the owner's
+D-V2-VISUAL-1 verdict (D-V2-LOCK-1, 2026-10-29) closed 022. Before it: 38 / 22 / 16, after the
 release-hardening fix closed 036, 037 and 038 locally. The candidate visual recapture (D-V2-VISUAL-RECAPTURE-1)
 had opened them earlier that day (38 / 19 / 19; before it, 35 / 19 / 16). It includes the
 separately tracked strict historical-source/membership verification gap 029. The earlier "18 / 17" was not updated
@@ -53,7 +54,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
 | V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed: the two formerly name-pinned files pass locally and on Linux (2026-10-28: backtest 6/6, state-b 1/1, under the guarded isolated target); strict isolated proofs replace the name pin | production-dump replay under the same guarded target contract |
 | V2-GAP-010 | Medium | AFL API coverage | no (coverage is not claimed) | open: 2012-2025 API coverage has no committed evidence | decide which seasons to evidence |
-| V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains | approve A-AFLT (disable the timer in the window) or complete ISSUE-316 C5 |
+| V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains | approve A-AFLT (disable the timer in the window); the alternative "release after C5" was withdrawn by the owner on 2026-10-29 (D-V2-LOCK-1), so A-AFLT is required before production schema/code installation |
 | V2-GAP-012 | Medium | legacy runtime | no | **CLOSED (Launch F)**: helpers moved to `settle-shared.ts`, both edges removed from the ratchet, settle integration suites pass on isolated PG16 | none |
 | V2-GAP-013 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): the poller refuses in V2; the preflight refuses the release while the email-intake timer runs | approve the release window (step 4, 4a) |
 | V2-GAP-014 | Low | legacy quarantine | no | **CLOSED locally**: acquisition implementations quarantined, refusing old entry points; deterministic rebuild retained and verified | no live retirement authorised |
@@ -64,7 +65,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
 | V2-GAP-020 | Low | curated awards | no | **CLOSED (2026-10-27, owner decision): accepted product constraint.** A winner still needs a resolved durable player identity before approval; the supported workflow is to link the player first, then propose. No identity was resolved and identity-less approval is not built | none |
 | V2-GAP-021 | Medium | Coleman | no | **CLOSED locally**: explicit guarded offline bootstrap refuses publisher-owned seasons; session locks survive batch commits; 27/27 publication tests | production comparison remains gap 015 |
-| V2-GAP-022 | Medium | admin UI | rehearsal | open, owner acceptance only: candidate `592c6c16` recaptured from a production build on 2026-10-29 (12 stale screens plus every §6 state producible with synthetic fixtures; 160 images, 0 external requests). Its defects 036/037/038 are fixed and the affected screens recaptured from the corrected production build (34 images, 0 external requests). The staged leaderboard, the derived 18-team mapping and their refusals are now captured on the same build from SYNTHETIC fixtures on a new disposable clone (24 images, 0 external requests; UI evidence only, not authentic reconciliation). The seven † Brownlow images were recaptured on the corrected build (14 images, 0 failures); every image linked for acceptance is the corrected candidate or a component proven unchanged. Remaining: the owner's verdict ([review sheet](owner-visual-review-candidate-2026-10-29.md)) | owner acceptance per screen |
+| V2-GAP-022 | Medium | admin UI | rehearsal | **CLOSED (2026-10-29, owner decision D-V2-VISUAL-1 under D-V2-LOCK-1)**: the owner accepted ALL screens and states presented for acceptance in the [review sheet](owner-visual-review-candidate-2026-10-29.md), covering the corrected candidate and the synthetic UI evidence; authentic provider reconciliation and production acceptance are not claimed ([record](owner-decision-lock-2026-10-29.md) §2). History: candidate `592c6c16` recaptured from a production build on 2026-10-29 (12 stale screens plus every §6 state producible with synthetic fixtures; 160 images, 0 external requests). Its defects 036/037/038 are fixed and the affected screens recaptured from the corrected production build (34 images, 0 external requests). The staged leaderboard, the derived 18-team mapping and their refusals are now captured on the same build from SYNTHETIC fixtures on a new disposable clone (24 images, 0 external requests; UI evidence only, not authentic reconciliation). The seven † Brownlow images were recaptured on the corrected build (14 images, 0 failures); every image linked for acceptance is the corrected candidate or a component proven unchanged. The owner's verdict closed it | none; authentic reconciliation stays with gate 7 (016, 023's production step, 030, 031) |
 | V2-GAP-023 | Low | Brownlow | no | **CLOSED in code, verified on a disposable clone of the authentic 2025 data (2026-10-20)**: the settle stages the API leaderboard on the observation spine and the reconciliation derives the 18-team provider-team-to-club mapping from the committed identities, corroborated by the fixtures; the operations centre shows both. Production staging still needs one operator-run settle with this code (owner action; nothing was run against production) | none for migration; the stage runs when the operator next settles a Brownlow snapshot |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | **CLOSED locally (2026-10-27)**: read-only `/admin/operations/afl-api-refusals` linked from the overview; real-PostgreSQL test 2/2 as `afldb_import` on a disposable isolated `_test` database; page rendered signed in at 1280x800 and 390x844 (populated, empty, second page, failed read). Not deployed | optional owner eyeball of `docs/v2/evidence/gap025-visual/` |
@@ -520,6 +521,15 @@ award results must be shown reconcilable before production; **no** — not a pro
   seasons the publisher covers.
 
 ## V2-GAP-022 — The Stage 5 admin pages have never been rendered (VISUAL: UNVERIFIED)
+
+- **CLOSED, 2026-10-29 (owner decision D-V2-VISUAL-1, given within D-V2-LOCK-1).**
+  - The owner accepted ALL screens and states presented for acceptance in
+    [the review sheet](owner-visual-review-candidate-2026-10-29.md): every §1a, §1b and §1c item, §2 row and §3 item
+    of the corrected candidate (application tree `7670441b`, build `XtSgl4BOQZXC2G8qIWJdV`), including the synthetic
+    UI evidence. No row was rejected.
+  - Out of scope by the owner's wording: authentic provider reconciliation and production acceptance. The submitted
+    "Revise approved winner" action (sheet §4) was not presented and is not accepted; the panel is.
+  - The verdict is the owner's; no agent verdict stands in for it. [Record](owner-decision-lock-2026-10-29.md) §2.
 
 - **Staged leaderboard and provider mapping captured, 2026-10-29 (still OPEN, owner acceptance only).**
   - The same build `XtSgl4BOQZXC2G8qIWJdV` was reused, not rebuilt: no application file is newer than it, and the bundled

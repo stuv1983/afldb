@@ -93,6 +93,12 @@ provider integration stays disabled; enabling any of them is choices 12–14.
 
 ## 8. Genuinely unresolved owner choices
 
+> **Update (D-V2-LOCK-1, approved 2026-10-29):** O-1 accepted in full (V2-GAP-022 closed), O-2 `beta.afldb.com`
+> with Caddy unchanged, O-3 "release after C5" withdrawn with A-AFLT still required before schema/code
+> installation, O-4 a normal `--no-ff` merge. See [the lock record](owner-decision-lock-2026-10-29.md), which also
+> carries the merge, the locked commit, the build and the remaining production approval package. O-5 to O-7 stay
+> open. The table below is kept as prepared.
+
 | # | Choice | Prepared position | Needed before |
 |---|---|---|---|
 | O-1 | D-V2-VISUAL-1 verdict | Return §6 of the [review sheet](owner-visual-review-candidate-2026-10-29.md). A REJECT becomes a tracked defect and re-opens the candidate | the lock |

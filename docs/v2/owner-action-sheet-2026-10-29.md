@@ -11,10 +11,10 @@ Choice numbers refer to [the release choices](owner-decision-release-choices-202
 | Step | Choice | Depends on | State |
 |---|---|---|---|
 | a | 1 D-V2-RESIDUALS-1 | none | **Recorded 2026-10-29**: residuals known and open, nothing waived |
-| b | 2 D-V2-VISUAL-1 | the owner's review ([checklist](owner-visual-review-2026-10-29.md)) | Pending. Four screens are stale; the refusals page has dev-server captures only; several states have no capture. A recapture is prepared ([checklist §5](owner-visual-review-2026-10-29.md)) |
+| b | 2 D-V2-VISUAL-1 | the owner's review ([checklist](owner-visual-review-2026-10-29.md)) | **Recorded 2026-10-29 (D-V2-LOCK-1)**: all screens and states presented in the [corrected-candidate sheet](owner-visual-review-candidate-2026-10-29.md) accepted; V2-GAP-022 closed ([record](owner-decision-lock-2026-10-29.md) §2) |
 | c | 6a D-V2-HOST-INSPECT-1, read-only ([procedure](host-prerequisites-inspection-2026-10-29.md)) | none | **DONE 2026-10-29** (with amendments): exit 10, identity and ledger 110 match, no release drift ([findings](host-prerequisites-findings-2026-10-29.md)) |
-| d | Policy decisions P1–P2 (§3) | c informs P1 | Open; recommendations in [findings §5–§6](host-prerequisites-findings-2026-10-29.md) |
-| e | 3 D-V2-PUSH-1: push, merge and lock the execution commit, then one production-configured build | a, b, d; and c, see the note below | Pending |
+| d | Policy decisions P1–P2 (§3) | c informs P1 | **Recorded 2026-10-29 (D-V2-LOCK-1)**: P1 `beta.afldb.com` through the existing Caddy route, apex separate; P2 "release after C5" withdrawn, A-AFLT required before schema/code installation ([record](owner-decision-lock-2026-10-29.md) §3) |
+| e | 3 D-V2-PUSH-1: push, merge and lock the execution commit, then one production-configured build | a, b, d; and c, see the note below | **Approved 2026-10-29 (D-V2-LOCK-1)**; execution in [the lock record](owner-decision-lock-2026-10-29.md) §4–§5 |
 | f | 6b Host change list | c, plus its own approval | **Prepared** (HC-1 to HC-5, each with a recovery route; [findings §4](host-prerequisites-findings-2026-10-29.md)); not approved |
 | g | 7 A-AFLT | P2 (RISK-27 and the C2 / D-316-1 position) | Pending |
 | h | 8 Window and A-BACKUP | e, f, g; a named window; a writer and admin-edit freeze; P3 | Pending |

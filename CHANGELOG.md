@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Owner visual acceptance and release decisions recorded (D-V2-LOCK-1, 2026-10-29; production NO-GO)
+
+- D-V2-VISUAL-1: the owner accepted all screens and states presented for acceptance in
+  `docs/v2/owner-visual-review-candidate-2026-10-29.md` (corrected candidate, application tree `7670441b`, and the
+  synthetic UI evidence). Authentic provider reconciliation and production acceptance are not claimed. V2-GAP-022 is
+  closed; the gap register is now 38 total / 23 closed / 15 open.
+- V2 will serve at `beta.afldb.com` through the existing Caddy route (unchanged); the apex launch stays separate.
+  "Release after C5" is withdrawn: stages A/B do not wait for 2027 evidence, and A-AFLT stays required before
+  production schema/code installation. Record: `docs/v2/owner-decision-lock-2026-10-29.md`. Nothing was deployed or
+  run against DEV or production.
+
 ### Last † Brownlow images recaptured; consolidated release decision package (2026-10-29; production NO-GO)
 
 - New `tools/v2/candidate-visual-brownlow-recapture.mts` recaptures the seven Brownlow season images that predated the

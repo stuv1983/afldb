@@ -1,5 +1,10 @@
 # Owner visual review sheet — corrected candidate (D-V2-VISUAL-1, V2-GAP-022)
 
+> **Owner verdict recorded (D-V2-VISUAL-1, within D-V2-LOCK-1, 2026-10-29):** ALL screens and states presented for
+> acceptance below are ACCEPTED, covering the corrected candidate and the synthetic UI evidence. Authentic provider
+> reconciliation and production acceptance are not claimed. V2-GAP-022 is CLOSED. The verdict block is in §6 and
+> [the lock record](owner-decision-lock-2026-10-29.md) §2. The text below is kept as prepared.
+
 **Prepared 2026-10-29 for the owner. Nothing here is accepted.** This is the single review sheet. It supersedes the
 screenshot links of [owner-visual-review-2026-10-29.md](owner-visual-review-2026-10-29.md) (kept as history). The
 automated checks are evidence, not acceptance. No agent verdict stands in for the owner's. V2-GAP-022 stays **OPEN**
@@ -266,6 +271,16 @@ Reviewed by: <screenshots | live on isolated environment> at <desktop and mobile
 ACCEPT: <§1a, §1b and §1c items, §2 rows and §3 items>
 REJECT: <row/item — defect>
 NOT REVIEWED / OUT OF SCOPE: <rows/items, with reason; include the §4 gaps>
+```
+
+**Returned 2026-10-29 (owner's wording, recorded in [the lock record](owner-decision-lock-2026-10-29.md) §2):**
+
+```text
+ACCEPT: ALL screens and states presented for acceptance in this sheet (every §1a, §1b and §1c item, §2 row and
+        §3 item), covering the corrected candidate and the synthetic UI evidence.
+REJECT: none.
+NOT REVIEWED / OUT OF SCOPE: authentic provider reconciliation and production acceptance (owner's wording); the
+        submitted "Revise approved winner" action of §4 was not presented and is not accepted; Appendix D.
 ```
 
 V2-GAP-022 closes only when every row and item is accepted or explicitly put out of scope by the owner. §1b accepts

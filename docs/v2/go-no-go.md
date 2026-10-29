@@ -161,7 +161,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 
 | # | Criterion | State | Evidence |
 |---|---|---|---|
-| 1 | The existing frontend builds and its critical contracts are preserved | **met locally** | `npm run build` exit 0 against the isolated database, 1,516 static pages (V2-GAP-002 closed); the operations pages were rendered from that build and captured at 1280x800 and 390x844 (`docs/v2/evidence/launchF-visual/`). The owner's eyeball verdict is pending (V2-GAP-022) |
+| 1 | The existing frontend builds and its critical contracts are preserved | **met locally** | `npm run build` exit 0 against the isolated database, 1,516 static pages (V2-GAP-002 closed); the operations pages were rendered from that build and captured at 1280x800 and 390x844 (`docs/v2/evidence/launchF-visual/`). The corrected candidate was recaptured from a production build on 2026-10-29, and the owner accepted all screens and states presented for acceptance (D-V2-VISUAL-1; V2-GAP-022 closed; synthetic UI evidence, not production acceptance) |
 | 2 | Existing PostgreSQL data retained without destructive migration | **met**, executed on isolated PG16 | migrations 111-114 only create tables or widen constraints (ADR 0004). On a copy of the local rebuild, the manifest before and after 111-114 compared identical. The reversal leaves a schema identical to 001-110 (`rollback-runbook.md` §7) |
 | 3 | Stable identifiers and relationships preserved or explicitly mapped | **met** (no id is changed); proof on real data pending | no migration alters an existing table; the manifest digests stable id columns as facts and the parity check fails on any change (plan §7 R-045); never run on real data (V2-GAP-007) |
 | 4 | AFL API ingestion snapshot-based, validated, replayable and idempotent | **met**, isolated PG16 | settle suites 5 of 7 pass on the isolated rebuild; 2 are pinned to `afldb_test` by design (V2-GAP-009); the fixture writer replays idempotently (17/17) |
@@ -221,7 +221,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | V2-GAP-021 | decided and built (ADR 0015); remaining: retire the offline loader's coleman group for covered seasons |
 | V2-GAP-024 | built (Launch F); nothing remaining |
 | contributor role | whether the contributor role keeps a purpose; Launch F removed its retired Upload link (RISK-21) |
-| V2-GAP-022 | eyeball verdicts for every Stage 5 page (`admin-operations.md` §6) from the candidate review sheet `docs/v2/owner-visual-review-candidate-2026-10-29.md` (2026-10-29 production-build recapture) |
+| V2-GAP-022 | **decided 2026-10-29 (D-V2-VISUAL-1)**: all screens and states presented in `docs/v2/owner-visual-review-candidate-2026-10-29.md` accepted; authentic reconciliation and production acceptance not claimed; gap closed (`owner-decision-lock-2026-10-29.md` §2) |
 | V2-GAP-036 | closed locally on 2026-10-29: the standalone bundle now carries and verifies the Coleman contract and the other runtime reference files, and the production build compared and published Coleman on the disposable clone (with 037/038). The fix changed the candidate, so the artifact lock must be re-taken on the corrected commit. Not deployed |
 | V2-GAP-015 | review every Coleman `disagree` found by the rehearsal |
 
