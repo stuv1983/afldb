@@ -1,0 +1,4 @@
+# Server-side diagnostics for LB7 (first line of each logged error; stacks omitted).
+# Source: stdout/stderr of local-release.mjs start v2, BUILD_ID XtSgl4BOQZXC2G8qIWJdV, serving afldb_v2_visual_leaderboard_test. The page shows only the generic text; the path is logged here.
+Operations centre: provider team identities unavailable Error [ProviderTeamIdentityError]: The provider team identities (data/reference/afl-api-identities.json) could not be read: ENOENT: no such file or directory, open 'D:\dev\afldbV2\.next\standalone\data\reference\afl-api-identities.json'
+Operations centre: provider team identities unavailable Error [ProviderTeamIdentityError]: The provider team identities (data/reference/afl-api-identities.json) could not be read: ENOENT: no such file or directory, open 'D:\dev\afldbV2\.next\standalone\data\reference\afl-api-identities.json'

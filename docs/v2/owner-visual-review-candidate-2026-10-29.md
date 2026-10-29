@@ -1,43 +1,38 @@
 # Owner visual review sheet — corrected candidate (D-V2-VISUAL-1, V2-GAP-022)
 
-**Prepared 2026-10-29 for the owner. Nothing here is accepted.** This sheet supersedes the screenshot links of
-[owner-visual-review-2026-10-29.md](owner-visual-review-2026-10-29.md) (kept as history). The automated checks
-below are evidence, not acceptance. No agent verdict stands in for the owner's, and V2-GAP-022 stays **OPEN**
+**Prepared 2026-10-29 for the owner. Nothing here is accepted.** This is the single review sheet. It supersedes the
+screenshot links of [owner-visual-review-2026-10-29.md](owner-visual-review-2026-10-29.md) (kept as history). The
+automated checks are evidence, not acceptance. No agent verdict stands in for the owner's. V2-GAP-022 stays **OPEN**
 until the owner returns §6.
 
-**Corrected candidate (review this one).** The candidate is the commit that adds §1a to this sheet: parent
-`5506d274`, which fixes V2-GAP-036, 037 and 038 and the raw-total evidence label. §1a lists the recaptured
-screens. They **replace** the §3 images marked *diagnostic history*, which show candidate `592c6c16` before the fix
-and cannot show that the corrected candidate works. Every other §2/§3 image is unaffected by the fix: no other
-admin page changed.
+**What to review.** §1–§3 hold only acceptance evidence for the corrected candidate. Everything that shows the broken
+candidate, a workaround or a harness artefact is in **Appendix D, diagnostic history**, and is not for acceptance.
 
 ## 0. What the captures represent
 
 | Item | Value |
 |---|---|
-| Candidate | `592c6c168c59fd7daa130a795d6dd6e02c3afdd3` (`v2/rebuild`). No application file changed in this run |
-| Build | One production build: `next build --webpack` + `prepare-standalone`, `NEXT_TELEMETRY_DISABLED=1`, installed tools only. BUILD_ID `ivryI9oSx3g1fpqeB65oJ`, 1516/1516 pages. Served standalone on 127.0.0.1:3912 |
-| Database | Disposable `afldb_v2_visual2_test`, cloned from `afldb_v2_rollbackapp_test` on `afldb_v2_isolated` (127.0.0.1:55433) and migrated 115 → 117. Identity and isolation were proven before any write. The template was not touched. The clone is retained (stopped) in the state §5 describes |
+| Candidate | The application tree of `7670441b` (`v2/rebuild`), which fixes V2-GAP-036/037/038 and the raw-total evidence label. Later commits change only tools, evidence and tracking |
+| Build | One production build: `local-release.mjs build v2` (`next build --webpack` + `prepare-standalone`), telemetry off. BUILD_ID `XtSgl4BOQZXC2G8qIWJdV`, 1516/1516 pages. It was reused for §1b, not rebuilt: no application file is newer than the build, the tree is clean, and the bundled `seasons.json`, `coleman-derivation.json` and `afl-api-identities.json` are byte-identical to the repository. Served standalone on 127.0.0.1:3912 |
+| Older images | The §2/§3 rows marked **A**, **P1** or **P2** come from candidate `592c6c16` (build `ivryI9oSx3g1fpqeB65oJ`). They are kept only where the page they show did not change in `7670441b`. Rows marked **†** show a Brownlow season page: its raw-vote-totals table predates the label fix (§4) |
+| Databases | Disposable clones on `afldb_v2_isolated` (127.0.0.1:55433, loopback, SCRAM). `afldb_v2_visual2_test` (A/P1/P2/C) and its clone `afldb_v2_visual_leaderboard_test` (LB). Identity, marker and listener were proven before every write. Both are retained, stopped |
 | Staff | Synthetic `candidate-visual-super_admin@example.invalid` and `candidate-visual-admin@example.invalid`, signed in by a locally minted session |
-| Checks per capture | HTTP status, final URL, page-level horizontal overflow (with the overflowing element named), console/page errors, required and forbidden controls, and external requests (blocked and counted: **0** in every context) |
-| Viewports | 1280x800 and 390x844, full-page. On mobile, the site's fixed bottom bar (Home · Players · Clubs · Seasons · More) appears once partway down each image. This is how a full-page capture draws a fixed bar, not a layout defect |
-| Logs | [phase A](evidence/candidate-visual-20261029/capture-log.txt) (read-only, history fingerprint unchanged) · [pass 1](evidence/candidate-visual-20261029-states/capture-log.txt) · [pass 2](evidence/candidate-visual-20261029-states2/capture-log.txt) (fixtures and test actions, §5) |
+| Checks per capture | HTTP status, final URL, page-level horizontal overflow (with the overflowing element named), console/page errors, required and forbidden controls, and external requests (blocked and counted: **0** in every context and, for LB, in the writer process) |
+| Viewports | 1280x800 and 390x844, full-page. On mobile, the site's fixed bottom bar (Home · Players · Clubs · Seasons · More) appears once partway down each image. That is how a full-page capture draws a fixed bar, not a layout defect. Wide tables scroll inside their own box on mobile; that is not page overflow |
 
-Folders: **A** = `evidence/candidate-visual-20261029/` (`tools/v2/candidate-visual-capture.mts`, unchanged);
-**P1** = `evidence/candidate-visual-20261029-states/` (`tools/v2/candidate-visual-states.mts` at `20994849`);
-**P2** = `evidence/candidate-visual-20261029-states2/` (the same tool, pass 2). Pass 1's action-outcome images
-were taken while the page was scrolled, so the sticky header and sidebar are drawn partway down them. Pass 2
-fixed this and re-produced each of those states on an equivalent record. Only the clean images are linked
-below.
+Folders under `docs/v2/evidence/`: **A** = `candidate-visual-20261029/`, **P1** = `candidate-visual-20261029-states/`,
+**P2** = `candidate-visual-20261029-states2/`, **C** = `candidate-visual-20261029-corrected/`,
+**LB** = `candidate-visual-20261029-leaderboard/`, **LBr** = `candidate-visual-20261029-leaderboard-recheck/`.
+Each holds its own `capture-log.txt`.
 
-## 1a. Corrected candidate: recaptured screens (folder **C** = `evidence/candidate-visual-20261029-corrected/`)
+## 1. The corrected candidate
 
-| Item | Value |
-|---|---|
-| Build | One production build: `local-release.mjs build v2` (`next build --webpack` + `prepare-standalone`), telemetry off. BUILD_ID `XtSgl4BOQZXC2G8qIWJdV`, 1516/1516 pages. `prepare-standalone` copied and verified 7 runtime reference files. The bundle's Coleman contract is byte-identical to the repository file (SHA-256 `93702c71…`). **Nothing was copied into the build output by hand** |
-| Database | The same `afldb_v2_visual2_test`, as pass 2 left it. Identity re-proven: cluster `afldb_v2_isolated`, isolated marker, loopback 127.0.0.1:55433, all 12 history counts equal to pass 2's end state. Template and other databases untouched |
-| Tool | `tools/v2/candidate-visual-corrected.mts`. [Capture log](evidence/candidate-visual-20261029-corrected/capture-log.txt) · [server log excerpt](evidence/candidate-visual-20261029-corrected/server-log-excerpt.txt). 34 images, 0 external requests, every step `match=true` |
-| Check failures | 2, both on L1 and both a check artefact. The tool compared lowercase text against `innerText`, which returns the CSS-uppercased badge and table-header text ("UNKNOWN (NOT RECORDED)", "INELIGIBILITY EVIDENCE"). Every L1 selector check passed (`data-eligibility="missing"`, `data-evidence-flag="true"`, the note), and the image shows both texts |
+### 1a. Recaptured screens (folder **C**)
+
+`tools/v2/candidate-visual-corrected.mts`: 34 images, 0 external requests, every step `match=true`
+([log](evidence/candidate-visual-20261029-corrected/capture-log.txt),
+[server log excerpt](evidence/candidate-visual-20261029-corrected/server-log-excerpt.txt)). `prepare-standalone`
+copied and verified 7 runtime reference files; nothing was copied into the build output by hand.
 
 | # | State | Captures (desktop / mobile) | Accept if | Verdict |
 |---|---|---|---|---|
@@ -49,38 +44,58 @@ below.
 | C-6 | Publish 2023 without the attestation | [d](evidence/candidate-visual-20261029-corrected/C6-coleman-publish-unattested-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/C6-coleman-publish-unattested-refused__mobile-390x844.png) | Refused; nothing written | |
 | C-7 | Publish 2023 outcome | [d](evidence/candidate-visual-20261029-corrected/C7-coleman-publish-outcome__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/C7-coleman-publish-outcome__mobile-390x844.png) | Outcome stated: 2023 matched the stored winner, so only provenance was recorded (+1 ledger row, +1 projection, `award_winners` unchanged) | |
 | C-8 | Coleman page after publishing, Super Admin / Admin | [d](evidence/candidate-visual-20261029-corrected/C8-coleman-after-publish__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/C8-coleman-after-publish__mobile-390x844.png); Admin [d](evidence/candidate-visual-20261029-corrected/C9-coleman-after-publish-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/C9-coleman-after-publish-admin__mobile-390x844.png) | 2023 listed among publications; Admin has no publish control | |
-| G-1 | Approval refused, season registry missing (replaces U5) | [d](evidence/candidate-visual-20261029-corrected/G1-approve-refused-registry-missing__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/G1-approve-refused-registry-missing__mobile-390x844.png) | Generic text naming `data/reference/seasons.json`, "Nothing was changed", code `season_registry_unavailable`; no server path; no overflow | |
+| G-1 | Approval refused, season registry missing | [d](evidence/candidate-visual-20261029-corrected/G1-approve-refused-registry-missing__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/G1-approve-refused-registry-missing__mobile-390x844.png) | Generic text naming `data/reference/seasons.json`, "Nothing was changed", code `season_registry_unavailable`; no server path; no overflow | |
 | G-2 | Coleman compare refused, season registry missing | [d](evidence/candidate-visual-20261029-corrected/G2-coleman-compare-registry-missing__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/G2-coleman-compare-registry-missing__mobile-390x844.png) | As G-1 | |
-| G-3 | Coleman compare refused, contract missing (replaces K1 as a refusal) | [d](evidence/candidate-visual-20261029-corrected/G3-coleman-compare-contract-missing__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/G3-coleman-compare-contract-missing__mobile-390x844.png) | Generic text naming `data/reference/coleman-derivation.json`, code `coleman_contract_unavailable`; no server path | |
+| G-3 | Coleman compare refused, contract missing | [d](evidence/candidate-visual-20261029-corrected/G3-coleman-compare-contract-missing__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/G3-coleman-compare-contract-missing__mobile-390x844.png) | Generic text naming `data/reference/coleman-derivation.json`, code `coleman_contract_unavailable`; no server path | |
 | G-4 | Coleman publish refused, contract missing | [d](evidence/candidate-visual-20261029-corrected/G4-coleman-publish-contract-missing__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/G4-coleman-publish-contract-missing__mobile-390x844.png) | As G-3; nothing written | |
-| B-12 | Brownlow 1996 tie (replaces S03) | [d](evidence/candidate-visual-20261029-corrected/B12-brownlow-1996-tie__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/B12-brownlow-1996-tie__mobile-390x844.png) | `refused_eligibility_rule_unrecorded` wraps inside the page at 390px; nothing cut off | |
-| B-13 | Brownlow 2023 after the decision, Super Admin / Admin (replace B10/B11) | [d](evidence/candidate-visual-20261029-corrected/B13-brownlow-2023-after-decision__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/B13-brownlow-2023-after-decision__mobile-390x844.png); Admin [d](evidence/candidate-visual-20261029-corrected/B14-brownlow-2023-after-decision-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/B14-brownlow-2023-after-decision-admin__mobile-390x844.png) | As B-12 | |
-| L-1 | Brownlow 2022 with the leader's eligibility unrecorded (synthetic fixture, restored) | [d](evidence/candidate-visual-20261029-corrected/L1-brownlow-unknown-eligibility-evidence-label__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/L1-brownlow-unknown-eligibility-evidence-label__mobile-390x844.png) | The determination says "unknown (not recorded)"; the raw totals say "Ineligibility evidence: not marked ineligible" with the note that this is not an eligibility status; nothing contradicts. ("The stored totals against themselves: 1 mismatch" is the fixture itself) | |
+| B-12 | Brownlow 1996: `determined`, tie with an excluded ineligible player | [d](evidence/candidate-visual-20261029-corrected/B12-brownlow-1996-tie__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/B12-brownlow-1996-tie__mobile-390x844.png) | Joint winners 6722 and 9596; player 3063 excluded as ineligible and still listed; `refused_eligibility_rule_unrecorded` wraps inside the page at 390px; nothing cut off | |
+| B-13 | Brownlow 2023 after the decision, Super Admin / Admin | [d](evidence/candidate-visual-20261029-corrected/B13-brownlow-2023-after-decision__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/B13-brownlow-2023-after-decision__mobile-390x844.png); Admin [d](evidence/candidate-visual-20261029-corrected/B14-brownlow-2023-after-decision-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/B14-brownlow-2023-after-decision-admin__mobile-390x844.png) | The recorded decision is current and in the history; the status wraps at 390px | |
+| L-1 | Brownlow 2022 with the leader's eligibility unrecorded (synthetic fixture, restored) | Rerun with the corrected checks, LB [d](evidence/candidate-visual-20261029-leaderboard/L1-brownlow-unknown-eligibility-evidence-label__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/L1-brownlow-unknown-eligibility-evidence-label__mobile-390x844.png) (the identical C images: [d](evidence/candidate-visual-20261029-corrected/L1-brownlow-unknown-eligibility-evidence-label__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-corrected/L1-brownlow-unknown-eligibility-evidence-label__mobile-390x844.png)) | The determination says "unknown (not recorded)". The raw totals say "Ineligibility evidence: not marked ineligible", with the note that this is not an eligibility status. Nothing contradicts. ("The stored totals against themselves: 1 mismatch" is the fixture itself.) All checks now pass (Appendix D3) | |
 
-**Raw-total label triage.** The §1 observation (B6) was a display defect, not two conflicting rules. The raw totals'
+**Raw-total label.** The earlier observation (P2 B6) was a display defect, not two conflicting rules. The raw totals'
 `eligible` is the reconciliation's folded evidence flag: true means only that no source marks the player
-ineligible. The page printed it as "eligible" under "Eligible", which reads as an eligibility status and
-contradicts the ADR 0014 determination. Only the label and wording changed. Medal rules, eligibility policy and vote
-data are unchanged.
+ineligible. Only the label and wording changed. Medal rules, eligibility policy and vote data are unchanged.
 
-## 1. Defects found in candidate `592c6c16` (now fixed; see §1a)
+### 1b. Staged API leaderboard and the derived 18-team provider mapping (folders **LB**, **LBr**)
 
-| Gap | Severity | Defect | Seen in |
-|---|---|---|---|
-| [V2-GAP-036](known-gaps.md) | **High** | The standalone production bundle omits `data/reference/coleman-derivation.json`. `server.js` changes directory to `.next/standalone`, and the Coleman page's file trace includes `seasons.json` but not the contract. **Every Coleman compare and publish is refused** (`coleman_contract_unavailable`). Production runs this same bundle (`deploy/server-cluster.mjs`) | P2 K1–K4 |
-| [V2-GAP-037](known-gaps.md) | Medium | Loader refusals render the raw `ENOENT` message, which includes the **absolute server path** (`'D:\dev\afldbV2\.next\standalone\data\reference\…'`), into the page. This contradicts the "generic text, the thrown message is logged" rule (admin-operations §2). The unbroken path also overflows the 390px page by 13px | P2 K1, U5 (mobile) |
-| [V2-GAP-038](known-gaps.md) | Low | At 390px the Brownlow "Award-result presentation" status token `refused_eligibility_rule_unrecorded` (monospace, unbreakable) widens the page by **28px**. It appears whenever the default `unrecorded` rule refuses (G1) | P2 S03, B9, B10, B11 (mobile) |
+> **Synthetic UI evidence, not provider reconciliation.** Every provider record in these images is SYNTHETIC: the
+> repository's AFL API test fixtures, re-keyed onto one synthetic provider match `CD_M2026V2VLBP` (Hawthorn v Brisbane
+> Lions, 2026-09-24), with the fixtures' synthetic voters "Alpha/Bravo/Charlie Player" (`CD_I900001`–`3`). LB-1 also
+> has a synthetic `CD_I900099` on a synthetic team `CD_T9990`. Only the 18 team identities are authentic: the
+> committed `data/reference/afl-api-identities.json`. Fixture corroboration comes from the synthetic match, so only
+> `CD_T80` and `CD_T20` are corroborated. The images prove that the corrected candidate renders these states and
+> refusals. They do **not** establish authentic provider reconciliation (go/no-go gate 7 and V2-GAP-023's production
+> staging are unchanged). The 2026 medal determination on these pages is computed from the synthetic votes and says
+> nothing about the 2026 Brownlow Medal.
 
-Observation, not graded at the time: when a stored row has no eligible rank (P2 B6), the determination says
-player 8354 is "unknown (not recorded)", while the reconciliation's "Raw vote totals" on the same page lists the
-same player as "eligible". The reconciliation reads only `is_ineligible`. **Resolved as a label defect in the
-corrected candidate (§1a, L-1).**
+| Item | Value |
+|---|---|
+| Database | New disposable `afldb_v2_visual_leaderboard_test`, created by `isolated-pg.ts create-db --template afldb_v2_visual2_test` and verified (`ISOLATED TARGET OK`). The cluster listener on 127.0.0.1:55433 was owned by the isolated cluster's own `postgres.exe`. Marker `afldb-v2-isolated-test`; `current_database()` proven for both the owner and the import role. Before the run, 2026 had no matches, no Brownlow totals and no staged rows |
+| Tool | `tools/v2/candidate-visual-leaderboard.mts`. [Full run log](evidence/candidate-visual-20261029-leaderboard/capture-log.txt) (18 images) · [refused-state recheck log](evidence/candidate-visual-20261029-leaderboard-recheck/capture-log.txt) (6 images, `--recheck-refused`, 0 failures) · [server log excerpt](evidence/candidate-visual-20261029-leaderboard/server-log-excerpt.txt) · [preservation proof](evidence/candidate-visual-20261029-leaderboard/preservation.txt) |
+| Fixture provenance | `tests/fixtures/afl_api/match/01-fixture-result.json` (`3d588ab1…`), `02-player-stats.raw.json` (`747a7a8e…`), `03-match-roster.raw.json` (`c0b6ff70…`), `tests/fixtures/afl_api/brownlow/01-brownlow-season-round.json` (`18cf0e9b…`), `02-brownlow-leaderboard-sample.json` (`8a5c1dc6…`); full SHA-256 values in the log. Re-key: provider match `CD_M20260142801` (API round 28, a 2026 final the Brownlow settle excludes) → `CD_M2026V2VLBP` (API round 5 = canonical home-and-away round 6) |
+| Guarded CLI route (attempted, refused) | `settle-afl-api.ts`, `settle-afl-api-fixtures.ts` and `settle-afl-api-brownlow.ts` refuse every writing mode for 2026 before opening a connection: `SealedSeasonRefusal: season 2026 is sealed historical data (sealed seasons 1897-2026)` (V2-GAP-006). Every season with an AFL API vocabulary (2022–2026) is sealed, and there is no 2027 vocabulary. `--allow-completed-season-backtest` admits only `afldb_test`. Neither guard was used or changed |
+| Producer used | The existing settle writers, driven exactly as `tests/integration/settle-afl-api-brownlow.test.ts` drives them, as `afldb_import` and with network calls blocked. (1) Three synthetic voters with `afl_api` bridge rows (the suite's voter fixture). (2) `runSettleAflApi`, apply + autoApply, `inProgressSeasons: [2026]` as the suite passes. That caller input is what admits the canonical match write on this disposable clone. (3) `runSettleAflApiBrownlow`, apply, **autoApply off**, with the registry's own in-progress seasons `[2027]`. It stages the vote set, its typed projection and the leaderboard, and writes no canonical Brownlow row (`brownlow_round_votes` for 2026: 0) |
+| Not changed | No guard, medal rule, eligibility policy or page query was changed or mocked. The page read the real tables through the real loader |
 
-All three defects are **CLOSED locally** in `known-gaps.md`, from the §1a evidence.
+| # | State | Captures (desktop / mobile) | Accept if | Verdict |
+|---|---|---|---|---|
+| LB-0 | 2026 before staging, Super Admin | LB [d](evidence/candidate-visual-20261029-leaderboard/LB0-brownlow-2026-not-staged__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/LB0-brownlow-2026-not-staged__mobile-390x844.png) | "The API leaderboard is not staged"; leaderboard "not staged"; mapping "not attempted: no API votes are staged" | |
+| LB-1 | Staged leaderboard with an unresolved player on an unmapped team: refused | LBr [d](evidence/candidate-visual-20261029-leaderboard-recheck/LB1-brownlow-2026-unresolved-unmapped-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard-recheck/LB1-brownlow-2026-unresolved-unmapped-refused__mobile-390x844.png); findings expanded [d](evidence/candidate-visual-20261029-leaderboard-recheck/LB1b-brownlow-2026-refused-findings-expanded__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard-recheck/LB1b-brownlow-2026-refused-findings-expanded__mobile-390x844.png) | Leaderboard staged, 4 entries (status IN_PROGRESS); 1 unresolved player. Mapping "refused: 1 problem(s), no mapping applied": `provider_team_unmapped`, `CD_T9990`, "no committed identity". "Season 2026: Refused", `refused_whole_set`, finding `unresolved_player_identity` (source leaderboard). Medal "Refused: unresolved evidence", no winner, no totals | |
+| LB-2 | Staged leaderboard and derived mapping, Super Admin | LB [d](evidence/candidate-visual-20261029-leaderboard/LB2-brownlow-2026-staged-mapping-derived__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/LB2-brownlow-2026-staged-mapping-derived__mobile-390x844.png) | "The API leaderboard is staged (V2-GAP-023)", with club consistency checked through the derived mapping. 3 entries (status IN_PROGRESS), 0 unresolved, 1 no longer listed (LB-1's extra entry). Mapping "derived: 18 teams, corroborated by 1 fixtures". "Round votes against the API leaderboard": compared 3, 0 mismatches. Season in progress: `season_incomplete`, no winner stated | |
+| LB-3 | The same, Admin | LB [d](evidence/candidate-visual-20261029-leaderboard/LB3-brownlow-2026-staged-mapping-derived-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/LB3-brownlow-2026-staged-mapping-derived-admin__mobile-390x844.png) | Same evidence, read-only; no decision submit control | |
+| LB-4 | The 18 mapped teams expanded, Super Admin / Admin | LB [d](evidence/candidate-visual-20261029-leaderboard/LB4-brownlow-2026-mapping-expanded__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/LB4-brownlow-2026-mapping-expanded__mobile-390x844.png); Admin [d](evidence/candidate-visual-20261029-leaderboard/LB5-brownlow-2026-mapping-expanded-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/LB5-brownlow-2026-mapping-expanded-admin__mobile-390x844.png) | 18 rows, provider team → club history name → club id. `CD_T80` Hawthorn (13) and `CD_T20` Brisbane Lions (3) have 1 agreeing fixture slot each; the other 16 show 0, because no fixture names them. No "No fixture corroborates" line: every team that cast or received a vote is corroborated | |
+| LB-5 | Without a session | LB [d](evidence/candidate-visual-20261029-leaderboard/LB6-brownlow-2026-anonymous__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/LB6-brownlow-2026-anonymous__mobile-390x844.png) | Redirected to `/admin/login`; no Brownlow evidence rendered | |
+| LB-6 | Committed identities unavailable (bundle file hidden, restored byte-identical) | LB [d](evidence/candidate-visual-20261029-leaderboard/LB7-brownlow-2026-identities-unavailable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/LB7-brownlow-2026-identities-unavailable__mobile-390x844.png) | Leaderboard still staged. Mapping "not attempted: the committed identities could not be read (data/reference/afl-api-identities.json is unreadable or invalid; see the server log)", with no server path (the path is only in the server log). Club consistency reported as unverifiable (info: 1). Nothing written | |
 
-## 2. Screen by screen (§2 of the earlier checklist)
+Every LB capture: HTTP 200 (LB-5: the login page), 0px horizontal overflow at 1280 and 390, 0 console errors, 0
+external requests. Two observations, not graded and not changed: the mapping line reads "corroborated by **1
+fixtures**" (plural for one), and on mobile the raw-vote-leaderboard and comparison tables scroll inside their own box.
 
-Criteria G1–G4 (earlier checklist, top) apply to every row. Mark each row ACCEPT, REJECT (with the defect) or NOT REVIEWED.
+## 2. Screen by screen
+
+Criteria G1–G4 (earlier checklist, top) apply to every row. Mark each row ACCEPT, REJECT (with the defect) or NOT
+REVIEWED. **†** = a Brownlow season image from `592c6c16`: its raw-vote-totals table shows the old "Eligible" header
+(§4). Judge that table from L-1, B-12, B-13 or LB-2, and the rest of the image as captured.
 
 | # | Screen and role | Current captures (desktop / mobile) | Accept if, in addition to G1–G4 | Verdict |
 |---|---|---|---|---|
@@ -92,18 +107,18 @@ Criteria G1–G4 (earlier checklist, top) apply to every row. Mark each row ACCE
 | 06 | Rejected proposal with history | [launchF d](evidence/launchF-visual/06-proposal-rejected-history__desktop-1280x800.png) / [m](evidence/launchF-visual/06-proposal-rejected-history__mobile-390x844.png) (unchanged since) | Rejection explicit and terminal; append-only history, not a publication | |
 | 07 | `/admin/operations/coleman`, before compare | Super Admin: [launchF d](evidence/launchF-visual/07-coleman__desktop-1280x800.png) / [m](evidence/launchF-visual/07-coleman__mobile-390x844.png); Admin: P1 [d](evidence/candidate-visual-20261029-states/S02-coleman-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/S02-coleman-admin__mobile-390x844.png) | Compare labelled read-only. Publish needs the attestation and a 20–2000 character note and is NOT REVERSIBLE. Admin sees "Publishing is a Super Admin action" | |
 | 08 | `/admin/operations/brownlow`, no season | A [d](evidence/candidate-visual-20261029/08-brownlow__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029/08-brownlow__mobile-390x844.png) | Reconciliation only reads; the diagnostic rule is separate from the ADR 0014 determination; leaderboard state per season | |
-| 09 | `/admin/operations/brownlow?season=2025` | Super Admin: A [d](evidence/candidate-visual-20261029/09-brownlow-2025__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029/09-brownlow-2025__mobile-390x844.png); Admin: P1 [d](evidence/candidate-visual-20261029-states/S06-brownlow-2025-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/S06-brownlow-2025-admin__mobile-390x844.png) | Outcome, findings by severity, raw leaderboard with eligibility and source; names a winner only when `determined`; states agreement or disagreement of stored flags. **This clone has no staged 2025 API votes**, so the page shows "not staged / not supplied / mapping not attempted" (§4) | |
+| 09 | `/admin/operations/brownlow?season=2025` † | Super Admin: A [d](evidence/candidate-visual-20261029/09-brownlow-2025__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029/09-brownlow-2025__mobile-390x844.png); Admin: P1 [d](evidence/candidate-visual-20261029-states/S06-brownlow-2025-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/S06-brownlow-2025-admin__mobile-390x844.png) | Outcome, findings by severity, raw leaderboard with eligibility and source; names a winner only when `determined`; states agreement or disagreement of stored flags. The clone has no staged 2025 votes, so this shows "not staged / mapping not attempted"; the staged states are in §1b | |
 | 10 | `/admin/current-season` | [launchF d](evidence/launchF-visual/10-current-season__desktop-1280x800.png) / [m](evidence/launchF-visual/10-current-season__mobile-390x844.png) (layout unchanged) | Only AFL API switches and settle units; missing host status reads "not available" | |
 | 11 | `/admin/upload` | [launchF d](evidence/launchF-visual/11-upload-retired__desktop-1280x800.png) / [m](evidence/launchF-visual/11-upload-retired__mobile-390x844.png) | Retirement notice, no working upload | |
 | 12 | `/admin` | [launchF d](evidence/launchF-visual/12-admin-home__desktop-1280x800.png) / [m](evidence/launchF-visual/12-admin-home__mobile-390x844.png) | No review notice; read-only submissions log | |
 | 13 | `/admin/fixtures` | [launchF d](evidence/launchF-visual/13-fixtures__desktop-1280x800.png) / [m](evidence/launchF-visual/13-fixtures__mobile-390x844.png) | Readable route and action wording | |
-| S | Sidebar | Super Admin in every Super Admin capture; Admin in 02, S01, S02, S06, S07 | "Operations centre" in Overview for both roles; no "Legacy file intake" | |
+| S | Sidebar | Super Admin in every Super Admin capture; Admin in 02, S01, S02, S06, S07, LB-3 | "Operations centre" in Overview for both roles; no "Legacy file intake" | |
 
-## 3. The previously uncaptured §6 states, now captured
+## 3. The other §6 states
 
 | Item | State | Captures (desktop / mobile) | Accept if | Verdict |
 |---|---|---|---|---|
-| 1 | Overview with the season registry unreadable | Super Admin P1 [d](evidence/candidate-visual-20261029-states/U1-operations-registry-unreadable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/U1-operations-registry-unreadable__mobile-390x844.png); Admin P1 [d](evidence/candidate-visual-20261029-states/U2-operations-registry-unreadable-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/U2-operations-registry-unreadable-admin__mobile-390x844.png); Coleman notice P1 [d](evidence/candidate-visual-20261029-states/U3-coleman-registry-unreadable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/U3-coleman-registry-unreadable__mobile-390x844.png); approval refused (*diagnostic history, superseded by §1a G-1*) P2 [d](evidence/candidate-visual-20261029-states2/U5-approve-refused-registry-unreadable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/U5-approve-refused-registry-unreadable__mobile-390x844.png) | The page says the registry cannot be read and that approvals are refused; an approval attempt is refused `season_registry_unavailable` and writes nothing. The P2 notice shows a server path (V2-GAP-037, fixed: see §1a G-1/G-2) | |
+| 1 | Overview and Coleman with the season registry unreadable | Super Admin P1 [d](evidence/candidate-visual-20261029-states/U1-operations-registry-unreadable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/U1-operations-registry-unreadable__mobile-390x844.png); Admin P1 [d](evidence/candidate-visual-20261029-states/U2-operations-registry-unreadable-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/U2-operations-registry-unreadable-admin__mobile-390x844.png); Coleman notice P1 [d](evidence/candidate-visual-20261029-states/U3-coleman-registry-unreadable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/U3-coleman-registry-unreadable__mobile-390x844.png); the refused approval and compare are §1a G-1/G-2 | The page says the registry cannot be read and that approvals are refused | |
 | 2 | Empty award queue | Super Admin P1 [d](evidence/candidate-visual-20261029-states/Q1-awards-queue-empty__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/Q1-awards-queue-empty__mobile-390x844.png); Admin P1 [d](evidence/candidate-visual-20261029-states/Q2-awards-queue-empty-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/Q2-awards-queue-empty-admin__mobile-390x844.png) | An empty queue is stated plainly; the create form is shown only to Super Admin | |
 | 2 | Create form: whole-file refusal and success | Refused P2 [d](evidence/candidate-visual-20261029-states2/A15-create-invalid-file-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A15-create-invalid-file-refused__mobile-390x844.png); created P2 [d](evidence/candidate-visual-20261029-states2/A16-create-valid-file-outcome__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A16-create-valid-file-outcome__mobile-390x844.png) | One invalid row refuses the whole file and creates nothing; success says "Nothing was validated or approved" | |
 | 3 | Sealed-season approval refusal | P2 [d](evidence/candidate-visual-20261029-states2/A11-approve-sealed-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A11-approve-sealed-refused__mobile-390x844.png) | Approval into sealed 2026 without a 20+ character note is refused `season_sealed_correction_invalid`, nothing written | |
@@ -111,42 +126,38 @@ Criteria G1–G4 (earlier checklist, top) apply to every row. Mark each row ACCE
 | 3 | "Revise approved winner" panel | Super Admin P2 [d](evidence/candidate-visual-20261029-states2/A13-proposal-approved-revise-panel__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A13-proposal-approved-revise-panel__mobile-390x844.png); Admin (unavailable) P2 [d](evidence/candidate-visual-20261029-states2/A14-proposal-approved-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A14-proposal-approved-admin__mobile-390x844.png) | Super Admin sees the revise panel with its card; Admin sees the reason it is unavailable and no controls | |
 | 3 | Self-approval attestation | Field P2 [d](evidence/candidate-visual-20261029-states2/A18-self-approval-attestation__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A18-self-approval-attestation__mobile-390x844.png); refused without it P2 [d](evidence/candidate-visual-20261029-states2/A19-self-approve-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A19-self-approve-refused__mobile-390x844.png); own validate P2 [d](evidence/candidate-visual-20261029-states2/A17-validate-own-outcome__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A17-validate-own-outcome__mobile-390x844.png) | The creator is asked for an attestation; approving without one is refused | |
 | 3 | Reject with a short reason | P2 [d](evidence/candidate-visual-20261029-states2/A20-reject-short-reason-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/A20-reject-short-reason-refused__mobile-390x844.png) | Refused, nothing written | |
-| 4 | *Diagnostic history (candidate `592c6c16`, superseded by §1a C-1 to C-5 and G-3):* Coleman compare as built, all refused (V2-GAP-036) | Super Admin P2 [d](evidence/candidate-visual-20261029-states2/K1-coleman-compare-2024__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/K1-coleman-compare-2024__mobile-390x844.png); Admin P2 [d](evidence/candidate-visual-20261029-states2/K2-coleman-compare-2024-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/K2-coleman-compare-2024-admin__mobile-390x844.png); 2027 P2 [d](evidence/candidate-visual-20261029-states2/K3-coleman-compare-2027__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/K3-coleman-compare-2027__mobile-390x844.png); unattested P2 [d](evidence/candidate-visual-20261029-states2/K4-coleman-compare-unsettled__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/K4-coleman-compare-unsettled__mobile-390x844.png) | The defect, kept for the record. Not for acceptance | |
-| 4 | *Diagnostic history (WORKAROUND, superseded by §1a C-1 to C-8):* Coleman with the contract copied into the build output by hand | Derivable compare with the `award_winners` preview P2 [d](evidence/candidate-visual-20261029-states2/W1-coleman-compare-2024-derivable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W1-coleman-compare-2024-derivable__mobile-390x844.png); Admin compare P2 [d](evidence/candidate-visual-20261029-states2/W2-coleman-compare-2024-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W2-coleman-compare-2024-admin__mobile-390x844.png); refusal (1975, `season_before_contract`) P2 [d](evidence/candidate-visual-20261029-states2/W3-coleman-compare-1975-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W3-coleman-compare-1975-refused__mobile-390x844.png); publish refused (no attestation) P2 [d](evidence/candidate-visual-20261029-states2/W4-coleman-publish-unsettled-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W4-coleman-publish-unsettled-refused__mobile-390x844.png); publish outcome P2 [d](evidence/candidate-visual-20261029-states2/W5-coleman-publish-outcome__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W5-coleman-publish-outcome__mobile-390x844.png); after publish P2 [d](evidence/candidate-visual-20261029-states2/W6-coleman-after-publish__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W6-coleman-after-publish__mobile-390x844.png), Admin [d](evidence/candidate-visual-20261029-states2/W7-coleman-after-publish-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W7-coleman-after-publish-admin__mobile-390x844.png) | Shows what a fixed bundle would render: the preview counts before publishing, a missing goal never counted as zero, and the outcome (2024 matched the stored winner, so only provenance was recorded). These cannot prove the corrected candidate works; review §1a instead | |
-| 5 | Brownlow refused / invalid season | 2027 in progress P1 [d](evidence/candidate-visual-20261029-states/S04-brownlow-2027-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/S04-brownlow-2027-refused__mobile-390x844.png); 1800 invalid P1 [d](evidence/candidate-visual-20261029-states/S05-brownlow-invalid-season__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/S05-brownlow-invalid-season__mobile-390x844.png) | No winner for a season in progress; an invalid season is a field error | |
-| 5 | Determination `determined`, tie with an excluded ineligible player | 1996 P2 [d](evidence/candidate-visual-20261029-states2/S03-brownlow-1996-tie__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/S03-brownlow-1996-tie__mobile-390x844.png) (*diagnostic history* for mobile: the 28px overflow, V2-GAP-038; corrected in §1a B-12) | Joint winners 6722 and 9596; player 3063 excluded as ineligible and still listed | |
-| 5 | Determination `requires_review` | 2023 Super Admin P2 [d](evidence/candidate-visual-20261029-states2/B6-brownlow-2023-requires-review__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B6-brownlow-2023-requires-review__mobile-390x844.png); Admin P2 [d](evidence/candidate-visual-20261029-states2/B7-brownlow-2023-requires-review-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B7-brownlow-2023-requires-review-admin__mobile-390x844.png) (also 2024 in P1 B1/B2) | No winner named; the review player is identified; Super Admin gets the decision form with its card; Admin sees the form unavailable | |
-| 5 | Eligibility decision error and success | Error P2 [d](evidence/candidate-visual-20261029-states2/B8-decision-error__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B8-decision-error__mobile-390x844.png); success P2 [d](evidence/candidate-visual-20261029-states2/B9-decision-success__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B9-decision-success__mobile-390x844.png); after (*diagnostic history* for mobile; corrected in §1a B-13) P2 [d](evidence/candidate-visual-20261029-states2/B10-brownlow-2023-after-decision__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B10-brownlow-2023-after-decision__mobile-390x844.png), Admin [d](evidence/candidate-visual-20261029-states2/B11-brownlow-2023-after-decision-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B11-brownlow-2023-after-decision-admin__mobile-390x844.png) | A blank citation and a short note are field errors and write nothing; success records one decision, recomputes the result and shows it in the history (synthetic INELIGIBLE ruling) | |
+| 4 | Coleman compare, preview, publish and refusals | §1a C-1 to C-8, G-2 to G-4 | As listed there | |
+| 5 | Brownlow refused / invalid season † | 2027 in progress P1 [d](evidence/candidate-visual-20261029-states/S04-brownlow-2027-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/S04-brownlow-2027-refused__mobile-390x844.png); 1800 invalid P1 [d](evidence/candidate-visual-20261029-states/S05-brownlow-invalid-season__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states/S05-brownlow-invalid-season__mobile-390x844.png) | No winner for a season in progress; an invalid season is a field error | |
+| 5 | Determination `determined`, tie with an excluded ineligible player | §1a B-12 | As listed there | |
+| 5 | Determination `requires_review` † | 2023 Super Admin P2 [d](evidence/candidate-visual-20261029-states2/B6-brownlow-2023-requires-review__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B6-brownlow-2023-requires-review__mobile-390x844.png); Admin P2 [d](evidence/candidate-visual-20261029-states2/B7-brownlow-2023-requires-review-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B7-brownlow-2023-requires-review-admin__mobile-390x844.png); corrected candidate, Super Admin: §1a L-1 | No winner named; the review player is identified; Super Admin gets the decision form with its card; Admin sees the form unavailable | |
+| 5 | Eligibility decision error and success † | Error P2 [d](evidence/candidate-visual-20261029-states2/B8-decision-error__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B8-decision-error__mobile-390x844.png); success P2 [d](evidence/candidate-visual-20261029-states2/B9-decision-success__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B9-decision-success__mobile-390x844.png); after: §1a B-13 | A blank citation and a short note are field errors and write nothing; success records one decision, recomputes the result and shows it in the history (synthetic INELIGIBLE ruling) | |
+| 5 | Staged leaderboard and provider-team mapping (§6 item 5) | §1b LB-0 to LB-6 | As listed there | |
 | 7 | `/admin/submissions/[id]`, read-only history | Super Admin P2 [d](evidence/candidate-visual-20261029-states2/S12-submission-history__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/S12-submission-history__mobile-390x844.png); Admin P2 [d](evidence/candidate-visual-20261029-states2/S13-submission-history-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/S13-submission-history-admin__mobile-390x844.png) | "This submission is read-only history"; recorded verdicts listed; no action control | |
 | 9 | Refusals page, production build | Empty A [R1 d](evidence/candidate-visual-20261029/R1-refusals__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029/R1-refusals__mobile-390x844.png), [R2 d](evidence/candidate-visual-20261029/R2-findings__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029/R2-findings__mobile-390x844.png); populated P2 [d](evidence/candidate-visual-20261029-states2/R3-refusals-populated__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/R3-refusals-populated__mobile-390x844.png); page 2 P2 [d](evidence/candidate-visual-20261029-states2/R4-refusals-page2__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/R4-refusals-page2__mobile-390x844.png); findings P2 [d](evidence/candidate-visual-20261029-states2/R5-findings-populated__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/R5-findings-populated__mobile-390x844.png); Admin P2 [d](evidence/candidate-visual-20261029-states2/R6-refusals-populated-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/R6-refusals-populated-admin__mobile-390x844.png); failed read P2 [d](evidence/candidate-visual-20261029-states2/R7-refusals-read-failed__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/R7-refusals-read-failed__mobile-390x844.png) | Read-only, newest first, 50 per page, codes not values; the failed read is a generic notice | |
 
-## 4. States genuinely unavailable in this run
+## 4. Remaining gaps (genuine)
 
-- **Staged API leaderboard and the 18-team provider mapping (09, §6 item 5).** The template has no
-  `staging.afl_api_brownlow_vote` rows for any season. Producing them would need a synthetic Brownlow settle
-  (sources, batches, version sequences, leaderboard observations and fixture corroboration). That was not
-  attempted, so only the "not staged / not supplied / mapping not attempted" state exists for this candidate.
-  The earlier checklist §5 assumed the template held a staged 2025 state; it holds none.
-  **Still unavailable for the corrected candidate.** The only existing producer of this state is the real settle
-  writers (`runSettleAflApi` and `runSettleAflApiBrownlow`) over `tests/fixtures/afl_api`. They also apply canonical
-  match and vote rows, so they are not a safe fixture for this clone. No fixture stages leaderboard rows alone. The
-  staged-leaderboard and derived-mapping rendering is covered only by component tests on SYNTHETIC props
-  (`tests/v2-admin-operations-ui.test.ts`, "a staged leaderboard and a derived mapping are shown as evidence").
-- ~~Coleman derivable compare, preview and publish outcome on the candidate as built~~: now captured from the
-  corrected production build (§1a C-1 to C-8).
-- **A submitted "Revise approved winner" action.** §6 asks for the panel, which is captured. No revision
-  was submitted.
-- **Screens 03, 06, 07 (Super Admin), 10–13** were not recaptured: no change since `launchF-visual`
-  affects them (earlier checklist §1).
+- **Authentic provider reconciliation is not shown.** §1b is synthetic UI evidence only (see its box). Staging an
+  authentic leaderboard needs an operator-run Brownlow settle on a real snapshot (V2-GAP-023's production step), and
+  gate 7 is not met. Nothing here changes either.
+- **† Brownlow season images from `592c6c16` predate the raw-totals label fix.** `BrownlowViews.tsx` changed in
+  `7670441b` (the raw-totals "Ineligibility evidence" label and the 390px status wrap). The earlier sheet said no other
+  admin page changed; for these Brownlow images that was not exact. The images marked † (09, S06, S04, B6, B7, B8, B9)
+  show the old "Eligible" header wherever they include the raw-totals table. The determination, decision form and
+  history components did not change. The corrected rendering of that table is shown on four season pages (L-1, B-12,
+  B-13, LB-2), but no corrected-candidate image exists for the Admin `requires_review` view or the decision
+  error/success flow. Recapturing them was outside this bounded run. The owner may judge them as marked, or ask for a
+  recapture.
+- **A submitted "Revise approved winner" action.** §6 asks for the panel, which is captured. No revision was
+  submitted.
+- **Screens 03, 06, 07 (Super Admin), 10–13** were not recaptured: no change since `launchF-visual` affects them
+  (earlier checklist §1).
 
 ## 5. Fixtures and test actions (deliberate changes, not unchanged data)
 
-Read-only checks and deliberate changes are kept apart. Each capture group between actions observed **no
-change** in the twelve fingerprinted tables (`award_*`, `derived_award_*`, `brownlow_*`, `data_edits`,
-`data_issues`, `data_submission*`). Each action's expected effect matched the observed one (`match=true` in
-the logs), with two exceptions. In pass 1 two expectations omitted the sealed-season `data_edits` audit row,
-which the operating guide documents; pass 2 corrected them. Two pass-1 fixtures failed (identity columns) and
-were redone in pass 2.
+Read-only captures and deliberate changes are kept apart. Each read-only group between actions observed **no change**
+in the fingerprinted tables. Each action's expected effect matched the observed one (`match=true` in the logs), apart
+from the pass-1 history in Appendix D4.
 
 | Pass | Step | Effect (observed) | Net |
 |---|---|---|---|
@@ -161,29 +172,96 @@ were redone in pass 2.
 | 2 | insert 60 synthetic refusals and 3 settle findings (`source_key afl_api`) | +63 `data_issues` | persists |
 | 2 | validate and approve proposal #2 (goal-of-the-year 2026) | +2 decisions, +1 `award_winners`, +1 `data_edits` | persists |
 | 2 | create and validate proposal #5 (aflpa-mvp 2026), left undecided | +1 proposal, +2 decisions | persists |
-| 2 | copy `coleman-derivation.json` into the build output; publish Coleman 2024 | +1 `derived_award_results`, +1 `derived_award_projections`, `award_winners` unchanged; copy removed and verified absent | publication persists |
+| 2 | copy `coleman-derivation.json` into the build output; publish Coleman 2024 (Appendix D2) | +1 `derived_award_results`, +1 `derived_award_projections`, `award_winners` unchanged; copy removed and verified absent | publication persists |
 | 2 | clear `eligible_rank` of the 2023 leader (player 8354), then record a synthetic INELIGIBLE ruling | +1 decision, +1 `data_edits`, `brownlow_season_votes` reprojected | persists |
-
-| C (corrected) | read-only Coleman compares 2024/2027/unsettled/1975 and the season choice | no change | — |
+| C | read-only Coleman compares 2024/2027/unsettled/1975 and the season choice | no change | — |
 | C | publish Coleman 2023 unattested (refused), then attested, from the genuine bundle | +1 `derived_award_results`, +1 `derived_award_projections`, `award_winners` unchanged | publication persists |
 | C | hide the bundle's `seasons.json`: approve proposal #5 and a compare, both refused | no change; restored, SHA-256 `1368e9b1…` match | none |
 | C | hide the bundle's `coleman-derivation.json`: a compare and an attested publish, both refused | no change; restored, SHA-256 `93702c71…` match | none |
 | C | clear `eligible_rank` of the 2022 leader (player 10243) for L-1, then restore it | `brownlow_season_votes` changed, then digest restored exactly | none |
 
-Refusal actions (approval with the registry hidden, a sealed approval without a note, approving your own
-proposal without an attestation, a short rejection, an invalid file, an unattested publish and an invalid
-decision) each observed **no change**.
+**§1b, on `afldb_v2_visual_leaderboard_test` only** (26 tables fingerprinted per step):
+
+| Step | Expected | Observed | Net |
+|---|---|---|---|
+| F1 voters | +3 `players`, +3 `external_identities` (synthetic voters, `afl_api` bridges) | +3, +3 | persists |
+| W1 `runSettleAflApi` | one canonical synthetic match with its typed projection, spine observations and batch; unbridged roster players refused one by one | +1 `matches` (16993, `2026\|6\|2026-09-24\|Hawthorn\|Brisbane Lions`), +8 `match_period_scores`, +4 spine records and versions, +1 `staging.afl_api_match`, +1 `import_batches`, +2 `canonical_applications`, +2 `promotion_candidates`, +2 `import_rejections` (two roster players with no bridge); `player_match_stats` unchanged | persists |
+| W2 `runSettleAflApiBrownlow` (autoApply off) | vote set, its projection and a 4-entry leaderboard staged; no canonical Brownlow row | +5 spine records and versions (1 vote set, 4 leaderboard), +3 `staging.afl_api_brownlow_vote`, +1 `import_batches`; `brownlow_round_votes` unchanged | persists |
+| W3 the same with the fixture's 3-entry leaderboard | the 4th entry stamped absent; no canonical row | `CD_I900099` absent; projection rows refreshed (still 3); +1 `import_batches` | persists |
+| U8 hide the bundle's `afl-api-identities.json` | nothing written; restored byte-identical | no change; SHA-256 `13eba653…` match | none |
+| L-1 rerun: clear, then restore, the 2022 leader's `eligible_rank` | changed, then restored exactly | digest restored | none |
+| LBr W2r, then W3 (recheck) | the absent entry reappears, then is stamped absent again; no canonical row | spine records changed, +1 `import_batches` each; `brownlow_round_votes` unchanged | persists |
+
+End state of the clone against its source: only `matches` (+1), `match_period_scores` (+8), `players` (+3),
+`external_identities` (+3), `import_batches` (+5), `canonical_applications` (+2), `promotion_candidates` (+2),
+`import_rejections` (+2) and the staging tables differ. Award, Brownlow vote, eligibility, `data_edits` and
+`data_issues` tables are identical. 2026 `brownlow_round_votes`: 0. Signing in added `auth_sessions` rows, as in every
+pass. **Preserved:** `afldb_v2_visual2_test` and its template `afldb_v2_rollbackapp_test` have identical fingerprints
+before the clone and after both runs (combined `8da618da…` and `4e1dddbf…`). No other database was created or touched
+([proof](evidence/candidate-visual-20261029-leaderboard/preservation.txt)).
 
 ## 6. Owner verdict (return this block)
 
 ```text
 D-V2-VISUAL-1 — owner visual review of docs/v2/owner-visual-review-candidate-2026-10-29.md (corrected candidate,
-the commit adding §1a; build XtSgl4BOQZXC2G8qIWJdV).
+application tree of 7670441b; build XtSgl4BOQZXC2G8qIWJdV).
 Reviewed by: <screenshots | live on isolated environment> at <desktop and mobile>.
-ACCEPT: <§1a items, §2 rows and the §3 items not marked diagnostic history>
+ACCEPT: <§1a and §1b items, §2 rows and §3 items>
 REJECT: <row/item — defect>
-NOT REVIEWED / OUT OF SCOPE: <rows/items, with reason; include the §4 unavailable states>
+NOT REVIEWED / OUT OF SCOPE: <rows/items, with reason; include the §4 gaps>
 ```
 
-V2-GAP-022 closes only when every row and item is accepted or explicitly put out of scope by the owner. The §3
-rows marked *diagnostic history* are not for acceptance: they show candidate `592c6c16` before the fix.
+V2-GAP-022 closes only when every row and item is accepted or explicitly put out of scope by the owner. §1b accepts
+the rendering of synthetic staged evidence; it cannot accept authentic provider reconciliation. Appendix D is not for
+acceptance.
+
+---
+
+## Appendix D. Diagnostic history (not acceptance evidence)
+
+These items show candidate `592c6c16` before the fix, a labelled workaround, or a harness artefact. They are kept for
+the record and prove nothing about the corrected candidate.
+
+### D1. Defects found in candidate `592c6c16` (all closed locally; see §1a)
+
+| Gap | Severity | Defect | Seen in |
+|---|---|---|---|
+| [V2-GAP-036](known-gaps.md) | **High** | The standalone production bundle omitted `data/reference/coleman-derivation.json`, so every Coleman compare and publish was refused (`coleman_contract_unavailable`) | P2 K1–K4 |
+| [V2-GAP-037](known-gaps.md) | Medium | Loader refusals rendered the raw `ENOENT` message with the absolute server path; it also overflowed the 390px page by 13px | P2 K1, U5 (mobile) |
+| [V2-GAP-038](known-gaps.md) | Low | At 390px the Brownlow status token `refused_eligibility_rule_unrecorded` widened the page by 28px | P2 S03, B9, B10, B11 (mobile) |
+
+Observation at the time (P2 B6): the determination said player 8354 was "unknown (not recorded)" while the raw totals
+listed the same player as "eligible". Resolved as a label defect (§1a, L-1).
+
+### D2. Superseded images
+
+| Item | Images | Superseded by |
+|---|---|---|
+| Approval refused with the registry unreadable (server path shown) | P2 [d](evidence/candidate-visual-20261029-states2/U5-approve-refused-registry-unreadable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/U5-approve-refused-registry-unreadable__mobile-390x844.png) | G-1 |
+| Coleman compare as built, all refused (V2-GAP-036) | P2 K1 [d](evidence/candidate-visual-20261029-states2/K1-coleman-compare-2024__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/K1-coleman-compare-2024__mobile-390x844.png), K2 [d](evidence/candidate-visual-20261029-states2/K2-coleman-compare-2024-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/K2-coleman-compare-2024-admin__mobile-390x844.png), K3 [d](evidence/candidate-visual-20261029-states2/K3-coleman-compare-2027__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/K3-coleman-compare-2027__mobile-390x844.png), K4 [d](evidence/candidate-visual-20261029-states2/K4-coleman-compare-unsettled__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/K4-coleman-compare-unsettled__mobile-390x844.png) | C-1 to C-5, G-3 |
+| WORKAROUND: Coleman with the contract copied into the build output by hand | P2 W1 [d](evidence/candidate-visual-20261029-states2/W1-coleman-compare-2024-derivable__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W1-coleman-compare-2024-derivable__mobile-390x844.png), W2 [d](evidence/candidate-visual-20261029-states2/W2-coleman-compare-2024-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W2-coleman-compare-2024-admin__mobile-390x844.png), W3 [d](evidence/candidate-visual-20261029-states2/W3-coleman-compare-1975-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W3-coleman-compare-1975-refused__mobile-390x844.png), W4 [d](evidence/candidate-visual-20261029-states2/W4-coleman-publish-unsettled-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W4-coleman-publish-unsettled-refused__mobile-390x844.png), W5 [d](evidence/candidate-visual-20261029-states2/W5-coleman-publish-outcome__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W5-coleman-publish-outcome__mobile-390x844.png), W6 [d](evidence/candidate-visual-20261029-states2/W6-coleman-after-publish__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W6-coleman-after-publish__mobile-390x844.png), W7 [d](evidence/candidate-visual-20261029-states2/W7-coleman-after-publish-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/W7-coleman-after-publish-admin__mobile-390x844.png) | C-1 to C-8 |
+| Brownlow 1996 tie (28px overflow on mobile) | P2 S03 [d](evidence/candidate-visual-20261029-states2/S03-brownlow-1996-tie__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/S03-brownlow-1996-tie__mobile-390x844.png) | B-12 |
+| Brownlow 2023 after the decision (overflow on mobile) | P2 B10 [d](evidence/candidate-visual-20261029-states2/B10-brownlow-2023-after-decision__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B10-brownlow-2023-after-decision__mobile-390x844.png), B11 [d](evidence/candidate-visual-20261029-states2/B11-brownlow-2023-after-decision-admin__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-states2/B11-brownlow-2023-after-decision-admin__mobile-390x844.png) | B-13 |
+| The full run's LB1 (one mis-specified check, D3) | LB [d](evidence/candidate-visual-20261029-leaderboard/LB1-brownlow-2026-unresolved-unmapped-refused__desktop-1280x800.png) / [m](evidence/candidate-visual-20261029-leaderboard/LB1-brownlow-2026-unresolved-unmapped-refused__mobile-390x844.png) | LB-1 (LBr) |
+
+### D3. Harness check artefacts, corrected and rerun
+
+- **The two case-sensitive L1 assertions (folder C).** The corrected-candidate run compared the authored words
+  "unknown (not recorded)" and "Ineligibility evidence" against `innerText`. `innerText` returns the CSS-uppercased
+  badge and table-header text, so both checks failed on a correct page (`failures=2` in the C log). The `text`
+  checks of `candidate-visual-corrected.mts` and of the new tool now read the visible text with `text-transform`
+  neutralised through the CSSOM. The words must still be visible and must still match the authored case exactly; the
+  `forbid` checks of `candidate-visual-corrected.mts` are unchanged. Only the affected state, L-1, was rerun (LB folder).
+  It passes, and a negative control proves that the comparison uses the authored case: the uppercased
+  "UNKNOWN (NOT RECORDED)" and "INELIGIBILITY EVIDENCE" are not matched.
+- **LB1 in the full run (folder LB).** The check for `unresolved_player_identity` failed because the finding codes sit in
+  a collapsed `<details>`, which `innerText` omits. The page was correct: the image shows "Refused", `refusal: 1` and
+  `refused_whole_set`. The tool now opens the findings and checks the code there. Only that state was rerun (folder
+  LBr: the same writer re-staged the 4-entry leaderboard, then restored the resolved one). It passes with 0 failures.
+
+### D4. Earlier pass notes
+
+Pass 1's action-outcome images were taken while the page was scrolled, so the sticky header and sidebar are drawn
+partway down them; pass 2 re-produced each of those states on an equivalent record, and only the clean images are
+linked above. In pass 1 two expectations omitted the sealed-season `data_edits` audit row, which the operating guide
+documents; pass 2 corrected them. Two pass-1 fixtures failed (identity columns) and were redone in pass 2.

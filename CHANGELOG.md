@@ -15,6 +15,25 @@ commit.
 
 ## [Unreleased]
 
+### Staged Brownlow leaderboard and provider mapping captured on the corrected candidate (2026-10-29; production NO-GO)
+
+- New `tools/v2/candidate-visual-leaderboard.mts` produces the staged API leaderboard and the derived 18-team
+  provider-team mapping on a new disposable clone, `afldb_v2_visual_leaderboard_test`.
+  - The settle CLIs refuse every AFL API season under the V2-GAP-006 seal. That refusal is logged and not bypassed.
+  - The tool drives the existing writers exactly as `tests/integration/settle-afl-api-brownlow.test.ts` does, over the
+    repository's synthetic `tests/fixtures/afl_api`. The Brownlow settle runs with autoApply off, so no canonical vote
+    row is written.
+  - No guard, medal rule or page query changed.
+- 24 images from the reused corrected build `XtSgl4BOQZXC2G8qIWJdV`, in
+  `docs/v2/evidence/candidate-visual-20261029-leaderboard*/`: not staged, refused, staged and derived (Super Admin,
+  Admin), the 18 teams expanded, anonymous, and identities unavailable. Synthetic UI evidence only; authentic provider
+  reconciliation is not shown.
+- Harness fix: `text` checks read visible text with CSS `text-transform` neutralised, so the two L1 assertions match
+  the authored words again. L1 was rerun and passes.
+- New `tools/v2/visual-db-fingerprint.mjs` shows the source clone and its template unchanged.
+- The owner review sheet now lists only current acceptance evidence, with diagnostic history in its Appendix D.
+  V2-GAP-022 stays open for the owner. Nothing was pushed, deployed or run against DEV or production.
+
 ### Release hardening: Coleman contract bundled, generic refusals, Brownlow wrap (2026-10-29; production NO-GO)
 
 - **V2-GAP-036 (High), closed locally.** The standalone build left out `data/reference/coleman-derivation.json`,

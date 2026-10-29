@@ -62,6 +62,10 @@ Open [owner-visual-review-2026-10-29.md](owner-visual-review-2026-10-29.md):
    holds the recapture of the corrected candidate. The earlier Coleman, registry-refusal and 390px Brownlow images
    are kept only as labelled diagnostic history.
 
+   **Update (2026-10-29, staged leaderboard):** the sheet's §1b now holds the staged API leaderboard, the derived
+   18-team mapping and their refusals, captured from synthetic fixtures (UI evidence, not authentic reconciliation).
+   Diagnostic history moved to its Appendix D, and its §4 lists the remaining gaps. Return its §6 block.
+
 ## 3. Policy decisions needed before the artifact lock
 
 Only genuine open policy points are listed. Everything else is an execution approval already prepared in

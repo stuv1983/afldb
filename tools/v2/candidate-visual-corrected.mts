@@ -122,10 +122,27 @@ async function shoot(s: Session, name: string, viewport: typeof DESKTOP, checks:
       .map((e) => `${e.tagName.toLowerCase()}${typeof e.className === 'string' && e.className ? `.${e.className.trim().split(/\s+/).join('.')}` : ''}"${(e.textContent ?? '').trim().slice(0, 40)}"@${Math.round(e.getBoundingClientRect().right)}`);
   }) : [];
   const body = (await s.page.locator('body').innerText()).replace(/\s+/g, ' ');
+  // `text` checks name AUTHORED words, so they read the visible text with CSS text-transform neutralised (through the
+  // CSSOM, which the page's CSP allows): innerText returns the uppercased rendering of badges and table headers, which
+  // made the two L1 checks fail on correct pages. Rerun in candidate-visual-leaderboard.mts.
+  const authored = (await s.page.evaluate(() => {
+    const elements = [document.body, ...document.body.querySelectorAll<HTMLElement>('*')];
+    const saved = elements.map((e) => [e.style.getPropertyValue('text-transform'), e.style.getPropertyPriority('text-transform')] as const);
+    for (const e of elements) e.style.setProperty('text-transform', 'none', 'important');
+    try {
+      return document.body.innerText;
+    } finally {
+      elements.forEach((e, i) => {
+        const [value, priority] = saved[i];
+        if (value) e.style.setProperty('text-transform', value, priority);
+        else e.style.removeProperty('text-transform');
+      });
+    }
+  })).replace(/\s+/g, ' ');
   const failed: string[] = [];
   for (const selector of checks.present ?? []) if (await s.page.locator(selector).count() === 0) failed.push(`missing ${selector}`);
   for (const selector of checks.absent ?? []) if (await s.page.locator(selector).count() > 0) failed.push(`unexpected ${selector}`);
-  for (const words of checks.text ?? []) if (!body.includes(words)) failed.push(`text not found "${words}"`);
+  for (const words of checks.text ?? []) if (!authored.includes(words)) failed.push(`text not found "${words}"`);
   for (const words of checks.forbid ?? []) if (body.includes(words)) failed.push(`forbidden text "${words}"`);
   if (status !== null && status !== (checks.status ?? 200)) failed.push(`status ${status}`);
   if (overflow > 0) failed.push(`overflow ${overflow}px by ${culprits.join(' | ')}`);

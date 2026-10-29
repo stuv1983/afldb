@@ -64,7 +64,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
 | V2-GAP-020 | Low | curated awards | no | **CLOSED (2026-10-27, owner decision): accepted product constraint.** A winner still needs a resolved durable player identity before approval; the supported workflow is to link the player first, then propose. No identity was resolved and identity-less approval is not built | none |
 | V2-GAP-021 | Medium | Coleman | no | **CLOSED locally**: explicit guarded offline bootstrap refuses publisher-owned seasons; session locks survive batch commits; 27/27 publication tests | production comparison remains gap 015 |
-| V2-GAP-022 | Medium | admin UI | rehearsal | open, owner acceptance only: candidate `592c6c16` recaptured from a production build on 2026-10-29 (12 stale screens plus every §6 state producible with synthetic fixtures; 160 images, 0 external requests). Its defects 036/037/038 are fixed and the affected screens recaptured from the corrected production build (34 images, 0 external requests). The staged-leaderboard/mapping state is still unavailable in the clone ([review sheet](owner-visual-review-candidate-2026-10-29.md)) | owner acceptance per screen |
+| V2-GAP-022 | Medium | admin UI | rehearsal | open, owner acceptance only: candidate `592c6c16` recaptured from a production build on 2026-10-29 (12 stale screens plus every §6 state producible with synthetic fixtures; 160 images, 0 external requests). Its defects 036/037/038 are fixed and the affected screens recaptured from the corrected production build (34 images, 0 external requests). The staged leaderboard, the derived 18-team mapping and their refusals are now captured on the same build from SYNTHETIC fixtures on a new disposable clone (24 images, 0 external requests; UI evidence only, not authentic reconciliation). Remaining: Brownlow images from `592c6c16` that predate the raw-totals label fix (marked †) ([review sheet](owner-visual-review-candidate-2026-10-29.md)) | owner acceptance per screen |
 | V2-GAP-023 | Low | Brownlow | no | **CLOSED in code, verified on a disposable clone of the authentic 2025 data (2026-10-20)**: the settle stages the API leaderboard on the observation spine and the reconciliation derives the 18-team provider-team-to-club mapping from the committed identities, corroborated by the fixtures; the operations centre shows both. Production staging still needs one operator-run settle with this code (owner action; nothing was run against production) | none for migration; the stage runs when the operator next settles a Brownlow snapshot |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | **CLOSED locally (2026-10-27)**: read-only `/admin/operations/afl-api-refusals` linked from the overview; real-PostgreSQL test 2/2 as `afldb_import` on a disposable isolated `_test` database; page rendered signed in at 1280x800 and 390x844 (populated, empty, second page, failed read). Not deployed | optional owner eyeball of `docs/v2/evidence/gap025-visual/` |
@@ -520,6 +520,25 @@ award results must be shown reconcilable before production; **no** — not a pro
   seasons the publisher covers.
 
 ## V2-GAP-022 — The Stage 5 admin pages have never been rendered (VISUAL: UNVERIFIED)
+
+- **Staged leaderboard and provider mapping captured, 2026-10-29 (still OPEN, owner acceptance only).**
+  - The same build `XtSgl4BOQZXC2G8qIWJdV` was reused, not rebuilt: no application file is newer than it, and the bundled
+    reference files are byte-identical. It served the new disposable `afldb_v2_visual_leaderboard_test`, cloned from
+    `afldb_v2_visual2_test` through `isolated-pg.ts`. Identity, marker and listener were proven before writes.
+  - Producer: the CLI route is refused for every AFL API season by the V2-GAP-006 seal (2022–2026 sealed, no 2027
+    vocabulary). That refusal was logged and not bypassed. Instead, `tools/v2/candidate-visual-leaderboard.mts` drives the
+    real writers exactly as `tests/integration/settle-afl-api-brownlow.test.ts` does: synthetic voters,
+    `runSettleAflApi` (one canonical synthetic match, `inProgressSeasons: [2026]` as the suite passes), then
+    `runSettleAflApiBrownlow` with autoApply off. No canonical Brownlow row was written, and no guard, rule or query
+    was changed or mocked.
+  - Captured: not staged; refused (unresolved player, `provider_team_unmapped`); staged with `derived: 18 teams`,
+    Super Admin and Admin; the 18 teams expanded; anonymous; identities unavailable. 24 images, 0 external requests.
+    The fixtures are synthetic, so this is UI evidence and not authentic reconciliation.
+  - The two case-sensitive L1 assertions of the corrected run now read text with `text-transform` neutralised; L1 was
+    rerun and passes.
+  - The source clone and its template have identical fingerprints before and after.
+  - Remaining for the owner: the † Brownlow images from `592c6c16` predate the raw-totals label fix (sheet §4).
+  - No agent verdict is recorded.
 
 - **Corrected candidate recaptured, 2026-10-29 (still OPEN, owner acceptance only).**
   - V2-GAP-036/037/038 were fixed. The affected screens were recaptured from the corrected production build
