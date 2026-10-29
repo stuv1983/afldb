@@ -24,6 +24,17 @@ const RULE_LABELS: Record<BrownlowEligibilityRule, string> = {
 
 const OUTCOME_LABELS = { reconciled: 'Reconciled', discrepancies: 'Discrepancies found', refused: 'Refused' } as const;
 
+/**
+ * The raw totals' `eligible` is the report's FOLDED EVIDENCE FLAG (BrownlowPlayerTotal), not an
+ * eligibility status: true only means no source marks the player ineligible. Worded as evidence so
+ * it is never read against the ADR 0014 determination, which can say "unknown (not recorded)".
+ */
+const EVIDENCE_FLAG_WORDS = {
+  true: 'not marked ineligible',
+  false: 'marked ineligible',
+  null: 'provider flag unknown',
+} as const;
+
 /** The most findings listed row by row; every finding is still counted. */
 export const FINDINGS_ROW_LIMIT = 100;
 
@@ -249,9 +260,10 @@ export function BrownlowReportView({
         </p>
         <dl className="audit-kv">
           <dt>Status</dt>
-          <dd><span className="mono">{presentation.status}</span>{presentation.refusalCode === null ? '' : <> (<span className="mono">{presentation.refusalCode}</span>)</>}</dd>
+          {/* V2-GAP-038: long status tokens wrap instead of widening the page at 390px. */}
+          <dd style={{ overflowWrap: 'anywhere' }}><span className="mono">{presentation.status}</span>{presentation.refusalCode === null ? '' : <> (<span className="mono">{presentation.refusalCode}</span>)</>}</dd>
           <dt>Eligibility rule</dt>
-          <dd className="mono">{presentation.eligibilityRule}</dd>
+          <dd className="mono" style={{ overflowWrap: 'anywhere' }}>{presentation.eligibilityRule}</dd>
           <dt>Leaders</dt>
           <dd>
             {presentation.leaders.length === 0
@@ -345,6 +357,10 @@ export function BrownlowReportView({
           The highest raw totals over every vote-getter, ineligible players included. These are what
           the sources said, not an award result.
         </p>
+        <p className="section-note" data-evidence-flag-note>
+          The last column is the reconciliation&apos;s evidence flag: whether any source marks the player
+          ineligible. It is not an eligibility status; the &quot;Medal determination&quot; section gives that.
+        </p>
         {report.rawVotes.topVoteGetters.length === 0 ? (
           <p className="muted">No vote totals could be formed.</p>
         ) : (
@@ -354,7 +370,7 @@ export function BrownlowReportView({
                 <tr>
                   <th scope="col" className="num">Player id</th>
                   <th scope="col" className="num">Votes</th>
-                  <th scope="col">Eligible</th>
+                  <th scope="col">Ineligibility evidence</th>
                 </tr>
               </thead>
               <tbody>
@@ -362,7 +378,7 @@ export function BrownlowReportView({
                   <tr key={entry.playerId}>
                     <td className="num">{entry.playerId}</td>
                     <td className="num">{entry.votes}</td>
-                    <td>{entry.eligible === null ? 'unknown' : entry.eligible ? 'eligible' : 'ineligible'}</td>
+                    <td data-evidence-flag={String(entry.eligible)}>{EVIDENCE_FLAG_WORDS[String(entry.eligible) as 'true' | 'false' | 'null']}</td>
                   </tr>
                 ))}
               </tbody>

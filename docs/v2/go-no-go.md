@@ -222,7 +222,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | V2-GAP-024 | built (Launch F); nothing remaining |
 | contributor role | whether the contributor role keeps a purpose; Launch F removed its retired Upload link (RISK-21) |
 | V2-GAP-022 | eyeball verdicts for every Stage 5 page (`admin-operations.md` §6) from the candidate review sheet `docs/v2/owner-visual-review-candidate-2026-10-29.md` (2026-10-29 production-build recapture) |
-| V2-GAP-036 | approve a fix that puts the Coleman derivation contract into the standalone bundle (the candidate refuses every Coleman compare and publish); a fix reopens the artifact lock |
+| V2-GAP-036 | closed locally on 2026-10-29: the standalone bundle now carries and verifies the Coleman contract and the other runtime reference files, and the production build compared and published Coleman on the disposable clone (with 037/038). The fix changed the candidate, so the artifact lock must be re-taken on the corrected commit. Not deployed |
 | V2-GAP-015 | review every Coleman `disagree` found by the rehearsal |
 
 ### 4.3 Production release approvals (V2 release track, `cutover-runbook.md`)

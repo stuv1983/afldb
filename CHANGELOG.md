@@ -15,6 +15,30 @@ commit.
 
 ## [Unreleased]
 
+### Release hardening: Coleman contract bundled, generic refusals, Brownlow wrap (2026-10-29; production NO-GO)
+
+- **V2-GAP-036 (High), closed locally.** The standalone build left out `data/reference/coleman-derivation.json`,
+  so the production server refused every Coleman compare and publish.
+  - `tools/build/prepare-standalone.mjs` now copies the 7 repository files the server reads through
+    `process.cwd()` (`tools/build/standalone-runtime-files.mjs`). It refuses to ship unless each is byte-identical
+    and `server.js` sits at the bundle root.
+  - This also bundles the two draft contracts, which were missing too. From the code, without them a production
+    build's admin draft editor offers no draft choices and no no-draft years; this was not observed live.
+  - A source-scan test keeps the list complete.
+  - Proven on production build `XtSgl4BOQZXC2G8qIWJdV` against the disposable `afldb_v2_visual2_test`: Coleman 2023
+    compared and published with nothing copied by hand.
+- **V2-GAP-037, closed locally.** Season-registry, Coleman-contract and provider-team-identity failures now show
+  fixed text with the stable code (`season_registry_unavailable`, `coleman_contract_unavailable`). The detail,
+  including the server path, is logged server-side. Still refused before any connection.
+- **V2-GAP-038, closed locally.** The Brownlow "Award-result presentation" status and rule wrap at 390px (0px
+  overflow).
+- **Raw vote totals label.** The column showing the reconciliation's folded evidence flag is now "Ineligibility
+  evidence" (not marked ineligible / marked ineligible / provider flag unknown), not "Eligible". It no longer
+  appears to contradict an "unknown (not recorded)" medal determination. No rule or data changed.
+- Recapture: `tools/v2/candidate-visual-corrected.mts`, 34 images in
+  `docs/v2/evidence/candidate-visual-20261029-corrected/`, listed in the owner review sheet §1a. V2-GAP-022 stays
+  open for the owner's verdict. Nothing was pushed, deployed or run against DEV or production.
+
 ### Candidate visual recapture from a production build (2026-10-29; production NO-GO)
 
 - D-V2-VISUAL-RECAPTURE-1 (approved, expanded scope) recaptured candidate `592c6c16` from one production build

@@ -29,6 +29,7 @@ import { CuratedAwardError, createProposal, validateProposal, type ProposalInput
 import type { ApprovedWinnerRevisionPort, AwardPromotionPort, CuratedAwardsViewer } from '@afldb/admin';
 import type { SqlExecutor, TransactionalSqlExecutor } from '@afldb/db';
 import {
+  ColemanContractError,
   ColemanProjectionRefusal,
   type ColemanDerivation,
   type ColemanProjectionRequest,
@@ -67,7 +68,10 @@ import {
   loadStoredColemanWinners,
 } from '@/db/queries/coleman-inputs';
 import {
+  COLEMAN_CONTRACT_REFUSAL,
   OPERATIONS_AUDIT_ACTIONS,
+  PROVIDER_TEAM_IDENTITIES_UNAVAILABLE,
+  SEASON_REGISTRY_REFUSAL,
   approveCurated,
   compareColemanSeason,
   createCuratedFromFile,
@@ -940,11 +944,17 @@ describe('curated awards: server callers on PGlite', () => {
 
   it('the registry is read on EVERY approval, and a loader failure refuses before any connection is opened', async () => {
     const proposalId = await seedProposal();
-    const failing = vi.fn(() => { throw new SeasonRegistryError('The season registry could not be read: STUB'); });
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failing = vi.fn(() => { throw new SeasonRegistryError("The season registry could not be read: ENOENT: no such file or directory, open 'Z:\\srv\\afldb\\.next\\standalone\\data\\reference\\seasons.json'"); });
     const { deps, spies } = makeDeps({ loadSealed: failing });
 
     const result = await approveCurated(SUPER_USER, { proposalId, decisionNote: LONG_NOTE }, deps);
-    expect(result).toMatchObject({ ok: false, code: 'season_registry_unavailable' });
+    // V2-GAP-037: generic text with the stable code; the loader's detail (server path, OS error) is only logged.
+    expect(result).toMatchObject({ ok: false, code: 'season_registry_unavailable', error: SEASON_REGISTRY_REFUSAL });
+    if (!result.ok) expect(result.error).not.toMatch(/ENOENT|Z:|standalone/);
+    expect(errorLog).toHaveBeenCalledWith('Operations centre: season registry unavailable', expect.any(SeasonRegistryError));
+    expect(auditMock.mock.calls[0][1]).toMatchObject({ outcome: 'refused', code: 'season_registry_unavailable' });
+    expect(JSON.stringify(auditMock.mock.calls[0][1])).not.toMatch(/ENOENT|standalone/);
     expect(failing).toHaveBeenCalledTimes(1);
     expect(spies.withExecutor).not.toHaveBeenCalled();
     expect(spies.promote).not.toHaveBeenCalled();
@@ -1332,11 +1342,20 @@ describe('Coleman: server callers on PGlite', () => {
     expect(bridge.preview).not.toHaveBeenCalled();
   });
 
-  it('a Coleman contract that cannot be read refuses with its own code', async () => {
+  it('a Coleman contract that cannot be read refuses with its own code, generic text and the detail logged', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { deps, spies } = makeDeps({ loadContract: () => loadColemanContract('Z:/no/such/project/root') });
     const result = await publishColemanSeason(SUPER_USER, { season: 2024, settled: true, note: NOTE }, deps);
-    expect(result).toMatchObject({ ok: false, code: 'coleman_contract_unavailable' });
+    expect(result).toMatchObject({ ok: false, code: 'coleman_contract_unavailable', error: COLEMAN_CONTRACT_REFUSAL });
     expect(spies.withExecutor).not.toHaveBeenCalled();
+    // V2-GAP-037: the compare (a read) refuses the same way; neither shows the path or the OS error.
+    const compared = await compareColemanSeason(SUPER_USER, { season: 2024, settled: true }, deps);
+    expect(compared).toMatchObject({ ok: false, code: 'coleman_contract_unavailable', error: COLEMAN_CONTRACT_REFUSAL });
+    for (const failure of [result, compared]) if (!failure.ok) expect(failure.error).not.toMatch(/ENOENT|no such|project[/\\]root/);
+    expect(spies.withExecutor).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledTimes(2);
+    expect(errorLog).toHaveBeenCalledWith('Operations centre: Coleman contract unavailable', expect.any(ColemanContractError));
+    expect(String(errorLog.mock.calls[0][1])).toMatch(/could not be read: ENOENT/);
   });
 });
 
@@ -1416,11 +1435,16 @@ describe('Brownlow reconciliation: server caller on PGlite', () => {
   const codesOf = (result: { ok: true; report: { findings: Array<{ code: string }> } }) => result.report.findings.map((f) => f.code);
 
   it('V2-GAP-023: without a leaderboard or identities the comparison is not supplied and club_unverifiable stays', async () => {
-    const { deps } = makeDeps({ loadProviderTeamIdentities: () => { throw new Error('identities file unreadable\nsecond line'); } });
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const unreadable = new Error("identities could not be read: ENOENT: no such file or directory, open 'Z:\\srv\\afldb\\.next\\standalone\\data\\reference\\afl-api-identities.json'");
+    const { deps } = makeDeps({ loadProviderTeamIdentities: () => { throw unreadable; } });
     const result = await reconcileBrownlowSeasonForAdmin(PLAIN_ADMIN, { season: 2024 }, deps);
+    // V2-GAP-037: fixed text on the page; the loader's detail (server path, OS error) goes to the server log only.
     expect(result).toMatchObject({ ok: true, staging: {
-      leaderboard: { staged: false }, teamMapping: { state: 'not_attempted', reason: 'identities_unavailable', error: 'identities file unreadable' },
+      leaderboard: { staged: false }, teamMapping: { state: 'not_attempted', reason: 'identities_unavailable', error: PROVIDER_TEAM_IDENTITIES_UNAVAILABLE },
     } });
+    expect(JSON.stringify(result)).not.toMatch(/ENOENT|standalone/);
+    expect(errorLog).toHaveBeenCalledWith('Operations centre: provider team identities unavailable', unreadable);
     if (result.ok) {
       expect(result.report.rawVotes.comparisons.leaderboard.state).toBe('not_supplied');
       expect(codesOf(result)).toContain('club_unverifiable');

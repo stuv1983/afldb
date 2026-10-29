@@ -1,0 +1,56 @@
+start database=afldb_v2_visual2_test baseURL=http://127.0.0.1:3912 buildId=XtSgl4BOQZXC2G8qIWJdV registrySha256=1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0 contractSha256=93702c7199c35c157925d8e70593876903200b531c9e16d61ca5b0b141b6c633 contractInBundleFromBuild=true history={"award_proposals":5,"award_proposal_decisions":13,"award_winners":3714,"derived_award_results":1,"derived_award_projections":1,"brownlow_season_votes":16120,"brownlow_round_votes":320861,"brownlow_eligibility_decisions":2,"data_edits":4,"data_issues":67,"data_submissions":1,"data_submission_rows":5}
+C1-coleman-compare-2024__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C1-coleman-compare-2024__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C2-coleman-compare-2024-admin__desktop-1280x800.png as=admin status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C2-coleman-compare-2024-admin__mobile-390x844.png as=admin status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C3-coleman-compare-2027__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C3-coleman-compare-2027__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C4-coleman-compare-unsettled__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C4-coleman-compare-unsettled__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C5-coleman-compare-1975-refused__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C5-coleman-compare-1975-refused__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-coleman-compare expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+coleman publication season=2023 (derivable, no earlier derived publication)
+STEP R-coleman-choose-season expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+C6-coleman-publish-unattested-refused__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C6-coleman-publish-unattested-refused__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP P1-publish-unattested expected="publish 2023 without the settled attestation: refused, nothing written" expectedTables=[] observed=[no change] match=true
+C7-coleman-publish-outcome__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C7-coleman-publish-outcome__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP P2-publish expected="publish 2023 attested from the genuine bundle: appends the derivation ledger row and its projection (award_winners/data_edits only if the preview showed changes)" expectedTables=[derived_award_results,derived_award_projections] mayChange=[award_winners,data_edits] observed=[derived_award_results:+1rows,derived_award_projections:+1rows] match=true
+C8-coleman-after-publish__desktop-1280x800.png as=super status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C8-coleman-after-publish__mobile-390x844.png as=super status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C9-coleman-after-publish-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C9-coleman-after-publish-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-coleman-after-publish expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+G1-approve-refused-registry-missing__desktop-1280x800.png as=super status=same-page final=/admin/operations/awards/5 h1="Award proposal #5" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+G1-approve-refused-registry-missing__mobile-390x844.png as=super status=same-page final=/admin/operations/awards/5 h1="Award proposal #5" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+G2-coleman-compare-registry-missing__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+G2-coleman-compare-registry-missing__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+restored .next/standalone/data/reference/seasons.json sha256 match=true
+STEP U6-registry-missing expected="hide the bundle's seasons.json; approving a validated proposal and a Coleman compare are both refused season_registry_unavailable with generic text; nothing written" expectedTables=[] observed=[no change] match=true
+G3-coleman-compare-contract-missing__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+G3-coleman-compare-contract-missing__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+G4-coleman-publish-contract-missing__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+G4-coleman-publish-contract-missing__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+restored .next/standalone/data/reference/coleman-derivation.json sha256 match=true
+STEP U7-contract-missing expected="hide the bundle's coleman-derivation.json; a Coleman compare and an attested publish are both refused coleman_contract_unavailable with generic text; nothing written" expectedTables=[] observed=[no change] match=true
+B12-brownlow-1996-tie__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=1996 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B12-brownlow-1996-tie__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=1996 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B13-brownlow-2023-after-decision__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=2023 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B13-brownlow-2023-after-decision__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=2023 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B14-brownlow-2023-after-decision-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/brownlow?season=2023 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B14-brownlow-2023-after-decision-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/brownlow?season=2023 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-brownlow-wrap expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+STEP F-evidence-label expected="clear eligible_rank (was 1) of the 2022 leader, player 10243: eligibility becomes missing (restored below)" expectedTables=[brownlow_season_votes] observed=[brownlow_season_votes:+0rows(changed)] match=true
+L1-brownlow-unknown-eligibility-evidence-label__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=2022 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=FAIL(text not found "unknown (not recorded)"; text not found "Ineligibility evidence")
+L1-brownlow-unknown-eligibility-evidence-label__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=2022 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=FAIL(text not found "unknown (not recorded)"; text not found "Ineligibility evidence")
+STEP R-evidence-label expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+F-evidence-label-restore brownlow_season_votes digest restored=true
+STEP F-evidence-label-restore expected="restore eligible_rank 1 of player 10243: brownlow_season_votes byte-identical to before the fixture" expectedTables=[brownlow_season_votes] observed=[brownlow_season_votes:+0rows(changed)] match=true
+context super_admin blockedRequests=0
+context admin blockedRequests=0
+end history={"award_proposals":5,"award_proposal_decisions":13,"award_winners":3714,"derived_award_results":2,"derived_award_projections":2,"brownlow_season_votes":16120,"brownlow_round_votes":320861,"brownlow_eligibility_decisions":2,"data_edits":4,"data_issues":67,"data_submissions":1,"data_submission_rows":5} netChangedTables=[derived_award_results:+1rows,derived_award_projections:+1rows]
+failures=2
+  L1-brownlow-unknown-eligibility-evidence-label__desktop-1280x800.png: text not found "unknown (not recorded)"; text not found "Ineligibility evidence"
+  L1-brownlow-unknown-eligibility-evidence-label__mobile-390x844.png: text not found "unknown (not recorded)"; text not found "Ineligibility evidence"

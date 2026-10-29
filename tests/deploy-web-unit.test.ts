@@ -1,14 +1,24 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+
+import { ColemanContractError } from '@afldb/derived';
+
+import { loadColemanContract } from '@/db/queries/coleman-inputs';
+import { loadSeasonRegistry } from '@/lib/seasons/sealed-seasons';
 
 import {
   findEnvFiles,
   findEnvFilesRecursive,
   removeEnvFiles,
 } from '../tools/build/env-in-standalone.mjs';
+import {
+  STANDALONE_RUNTIME_FILES,
+  checkRuntimeFiles,
+  copyRuntimeFiles,
+} from '../tools/build/standalone-runtime-files.mjs';
 
 /**
  * AFLDB-ISSUE-220 — the web unit's credential boundary.
@@ -161,6 +171,116 @@ describe('AFLDB-ISSUE-220 — standalone build ships no credential file', () => 
       expect(wrapper.indexOf(lastCopy)).toBeGreaterThan(-1);
       expect(scanAt).toBeGreaterThan(wrapper.indexOf(lastCopy));
     }
+  });
+});
+
+/**
+ * V2-GAP-036 — the standalone bundle must hold every repository file the server reads at runtime
+ * through a `process.cwd()` path. The production build omitted the Coleman derivation contract, so
+ * every Coleman compare and publish was refused there while the repository-root suites passed.
+ */
+describe('V2-GAP-036 — standalone bundle ships the runtime reference files', () => {
+  /**
+   * How src/ names a repository file: a `'data'|'tools', …, '<name>.json'` segment list (every server
+   * loader today) or one `'data/…/<name>.json'` string, in either quote style.
+   */
+  const PATHS = /(['"])(?:data|tools)\1(?:\s*,\s*(['"])[^'"\n]+\2)*\s*,\s*(['"])[^'"\n]+\.json\3|(['"])(?:data|tools)\/[^'"\n]+\.json\4/g;
+  /** CLI-only code the server never imports (asserted below), whose paths resolve at the repository root. */
+  const CLI_ONLY = 'src/lib/rollover/';
+
+  function sourceFiles(dir = 'src'): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) return sourceFiles(path);
+      return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [path] : [];
+    });
+  }
+
+  function runtimeReadsInSrc(): Map<string, string[]> {
+    const reads = new Map<string, string[]>();
+    for (const path of sourceFiles().filter((p) => !p.startsWith(CLI_ONLY))) {
+      for (const match of readFileSync(path, 'utf8').matchAll(PATHS)) {
+        const file = Array.from(match[0].matchAll(/['"]([^'"]+)['"]/g), (m) => m[1]).join('/');
+        reads.set(file, [...(reads.get(file) ?? []), path]);
+      }
+    }
+    return reads;
+  }
+
+  it(`${CLI_ONLY} is imported by no other src/ module, so its repository paths never run in the server`, () => {
+    const importers = sourceFiles().filter((p) => !p.startsWith(CLI_ONLY) && /lib\/rollover/.test(readFileSync(p, 'utf8')));
+    expect(importers).toEqual([]);
+  });
+
+  it('lists every data/ and tools/ JSON file a src/ loader reads, and the Coleman contract among them', () => {
+    const reads = runtimeReadsInSrc();
+    // Guards the scan itself: it must keep finding the loaders this gap was about.
+    expect(reads.get('data/reference/coleman-derivation.json')).toEqual(['src/db/queries/coleman-inputs.ts']);
+    expect(reads.get('data/reference/seasons.json')).toEqual(['src/lib/seasons/sealed-seasons.ts']);
+    for (const [file, readers] of reads) {
+      expect(STANDALONE_RUNTIME_FILES, `${file} is read by ${readers.join(', ')}`).toContain(file);
+    }
+  });
+
+  it('every listed file exists in the repository', () => {
+    for (const file of STANDALONE_RUNTIME_FILES) expect(existsSync(file), file).toBe(true);
+  });
+
+  it('copies the files into a standalone-shaped tree, where the Coleman and season loaders read them', async () => {
+    const scratch = await mkdtemp(join(tmpdir(), 'afldb-gap-036-standalone-'));
+    try {
+      expect((await checkRuntimeFiles(process.cwd(), scratch)).map((p) => p.file))
+        .toEqual(['server.js', ...STANDALONE_RUNTIME_FILES]);
+      expect((await checkRuntimeFiles(process.cwd(), scratch)).slice(1).map((p) => p.problem))
+        .toEqual(STANDALONE_RUNTIME_FILES.map(() => 'missing from the bundle'));
+      expect(() => loadColemanContract(scratch)).toThrow(ColemanContractError);
+
+      await writeFile(join(scratch, 'server.js'), '// standalone entry point\n');
+      await copyRuntimeFiles(process.cwd(), scratch);
+
+      expect(await checkRuntimeFiles(process.cwd(), scratch)).toEqual([]);
+      expect(loadColemanContract(scratch)).toEqual(loadColemanContract(process.cwd()));
+      expect(loadSeasonRegistry(scratch)).toEqual(loadSeasonRegistry(process.cwd()));
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a bundle file that differs from the repository copy', async () => {
+    const scratch = await mkdtemp(join(tmpdir(), 'afldb-gap-036-differs-'));
+    try {
+      await writeFile(join(scratch, 'server.js'), '// standalone entry point\n');
+      await copyRuntimeFiles(process.cwd(), scratch);
+      await writeFile(join(scratch, 'data', 'reference', 'coleman-derivation.json'), '{}\n');
+      expect(await checkRuntimeFiles(process.cwd(), scratch)).toEqual([
+        { file: 'data/reference/coleman-derivation.json', problem: 'differs from the repository file' },
+      ]);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('names a file missing from the repository instead of failing the copy', async () => {
+    const scratch = await mkdtemp(join(tmpdir(), 'afldb-gap-036-absent-'));
+    try {
+      await writeFile(join(scratch, 'server.js'), '// standalone entry point\n');
+      const files = ['data/reference/seasons.json', 'data/reference/no-such-runtime-file.json'];
+      await copyRuntimeFiles(process.cwd(), scratch, files);
+      expect(await checkRuntimeFiles(process.cwd(), scratch, files)).toEqual([
+        { file: 'data/reference/no-such-runtime-file.json', problem: 'missing from the repository' },
+      ]);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('prepare-standalone.mjs copies, then refuses to ship unless every file checks out', () => {
+    const wrapper = readFileSync('tools/build/prepare-standalone.mjs', 'utf8');
+    expect(wrapper).toMatch(
+      /await copyRuntimeFiles\(root, standalone\);\s*const runtimeFileProblems = await checkRuntimeFiles\(root, standalone\);\s*if \(runtimeFileProblems\.length > 0\) \{[\s\S]*?process\.exit\(1\);/,
+    );
+    // The credential scan runs after this copy too.
+    expect(wrapper.indexOf('findEnvFilesRecursive(standalone)')).toBeGreaterThan(wrapper.indexOf('copyRuntimeFiles(root, standalone)'));
   });
 });
 

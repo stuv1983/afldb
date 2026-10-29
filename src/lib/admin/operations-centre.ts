@@ -248,6 +248,19 @@ function viewerOf(admin: AdminUser): CuratedAwardsViewer {
   return { role: admin.role, canManageAdmins: admin.canManageAdmins, userId: admin.id };
 }
 
+/**
+ * What staff see for an unreadable or invalid reference file (V2-GAP-037). The loader's own message
+ * names the absolute server path and the operating-system error, so it is logged, never rendered.
+ */
+export const SEASON_REGISTRY_REFUSAL =
+  'The season registry (data/reference/seasons.json) could not be read or is not valid, so the sealed '
+  + 'range and season state are unknown and this request was refused. Nothing was changed; the detail is in the server log.';
+export const COLEMAN_CONTRACT_REFUSAL =
+  'The Coleman derivation contract (data/reference/coleman-derivation.json) could not be read or is not '
+  + 'valid, so this request was refused. Nothing was changed; the detail is in the server log.';
+export const PROVIDER_TEAM_IDENTITIES_UNAVAILABLE =
+  'data/reference/afl-api-identities.json is unreadable or invalid; see the server log';
+
 function toFailure(error: unknown): OperationFailure {
   if (error instanceof OperationRefusal) {
     return {
@@ -262,10 +275,12 @@ function toFailure(error: unknown): OperationFailure {
     };
   }
   if (error instanceof SeasonRegistryError) {
-    return { ok: false, code: 'season_registry_unavailable', error: error.message };
+    console.error('Operations centre: season registry unavailable', error);
+    return { ok: false, code: 'season_registry_unavailable', error: SEASON_REGISTRY_REFUSAL };
   }
   if (error instanceof ColemanContractError) {
-    return { ok: false, code: 'coleman_contract_unavailable', error: error.message };
+    console.error('Operations centre: Coleman contract unavailable', error);
+    return { ok: false, code: 'coleman_contract_unavailable', error: COLEMAN_CONTRACT_REFUSAL };
   }
   if (error instanceof BrownlowInputError) {
     return { ok: false, code: 'brownlow_input_inconsistent', error: error.message };
@@ -1027,7 +1042,9 @@ function readProviderTeamIdentities(
   try {
     return { identities: d.loadProviderTeamIdentities(), error: null };
   } catch (error) {
-    return { identities: undefined, error: error instanceof Error ? error.message.split('\n')[0] : 'unknown error' };
+    // V2-GAP-037: the loader's message names the absolute server path; it is logged, never shown.
+    console.error('Operations centre: provider team identities unavailable', error);
+    return { identities: undefined, error: PROVIDER_TEAM_IDENTITIES_UNAVAILABLE };
   }
 }
 

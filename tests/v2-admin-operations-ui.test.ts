@@ -884,6 +884,31 @@ describe('Brownlow views', () => {
     expect(refused).toContain('none stated');
   });
 
+  it('the raw totals word the folded evidence flag as evidence, never as an eligibility status', () => {
+    // The determination can say "unknown (not recorded)" for a player whose flag is true (no source marks
+    // them ineligible); the raw totals must not contradict it by printing "eligible".
+    const report = syntheticBrownlowReport('reconciled');
+    const withUnknown = {
+      ...report,
+      rawVotes: { ...report.rawVotes, topVoteGetters: [...report.rawVotes.topVoteGetters, { playerId: 1004, votes: 1, eligible: null }] },
+    };
+    const markup = html(createElement(BrownlowReportView, { report: withUnknown }));
+    const totals = markup.slice(markup.indexOf('id="brownlow-top"'));
+    expect(totals).toContain('<th scope="col">Ineligibility evidence</th>');
+    expect(totals).toContain('data-evidence-flag-note');
+    expect(totals).toContain('<td data-evidence-flag="true">not marked ineligible</td>');
+    expect(totals).toContain('<td data-evidence-flag="false">marked ineligible</td>');
+    expect(totals).toContain('<td data-evidence-flag="null">provider flag unknown</td>');
+    expect(totals).not.toMatch(/>eligible<|>Eligible<|>unknown</);
+  });
+
+  it('the presentation status and rule cells wrap long tokens (V2-GAP-038)', () => {
+    const markup = html(createElement(BrownlowReportView, { report: syntheticBrownlowReport('reconciled') }));
+    const result = markup.slice(markup.indexOf('id="brownlow-result"'), markup.indexOf('id="brownlow-comparisons"'));
+    expect(result).toContain('<dd style="overflow-wrap:anywhere"><span class="mono">refused_eligibility_rule_unrecorded</span> (<span class="mono">eligibility_rule_unrecorded</span>)</dd>');
+    expect(result).toMatch(/<dd class="mono" style="overflow-wrap:anywhere">unrecorded<\/dd>/);
+  });
+
   it('without staging evidence the caveat and the report keep saying the leaderboard is not supplied', () => {
     const report = html(createElement(BrownlowReportView, { report: syntheticBrownlowReport('reconciled') }));
     expect(report).not.toContain('data-brownlow-staging');

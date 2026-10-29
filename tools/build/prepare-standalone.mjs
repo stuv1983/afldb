@@ -13,6 +13,7 @@
 import { cp, access, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { findEnvFilesRecursive, removeEnvFiles } from './env-in-standalone.mjs';
+import { STANDALONE_RUNTIME_FILES, checkRuntimeFiles, copyRuntimeFiles } from './standalone-runtime-files.mjs';
 
 const root = process.cwd();
 const standalone = join(root, '.next', 'standalone');
@@ -81,6 +82,24 @@ if (await exists(join(root, 'deploy', 'coming-soon'))) {
   );
   console.log('prepare-standalone: copied deploy/coming-soon');
 }
+
+// V2-GAP-036: reference files the server reads by a process.cwd() path
+// (the Coleman derivation contract, the season registry, …). The same chdir
+// makes them resolve inside the bundle, and output file tracing missed the
+// Coleman contract, so every one is copied explicitly and checked byte for
+// byte. A missing or different file refuses the bundle rather than shipping
+// a server that refuses those operations at runtime.
+await copyRuntimeFiles(root, standalone);
+const runtimeFileProblems = await checkRuntimeFiles(root, standalone);
+if (runtimeFileProblems.length > 0) {
+  console.error(
+    `prepare-standalone: refusing to ship — runtime file(s) not usable: ${runtimeFileProblems
+      .map(({ file, problem }) => `${file} (${problem})`)
+      .join(', ')}`,
+  );
+  process.exit(1);
+}
+console.log(`prepare-standalone: copied and verified ${STANDALONE_RUNTIME_FILES.length} runtime reference files`);
 
 // Incremental static regeneration writes revalidated pages here. The
 // standalone output does not create it, and without it Next cannot

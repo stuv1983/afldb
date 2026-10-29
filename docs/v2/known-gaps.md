@@ -16,8 +16,9 @@ and 021 and 028 are closed locally; 016 has its publication and 98-season eviden
 open for production-dump/owner release acceptance. Gap 022 now requires owner acceptance only,
 not technical inspection. Gap 026 now requires the host/production-data rehearsal, not local
 application rollback. The historical Launch F counts below are retained as history.
-Current register: **38 total / 19 closed / 19 open**, counted from the table rows on 2026-10-29 after the
-candidate visual recapture (D-V2-VISUAL-RECAPTURE-1) opened 036, 037 and 038; before it, 35 / 19 / 16. It includes the
+Current register: **38 total / 22 closed / 16 open**, counted from the table rows on 2026-10-29 after the
+release-hardening fix closed 036, 037 and 038 locally. The candidate visual recapture (D-V2-VISUAL-RECAPTURE-1)
+had opened them earlier that day (38 / 19 / 19; before it, 35 / 19 / 16). It includes the
 separately tracked strict historical-source/membership verification gap 029. The earlier "18 / 17" was not updated
 when `58bd9e4c` closed 035 in the table. Gap 020 was closed on 2026-10-27 as an accepted product constraint
 (owner decision). Gaps 032, 033 and 034 were found and closed locally on 2026-10-28 (the R43b NL inspection, the
@@ -63,7 +64,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
 | V2-GAP-020 | Low | curated awards | no | **CLOSED (2026-10-27, owner decision): accepted product constraint.** A winner still needs a resolved durable player identity before approval; the supported workflow is to link the player first, then propose. No identity was resolved and identity-less approval is not built | none |
 | V2-GAP-021 | Medium | Coleman | no | **CLOSED locally**: explicit guarded offline bootstrap refuses publisher-owned seasons; session locks survive batch commits; 27/27 publication tests | production comparison remains gap 015 |
-| V2-GAP-022 | Medium | admin UI | rehearsal | open, owner acceptance only: candidate `592c6c16` recaptured from a production build on 2026-10-29 (12 stale screens plus every §6 state producible with synthetic fixtures; 160 images, 0 external requests). Defects found are tracked as 036/037/038; the staged-leaderboard/mapping state is unavailable in the clone ([review sheet](owner-visual-review-candidate-2026-10-29.md)) | owner acceptance per screen |
+| V2-GAP-022 | Medium | admin UI | rehearsal | open, owner acceptance only: candidate `592c6c16` recaptured from a production build on 2026-10-29 (12 stale screens plus every §6 state producible with synthetic fixtures; 160 images, 0 external requests). Its defects 036/037/038 are fixed and the affected screens recaptured from the corrected production build (34 images, 0 external requests). The staged-leaderboard/mapping state is still unavailable in the clone ([review sheet](owner-visual-review-candidate-2026-10-29.md)) | owner acceptance per screen |
 | V2-GAP-023 | Low | Brownlow | no | **CLOSED in code, verified on a disposable clone of the authentic 2025 data (2026-10-20)**: the settle stages the API leaderboard on the observation spine and the reconciliation derives the 18-team provider-team-to-club mapping from the committed identities, corroborated by the fixtures; the operations centre shows both. Production staging still needs one operator-run settle with this code (owner action; nothing was run against production) | none for migration; the stage runs when the operator next settles a Brownlow snapshot |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | **CLOSED locally (2026-10-27)**: read-only `/admin/operations/afl-api-refusals` linked from the overview; real-PostgreSQL test 2/2 as `afldb_import` on a disposable isolated `_test` database; page rendered signed in at 1280x800 and 390x844 (populated, empty, second page, failed read). Not deployed | optional owner eyeball of `docs/v2/evidence/gap025-visual/` |
@@ -77,9 +78,9 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-033 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: "played N games for <club> and also coached <club>" no longer counts career games at every club; `validatePlan` refuses a games condition when the played club is a builder parameter; the cross-domain opponent window is kept wide on purpose; 17 NL suites 1,641/1,641; typecheck exit 0. **PostgreSQL/Linux 2026-10-28:** the composition is refused (pre-fix: 6 players, one with 11 Richmond games); controls 27/365/107 unchanged. Not deployed | none |
 | V2-GAP-034 | Low | Birth-date enrichment | no | **CLOSED locally (2026-10-28)**: `enrich_birth_dates.py` no longer files a new open `external_identity_conflict` on every re-run; scoped delete-then-refile over the run's asserted profiles (ISSUE-090 §18 idiom), resolved history and other sources untouched; integration test 28 failed before (2 rows) and the file passes 28/28 on a disposable local `_test` copy, and 28/28 on Linux (2026-10-28). Not deployed | none |
 | V2-GAP-035 | Low | NL browser gate | no | **CLOSED locally (2026-10-28, owner decision: restate)**: the 27 ISSUE-190 career-count rows now expect `decline` and `rel_dec_001`/`rel_dec_002` expect `plan` (ISSUE-153 Stage 6), each pinned against its owning decision in `tests/nl-ui-corpus.test.ts`; no behaviour changed and the optional career-total mapping was not built. Focused Linux suites 1,002/1,002; rendered gate on Linux: 1,844/1,844 pass, 0 fail, 0 HTTP or page errors (before: 1,815 / 29) | none |
-| V2-GAP-036 | High | Coleman derivation | reconciliation | open: the standalone production bundle omits `data/reference/coleman-derivation.json`, so every Coleman compare and publish is refused (`coleman_contract_unavailable`) | trace or copy the contract into the standalone bundle; prove compare/publish from a production build |
-| V2-GAP-037 | Medium | admin UI / error handling | no | open: season-registry and Coleman-contract refusals render the raw `ENOENT` text with the absolute server path; it also overflows 390px by 13px | render generic text and log the detail; recapture |
-| V2-GAP-038 | Low | admin UI (Brownlow) | no | open: the unbreakable status token `refused_eligibility_rule_unrecorded` widens the Brownlow page by 28px at 390px | let the token wrap; recapture at 390px |
+| V2-GAP-036 | High | Coleman derivation | reconciliation | **CLOSED locally (2026-10-29)**: `prepare-standalone.mjs` copies the 7 runtime reference files (`tools/build/standalone-runtime-files.mjs`) and refuses to ship unless each is byte-identical; a source scan test keeps the list complete. Production build `XtSgl4BOQZXC2G8qIWJdV` compared and published Coleman 2023 on the disposable clone with nothing copied by hand. Not deployed | none; the fix reopens the artifact lock |
+| V2-GAP-037 | Medium | admin UI / error handling | no | **CLOSED locally (2026-10-29)**: registry, contract and provider-identity failures show fixed text with the stable code; the detail is logged server-side; still refused before any connection. Missing-registry and missing-contract paths verified in the production build, no path or OS error rendered, 0px overflow at 390px. Not deployed | none |
+| V2-GAP-038 | Low | admin UI (Brownlow) | no | **CLOSED locally (2026-10-29)**: the status and rule cells wrap (`overflow-wrap: anywhere`); 1996 and 2023 recaptured at 390px and 1280px with 0px overflow and nothing hidden. Not deployed | none |
 
 ## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
 
@@ -519,6 +520,17 @@ award results must be shown reconcilable before production; **no** — not a pro
   seasons the publisher covers.
 
 ## V2-GAP-022 — The Stage 5 admin pages have never been rendered (VISUAL: UNVERIFIED)
+
+- **Corrected candidate recaptured, 2026-10-29 (still OPEN, owner acceptance only).**
+  - V2-GAP-036/037/038 were fixed. The affected screens were recaptured from the corrected production build
+    `XtSgl4BOQZXC2G8qIWJdV` on the same clone: 17 states, 34 images, 0 external requests
+    (`evidence/candidate-visual-20261029-corrected/`).
+  - The pass-2 K, W, U5, S03 and B9–B11 images are kept as labelled diagnostic history. They prove nothing about
+    the corrected candidate.
+  - Still unavailable: the staged API leaderboard and the 18-team mapping. The only existing producer of that state
+    is the real settle writers over `tests/fixtures/afl_api`, which also apply canonical match and vote rows; no
+    fixture stages leaderboard rows alone. Their rendering is covered only by synthetic-props component tests.
+  - No agent verdict is recorded.
 
 - **Candidate recaptured, 2026-10-29 (D-V2-VISUAL-RECAPTURE-1; still OPEN, owner acceptance only).** Candidate
   `592c6c16`, one production build (1516 pages) served from the disposable `afldb_v2_visual2_test` (from
@@ -1036,8 +1048,36 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
 
 ## V2-GAP-036 — The production bundle cannot read the Coleman derivation contract
 
-- **OPEN (found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** Production-blocker class: reconciliation. Not fixed: the
-  release candidate was deliberately left unchanged.
+- **CLOSED locally (2026-10-29, release hardening; not deployed).** Production-blocker class: reconciliation.
+  - **Root cause.** Output file tracing is not a contract. It traced `seasons.json` (also imported as a module) but
+    not the contract, which only a spread of path segments names. The same scan found two more runtime reads that
+    were absent from the bundle and degraded silently: `data/reference/draftguru-event-kinds.json` and
+    `tools/rebuild/draftguru/draftguru-contract.json` (`src/db/queries/admin-draft.ts`).
+  - **Fix.** `tools/build/standalone-runtime-files.mjs` lists the 7 files the server reads through
+    `process.cwd()`. `prepare-standalone.mjs` copies them and refuses to ship if `server.js` is not at the bundle
+    root or if any file is missing or differs from the repository copy. It runs in `npm run build`,
+    `deploy/sync-dev.ps1` and `tools/v2/local-release.mjs`.
+  - **Regression coverage.** `tests/deploy-web-unit.test.ts`:
+    - scans `src/` for segment-list and whole-string `data/`/`tools/` JSON paths and requires each to be listed;
+      `src/lib/rollover/` is excluded, and the test asserts that no other `src/` module imports it;
+    - copies into a scratch bundle and loads the Coleman contract and the season registry from it;
+    - reports a missing, differing or repository-absent file;
+    - pins the copy-then-refuse order in `prepare-standalone.mjs`.
+  - **Validation.**
+    - Focused suites 245/245; wider V2/Coleman/Brownlow/admin unit run 48 files, 2,100/2,100; typecheck and lint
+      exit 0.
+    - Production build (`local-release.mjs build v2`), BUILD_ID `XtSgl4BOQZXC2G8qIWJdV`, 1516/1516 pages.
+      `prepare-standalone` printed "copied and verified 7 runtime reference files".
+    - The bundle's contract SHA-256 `93702c71…` equals the repository file. Nothing was copied by hand.
+    - Served on 127.0.0.1:3912 from `afldb_v2_visual2_test`, `tools/v2/candidate-visual-corrected.mts`
+      (`evidence/candidate-visual-20261029-corrected/`):
+      - compared 2024 as Super Admin and Admin, 2027, unattested and 1975 (`season_before_contract`);
+      - refused an unattested publish of 2023 with nothing written;
+      - published 2023: +1 `derived_award_results`, +1 `derived_award_projections`, `award_winners` unchanged;
+      - every capture group's expected effect matched its observed effect.
+  - **Not done.** DEV or production deployment, and the DEV smoke of the newly bundled draft and coach contracts.
+- **Original record (OPEN, found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** The release candidate was deliberately
+  left unchanged at the time.
 - **What.** `loadColemanContract()` (`src/db/queries/coleman-inputs.ts:47`) reads
   `join(process.cwd(), 'data', 'reference', 'coleman-derivation.json')`. The standalone `server.js` runs
   `process.chdir(__dirname)`, so the working directory is `.next/standalone`. The build's file trace for
@@ -1055,7 +1095,25 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
 
 ## V2-GAP-037 — Refusal notices render the absolute server path
 
-- **OPEN (found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** Not a production blocker on its own.
+- **CLOSED locally (2026-10-29, release hardening; not deployed).**
+  - **Fix.** `toFailure` (`src/lib/admin/operations-centre.ts`) maps the two codes to fixed text:
+    `SEASON_REGISTRY_REFUSAL` and `COLEMAN_CONTRACT_REFUSAL`. Each names the repository-relative file and says
+    nothing was changed and the detail is in the server log. The thrown error is logged with `console.error`
+    ("Operations centre: … unavailable"), the module's existing convention. The independent review found the same
+    leak in the Brownlow provider-team mapping (`readProviderTeamIdentities`); it now shows
+    `PROVIDER_TEAM_IDENTITIES_UNAVAILABLE` and logs the detail too.
+  - **Unchanged.** The codes, and the refusal before any connection is opened. Audit rows carry codes only.
+  - **Validation.**
+    - `tests/v2-admin-operations.test.ts` asserts the fixed text, the absence of `ENOENT` and the path, the log
+      call, the code-only audit row and no connection opened (approval, publish, compare, identities).
+    - Production build `XtSgl4BOQZXC2G8qIWJdV`, with the bundle's file hidden and restored byte for byte:
+      - G1: approving proposal #5 is refused `season_registry_unavailable`;
+      - G2: a compare is refused `season_registry_unavailable`;
+      - G3 and G4: a compare and an attested publish are refused `coleman_contract_unavailable`.
+    - Each rendered the generic text and none of `ENOENT`, "no such file", `standalone` or the repository path.
+      Nothing was written, and the overflow was 0px at 390px.
+    - The server log holds the detail (`evidence/candidate-visual-20261029-corrected/server-log-excerpt.txt`).
+- **Original record (OPEN, found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** Not a production blocker on its own.
 - **What.** `SeasonRegistryError` (`src/lib/seasons/sealed-seasons.ts:53`) and `ColemanContractError`
   (`src/db/queries/coleman-inputs.ts:52`) embed the first line of the underlying error, e.g. `ENOENT: no such file or
   directory, open 'D:\dev\afldbV2\.next\standalone\data\reference\seasons.json'`. The pages render it verbatim
@@ -1067,7 +1125,21 @@ The actual committed `common.py` rookie replay restores 8/8 removed selections o
 
 ## V2-GAP-038 — A Brownlow status token overflows the page at 390px
 
-- **OPEN (found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** Low; not a production blocker.
+- **CLOSED locally (2026-10-29, release hardening; not deployed).**
+  - **Fix.** The "Award-result presentation" status and eligibility-rule cells use `overflow-wrap: anywhere`, the
+    page's existing idiom. A UI test pins both cells.
+  - **Validation.** Production build `XtSgl4BOQZXC2G8qIWJdV`: B12 (1996), B13 and B14 (2023 after the decision,
+    Super Admin and Admin), at 1280x800 and 390x844. Every capture shows 0px horizontal overflow, and the full
+    `refused_eligibility_rule_unrecorded` text is present.
+  - **Related display defect (fixed in the same change).** The raw vote totals printed the reconciliation's folded
+    evidence flag (`BrownlowPlayerTotal.eligible`: "no source marks the player ineligible") under "Eligible", as
+    "eligible". The ADR 0014 determination on the same page can say "unknown (not recorded)" for that player. The
+    two are different concepts, so the column was mislabelled; no rule or data was wrong.
+    - Now: the column is "Ineligibility evidence" (not marked ineligible / marked ineligible / provider flag
+      unknown), with a note that it is not an eligibility status.
+    - Captured as L1 (2022, one reversible `eligible_rank` fixture, restored byte for byte).
+    - Medal rules, eligibility policy and vote data are unchanged.
+- **Original record (OPEN, found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** Low; not a production blocker.
 - **What.** In "Award-result presentation" the monospace status `refused_eligibility_rule_unrecorded` cannot wrap. At
   390px it widens the page by 28px (G1), whenever the default `unrecorded` rule refuses (for example 1996, and 2023
   after an ineligibility decision).

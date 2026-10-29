@@ -58,6 +58,10 @@ Open [owner-visual-review-2026-10-29.md](owner-visual-review-2026-10-29.md):
    recapture of candidate `592c6c16` and every §6 state producible with fixtures. It also records three defects
    found (V2-GAP-036 High, 037, 038) and the states still unavailable. Return its §6 block instead.
 
+   **Update (2026-10-29, release hardening):** 036, 037 and 038 are fixed and closed locally. The same sheet's §1a
+   holds the recapture of the corrected candidate. The earlier Coleman, registry-refusal and 390px Brownlow images
+   are kept only as labelled diagnostic history.
+
 ## 3. Policy decisions needed before the artifact lock
 
 Only genuine open policy points are listed. Everything else is an execution approval already prepared in
