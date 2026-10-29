@@ -212,7 +212,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 
 | Item | Decision |
 |---|---|
-| V2 merge | review and merge `v2/rebuild` into the mainline (V2 has no remote); reconcile the 19 ISSUE-316 follow-up-8 files it carries (commit `c9cca86d`) with the source worktree (RISK-15) |
+| V2 merge | **merged locally 2026-10-29 (D-V2-LOCK-1)**: `git merge --no-ff` into local `main`, locked execution commit `9ed9c9dd`; not pushed, because V2 has no remote (O-PUSH in `owner-decision-lock-2026-10-29.md` §6). Earlier text: reconcile the 19 ISSUE-316 follow-up-8 files it carries (commit `c9cca86d`) with the source worktree (RISK-15) |
 | V2-GAP-004 | fix or disable the user-level Read/Grep/Glob hook that runs in the source worktree; decide on the stray `supplies` |
 | V2-GAP-005 | whether AFLW joins the historical manifest |
 | V2-GAP-006 | database-level seal enforcement |

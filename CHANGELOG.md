@@ -25,6 +25,13 @@ commit.
   "Release after C5" is withdrawn: stages A/B do not wait for 2027 evidence, and A-AFLT stays required before
   production schema/code installation. Record: `docs/v2/owner-decision-lock-2026-10-29.md`. Nothing was deployed or
   run against DEV or production.
+- `v2/rebuild` merged into local `main` with `--no-ff`; locked execution commit `9ed9c9dd` (no application change
+  against the accepted candidate `7670441b`). Not pushed: V2 has no remote, so the push needs the owner's route
+  choice (O-PUSH).
+- One build of the locked commit by the established local release procedure (Windows 11, Node 22.21.0, Next.js
+  16.3.1): `BUILD_ID` `6z0tEoDM6-V-s4wbIH5RE`, 1516/1516 pages, standalone manifest SHA-256 `68f1d184…`
+  (`docs/v2/evidence/lock-build-20261029/`). Built with development transport headers against synthetic isolated
+  data; it is the lock's identity record, not the Linux install artifact, and implies no Linux verification.
 
 ### Last † Brownlow images recaptured; consolidated release decision package (2026-10-29; production NO-GO)
 
