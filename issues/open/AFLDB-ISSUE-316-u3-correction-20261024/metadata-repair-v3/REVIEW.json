@@ -1,0 +1,25 @@
+{
+  "verdict": "NO-GO",
+  "stopping_findings": 1,
+  "manifest_sha256": "5bf642882f29731c2db95558ac12779fd97a83ccfacf3cfe36e66700ce54034d",
+  "report_sha256": "a96c576e9939fd2d832a03155f965b8fe1ff4faf9033d39a4b2a0c48fa0e52a4",
+  "reviewer": "/root/metadata_review_v3",
+  "reviewed_utc": "2026-10-24T13:13:32.881Z",
+  "findings": [
+    {
+      "id": "F-005",
+      "grade": "MED",
+      "stopping": true,
+      "file": "locks.sql:3; repair.sql:29-33; validate-pg.cjs:148-159",
+      "summary": "An already-executed optional CREATE can commit through catalog SHARE locks after final assertions, before metadata COMMIT."
+    }
+  ],
+  "prior_findings": {
+    "F-001": "CLOSED as originally stated",
+    "F-002": "CLOSED",
+    "F-003": "CLOSED as originally stated",
+    "F-004": "CLOSED as originally stated"
+  },
+  "production_contact": false,
+  "repair_executed": false
+}

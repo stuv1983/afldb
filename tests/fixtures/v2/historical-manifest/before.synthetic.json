@@ -1,0 +1,56 @@
+{
+  "$comment": "SYNTHETIC test fixture for tests/v2-historical-manifest.test.ts. Not produced from any database; every count and digest is invented to exercise the comparator and is NOT AFLDB data.",
+  "format": "afldb.v2.historical-baseline-manifest",
+  "formatVersion": 1,
+  "specVersion": 1,
+  "status": "complete",
+  "producedAt": "2026-10-19T00:00:00.000Z",
+  "source": {
+    "database": "synthetic_fixture_test",
+    "serverVersion": "0.0 (synthetic)",
+    "readOnlySource": false,
+    "transaction": "repeatable read, read only, rolled back"
+  },
+  "sealed": { "from": 1897, "through": 2025, "open": [] },
+  "pinnedTo": null,
+  "tables": [
+    {
+      "table": "matches",
+      "kind": "fact",
+      "season": "row.season",
+      "key": ["row.match_key"],
+      "factColumns": ["id", "season", "match_key", "home_score", "away_score"],
+      "metadataColumns": ["source_id", "source_record_id", "import_batch_id", "imported_at"],
+      "excludedColumns": [],
+      "buckets": [
+        { "season": 2024, "sealed": true, "rows": 216, "keyDigest": "1111111111111111111111111111111111111111111111111111111111111111", "factDigest": "2222222222222222222222222222222222222222222222222222222222222222", "metadataDigest": "3333333333333333333333333333333333333333333333333333333333333333" },
+        { "season": 2025, "sealed": true, "rows": 216, "keyDigest": "4444444444444444444444444444444444444444444444444444444444444444", "factDigest": "5555555555555555555555555555555555555555555555555555555555555555", "metadataDigest": "6666666666666666666666666666666666666666666666666666666666666666" },
+        { "season": 2026, "sealed": false, "rows": 120, "keyDigest": "7777777777777777777777777777777777777777777777777777777777777777", "factDigest": "8888888888888888888888888888888888888888888888888888888888888888", "metadataDigest": "9999999999999999999999999999999999999999999999999999999999999999" }
+      ]
+    },
+    {
+      "table": "player_match_stats",
+      "kind": "fact",
+      "season": "match.season",
+      "key": ["match.match_key", "row.player_id"],
+      "factColumns": ["player_id", "match_id", "club_id", "kicks", "goals"],
+      "metadataColumns": ["source_id", "source_record_id", "import_batch_id", "imported_at"],
+      "excludedColumns": ["id"],
+      "buckets": [
+        { "season": 2025, "sealed": true, "rows": 9504, "keyDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "factDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "metadataDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
+      ]
+    },
+    {
+      "table": "players",
+      "kind": "reference",
+      "season": null,
+      "key": ["row.id"],
+      "factColumns": ["id", "first_name", "surname"],
+      "metadataColumns": [],
+      "excludedColumns": [],
+      "buckets": [
+        { "season": null, "sealed": false, "rows": 13000, "keyDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "factDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "metadataDigest": null }
+      ]
+    }
+  ]
+}

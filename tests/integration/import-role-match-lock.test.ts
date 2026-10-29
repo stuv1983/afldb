@@ -37,7 +37,7 @@
  * problem and every connection-close failure are all in the reported error
  * (`import-role-lock-fixture.ts`, checked DB-free by `tests/import-role-lock-fixture.test.ts`).
  */
-import './guard';
+import { verifyIsolatedIntegrationDatabase } from './guard';
 
 import postgres from 'postgres';
 import { describe, expect, it } from 'vitest';
@@ -86,7 +86,9 @@ function requireRoleDsn(ownerDsn: string): string {
   if (role.user !== 'afldb_import') {
     throw new Error(`AFLDB_ISSUE274_IMPORT_LOCK_DSN must name the role afldb_import; it names '${role.user}'.`);
   }
-  if (role.database !== 'afldb_test' || owner.database !== 'afldb_test') {
+  const isolated = process.env.AFLDB_V2_ISOLATED_PG === '1';
+  if (role.database !== owner.database
+      || (isolated ? !/^afldb_v2_[a-z0-9_]+_test$/.test(owner.database) : owner.database !== 'afldb_test')) {
     throw new Error(
       'Both AFLDB_ISSUE274_IMPORT_LOCK_DSN and AFLDB_TEST_DATABASE_URL must name the database afldb_test '
       + `(role DSN: '${role.database}', owner DSN: '${owner.database}').`,
@@ -138,13 +140,16 @@ describe.runIf(SELECTED)('AFLDB-ISSUE-274 D-274-2 — runtime lock permission of
         SELECT current_database() AS database, current_user AS "currentUser", session_user AS "sessionUser",
                (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS superuser
       `;
-      expect(ownerIdentity).toMatchObject({ database: 'afldb_test', currentUser: 'afldb_owner', sessionUser: 'afldb_owner' });
+      const database = process.env.AFLDB_V2_ISOLATED_PG === '1'
+        ? await verifyIsolatedIntegrationDatabase(owner) : 'afldb_test';
+      if (process.env.AFLDB_V2_ISOLATED_PG === '1') await verifyIsolatedIntegrationDatabase(role);
+      expect(ownerIdentity).toMatchObject({ database, currentUser: 'afldb_owner', sessionUser: 'afldb_owner' });
       const [roleIdentity] = await role<Identity[]>`
         SELECT current_database() AS database, current_user AS "currentUser", session_user AS "sessionUser",
                (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS superuser
       `;
       expect(roleIdentity).toEqual({
-        database: 'afldb_test', currentUser: 'afldb_import', sessionUser: 'afldb_import', superuser: false,
+        database, currentUser: 'afldb_import', sessionUser: 'afldb_import', superuser: false,
       });
       // The role's backend pid is how its end is confirmed later: `pid` is visible in pg_stat_activity
       // to every role, whereas `application_name` of ANOTHER role's session is hidden unless the viewer
@@ -229,7 +234,7 @@ describe.runIf(SELECTED)('AFLDB-ISSUE-274 D-274-2 — runtime lock permission of
       expect(seen, 'the probe ran to its rollback').not.toBeNull();
       const observed = seen as unknown as { ids: number[]; inside: Identity; competingSqlstate: string | null };
       expect(observed.inside).toEqual({
-        database: 'afldb_test', currentUser: 'afldb_import', sessionUser: 'afldb_import', superuser: false,
+        database, currentUser: 'afldb_import', sessionUser: 'afldb_import', superuser: false,
       });
       expect(observed.ids, 'exactly the one test-owned row was locked').toEqual([fixtureId]);
       expect(observed.competingSqlstate, 'a conflicting FOR UPDATE NOWAIT was refused while the role held the lock')

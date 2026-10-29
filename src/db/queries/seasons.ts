@@ -1,3 +1,4 @@
+import { acceptedBrownlowRowsSql } from './brownlow-readiness';
 import 'server-only';
 
 import { cache } from 'react';
@@ -194,7 +195,7 @@ export async function getSeasonBrownlow(year: number, limit = 10) {
   }[]>`
     SELECT p.id, p.slug, p.display_name AS "displayName",
            b.votes, b.is_winner AS "isWinner", b.is_ineligible AS "isIneligible"
-      FROM brownlow_season_votes b
+      FROM ${sql.unsafe(acceptedBrownlowRowsSql())} b
       JOIN players p ON p.id = b.player_id
      WHERE b.season = ${year}
      ORDER BY b.votes DESC, p.sort_name

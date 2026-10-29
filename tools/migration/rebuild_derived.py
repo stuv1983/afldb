@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import psycopg  # noqa: E402
 
 from common import Reporter, analyze, connect_pg, load_env, require_env, safe_dsn, scalar  # noqa: E402
+from brownlow_readiness import accepted_sql, status_sql  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Shared context: a player-game joined to its match, with the result
@@ -186,8 +187,8 @@ GROUP BY c.player_id, c.season, c.club_id;
 # brownlow_status distinguishes the three reasons a total can be absent:
 #   complete        the medal was decided; 0 means "polled nothing"
 #   not_applicable  no medal that season (pre-1924, and 1942-1945)
-#   pending         season still in progress, medal not yet awarded
-REBUILDS["player_season_stats"] = """
+#   pending         no accepted availability/publication decision, regardless of football status
+REBUILDS["player_season_stats"] = f"""
 TRUNCATE player_season_stats;
 INSERT INTO player_season_stats
       (player_id, season, primary_club_id, club_count,
@@ -199,12 +200,7 @@ INSERT INTO player_season_stats
        brownlow_votes, brownlow_status, is_premier)
 WITH season_brownlow AS (
     SELECT s.year AS season,
-           CASE
-             WHEN EXISTS (SELECT 1 FROM brownlow_season_votes b
-                           WHERE b.season = s.year)     THEN 'complete'
-             WHEN s.status = 'in_progress'              THEN 'pending'
-             ELSE 'not_applicable'
-           END::coverage_status AS status
+           ({status_sql('s.year')})::coverage_status AS status
     FROM seasons s
 ),
 agg AS (
@@ -260,7 +256,7 @@ LEFT JOIN brownlow_season_votes bsv
 # replay_admin_overrides(players) re-creates one. It is re-derived here to the
 # same zero row the targeted recompute writes. None is invented: a player who
 # never had one, such as a DraftGuru shell (AFLDB-ISSUE-108), still has none.
-REBUILDS["player_career_stats"] = """
+REBUILDS["player_career_stats"] = f"""
 CREATE TEMPORARY TABLE matchless_career ON COMMIT DROP AS
 SELECT c.player_id
 FROM player_career_stats c
@@ -321,6 +317,7 @@ LEFT JOIN (
            sum(votes)                        AS votes,
            count(*) FILTER (WHERE is_winner) AS medals
     FROM brownlow_season_votes
+    WHERE {accepted_sql('brownlow_season_votes.season')}
     GROUP BY player_id
 ) b ON b.player_id = g.player_id;
 
@@ -347,6 +344,7 @@ LEFT JOIN (
            sum(votes)                        AS votes,
            count(*) FILTER (WHERE is_winner) AS medals
     FROM brownlow_season_votes
+    WHERE {accepted_sql('brownlow_season_votes.season')}
     GROUP BY player_id
 ) b ON b.player_id = z.player_id
 WHERE NOT EXISTS (SELECT 1 FROM player_match_stats pms WHERE pms.player_id = z.player_id);

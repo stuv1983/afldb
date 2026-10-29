@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { TransactionSql } from 'postgres';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
   AFL_API_ADMIN_MATCH_METHOD,
@@ -65,6 +65,7 @@ import { loadFitzroyProfileContinuityRules } from '../src/lib/acquisition/fitzro
 import { canonicalJson, type JsonValue } from '../src/lib/acquisition/observations';
 import {
   COLEMAN_REFRESH_COMMAND,
+  closeCorrectionConnection,
   dbImpactReportReader,
   formatCommittedReportIncomplete,
   gatherImpactReport,
@@ -2069,6 +2070,27 @@ describe('Slice 8: the post-transaction report lifecycle and content', () => {
     expect(text).not.toMatch(/nothing (was )?written/);
   });
 
+  // AFLDB-ISSUE-238 S8 LOW-1: main's `finally`. After a COMMIT a failed close is a warning,
+  // never the top-level "nothing was written" handler; before it, the failure still propagates.
+  it('closeCorrectionConnection: a close failure after COMMIT warns and resolves; before COMMIT it throws', async () => {
+    const timeouts: unknown[] = [];
+    const failing = {
+      end: (options: unknown) => { timeouts.push(options); return Promise.reject(new Error('socket hang up')); },
+    } as unknown as Parameters<typeof closeCorrectionConnection>[0];
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(closeCorrectionConnection(failing, true)).resolves.toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain('socket hang up');
+      expect(String(warn.mock.calls[0][0])).toContain('the correction IS COMMITTED');
+      await expect(closeCorrectionConnection(failing, false)).rejects.toThrow('socket hang up');
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(timeouts).toEqual([{ timeout: 5 }, { timeout: 5 }]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('the reporter mutates nothing: its input context is unchanged and the fake reader was only read', async () => {
     const before = structuredClone(impactInput);
     const calls: string[] = [];
@@ -2105,6 +2127,29 @@ describe('Slice 8: the post-transaction report lifecycle and content', () => {
     }
     // empty fake answers never become invented paths: the slugs are named as unresolved
     expect(report.cache?.unresolved).toContain('player 10: slug unavailable (/players/<slug>-10)');
+  });
+
+  // ISSUE-238 S8 LOW-2: careerDebut orders matchDate as a string, so the DP-5 reads must emit ISO
+  // whatever the session DateStyle. Under 'SQL, DMY' match_date::text misordered 475 of 500 real
+  // careers (isolated afldb_v2_rb_final_test, 2026-10-28); to_char does not follow DateStyle.
+  it('the DP-5 career reads format match_date with to_char, never the DateStyle-dependent ::text', async () => {
+    const texts: string[] = [];
+    const tx = Object.assign(
+      (strings: TemplateStringsArray) => { texts.push(strings.join('?')); return Promise.resolve([]); },
+      { array: (values: unknown[]) => values },
+    );
+    const fakeDb = {
+      begin: async (_opts: string, read: (t: unknown) => Promise<unknown>) => read(tx),
+    } as unknown as Parameters<typeof dbImpactReportReader>[0];
+    const reader = dbImpactReportReader(fakeDb);
+    await reader.careers([10, 11]);
+    await reader.matchCareerFacts([1]);
+    expect(texts).toHaveLength(2);
+    for (const text of texts) {
+      expect(text).toContain("COALESCE(to_char(");
+      expect(text).toContain("'YYYY-MM-DD'), '9999-12-31') AS \"matchDate\"");
+      expect(text).not.toContain('match_date::text');
+    }
   });
 
   it('dry-run (ROLLED_BACK) and validate-only (PLANNED) render a prospective "would affect" report, never "affected"', async () => {

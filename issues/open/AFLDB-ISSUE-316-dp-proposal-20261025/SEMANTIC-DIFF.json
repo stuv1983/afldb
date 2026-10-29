@@ -1,0 +1,85 @@
+{
+  "source": "a1e16e674a1c3f552e5299883650602f3db36a2b",
+  "proposed_date": "2026-10-27",
+  "finals": [
+    {
+      "path": "data/reference/afltables-network.json",
+      "old_J2_sha256": "3d03022267745316dd71d27580f9c4d369bfc6f03e4da332e302965d3c40d2eb",
+      "proposed_sha256": "04e2a269559cbc09a590e22e46207cd199d78eb60dbdc49c605bb2e724d3b897",
+      "differences": [
+        {
+          "pointer": "/changed_at",
+          "before": "2026-10-24",
+          "after": "2026-10-27"
+        }
+      ],
+      "non_date_semantic_changes": 0
+    },
+    {
+      "path": "tools/rebuild/afl_api/afl-api-contract.json",
+      "old_J2_sha256": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148",
+      "proposed_sha256": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148",
+      "differences": [],
+      "non_date_semantic_changes": 0
+    },
+    {
+      "path": "tools/rebuild/afltables/afltables-contract.json",
+      "old_J2_sha256": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f",
+      "proposed_sha256": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f",
+      "differences": [],
+      "non_date_semantic_changes": 0
+    },
+    {
+      "path": "data/reference/fitzroy-accepted-baselines.json",
+      "old_J2_sha256": "6a2a4b8681c2d3d89388abbdfe9aa7569f55014ce2be151788b1d80d67e5a049",
+      "proposed_sha256": "0d4f7b3067112d8cf7fb3acc97b73ffb909b51cee09d8c4f59c326beb7e4f05f",
+      "differences": [
+        {
+          "pointer": "/baselines/2/accepted_on",
+          "before": "2026-10-24",
+          "after": "2026-10-27"
+        },
+        {
+          "pointer": "/baselines/2/validation/validated_on",
+          "before": "2026-10-24",
+          "after": "2026-10-27"
+        }
+      ],
+      "non_date_semantic_changes": 0
+    },
+    {
+      "path": "data/reference/seasons.json",
+      "old_J2_sha256": "1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0",
+      "proposed_sha256": "1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0",
+      "differences": [],
+      "non_date_semantic_changes": 0
+    },
+    {
+      "path": "tools/rebuild/fitzroy/fitzroy-contract.json",
+      "old_J2_sha256": "fef594af13b977e60d847f0a692837ce32c61cb2315c8ce6844a44898ac512cd",
+      "proposed_sha256": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5",
+      "differences": [
+        {
+          "pointer": "/full_history/season_range/resolved_on",
+          "before": "2026-10-24",
+          "after": "2026-10-27"
+        }
+      ],
+      "non_date_semantic_changes": 0
+    },
+    {
+      "path": "data/reference/stat-availability.json",
+      "old_J2_sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8",
+      "proposed_sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8",
+      "differences": [],
+      "non_date_semantic_changes": 0
+    }
+  ],
+  "structural_changes": [
+    "apply write_set/final_sha256: 8 to 7, omitting rebuild-test.ts",
+    "successor table edit becomes a separate activation authority/write",
+    "rebuild-test.ts read-only at inactive pin during apply; projected active pin separate",
+    "activation and deactivation bind exact source/head commits and migrations"
+  ],
+  "tuple_semantics_unchanged": true
+}

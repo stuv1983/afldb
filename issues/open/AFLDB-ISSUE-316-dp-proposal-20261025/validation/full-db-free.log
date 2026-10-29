@@ -1,0 +1,71 @@
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-Zdga2z\data\sources\afl_api\matches\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-AKPZDm\data\sources\afl_api\matches\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-BA0WMV\data\sources\afl_api\matches\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M2: player-stats + match-roster acquired
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-6Fvf8z\data\sources\afl_api\matches\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-MUUsUT\data\sources\afl_api\matches\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-hZ4JXY\data\sources\afl_api\matches\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000-2
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-hZ4JXY\data\sources\afl_api\matches\afl-api-2026-2026-09-19-143000-2\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000-2
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-Ph9MK1\data\sources\afl_api\matches\afl-api-2026-2026-09-19-143000-2\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 2 match(es); selected: 1
+  CD_M1: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-3BUGjI\data\sources\afl_api\fixtures\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000-2 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 2 match(es); selected: 1
+  CD_M1: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-3BUGjI\data\sources\afl_api\fixtures\afl-api-2026-2026-09-19-143000-2\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 2 match(es); selected: 1
+  CD_M1: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-LFhS7E\data\sources\afl_api\fixtures\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 2 match(es); selected: 1
+  CD_M2: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-acquire-ABLItu\data\sources\afl_api\fixtures\afl-api-2026-2026-09-19-143000\manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-brownlow-acquire-osalEj\data\sources\afl_api\brownlow\afl-api-brownlow-2025-2026-09-20-100800\manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800-2
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-brownlow-acquire-osalEj\data\sources\afl_api\brownlow\afl-api-brownlow-2025-2026-09-20-100800-2\manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800-2
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-brownlow-acquire-5lLgOJ\data\sources\afl_api\brownlow\afl-api-brownlow-2025-2026-09-20-100800-2\manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-brownlow-acquire-CUCOzY\data\sources\afl_api\brownlow\afl-api-brownlow-2025-2026-09-20-100800\manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-brownlow-acquire-nfPcFx\data\sources\afl_api\brownlow\afl-api-brownlow-2025-2026-09-20-100800\manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800-2
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+  manifest: C:\Users\stuar\AppData\Local\Temp\afldb-issue-228-brownlow-acquire-eSEHqk\data\sources\afl_api\brownlow\afl-api-brownlow-2025-2026-09-20-100800\manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+JSON report written to D:/dev/afldbV2/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/validation/full-db-free.results.json

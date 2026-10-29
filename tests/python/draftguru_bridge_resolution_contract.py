@@ -331,8 +331,10 @@ sql_statements, unresolved_execs = executed_sql(EXPORTER_SRC)
 
 check("8a every execute() call resolves to a known SQL string",
       not unresolved_execs, "; ".join(unresolved_execs))
-check("8b the module executes exactly the two statements of the registration read",
-      len(sql_statements) == 2, str(len(sql_statements)))
+check("8b the module executes exactly three SELECTs: live isolated identity, read-only proof and registration",
+      len(sql_statements) == 3
+      and any("cluster_name" in s and "pg_database" in s for s in sql_statements),
+      str(len(sql_statements)))
 check("8c every executed statement is a SELECT",
       all(s.strip().lower().startswith("select") for s in sql_statements),
       str([s.strip().split()[0] for s in sql_statements if s.strip()]))
@@ -379,6 +381,36 @@ for _n in ast.walk(ast.parse(EXPORTER_SRC)):
 check("8j the tool imports no importer module (no write surface, even transitively) -- a "
       "comment naming import_draftguru is prose, not an import",
       "import_draftguru" not in imported, str(sorted(imported)))
+
+print("9. isolated target DSN refuses redirection and requires the dedicated runner")
+import os
+from unittest.mock import patch
+with patch.dict(os.environ, {
+    "AFLDB_V2_ISOLATED_PG": "1", "AFLDB_V2_ISOLATED_PORT": "55432",
+    "AFLDB_TEST_DATABASE_URL": "postgresql://fixture@127.0.0.1:55432/afldb_v2_contract_test",
+}):
+    check("9a guarded isolated target admitted", exporter.resolve_target_dsn("isolated", None)[0].endswith("/afldb_v2_contract_test"))
+    for name, dsn in {
+        "remote": "postgresql://fixture@example.invalid:55432/afldb_v2_contract_test",
+        "wrong port": "postgresql://fixture@127.0.0.1:5432/afldb_v2_contract_test",
+        "non-test": "postgresql://fixture@127.0.0.1:55432/afldb_v2_main",
+        "redirect": "postgresql://fixture@127.0.0.1:55432/afldb_v2_contract_test?host=elsewhere",
+    }.items():
+        with patch.dict(os.environ, {"AFLDB_TEST_DATABASE_URL": dsn}):
+            check_raises("9b refuses " + name, exporter.BridgeExportError, exporter.resolve_target_dsn, "isolated", None)
+    with patch.dict(os.environ, {"AFLDB_V2_ISOLATED_PG": "0"}):
+        check_raises("9c refuses absent runner", exporter.BridgeExportError, exporter.resolve_target_dsn, "isolated", None)
+    # The guarded cluster's port is whatever the runner declares (55433 on the workstation, a
+    # dedicated port on a Linux verification host), never a literal; the DSN must still match it.
+    with patch.dict(os.environ, {"AFLDB_V2_ISOLATED_PORT": "55461",
+                                 "AFLDB_TEST_DATABASE_URL": "postgresql://fixture@127.0.0.1:55461/afldb_v2_contract_test"}):
+        check("9d the runner-declared port is admitted", exporter.resolve_target_dsn("isolated", None)[0].endswith("/afldb_v2_contract_test"))
+        with patch.dict(os.environ, {"AFLDB_TEST_DATABASE_URL": "postgresql://fixture@127.0.0.1:55432/afldb_v2_contract_test"}):
+            check_raises("9e refuses a DSN port other than the runner's", exporter.BridgeExportError, exporter.resolve_target_dsn, "isolated", None)
+    for port in ("5432", "80", "not-a-port", ""):
+        with patch.dict(os.environ, {"AFLDB_V2_ISOLATED_PORT": port,
+                                     "AFLDB_TEST_DATABASE_URL": f"postgresql://fixture@127.0.0.1:{port or '55432'}/afldb_v2_contract_test"}):
+            check_raises(f"9f refuses runner port {port!r}", exporter.BridgeExportError, exporter.resolve_target_dsn, "isolated", None)
 
 print()
 if failures:

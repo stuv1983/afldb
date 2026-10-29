@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-20",
+  "startingHead": "99a1165c21ed1b6d3c4177f847725bd91911bfe9",
+  "comparisonHead": "4528f41f",
+  "environment": {
+    "distribution": "AFLDB-V2-Rehearsal-20261020",
+    "cluster": "afldb_v2_isolated",
+    "port": 55434,
+    "namespace": "afldb-v2-rehearsal",
+    "externalRoutes": 0,
+    "agents": 1,
+    "subagents": 0,
+    "productionOrSharedAccess": false
+  },
+  "source": {
+    "verifiedFiles": 1422,
+    "canonicalLfManifestSha256": "0ce3084859795138facf7089f0816ebc4f4e1df047b0788a2b5c014f37c2fcc6",
+    "lineEndingOnlyDifferences": [
+      "tools/v2/rollback-fingerprint.ts"
+    ]
+  },
+  "P2": {
+    "classification": "explicit unmet archive correction prerequisite; identical on parent and starting HEAD",
+    "unresolvedOnBoth": 330383,
+    "preparedTarget": "afldb_v2_rb_final_regression_test",
+    "repairable": 330383,
+    "excluded": 0,
+    "applied": 330383,
+    "nonMatchIdColumnsPreserved": true,
+    "baselineRepaired": false,
+    "localFixtureSeasons": "1984-2026",
+    "productionApprovedPolicySeasons": "1984-2025; execution not approved"
+  },
+  "OD5": {
+    "classification": "exact reinstate case fails target-name guard on both revisions; passes existing permitted rebuild namespace",
+    "guardChanged": false,
+    "wrongNamespace": "afldb_v2_final_unprepared_test",
+    "correctNamespace": "afldb_v2_rb_final_regression_test",
+    "parentCorrectNamespacePassed": true
+  },
+  "tests": {
+    "adminBrownlowFinal": {
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "file": "admin-brownlow.test.ts",
+          "durationMs": 2494.257
+        }
+      ]
+    },
+    "settleAflApiComplete": {
+      "passed": 73,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 18438.962
+    },
+    "eligibilityIntegrationFinal": {
+      "passed": 47,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "file": "v2-brownlow-eligibility.test.ts",
+          "durationMs": 636.325
+        }
+      ]
+    },
+    "eligibilityUnit": {
+      "passed": 65,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "file": "v2-brownlow-eligibility.test.ts",
+          "durationMs": 62.641
+        }
+      ]
+    },
+    "authenticTwelveFinal": {
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "file": "v2-brownlow-eligibility-2025-final-labelled.test.ts",
+          "durationMs": 44358.059
+        }
+      ]
+    },
+    "publicationBeforeFix": {
+      "passed": 0,
+      "failed": 1,
+      "skipped": 45,
+      "files": [
+        {
+          "file": "v2-brownlow-eligibility.test.ts",
+          "durationMs": 62.784
+        }
+      ]
+    }
+  },
+  "build": {
+    "finalExitCode": 0,
+    "mode": "Next production build --webpack and standalone preparation",
+    "typecheckIncluded": true,
+    "standalonePrepared": true,
+    "envFilesExcluded": true,
+    "fontOnlyProxyStoppedBeforeRuntime": true,
+    "retainedDiagnosticBuildsBeforeFinal": 2,
+    "transportSecurityFlag": "development; isolated HTTP rehearsal, not production host acceptance"
+  },
+  "browser": {
+    "paths": [
+      "/admin/operations/brownlow?season=2025",
+      "/brownlow/2025",
+      "/brownlow"
+    ],
+    "authenticSnapshotAndTwelveRulings": true,
+    "unknownLeaderClearsWinner": true,
+    "unknownLowerPreservesWinnerAndWithholdsRanks": true,
+    "partialPreservesStoredEligibilityAndRanks": true,
+    "withheldPreservesRecordsAndAddsNoPublicationAudit": true,
+    "conflictingEvidenceRefusesWinner": true,
+    "publicFlagsLabelledRecorded": true,
+    "auditedOverride": {
+      "label": "07-browser-audited-override",
+      "pendingCleared": true,
+      "operationsRefreshed": true,
+      "publicCachesRefreshed": true,
+      "decisionAudit": true,
+      "publicationAudit": true,
+      "activityAudit": true,
+      "rawVotesUnchanged": true,
+      "permissions": true
+    },
+    "rawVotesUnchanged": true,
+    "pageErrors": [],
+    "externalRequests": 0
+  },
+  "validation": {
+    "typecheckExit": 0,
+    "changedFileEslintExit": 0
+  },
+  "migrationAuthority": {
+    "110-115": "original archive-scoped acceptance only",
+    "116": "isolated verification complete; production schema approval pending",
+    "117": "isolated verification complete; production schema approval pending"
+  },
+  "localImplementationComplete": true,
+  "remainingLocalBlockers": [],
+  "nextProductionAuthority": [
+    "Separate schema installation approvals for 116 and 117 with fresh verified backup/restore evidence",
+    "Reviewed deployment/execution revision and release window approval",
+    "Separate exact target/revision/plan-bound unexpired execution approval for each observe, backfill, adopt and eligibility operation; twelve rulings enumerated by durable identity, current id, citation and note; exclude 2026",
+    "Production reconciliation and remaining host/release acceptance under existing checklist"
+  ],
+  "restrictedRawEvidence": "/home/rehearsal/final-regression-20261020/evidence/"
+}

@@ -93,7 +93,7 @@
  * is refused here even if it were ever routed to this tool. No DSN is ever printed.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import postgres, { type TransactionSql } from 'postgres';
@@ -123,9 +123,13 @@ import {
   AFL_API_ADJUDICATION_DSN_ENV,
   AFL_API_ADJUDICATION_TARGET_ENV,
   CAPTURE_ROOT_ENV,
+  assertIsolatedRebuildDsn,
   assertRebuildTargetName,
   databaseOf,
+  isIsolatedRebuildName,
+  isolatedRunPort,
   resolveCaptureRoot,
+  restingDatabaseComment,
 } from '../db/rebuild-test';
 import { redact } from '../db/psql';
 import {
@@ -1026,7 +1030,7 @@ export function resolveAdjudicationTarget(
     throw new AdjudicationRebuildRefused(
       `${AFL_API_ADJUDICATION_TARGET_ENV} is not set. This tool runs only as a db:test:rebuild stage.`);
   }
-  assertRebuildTargetName(database);
+  assertRebuildTargetName(database, env);
   const dsn = env[AFL_API_ADJUDICATION_DSN_ENV];
   if (!dsn) throw new AdjudicationRebuildRefused(`${AFL_API_ADJUDICATION_DSN_ENV} is not set.`);
   let named: string;
@@ -1035,10 +1039,19 @@ export function resolveAdjudicationTarget(
   } catch {
     throw new AdjudicationRebuildRefused(`${AFL_API_ADJUDICATION_DSN_ENV} is not a valid connection URL.`);
   }
-  assertRebuildTargetName(named);
+  assertRebuildTargetName(named, env);
   if (named !== database) {
     throw new AdjudicationRebuildRefused(
       `${AFL_API_ADJUDICATION_DSN_ENV} names database '${named}', not the rebuild target '${database}'.`);
+  }
+  // V2 Launch F: an isolated-cluster target (admitted by name only inside an isolated run) also
+  // proves its DSN is a loopback DSN on the isolated cluster's port.
+  if (isIsolatedRebuildName(database)) {
+    const port = isolatedRunPort(env);
+    if (port === null) {
+      throw new AdjudicationRebuildRefused(`'${database}' is an isolated-cluster target outside an isolated run.`);
+    }
+    assertIsolatedRebuildDsn(dsn, port, AFL_API_ADJUDICATION_DSN_ENV);
   }
   return { database, dsn };
 }
@@ -1104,7 +1117,7 @@ export type RebuildMarker = {
   fileSha256: string;
 };
 
-function parseRebuildMarker(raw: string): RebuildMarker {
+export function parseRebuildMarker(raw: string): RebuildMarker {
   let obj: unknown;
   try {
     obj = JSON.parse(raw);
@@ -1155,7 +1168,9 @@ export async function readRebuildMarker(tx: TransactionSql, database: string): P
     SELECT shobj_description(oid, 'pg_database') AS comment FROM pg_database WHERE datname = current_database()
   `;
   const comment = row?.comment ?? null;
-  return comment === null ? null : parseRebuildMarker(comment);
+  // V2 Launch F: an isolated-cluster database RESTS with the isolated-pg marker comment, which is
+  // not a rebuild marker (restingDatabaseComment; null, so unchanged, for every other target).
+  return comment === null || comment === restingDatabaseComment(database) ? null : parseRebuildMarker(comment);
 }
 
 /** Never overwrites an unrelated/pre-existing database comment silently — it refuses instead
@@ -1173,7 +1188,7 @@ export async function setRebuildMarker(
   const [row] = await tx<{ comment: string | null }[]>`
     SELECT shobj_description(oid, 'pg_database') AS comment FROM pg_database WHERE datname = current_database()
   `;
-  if (row?.comment != null) {
+  if (row?.comment != null && row.comment !== restingDatabaseComment(database)) {
     throw new AdjudicationRebuildRefused(
       `${database} already carries a database comment; refusing to overwrite it silently (D11b). `
       + 'Resolve the existing comment by hand before capturing.');
@@ -1193,7 +1208,129 @@ export async function setRebuildMarker(
 export async function clearRebuildMarker(tx: TransactionSql, database: string): Promise<void> {
   assertRebuildTargetName(database);
   await assertConnectedToTarget(tx, database);
-  await tx.unsafe(`COMMENT ON DATABASE "${database}" IS NULL`);
+  // V2 Launch F: an isolated-cluster database returns to its resting isolated-pg marker, not to
+  // NULL, so tools/v2/isolated-pg.ts can still verify, run against and drop it after the rebuild.
+  const resting = restingDatabaseComment(database);
+  await tx.unsafe(resting === null
+    ? `COMMENT ON DATABASE "${database}" IS NULL`
+    : `COMMENT ON DATABASE "${database}" IS '${resting}'`);
+}
+
+// ---------------------------------------------------------------------------
+// The capture-bound marker check (the runner's pre-recreate live recheck)
+// ---------------------------------------------------------------------------
+
+/**
+ * What the runner's own capture stage completed in THIS execution: the capture file it left, as
+ * read, validated and hashed straight after the stage exited 0. Only `bindCompletedCapture` makes
+ * one (the issued set below), so a literal, a boolean or another run's file cannot stand in for
+ * it. It carries digests, a path and counts: no DSN and no captured value.
+ */
+export type CompletedCapture = Readonly<{
+  database: string; dir: string; capturedAt: string; payloadSha256: string; fileSha256: string;
+  ledgerRows: number; importerRows: number; registrations: number;
+}>;
+
+const issuedCompletedCaptures = new WeakSet<object>();
+
+function captureFileState(dir: string): 'absent' | 'regular' | 'other' {
+  try {
+    const stat = lstatSync(join(dir, PENDING_CAPTURE_FILE));
+    return stat.isFile() && !stat.isSymbolicLink() ? 'regular' : 'other';
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'absent' : 'other';
+  }
+}
+
+/** True only when no pending capture entry of any kind exists yet (a symlink or directory is not absent). */
+export function pendingCaptureAbsent(dir: string): boolean {
+  return captureFileState(dir) === 'absent';
+}
+
+function singleReportedDigest(label: 'sha256' | 'payload', stdout: string): string | null {
+  const matches = [...stdout.matchAll(new RegExp(`^[ \\t]*${label}[ \\t]*:[ \\t]*([0-9a-f]{64})[ \\t]*\\r?$`, 'gm'))];
+  return matches.length === 1 ? matches[0][1] : null;
+}
+
+/**
+ * Called by the runner immediately after the capture stage exits 0, and by nothing else. The
+ * capture file must not have pre-existed (a file already present is another run's, adopted by
+ * `--recover` rather than produced), must validate through the existing capture parser (format,
+ * target, structure, payload hash), and must be the very file the stage reported: the digests the
+ * stage printed equal the bytes' and the payload's. Refuses otherwise; nothing is bound.
+ */
+export function bindCompletedCapture(input: {
+  dir: string; database: string; absentBeforeCapture: boolean; captureStdout: string;
+}): CompletedCapture {
+  const refuse = (why: string) => new AdjudicationRebuildRefused(
+    `The capture stage's result cannot be bound to a capture file: ${why}.`);
+  if (!input.absentBeforeCapture) {
+    throw refuse('a pending capture entry already existed before the capture stage, so it belongs to another run');
+  }
+  if (captureFileState(input.dir) !== 'regular') {
+    throw refuse('no regular capture file exists where the capture stage wrote it');
+  }
+  let info: { capture: CombinedCapture; fileSha256: string } | null;
+  try {
+    info = readPendingCaptureWithHash(input.dir, input.database);
+  } catch (error) {
+    throw refuse(`the capture file does not validate (${(error as Error).message})`);
+  }
+  if (!info) throw refuse('the capture file disappeared');
+  if (singleReportedDigest('sha256', input.captureStdout) !== info.fileSha256
+      || singleReportedDigest('payload', input.captureStdout) !== info.capture.payloadSha256) {
+    throw refuse('the digests the capture stage reported do not match the file it left');
+  }
+  const bound: CompletedCapture = Object.freeze({
+    database: input.database, dir: input.dir, capturedAt: info.capture.capturedAt,
+    payloadSha256: info.capture.payloadSha256, fileSha256: info.fileSha256,
+    ledgerRows: info.capture.ledgerRows.length, importerRows: info.capture.importerRows.length,
+    registrations: info.capture.registrations.length,
+  });
+  issuedCompletedCaptures.add(bound);
+  return bound;
+}
+
+/**
+ * Whether `comment` (the live database comment) is the genuine pending rebuild marker of exactly
+ * the capture this execution completed. Empty = it is. Each problem is a fixed nonsecret phrase.
+ * Re-derives from the file's current bytes rather than trusting the binding made earlier, and
+ * parses the comment through the existing marker validator.
+ */
+export function captureBoundMarkerProblems(input: {
+  bound: CompletedCapture; database: string; comment: string | null;
+}): string[] {
+  const { bound, database, comment } = input;
+  if (typeof bound !== 'object' || bound === null || !issuedCompletedCaptures.has(bound)) {
+    return ['the capture binding was not issued by a completed capture stage'];
+  }
+  if (bound.database !== database) return ['the completed capture belongs to a different database'];
+  if (comment === null) return ['the database carries no rebuild marker'];
+  if (comment === restingDatabaseComment(database)) {
+    return ['the database still carries the resting isolated-test comment, so the capture marker was not set'];
+  }
+  let marker: RebuildMarker;
+  try {
+    marker = parseRebuildMarker(comment);
+  } catch {
+    return ['the database comment is not a valid rebuild marker for this tooling'];
+  }
+  if (captureFileState(bound.dir) !== 'regular') return ['the capture file is missing or not a regular file'];
+  let info: { capture: CombinedCapture; fileSha256: string } | null;
+  try {
+    info = readPendingCaptureWithHash(bound.dir, database);
+  } catch {
+    return ['the capture file no longer validates'];
+  }
+  if (!info) return ['the capture file is missing'];
+  const problems: string[] = [];
+  if (info.fileSha256 !== bound.fileSha256) problems.push('the capture file bytes changed since the capture stage');
+  if (info.capture.payloadSha256 !== bound.payloadSha256) problems.push('the capture payload changed since the capture stage');
+  if (info.capture.capturedAt !== bound.capturedAt) problems.push('the capture time changed since the capture stage');
+  if (marker.fileSha256 !== bound.fileSha256) problems.push('the marker names a different capture file');
+  if (marker.payloadSha256 !== bound.payloadSha256) problems.push('the marker names a different capture payload');
+  if (marker.capturedAt !== bound.capturedAt) problems.push('the marker names a different capture time');
+  return problems;
 }
 
 // ---------------------------------------------------------------------------

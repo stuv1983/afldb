@@ -108,7 +108,7 @@ for 2026 and every future season should be.
 | Match provenance | `064_matches_external_provenance.sql` | `add_provenance_columns('matches')` → `source_id`, `source_record_id`, `import_batch_id` |
 | API clients | `src/lib/external-afl/current-matches.ts` | Squiggle `?q=teams` + `?q=games`; Kali `GET /matches?year=&limit=200` with `Authorization: Bearer` |
 | Orchestration | `src/lib/external-afl/current-season-import.ts` | fetch → resolve club → resolve local match → upsert staging → optional canonical update/insert, all inside one `sql.begin` |
-| CLI | `tools/current-season/update-current-season.ts` | `npm run current-season:update`, dry-run default, `--apply`, `--insert-missing-matches`, `--update-matches`, `--report` |
+| CLI | `legacy/offline/tools/current-season/update-current-season.ts` (**retired in AFLDB V2 Stage 4**: offline only, `--source` required; `npm run current-season:update` now refuses, see `docs/v2/legacy-disposition.md` L6) | formerly `npm run current-season:update`, dry-run default, `--apply`, `--insert-missing-matches`, `--update-matches`, `--report` |
 | Admin | `src/app/admin/current-season/{page,actions}.tsx` | super-admin only, audited. **Superseded by ISSUE-128:** `mode=auto` is gone; the only fallback modes are `manual` (explicit source, no canonical write) and `report` |
 | Debug contract | `.agents/skills/afldb-api-data-debug/SKILL.md` | pipeline-correctness skill; records a live 2026 dry-run whose aggregate and per-source counters contradict each other |
 
@@ -1940,8 +1940,8 @@ guessing a value.
 **DB WRITE-CAPABLE** (opens `AFLDB_IMPORT_DATABASE_URL`; `--dry-run` still writes then rolls
 back inside one transaction — never confuse "opens a connection" with "commits"):
 ```
-npm run settle:afl-api -- --label <label> --dry-run --auto-apply
-npm run settle:afl-api -- --label <label> --apply [--auto-apply] [--require-complete-source]
+npm run settle:afl-api -- --label <label> --dry-run --auto-apply [--report-out <new-file.json>]
+npm run settle:afl-api -- --label <label> --apply [--auto-apply] [--require-complete-source] [--report-out <new-file.json>]
 npm run settle:afl-api-fixtures -- --label <fixtures-only-label> --dry-run | --apply
 npm run settle:afl-api-brownlow -- --label <label> --observe-only --apply
 npm run settle:afl-api-brownlow -- --label <label> --dry-run --auto-apply
@@ -1952,6 +1952,10 @@ npm run import:afl-api-player-bridge -- --artefact <artefact.json> [--target afl
 
 `--auto-apply` is the automatic-canonical-write switch throughout: `--apply` alone persists
 observations and typed projections only (staging), never a `matches`/`brownlow_round_votes` row.
+`--report-out` (V2-GAP-027) also writes the machine-readable `afldb.v2.afl-api-reconciliation-report`
+for that run. The file is checked and created before any connection opens, is never overwritten, and
+a report that cannot be written never undoes or hides the run's outcome (exit 3 when that is the
+only failure).
 The Brownlow CLI's `--allow-completed-season-backtest` flag is reserved for the completed-season
 historical backtest (§14.10) and refuses outright unless the live connection's own
 `current_database()` is exactly `afldb_test` — it must never be used for the live 2026 count

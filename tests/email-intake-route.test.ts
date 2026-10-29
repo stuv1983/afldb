@@ -1,269 +1,168 @@
 /**
- * AFLDB-ISSUE-273 (D-273-1): how POST /api/admin/email-intake answers a
- * validation refused because a reviewer ruled on the file -- at its first
- * read (SubmissionNotValidatableError, the intake's start policy) or at its
- * write (SubmissionChangedError) -- DB-free.
+ * POST /api/admin/email-intake after AFLDB V2 Stage 5 retired it (V2-GAP-013,
+ * docs/v2/legacy-disposition.md L3), DB-free.
  *
- * The races themselves are driven for real in
- * tests/integration/email-intake.test.ts. This file pins the branches a real
- * database cannot easily produce: the re-read failing, a status the route
- * does not know, 'failed', and an audit failure on the acknowledged path.
+ * The route used to authenticate the mailbox poller by a shared secret, resolve the claimed
+ * sender against `auth_users`, stage the attached CSV and validate it (AFLDB-ISSUE-273 and
+ * AFLDB-ISSUE-304 hardened that path: reviewer races, the declared-size bound). All of it fed the
+ * retired CSV review and promotion path, so the route now answers HTTP 410 Gone IMMEDIATELY with
+ * the typed refusal: no body is read, no secret is compared, no database is touched and no audit
+ * row is written (an unauthenticated caller cannot be attributed, and auditing anonymous calls
+ * would let anyone write audit rows).
+ *
+ * Every dependency the old route had is a mock here and is asserted uncalled. The staging and
+ * validation LIBRARY (`src/lib/ingest/pipeline.ts`) is retained for the offline tools and keeps
+ * its own tests (tests/submission-review-actions.test.ts, tests/integration/submission-
+ * promotion.test.ts); the reviewer races of ISSUE-273 reached the library only through this
+ * route and the retired review actions, so they have no remaining runtime entry point.
  */
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const h = vi.hoisted(() => {
-  class SubmissionChangedError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = 'SubmissionChangedError';
-    }
-  }
-  class SubmissionNotValidatableError extends Error {
-    readonly submissionId: number;
-    readonly status: string;
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-    constructor(submissionId: number, status: string) {
-      super(`submission is ${status}; only staged files can be validated`);
-      this.name = 'SubmissionNotValidatableError';
-      this.submissionId = submissionId;
-      this.status = status;
-    }
-  }
-  return {
-    SubmissionChangedError,
-    SubmissionNotValidatableError,
-    INTAKE_VALIDATION_START_STATUSES: ['staged', 'validated'],
-    reread: vi.fn<() => Promise<{ status: string }[]>>(),
-    validate: vi.fn(),
-    audit: vi.fn<(...args: unknown[]) => Promise<void>>(),
-  };
-});
-
-vi.mock('@/db/authClient', () => ({
-  authSql: (strings: TemplateStringsArray) => {
-    const text = strings.join('$');
-    if (text.includes('FROM auth_users')) return Promise.resolve([{ id: 7, email: 'admin@example.com' }]);
-    if (text.includes('FROM data_submissions')) return h.reread();
-    throw new Error(`unexpected query: ${text}`);
-  },
+const h = vi.hoisted(() => ({
+  audit: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  authSql: vi.fn(() => { throw new Error('the retired email-intake route must not touch the database'); }),
+  stageSubmission: vi.fn(),
+  validateSubmission: vi.fn(),
 }));
+
+vi.mock('@/db/authClient', () => ({ authSql: h.authSql }));
 vi.mock('@/lib/auth/session', () => ({ audit: h.audit, lastForwardedIp: () => '203.0.113.9' }));
 vi.mock('@/lib/ingest/pipeline', () => ({
-  INTAKE_VALIDATION_START_STATUSES: h.INTAKE_VALIDATION_START_STATUSES,
+  INTAKE_VALIDATION_START_STATUSES: ['staged', 'validated'],
   MAX_UPLOAD_BYTES: 5 * 1024 * 1024,
-  SubmissionChangedError: h.SubmissionChangedError,
-  SubmissionNotValidatableError: h.SubmissionNotValidatableError,
-  stageSubmission: vi.fn(async () => ({ ok: true, submissionId: 41, rowCount: 1, duplicate: true })),
-  validateSubmission: h.validate,
+  stageSubmission: h.stageSubmission,
+  validateSubmission: h.validateSubmission,
 }));
 
 const { POST } = await import('@/app/api/admin/email-intake/route');
 
-const RETRY_500 = {
-  error: 'The file was staged but validation failed; it can be re-validated from the review page.',
-  submissionId: 41,
-  reviewUrl: '/admin/submissions/41',
-};
+/** The route takes no parameter; a stub request lets the cases prove nothing on it is read. */
+const deliver = POST as unknown as (request: Request) => Promise<Response>;
 
-function deliver() {
-  return POST(new Request('http://localhost/api/admin/email-intake', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-intake-secret': 'unit-secret' },
-    body: JSON.stringify({
-      senderEmail: 'admin@example.com',
-      dataset: 'player_bio',
-      contentBase64: Buffer.from('player_id,dob\n1,2000-01-01\n').toString('base64'),
+const ROOT = process.cwd();
+const read = (relative: string) => readFileSync(join(ROOT, relative), 'utf8').replace(/\r\n/g, '\n');
+
+function trackedRequest(headers: Record<string, string> = {}) {
+  const calls: string[] = [];
+  const touch = (name: string) => () => { calls.push(name); throw new Error(`the request ${name} must not be read`); };
+  const request = {
+    headers: new Proxy(new Headers(headers), {
+      get(target, prop) {
+        if (typeof prop === 'string' && ['get', 'has', 'entries', 'forEach'].includes(prop)) {
+          return () => { calls.push(`headers.${prop}`); return null; };
+        }
+        return Reflect.get(target, prop, target);
+      },
     }),
-  }));
+    json: touch('json'),
+    text: touch('text'),
+    formData: touch('formData'),
+    arrayBuffer: touch('arrayBuffer'),
+  } as unknown as Request;
+  return { request, calls };
 }
-
-const actions = () => h.audit.mock.calls.map((call) => call[0]);
-
-const acknowledged = (status: string) => ({
-  ok: true,
-  submissionId: 41,
-  duplicate: true,
-  rowCount: 1,
-  validated: false,
-  status,
-  message: `A reviewer has ruled on this file (it is now ${status}); `
-    + 'this validation attempt wrote no verdicts or resolved payloads.',
-  reviewUrl: '/admin/submissions/41',
-});
 
 beforeAll(() => { vi.stubEnv('AFLDB_EMAIL_INTAKE_SECRET', 'unit-secret'); });
 afterAll(() => { vi.unstubAllEnvs(); });
 beforeEach(() => {
-  h.reread.mockReset();
-  h.validate.mockReset();
-  h.audit.mockReset();
-  h.audit.mockImplementation(async () => {});
-  h.validate.mockRejectedValue(new h.SubmissionChangedError('changed'));
-});
-afterEach(() => { vi.restoreAllMocks(); });
-
-describe('email intake: a validation refused because the submission changed', () => {
-  it.each(['approved', 'rejected', 'promoted', 'failed'])('acknowledges a file a reviewer left %s', async (status) => {
-    h.reread.mockResolvedValue([{ status }]);
-
-    const res = await deliver();
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(acknowledged(status));
-    expect(actions()).toEqual(['email_intake.duplicate', 'email_intake.validation_superseded']);
-    expect(h.audit.mock.calls[1][1]).toMatchObject({ submissionId: 41, status });
-  });
-
-  it.each([
-    ['still staged', () => h.reread.mockResolvedValue([{ status: 'staged' }])],
-    ['still validated (lost to another validation)', () => h.reread.mockResolvedValue([{ status: 'validated' }])],
-    ['missing', () => h.reread.mockResolvedValue([])],
-    ['an unknown status', () => h.reread.mockResolvedValue([{ status: 'archived' }])],
-    ['unreadable', () => h.reread.mockRejectedValue(new Error('connection reset'))],
-  ])('keeps the retryable 500 when the submission is %s', async (_label, arrange) => {
-    arrange();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const res = await deliver();
-
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual(RETRY_500);
-    expect(h.reread).toHaveBeenCalledTimes(1);
-    expect(actions()).toEqual(['email_intake.duplicate', 'email_intake.validate_error']);
-  });
-
-  it('keeps the existing 500 for an ordinary validation failure, without re-reading', async () => {
-    h.validate.mockRejectedValue(new Error('validator query timed out'));
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const res = await deliver();
-
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual(RETRY_500);
-    expect(h.reread).not.toHaveBeenCalled();
-    expect(actions()).toEqual(['email_intake.duplicate', 'email_intake.validate_error']);
-  });
-
-  it('validates under the intake start policy, which excludes rejected', async () => {
-    h.validate.mockResolvedValue({ ok: 1, warnings: 0, errors: 0, duplicates: 0 });
-
-    const res = await deliver();
-
-    expect(res.status).toBe(200);
-    expect(h.validate).toHaveBeenCalledWith(41, { startStatuses: ['staged', 'validated'] });
-    expect(actions()).toEqual(['email_intake.duplicate', 'email_intake.validated']);
-  });
-
-  it('still acknowledges a superseded delivery when its audit write fails', async () => {
-    h.reread.mockResolvedValue([{ status: 'promoted' }]);
-    h.audit.mockImplementation(async (action) => {
-      if (action === 'email_intake.validation_superseded') throw new Error('audit insert failed');
-    });
-    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const res = await deliver();
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, validated: false, status: 'promoted' });
-    expect(logged).toHaveBeenCalledWith('[email-intake] audit failed', expect.any(Error));
-  });
+  vi.clearAllMocks();
+  h.audit.mockResolvedValue(undefined);
 });
 
-describe('email intake: a validation refused at its first read by the intake start policy', () => {
-  it.each(['approved', 'rejected', 'promoted', 'failed'])(
-    'acknowledges a file a reviewer left %s, from that read and without a re-read',
-    async (status) => {
-      h.validate.mockRejectedValue(new h.SubmissionNotValidatableError(41, status));
-
-      const res = await deliver();
-
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual(acknowledged(status));
-      expect(h.reread).not.toHaveBeenCalled();
-      expect(actions()).toEqual(['email_intake.duplicate', 'email_intake.validation_superseded']);
-      expect(h.audit.mock.calls[1][1]).toMatchObject({ submissionId: 41, status });
-    },
-  );
-
-  it('keeps the retryable 500 for a status it does not know', async () => {
-    h.validate.mockRejectedValue(new h.SubmissionNotValidatableError(41, 'archived'));
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const res = await deliver();
-
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual(RETRY_500);
-    expect(h.reread).not.toHaveBeenCalled();
-    expect(actions()).toEqual(['email_intake.duplicate', 'email_intake.validate_error']);
-  });
-
-  it('keeps the retryable 500 for a missing submission (a plain error, not a refusal)', async () => {
-    h.validate.mockRejectedValue(new Error('submission 41 not found'));
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const res = await deliver();
-
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual(RETRY_500);
-    expect(h.reread).not.toHaveBeenCalled();
-    expect(actions()).toEqual(['email_intake.duplicate', 'email_intake.validate_error']);
-  });
-});
-
-describe('email intake: the declared body size is bounded before the body is parsed (AFLDB-ISSUE-304)', () => {
-  // Mirrors the route: 4 base64 characters per 3 bytes of the 5 MB ceiling, plus padding, plus the
-  // JSON envelope's slack. Computed here, not imported: the route exports only its handlers.
-  const MAX_BASE64 = Math.ceil((5 * 1024 * 1024) / 3) * 4 + 4;
-  const MAX_BODY = MAX_BASE64 + 16 * 1024;
-
-  function requestDeclaring(contentLength: string | null, secret = 'unit-secret') {
-    const headers = new Headers({ 'x-intake-secret': secret });
-    if (contentLength !== null) headers.set('content-length', contentLength);
-    const json = vi.fn(async () => ({
-      senderEmail: 'admin@example.com',
-      dataset: 'player_bio',
-      contentBase64: Buffer.from('player_id,dob\n1,2000-01-01\n').toString('base64'),
+describe('email intake: retired, HTTP 410 with the typed refusal', () => {
+  it('answers 410 Gone with the retirement refusal for a delivery the old route would have accepted', async () => {
+    const res = await deliver(new Request('http://localhost/api/admin/email-intake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-intake-secret': 'unit-secret' },
+      body: JSON.stringify({
+        senderEmail: 'admin@example.com',
+        dataset: 'player_bio',
+        contentBase64: Buffer.from('player_id,dob\n1,2000-01-01\n').toString('base64'),
+      }),
     }));
-    return { request: { headers, json } as unknown as Request, json };
-  }
 
-  it('answers 400 for a declared body over the limit, and never parses it', async () => {
-    const { request, json } = requestDeclaring(String(MAX_BODY + 1));
-    const res = await POST(request);
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'The attachment exceeds the 5 MB limit.' });
-    expect(json).not.toHaveBeenCalled();
+    expect(res.status).toBe(410);
+    const body = await res.json() as { refused: boolean; code: string; surface: string; error: string };
+    expect(body).toMatchObject({ refused: true, code: 'legacy_retired', surface: 'admin.email_intake' });
+    expect(body.error).toMatch(/retired/i);
+    expect(h.stageSubmission).not.toHaveBeenCalled();
+    expect(h.validateSubmission).not.toHaveBeenCalled();
+  });
+
+  it('answers the same for a wrong secret, no secret header and an unconfigured server', async () => {
+    const answers: unknown[] = [];
+    for (const secret of ['not-the-secret', undefined]) {
+      const res = await deliver(new Request('http://localhost/api/admin/email-intake', {
+        method: 'POST',
+        headers: secret === undefined ? {} : { 'x-intake-secret': secret },
+        body: '{}',
+      }));
+      expect(res.status).toBe(410);
+      answers.push(await res.json());
+    }
+    vi.stubEnv('AFLDB_EMAIL_INTAKE_SECRET', '');
+    const unconfigured = await deliver(new Request('http://localhost/api/admin/email-intake', { method: 'POST', body: '{}' }));
+    expect(unconfigured.status).toBe(410);
+    answers.push(await unconfigured.json());
+    vi.stubEnv('AFLDB_EMAIL_INTAKE_SECRET', 'unit-secret');
+
+    // Never 401 or 503: nothing about the caller or the configuration can change the answer.
+    expect(new Set(answers.map((a) => JSON.stringify(a))).size).toBe(1);
+  });
+
+  it('reads nothing from the request: no body, no header, no secret comparison', async () => {
+    const { request, calls } = trackedRequest({ 'x-intake-secret': 'unit-secret', 'content-length': '999999999' });
+
+    const res = await deliver(request);
+
+    expect(res.status).toBe(410);
+    expect(calls).toEqual([]);
+  });
+
+  it('touches no database and writes no audit row, even for an unattributable caller', async () => {
+    await deliver(new Request('http://localhost/api/admin/email-intake', {
+      method: 'POST',
+      headers: { 'x-intake-secret': 'unit-secret' },
+      body: JSON.stringify({ senderEmail: 'someone@example.com', dataset: 'player_bio', contentBase64: 'AAAA' }),
+    }));
+
+    expect(h.authSql).not.toHaveBeenCalled();
     expect(h.audit).not.toHaveBeenCalled();
   });
 
-  it('parses a body declared exactly at the limit', async () => {
-    h.reread.mockResolvedValue([{ status: 'approved' }]);
-    const { request, json } = requestDeclaring(String(MAX_BODY));
-    const res = await POST(request);
-    expect(json).toHaveBeenCalledTimes(1);
-    expect(res.status).toBe(200);
+  it('ignores a body that would have been oversized, malformed or from an unknown sender', async () => {
+    for (const body of ['not json', JSON.stringify({ senderEmail: 'nobody@example.com' }), 'x'.repeat(100_000)]) {
+      const res = await deliver(new Request('http://localhost/api/admin/email-intake', {
+        method: 'POST', headers: { 'x-intake-secret': 'unit-secret' }, body,
+      }));
+      expect(res.status).toBe(410);
+    }
+    expect(h.authSql).not.toHaveBeenCalled();
+    expect(h.audit).not.toHaveBeenCalled();
+  });
+});
+
+describe('email intake: what is pinned statically', () => {
+  const route = read('src/app/api/admin/email-intake/route.ts');
+  const code = route.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  it('the route imports no pipeline, database, session, secret or rate limiter', () => {
+    expect(code).not.toMatch(/ingest\/pipeline|ingest\/datasets|authClient|auth\/session|rate-limit/);
+    expect(code).not.toMatch(/AFLDB_EMAIL_INTAKE_SECRET|timingSafeEqual|x-intake-secret|request\.json|authSql/);
+    expect(code).toContain("goneRetiredAdminRoute('admin.email_intake')");
   });
 
-  it('parses a body that declares no length, which cannot be bounded here', async () => {
-    h.reread.mockResolvedValue([{ status: 'approved' }]);
-    const { request, json } = requestDeclaring(null);
-    const res = await POST(request);
-    expect(json).toHaveBeenCalledTimes(1);
-    expect(res.status).toBe(200);
-  });
-
-  it('treats a length it cannot read as undeclared rather than as oversize', async () => {
-    h.reread.mockResolvedValue([{ status: 'approved' }]);
-    const { request, json } = requestDeclaring('not-a-number');
-    const res = await POST(request);
-    expect(json).toHaveBeenCalledTimes(1);
-    expect(res.status).toBe(200);
-  });
-
-  it('still answers a wrong secret 401 before it looks at the size', async () => {
-    const { request, json } = requestDeclaring(String(MAX_BODY * 10), 'not-the-secret');
-    const res = await POST(request);
-    expect(res.status).toBe(401);
-    expect(json).not.toHaveBeenCalled();
+  it('the poller files a 4xx answer other than 408/429 to its Errors folder, so a 410 loses no message', () => {
+    // tools/email_intake/fetch_and_stage.py: post_to_intake raises PermanentFailure for 4xx other
+    // than 408/429, and main() files that message to the error folder (copy + \Seen, never deleted).
+    // This test pins the Python source text only; the poller is not executable in V2.
+    const poller = read('legacy/offline/tools/email_intake/fetch_and_stage.py');
+    expect(poller).toContain('if 400 <= exc.code < 500 and exc.code not in (408, 429):');
+    expect(poller).toMatch(/raise PermanentFailure\(f"HTTP \{exc\.code\}: \{detail\}"\) from exc/);
+    expect(poller).toMatch(/except PermanentFailure as exc:\n\s+print\(f" {4}REJECTED: \{exc\}"\)\n\s+file_message\(conn, msg_id, error_folder\)/);
+    expect(poller).not.toMatch(/\\Deleted|expunge/);
   });
 });

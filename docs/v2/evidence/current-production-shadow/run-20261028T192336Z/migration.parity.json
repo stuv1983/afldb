@@ -1,0 +1,160 @@
+{
+  "format": "afldb.v2.shadow-parity-report",
+  "formatVersion": 1,
+  "policyVersion": "v2.parity.1",
+  "generatedAt": "2026-10-28T20:00:29Z",
+  "verdict": "FAIL",
+  "checks": [
+    {
+      "id": "historical_manifest",
+      "required": true,
+      "status": "pass",
+      "inputs": {
+        "before": "before.manifest.json",
+        "after": "postmig.manifest.json"
+      },
+      "thresholds": "Zero tolerance on sealed history: every comparator violation, unverified and review finding FAILS (including METADATA_CHANGED on a sealed bucket, REFERENCE_CHANGED, REFERENCE_ROWS_DECREASED, METADATA_COLUMNS_CHANGED, SPEC_VERSION_DIFFERS and every definition change) and a moved seal (SEALED_RANGE_DIFFERS) FAILS; only OPEN_SEASON_CHANGED and TABLE_ADDED are info. The manifest digests stable id columns as facts and reference tables whole, so any id change surfaces as a fail finding.",
+      "counts": {
+        "comparatorInfo": 0,
+        "fail": 0,
+        "info": 0,
+        "review": 0,
+        "unverified": 0,
+        "violation": 0
+      },
+      "findings": []
+    },
+    {
+      "id": "table_row_counts",
+      "required": true,
+      "status": "fail",
+      "inputs": {
+        "before": "before.row-counts.json",
+        "after": "postmig.row-counts.json"
+      },
+      "thresholds": "Schemas must match; a dropped table FAILS; a table added after FAILS unless it is one of the V2-added tables (award_proposals, award_proposal_decisions, derived_award_results, brownlow_eligibility_decisions, derived_award_projections), which must all be present after; fewer rows in a non-V2 table FAILS; more rows in a non-V2 table and any change in a V2-added table are info.",
+      "counts": {
+        "fail": 1,
+        "info": 6,
+        "tablesAfter": 105,
+        "tablesBefore": 99
+      },
+      "findings": [
+        {
+          "code": "UNEXPECTED_TABLE_ADDED",
+          "severity": "fail",
+          "subject": "public.brownlow_correction_receipts",
+          "detail": "absent before, present after (0 rows), and not a V2-added table"
+        },
+        {
+          "code": "ROWS_INCREASED",
+          "severity": "info",
+          "subject": "afldb_meta.schema_migrations",
+          "detail": "rows 110 -> 117"
+        },
+        {
+          "code": "V2_TABLE_ADDED",
+          "severity": "info",
+          "subject": "public.award_proposal_decisions",
+          "detail": "created by the V2 migrations; 0 rows after"
+        },
+        {
+          "code": "V2_TABLE_ADDED",
+          "severity": "info",
+          "subject": "public.award_proposals",
+          "detail": "created by the V2 migrations; 0 rows after"
+        },
+        {
+          "code": "V2_TABLE_ADDED",
+          "severity": "info",
+          "subject": "public.brownlow_eligibility_decisions",
+          "detail": "created by the V2 migrations; 0 rows after"
+        },
+        {
+          "code": "V2_TABLE_ADDED",
+          "severity": "info",
+          "subject": "public.derived_award_projections",
+          "detail": "created by the V2 migrations; 0 rows after"
+        },
+        {
+          "code": "V2_TABLE_ADDED",
+          "severity": "info",
+          "subject": "public.derived_award_results",
+          "detail": "created by the V2 migrations; 0 rows after"
+        }
+      ]
+    },
+    {
+      "id": "coleman",
+      "required": true,
+      "status": "pass",
+      "inputs": {
+        "before": "before.coleman.json",
+        "after": "postmig.coleman.json"
+      },
+      "thresholds": "Per season present before: missing after, category, stored active rows, derived winners, input checksum or refusal code changed all FAIL, as does any change in stored seasons without an outcome; a season that disagrees (or is not derivable with the same refusal code) in both is info for owner reconciliation (V2-GAP-015); a season only after is info.",
+      "counts": {
+        "fail": 0,
+        "info": 0,
+        "seasonsAfter": 46,
+        "seasonsBefore": 46,
+        "seasonsCompared": 46
+      },
+      "findings": []
+    },
+    {
+      "id": "brownlow",
+      "required": true,
+      "status": "incomplete",
+      "inputs": {
+        "before": null,
+        "after": null
+      },
+      "thresholds": "Reports pair by season (a duplicate season on one side is an invalid input). For a season complete before: missing after, state, outcome, raw player totals, award presentation (status, refusal, leaders, eligibility rule) or finding counts changed all FAIL; discrepancies or refused in both, unchanged, is info; an in-progress season may change (info); a season only after is info.",
+      "counts": {
+        "fail": 2,
+        "info": 0,
+        "seasonsAfter": 0,
+        "seasonsBefore": 0,
+        "seasonsCompared": 0
+      },
+      "findings": [
+        {
+          "code": "INPUT_MISSING",
+          "severity": "fail",
+          "subject": "after",
+          "detail": "no Brownlow reconciliation report was supplied for after"
+        },
+        {
+          "code": "INPUT_MISSING",
+          "severity": "fail",
+          "subject": "before",
+          "detail": "no Brownlow reconciliation report was supplied for before"
+        }
+      ]
+    },
+    {
+      "id": "coverage",
+      "required": true,
+      "status": "pass",
+      "inputs": {
+        "before": "before.coverage.json",
+        "after": "postmig.coverage.json"
+      },
+      "thresholds": "Either registry export with registry problems FAILS; a coverage cell missing on either side FAILS; any status change FAILS (claims never move during a rehearsal).",
+      "counts": {
+        "cellsAfter": 655,
+        "cellsBefore": 655,
+        "cellsChanged": 0,
+        "fail": 0,
+        "info": 0
+      },
+      "findings": []
+    }
+  ],
+  "summary": {
+    "pass": 3,
+    "fail": 1,
+    "incomplete": 1
+  }
+}

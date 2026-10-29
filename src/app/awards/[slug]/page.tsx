@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
@@ -50,6 +50,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  if (slug === 'brownlow-medal') permanentRedirect('/brownlow');
   const award = await getAward(slug);
   if (!award) return notFoundMetadata('Award');
 
@@ -70,6 +71,7 @@ export default async function AwardPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
+  if (slug === 'brownlow-medal') permanentRedirect('/brownlow');
   const award = await getAward(slug);
   if (!award) notFound();
 

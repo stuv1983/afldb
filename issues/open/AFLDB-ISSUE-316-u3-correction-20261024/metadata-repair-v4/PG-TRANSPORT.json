@@ -1,0 +1,122 @@
+{
+  "status": 255,
+  "error": "EOF",
+  "verdict": "FAIL",
+  "finished_utc": "2026-10-24T19:40:28.893Z",
+  "submitted_members": [
+    {
+      "name": "ACTOR-EVIDENCE.json",
+      "sha256": "0f980b0779cc924829f849bf3346237623516cbfa947a18e8c3118ef0e994f50"
+    },
+    {
+      "name": "assert-post.sql",
+      "sha256": "6ff903c74f78317f97de2e8ede4c328b5f4c65ab4daa6cd134f54ddf7cabc1fd"
+    },
+    {
+      "name": "audit-log-source.txt",
+      "sha256": "f936209313d36e0a1999c5c9e4779d349e1b5360bc504d52377a0b10cdd69644"
+    },
+    {
+      "name": "audit-schema-source.txt",
+      "sha256": "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720"
+    },
+    {
+      "name": "binding.json",
+      "sha256": "e91761ab61301c191639bc03ce35ee8812c36b7d2ba5eabb79dd81bc3af2a4fd"
+    },
+    {
+      "name": "canonical-gates.sql",
+      "sha256": "712db81e784760e1defd4ba663592ebc360d949e78925ffd859448134a9deac3"
+    },
+    {
+      "name": "checks.sql",
+      "sha256": "53b02b5c6ef5fd7d1fbf1b9a87c787cb44989e9fc2f5ebe34bf74c311455002d"
+    },
+    {
+      "name": "DERIVATION.json",
+      "sha256": "f237a2648655c566601551d081ff8edce2476671b5318ec25e56618b308556c0"
+    },
+    {
+      "name": "expected-migrations.json",
+      "sha256": "ed2a6ad4ee8e914349768682fccddd577b97e5765587e036f2d3fbc837f803a5"
+    },
+    {
+      "name": "identity.sql",
+      "sha256": "0acad1249c6af37cac1f95454cc1ecf7b463bf93b16fe177416181f394752ff6"
+    },
+    {
+      "name": "lock-assert.sql",
+      "sha256": "3c8c458dd38d988a416c8522662bf07daf0b6d39d74f9e1d647cdfcfd5fcdbb4"
+    },
+    {
+      "name": "locks.sql",
+      "sha256": "5ac97832452d0cddf86cbf65ab5749e9fe3cec56b57608321d12afe511d927f8"
+    },
+    {
+      "name": "migration-guard.sql",
+      "sha256": "4d211262c64cd356987f57937abae522ba09a771cc3f3355a50460c2662de305"
+    },
+    {
+      "name": "note.txt",
+      "sha256": "3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d"
+    },
+    {
+      "name": "operational-guard.sql",
+      "sha256": "375358733a87c036b69b3f1827c228f43c0df2d4085be8a3c6e428820079189f"
+    },
+    {
+      "name": "postcheck.sql",
+      "sha256": "86c6d4656afc78392c29670e66d90c97259a63f345368b898eeaebd9df482cb0"
+    },
+    {
+      "name": "preflight.sql",
+      "sha256": "9c53ad4146631da96f10d560047f6aa4897e98f7e0c5e6b5fe853afd8544798d"
+    },
+    {
+      "name": "protected.json",
+      "sha256": "5c19db42754a5968f4838bd7b7ffa672958cb5b3474d30554045f82f35eed2dc"
+    },
+    {
+      "name": "repair-body.sql",
+      "sha256": "5f6aeaa128d5b667a9e1f679fc040fa0001b4c8f5ace0a5d52ca786dd3b4bb9b"
+    },
+    {
+      "name": "repair.sql",
+      "sha256": "c0f8c47e103b81347afcbd2b10be557d73ac36e36f7c30117d356f34bec7ce55"
+    },
+    {
+      "name": "run.cjs",
+      "sha256": "7f7617f043391bbd7213aea8e98c22572ee8fd99d80bdb7988ce59eb53b81109"
+    },
+    {
+      "name": "schema-evidence.json",
+      "sha256": "eda89cb457b94865bbf1042bbb85360b1179dde3602c3b99d64256cf1935e593"
+    },
+    {
+      "name": "snapshot.sql",
+      "sha256": "6a5b8248b14fd9577c22fe8f501540719de91e247ffd97554c33f569eb307570"
+    },
+    {
+      "name": "validate-order.cjs",
+      "sha256": "ce5e0cbf96786213d5f7bd2de6e8021b3de329bf3fd53bd6b1eb69c3eb8d28e6"
+    },
+    {
+      "name": "validate-pg.cjs",
+      "sha256": "12f5f88caf5b609905283d3f270aa55d44352dc11872a10f7f3968ebe59f4815"
+    },
+    {
+      "name": "validate-remote.cjs",
+      "sha256": "379e53c7e34ec025b2f34715d215e76f6214d8483ff868c022549884a35f00b3"
+    },
+    {
+      "name": "validate.cjs",
+      "sha256": "2d0af2aba4056b6ba469be7975ff808ab1c5bb6f79c9464e857a94d5c43424c1"
+    },
+    {
+      "name": "VALIDATION.json",
+      "sha256": "ef94a9b4a4e4723f8d07f2ad612a29f4837f0d8b580c9c0cd109ce5ec6964278"
+    }
+  ],
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "737835aec1f8e26a9c0ccb5dbb7a1eb6ac502c68b3923f1e399d248741560925"
+}

@@ -1056,7 +1056,7 @@ describe('gate 8: every mutation is all-or-nothing', () => {
     // the durable record instead -- the same transaction, a later statement.
     const before = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM players`;
     const result = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 201, pickNote: GATE8_FAIL_NOTE }),
+      ...manualFields({ pickNumber: 121, pickNote: GATE8_FAIL_NOTE }),
       player: { displayName: `${MARKER} Late Failure`, dob: '2000-02-02' },
       adminUserId: actorId,
     });
@@ -1074,7 +1074,7 @@ describe('gate 8: every mutation is all-or-nothing', () => {
       SELECT (SELECT count(*) FROM draft_picks)::int AS picks,
              (SELECT count(*) FROM data_overrides)::int AS overrides`;
     const result = await createManualPick({
-      ...manualFields({ pickNumber: 202, draftKind: 'mini_draft', draftType: 'Mini-Draft' }),
+      ...manualFields({ pickNumber: 122, draftKind: 'mini_draft', draftType: 'Mini-Draft' }),
       playerId: sourcedPlayerId, adminUserId: actorId, note: GATE8_FAIL_NOTE,
     });
     expect(result).toMatchObject({ ok: false, reason: 'failed' });
@@ -1102,7 +1102,7 @@ describe('gate 8: every mutation is all-or-nothing', () => {
 
   it('6.6 rolls the DELETE back with its audit', async () => {
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 203 }),
+      ...manualFields({ pickNumber: 123 }),
       player: { displayName: `${MARKER} Undeleted`, dob: '1999-03-03' },
       adminUserId: actorId,
     });
@@ -1122,7 +1122,7 @@ describe('gate 8: every mutation is all-or-nothing', () => {
 
   it('6.5 rolls back the identity and the record update', async () => {
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 204 }),
+      ...manualFields({ pickNumber: 124 }),
       player: { displayName: `${MARKER} Unattached`, dob: '1998-04-04' },
       adminUserId: actorId,
     });
@@ -1151,7 +1151,7 @@ describe('gate 8: every mutation is all-or-nothing', () => {
     // the AFL Tables identity with no `data_edits` row and tell the operator it
     // failed. The refusal must roll back (§9.1).
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 206 }),
+      ...manualFields({ pickNumber: 126 }),
       player: { displayName: `${MARKER} Recordless`, dob: '1997-05-05' },
       adminUserId: actorId,
     });
@@ -1219,7 +1219,7 @@ describe('gate 8: every mutation is all-or-nothing', () => {
 describe.skipIf(!canReplay)('gate 11: the durable record really re-creates a promoted-away row', () => {
   it('re-creates the manual player and selection with the same tokens, and no twin', async () => {
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 210 }),
+      ...manualFields({ pickNumber: 130 }),
       player: {
         displayName: `${MARKER} Replay Subject`, dob: '2007-11-11',
         heightCm: 191, weightKg: 85, notes: 'fixture note',
@@ -1279,7 +1279,7 @@ describe.skipIf(!canReplay)('gate 11: the durable record really re-creates a pro
        WHERE s.key = 'manual_admin_edit' AND dp.player_url = ${`manual:${created.pickToken}`}`;
     expect(rebuiltPick).toHaveLength(1);
     expect(rebuiltPick[0]).toMatchObject({
-      draftYear: fixtureYear, draftKind: 'national', pickNumber: 210,
+      draftYear: fixtureYear, draftKind: 'national', pickNumber: 130,
       clubId, status: 'resolved',
     });
     // Re-linked to the re-created player, resolved through the token -- never a name.
@@ -1303,7 +1303,7 @@ describe.skipIf(!canReplay)('gate 11: the durable record really re-creates a pro
 
   it('replays a corrected year and club onto the manual row', async () => {
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 211 }),
+      ...manualFields({ pickNumber: 131 }),
       player: { displayName: `${MARKER} Corrected Selection`, dob: '2007-12-12' },
       adminUserId: actorId,
     });
@@ -1315,7 +1315,7 @@ describe.skipIf(!canReplay)('gate 11: the durable record really re-creates a pro
     const saved = await saveManualPick({
       pickId: created.pickId, playerId: created.playerId, adminUserId: actorId,
       draftYear: fixtureYear, draftType: 'Rookie', draftKind: 'rookie',
-      pickNumber: 212, clubSlug: otherClubSlug,
+      pickNumber: 132, clubSlug: otherClubSlug,
     });
     expect(saved.ok, JSON.stringify(saved)).toBe(true);
 
@@ -1328,7 +1328,7 @@ describe.skipIf(!canReplay)('gate 11: the durable record really re-creates a pro
     expect(replay.status, replay.stdout + replay.stderr).toBe(0);
 
     const detail = await getDraftPickAdminDetail(created.pickId);
-    expect(detail).toMatchObject({ pickNumber: 212, draftKind: 'rookie', draftType: 'Rookie' });
+    expect(detail).toMatchObject({ pickNumber: 132, draftKind: 'rookie', draftType: 'Rookie' });
     expect(detail?.clubSlug).toBe(otherClubSlug);
   });
 
@@ -1337,7 +1337,7 @@ describe.skipIf(!canReplay)('gate 11: the durable record really re-creates a pro
     // player: the candidate already has the footballer under their AFL Tables
     // profile, so the replay must attach the token rather than insert.
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 213 }),
+      ...manualFields({ pickNumber: 133 }),
       player: { displayName: `${MARKER} Bound Debutant`, dob: '2005-10-10' },
       adminUserId: actorId,
     });
@@ -1422,7 +1422,7 @@ describe.skipIf(!canReplay)('gate 10: the D-2 fitzRoy guard', () => {
 
   it('finds a manual player awaiting identity with the REAL candidate query, and refuses', async () => {
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 220 }),
+      ...manualFields({ pickNumber: 140 }),
       player: { displayName: `${MARKER} Guarded`, dob: '2004-08-08' },
       adminUserId: actorId,
     });
@@ -1486,7 +1486,7 @@ describe.skipIf(!canReplay)('gate 10: the D-2 fitzRoy guard', () => {
 describe('gate 12: the lineage rules resolve these rows on a real database', () => {
   it('draft_pick_key names a source row and a manual row, and skips a NULL-source one', async () => {
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 230 }),
+      ...manualFields({ pickNumber: 150 }),
       player: { displayName: `${MARKER} Lineage`, dob: '2003-03-13' },
       adminUserId: actorId,
     });
@@ -1527,7 +1527,7 @@ describe('gate 12: the lineage rules resolve these rows on a real database', () 
 
   it('the players rule gives a manual player exactly one identity, path-first', async () => {
     const created = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 232 }),
+      ...manualFields({ pickNumber: 152 }),
       player: { displayName: `${MARKER} Two Identities`, dob: '2003-04-14' },
       adminUserId: actorId,
     });
@@ -1598,7 +1598,7 @@ describe('the /admin/draft list review states (§18)', () => {
               'unique', 'afltables_profile_url')`;
 
     const withOverride = await createManualPick({
-      ...manualFields({ pickNumber: 301, draftKind: 'trade', draftType: 'Trade' }),
+      ...manualFields({ pickNumber: 181, draftKind: 'trade', draftType: 'Trade' }),
       playerId: overridePlayer.id, adminUserId: actorId,
     });
     expect(withOverride.ok, JSON.stringify(withOverride)).toBe(true);
@@ -1609,7 +1609,7 @@ describe('the /admin/draft list review states (§18)', () => {
     // `awaiting-identity`: a manually created player, which by construction
     // holds a manual_admin_edit identity and no AFL Tables one.
     const awaiting = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 302, draftKind: 'preseason', draftType: 'Pre-Season' }),
+      ...manualFields({ pickNumber: 182, draftKind: 'preseason', draftType: 'Pre-Season' }),
       player: { displayName: MARKER + ' State Awaiting', dob: '2002-06-06' },
       adminUserId: actorId,
     });
@@ -1624,7 +1624,7 @@ describe('the /admin/draft list review states (§18)', () => {
     // the same selection and it is linked to the same player -- exactly the
     // sequence the state exists to surface, and the one 6.6/6.7 resolve.
     const dup = await createPlayerAndDraftPick({
-      ...manualFields({ pickNumber: 303, draftKind: 'post_draft', draftType: 'Post-Draft' }),
+      ...manualFields({ pickNumber: 183, draftKind: 'post_draft', draftType: 'Post-Draft' }),
       player: { displayName: MARKER + ' State Duplicate', dob: '2003-07-07' },
       adminUserId: actorId,
     });

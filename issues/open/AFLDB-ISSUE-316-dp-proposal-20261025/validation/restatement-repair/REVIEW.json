@@ -1,0 +1,53 @@
+{
+  "verdict": "GO",
+  "reviewer": "/root/restatement_review",
+  "role": "afldb-closure",
+  "fresh_context": true,
+  "read_only": true,
+  "edits_made": [],
+  "findings": [],
+  "stopping_findings": [],
+  "scope": "Proposal B/C restatements, map, fixtures, assertion movement/integrity and retained proof; accepted structural design not reopened",
+  "independent_checks": {
+    "declarations": 4364,
+    "B_only": 6,
+    "C_only": 14,
+    "invariant": 4344,
+    "map_token_line_classification_discrepancies": 0,
+    "unmatched_P_declarations": 0,
+    "protected_hashes": 1574,
+    "protected_mismatches": 0,
+    "protected_inventory_additions": 0,
+    "predecessor_fixture_pins": 7,
+    "repaired_copies": 3,
+    "execution_overlays_equal_proposed_files": true,
+    "all_four_retained_results_checked": true,
+    "identical_seven_expected_broader_skips": true,
+    "assertion_weakening_found": false
+  },
+  "reviewed_files": {
+    "restatements/state-B/tests/db-test-rebuild.test.ts.txt": "c9484c0a93adf78c7960991f4bc290851066201b706427f3782dc0a90b74ead6",
+    "restatements/state-C/tests/db-test-rebuild.test.ts.txt": "3a0f1e15521b82da86af9c049245dd63f831f2c10ad8774ddf626849236124be",
+    "restatements/state-C/tests/season-rollover.test.ts.txt": "b62197070847b7ea4eda2e3cfcc01395eb2efb50e1d6dad6ddbdb1b09cf19ff4",
+    "restatements/RESTATEMENT-MAP.json": "3b588edf735e23653b7db224ce664cdcc10c46217798046787d28cf9960fc486"
+  },
+  "evidence_locations": [
+    "restatements/state-B/tests/db-test-rebuild.test.ts.txt:238",
+    "restatements/state-B/tests/db-test-rebuild.test.ts.txt:266",
+    "restatements/state-C/tests/db-test-rebuild.test.ts.txt:238",
+    "restatements/state-C/tests/db-test-rebuild.test.ts.txt:272",
+    "restatements/state-C/tests/db-test-rebuild.test.ts.txt:5744",
+    "restatements/state-B/tests/season-rollover.test.ts.txt:2842",
+    "restatements/state-C/tests/season-rollover.test.ts.txt:2842"
+  ],
+  "limitations": [
+    "Graph unavailable; bounded direct source inspection used",
+    "No fresh Git ancestry or P commit proof",
+    "Reviewer independently checked retained full test results but did not rerun tests, typecheck or build",
+    "No registry/documentation generators, retained J2 validator, database, network, production or rebuild commands executed",
+    "Final package assembly requires a subsequent bounded check"
+  ],
+  "owner_DP_approval": "PENDING",
+  "structural_gate": "CLOSED / ACCEPTED",
+  "production": "NO-GO"
+}

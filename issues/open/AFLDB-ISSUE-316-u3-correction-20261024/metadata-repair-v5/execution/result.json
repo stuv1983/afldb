@@ -1,0 +1,12 @@
+{
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "verdict": "PASS",
+  "metadata_verified": true,
+  "u3_confirmed": true,
+  "attempt_consumed": true,
+  "automatic_retry": false,
+  "automatic_reversal": false,
+  "finished_utc": "2026-10-24T21:30:32.762Z"
+}

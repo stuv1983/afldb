@@ -1,0 +1,488 @@
+{
+  "version": 1,
+  "decision": "Retained ISSUE-118 §23.36 W.2/W.3 accepted criterion deferrals; not data matches and not a waiver of strict parity",
+  "approvalEvidence": "issues/closed/AFLDB-ISSUE-118.md §23.36 W.2/W.3 and §23.38 Z.6/closure; issues.md ISSUE-118 acceptance record. No separate signed owner transcript retained.",
+  "decidedOn": "2026-09-05",
+  "calendarExpiry": null,
+  "closureCondition": "Review each entry when its mapping becomes supported or canonical scope/source availability changes. Any corpus-byte or bounded-cell/criterion change invalidates this representation; no automatic extension.",
+  "corpusSha256": "bb5ae25ccdbb84e2a7579f41e3984f006da201cf86b8ee4bb8499406119b504f",
+  "criteria": [
+    "intrulesplayer",
+    "irish",
+    "nfl",
+    "recruitedByDodoro",
+    "season2024player",
+    "spoils5season",
+    "tasmanian"
+  ],
+  "cells": [
+    {
+      "board": 16,
+      "cell": "0-2",
+      "row": "RI",
+      "col": "tasmanian"
+    },
+    {
+      "board": 16,
+      "cell": "1-2",
+      "row": "BL",
+      "col": "tasmanian"
+    },
+    {
+      "board": 16,
+      "cell": "2-2",
+      "row": "2000s",
+      "col": "tasmanian"
+    },
+    {
+      "board": 17,
+      "cell": "0-2",
+      "row": "HW",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 17,
+      "cell": "1-2",
+      "row": "GW",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 17,
+      "cell": "2-2",
+      "row": "pick1",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 27,
+      "cell": "0-2",
+      "row": "BL",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 27,
+      "cell": "1-2",
+      "row": "ES",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 27,
+      "cell": "2-2",
+      "row": "coleman",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 47,
+      "cell": "0-2",
+      "row": "RI",
+      "col": "spoils5season"
+    },
+    {
+      "board": 47,
+      "cell": "1-2",
+      "row": "GW",
+      "col": "spoils5season"
+    },
+    {
+      "board": 47,
+      "cell": "2-2",
+      "row": "PA",
+      "col": "spoils5season"
+    },
+    {
+      "board": 57,
+      "cell": "0-2",
+      "row": "goals100career",
+      "col": "nfl"
+    },
+    {
+      "board": 57,
+      "cell": "1-2",
+      "row": "2000s",
+      "col": "nfl"
+    },
+    {
+      "board": 57,
+      "cell": "2-2",
+      "row": "games100orless",
+      "col": "nfl"
+    },
+    {
+      "board": 59,
+      "cell": "2-0",
+      "row": "irish",
+      "col": "BL"
+    },
+    {
+      "board": 59,
+      "cell": "2-1",
+      "row": "irish",
+      "col": "2010s"
+    },
+    {
+      "board": 59,
+      "cell": "2-2",
+      "row": "irish",
+      "col": "finals1"
+    },
+    {
+      "board": 96,
+      "cell": "1-0",
+      "row": "recruitedByDodoro",
+      "col": "games200"
+    },
+    {
+      "board": 96,
+      "cell": "1-1",
+      "row": "recruitedByDodoro",
+      "col": "finals1"
+    },
+    {
+      "board": 96,
+      "cell": "1-2",
+      "row": "recruitedByDodoro",
+      "col": "clubLeadingGoalKicker"
+    },
+    {
+      "board": 111,
+      "cell": "2-0",
+      "row": "irish",
+      "col": "ME"
+    },
+    {
+      "board": 111,
+      "cell": "2-1",
+      "row": "irish",
+      "col": "clubs1"
+    },
+    {
+      "board": 111,
+      "cell": "2-2",
+      "row": "irish",
+      "col": "grandfinals1"
+    },
+    {
+      "board": 121,
+      "cell": "2-0",
+      "row": "intrulesplayer",
+      "col": "WB"
+    },
+    {
+      "board": 121,
+      "cell": "2-1",
+      "row": "intrulesplayer",
+      "col": "RI"
+    },
+    {
+      "board": 121,
+      "cell": "2-2",
+      "row": "intrulesplayer",
+      "col": "2000s"
+    },
+    {
+      "board": 130,
+      "cell": "2-0",
+      "row": "recruitedByDodoro",
+      "col": "ES"
+    },
+    {
+      "board": 130,
+      "cell": "2-1",
+      "row": "recruitedByDodoro",
+      "col": "GW"
+    },
+    {
+      "board": 130,
+      "cell": "2-2",
+      "row": "recruitedByDodoro",
+      "col": "clubs2+"
+    },
+    {
+      "board": 194,
+      "cell": "0-2",
+      "row": "allAus1990s",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 194,
+      "cell": "1-2",
+      "row": "allAus2000s",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 194,
+      "cell": "2-2",
+      "row": "allAus2010s",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 225,
+      "cell": "0-0",
+      "row": "WC",
+      "col": "season2024player"
+    },
+    {
+      "board": 225,
+      "cell": "1-0",
+      "row": "KA",
+      "col": "season2024player"
+    },
+    {
+      "board": 225,
+      "cell": "2-0",
+      "row": "WB",
+      "col": "season2024player"
+    },
+    {
+      "board": 227,
+      "cell": "0-0",
+      "row": "CA",
+      "col": "season2024player"
+    },
+    {
+      "board": 227,
+      "cell": "1-0",
+      "row": "marc-murphy-teammate-4944",
+      "col": "season2024player"
+    },
+    {
+      "board": 227,
+      "cell": "2-0",
+      "row": "height180",
+      "col": "season2024player"
+    },
+    {
+      "board": 228,
+      "cell": "0-1",
+      "row": "SY",
+      "col": "season2024player"
+    },
+    {
+      "board": 228,
+      "cell": "1-1",
+      "row": "keidean-coleman-teammate-4374",
+      "col": "season2024player"
+    },
+    {
+      "board": 228,
+      "cell": "2-1",
+      "row": "disposals20grandfinal",
+      "col": "season2024player"
+    },
+    {
+      "board": 229,
+      "cell": "0-1",
+      "row": "GE",
+      "col": "season2024player"
+    },
+    {
+      "board": 229,
+      "cell": "1-1",
+      "row": "zach-merrett-teammate-7459",
+      "col": "season2024player"
+    },
+    {
+      "board": 229,
+      "cell": "2-1",
+      "row": "brownlowTop10",
+      "col": "season2024player"
+    },
+    {
+      "board": 234,
+      "cell": "0-1",
+      "row": "allAus2x",
+      "col": "season2024player"
+    },
+    {
+      "board": 234,
+      "cell": "1-1",
+      "row": "rory-laird-teammate-6333",
+      "col": "season2024player"
+    },
+    {
+      "board": 234,
+      "cell": "2-1",
+      "row": "disposalstop10season",
+      "col": "season2024player"
+    },
+    {
+      "board": 241,
+      "cell": "0-1",
+      "row": "captain",
+      "col": "season2024player"
+    },
+    {
+      "board": 241,
+      "cell": "1-1",
+      "row": "toby-greene-teammate-6998",
+      "col": "season2024player"
+    },
+    {
+      "board": 241,
+      "cell": "2-1",
+      "row": "goalstop10season",
+      "col": "season2024player"
+    },
+    {
+      "board": 302,
+      "cell": "0-2",
+      "row": "disposals35",
+      "col": "season2024player"
+    },
+    {
+      "board": 302,
+      "cell": "1-2",
+      "row": "ben-keays-teammate-621",
+      "col": "season2024player"
+    },
+    {
+      "board": 302,
+      "cell": "2-2",
+      "row": "draw",
+      "col": "season2024player"
+    },
+    {
+      "board": 368,
+      "cell": "0-2",
+      "row": "clubbestfairest",
+      "col": "season2024player"
+    },
+    {
+      "board": 368,
+      "cell": "1-2",
+      "row": "harry-sheezel-teammate-3108",
+      "col": "season2024player"
+    },
+    {
+      "board": 368,
+      "cell": "2-2",
+      "row": "disposals35",
+      "col": "season2024player"
+    },
+    {
+      "board": 390,
+      "cell": "0-0",
+      "row": "season2024player",
+      "col": "CW"
+    },
+    {
+      "board": 390,
+      "cell": "0-1",
+      "row": "season2024player",
+      "col": "SY"
+    },
+    {
+      "board": 390,
+      "cell": "0-2",
+      "row": "season2024player",
+      "col": "premier1x"
+    },
+    {
+      "board": 411,
+      "cell": "0-1",
+      "row": "allAus1953",
+      "col": "season2024player"
+    },
+    {
+      "board": 411,
+      "cell": "1-1",
+      "row": "marcus-bontempelli-teammate-4950",
+      "col": "season2024player"
+    },
+    {
+      "board": 411,
+      "cell": "2-1",
+      "row": "disposals30-goals2",
+      "col": "season2024player"
+    },
+    {
+      "board": 421,
+      "cell": "0-1",
+      "row": "goals3final",
+      "col": "season2024player"
+    },
+    {
+      "board": 421,
+      "cell": "1-1",
+      "row": "isaac-heeney-teammate-3302",
+      "col": "season2024player"
+    },
+    {
+      "board": 421,
+      "cell": "2-1",
+      "row": "disposals30final",
+      "col": "season2024player"
+    },
+    {
+      "board": 440,
+      "cell": "0-0",
+      "row": "SY",
+      "col": "season2024player"
+    },
+    {
+      "board": 440,
+      "cell": "1-0",
+      "row": "BL",
+      "col": "season2024player"
+    },
+    {
+      "board": 440,
+      "cell": "2-0",
+      "row": "allAus1953",
+      "col": "season2024player"
+    },
+    {
+      "board": 487,
+      "cell": "0-1",
+      "row": "captain",
+      "col": "season2024player"
+    },
+    {
+      "board": 487,
+      "cell": "1-1",
+      "row": "toby-greene-teammate-6998",
+      "col": "season2024player"
+    },
+    {
+      "board": 487,
+      "cell": "2-1",
+      "row": "goalstop10season",
+      "col": "season2024player"
+    },
+    {
+      "board": 560,
+      "cell": "0-2",
+      "row": "allAus1990s",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 560,
+      "cell": "1-2",
+      "row": "allAus2000s",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 560,
+      "cell": "2-2",
+      "row": "allAus2010s",
+      "col": "intrulesplayer"
+    },
+    {
+      "board": 928,
+      "cell": "0-0",
+      "row": "season2024player",
+      "col": "CW"
+    },
+    {
+      "board": 928,
+      "cell": "0-1",
+      "row": "season2024player",
+      "col": "SY"
+    },
+    {
+      "board": 928,
+      "cell": "0-2",
+      "row": "season2024player",
+      "col": "premier1x"
+    }
+  ]
+}

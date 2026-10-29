@@ -1,0 +1,194 @@
+{
+  "decision": "D-V2-CURRENT-SHADOW-FOLLOWUP-1",
+  "item": "4c normalised schema sections",
+  "inputs": {
+    "archive": [
+      "archive.sql",
+      "0b7435c8563b5146e94696575b777b26d411f4ac78dea400e51faf18aee492e3"
+    ],
+    "before": [
+      "before.sql",
+      "966c46f18c927bdc45a706f06596b888f869dc420b8f7229cabb508997dbc55e"
+    ],
+    "post": [
+      "neg2.sql",
+      "7e12213e316a3d7f716c4634f21220adb47a465d437eea39b605581dc7816dfb"
+    ],
+    "migrations": [
+      [
+        "111_curated_award_proposals.sql",
+        "2ed29d9598742c74d0f9db6f7bac0bec8409733c1dace1d25356ad27edb91290"
+      ],
+      [
+        "112_derived_award_results.sql",
+        "e0aa0c7e6fd14b6885aaf43725309e82e2d9b362cf167fd57cca9b95cef401ac"
+      ],
+      [
+        "113_brownlow_eligibility_decisions.sql",
+        "79e7b9d1b839414962571ffff832b230e458273c24bd26d8474d259137ca9971"
+      ],
+      [
+        "114_award_projections_and_curated_revisions.sql",
+        "1c33324f9c7c616e998aa152fdd5fbdf20b2585694b3e6d62c2addb5f307f180"
+      ],
+      [
+        "115_adjudication_supersession_fk_index.sql",
+        "2f16efb9694f76f946543bbaca01785127b632417ad21ba1fc7b8745bb7c1852"
+      ],
+      [
+        "116_brownlow_correction_receipts.sql",
+        "c61953b71e1210b5389579342e155d367dfada5737bf3cd37f1a536b9ac61075"
+      ],
+      [
+        "117_brownlow_provider_eligibility_unknown.sql",
+        "a7dff2bddb1dd9c01ea0e69478193c5e5c50d8a531b2db448e7052b9f25e286f"
+      ]
+    ]
+  },
+  "normalisation": "drop \\restrict/\\unrestrict token lines, blank and \"--\" lines, trailing whitespace; sort lines inside ACL sections; owner ignored (all dumps --no-owner)",
+  "summary": {
+    "sections": {
+      "archive": 4,
+      "before": 3,
+      "post": 10
+    },
+    "A_restoreFidelity": {
+      "equal": 2,
+      "onlyInArchive": 0,
+      "onlyInRestored": 0,
+      "changed": 0
+    },
+    "B_migration": {
+      "unchanged": 1,
+      "removed": 0,
+      "changed": 1,
+      "added": 5,
+      "addedByType": {
+        "COMMENT": 1,
+        "TABLE": 1,
+        "CONSTRAINT": 1,
+        "FUNCTION": 1,
+        "INDEX": 1
+      },
+      "migrationSupported": 5,
+      "unclassified": 1
+    },
+    "C_acl": {
+      "beforeAclSections": 0,
+      "archiveAclSections": 1,
+      "postAclSections": 2,
+      "preexistingEqualToArchive": 1,
+      "preexistingDiffersFromArchive": 0,
+      "preexistingAbsentFromArchive": 0,
+      "archiveOnly": 0,
+      "newObjectAclSections": 1,
+      "newObjectGrantLines": 1,
+      "newObjectGrantLinesNotInPinnedMigrations": 0
+    },
+    "newTablesFromPinnedMigrations": {
+      "public.award_proposals": "111_curated_award_proposals.sql",
+      "public.award_proposal_decisions": "111_curated_award_proposals.sql",
+      "public.derived_award_results": "112_derived_award_results.sql",
+      "public.brownlow_eligibility_decisions": "113_brownlow_eligibility_decisions.sql",
+      "public.derived_award_projections": "114_award_projections_and_curated_revisions.sql",
+      "public.brownlow_correction_receipts": "116_brownlow_correction_receipts.sql"
+    }
+  },
+  "A": {
+    "equal": 2,
+    "onlyInArchive": [],
+    "onlyInRestored": [],
+    "changed": []
+  },
+  "B": {
+    "unchanged": 1,
+    "removed": [],
+    "changed": [
+      {
+        "key": "TABLE|staging|afl_api_brownlow_vote",
+        "class": "UNCLASSIFIED",
+        "basis": "no pinned 111-117 statement accounts for this change",
+        "removed": [
+          "    eligible boolean NOT NULL,",
+          "    votes integer"
+        ],
+        "added": [
+          "    eligible boolean,",
+          "    votes bigint"
+        ]
+      }
+    ],
+    "added": [
+      {
+        "key": "COMMENT|staging|COLUMN afl_api_brownlow_vote.eligible",
+        "type": "COMMENT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "COMMENT ON COLUMN staging.afl_api_brownlow_vote.eligible in 117_brownlow_provider_eligibility_unknown.sql; text identical"
+      },
+      {
+        "key": "TABLE|public|brownlow_correction_receipts",
+        "type": "TABLE",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CREATE TABLE public.brownlow_correction_receipts in 116_brownlow_correction_receipts.sql"
+      },
+      {
+        "key": "CONSTRAINT|public|brownlow_correction_receipts brownlow_correction_receipts_pkey",
+        "type": "CONSTRAINT",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "CONSTRAINT on public.brownlow_correction_receipts, created in 116_brownlow_correction_receipts.sql"
+      },
+      {
+        "key": "FUNCTION|public|refuse_brownlow_receipt_mutation()",
+        "type": "FUNCTION",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "FUNCTION refuse_brownlow_receipt_mutation named in 116_brownlow_correction_receipts.sql"
+      },
+      {
+        "key": "INDEX|staging|ix_afl_api_identity_adjudications_supersedes_id",
+        "type": "INDEX",
+        "class": "MIGRATION_SUPPORTED",
+        "basis": "INDEX ix_afl_api_identity_adjudications_supersedes_id named in 115_adjudication_supersession_fk_index.sql (on pre-existing staging.afl_api_identity_adjudications)"
+      }
+    ]
+  },
+  "C": {
+    "preexisting": {
+      "equalToArchive": [
+        "ACL|public|TABLE players"
+      ],
+      "differsFromArchive": [],
+      "absentFromArchive": []
+    },
+    "archiveOnly": [],
+    "newObjects": [
+      {
+        "key": "ACL|public|TABLE brownlow_correction_receipts",
+        "lines": [
+          {
+            "line": "REVOKE ALL ON TABLE public.brownlow_correction_receipts FROM PUBLIC;",
+            "class": "MIGRATION_SUPPORTED",
+            "files": [
+              "116_brownlow_correction_receipts.sql"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "unclassified": [
+    {
+      "key": "TABLE|staging|afl_api_brownlow_vote",
+      "class": "UNCLASSIFIED",
+      "basis": "no pinned 111-117 statement accounts for this change",
+      "removed": [
+        "    eligible boolean NOT NULL,",
+        "    votes integer"
+      ],
+      "added": [
+        "    eligible boolean,",
+        "    votes bigint"
+      ]
+    }
+  ],
+  "limits": "Stored ACLs only. Effective permissions (role attributes, memberships, superuser) are not compared here. The archive is production stored state at capture, not live production."
+}

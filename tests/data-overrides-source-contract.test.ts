@@ -609,7 +609,7 @@ describe('AFLDB-ISSUE-160 source contract', () => {
       }
     };
     walk(path.join(root, 'src'));
-    expect(found).toEqual(['src/db/queries/admin-fixtures.ts']);
+    expect(found).toEqual(['src/db/queries/admin-fixtures.ts', 'src/lib/acquisition/afl-api-fixture-writer.ts']);
   });
 
   test('AFLDB-ISSUE-162: a fixture is never a played match, and never becomes one', () => {

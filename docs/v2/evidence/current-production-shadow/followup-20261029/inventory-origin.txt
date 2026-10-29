@@ -1,0 +1,16 @@
+b64c8a75cb2def63702549b803d7f8aedcad6c27f64eb30f76d125763e5e056d  /home/arm/afldb-v2-linuxverify-20261028T0310Z/xfer/inputs.sha256
+42822c7590a05e4ff8dc2066d33fbee0d7bdbc48b626099c5603b363607dac42  /home/arm/afldb-v2-linuxverify-20261028T0310Z/xfer/inputs.tar
+a08b7f64192dc1efd7466c7b7d0d8fb87b9f551f4cf339ac623914670f40b958  /home/arm/afldb-v2-linuxverify-20261028T0310Z/evidence/src-c478c31b.files.sha256
+f1d5c098c6fd2e5f3ceeb3be2af07212021ee0275768413e39f6f2494c80ff9e  /home/arm/afldb-v2-linuxverify-20261028T0310Z/evidence/setup.log
+e35ba0e9490113bc2124b09ec1ff478a1986c6b457713ed850e48a3123bec05e  /home/arm/afldb-v2-linuxverify-20261028T0310Z/xfer/setup.sh
+-- setup.sh order (manifest taken, then inputs extracted into the same src):
+55:( cd "$R/src" && find . -path ./node_modules -prune -o -type f -print0 | sort -z | xargs -0 sha256sum ) > "$E/src-c478c31b.files.sha256"
+61:tar -xf "$X/inputs.tar" -C "$R/src"
+62:( cd "$R/src" && sha256sum --quiet -c "$X/inputs.sha256" ) && echo "inputs OK ($(wc -l < "$X/inputs.sha256"))"
+-- setup.log:
+13:src manifest: 2939 lines, sha256 a08b7f64192dc1efd7466c7b7d0d8fb87b9f551f4cf339ac623914670f40b958
+24:== inputs
+25:inputs OK (785)
+-- shadow-restore.sh S2 SRC_FROM/SRC_MANIFEST:
+14:SRC_FROM=/home/arm/afldb-v2-linuxverify-20261028T0310Z/src
+15:SRC_MANIFEST=/home/arm/afldb-v2-linuxverify-20261028T0310Z/evidence/src-c478c31b.files.sha256

@@ -85,7 +85,7 @@ import {
   NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
   PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, STREAK_WORDS, PERIOD_SPLIT_WORDS, TOP_N_RE,
   TEAM_MATCH_RESULT_HOW_MUCH_RE, TEAM_MATCH_RESULT_LOPSIDED_RE,
-  UNANSWERABLE_TOPICS, canonicalise, readCount,
+  UNANSWERABLE_TOPICS, YEAR_TO_YEAR_RE, canonicalise, readCount,
 } from '@/search/nl/vocab';
 
 export type NlPlayerCandidate = {
@@ -142,6 +142,17 @@ function emptyReport(normalisedQuery: string): NlParseReport {
 
 function meaningfulTokens(text: string): string[] {
   return text.split(/\s+/).filter((t) => t.length > 0 && !STOPWORDS.has(t) && !/^\d+\+?$/.test(t));
+}
+
+/**
+ * Bare numbers still in the residual text once every extractor has run:
+ * none of them claimed the number (an extractor that reads one strips it).
+ * meaningfulTokens() leaves digits out of the ledger, so without this a
+ * stray number cost nothing -- "Adelaide goals 200 40" answered the
+ * club's goals leaderboard at confidence 1 with both numbers discarded.
+ */
+function strayNumberTokens(text: string): string[] {
+  return text.split(/\s+/).filter((t) => /^\d+\+?$/.test(t));
 }
 
 /** True when `matchedText`, as a whole word/phrase, occurs in `text`. */
@@ -430,12 +441,13 @@ function extractSeasons(text: string): SeasonExtraction {
     }
   }
 
-  const between = BETWEEN_RE.exec(working);
+  // "between 2005 and 2015", or "1980 to 1989": the same inclusive range.
+  const between = BETWEEN_RE.exec(working) ?? YEAR_TO_YEAR_RE.exec(working);
   if (between) {
     const a = Number(between[1]);
     const b = Number(between[2]);
     consumed.push(between[0]);
-    working = working.replace(BETWEEN_RE, ' ');
+    working = working.replace(between[0], ' ');
     return { text: working, seasonMin: Math.min(a, b), seasonMax: Math.max(a, b), consumed };
   }
 
@@ -992,10 +1004,9 @@ function extractMarqueeMatches(
     if (SUPERLATIVE_GOVERNS.test(before)) continue;
 
     // Count lookback: "3 showdowns", "3+ anzac day games", "two western
-    // derbies". Digit counts are read but not stripped -- pure digits are
-    // invisible to both the confidence ratio and the player-name scan --
-    // while an alpha number word is stripped like any other understood
-    // token.
+    // derbies". A count that is read is stripped, digit or word: a digit
+    // left behind would be a stray number (strayNumberTokens) and decline
+    // the question.
     const countWindow = working.slice(Math.max(0, match.index - 18), match.index);
     let times = 1;
     let countWord: string | null = null;
@@ -1016,6 +1027,11 @@ function extractMarqueeMatches(
     if (!predicate) continue;
     predicates.push(predicate);
     consumed.push(match[0]);
+    if (digits) {
+      // Positional, before the phrase strip moves it: stripMatch's \b
+      // cannot end a match on the "+" of "3+".
+      working = `${working.slice(0, match.index).replace(/\d{1,4}\+?(?=\s*(?:or more\s*)?$)/, ' ')}${working.slice(match.index)}`;
+    }
     working = stripMatch(working, match[0]);
     if (countWord) {
       consumed.push(countWord);
@@ -4186,7 +4202,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // all, so ratio 1 on an empty totalTokens can only ever help a
   // question where something upstream had already extracted something
   // real -- it cannot by itself accept "the a is of".
-  const ratio = totalTokens.length === 0 ? 1 : consumedCount / totalTokens.length;
+  // A number no extractor claimed is an unexplained token exactly as an
+  // unconsumed word is: it counts against the ratio and as a leftover.
+  const strayNumbers = strayNumberTokens(text);
+  const tokenCount = totalTokens.length + strayNumbers.length;
+  const ratio = tokenCount === 0 ? 1 : consumedCount / tokenCount;
 
   // Meaningful tokens the parser could do nothing with -- excluding the
   // failed player mention's own tokens, which are reported separately
@@ -4196,9 +4216,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // reader's decline message name the exact words that stopped the
   // answer instead of only the failed name lookups.
   const mentionTokens = new Set(unresolvedPlayerMention ? unresolvedPlayerMention.split(' ') : []);
-  const leftoverTokens = totalTokens.filter(
-    (t) => !consumedSet.has(t) && !mentionTokens.has(t) && t !== candidateRaw?.split(' ')[0],
-  );
+  const leftoverTokens = [
+    ...totalTokens.filter(
+      (t) => !consumedSet.has(t) && !mentionTokens.has(t) && t !== candidateRaw?.split(' ')[0],
+    ),
+    ...strayNumbers,
+  ];
 
   const structuralPenalty = structuralOk ? 1 : 0.3;
   const unresolvedPenalty = unresolvedPlayerMention ? 0.35 : 0;

@@ -1,0 +1,31 @@
+{
+  "issue": "AFLDB-ISSUE-316",
+  "revision": "metadata-repair-v4",
+  "frozen_utc": "2026-10-24T19:56:00.329Z",
+  "manifest_sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+  "package_hash_definition": "SHA-256 of exact MANIFEST.json bytes; manifest covers every executable/input/retained package member, external real PostgreSQL evidence pinned by VALIDATION-EVIDENCE.json",
+  "members": 40,
+  "candidate_manifest_sha256": "e840cd79a74ca20f523b0dfab10f9c86407f248f493ca229e12b146d09e0c021",
+  "candidate_delta": {
+    "changed": [
+      "README.md",
+      "validate-pg.cjs",
+      "validate-remote.cjs"
+    ],
+    "added": [
+      "VALIDATION-EVIDENCE.json"
+    ],
+    "removed": []
+  },
+  "all_candidate_sql_unchanged": true,
+  "real_database_cases": 10,
+  "static_checks": 1,
+  "cleanup": "PASS",
+  "independent_review": "GO; zero stopping findings; F-006 LOW retained",
+  "production_contact": false,
+  "production_attempt": false,
+  "u3_confirmed": false,
+  "standing": "U4 Route B; Brownlow untouched; production NO-GO; validation-only task",
+  "report_sha256": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+  "decision_sha256": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2"
+}

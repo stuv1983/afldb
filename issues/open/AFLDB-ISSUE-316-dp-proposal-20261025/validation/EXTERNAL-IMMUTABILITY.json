@@ -1,0 +1,11 @@
+{
+  "verified_at": "2026-10-25T03:57:53.270Z",
+  "status": "PASS",
+  "package_files": 167,
+  "successor_files": 264,
+  "separately_consumed_historical_censuses": 3,
+  "all_434_pin_checks_match": true,
+  "external_writes": false,
+  "original_package_manifest_sha256": "6d61c1c3ca35d315226efd15af8142e9f180c68e400be7e450088d1aa0e45d82",
+  "final_package_manifest_sha256": "6d61c1c3ca35d315226efd15af8142e9f180c68e400be7e450088d1aa0e45d82"
+}

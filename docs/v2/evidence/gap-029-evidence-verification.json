@@ -1,0 +1,114 @@
+{
+  "generated": "2026-10-20",
+  "baseHEAD": "a68a77fe",
+  "launcherCommit": "b27e63eb",
+  "database": "afldb_v2_gap029_test",
+  "port": 55433,
+  "totals": {
+    "tests": 1407,
+    "passed": 1397,
+    "failed": 3,
+    "skipped": 7
+  },
+  "files": [
+    {
+      "file": "tests/gridley-compat.test.ts",
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/v2-isolated-test-target.test.ts",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/club-comparison-route.test.ts",
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/gridley-corpus.test.ts",
+      "passed": 1207,
+      "failed": 3,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/home-records.test.ts",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/nl-answers-cross-domain.test.ts",
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/release-gates.test.ts",
+      "passed": 59,
+      "failed": 0,
+      "skipped": 7
+    }
+  ],
+  "failures": [
+    {
+      "name": "Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode",
+      "messages": [
+        "AssertionError: expected [ 'anzac-playedin-1', …(5) ] to deeply equal []\n    at D:/dev/afldbV2/tests/integration/gridley-corpus.test.ts:498:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells",
+      "messages": [
+        "AssertionError: expected [ …(40) ] to deeply equal []\n    at D:/dev/afldbV2/tests/integration/gridley-corpus.test.ts:813:152\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode",
+      "messages": [
+        "AssertionError: expected [ …(71) ] to deeply equal []\n    at D:/dev/afldbV2/tests/integration/gridley-corpus.test.ts:822:68\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    }
+  ],
+  "strict": {
+    "strict": {
+      "passed": false,
+      "findings": 149
+    },
+    "approved": {
+      "findings": 78,
+      "dataMatches": 0
+    },
+    "policyPassed": false,
+    "unapproved": 71
+  },
+  "focusedUnit": {
+    "passed": 76,
+    "failed": 0
+  },
+  "launcherFinalRetest": {
+    "passed": 17,
+    "failed": 0
+  },
+  "typecheck": {
+    "command": "npm.cmd run typecheck",
+    "exitCode": 0
+  },
+  "changedFileLint": {
+    "files": [
+      "tools/v2/isolated-pg.ts",
+      "tests/v2-isolated-test-target.test.ts",
+      "tests/gridley-corpus-support.ts",
+      "tests/gridley-compat.test.ts",
+      "tests/integration/gridley-corpus.test.ts"
+    ],
+    "exitCode": 0
+  },
+  "actualReplay": "gap-029-rookie-actual-replay.json",
+  "fullRepositoryWorkflowRun": false,
+  "command": "node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts run afldb_v2_gap029_test -- node node_modules/vitest/vitest.mjs run tests/v2-isolated-test-target.test.ts tests/gridley-compat.test.ts tests/integration/gridley-corpus.test.ts tests/integration/club-comparison-route.test.ts tests/integration/home-records.test.ts tests/integration/nl-answers-cross-domain.test.ts tests/integration/release-gates.test.ts --reporter=json --outputFile=.local-release/gap-029-evidence-final-tests.json"
+}

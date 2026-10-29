@@ -17,13 +17,14 @@
  * one field each case is actually about. Every case gets its OWN provider
  * match id (`CD_M2026ISSUE228<n>`), so cases never share canonical rows.
  *
- * `clubs` (Hawthorn, Brisbane Lions) and `venues` (M.C.G.) are READ, never
- * written — real historical identities, exactly as `settle-afltables.test.ts`
- * reads two existing clubs rather than inventing any. `sources` rows for
+ * Insertion contracts use two namespaced synthetic clubs/organisations and a
+ * test-local team map. Real Hawthorn/Brisbane history must not become an
+ * accidental ambiguity candidate. The tracked provider map is never edited.
+ * `venues` (M.C.G.) and `sources` rows for
  * `afl_api` (077) and `afltables` are READ, never written: both should
  * already exist on any correctly migrated `afldb_test`.
  *
- * COMMITTED BY THIS SUITE: one dedicated `players` row and one
+ * COMMITTED BY THIS SUITE: two dedicated clubs/organisations, one `players` row and one
  * `external_identities` bootstrap-bridge row (T1, §6.3) for the ONE player
  * this suite resolves; every settle-produced row (import_batches, the
  * migration-074 spine, the migration-103 typed projections,
@@ -38,13 +39,14 @@
  */
 import './guard';
 
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import postgres from 'postgres';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { aflApiSnapshotManifestSha256, validateAflApiReconciliationReport } from '@afldb/acquisition';
 import {
   linkAflApiProvider,
   revokeAflApiLink,
@@ -99,6 +101,9 @@ import {
   type ReinstateReport,
 } from '../../tools/migration/rebuild_afl_api_adjudications';
 import { RESET_SQL } from '../../tools/db/rebuild-test';
+import { runAflApiSettleCli } from '../../tools/current-season/settle-afl-api';
+import { writeSnapshot } from '../afl-api-snapshot-fixture';
+import { predecessorText } from '../rollover-predecessor-fixture';
 import {
   AflApiReplayAbort,
   assertAflApiAdjudicationBijection,
@@ -157,12 +162,20 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-const REAL_MATCH_ID = 'CD_M20260142801';
+/**
+ * Raw AFL API provider JSON as the fixtures mutate it: deep, schemaless property writes on cloned
+ * payloads. One alias so the escape hatch is declared once, here, and nowhere else.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- schemaless provider JSON, mutated in place by the cases
+type RawJson = Record<string, any>;
+
 /** This suite's own namespace. Appears nowhere else in the repository. */
 const NS = 'CD_M2026ISSUE228';
 const SEASON = 2026;
-const HOME_HIST = 'Hawthorn';
-const AWAY_HIST = 'Brisbane Lions';
+// Dedicated insertion identities: changing only dates still collides with a restored PF
+// through the one-component ambiguity guard. These are test clubs, never historical aliases.
+const HOME_HIST = 'ISSUE-228 synthetic home';
+const AWAY_HIST = 'ISSUE-228 synthetic away';
 const BRIDGED_PROVIDER_PLAYER_ID = 'CD_I297354'; // Karl Amon, home side, in the fixture
 /**
  * AFLDB-ISSUE-237: the bridged fixture player's own AFL Tables identity. A real importer row's
@@ -208,11 +221,11 @@ const UNBRIDGED_PROVIDER_PLAYER_ID = 'CD_I500001'; // "Test Forward", away side 
  * `unproved_match_date`.
  */
 function unitSourceFor(providerMatchId: string, mutate?: (raw: {
-  fixture: Record<string, any>; roster: Record<string, any>; stats: Record<string, any>;
+  fixture: RawJson; roster: RawJson; stats: RawJson;
 }) => void): AflApiSettleUnitSource {
-  const fixture = clone(readFixture('01-fixture-result.json')) as Record<string, any>;
-  const roster = clone(readFixture('03-match-roster.raw.json')) as Record<string, any>;
-  const stats = clone(readFixture('02-player-stats.raw.json')) as Record<string, any>;
+  const fixture = clone(readFixture('01-fixture-result.json')) as RawJson;
+  const roster = clone(readFixture('03-match-roster.raw.json')) as RawJson;
+  const stats = clone(readFixture('02-player-stats.raw.json')) as RawJson;
   const matchDate = matchDateFor(providerMatchId);
 
   fixture.providerId = providerMatchId;
@@ -326,6 +339,8 @@ const CASE_IDS = {
   nonParticipant: `${NS}N255`,
   // AFLDB-ISSUE-257 (§17.8/F-S9-03): a Match Sheet correction over an afl_api-owned stat row.
   matchSheetAuthority: `${NS}N257`,
+  // V2-GAP-027: the settle CLI's `--report-out`, driven end to end over a real snapshot directory.
+  reportOut: `${NS}W027`,
 } as const;
 const ALL_PROVIDER_IDS = Object.values(CASE_IDS);
 
@@ -356,12 +371,9 @@ const HA_ROUND_CODE = '2';
  * case its own canonical match (see `unitSourceFor()`'s comment; the provider
  * id is not part of `match_key` at all).
  *
- * Every date is a September 2026 Monday, Tuesday or Wednesday. No AFL match
- * is ever played mid-week in the finals series, so none of these keys can
- * collide with a real fixture that an AFL Tables settle may already have
- * written to `afldb_test` — which matters because `matches.match_key` is
- * UNIQUE and a collision would silently turn a "new match" case into a
- * corroboration against somebody else's row.
+ * Dates distinguish cases' exact keys. Dedicated synthetic clubs provide
+ * isolation from restored history: moving a date alone does NOT prevent
+ * `possible_existing_match` when season, oriented clubs and round agree.
  */
 const CASE_DATES: Readonly<Record<string, string>> = {
   [CASE_IDS.golden]: '2026-09-21',
@@ -408,6 +420,8 @@ const CASE_DATES: Readonly<Record<string, string>> = {
   [CASE_IDS.nonParticipant]: '2026-06-02',
   // AFLDB-ISSUE-257: the June Wednesday after it (AEST), used by no other case.
   [CASE_IDS.matchSheetAuthority]: '2026-06-03',
+  // V2-GAP-027: the June Monday after it (AEST), used by no other case.
+  [CASE_IDS.reportOut]: '2026-06-08',
   // I244-F001 H&A cases: deliberately the LATEST dates in the suite (every
   // other case is <= 2026-09-30) so seasons.last_match_date/
   // data_through_date/last_loaded_round can be proven to reflect THIS
@@ -446,7 +460,7 @@ const KEEPALIVE_MATCH_KEY = `${NS}-keepalive`;
  * family's own round (grepped: only the Brownlow path reads it), but both
  * are set for internal consistency of the fixture.
  */
-function toHomeAndAwayRound(raw: { fixture: Record<string, any>; roster: Record<string, any> }): void {
+function toHomeAndAwayRound(raw: { fixture: RawJson; roster: RawJson }): void {
   raw.fixture.round = { ...raw.fixture.round, abbreviation: 'Rd 1', name: 'Round 1', roundNumber: 1 };
   raw.roster.matchRoster.roundNumber = 1;
 }
@@ -811,6 +825,26 @@ beforeAll(async () => {
   identities = parseAflApiIdentities(
     JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'afl-api-identities.json'), 'utf8')),
   );
+  const teams = new Map(identities.teams);
+  teams.set('CD_T80', { ...teams.get('CD_T80')!, hist: HOME_HIST });
+  teams.set('CD_T20', { ...teams.get('CD_T20')!, hist: AWAY_HIST });
+  identities = { ...identities, teams };
+  // Namespaced canonical fixtures belong to this suite. No historical club or match is
+  // renamed/deleted, and the production reference mapping stays unchanged.
+  for (const [hist, slug] of [[HOME_HIST, 'issue228-home'], [AWAY_HIST, 'issue228-away']]) {
+    await sql`
+      INSERT INTO club_organizations (name, slug) VALUES (${hist}, ${slug})
+      ON CONFLICT (name) DO NOTHING
+    `;
+    await sql`
+      INSERT INTO clubs (id, slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+      OVERRIDING SYSTEM VALUE
+      SELECT id, ${slug}, ${hist}, ${hist}, 'I228', id, ${hist},
+             (SELECT id FROM club_organizations WHERE name = ${hist})
+        FROM (SELECT nextval(pg_get_serial_sequence('clubs', 'id'))::int AS id) fixture
+      ON CONFLICT (legacy_club_hist) DO NOTHING
+    `;
+  }
   getSourceFamily(registry, 'afl_api', 'match'); // fails loudly if the registry is somehow not this repo's
 
   const [afl] = await sql<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afl_api'`;
@@ -825,7 +859,7 @@ beforeAll(async () => {
   const [away] = await sql<{ id: number; name: string }[]>`SELECT id, name FROM clubs WHERE legacy_club_hist = ${AWAY_HIST}`;
   const [venue] = await sql<{ id: number }[]>`SELECT id FROM venues WHERE legacy_name = 'M.C.G.'`;
   if (!home || !away || !venue) {
-    throw new Error('Hawthorn, Brisbane Lions and M.C.G. must all exist on afldb_test (real historical identities).');
+    throw new Error('Dedicated ISSUE-228 clubs and M.C.G. must exist on the test database.');
   }
   homeClubId = home.id;
   awayClubId = away.id;
@@ -938,6 +972,9 @@ afterAll(async () => {
   // holding stale season/club rows keyed to fixture matches that no longer
   // exist (see the helper's own doc comment for the full failure mode).
   await recompute2026SeasonDerivedState();
+  await sql`DELETE FROM club_seasons WHERE club_id IN (${homeClubId}, ${awayClubId})`;
+  await sql`DELETE FROM clubs WHERE legacy_club_hist IN (${HOME_HIST}, ${AWAY_HIST})`;
+  await sql`DELETE FROM club_organizations WHERE name IN (${HOME_HIST}, ${AWAY_HIST})`;
   await sql.end({ timeout: 5 });
 }, 30_000);
 
@@ -2450,6 +2487,67 @@ describe('AFLDB-ISSUE-228 S6 — settle-afl-api.ts against afldb_test', () => {
     expect(afterDryRun).toBeUndefined();
   });
 
+  it('V2-GAP-027: the settle CLI writes a valid reconciliation report for a real dry-run and a real apply', async () => {
+    const providerId = CASE_IDS.reportOut;
+    const label = `issue228-integration-${providerId}-gap027`;
+    // A scratch project root: the tracked registry, the seasons registry and the tracked identities
+    // with this suite's two synthetic team identities (exactly what `identities` above carries).
+    // AFLDB-ISSUE-316: the case settles 2026 as the season IN PROGRESS, so the seasons registry is
+    // the explicit predecessor of the 2026 rollover (the tracked one seals 2026).
+    const projectRoot = mkdtempSync(join(tmpdir(), 'afldb-gap027-'));
+    try {
+      const reference = join(projectRoot, 'data', 'reference');
+      mkdirSync(reference, { recursive: true });
+      writeFileSync(join(reference, 'source-families.json'), readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json')));
+      writeFileSync(join(reference, 'seasons.json'), predecessorText('data/reference/seasons.json'));
+      const identityJson = JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'afl-api-identities.json'), 'utf8'));
+      identityJson.teams.CD_T80 = { ...identityJson.teams.CD_T80, hist: HOME_HIST };
+      identityJson.teams.CD_T20 = { ...identityJson.teams.CD_T20, hist: AWAY_HIST };
+      writeFileSync(join(reference, 'afl-api-identities.json'), JSON.stringify(identityJson));
+      const source = unitSourceFor(providerId);
+      const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'matches', label);
+      writeSnapshot(snapshotDir, [{
+        id: providerId, fixture: source.fixtureRaw as RawJson, roster: source.rosterRaw as RawJson,
+        playerStats: source.playerStatsRaw as RawJson,
+      }]);
+      const deps = {
+        projectRoot, sql, log: () => {}, now: () => '2026-10-27T00:00:00.000Z',
+        ingestionControls: { currentSeasonEnabled: true, brownlowAdminEnabled: false },
+      };
+
+      const dryOut = join(projectRoot, 'dry-run.json');
+      const dry = await runAflApiSettleCli(['--label', label, '--dry-run', '--auto-apply', '--report-out', dryOut], deps);
+      expect(dry.result).toMatchObject({ applied: false, rollbackReason: 'dry_run', halt: null });
+      expect(dry.reconciliationReport).toEqual({ path: dryOut, written: true, error: null });
+      expect(await batchesLabelled(label)).toBe(0);
+      const dryReport = JSON.parse(readFileSync(dryOut, 'utf8'));
+      expect(validateAflApiReconciliationReport(dryReport)).toEqual([]);
+      expect(dryReport.source).toEqual({
+        sourceKey: 'afl_api', season: SEASON, snapshotLabel: label, manifestSha256: aflApiSnapshotManifestSha256(snapshotDir),
+      });
+      expect(dryReport.run).toEqual({ mode: 'dry_run', batchId: null, applied: false, halt: null, rollbackReason: 'dry_run' });
+      expect(dryReport.counters).toEqual(dry.result!.counters);
+      expect(dryReport.counters.canonicalRowsInserted).toBeGreaterThan(0);
+      expect(dryReport.refusals).toHaveLength(dry.result!.refusalEvidence.length);
+      expect(dryReport.exceptions).toBeNull();
+
+      const applyOut = join(projectRoot, 'apply.json');
+      const applied = await runAflApiSettleCli(['--label', label, '--apply', '--auto-apply', '--report-out', applyOut], deps);
+      expect(applied.result).toMatchObject({ applied: true, halt: null, rollbackReason: null });
+      const applyReport = JSON.parse(readFileSync(applyOut, 'utf8'));
+      expect(validateAflApiReconciliationReport(applyReport)).toEqual([]);
+      expect(applyReport.run).toEqual({ mode: 'apply', batchId: applied.result!.batchId, applied: true, halt: null, rollbackReason: null });
+      expect(applyReport.counters).toEqual(applied.result!.counters);
+      // The real post-commit exception report, as the CLI read it, carried whole.
+      expect(applyReport.exceptions).toEqual(JSON.parse(JSON.stringify(applied.report)));
+      expect(await batchesLabelled(label)).toBe(1);
+      // The dry-run executed the same write path: its counters are the apply's.
+      expect(dryReport.counters).toEqual(applyReport.counters);
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
   it('I244-F008: a failure while finalising the batch rolls the whole run back — no batch, no canonical row, no spine row', async () => {
     const providerId = CASE_IDS.batchFinaliseFailure;
     const label = `issue228-integration-${providerId}-f008-finalise-failure`;
@@ -2884,7 +2982,7 @@ async function identityFindingsFor(providerId: string): Promise<ApplyFindingRow[
 /** The unit for `providerId` with its match date replaced (both halves, so §11.1's cross-check still proves it). */
 function sourceWithMatchDate(
   providerId: string, matchDate: string,
-  extra?: (raw: { fixture: Record<string, any>; roster: Record<string, any>; stats: Record<string, any> }) => void,
+  extra?: (raw: { fixture: RawJson; roster: RawJson; stats: RawJson }) => void,
 ): AflApiSettleUnitSource {
   return unitSourceFor(providerId, (raw) => {
     raw.fixture.utcStartTime = `${matchDate}T07:15:00.000+0000`;
@@ -2907,8 +3005,8 @@ function f010Options(
   };
 }
 
-async function matchRowByKey(matchKey: string): Promise<Record<string, any>> {
-  const [row] = await sql<{ snapshot: Record<string, any> }[]>`
+async function matchRowByKey(matchKey: string): Promise<RawJson> {
+  const [row] = await sql<{ snapshot: RawJson }[]>`
     SELECT to_jsonb(m) AS snapshot FROM matches m WHERE m.match_key = ${matchKey}
   `;
   expect(row).toBeDefined();
@@ -2932,8 +3030,9 @@ describe('AFLDB-ISSUE-257 §17.8 — Match Sheet authority over an afl_api-owned
 
     const providerId = CASE_IDS.matchSheetAuthority;
     const matchKey = matchKeyFor(providerId);
-    const [actor] = await sql<{ id: number }[]>`SELECT id FROM auth_users ORDER BY id LIMIT 1`;
-    const adminUserId = actor?.id ?? await seedS6Actor(sql);
+    // The suite's own disabled fixture actor, never an arbitrary existing account (ISSUE-235 S6:
+    // a rebuilt afldb_test has zero auth_users; tests/player-link-mutations.test.ts I14 pins this).
+    const adminUserId = await seedS6Actor(sql);
     const priorImportUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
     process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
 
@@ -3034,7 +3133,7 @@ describe('AFLDB-ISSUE-244 I244-F010 — identity-bearing corrections are withhel
     expect(created.counters.canonicalRowsInserted).toBeGreaterThan(0);
     expect(await identityFindingsFor(providerId)).toHaveLength(0);
     const before = await canonicalSnapshot(keyA, providerId);
-    const matchRow = before.match as Record<string, any>;
+    const matchRow = before.match as RawJson;
     expect(matchRow.match_key).toBe(keyA);
     expect(String(matchRow.match_date)).toBe(matchDateFor(providerId));
 
@@ -3093,7 +3192,7 @@ describe('AFLDB-ISSUE-244 I244-F010 — identity-bearing corrections are withhel
     // PARTIAL: the same corrected date arrives together with a score correction. The non-identity
     // part applies (and recomputes derived state); the date is still withheld and the key still
     // renders the row.
-    const withScore = (raw: { fixture: Record<string, any> }) => {
+    const withScore = (raw: { fixture: RawJson }) => {
       raw.fixture.home.score = { goals: 23, behinds: 12, totalScore: 150, superGoals: 0 };
     };
     const partial = await runSettleAflApi(sql, f010Options(providerId, 'partial', correctedDate(withScore)));
@@ -3183,8 +3282,8 @@ describe('AFLDB-ISSUE-244 I244-F010 — identity-bearing corrections are withhel
     }, other);
     const targetBefore = await canonicalSnapshot(keyTarget, target);
     const otherBefore = await canonicalSnapshot(keyOther, other);
-    const targetId = (targetBefore.match as Record<string, any>).id as number;
-    const otherId = (otherBefore.match as Record<string, any>).id as number;
+    const targetId = (targetBefore.match as RawJson).id as number;
+    const otherId = (otherBefore.match as RawJson).id as number;
     expect(targetId).not.toBe(otherId);
 
     // COLLISION — the provider now says the target match is played on the OTHER match's date, so
@@ -3675,10 +3774,10 @@ describe('AFLDB-ISSUE-244 I244-F030 — an unresolved record vs a canonical fixt
     const other = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, { max: 1, onnotice: () => {} });
     try {
       let raced: { id: number; matchKey: string } | null = null;
-      let racedSnapshot: Record<string, any> | null = null;
+      let racedSnapshot: RawJson | null = null;
       const wrapped = sqlCommittingAfterPlanning(sql, async () => {
         raced = await seedCanonicalMatch(other, F030_SEEDS.raceForeign);
-        const [row] = await other<{ snapshot: Record<string, any> }[]>`
+        const [row] = await other<{ snapshot: RawJson }[]>`
           SELECT to_jsonb(m) AS snapshot FROM matches m WHERE m.id = ${raced.id}
         `;
         racedSnapshot = row.snapshot;

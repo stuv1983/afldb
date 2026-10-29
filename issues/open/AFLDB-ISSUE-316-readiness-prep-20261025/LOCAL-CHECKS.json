@@ -1,0 +1,100 @@
+{
+  "classification": "PRE-WINDOW LOCAL TOOLING CHECKS ONLY — NOT FRESH WINDOW EVIDENCE",
+  "checked_at_utc": "2026-10-25T09:22:05.372Z",
+  "checks": [
+    {
+      "check": "raw helper byte comparison accepts identical frozen bytes",
+      "result": "PASS"
+    },
+    {
+      "check": "one-byte helper drift refuses without altering working files",
+      "result": "PASS"
+    },
+    {
+      "check": "short or implicit helper commit refuses",
+      "result": "PASS"
+    },
+    {
+      "check": "administrative anchor without helpers cannot substitute for H",
+      "result": "PASS"
+    },
+    {
+      "check": "exact committed administrative authority bytes accepted",
+      "result": "PASS"
+    },
+    {
+      "check": "in-memory authority/allowlist substitution refuses before parsing",
+      "result": "PASS"
+    },
+    {
+      "check": "in-memory external inventory hash substitution refuses",
+      "result": "PASS"
+    },
+    {
+      "check": "accepted committed external inventory has 264 unique paths",
+      "result": "PASS"
+    },
+    {
+      "check": "264 entries with a duplicate path refuse",
+      "result": "PASS"
+    },
+    {
+      "check": "short external inventory refuses",
+      "result": "PASS"
+    },
+    {
+      "check": "pure UTC window boundary 2026-10-27T01:59:59.999Z",
+      "result": "PASS",
+      "expected": false
+    },
+    {
+      "check": "pure UTC window boundary 2026-10-27T02:00:00.000Z",
+      "result": "PASS",
+      "expected": true
+    },
+    {
+      "check": "pure UTC window boundary 2026-10-27T03:00:00.000Z",
+      "result": "PASS",
+      "expected": true
+    },
+    {
+      "check": "pure UTC window boundary 2026-10-27T03:59:59.999Z",
+      "result": "PASS",
+      "expected": true
+    },
+    {
+      "check": "pure UTC window boundary 2026-10-27T04:00:00.000Z",
+      "result": "PASS",
+      "expected": false
+    },
+    {
+      "check": "pure UTC window boundary 2026-10-28T02:00:00.000Z",
+      "result": "PASS",
+      "expected": false
+    },
+    {
+      "check": "actual-clock early/expired opening refuses without starting freshness work",
+      "result": "PASS"
+    },
+    {
+      "check": "administrative descendant cannot substitute for execution P",
+      "result": "PASS"
+    },
+    {
+      "check": "unknown execution mode refuses; no forwarded command or automatic apply",
+      "result": "PASS"
+    },
+    {
+      "check": "current source gate passes all raw P blob and source-type checks",
+      "result": "PASS"
+    },
+    {
+      "check": "prepared exact-P worktree status is clean",
+      "result": "PASS"
+    }
+  ],
+  "production_contact": false,
+  "host_native_proof": "NOT RUN",
+  "fresh_censuses": "NOT RUN",
+  "enforced_dry_run": "NOT RUN"
+}

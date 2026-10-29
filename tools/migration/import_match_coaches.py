@@ -23,6 +23,10 @@ What it does, fail-closed at every join:
 
   * verifies every artefact it reads against its tracked manifest (``--validate-only``
     stops here, offline, for the rebuild's preflight);
+  * with ``--require-raw-bundle`` (AFLDB-ISSUE-319; the rebuild passes it for every profile
+    except the predecessor), replays the contract-pinned raw bundle in memory through the
+    acquisition's own parser (``tools/rebuild/afltables/coach_snapshot_parser.py``) and
+    refuses unless the rendered bytes equal the manifest digests and the very bytes it loads;
   * folds the per-match rows to one coach string per (match_key, club); two strings
     for one (match, club) is a refusal;
   * resolves each string to exactly one index ``name_raw`` by EXACT string — an
@@ -48,13 +52,21 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
+import io
 import json
+import os
+import stat
 import sys
+import tarfile
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(1, str(Path(__file__).resolve().parents[1] / "rebuild" / "afltables"))
+
+import coach_snapshot_parser  # noqa: E402
 
 from common import connect_pg, import_batch, load_env, replay_admin_overrides, require_env, safe_dsn  # noqa: E402
 from enrich_heights import verified_files as verified_fitzroy_files  # noqa: E402
@@ -83,8 +95,154 @@ def load_manifest(label: str) -> dict:
         return json.load(fh)
 
 
-def verify_coaches_snapshot(label: str, contract: dict) -> tuple[dict, list[dict], list[dict], str]:
-    """The tracked parsed artefacts (always) and the raw bytes (when present), hash-verified."""
+# AFLDB-ISSUE-319: bounds on the in-memory raw replay (the accepted bundle is 24,023,040 B, its
+# largest member 421,662 B). Exceeding either is a refusal, never a partial read.
+RAW_BUNDLE_MAX_BYTES = 64 * 1024 * 1024
+RAW_MEMBER_MAX_BYTES = 8 * 1024 * 1024
+RAW_BUNDLE_PIN_KEYS = {"filename", "sha256", "bytes", "members"}
+
+
+class RawReplayRefused(RuntimeError):
+    """The raw bundle does not prove the parsed artefacts this process loads: refused, never skipped."""
+
+
+def raw_bundle_pin(label: str, contract: dict) -> dict:
+    """coaches.accepted_snapshot.raw_bundle for exactly this label; anything else refuses."""
+    accepted = contract.get("accepted_snapshot")
+    if not isinstance(accepted, dict) or accepted.get("label") != label:
+        raise RawReplayRefused(f"the contract's accepted coaches snapshot is not {label!r}")
+    pin = accepted.get("raw_bundle")
+    if not isinstance(pin, dict) or set(pin) - {"$comment"} != RAW_BUNDLE_PIN_KEYS:
+        raise RawReplayRefused("coaches.accepted_snapshot.raw_bundle is absent or not exactly "
+                               f"{sorted(RAW_BUNDLE_PIN_KEYS)}; raw replay is required and has no pin")
+    name, digest = pin["filename"], pin["sha256"]
+    # The rebuild's own rule (tools/db/rebuild-test.ts coachRawBundlePin): ^[A-Za-z0-9_][A-Za-z0-9_.-]*\.tar$
+    if (not isinstance(name, str) or len(name) < 5 or not name.endswith(".tar")
+            or not (name[0].isascii() and (name[0].isalnum() or name[0] == "_"))
+            or any(not (ch.isascii() and (ch.isalnum() or ch in "_.-")) for ch in name)):
+        raise RawReplayRefused(f"raw_bundle.filename {name!r} is not a plain .tar file name")
+    if not isinstance(digest, str) or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+        raise RawReplayRefused("raw_bundle.sha256 is not 64 lowercase hex characters")
+    for key in ("bytes", "members"):
+        if type(pin[key]) is not int or pin[key] <= 0:
+            raise RawReplayRefused(f"raw_bundle.{key} is not a positive integer")
+    if pin["bytes"] > RAW_BUNDLE_MAX_BYTES:
+        raise RawReplayRefused(f"raw_bundle.bytes {pin['bytes']} exceeds the replay bound {RAW_BUNDLE_MAX_BYTES}")
+    return pin
+
+
+def read_raw_bundle(path: Path, pin: dict) -> bytes:
+    """The pinned bundle's bytes: a regular, unlinked file of exactly the pinned size and digest."""
+    try:
+        before = os.lstat(path)
+    except FileNotFoundError:
+        raise RawReplayRefused(f"the raw bundle {path.name} is absent; raw replay is required") from None
+    if not stat.S_ISREG(before.st_mode):
+        raise RawReplayRefused(f"the raw bundle {path.name} is not a regular file")
+    if before.st_size != pin["bytes"]:
+        raise RawReplayRefused(f"the raw bundle is {before.st_size} B, the pin says {pin['bytes']} B")
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
+    with os.fdopen(fd, "rb") as fh:
+        opened = os.fstat(fh.fileno())
+        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino) or not stat.S_ISREG(opened.st_mode):
+            raise RawReplayRefused("the raw bundle changed identity while it was opened")
+        data = fh.read(pin["bytes"] + 1)
+    if len(data) != pin["bytes"] or hashlib.sha256(data).hexdigest() != pin["sha256"]:
+        raise RawReplayRefused("the raw bundle bytes are not the pinned bundle")
+    return data
+
+
+def raw_bundle_members(data: bytes, expected: dict[str, str]) -> dict[str, bytes]:
+    """Every member, in memory, exactly the manifest's raw files: nothing is extracted to disk.
+
+    One directory entry ``raw`` is allowed; any other directory, link, device, duplicate,
+    unlisted name (absolute, ``..`` or outside raw/), missing file or changed byte refuses.
+    """
+    members: dict[str, bytes] = {}
+    seen_dir = False
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as tf:
+            for m in tf:
+                if m.isdir() and m.name == "raw" and not seen_dir:
+                    seen_dir = True
+                    continue
+                if not m.isreg():
+                    raise RawReplayRefused(f"non-regular tar member {m.name!r}")
+                if m.name in members:
+                    raise RawReplayRefused(f"duplicate tar member {m.name!r}")
+                if m.name not in expected:
+                    raise RawReplayRefused(f"tar member not in the manifest {m.name!r}")
+                if m.size > RAW_MEMBER_MAX_BYTES:
+                    raise RawReplayRefused(f"tar member {m.name!r} exceeds the replay bound")
+                fh = tf.extractfile(m)
+                body = fh.read() if fh is not None else None
+                if body is None or len(body) != m.size:
+                    raise RawReplayRefused(f"tar member {m.name!r} is truncated")
+                members[m.name] = body
+    except tarfile.TarError as exc:
+        raise RawReplayRefused(f"the raw bundle is not a readable uncompressed tar: {exc}") from None
+    missing = sorted(set(expected) - set(members))
+    if missing:
+        raise RawReplayRefused(f"{len(missing)} manifest raw files missing from the bundle, e.g. {missing[:3]}")
+    bad = sorted(n for n, b in members.items() if hashlib.sha256(b).hexdigest() != expected[n])
+    if bad:
+        raise RawReplayRefused(f"{len(bad)} raw members differ from the manifest, e.g. {bad[:3]}")
+    return members
+
+
+def replay_raw_bundle(label: str, contract: dict, manifest: dict, parsed_bytes: dict[str, bytes],
+                      snapshot_dir: Path) -> str:
+    """AFLDB-ISSUE-319: prove the parsed bytes THIS process loads are the adapter parser's output.
+
+    The pinned bundle's members must be exactly the tracked manifest's raw files; the shared
+    acquisition parser (tools/rebuild/afltables/coach_snapshot_parser.py, the code the adapter
+    ran) replays them in memory, and the rendered CSV bytes must equal both the manifest's parsed
+    digests and ``parsed_bytes`` — the bytes the caller then parses into the rows it loads.
+    """
+    pin = raw_bundle_pin(label, contract)
+    data = read_raw_bundle(snapshot_dir / pin["filename"], pin)
+    expected = {manifest["index"]["raw_filename"]: manifest["index"]["raw_sha256"]}
+    for entry in manifest.get("files", []):
+        if entry["raw_filename"] in expected:
+            raise RawReplayRefused(f"the manifest lists {entry['raw_filename']!r} twice")
+        expected[entry["raw_filename"]] = entry["raw_sha256"]
+    if len(expected) != pin["members"]:
+        raise RawReplayRefused(f"the manifest names {len(expected)} raw files, the pin says {pin['members']}")
+    members = raw_bundle_members(data, expected)
+    parser = coach_snapshot_parser
+    try:
+        index_rows = parser.parse_index(members[manifest["index"]["raw_filename"]].decode("utf-8", "replace"), contract)
+        pages = []
+        for row in index_rows:
+            body = members.get(f"raw/{row['coach_href']}")
+            if body is None:
+                raise RawReplayRefused(f"the index names {row['coach_href']!r}, absent from the bundle")
+            page = parser.parse_page(body.decode("utf-8", "replace"), row["coach_path"])
+            page["raw_sha256"] = parser.sha256_bytes(body)
+            pages.append(page)
+    except RawReplayRefused:
+        raise
+    except (SystemExit, Exception) as exc:  # the parser's Terminal is a SystemExit
+        raise RawReplayRefused(f"the acquisition parser refused the raw bytes: {exc}") from None
+    rendered = {"coaches_index": parser.render_csv(list(contract["index_columns"]), index_rows),
+                "coach_pages": parser.render_csv(list(contract["page_columns"]), pages)}
+    digests = []
+    for entry in manifest["parsed"]:
+        dataset = entry["dataset"]
+        got = hashlib.sha256(rendered[dataset]).hexdigest()
+        if got != entry["sha256"]:
+            raise RawReplayRefused(f"{dataset}: the raw replay {got[:12]}… differs from the manifest {entry['sha256'][:12]}…")
+        if parsed_bytes.get(dataset) != rendered[dataset]:
+            raise RawReplayRefused(f"{dataset}: the parsed input this run loads differs from the raw replay")
+        digests.append(f"{dataset} {got}")
+    return (f"raw bundle {pin['filename']} sha256 {pin['sha256']} replayed ({len(members)} members): "
+            f"{', '.join(digests)} equal to the replay, the manifest and the loaded files")
+
+
+def verify_coaches_snapshot(label: str, contract: dict, require_raw_bundle: bool = False,
+                            ) -> tuple[dict, list[dict], list[dict], str]:
+    """The tracked parsed artefacts (always), the raw bytes (when present), hash-verified, and —
+    when ``require_raw_bundle`` — the pinned raw bundle replayed into exactly the loaded bytes."""
     manifest = load_manifest(label)
     if manifest.get("family") != contract["family"]:
         sys.exit(f"ERROR: manifest {label!r} is a {manifest.get('family')!r} manifest, not {contract['family']!r}")
@@ -96,20 +254,23 @@ def verify_coaches_snapshot(label: str, contract: dict) -> tuple[dict, list[dict
     if set(parsed) != {"coaches_index", "coach_pages"}:
         sys.exit(f"ERROR: manifest {label!r} lists parsed datasets {sorted(parsed)}; expected coaches_index and coach_pages")
     tables: dict[str, list[dict]] = {}
+    parsed_bytes: dict[str, bytes] = {}
     for dataset, columns_key in (("coaches_index", "index_columns"), ("coach_pages", "page_columns")):
         entry = parsed[dataset]
         path = snapshot_dir / entry["filename"]
         if not path.is_file():
             sys.exit(f"ERROR: {label}: {entry['filename']} is missing from {snapshot_dir}")
-        digest = sha256_file(path)
+        # Read once: the digest, the raw replay comparison and the loaded rows are all these bytes.
+        data = path.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
         if digest != entry.get("sha256"):
             sys.exit(f"ERROR: {label}: {entry['filename']} sha256 {digest[:12]}… does not match the "
                      f"tracked manifest ({str(entry.get('sha256'))[:12]}…)")
-        with path.open(encoding="utf-8", newline="") as fh:
-            reader = csv.DictReader(fh)
-            if reader.fieldnames != list(contract[columns_key]):
-                sys.exit(f"ERROR: {path.name}: columns {reader.fieldnames} differ from the contract's")
-            rows = list(reader)
+        parsed_bytes[dataset] = data
+        reader = csv.DictReader(io.StringIO(data.decode("utf-8"), newline=""))
+        if reader.fieldnames != list(contract[columns_key]):
+            sys.exit(f"ERROR: {path.name}: columns {reader.fieldnames} differ from the contract's")
+        rows = list(reader)
         if len(rows) != int(entry["row_count"]):
             sys.exit(f"ERROR: {path.name}: {len(rows)} rows, manifest says {entry['row_count']}")
         tables[dataset] = rows
@@ -140,6 +301,12 @@ def verify_coaches_snapshot(label: str, contract: dict) -> tuple[dict, list[dict
         raw_state = f"raw bytes verified ({len(checks)} files)"
     else:
         raw_state = "raw/ not present (the tracked parsed artefacts are the rebuild input)"
+    if require_raw_bundle:
+        try:
+            replayed = f"AFLDB-COACH-RAW-REPLAY VERIFIED: {replay_raw_bundle(label, contract, manifest, parsed_bytes, snapshot_dir)}"
+            raw_state = f"{raw_state}; {replayed}" if raw_dir.is_dir() else replayed
+        except RawReplayRefused as exc:
+            sys.exit(f"ERROR: {label}: AFLDB-COACH-RAW-REPLAY REFUSED: {exc}; nothing was loaded")
     return manifest, index, pages, raw_state
 
 
@@ -281,6 +448,9 @@ def main() -> int:
     parser.add_argument("--validate-only", action="store_true",
                         help="verify every tracked manifest and artefact hash, then stop (no database)")
     parser.add_argument("--dry-run", action="store_true", help="reconcile and report; write nothing")
+    parser.add_argument("--require-raw-bundle", action="store_true",
+                        help="AFLDB-ISSUE-319: refuse unless the contract-pinned raw bundle replays, through the "
+                             "acquisition parser, into exactly the parsed bytes this run loads (validate, dry run and load)")
     args = parser.parse_args()
     t0 = time.time()
 
@@ -288,7 +458,7 @@ def main() -> int:
         contract = json.load(fh)["coaches"]
     link_corrections = list(contract.get("profile_link_corrections", {}).get("rules", []))
     print("AFLDB coaches import (AFL Tables coach pages + fitzRoy per-match Coach column)")
-    manifest, index, pages, raw_state = verify_coaches_snapshot(args.label, contract)
+    manifest, index, pages, raw_state = verify_coaches_snapshot(args.label, contract, args.require_raw_bundle)
     print(f"  {args.label}: {len(index)} index rows, {len(pages)} pages verified; {raw_state}")
     stats_files = fitzroy_stats_files(args.fitzroy_label, args.supplement_label)
     print(f"  fitzRoy player_stats files verified: {args.fitzroy_label} + {args.supplement_label} = {len(stats_files)} files")

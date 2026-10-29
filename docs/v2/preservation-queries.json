@@ -1,0 +1,8 @@
+{
+  "match_detail": "SELECT m.id, m.season, m.round_type, m.round_number, m.round_code, m.is_final, m.match_date, m.match_time, COALESCE(v.canonical_name,m.venue_raw) AS venue_name, v.slug AS venue_slug, m.home_club_id, h.name AS home_name, h.slug AS home_slug, m.away_club_id, a.name AS away_name, a.slug AS away_slug, m.home_goals, m.home_behinds, m.home_score, m.away_goals, m.away_behinds, m.away_score, m.result::text, w.name AS winner_name, m.margin, m.attendance, m.match_event FROM public.matches m JOIN public.clubs h ON h.id=m.home_club_id JOIN public.clubs a ON a.id=m.away_club_id LEFT JOIN public.clubs w ON w.id=m.winner_club_id LEFT JOIN public.venues v ON v.id=m.venue_id",
+  "player_registration": "SELECT pc.*, cl.name AS club_name, cl.slug AS club_slug FROM public.player_clubs pc JOIN public.clubs cl ON cl.id=pc.club_id",
+  "player_participation": "SELECT s.*, m.season, m.match_date, m.match_event, cl.name AS club_name FROM public.player_match_stats s JOIN public.matches m ON m.id=s.match_id JOIN public.clubs cl ON cl.id=s.club_id",
+  "brownlow_raw": "SELECT b.*, p.slug, p.display_name, cl.name AS club_name, cl.slug AS club_slug FROM public.brownlow_season_votes b JOIN public.players p ON p.id=b.player_id LEFT JOIN public.player_season_stats ps ON ps.player_id=b.player_id AND ps.season=b.season LEFT JOIN public.clubs cl ON cl.id=COALESCE(b.club_id,ps.primary_club_id)",
+  "award_publication": "SELECT w.*, a.slug AS award_slug, a.name AS award_name, p.slug AS player_slug FROM public.award_winners w JOIN public.awards a ON a.id=w.award_id LEFT JOIN public.players p ON p.id=w.player_id",
+  "audit_history": "SELECT * FROM public.auth_audit_log"
+}

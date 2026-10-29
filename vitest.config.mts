@@ -21,12 +21,22 @@ export default defineConfig({
     fileParallelism: false,
   },
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    alias: [
+      // AFLDB V2 plan D1: `@afldb/<module>` resolves to that package's index only, mirroring
+      // tsconfig.json `paths`. A subpath (`@afldb/<module>/x`) deliberately does not match, so
+      // it fails to resolve here as well as failing tests/v2-module-boundaries.test.ts.
+      {
+        find: /^@afldb\/([a-z]+)$/,
+        replacement: `${fileURLToPath(new URL('./packages', import.meta.url))}/$1/src/index.ts`,
+      },
+      { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
       // src modules guard themselves with `server-only`, which throws
       // outside a React Server Component. Tests exercise the query SQL
       // directly, so the guard is stubbed here.
-      'server-only': fileURLToPath(new URL('./tests/stubs/server-only.ts', import.meta.url)),
-    },
+      {
+        find: 'server-only',
+        replacement: fileURLToPath(new URL('./tests/stubs/server-only.ts', import.meta.url)),
+      },
+    ],
   },
 });

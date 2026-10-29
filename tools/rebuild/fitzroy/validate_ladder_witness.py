@@ -10,7 +10,7 @@ the contract says it is, and that every source label resolves to exactly one tim
 AFLDB club identity.
 
 `--compare` additionally runs the D7 cross-check against `club_seasons` using
-AFLDB_IMPORT_DATABASE_URL. It is READ-ONLY: it issues one SELECT and writes nothing, ever.
+AFLDB_IMPORT_DATABASE_URL. It is READ-ONLY: it issues SELECTs and writes nothing, ever.
 
 WHY THIS EXISTS, AND WHAT IT IS NOT
 -----------------------------------
@@ -33,10 +33,12 @@ quantities, and a field-by-field diff would be meaningless in both directions �
 report AFLDB as wrong, or, if the check were loosened to tolerate it, would stop detecting
 real ladder defects.
 
-The witness is not weakened to make that disagreement disappear. Instead `--compare` asks
-AFLDB (read-only) which seasons actually contain a `wildcard_final` match and declares
-those seasons EXPLICITLY UNCOMPARABLE, naming them and the reason. Every other season is
-compared exactly as strictly as before. A wildcard season is never silently passed.
+The witness bytes stay unchanged. `--compare` requires exact WF fixture agreement with
+the accepted, hash-bound core results (including the source's Regular classification).
+Canonical H&A-plus-WF tallies must reconstruct every raw witness field for every club.
+Only the evidenced WF points/for/against are then removed from a copy; percentage and
+positions are recomputed for the ENTIRE table before exact comparison to club_seasons.
+Missing/extra fixtures or unexplained differences fail. Ordinary seasons stay strict.
 
 This file is the ONE authority for the witness. The rebuild calls it, and
 `tests/python/ladder_identity_contract.py` calls it too, so there is no second
@@ -56,6 +58,8 @@ import json
 import os
 import sys
 from decimal import Decimal, ROUND_HALF_UP
+from collections import Counter
+from fractions import Fraction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -182,7 +186,7 @@ def load_witness(label: str, rep: Report, contract_path: Path | None = None,
             f"the tracked manifest for {label!r} exists but its acquired bytes are absent "
             f"from {snapshot_dir}. Raw snapshots are deliberately gitignored (ISSUE-093 "
             f"convention): re-acquire with\n"
-            f"  Rscript tools/rebuild/fitzroy/acquire_core.R --acquire --label {label} "
+            f"  Rscript legacy/offline/tools/rebuild/fitzroy/acquire_core.R --acquire --label {label} "
             f"--datasets ladder --from {cov['first_season']} --to {cov['last_season']}")
 
     print("\n3. raw artefacts (bytes, schema, per-season structure)")
@@ -310,8 +314,130 @@ def resolve_all(rows: list[dict], rep: Report,
     return by_identity
 
 
+def load_source_wildcards(contract_path: Path | None = None) -> list[dict]:
+    """Read only the accepted core's hash-bound results; never choose a candidate.
+
+    The contract is read through the same routed path as every other read site (default:
+    the tracked contract), so no site can read a different contract from the others."""
+    register = json.loads((ROOT / "data/reference/fitzroy-accepted-baselines.json")
+                          .read_text(encoding="utf-8"))
+    accepted = [b for b in register["baselines"] if b["acceptance_status"] == "accepted"]
+    if len(accepted) != 1:
+        raise WitnessError("D7 requires exactly one accepted core baseline")
+    baseline = fz.select_accepted_baseline(register, accepted[0]["snapshot_label"])
+    manifest_path = ROOT / baseline["acquisition"]["manifest_path"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    contract = json.loads((contract_path or CONTRACT).read_text(encoding="utf-8"))
+    fz.verify_accepted_binding(baseline, manifest_path, manifest, contract)
+    entries = [f for f in manifest["files"] if f["filename"] == "results.csv"]
+    if len(entries) != 1:
+        raise WitnessError("accepted core must bind exactly one results.csv")
+    path = ROOT / baseline["snapshot_dir"] / "results.csv"
+    if sha256_file(path) != entries[0]["sha256"]:
+        raise WitnessError("accepted results.csv SHA-256 differs")
+    clubs = json.loads(CLUBS.read_text(encoding="utf-8"))
+    resolver = fz.ClubResolver(clubs, contract["source_club_normalisation"]["rules"])
+    slugs = {c["hist"]: c["slug"] for c in clubs["identities"]}
+    wildcards = []
+    with path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    if len(rows) != entries[0]["row_count"]:
+        raise WitnessError("accepted results.csv row count differs")
+    for row in rows:
+        _, round_type = fz.normalise_results_round(row["Round"], "D7 results")
+        if round_type != "wildcard_final":
+            continue
+        season = int(row["Season"])
+        wildcards.append(dict(
+            season=season, date=row["Date"],
+            home=slugs[resolver.resolve(row["Home.Team"], season, "results")],
+            away=slugs[resolver.resolve(row["Away.Team"], season, "results")],
+            home_score=int(row["Home.Points"]), away_score=int(row["Away.Points"]),
+            source_round_type=row["Round.Type"]))
+    return wildcards
+
+
+def rate_table(table: dict) -> dict:
+    """Recompute the whole table: exact ratio, half-up percentage, no tie-break."""
+    rated = {key: {**row, "percentage_stored": pct_stored(
+        row["score_for"], row["score_against"])} for key, row in table.items()}
+    def ordering(key):
+        row = rated[key]
+        ratio = (Fraction(row["score_for"], row["score_against"])
+                 if row["score_against"] else None)
+        return (row["season_points"], ratio is not None, ratio or Fraction(0))
+    counts = Counter(ordering(key) for key in rated)
+    for pos, key in enumerate(sorted(rated, key=ordering, reverse=True), 1):
+        rated[key]["ladder_position"] = pos if counts[ordering(key)] == 1 else None
+    return rated
+
+
+def wildcard_policy(resolved: dict, canonical: list[dict], source: list[dict],
+                    rep: Report) -> dict:
+    """Prove the raw reconstruction before removing only evidenced WF tallies."""
+    fields = ("season_points", "score_for", "score_against",
+              "percentage_stored", "ladder_position")
+    fixture_fields = ("season", "date", "home", "away", "home_score", "away_score")
+    seasons = {key[0] for key in resolved}
+    wf = [m for m in canonical if m["round_type"] == "wildcard_final"
+          and m["season"] in seasons]
+    source = [m for m in source if m["season"] in seasons]
+    expected = {key: dict(row) for key, row in resolved.items()}
+    for season in sorted({m["season"] for m in wf + source}):
+        matches = [m for m in wf if m["season"] == season]
+        evidence = [m for m in source if m["season"] == season]
+        db_set = Counter(tuple(m[f] for f in fixture_fields) for m in matches)
+        src_set = Counter(tuple(m[f] for f in fixture_fields) for m in evidence)
+        if not rep.check(f"{season} exact canonical/source WF fixture set",
+                         bool(matches) and db_set == src_set
+                         and all(n == 1 for n in db_set.values())
+                         and all(m["is_final"] is True for m in matches)
+                         and all(m["source_round_type"] == "Regular" for m in evidence),
+                         f"canonical={dict(db_set)!r}; source={dict(src_set)!r}"):
+            continue  # failure retained; never a season exemption
+        season_rows = {key: row for key, row in resolved.items() if key[0] == season}
+        tallies = {}
+        classification_ok = True
+        for m in canonical:
+            if m["season"] != season:
+                continue
+            if not m["is_final"] and m["round_type"] != "home_and_away":
+                classification_ok = False
+            if m["is_final"] and m["round_type"] != "wildcard_final":
+                continue
+            for side, other in (("home", "away"), ("away", "home")):
+                key = (season, m[side])
+                row = tallies.setdefault(key, dict(season_points=0, score_for=0,
+                                                  score_against=0))
+                row["score_for"] += m[f"{side}_score"]
+                row["score_against"] += m[f"{other}_score"]
+                row["season_points"] += (2 if m["result"] == "draw" else
+                                         4 if m["winner"] == m[side] else 0)
+        reconstructed = rate_table(tallies)
+        if not rep.check(f"{season} H&A-plus-WF reconstruction matches every raw witness field",
+                         classification_ok and set(reconstructed) == set(season_rows)
+                         and all(reconstructed[k][f] == season_rows[k][f]
+                                 for k in reconstructed if k in season_rows for f in fields)):
+            continue
+        corrected = {key: dict(row) for key, row in season_rows.items()}
+        for m in evidence:
+            for side, other in (("home", "away"), ("away", "home")):
+                row = corrected[(season, m[side])]
+                sf, sa = m[f"{side}_score"], m[f"{other}_score"]
+                row["score_for"] -= sf
+                row["score_against"] -= sa
+                row["season_points"] -= 4 if sf > sa else 2 if sf == sa else 0
+        corrected = rate_table(corrected)
+        print("        club | raw points/for/against/%/position | H&A policy")
+        for key in sorted(corrected):
+            print(f"        {key[1]} | " + "/".join(str(season_rows[key][f]) for f in fields)
+                  + " | " + "/".join(str(corrected[key][f]) for f in fields))
+        expected.update(corrected)
+    return expected
+
+
 def compare_to_database(resolved: dict[tuple[int, str], dict], rep: Report) -> None:
-    """D7 cross-check. READ-ONLY: one SELECT, no write of any kind."""
+    """D7 cross-check. READ-ONLY SELECTs, no write of any kind."""
     print("\n5. D7 cross-check against club_seasons (read-only)")
     import psycopg                                                  # noqa: PLC0415
 
@@ -319,6 +445,7 @@ def compare_to_database(resolved: dict[tuple[int, str], dict], rep: Report) -> N
     if not dsn:
         raise WitnessError("--compare needs AFLDB_IMPORT_DATABASE_URL")
 
+    source = load_source_wildcards()
     with psycopg.connect(dsn) as conn:
         conn.read_only = True
         with conn.cursor() as cur:
@@ -328,19 +455,20 @@ def compare_to_database(resolved: dict[tuple[int, str], dict], rep: Report) -> N
                   FROM club_seasons cs JOIN clubs c ON c.id = cs.club_id
             """)
             db = {(int(r[0]), r[1]): r for r in cur.fetchall()}
-            # See "THE WILDCARD ROUND EXCEPTION" above. Read from AFLDB rather than
-            # hard-coded, so a season is excluded only while it genuinely contains one.
             cur.execute("""
-                SELECT DISTINCT season FROM matches
-                 WHERE round_type = 'wildcard_final'
-                 ORDER BY season
-            """)
-            wildcard_seasons = {int(r[0]) for r in cur.fetchall()}
+                SELECT m.season, m.match_date, h.slug, a.slug, m.home_score,
+                       m.away_score, m.round_type, m.is_final, m.result, w.slug
+                  FROM matches m JOIN clubs h ON h.id = m.home_club_id
+                  JOIN clubs a ON a.id = m.away_club_id
+                  LEFT JOIN clubs w ON w.id = m.winner_club_id
+                 WHERE m.season = ANY(%s)
+            """, (sorted({key[0] for key in resolved}),))
+            canonical = [dict(zip(("season", "date", "home", "away", "home_score",
+                                   "away_score", "round_type", "is_final", "result",
+                                   "winner"), (r[0], r[1].isoformat(), *r[2:])))
+                         for r in cur.fetchall()]
 
-    if wildcard_seasons:
-        print(f"        wildcard-round seasons excluded from the field comparison: "
-              f"{sorted(wildcard_seasons)} — fitzRoy labels a WF row Round.Type='Regular' "
-              f"and counts it on the ladder; AFLDB does not (AFLDB-ISSUE-129 §8.4).")
+    expected_rows = wildcard_policy(resolved, canonical, source, rep)
 
     missing = sorted(set(resolved) - set(db))
     extra = sorted(set(db) - set(resolved))
@@ -354,10 +482,8 @@ def compare_to_database(resolved: dict[tuple[int, str], dict], rep: Report) -> N
     diffs: list[str] = []
     comparable = 0
     for key in sorted(set(resolved) & set(db)):
-        w, row = resolved[key], db[key]
+        w, row = expected_rows[key], db[key]
         season, slug = key
-        if season in wildcard_seasons:
-            continue
         comparable += 1
         for field, actual, expected in (
             ("points_for", row[2], w["score_for"]),
@@ -424,7 +550,7 @@ def main() -> int:
         resolved = resolve_all(rows, rep, contract_path)
         if args.compare:
             compare_to_database(resolved, rep)
-    except WitnessError as exc:
+    except (WitnessError, fz.SnapshotValidationError, OSError) as exc:
         print(f"\nREFUSED: {exc}")
         return 2
 

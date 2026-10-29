@@ -916,6 +916,14 @@ export const BEFORE_RE = /\bbefore (\d{4})\b/;
 export const AFTER_RE = /\bafter (\d{4})\b/;
 export const BETWEEN_RE = /\bbetween (\d{4}) and (\d{4})\b/;
 /**
+ * "in 1980 to 1989" -- the real-user corpus's user_range_leaders form, an
+ * inclusive range exactly like BETWEEN_RE. Both ends must be years in the
+ * BARE_YEAR_RE span, so a club "to" ("lost to Richmond") never matches.
+ * Before this, BARE_YEAR_RE took the first year as one exact season and
+ * the second was silently dropped.
+ */
+export const YEAR_TO_YEAR_RE = /\b(1[89]\d{2}|20\d{2}) to (1[89]\d{2}|20\d{2})\b/;
+/**
  * "in the 1990s" (group 1, the decade's first year) or "in the 90s"
  * (group 2, a single leading digit). Two-digit decades resolve 30s-90s
  * to the 1900s and 00s/10s to the 2000s; "the 20s" is DELIBERATELY

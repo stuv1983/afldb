@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { ReviewControls } from '@/app/admin/submissions/[id]/ReviewControls';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
 import { requireCapability } from '@/lib/auth/session';
@@ -11,7 +11,7 @@ import type { ImportBatchId } from '@/lib/import-batch-id';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Review submission',
+  title: 'Submission history',
   robots: { index: false, follow: false },
 };
 
@@ -20,11 +20,12 @@ export default async function SubmissionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // The status page of a legacy-intake submission: open to every staff
+  // The read-only history of a legacy-intake submission: open to every staff
   // role exactly as requireUploader() was (acquisition.legacyIntake is
   // ALL_STAFF), with the uploader-or-admin ownership check below narrowing
-  // it per submission. The review verdicts in ./actions.ts keep their
-  // role guards: no capability names them (AFLDB-ISSUE-158).
+  // it per submission. AFLDB V2 Stage 5 retired validation, approval and
+  // promotion: the actions in ./actions.ts keep their role guards
+  // (AFLDB-ISSUE-158) and refuse.
   const admin = await requireCapability('acquisition.legacyIntake');
 
   const { id: idText } = await params;
@@ -56,8 +57,8 @@ export default async function SubmissionPage({
   // same as the rest of /admin.
   if (admin.role === 'contributor' && submission.uploadedBy !== admin.id) notFound();
 
-  // Problem rows first, then a sample of clean ones: the reviewer's job
-  // is to look at what is wrong, not to scroll past what is right.
+  // Problem rows first, then a sample of clean ones: the verdicts recorded at
+  // the time are what a reader of this history wants to see.
   const problemRows = await authSql<{
     rowNo: number; verdict: string | null;
     payload: Record<string, string | null>;
@@ -122,32 +123,25 @@ export default async function SubmissionPage({
         </div>
       )}
 
-      {admin.role === 'contributor' ? (
-        <p className="section-note">
-          Review and promotion are handled by an admin — this page will update once
-          they act on it.
-        </p>
-      ) : (
-        <ReviewControls id={submission.id} status={submission.status} />
-      )}
+      <p className="notice">
+        <strong>This submission is read-only history.</strong> CSV submission review and
+        promotion have been retired, so it can no longer be validated, approved, rejected or
+        promoted. Curated award proposals (<Link href="/admin/operations/awards">operations
+        centre</Link>) and the audited data editors replace this path.
+      </p>
 
       {submission.status === 'promoted' && (
         <p className="notice">
           Applied as import batch {submission.importBatchId} on{' '}
           {submission.promotedAt?.toISOString().slice(0, 16).replace('T', ' ')}.
-          Re-promoting a corrected file updates the same source records.
-          {['match_results', 'player_match_stats'].includes(submission.dataset) && (
-            <> This changed source fact tables — run <code>tools/migration/rebuild_derived.py</code> on
-              the server so career/season summaries and Advanced Search reflect it.</>
-          )}
         </p>
       )}
 
       {problemRows.length > 0 && (
         <section className="section">
           <p className="section-note">
-            Errors block approval. Warnings do not: an unmatched player imports with the
-            source spelling and no link, which is AFLDB’s standard treatment.
+            Verdicts recorded when the file was validated: an error row blocked approval, a warning
+            did not.
           </p>
           <CollapsibleTable title="Rows needing attention">
           <div className="table-wrap">

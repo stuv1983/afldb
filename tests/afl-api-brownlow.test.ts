@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import type postgres from 'postgres';
 import {
-  beforeEach, describe, expect, it, vi,
+  afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
 import {
@@ -31,6 +31,7 @@ import {
   describeAflApiBrownlowFixtureIdentityRequirement,
   emptyAflApiBrownlowCounters,
   isAflApiBrownlowEnabled,
+  planAflApiBrownlowMatchSet,
   planBrownlowPositiveSlotReleases,
   proposedBrownlowMatchId,
   reconcileAflApiBrownlowSeason,
@@ -137,30 +138,55 @@ describe('isAflApiBrownlowEnabled (AFLDB-ISSUE-228 §10 "Operational enablement"
 });
 
 describe('requireAflApiBrownlowBacktestDatabase (AFLDB-ISSUE-228 §10 follow-up: completed-season backtest)', () => {
+  afterEach(() => vi.unstubAllEnvs());
   /** A minimal stand-in for `postgres.Sql`: called as a tagged template,
    * returning whatever `SELECT current_database() AS name` would. No real
    * connection is opened — this is exactly item #9 of the backtest test
    * plan ("test the guard/parser/helper directly", not a real non-afldb_test
    * database). */
   function fakeSql(name: string): postgres.Sql {
-    return (async () => [{ name }]) as unknown as postgres.Sql;
+    return Object.assign(async () => [{ name }], {
+      unsafe: async () => [{ cluster_name: 'afldb_v2_isolated', database_comment: 'afldb-v2-isolated-test' }],
+    }) as unknown as postgres.Sql;
   }
 
-  it('grants the authority when the live connection reports afldb_test', async () => {
-    const authority = await requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_test'));
-    expect(authority).toEqual({ kind: 'allow-completed-season-backtest', verifiedDatabase: 'afldb_test' });
+  beforeEach(() => {
+    vi.stubEnv('AFLDB_TEST_DATABASE_URL', 'postgresql://test:test@127.0.0.1:55432/afldb_v2_backtest_test');
+    vi.stubEnv('AFLDB_V2_ISOLATED_PORT', '55432');
+    vi.stubEnv('AFLDB_V2_ISOLATED_PG', '1');
+  });
+
+  it('grants authority only after the isolated DSN and live server proofs', async () => {
+    const authority = await requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_v2_backtest_test'));
+    expect(authority).toEqual({ kind: 'allow-completed-season-backtest', verifiedDatabase: 'afldb_v2_backtest_test' });
+  });
+
+  it.each([
+    'postgresql://test:test@remote.invalid:55432/afldb_v2_backtest_test',
+    'postgresql://test:test@127.0.0.1:5432/afldb_v2_backtest_test',
+    'postgresql://test:test@127.0.0.1:55432/afldb_v2_backtest',
+    'postgresql://test:test@127.0.0.1:55432/afldb_v2_backtest_test?host=remote.invalid',
+  ])('refuses unsafe connection metadata before granting an authority (%s)', async (dsn) => {
+    vi.stubEnv('AFLDB_TEST_DATABASE_URL', dsn);
+    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_v2_backtest_test'))).rejects.toThrow(/refused/);
+  });
+
+  it.each(['cluster_name', 'database_comment'])('refuses an incorrect live %s', async (field) => {
+    const sql = fakeSql('afldb_v2_backtest_test');
+    sql.unsafe = (async () => [{ cluster_name: 'afldb_v2_isolated', database_comment: 'afldb-v2-isolated-test', [field]: 'wrong' }]) as unknown as typeof sql.unsafe;
+    await expect(requireAflApiBrownlowBacktestDatabase(sql)).rejects.toThrow(/refused/);
   });
 
   it('hard refuses for afldb_dev — never trusting anything but the live current_database() read', async () => {
-    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_dev'))).rejects.toThrow(/afldb_dev/);
+    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_dev'))).rejects.toThrow(/current_database/);
   });
 
   it('hard refuses for production', async () => {
-    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_prod'))).rejects.toThrow(/afldb_prod/);
+    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_prod'))).rejects.toThrow(/current_database/);
   });
 
   it('hard refuses for any other database name, never partial-matching "afldb_test"', async () => {
-    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_test_old'))).rejects.toThrow(/afldb_test_old/);
+    await expect(requireAflApiBrownlowBacktestDatabase(fakeSql('afldb_test_old'))).rejects.toThrow(/current_database/);
   });
 });
 
@@ -538,6 +564,113 @@ describe('planBrownlowPositiveSlotReleases (AFLDB-ISSUE-244 I244-F007 blocker 1 
       const occupiedAfterRelease = [...before].filter(([player]) => !released.has(player)).map(([, v]) => v);
       const claimsByChangedRecipients = [...after].filter(([player]) => released.has(player)).map(([, v]) => v);
       for (const claimed of claimsByChangedRecipients) expect(occupiedAfterRelease).not.toContain(claimed);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB V2 Launch B — one unresolved vote refuses the whole Brownlow match set
+// (docs/v2/owner-instruction-2026-10-19.md "Fixtures and player identity";
+// afl-api-brownlow.ts planAflApiBrownlowMatchSet, the per-vote resolveAflApiPlayer loop). DB-free:
+// a fake tagged-template handle answers exactly the statements the planner issues for a match that
+// already resolves, so the only variable is the player lookup. Before this block the refusal was
+// proved only by a structural type check above and by the integration suites
+// (tests/integration/settle-afl-api-brownlow-backtest.test.ts, unexecuted without a database).
+// ---------------------------------------------------------------------------
+
+describe('AFLDB V2 Launch B — one unresolved vote refuses the whole Brownlow match set', () => {
+  const STAGED = { season: 2026, roundCode: '6', matchDate: '2026-04-11', homeClubId: 1, awayClubId: 2, isFinal: false };
+
+  function planningSql(playerRows: (providerPlayerId: string) => unknown[]): {
+    sql: postgres.TransactionSql; seen: string[]; lookups: string[];
+  } {
+    const seen: string[] = [];
+    const lookups: string[] = [];
+    const sql = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const text = strings.join('?').replace(/\s+/g, ' ').trim();
+      seen.push(text);
+      if (text.includes('FROM staging.afl_api_match')) return [STAGED];
+      if (text.includes('FROM clubs h, clubs a')) return [{ homeName: 'Home FC', awayName: 'Away FC' }];
+      if (text.includes('source_record_id =')) {
+        return [{ id: 501, season: 2026, homeClubId: 1, awayClubId: 2, matchKey: '2026|6|2026-04-11|Home FC|Away FC' }];
+      }
+      if (text.includes('round_number AS "roundNumber" FROM matches')) return [{ roundNumber: 6 }];
+      if (text.includes('FROM external_identities')) {
+        lookups.push(String(values[1]));
+        return playerRows(String(values[1]));
+      }
+      throw new Error(`unexpected statement in the Brownlow planning stub: ${text}`);
+    }) as unknown as postgres.TransactionSql;
+    return { sql, seen, lookups };
+  }
+
+  // SYNTHETIC vote set (provider ids are placeholders, not real players); apiRoundNumber 5 is the
+  // declared 2026 round that translates to canonical round 6.
+  const record: AflApiBrownlowMatchVoteRecord = {
+    providerMatchId: 'CD_M_SYNTHETIC',
+    apiRoundNumber: 5,
+    votes: [
+      { providerPlayerId: 'CD_I1', providerTeamId: 'CD_T10', votes: 3, eligible: true },
+      { providerPlayerId: 'CD_I2', providerTeamId: 'CD_T20', votes: 2, eligible: true },
+      { providerPlayerId: 'CD_I3', providerTeamId: 'CD_T10', votes: 1, eligible: true },
+    ],
+  };
+  const ids: Record<string, number> = { CD_I1: 101, CD_I2: 102, CD_I3: 103 };
+
+  it('control: when every vote resolves, the set is planned with one unit per vote', async () => {
+    const { sql, lookups } = planningSql((id) => [{ playerId: ids[id] }]);
+
+    const plan = await planAflApiBrownlowMatchSet(sql, 7, registry, record);
+
+    expect(plan.status).toBe('planned');
+    if (plan.status !== 'planned') return;
+    expect(plan.units.map((u) => u.playerId)).toEqual([101, 102, 103]);
+    expect(lookups).toEqual(['CD_I1', 'CD_I2', 'CD_I3']);
+  });
+
+  it('one unresolved vote refuses the WHOLE set (unresolved_identity), names the provider id, and stops looking', async () => {
+    const { sql, lookups } = planningSql((id) => (id === 'CD_I2' ? [] : [{ playerId: ids[id] }]));
+
+    const plan = await planAflApiBrownlowMatchSet(sql, 7, registry, record);
+
+    expect(plan).toEqual({
+      status: 'refused', providerMatchId: 'CD_M_SYNTHETIC', reason: 'unresolved_identity', detail: 'CD_I2',
+    });
+    // The refused plan carries no units: the two resolvable votes are not partially planned.
+    expect('units' in plan).toBe(false);
+    expect('matchId' in plan).toBe(false);
+    // CD_I3 is never consulted after CD_I2 refuses.
+    expect(lookups).toEqual(['CD_I1', 'CD_I2']);
+  });
+
+  it('a first-vote miss refuses the whole set even though the later votes would resolve', async () => {
+    const { sql, lookups } = planningSql((id) => (id === 'CD_I1' ? [] : [{ playerId: ids[id] }]));
+
+    const plan = await planAflApiBrownlowMatchSet(sql, 7, registry, record);
+
+    expect(plan).toMatchObject({ status: 'refused', reason: 'unresolved_identity', detail: 'CD_I1' });
+    expect(lookups).toEqual(['CD_I1']);
+  });
+
+  it('an ambiguous bridged identity refuses the whole set as player_identity_ambiguous', async () => {
+    const { sql } = planningSql((id) => (id === 'CD_I3' ? [{ playerId: 1 }, { playerId: 2 }] : [{ playerId: ids[id] }]));
+
+    const plan = await planAflApiBrownlowMatchSet(sql, 7, registry, record);
+
+    expect(plan).toEqual({
+      status: 'refused', providerMatchId: 'CD_M_SYNTHETIC', reason: 'player_identity_ambiguous', detail: 'CD_I3',
+    });
+  });
+
+  it('planning never writes and never reads a player by name or from the players table', async () => {
+    const { sql, seen } = planningSql((id) => (id === 'CD_I2' ? [] : [{ playerId: ids[id] }]));
+
+    await planAflApiBrownlowMatchSet(sql, 7, registry, record);
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const text of seen) {
+      expect(text).not.toMatch(/^(INSERT|UPDATE|DELETE|TRUNCATE)\b/i);
+      expect(text).not.toMatch(/player_name_aliases|\bFROM players\b|\bJOIN players\b/i);
     }
   });
 });

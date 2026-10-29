@@ -36,6 +36,7 @@ import {
   planAflApiMatchUnit,
   AflApiSettlePlanError,
 } from '@/lib/acquisition/afl-api-settle-plan';
+import { resolveAflApiPlayer } from '@/lib/acquisition/afl-api-player-resolver';
 import { NO_MATCH_REKEY_SCOPE } from '@/lib/acquisition/match-rekey';
 import { parseSourceFamilyRegistry } from '@/lib/acquisition/source-families';
 
@@ -931,5 +932,56 @@ describe('AFLDB-ISSUE-255 — unused-emergency player_match_stats rows are obser
       },
     });
     expect(deferred.statusOf(PLAYED_HOME_PLAYER)).toBe('deferred');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB V2 Launch B — player resolution is fail-closed
+// (docs/v2/owner-instruction-2026-10-19.md "Fixtures and player identity"). Already covered
+// elsewhere and NOT repeated here: resolved/unresolved/ambiguous outcomes of
+// resolveAflApiPlayer (tests/afl-api-match.test.ts "resolveAflApiPlayer" suite), the
+// per-player unresolved_identity and player_identity_ambiguous plan cases (above), and the static
+// no-INSERT-INTO-players scan (tests/afl-api-ingestion-safety.test.ts). This block adds the
+// captured-SQL proof that the ONLY thing consulted is external_identities, and that an
+// all-unresolved unit produces no player id and no write.
+// ---------------------------------------------------------------------------
+
+describe('AFLDB V2 Launch B — player resolution is fail-closed', () => {
+  const PLAYER_LOOKUP = /^SELECT player_id AS "playerId" FROM external_identities WHERE source_id = 42 AND external_id = "CD_I\d+" AND status IN \('unique', 'resolved'\) AND player_id IS NOT NULL$/;
+  const NAME_OR_PLAYERS_TABLE = /player_name_aliases|\bplayers\b|\bname\b|alias|jumper|afltables/i;
+
+  it('the resolver issues one statement: external_identities by (source_id, external_id), trusted statuses only', async () => {
+    const { sql, seen } = fakeSql(() => [{ playerId: 900 }]);
+
+    await expect(resolveAflApiPlayer(sql, SOURCE_ID, 'CD_I500001')).resolves.toEqual({ outcome: 'resolved', playerId: 900 });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatch(PLAYER_LOOKUP);
+    expect(seen[0]).not.toMatch(NAME_OR_PLAYERS_TABLE);
+  });
+
+  it('a unit whose provider players are ALL unresolved plans no player, carries no player id, and issues no write or name lookup', async () => {
+    const { bundle, records } = loadBundleAndRecords();
+    const { sql, seen } = planningSql({ matchRespond: () => [], playerRespond: () => [] });
+
+    const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, {
+      kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE,
+    });
+
+    expect(plan.players).toHaveLength(2);
+    for (const player of plan.players) {
+      expect(player).toMatchObject({ status: 'refused', reason: 'unresolved_identity' });
+      expect('playerId' in player).toBe(false);
+    }
+
+    const lookups = seen.filter((text) => text.includes('FROM external_identities'));
+    expect(lookups).toHaveLength(plan.players.length);
+    for (const text of lookups) expect(text).toMatch(PLAYER_LOOKUP);
+
+    // Nothing in the whole planning pass writes, or reads a player by name.
+    for (const text of seen) {
+      expect(text).not.toMatch(/^(INSERT|UPDATE|DELETE|TRUNCATE)\b/i);
+      expect(text).not.toMatch(/player_name_aliases|\bFROM players\b|\bJOIN players\b/i);
+    }
   });
 });

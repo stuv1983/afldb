@@ -1,0 +1,13 @@
+isolated-pg: afldb_v2_shadow_current_migration_test verified (cluster afldb_v2_isolated, 127.0.0.1:55467); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55467/afldb_v2_shadow_current_migration_test)
+  117 migration file(s), 110 already applied
+
+  applying 111_curated_award_proposals.sql ... ok (120 ms)
+  applying 112_derived_award_results.sql ... ok (59 ms)
+  applying 113_brownlow_eligibility_decisions.sql ... ok (46 ms)
+  applying 114_award_projections_and_curated_revisions.sql ... ok (37 ms)
+  applying 115_adjudication_supersession_fk_index.sql ... ok (10 ms)
+  applying 116_brownlow_correction_receipts.sql ... ok (20 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (5 ms)
+
+Applied 7 migration(s).

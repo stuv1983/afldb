@@ -1,0 +1,6 @@
+{
+  "derived_from_v4_manifest_sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+  "v4_review_report_sha256": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+  "operational_observation_source": "../metadata-repair-v4-unprivileged-observation-20261025/operational-observation-v2.sh (byte-identical; passed on production 2026-10-24T20:28Z)",
+  "frozen_v2_v3_v4": "Never execute; no member modified"
+}

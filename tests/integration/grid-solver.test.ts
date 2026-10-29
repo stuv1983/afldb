@@ -7,7 +7,7 @@
  * compiler against either a hand-written equivalent query or a real,
  * dynamically-discovered pair of players -- never a hardcoded name.
  */
-import './guard';
+import { verifyIsolatedIntegrationDatabase } from './guard';
 
 import { performance } from 'node:perf_hooks';
 
@@ -750,7 +750,7 @@ describe('grid solver correctness', () => {
       SELECT current_database() AS database,
              current_setting('statement_timeout') AS "statementTimeout"
     `;
-    expect(environment.database).toBe('afldb_test');
+    expect(environment.database).toBe(await verifyIsolatedIntegrationDatabase(sql));
     expect(environment.statementTimeout).toBe('5s');
 
     const cases: Array<{
@@ -895,7 +895,7 @@ describe('grid solver correctness', () => {
       'games_asc',
     );
     const [expected] = await sql<{ count: string }[]>`
-      SELECT count(DISTINCT player_id) FROM brownlow_season_votes WHERE eligible_rank <= 1
+      SELECT count(DISTINCT player_id) FROM brownlow_season_votes WHERE is_winner
     `;
     expect(summary.eligible).toBe(Number(expected.count));
   });
@@ -908,10 +908,14 @@ describe('grid solver correctness', () => {
       { builder: 'career_games_min', params: { games: '0' } },
       'games_asc',
     );
+    // The criterion counts people selected in a draft, not repeat picks or
+    // trade/free-agency list moves. The authentic bridge makes those distinct.
     const [expected] = await sql<{ count: string }[]>`
       SELECT count(*) FROM (
-        SELECT dp.player_id FROM draft_picks dp
+        SELECT DISTINCT dp.player_id FROM draft_picks dp
          WHERE dp.link_status_value IN ('unique', 'resolved')
+           AND dp.draft_kind IS DISTINCT FROM 'trade'
+           AND dp.draft_kind IS DISTINCT FROM 'free_agency'
            AND dp.club_id IN (SELECT id FROM clubs WHERE organization_id = ${org.id})
            AND NOT EXISTS (
              SELECT 1 FROM player_clubs pc WHERE pc.player_id = dp.player_id
@@ -919,6 +923,7 @@ describe('grid solver correctness', () => {
            )
       ) t
     `;
+    expect(Number(expected.count), 'linked draft selections are required to exercise the criterion').toBeGreaterThan(0);
     expect(summary.eligible).toBe(Number(expected.count));
   });
 

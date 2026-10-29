@@ -808,7 +808,11 @@ export type AflApiBrownlowVote = {
   providerPlayerId: string;
   providerTeamId: string;
   votes: number;
-  eligible: boolean;
+  /**
+   * The provider's explicit boolean, or null when the value is absent, null or not a boolean. Null is UNKNOWN
+   * (BP-2025-ELIGIBILITY-v1): it is carried through staging and reconciliation and is never read as false.
+   */
+  eligible: boolean | null;
 };
 
 export type AflApiBrownlowMatchVoteRecord = {
@@ -882,7 +886,7 @@ export function emitAflApiBrownlowMatchVotes(
         providerPlayerId: str(player.playerId, `${votePath}.player.playerId`),
         providerTeamId: str(team.teamId, `${votePath}.team.teamId`),
         votes: num(vote.votes, `${votePath}.votes`),
-        eligible: vote.eligible === true,
+        eligible: typeof vote.eligible === 'boolean' ? vote.eligible : null,
       };
     });
 
@@ -915,7 +919,8 @@ export type AflApiBrownlowLeaderboardRecord = {
   providerPlayerId: string;
   providerTeamId: string;
   votes: number;
-  eligible: boolean;
+  /** The provider's explicit boolean; null = absent, null or not a boolean (UNKNOWN, see {@link AflApiBrownlowVote}). */
+  eligible: boolean | null;
   winner: boolean;
   /** Measured as a separate boolean from `winner` (both keys are present on
    * every entry); AFLDB has no current use for it, so it is carried
@@ -960,7 +965,7 @@ export function emitAflApiBrownlowLeaderboard(
       // `votes` key (confirmed on every captured season, 2022-2025) — `votes` on this
       // type is AFLDB's own field name, not a source key.
       votes: num(entry.totalVotes, `${path}.totalVotes`),
-      eligible: entry.eligible === true,
+      eligible: typeof entry.eligible === 'boolean' ? entry.eligible : null,
       winner: entry.winner === true,
       leader: entry.leader === true,
       roundVotes: roundByRoundVotes.map((rvRaw, rvIndex) => {

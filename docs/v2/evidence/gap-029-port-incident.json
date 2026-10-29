@@ -1,0 +1,47 @@
+{
+  "reviewedOn": "2026-10-20",
+  "baselineHEAD": "a68a77fe",
+  "localEvidence": {
+    "sshPid": 25804,
+    "sshStartTimeUtc": "2026-10-19T21:14:49.3295904Z",
+    "historicallyObservedPid": 25804,
+    "localAddress": "127.0.0.1",
+    "localPort": 55432,
+    "forwardTargetHost": "127.0.0.1",
+    "forwardTargetPort": 5432,
+    "sshDestinationHost": "10.0.40.100",
+    "configurationEvidence": [
+      "C:/Users/stuar/.ssh/config: Host dev/streamanator maps to 10.0.40.100",
+      "docs/deployment.md: development host streamanator, PostgreSQL loopback 5432 and shared afldb_dev/afldb_test databases",
+      "deploy/sync-dev.ps1: default development SSH target 10.0.40.100"
+    ],
+    "retainedFailureLog": ".local-release/gap-029-before.log",
+    "retainedFailureLogSha256": "e5c86ae22c30f6bbde901feeab965fe157d0c5dfc11dc90150470b247872f587",
+    "retainedFailureLogMtimeUtc": "2026-10-19T21:15:44.480Z"
+  },
+  "proven": [
+    "The same SSH PID was identified during the earlier run and remains the local listener; its process start precedes the retained authentication failure log.",
+    "The forwarding arguments target PostgreSQL port 5432 on the remote loopback of the documented shared development host.",
+    "The earlier owner login returned a PostgreSQL password authentication failure. The previous session also recorded a superuser authentication failure. These were authentication contacts through the development tunnel, not isolated-cluster contacts.",
+    "The isolated cluster was stopped then, and is now owned by the documented postgres.exe/data directory on 55433.",
+    "No successful authentication or application SQL is demonstrated by the retained failures."
+  ],
+  "unknown": [
+    "Remote PostgreSQL server/cluster identity and requested-database existence were never authenticated or queried.",
+    "Remote server authentication logs and authentication method were not collected; this review does not assert plaintext-password transmission or successful access.",
+    "The host is documented as development; its exact service role at the incident time cannot be independently audited from local evidence. Production contact is not established, and a blanket no-production/shared-contact claim is withdrawn."
+  ],
+  "guard": {
+    "unexpected55432": "refused before reading/sending credentials or constructing PostgreSQL client",
+    "verified55433": "accepted matching postmaster PID, executable path, data-directory argument, recorded port and loopback listener; existing cluster/database checks also passed",
+    "unitTests": 17,
+    "limitations": "Local process inspection is best-effort with an unavoidable race before connection; SQL identity checks remain additional defence. Linux ss/proc branch is implemented; live validation here is Windows only."
+  },
+  "actionsNotTaken": [
+    "No new connection through the SSH tunnel",
+    "No stop or modification of SSH",
+    "No remote/shared SQL, service operation, credential rotation or reset in this follow-up"
+  ],
+  "requiredForRemoteAudit": "Owner-authorized inspection of the development PostgreSQL authentication logs for the retained failure-log timestamp and the attempted owner/superuser roles; remote cluster/database identity and authentication method cannot be established locally.",
+  "assessment": "Shared-development authentication contact is supported by the unchanged same-process forward, its start before the retained failure timestamp, historical PID observation and the PostgreSQL response. This is local forensic correlation, not a packet capture or authenticated remote server identity."
+}

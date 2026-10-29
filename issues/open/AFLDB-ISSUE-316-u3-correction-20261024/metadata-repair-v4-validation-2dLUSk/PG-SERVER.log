@@ -1,0 +1,2167 @@
+2026-10-25 06:52:14.175 AEDT [884459] LOG:  starting PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+2026-10-25 06:52:14.178 AEDT [884459] LOG:  listening on Unix socket "/tmp/i316-f004-pg-8AEBh2/socket/.s.PGSQL.55864"
+2026-10-25 06:52:14.189 AEDT [884462] LOG:  database system was shut down at 2026-10-25 06:52:13 AEDT
+2026-10-25 06:52:14.196 AEDT [884459] LOG:  database system is ready to accept connections
+2026-10-25 06:52:16.139 AEDT [884470] ERROR:  I316 state drift after read-only preflight
+2026-10-25 06:52:16.139 AEDT [884470] CONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE
+2026-10-25 06:52:16.139 AEDT [884470] STATEMENT:  
+	BEGIN ISOLATION LEVEL SERIALIZABLE;
+	
+	SET LOCAL lock_timeout='2s';
+	SET LOCAL statement_timeout='10min';
+	SET LOCAL idle_in_transaction_session_timeout='2min';
+	SET LOCAL timezone='UTC';
+	SET LOCAL search_path=pg_catalog,public;
+	-- Plain LOCK utilities only: no DO, SELECT, regclass expression or catalog query.
+	-- Existing protected relations only. Absent optional relations are environment observations.
+	LOCK TABLE public.data_edits IN SHARE ROW EXCLUSIVE MODE;
+	LOCK TABLE public.auth_users IN SHARE MODE;
+	LOCK TABLE public.data_overrides IN SHARE MODE;
+	LOCK TABLE public.matches IN SHARE MODE;
+	LOCK TABLE public.player_match_stats IN SHARE MODE;
+	LOCK TABLE public.match_period_scores IN SHARE MODE;
+	LOCK TABLE public.player_match_period_stats IN SHARE MODE;
+	LOCK TABLE public.player_career_stats IN SHARE MODE;
+	LOCK TABLE public.player_season_stats IN SHARE MODE;
+	LOCK TABLE public.player_club_season_stats IN SHARE MODE;
+	LOCK TABLE public.player_clubs IN SHARE MODE;
+	LOCK TABLE public.players IN SHARE MODE;
+	LOCK TABLE public.clubs IN SHARE MODE;
+	LOCK TABLE public.club_seasons IN SHARE MODE;
+	LOCK TABLE public.seasons IN SHARE MODE;
+	LOCK TABLE public.import_batches IN SHARE MODE;
+	LOCK TABLE public.import_rejections IN SHARE MODE;
+	LOCK TABLE public.canonical_applications IN SHARE MODE;
+	LOCK TABLE public.brownlow_season_votes IN SHARE MODE;
+	LOCK TABLE public.brownlow_round_votes IN SHARE MODE;
+	LOCK TABLE public.brownlow_vote_entry_state IN SHARE MODE;
+	LOCK TABLE public.brownlow_season_authority IN SHARE MODE;
+	LOCK TABLE public.auth_audit_log IN SHARE MODE;
+	LOCK TABLE staging.afltables_player_match IN SHARE MODE;
+	LOCK TABLE staging.afltables_match IN SHARE MODE;
+	LOCK TABLE staging.afl_api_lineup IN SHARE MODE;
+	LOCK TABLE staging.afl_api_brownlow_vote IN SHARE MODE;
+	
+	
+	LOCK TABLE afldb_meta.schema_migrations IN SHARE MODE;
+	
+	
+	
+	-- First runs after every plain LOCK statement and production identity.
+	DO $held$
+	DECLARE relname text; expected_mode text;
+	        required text[] := ARRAY['public.data_edits','public.auth_users','public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores','public.player_match_period_stats','public.player_career_stats','public.player_season_stats','public.player_club_season_stats','public.player_clubs','public.players','public.clubs','public.club_seasons','public.seasons','public.import_batches','public.import_rejections','public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes','public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log','staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relname IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	  IF to_regclass(relname) IS NULL THEN
+	   IF relname=ANY(required) THEN RAISE EXCEPTION 'I316 required lock relation absent %',relname; END IF;
+	  ELSE
+	   expected_mode := CASE WHEN relname='public.data_edits' THEN 'ShareRowExclusiveLock' ELSE 'ShareLock' END;
+	   IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_locks WHERE pid=pg_backend_pid() AND locktype='relation'
+	     AND relation=to_regclass(relname) AND mode=expected_mode AND granted)
+	   THEN RAISE EXCEPTION 'I316 complete protected lock set not held %',relname; END IF;
+	  END IF;
+	 END LOOP;
+	END $held$;
+	
+	SELECT id FROM public.data_edits WHERE id=94 FOR UPDATE;
+	SELECT id FROM public.data_overrides WHERE id=93 FOR SHARE;
+	SELECT id FROM public.auth_users WHERE id=1 FOR SHARE;
+	-- Expected pre-repair ledger. No migration is run or authorised.
+	DO $migration$
+	DECLARE expected jsonb := current_setting('afldb.i316.expected_migrations')::jsonb;
+	BEGIN
+	 IF (SELECT count(*) FROM afldb_meta.schema_migrations) <> jsonb_array_length(expected)
+	 OR EXISTS (SELECT 1 FROM jsonb_array_elements(expected) e
+	   LEFT JOIN afldb_meta.schema_migrations m ON m.name=e->>'name'
+	   WHERE m.name IS NULL OR NOT (e->'checksums' ? m.checksum))
+	 THEN RAISE EXCEPTION 'I316 expected pre-repair migration/schema version refused'; END IF;
+	END $migration$;
+	
+	-- Read-only checks shared by preflight and the locked repair transaction.
+	DO $checks$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        n text := b->>'note';
+	BEGIN
+	 IF n IS NULL OR length(n) <> 967 OR octet_length(n) <> 967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 THEN RAISE EXCEPTION 'I316 note input refused'; END IF;
+	 IF b->'actor' <> '{"id":1,"email":"stuart.villanti@gmail.com","role":"super_admin"}'::jsonb
+	 OR (SELECT count(*) FROM public.auth_users WHERE id=1 AND email=b->'actor'->>'email'
+	     AND role='super_admin' AND disabled_at IS NULL) <> 1
+	 THEN RAISE EXCEPTION 'I316 actor refused'; END IF;
+	 IF b->>'approval_sha256' IS DISTINCT FROM current_setting('afldb.i316.approval_sha256')
+	 OR b->>'approval_reference' IS DISTINCT FROM 'OWNER-RULING.md (retained 2026-10-25 owner instruction: Accept F-005 as a valid finding against the v3 proof contract.)'
+	 OR b->>'issue' IS DISTINCT FROM 'AFLDB-ISSUE-316'
+	 THEN RAISE EXCEPTION 'I316 approval refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_edits WHERE id=94) <> 1
+	 OR (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=94) IS DISTINCT FROM b->'edit94'
+	 OR (SELECT note FROM public.data_edits WHERE id=94) IS NOT NULL
+	 THEN RAISE EXCEPTION 'I316 target identity/null guard refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_overrides WHERE id=93) <> 1
+	 OR (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94'))
+	 THEN RAISE EXCEPTION 'I316 prior repair refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND NOT tgisinternal)
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class IN ('public.data_edits'::regclass,'public.data_overrides'::regclass))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND (relrowsecurity OR relforcerowsecurity OR relkind<>'r'))
+	 THEN RAISE EXCEPTION 'I316 unexpected audit/authority trigger/rule/RLS/relation'; END IF;
+	 IF (SELECT jsonb_agg(def ORDER BY def COLLATE "C") FROM
+	    (SELECT pg_get_constraintdef(oid) AS def FROM pg_catalog.pg_constraint
+	     WHERE conrelid='public.data_edits'::regclass) c) IS DISTINCT FROM b->'audit_constraints'
+	 OR (SELECT attidentity FROM pg_catalog.pg_attribute WHERE attrelid='public.data_edits'::regclass AND attname='id') IS DISTINCT FROM 'a'
+	 THEN RAISE EXCEPTION 'I316 audit schema/constraint drift'; END IF;
+	 IF NOT has_column_privilege(current_user,'public.data_edits','note','UPDATE')
+	 OR NOT has_table_privilege(current_user,'public.data_edits','INSERT')
+	 THEN RAISE EXCEPTION 'I316 existing role lacks repair privileges'; END IF;
+	END $checks$;
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	DO $fresh$
+	BEGIN
+	 IF current_setting('afldb.i316.snapshot')::jsonb IS DISTINCT FROM current_setting('afldb.i316.before')::jsonb
+	 THEN RAISE EXCEPTION 'I316 state drift after read-only preflight'; END IF;
+	END $fresh$;
+	SELECT 'I316_LOCKED_OPTIONAL_SCHEMA=' || (current_setting('afldb.i316.snapshot')::jsonb->'optional_schema')::text;
+	
+	
+	-- Exactly two logical writes. No catch block: every exception aborts the transaction.
+	DO $repair$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        audit_id bigint; affected integer; audit_row jsonb;
+	        oldj jsonb; newj jsonb; audit_note text;
+	BEGIN
+	 oldj := jsonb_build_object('target_audit_id',94,'authority_id',93,'note',NULL);
+	 newj := oldj || jsonb_build_object('note',b->>'note','issue',b->>'issue',
+	   'approval_reference',b->>'approval_reference','approval_sha256',b->>'approval_sha256',
+	   'review_manifest_sha256',current_setting('afldb.i316.manifest_sha256'),
+	   'review_record_sha256',current_setting('afldb.i316.review_sha256'),
+	   'execution_operator','Codex, delegated by the retained owner instruction; SSH arm -> sudo postgres',
+	   'database_session_user',session_user,'database_current_user',current_user,
+	   'reason','Approved correction note was missing from the committed audit record; canonical correction state was already separately verified correct. Metadata-only repair.');
+	 audit_note := 'AFLDB-ISSUE-316 metadata-only repair of data_edits 94.note; durable removal authority 93 unchanged. Owner approval OWNER-RULING.md SHA-256 '
+	   || (b->>'approval_sha256') || '; reviewed manifest SHA-256 ' || current_setting('afldb.i316.manifest_sha256')
+	   || '; independent review record SHA-256 ' || current_setting('afldb.i316.review_sha256') || '.';
+	 UPDATE public.data_edits d SET note=b->>'note'
+	 WHERE id=94 AND note IS NULL AND to_jsonb(d)=b->'edit94';
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 THEN RAISE EXCEPTION 'I316 update cardinality %',affected; END IF;
+	 INSERT INTO public.data_edits(table_name,row_id,field_group,old_values,new_values,admin_user_id,note,created_at)
+	 VALUES ('matches',17214,'audit_note_repair',oldj,newj,1,audit_note,transaction_timestamp())
+	 RETURNING to_jsonb(data_edits),id INTO audit_row,audit_id;
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 OR audit_id=94 THEN RAISE EXCEPTION 'I316 insert cardinality/id refused'; END IF;
+	 PERFORM set_config('afldb.i316.receipt',jsonb_build_object('id',audit_id,'row',audit_row)::text,false);
+	END $repair$;
+	
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	-- Read-only assertions: usable before COMMIT and in the independent postcommit transaction.
+	DO $post$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        beforej jsonb := current_setting('afldb.i316.before')::jsonb;
+	        afterj jsonb := current_setting('afldb.i316.snapshot')::jsonb;
+	        receipt jsonb := current_setting('afldb.i316.receipt')::jsonb;
+	        rid bigint := (receipt->>'id')::bigint;
+	        n text; relation text; beforep jsonb := beforej->'protected'; afterp jsonb := afterj->'protected';
+	        postcommit boolean := COALESCE(current_setting('afldb.i316.postcommit',true),'false')='true';
+	        drift boolean := afterj->'optional_schema' IS DISTINCT FROM beforej->'optional_schema';
+	BEGIN
+	 SELECT note INTO n FROM public.data_edits WHERE id=94;
+	 IF n IS DISTINCT FROM b->>'note' OR length(n)<>967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 OR (SELECT to_jsonb(d)-'note' FROM public.data_edits d WHERE id=94) IS DISTINCT FROM (b->'edit94')-'note'
+	 THEN RAISE EXCEPTION 'I316 repaired note/target postcondition refused'; END IF;
+	 IF (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=rid) IS DISTINCT FROM receipt->'row'
+	 OR (SELECT count(*) FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94')) <> 1
+	 OR receipt->'row'->>'field_group' <> 'audit_note_repair'
+	 OR receipt->'row'->>'admin_user_id' <> '1'
+	 OR receipt->'row'->'new_values'->>'approval_sha256' <> b->>'approval_sha256'
+	 OR receipt->'row'->'new_values'->>'review_record_sha256' <> current_setting('afldb.i316.review_sha256')
+	 THEN RAISE EXCEPTION 'I316 linked audit postcondition refused'; END IF;
+	 IF (afterj->'audit_rows')-rid::text-'94' IS DISTINCT FROM (beforej->'audit_rows')-'94'
+	 OR (beforej->'audit_rows') ? rid::text
+	 OR (SELECT count(*) FROM jsonb_object_keys(afterj->'audit_rows')) <>
+	    (SELECT count(*)+1 FROM jsonb_object_keys(beforej->'audit_rows'))
+	 THEN RAISE EXCEPTION 'I316 additional/missing/changed audit row refused'; END IF;
+	 IF postcommit THEN
+	   FOREACH relation IN ARRAY ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	     IF beforep->relation = '{"absent":true}'::jsonb THEN
+	       beforep := beforep-relation; afterp := afterp-relation;
+	     END IF;
+	   END LOOP;
+	 END IF;
+	 IF afterp IS DISTINCT FROM beforep
+	 THEN RAISE EXCEPTION 'I316 protected canonical/derived/history/Brownlow state changed'; END IF;
+	 IF (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority postcondition refused'; END IF;
+	 IF drift AND NOT postcommit THEN RAISE EXCEPTION 'I316 optional schema drift before commit'; END IF;
+	 PERFORM set_config('afldb.i316.environment_status',CASE WHEN drift THEN 'CONCURRENT_SCHEMA_DRIFT' ELSE 'CLEAN' END,false);
+	END $post$;
+	
+	
+	SELECT 'I316_PRECOMMIT=' || current_setting('afldb.i316.receipt');
+	COMMIT;
+	
+	
+2026-10-25 06:52:19.592 AEDT [884478] ERROR:  canceling statement due to lock timeout
+2026-10-25 06:52:19.592 AEDT [884478] STATEMENT:  
+	BEGIN ISOLATION LEVEL SERIALIZABLE;
+	
+	SET LOCAL lock_timeout='2s';
+	SET LOCAL statement_timeout='10min';
+	SET LOCAL idle_in_transaction_session_timeout='2min';
+	SET LOCAL timezone='UTC';
+	SET LOCAL search_path=pg_catalog,public;
+	-- Plain LOCK utilities only: no DO, SELECT, regclass expression or catalog query.
+	-- Existing protected relations only. Absent optional relations are environment observations.
+	LOCK TABLE public.data_edits IN SHARE ROW EXCLUSIVE MODE;
+	LOCK TABLE public.auth_users IN SHARE MODE;
+	LOCK TABLE public.data_overrides IN SHARE MODE;
+	LOCK TABLE public.matches IN SHARE MODE;
+	LOCK TABLE public.player_match_stats IN SHARE MODE;
+	LOCK TABLE public.match_period_scores IN SHARE MODE;
+	LOCK TABLE public.player_match_period_stats IN SHARE MODE;
+	LOCK TABLE public.player_career_stats IN SHARE MODE;
+	LOCK TABLE public.player_season_stats IN SHARE MODE;
+	LOCK TABLE public.player_club_season_stats IN SHARE MODE;
+	LOCK TABLE public.player_clubs IN SHARE MODE;
+	LOCK TABLE public.players IN SHARE MODE;
+	LOCK TABLE public.clubs IN SHARE MODE;
+	LOCK TABLE public.club_seasons IN SHARE MODE;
+	LOCK TABLE public.seasons IN SHARE MODE;
+	LOCK TABLE public.import_batches IN SHARE MODE;
+	LOCK TABLE public.import_rejections IN SHARE MODE;
+	LOCK TABLE public.canonical_applications IN SHARE MODE;
+	LOCK TABLE public.brownlow_season_votes IN SHARE MODE;
+	LOCK TABLE public.brownlow_round_votes IN SHARE MODE;
+	LOCK TABLE public.brownlow_vote_entry_state IN SHARE MODE;
+	LOCK TABLE public.brownlow_season_authority IN SHARE MODE;
+	LOCK TABLE public.auth_audit_log IN SHARE MODE;
+	LOCK TABLE staging.afltables_player_match IN SHARE MODE;
+	LOCK TABLE staging.afltables_match IN SHARE MODE;
+	LOCK TABLE staging.afl_api_lineup IN SHARE MODE;
+	LOCK TABLE staging.afl_api_brownlow_vote IN SHARE MODE;
+	
+	
+	LOCK TABLE afldb_meta.schema_migrations IN SHARE MODE;
+	
+	
+	
+	-- First runs after every plain LOCK statement and production identity.
+	DO $held$
+	DECLARE relname text; expected_mode text;
+	        required text[] := ARRAY['public.data_edits','public.auth_users','public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores','public.player_match_period_stats','public.player_career_stats','public.player_season_stats','public.player_club_season_stats','public.player_clubs','public.players','public.clubs','public.club_seasons','public.seasons','public.import_batches','public.import_rejections','public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes','public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log','staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relname IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	  IF to_regclass(relname) IS NULL THEN
+	   IF relname=ANY(required) THEN RAISE EXCEPTION 'I316 required lock relation absent %',relname; END IF;
+	  ELSE
+	   expected_mode := CASE WHEN relname='public.data_edits' THEN 'ShareRowExclusiveLock' ELSE 'ShareLock' END;
+	   IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_locks WHERE pid=pg_backend_pid() AND locktype='relation'
+	     AND relation=to_regclass(relname) AND mode=expected_mode AND granted)
+	   THEN RAISE EXCEPTION 'I316 complete protected lock set not held %',relname; END IF;
+	  END IF;
+	 END LOOP;
+	END $held$;
+	
+	SELECT id FROM public.data_edits WHERE id=94 FOR UPDATE;
+	SELECT id FROM public.data_overrides WHERE id=93 FOR SHARE;
+	SELECT id FROM public.auth_users WHERE id=1 FOR SHARE;
+	-- Expected pre-repair ledger. No migration is run or authorised.
+	DO $migration$
+	DECLARE expected jsonb := current_setting('afldb.i316.expected_migrations')::jsonb;
+	BEGIN
+	 IF (SELECT count(*) FROM afldb_meta.schema_migrations) <> jsonb_array_length(expected)
+	 OR EXISTS (SELECT 1 FROM jsonb_array_elements(expected) e
+	   LEFT JOIN afldb_meta.schema_migrations m ON m.name=e->>'name'
+	   WHERE m.name IS NULL OR NOT (e->'checksums' ? m.checksum))
+	 THEN RAISE EXCEPTION 'I316 expected pre-repair migration/schema version refused'; END IF;
+	END $migration$;
+	
+	-- Read-only checks shared by preflight and the locked repair transaction.
+	DO $checks$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        n text := b->>'note';
+	BEGIN
+	 IF n IS NULL OR length(n) <> 967 OR octet_length(n) <> 967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 THEN RAISE EXCEPTION 'I316 note input refused'; END IF;
+	 IF b->'actor' <> '{"id":1,"email":"stuart.villanti@gmail.com","role":"super_admin"}'::jsonb
+	 OR (SELECT count(*) FROM public.auth_users WHERE id=1 AND email=b->'actor'->>'email'
+	     AND role='super_admin' AND disabled_at IS NULL) <> 1
+	 THEN RAISE EXCEPTION 'I316 actor refused'; END IF;
+	 IF b->>'approval_sha256' IS DISTINCT FROM current_setting('afldb.i316.approval_sha256')
+	 OR b->>'approval_reference' IS DISTINCT FROM 'OWNER-RULING.md (retained 2026-10-25 owner instruction: Accept F-005 as a valid finding against the v3 proof contract.)'
+	 OR b->>'issue' IS DISTINCT FROM 'AFLDB-ISSUE-316'
+	 THEN RAISE EXCEPTION 'I316 approval refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_edits WHERE id=94) <> 1
+	 OR (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=94) IS DISTINCT FROM b->'edit94'
+	 OR (SELECT note FROM public.data_edits WHERE id=94) IS NOT NULL
+	 THEN RAISE EXCEPTION 'I316 target identity/null guard refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_overrides WHERE id=93) <> 1
+	 OR (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94'))
+	 THEN RAISE EXCEPTION 'I316 prior repair refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND NOT tgisinternal)
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class IN ('public.data_edits'::regclass,'public.data_overrides'::regclass))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND (relrowsecurity OR relforcerowsecurity OR relkind<>'r'))
+	 THEN RAISE EXCEPTION 'I316 unexpected audit/authority trigger/rule/RLS/relation'; END IF;
+	 IF (SELECT jsonb_agg(def ORDER BY def COLLATE "C") FROM
+	    (SELECT pg_get_constraintdef(oid) AS def FROM pg_catalog.pg_constraint
+	     WHERE conrelid='public.data_edits'::regclass) c) IS DISTINCT FROM b->'audit_constraints'
+	 OR (SELECT attidentity FROM pg_catalog.pg_attribute WHERE attrelid='public.data_edits'::regclass AND attname='id') IS DISTINCT FROM 'a'
+	 THEN RAISE EXCEPTION 'I316 audit schema/constraint drift'; END IF;
+	 IF NOT has_column_privilege(current_user,'public.data_edits','note','UPDATE')
+	 OR NOT has_table_privilege(current_user,'public.data_edits','INSERT')
+	 THEN RAISE EXCEPTION 'I316 existing role lacks repair privileges'; END IF;
+	END $checks$;
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	DO $fresh$
+	BEGIN
+	 IF current_setting('afldb.i316.snapshot')::jsonb IS DISTINCT FROM current_setting('afldb.i316.before')::jsonb
+	 THEN RAISE EXCEPTION 'I316 state drift after read-only preflight'; END IF;
+	END $fresh$;
+	SELECT 'I316_LOCKED_OPTIONAL_SCHEMA=' || (current_setting('afldb.i316.snapshot')::jsonb->'optional_schema')::text;
+	
+	
+	-- Exactly two logical writes. No catch block: every exception aborts the transaction.
+	DO $repair$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        audit_id bigint; affected integer; audit_row jsonb;
+	        oldj jsonb; newj jsonb; audit_note text;
+	BEGIN
+	 oldj := jsonb_build_object('target_audit_id',94,'authority_id',93,'note',NULL);
+	 newj := oldj || jsonb_build_object('note',b->>'note','issue',b->>'issue',
+	   'approval_reference',b->>'approval_reference','approval_sha256',b->>'approval_sha256',
+	   'review_manifest_sha256',current_setting('afldb.i316.manifest_sha256'),
+	   'review_record_sha256',current_setting('afldb.i316.review_sha256'),
+	   'execution_operator','Codex, delegated by the retained owner instruction; SSH arm -> sudo postgres',
+	   'database_session_user',session_user,'database_current_user',current_user,
+	   'reason','Approved correction note was missing from the committed audit record; canonical correction state was already separately verified correct. Metadata-only repair.');
+	 audit_note := 'AFLDB-ISSUE-316 metadata-only repair of data_edits 94.note; durable removal authority 93 unchanged. Owner approval OWNER-RULING.md SHA-256 '
+	   || (b->>'approval_sha256') || '; reviewed manifest SHA-256 ' || current_setting('afldb.i316.manifest_sha256')
+	   || '; independent review record SHA-256 ' || current_setting('afldb.i316.review_sha256') || '.';
+	 UPDATE public.data_edits d SET note=b->>'note'
+	 WHERE id=94 AND note IS NULL AND to_jsonb(d)=b->'edit94';
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 THEN RAISE EXCEPTION 'I316 update cardinality %',affected; END IF;
+	 INSERT INTO public.data_edits(table_name,row_id,field_group,old_values,new_values,admin_user_id,note,created_at)
+	 VALUES ('matches',17214,'audit_note_repair',oldj,newj,1,audit_note,transaction_timestamp())
+	 RETURNING to_jsonb(data_edits),id INTO audit_row,audit_id;
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 OR audit_id=94 THEN RAISE EXCEPTION 'I316 insert cardinality/id refused'; END IF;
+	 PERFORM set_config('afldb.i316.receipt',jsonb_build_object('id',audit_id,'row',audit_row)::text,false);
+	END $repair$;
+	
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	-- Read-only assertions: usable before COMMIT and in the independent postcommit transaction.
+	DO $post$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        beforej jsonb := current_setting('afldb.i316.before')::jsonb;
+	        afterj jsonb := current_setting('afldb.i316.snapshot')::jsonb;
+	        receipt jsonb := current_setting('afldb.i316.receipt')::jsonb;
+	        rid bigint := (receipt->>'id')::bigint;
+	        n text; relation text; beforep jsonb := beforej->'protected'; afterp jsonb := afterj->'protected';
+	        postcommit boolean := COALESCE(current_setting('afldb.i316.postcommit',true),'false')='true';
+	        drift boolean := afterj->'optional_schema' IS DISTINCT FROM beforej->'optional_schema';
+	BEGIN
+	 SELECT note INTO n FROM public.data_edits WHERE id=94;
+	 IF n IS DISTINCT FROM b->>'note' OR length(n)<>967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 OR (SELECT to_jsonb(d)-'note' FROM public.data_edits d WHERE id=94) IS DISTINCT FROM (b->'edit94')-'note'
+	 THEN RAISE EXCEPTION 'I316 repaired note/target postcondition refused'; END IF;
+	 IF (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=rid) IS DISTINCT FROM receipt->'row'
+	 OR (SELECT count(*) FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94')) <> 1
+	 OR receipt->'row'->>'field_group' <> 'audit_note_repair'
+	 OR receipt->'row'->>'admin_user_id' <> '1'
+	 OR receipt->'row'->'new_values'->>'approval_sha256' <> b->>'approval_sha256'
+	 OR receipt->'row'->'new_values'->>'review_record_sha256' <> current_setting('afldb.i316.review_sha256')
+	 THEN RAISE EXCEPTION 'I316 linked audit postcondition refused'; END IF;
+	 IF (afterj->'audit_rows')-rid::text-'94' IS DISTINCT FROM (beforej->'audit_rows')-'94'
+	 OR (beforej->'audit_rows') ? rid::text
+	 OR (SELECT count(*) FROM jsonb_object_keys(afterj->'audit_rows')) <>
+	    (SELECT count(*)+1 FROM jsonb_object_keys(beforej->'audit_rows'))
+	 THEN RAISE EXCEPTION 'I316 additional/missing/changed audit row refused'; END IF;
+	 IF postcommit THEN
+	   FOREACH relation IN ARRAY ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	     IF beforep->relation = '{"absent":true}'::jsonb THEN
+	       beforep := beforep-relation; afterp := afterp-relation;
+	     END IF;
+	   END LOOP;
+	 END IF;
+	 IF afterp IS DISTINCT FROM beforep
+	 THEN RAISE EXCEPTION 'I316 protected canonical/derived/history/Brownlow state changed'; END IF;
+	 IF (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority postcondition refused'; END IF;
+	 IF drift AND NOT postcommit THEN RAISE EXCEPTION 'I316 optional schema drift before commit'; END IF;
+	 PERFORM set_config('afldb.i316.environment_status',CASE WHEN drift THEN 'CONCURRENT_SCHEMA_DRIFT' ELSE 'CLEAN' END,false);
+	END $post$;
+	
+	
+	SELECT 'I316_PRECOMMIT=' || current_setting('afldb.i316.receipt');
+	COMMIT;
+	
+	
+2026-10-25 06:52:21.156 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:21.156 AEDT [884544] STATEMENT:  UPDATE public.data_overrides SET id=id
+2026-10-25 06:52:21.309 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:21.309 AEDT [884544] STATEMENT:  DELETE FROM public.data_overrides WHERE false
+2026-10-25 06:52:21.461 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:21.461 AEDT [884544] STATEMENT:  INSERT INTO public.data_overrides(entity_type) SELECT entity_type FROM public.data_overrides WHERE false
+2026-10-25 06:52:21.614 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:21.614 AEDT [884544] STATEMENT:  UPDATE public.matches SET id=id
+2026-10-25 06:52:21.766 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:21.766 AEDT [884544] STATEMENT:  DELETE FROM public.matches WHERE false
+2026-10-25 06:52:21.919 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:21.919 AEDT [884544] STATEMENT:  INSERT INTO public.matches(id) SELECT id FROM public.matches WHERE false
+2026-10-25 06:52:22.072 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:22.072 AEDT [884544] STATEMENT:  UPDATE public.player_match_stats SET id=id
+2026-10-25 06:52:22.225 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:22.225 AEDT [884544] STATEMENT:  DELETE FROM public.player_match_stats WHERE false
+2026-10-25 06:52:22.377 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:22.377 AEDT [884544] STATEMENT:  INSERT INTO public.player_match_stats(id) SELECT id FROM public.player_match_stats WHERE false
+2026-10-25 06:52:22.529 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:22.529 AEDT [884544] STATEMENT:  UPDATE public.match_period_scores SET fixture_key=fixture_key
+2026-10-25 06:52:22.683 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:22.683 AEDT [884544] STATEMENT:  DELETE FROM public.match_period_scores WHERE false
+2026-10-25 06:52:22.835 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:22.835 AEDT [884544] STATEMENT:  INSERT INTO public.match_period_scores(fixture_key) SELECT fixture_key FROM public.match_period_scores WHERE false
+2026-10-25 06:52:22.988 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:22.988 AEDT [884544] STATEMENT:  UPDATE public.player_match_period_stats SET fixture_key=fixture_key
+2026-10-25 06:52:23.141 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:23.141 AEDT [884544] STATEMENT:  DELETE FROM public.player_match_period_stats WHERE false
+2026-10-25 06:52:23.294 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:23.294 AEDT [884544] STATEMENT:  INSERT INTO public.player_match_period_stats(fixture_key) SELECT fixture_key FROM public.player_match_period_stats WHERE false
+2026-10-25 06:52:23.445 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:23.445 AEDT [884544] STATEMENT:  UPDATE public.player_career_stats SET fixture_key=fixture_key
+2026-10-25 06:52:23.598 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:23.598 AEDT [884544] STATEMENT:  DELETE FROM public.player_career_stats WHERE false
+2026-10-25 06:52:23.751 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:23.751 AEDT [884544] STATEMENT:  INSERT INTO public.player_career_stats(fixture_key) SELECT fixture_key FROM public.player_career_stats WHERE false
+2026-10-25 06:52:23.904 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:23.904 AEDT [884544] STATEMENT:  UPDATE public.player_season_stats SET fixture_key=fixture_key
+2026-10-25 06:52:24.056 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:24.056 AEDT [884544] STATEMENT:  DELETE FROM public.player_season_stats WHERE false
+2026-10-25 06:52:24.209 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:24.209 AEDT [884544] STATEMENT:  INSERT INTO public.player_season_stats(fixture_key) SELECT fixture_key FROM public.player_season_stats WHERE false
+2026-10-25 06:52:24.361 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:24.361 AEDT [884544] STATEMENT:  UPDATE public.player_club_season_stats SET fixture_key=fixture_key
+2026-10-25 06:52:24.514 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:24.514 AEDT [884544] STATEMENT:  DELETE FROM public.player_club_season_stats WHERE false
+2026-10-25 06:52:24.666 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:24.666 AEDT [884544] STATEMENT:  INSERT INTO public.player_club_season_stats(fixture_key) SELECT fixture_key FROM public.player_club_season_stats WHERE false
+2026-10-25 06:52:24.819 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:24.819 AEDT [884544] STATEMENT:  UPDATE public.player_clubs SET fixture_key=fixture_key
+2026-10-25 06:52:24.972 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:24.972 AEDT [884544] STATEMENT:  DELETE FROM public.player_clubs WHERE false
+2026-10-25 06:52:25.124 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:25.124 AEDT [884544] STATEMENT:  INSERT INTO public.player_clubs(fixture_key) SELECT fixture_key FROM public.player_clubs WHERE false
+2026-10-25 06:52:25.277 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:25.277 AEDT [884544] STATEMENT:  UPDATE public.players SET fixture_key=fixture_key
+2026-10-25 06:52:25.429 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:25.429 AEDT [884544] STATEMENT:  DELETE FROM public.players WHERE false
+2026-10-25 06:52:25.582 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:25.582 AEDT [884544] STATEMENT:  INSERT INTO public.players(fixture_key) SELECT fixture_key FROM public.players WHERE false
+2026-10-25 06:52:25.734 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:25.734 AEDT [884544] STATEMENT:  UPDATE public.clubs SET fixture_key=fixture_key
+2026-10-25 06:52:25.887 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:25.887 AEDT [884544] STATEMENT:  DELETE FROM public.clubs WHERE false
+2026-10-25 06:52:26.039 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:26.039 AEDT [884544] STATEMENT:  INSERT INTO public.clubs(fixture_key) SELECT fixture_key FROM public.clubs WHERE false
+2026-10-25 06:52:26.192 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:26.192 AEDT [884544] STATEMENT:  UPDATE public.club_seasons SET fixture_key=fixture_key
+2026-10-25 06:52:26.345 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:26.345 AEDT [884544] STATEMENT:  DELETE FROM public.club_seasons WHERE false
+2026-10-25 06:52:26.497 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:26.497 AEDT [884544] STATEMENT:  INSERT INTO public.club_seasons(fixture_key) SELECT fixture_key FROM public.club_seasons WHERE false
+2026-10-25 06:52:26.649 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:26.649 AEDT [884544] STATEMENT:  UPDATE public.seasons SET fixture_key=fixture_key
+2026-10-25 06:52:26.802 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:26.802 AEDT [884544] STATEMENT:  DELETE FROM public.seasons WHERE false
+2026-10-25 06:52:26.955 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:26.955 AEDT [884544] STATEMENT:  INSERT INTO public.seasons(fixture_key) SELECT fixture_key FROM public.seasons WHERE false
+2026-10-25 06:52:27.107 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:27.107 AEDT [884544] STATEMENT:  UPDATE public.import_batches SET fixture_key=fixture_key
+2026-10-25 06:52:27.260 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:27.260 AEDT [884544] STATEMENT:  DELETE FROM public.import_batches WHERE false
+2026-10-25 06:52:27.413 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:27.413 AEDT [884544] STATEMENT:  INSERT INTO public.import_batches(fixture_key) SELECT fixture_key FROM public.import_batches WHERE false
+2026-10-25 06:52:27.565 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:27.565 AEDT [884544] STATEMENT:  UPDATE public.import_rejections SET fixture_key=fixture_key
+2026-10-25 06:52:27.718 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:27.718 AEDT [884544] STATEMENT:  DELETE FROM public.import_rejections WHERE false
+2026-10-25 06:52:27.871 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:27.871 AEDT [884544] STATEMENT:  INSERT INTO public.import_rejections(fixture_key) SELECT fixture_key FROM public.import_rejections WHERE false
+2026-10-25 06:52:28.023 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:28.023 AEDT [884544] STATEMENT:  UPDATE public.canonical_applications SET fixture_key=fixture_key
+2026-10-25 06:52:28.176 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:28.176 AEDT [884544] STATEMENT:  DELETE FROM public.canonical_applications WHERE false
+2026-10-25 06:52:28.328 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:28.328 AEDT [884544] STATEMENT:  INSERT INTO public.canonical_applications(fixture_key) SELECT fixture_key FROM public.canonical_applications WHERE false
+2026-10-25 06:52:28.481 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:28.481 AEDT [884544] STATEMENT:  UPDATE public.brownlow_season_votes SET fixture_key=fixture_key
+2026-10-25 06:52:28.635 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:28.635 AEDT [884544] STATEMENT:  DELETE FROM public.brownlow_season_votes WHERE false
+2026-10-25 06:52:28.788 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:28.788 AEDT [884544] STATEMENT:  INSERT INTO public.brownlow_season_votes(fixture_key) SELECT fixture_key FROM public.brownlow_season_votes WHERE false
+2026-10-25 06:52:28.940 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:28.940 AEDT [884544] STATEMENT:  UPDATE public.brownlow_round_votes SET fixture_key=fixture_key
+2026-10-25 06:52:29.093 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:29.093 AEDT [884544] STATEMENT:  DELETE FROM public.brownlow_round_votes WHERE false
+2026-10-25 06:52:29.245 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:29.245 AEDT [884544] STATEMENT:  INSERT INTO public.brownlow_round_votes(fixture_key) SELECT fixture_key FROM public.brownlow_round_votes WHERE false
+2026-10-25 06:52:29.398 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:29.398 AEDT [884544] STATEMENT:  UPDATE public.brownlow_vote_entry_state SET fixture_key=fixture_key
+2026-10-25 06:52:29.551 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:29.551 AEDT [884544] STATEMENT:  DELETE FROM public.brownlow_vote_entry_state WHERE false
+2026-10-25 06:52:29.703 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:29.703 AEDT [884544] STATEMENT:  INSERT INTO public.brownlow_vote_entry_state(fixture_key) SELECT fixture_key FROM public.brownlow_vote_entry_state WHERE false
+2026-10-25 06:52:29.856 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:29.856 AEDT [884544] STATEMENT:  UPDATE public.brownlow_season_authority SET fixture_key=fixture_key
+2026-10-25 06:52:30.008 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:30.008 AEDT [884544] STATEMENT:  DELETE FROM public.brownlow_season_authority WHERE false
+2026-10-25 06:52:30.160 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:30.160 AEDT [884544] STATEMENT:  INSERT INTO public.brownlow_season_authority(fixture_key) SELECT fixture_key FROM public.brownlow_season_authority WHERE false
+2026-10-25 06:52:30.313 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:30.313 AEDT [884544] STATEMENT:  UPDATE public.auth_audit_log SET fixture_key=fixture_key
+2026-10-25 06:52:30.465 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:30.465 AEDT [884544] STATEMENT:  DELETE FROM public.auth_audit_log WHERE false
+2026-10-25 06:52:30.618 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:30.618 AEDT [884544] STATEMENT:  INSERT INTO public.auth_audit_log(fixture_key) SELECT fixture_key FROM public.auth_audit_log WHERE false
+2026-10-25 06:52:30.771 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:30.771 AEDT [884544] STATEMENT:  UPDATE staging.afltables_player_match SET season=season
+2026-10-25 06:52:30.925 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:30.925 AEDT [884544] STATEMENT:  DELETE FROM staging.afltables_player_match WHERE false
+2026-10-25 06:52:31.078 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:31.078 AEDT [884544] STATEMENT:  INSERT INTO staging.afltables_player_match(season) SELECT season FROM staging.afltables_player_match WHERE false
+2026-10-25 06:52:31.230 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:31.230 AEDT [884544] STATEMENT:  UPDATE staging.afltables_match SET fixture_key=fixture_key
+2026-10-25 06:52:31.383 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:31.383 AEDT [884544] STATEMENT:  DELETE FROM staging.afltables_match WHERE false
+2026-10-25 06:52:31.535 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:31.535 AEDT [884544] STATEMENT:  INSERT INTO staging.afltables_match(fixture_key) SELECT fixture_key FROM staging.afltables_match WHERE false
+2026-10-25 06:52:31.688 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:31.688 AEDT [884544] STATEMENT:  UPDATE staging.afl_api_lineup SET fixture_key=fixture_key
+2026-10-25 06:52:31.841 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:31.841 AEDT [884544] STATEMENT:  DELETE FROM staging.afl_api_lineup WHERE false
+2026-10-25 06:52:31.993 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:31.993 AEDT [884544] STATEMENT:  INSERT INTO staging.afl_api_lineup(fixture_key) SELECT fixture_key FROM staging.afl_api_lineup WHERE false
+2026-10-25 06:52:32.146 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:32.146 AEDT [884544] STATEMENT:  UPDATE staging.afl_api_brownlow_vote SET fixture_key=fixture_key
+2026-10-25 06:52:32.298 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:32.298 AEDT [884544] STATEMENT:  DELETE FROM staging.afl_api_brownlow_vote WHERE false
+2026-10-25 06:52:32.450 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:32.450 AEDT [884544] STATEMENT:  INSERT INTO staging.afl_api_brownlow_vote(fixture_key) SELECT fixture_key FROM staging.afl_api_brownlow_vote WHERE false
+2026-10-25 06:52:32.602 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:32.602 AEDT [884544] STATEMENT:  UPDATE afldb_meta.schema_migrations SET name=name
+2026-10-25 06:52:32.755 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:32.755 AEDT [884544] STATEMENT:  DELETE FROM afldb_meta.schema_migrations WHERE false
+2026-10-25 06:52:32.907 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:32.907 AEDT [884544] STATEMENT:  INSERT INTO afldb_meta.schema_migrations(name) SELECT name FROM afldb_meta.schema_migrations WHERE false
+2026-10-25 06:52:33.060 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:33.060 AEDT [884544] STATEMENT:  UPDATE public.brownlow_eligibility_decisions SET fixture_key=fixture_key
+2026-10-25 06:52:33.212 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:33.212 AEDT [884544] STATEMENT:  DELETE FROM public.brownlow_eligibility_decisions WHERE false
+2026-10-25 06:52:33.367 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:33.367 AEDT [884544] STATEMENT:  INSERT INTO public.brownlow_eligibility_decisions(fixture_key) SELECT fixture_key FROM public.brownlow_eligibility_decisions WHERE false
+2026-10-25 06:52:33.519 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:33.519 AEDT [884544] STATEMENT:  UPDATE public.brownlow_correction_receipts SET fixture_key=fixture_key
+2026-10-25 06:52:33.671 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:33.671 AEDT [884544] STATEMENT:  DELETE FROM public.brownlow_correction_receipts WHERE false
+2026-10-25 06:52:33.822 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:33.822 AEDT [884544] STATEMENT:  INSERT INTO public.brownlow_correction_receipts(fixture_key) SELECT fixture_key FROM public.brownlow_correction_receipts WHERE false
+2026-10-25 06:52:33.973 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:33.973 AEDT [884544] STATEMENT:  UPDATE public.auth_users SET role=role WHERE id=1
+2026-10-25 06:52:34.126 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 8
+2026-10-25 06:52:34.126 AEDT [884544] STATEMENT:  UPDATE public.data_edits SET note=note WHERE id=94
+2026-10-25 06:52:34.279 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:34.279 AEDT [884544] STATEMENT:  DELETE FROM public.data_edits WHERE false
+2026-10-25 06:52:34.431 AEDT [884544] ERROR:  canceling statement due to lock timeout at character 13
+2026-10-25 06:52:34.431 AEDT [884544] STATEMENT:  INSERT INTO public.data_edits(table_name) SELECT table_name FROM public.data_edits WHERE false
+2026-10-25 06:52:34.584 AEDT [884544] ERROR:  canceling statement due to lock timeout
+2026-10-25 06:52:34.584 AEDT [884544] STATEMENT:  ALTER TABLE public.data_edits ADD COLUMN forbidden integer
+2026-10-25 06:52:37.518 AEDT [884710] ERROR:  duplicate key value violates unique constraint "data_edits_pkey"
+2026-10-25 06:52:37.518 AEDT [884710] DETAIL:  Key (id)=(94) already exists.
+2026-10-25 06:52:37.518 AEDT [884710] CONTEXT:  SQL statement "INSERT INTO public.data_edits(table_name,row_id,field_group,old_values,new_values,admin_user_id,note,created_at)
+	 VALUES ('matches',17214,'audit_note_repair',oldj,newj,1,audit_note,transaction_timestamp())
+	 RETURNING to_jsonb(data_edits),id"
+	PL/pgSQL function inline_code_block line 21 at SQL statement
+2026-10-25 06:52:37.518 AEDT [884710] STATEMENT:  
+	BEGIN ISOLATION LEVEL SERIALIZABLE;
+	
+	SET LOCAL lock_timeout='2s';
+	SET LOCAL statement_timeout='10min';
+	SET LOCAL idle_in_transaction_session_timeout='2min';
+	SET LOCAL timezone='UTC';
+	SET LOCAL search_path=pg_catalog,public;
+	-- Plain LOCK utilities only: no DO, SELECT, regclass expression or catalog query.
+	-- Existing protected relations only. Absent optional relations are environment observations.
+	LOCK TABLE public.data_edits IN SHARE ROW EXCLUSIVE MODE;
+	LOCK TABLE public.auth_users IN SHARE MODE;
+	LOCK TABLE public.data_overrides IN SHARE MODE;
+	LOCK TABLE public.matches IN SHARE MODE;
+	LOCK TABLE public.player_match_stats IN SHARE MODE;
+	LOCK TABLE public.match_period_scores IN SHARE MODE;
+	LOCK TABLE public.player_match_period_stats IN SHARE MODE;
+	LOCK TABLE public.player_career_stats IN SHARE MODE;
+	LOCK TABLE public.player_season_stats IN SHARE MODE;
+	LOCK TABLE public.player_club_season_stats IN SHARE MODE;
+	LOCK TABLE public.player_clubs IN SHARE MODE;
+	LOCK TABLE public.players IN SHARE MODE;
+	LOCK TABLE public.clubs IN SHARE MODE;
+	LOCK TABLE public.club_seasons IN SHARE MODE;
+	LOCK TABLE public.seasons IN SHARE MODE;
+	LOCK TABLE public.import_batches IN SHARE MODE;
+	LOCK TABLE public.import_rejections IN SHARE MODE;
+	LOCK TABLE public.canonical_applications IN SHARE MODE;
+	LOCK TABLE public.brownlow_season_votes IN SHARE MODE;
+	LOCK TABLE public.brownlow_round_votes IN SHARE MODE;
+	LOCK TABLE public.brownlow_vote_entry_state IN SHARE MODE;
+	LOCK TABLE public.brownlow_season_authority IN SHARE MODE;
+	LOCK TABLE public.auth_audit_log IN SHARE MODE;
+	LOCK TABLE staging.afltables_player_match IN SHARE MODE;
+	LOCK TABLE staging.afltables_match IN SHARE MODE;
+	LOCK TABLE staging.afl_api_lineup IN SHARE MODE;
+	LOCK TABLE staging.afl_api_brownlow_vote IN SHARE MODE;
+	
+	
+	LOCK TABLE afldb_meta.schema_migrations IN SHARE MODE;
+	
+	
+	
+	-- First runs after every plain LOCK statement and production identity.
+	DO $held$
+	DECLARE relname text; expected_mode text;
+	        required text[] := ARRAY['public.data_edits','public.auth_users','public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores','public.player_match_period_stats','public.player_career_stats','public.player_season_stats','public.player_club_season_stats','public.player_clubs','public.players','public.clubs','public.club_seasons','public.seasons','public.import_batches','public.import_rejections','public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes','public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log','staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relname IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	  IF to_regclass(relname) IS NULL THEN
+	   IF relname=ANY(required) THEN RAISE EXCEPTION 'I316 required lock relation absent %',relname; END IF;
+	  ELSE
+	   expected_mode := CASE WHEN relname='public.data_edits' THEN 'ShareRowExclusiveLock' ELSE 'ShareLock' END;
+	   IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_locks WHERE pid=pg_backend_pid() AND locktype='relation'
+	     AND relation=to_regclass(relname) AND mode=expected_mode AND granted)
+	   THEN RAISE EXCEPTION 'I316 complete protected lock set not held %',relname; END IF;
+	  END IF;
+	 END LOOP;
+	END $held$;
+	
+	SELECT id FROM public.data_edits WHERE id=94 FOR UPDATE;
+	SELECT id FROM public.data_overrides WHERE id=93 FOR SHARE;
+	SELECT id FROM public.auth_users WHERE id=1 FOR SHARE;
+	-- Expected pre-repair ledger. No migration is run or authorised.
+	DO $migration$
+	DECLARE expected jsonb := current_setting('afldb.i316.expected_migrations')::jsonb;
+	BEGIN
+	 IF (SELECT count(*) FROM afldb_meta.schema_migrations) <> jsonb_array_length(expected)
+	 OR EXISTS (SELECT 1 FROM jsonb_array_elements(expected) e
+	   LEFT JOIN afldb_meta.schema_migrations m ON m.name=e->>'name'
+	   WHERE m.name IS NULL OR NOT (e->'checksums' ? m.checksum))
+	 THEN RAISE EXCEPTION 'I316 expected pre-repair migration/schema version refused'; END IF;
+	END $migration$;
+	
+	-- Read-only checks shared by preflight and the locked repair transaction.
+	DO $checks$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        n text := b->>'note';
+	BEGIN
+	 IF n IS NULL OR length(n) <> 967 OR octet_length(n) <> 967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 THEN RAISE EXCEPTION 'I316 note input refused'; END IF;
+	 IF b->'actor' <> '{"id":1,"email":"stuart.villanti@gmail.com","role":"super_admin"}'::jsonb
+	 OR (SELECT count(*) FROM public.auth_users WHERE id=1 AND email=b->'actor'->>'email'
+	     AND role='super_admin' AND disabled_at IS NULL) <> 1
+	 THEN RAISE EXCEPTION 'I316 actor refused'; END IF;
+	 IF b->>'approval_sha256' IS DISTINCT FROM current_setting('afldb.i316.approval_sha256')
+	 OR b->>'approval_reference' IS DISTINCT FROM 'OWNER-RULING.md (retained 2026-10-25 owner instruction: Accept F-005 as a valid finding against the v3 proof contract.)'
+	 OR b->>'issue' IS DISTINCT FROM 'AFLDB-ISSUE-316'
+	 THEN RAISE EXCEPTION 'I316 approval refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_edits WHERE id=94) <> 1
+	 OR (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=94) IS DISTINCT FROM b->'edit94'
+	 OR (SELECT note FROM public.data_edits WHERE id=94) IS NOT NULL
+	 THEN RAISE EXCEPTION 'I316 target identity/null guard refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_overrides WHERE id=93) <> 1
+	 OR (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94'))
+	 THEN RAISE EXCEPTION 'I316 prior repair refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND NOT tgisinternal)
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class IN ('public.data_edits'::regclass,'public.data_overrides'::regclass))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND (relrowsecurity OR relforcerowsecurity OR relkind<>'r'))
+	 THEN RAISE EXCEPTION 'I316 unexpected audit/authority trigger/rule/RLS/relation'; END IF;
+	 IF (SELECT jsonb_agg(def ORDER BY def COLLATE "C") FROM
+	    (SELECT pg_get_constraintdef(oid) AS def FROM pg_catalog.pg_constraint
+	     WHERE conrelid='public.data_edits'::regclass) c) IS DISTINCT FROM b->'audit_constraints'
+	 OR (SELECT attidentity FROM pg_catalog.pg_attribute WHERE attrelid='public.data_edits'::regclass AND attname='id') IS DISTINCT FROM 'a'
+	 THEN RAISE EXCEPTION 'I316 audit schema/constraint drift'; END IF;
+	 IF NOT has_column_privilege(current_user,'public.data_edits','note','UPDATE')
+	 OR NOT has_table_privilege(current_user,'public.data_edits','INSERT')
+	 THEN RAISE EXCEPTION 'I316 existing role lacks repair privileges'; END IF;
+	END $checks$;
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	DO $fresh$
+	BEGIN
+	 IF current_setting('afldb.i316.snapshot')::jsonb IS DISTINCT FROM current_setting('afldb.i316.before')::jsonb
+	 THEN RAISE EXCEPTION 'I316 state drift after read-only preflight'; END IF;
+	END $fresh$;
+	SELECT 'I316_LOCKED_OPTIONAL_SCHEMA=' || (current_setting('afldb.i316.snapshot')::jsonb->'optional_schema')::text;
+	
+	
+	-- Exactly two logical writes. No catch block: every exception aborts the transaction.
+	DO $repair$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        audit_id bigint; affected integer; audit_row jsonb;
+	        oldj jsonb; newj jsonb; audit_note text;
+	BEGIN
+	 oldj := jsonb_build_object('target_audit_id',94,'authority_id',93,'note',NULL);
+	 newj := oldj || jsonb_build_object('note',b->>'note','issue',b->>'issue',
+	   'approval_reference',b->>'approval_reference','approval_sha256',b->>'approval_sha256',
+	   'review_manifest_sha256',current_setting('afldb.i316.manifest_sha256'),
+	   'review_record_sha256',current_setting('afldb.i316.review_sha256'),
+	   'execution_operator','Codex, delegated by the retained owner instruction; SSH arm -> sudo postgres',
+	   'database_session_user',session_user,'database_current_user',current_user,
+	   'reason','Approved correction note was missing from the committed audit record; canonical correction state was already separately verified correct. Metadata-only repair.');
+	 audit_note := 'AFLDB-ISSUE-316 metadata-only repair of data_edits 94.note; durable removal authority 93 unchanged. Owner approval OWNER-RULING.md SHA-256 '
+	   || (b->>'approval_sha256') || '; reviewed manifest SHA-256 ' || current_setting('afldb.i316.manifest_sha256')
+	   || '; independent review record SHA-256 ' || current_setting('afldb.i316.review_sha256') || '.';
+	 UPDATE public.data_edits d SET note=b->>'note'
+	 WHERE id=94 AND note IS NULL AND to_jsonb(d)=b->'edit94';
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 THEN RAISE EXCEPTION 'I316 update cardinality %',affected; END IF;
+	 INSERT INTO public.data_edits(table_name,row_id,field_group,old_values,new_values,admin_user_id,note,created_at)
+	 VALUES ('matches',17214,'audit_note_repair',oldj,newj,1,audit_note,transaction_timestamp())
+	 RETURNING to_jsonb(data_edits),id INTO audit_row,audit_id;
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 OR audit_id=94 THEN RAISE EXCEPTION 'I316 insert cardinality/id refused'; END IF;
+	 PERFORM set_config('afldb.i316.receipt',jsonb_build_object('id',audit_id,'row',audit_row)::text,false);
+	END $repair$;
+	
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	-- Read-only assertions: usable before COMMIT and in the independent postcommit transaction.
+	DO $post$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        beforej jsonb := current_setting('afldb.i316.before')::jsonb;
+	        afterj jsonb := current_setting('afldb.i316.snapshot')::jsonb;
+	        receipt jsonb := current_setting('afldb.i316.receipt')::jsonb;
+	        rid bigint := (receipt->>'id')::bigint;
+	        n text; relation text; beforep jsonb := beforej->'protected'; afterp jsonb := afterj->'protected';
+	        postcommit boolean := COALESCE(current_setting('afldb.i316.postcommit',true),'false')='true';
+	        drift boolean := afterj->'optional_schema' IS DISTINCT FROM beforej->'optional_schema';
+	BEGIN
+	 SELECT note INTO n FROM public.data_edits WHERE id=94;
+	 IF n IS DISTINCT FROM b->>'note' OR length(n)<>967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 OR (SELECT to_jsonb(d)-'note' FROM public.data_edits d WHERE id=94) IS DISTINCT FROM (b->'edit94')-'note'
+	 THEN RAISE EXCEPTION 'I316 repaired note/target postcondition refused'; END IF;
+	 IF (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=rid) IS DISTINCT FROM receipt->'row'
+	 OR (SELECT count(*) FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94')) <> 1
+	 OR receipt->'row'->>'field_group' <> 'audit_note_repair'
+	 OR receipt->'row'->>'admin_user_id' <> '1'
+	 OR receipt->'row'->'new_values'->>'approval_sha256' <> b->>'approval_sha256'
+	 OR receipt->'row'->'new_values'->>'review_record_sha256' <> current_setting('afldb.i316.review_sha256')
+	 THEN RAISE EXCEPTION 'I316 linked audit postcondition refused'; END IF;
+	 IF (afterj->'audit_rows')-rid::text-'94' IS DISTINCT FROM (beforej->'audit_rows')-'94'
+	 OR (beforej->'audit_rows') ? rid::text
+	 OR (SELECT count(*) FROM jsonb_object_keys(afterj->'audit_rows')) <>
+	    (SELECT count(*)+1 FROM jsonb_object_keys(beforej->'audit_rows'))
+	 THEN RAISE EXCEPTION 'I316 additional/missing/changed audit row refused'; END IF;
+	 IF postcommit THEN
+	   FOREACH relation IN ARRAY ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	     IF beforep->relation = '{"absent":true}'::jsonb THEN
+	       beforep := beforep-relation; afterp := afterp-relation;
+	     END IF;
+	   END LOOP;
+	 END IF;
+	 IF afterp IS DISTINCT FROM beforep
+	 THEN RAISE EXCEPTION 'I316 protected canonical/derived/history/Brownlow state changed'; END IF;
+	 IF (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority postcondition refused'; END IF;
+	 IF drift AND NOT postcommit THEN RAISE EXCEPTION 'I316 optional schema drift before commit'; END IF;
+	 PERFORM set_config('afldb.i316.environment_status',CASE WHEN drift THEN 'CONCURRENT_SCHEMA_DRIFT' ELSE 'CLEAN' END,false);
+	END $post$;
+	
+	
+	SELECT 'I316_PRECOMMIT=' || current_setting('afldb.i316.receipt');
+	COMMIT;
+	
+	
+2026-10-25 06:52:39.994 AEDT [884748] ERROR:  I316 target identity/null guard refused
+2026-10-25 06:52:39.994 AEDT [884748] CONTEXT:  PL/pgSQL function inline_code_block line 19 at RAISE
+2026-10-25 06:52:39.994 AEDT [884748] STATEMENT:  
+	BEGIN ISOLATION LEVEL SERIALIZABLE;
+	
+	SET LOCAL lock_timeout='2s';
+	SET LOCAL statement_timeout='10min';
+	SET LOCAL idle_in_transaction_session_timeout='2min';
+	SET LOCAL timezone='UTC';
+	SET LOCAL search_path=pg_catalog,public;
+	-- Plain LOCK utilities only: no DO, SELECT, regclass expression or catalog query.
+	-- Existing protected relations only. Absent optional relations are environment observations.
+	LOCK TABLE public.data_edits IN SHARE ROW EXCLUSIVE MODE;
+	LOCK TABLE public.auth_users IN SHARE MODE;
+	LOCK TABLE public.data_overrides IN SHARE MODE;
+	LOCK TABLE public.matches IN SHARE MODE;
+	LOCK TABLE public.player_match_stats IN SHARE MODE;
+	LOCK TABLE public.match_period_scores IN SHARE MODE;
+	LOCK TABLE public.player_match_period_stats IN SHARE MODE;
+	LOCK TABLE public.player_career_stats IN SHARE MODE;
+	LOCK TABLE public.player_season_stats IN SHARE MODE;
+	LOCK TABLE public.player_club_season_stats IN SHARE MODE;
+	LOCK TABLE public.player_clubs IN SHARE MODE;
+	LOCK TABLE public.players IN SHARE MODE;
+	LOCK TABLE public.clubs IN SHARE MODE;
+	LOCK TABLE public.club_seasons IN SHARE MODE;
+	LOCK TABLE public.seasons IN SHARE MODE;
+	LOCK TABLE public.import_batches IN SHARE MODE;
+	LOCK TABLE public.import_rejections IN SHARE MODE;
+	LOCK TABLE public.canonical_applications IN SHARE MODE;
+	LOCK TABLE public.brownlow_season_votes IN SHARE MODE;
+	LOCK TABLE public.brownlow_round_votes IN SHARE MODE;
+	LOCK TABLE public.brownlow_vote_entry_state IN SHARE MODE;
+	LOCK TABLE public.brownlow_season_authority IN SHARE MODE;
+	LOCK TABLE public.auth_audit_log IN SHARE MODE;
+	LOCK TABLE staging.afltables_player_match IN SHARE MODE;
+	LOCK TABLE staging.afltables_match IN SHARE MODE;
+	LOCK TABLE staging.afl_api_lineup IN SHARE MODE;
+	LOCK TABLE staging.afl_api_brownlow_vote IN SHARE MODE;
+	
+	
+	LOCK TABLE afldb_meta.schema_migrations IN SHARE MODE;
+	
+	
+	
+	-- First runs after every plain LOCK statement and production identity.
+	DO $held$
+	DECLARE relname text; expected_mode text;
+	        required text[] := ARRAY['public.data_edits','public.auth_users','public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores','public.player_match_period_stats','public.player_career_stats','public.player_season_stats','public.player_club_season_stats','public.player_clubs','public.players','public.clubs','public.club_seasons','public.seasons','public.import_batches','public.import_rejections','public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes','public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log','staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relname IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	  IF to_regclass(relname) IS NULL THEN
+	   IF relname=ANY(required) THEN RAISE EXCEPTION 'I316 required lock relation absent %',relname; END IF;
+	  ELSE
+	   expected_mode := CASE WHEN relname='public.data_edits' THEN 'ShareRowExclusiveLock' ELSE 'ShareLock' END;
+	   IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_locks WHERE pid=pg_backend_pid() AND locktype='relation'
+	     AND relation=to_regclass(relname) AND mode=expected_mode AND granted)
+	   THEN RAISE EXCEPTION 'I316 complete protected lock set not held %',relname; END IF;
+	  END IF;
+	 END LOOP;
+	END $held$;
+	
+	SELECT id FROM public.data_edits WHERE id=94 FOR UPDATE;
+	SELECT id FROM public.data_overrides WHERE id=93 FOR SHARE;
+	SELECT id FROM public.auth_users WHERE id=1 FOR SHARE;
+	-- Expected pre-repair ledger. No migration is run or authorised.
+	DO $migration$
+	DECLARE expected jsonb := current_setting('afldb.i316.expected_migrations')::jsonb;
+	BEGIN
+	 IF (SELECT count(*) FROM afldb_meta.schema_migrations) <> jsonb_array_length(expected)
+	 OR EXISTS (SELECT 1 FROM jsonb_array_elements(expected) e
+	   LEFT JOIN afldb_meta.schema_migrations m ON m.name=e->>'name'
+	   WHERE m.name IS NULL OR NOT (e->'checksums' ? m.checksum))
+	 THEN RAISE EXCEPTION 'I316 expected pre-repair migration/schema version refused'; END IF;
+	END $migration$;
+	
+	-- Read-only checks shared by preflight and the locked repair transaction.
+	DO $checks$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        n text := b->>'note';
+	BEGIN
+	 IF n IS NULL OR length(n) <> 967 OR octet_length(n) <> 967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 THEN RAISE EXCEPTION 'I316 note input refused'; END IF;
+	 IF b->'actor' <> '{"id":1,"email":"stuart.villanti@gmail.com","role":"super_admin"}'::jsonb
+	 OR (SELECT count(*) FROM public.auth_users WHERE id=1 AND email=b->'actor'->>'email'
+	     AND role='super_admin' AND disabled_at IS NULL) <> 1
+	 THEN RAISE EXCEPTION 'I316 actor refused'; END IF;
+	 IF b->>'approval_sha256' IS DISTINCT FROM current_setting('afldb.i316.approval_sha256')
+	 OR b->>'approval_reference' IS DISTINCT FROM 'OWNER-RULING.md (retained 2026-10-25 owner instruction: Accept F-005 as a valid finding against the v3 proof contract.)'
+	 OR b->>'issue' IS DISTINCT FROM 'AFLDB-ISSUE-316'
+	 THEN RAISE EXCEPTION 'I316 approval refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_edits WHERE id=94) <> 1
+	 OR (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=94) IS DISTINCT FROM b->'edit94'
+	 OR (SELECT note FROM public.data_edits WHERE id=94) IS NOT NULL
+	 THEN RAISE EXCEPTION 'I316 target identity/null guard refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_overrides WHERE id=93) <> 1
+	 OR (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94'))
+	 THEN RAISE EXCEPTION 'I316 prior repair refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND NOT tgisinternal)
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class IN ('public.data_edits'::regclass,'public.data_overrides'::regclass))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND (relrowsecurity OR relforcerowsecurity OR relkind<>'r'))
+	 THEN RAISE EXCEPTION 'I316 unexpected audit/authority trigger/rule/RLS/relation'; END IF;
+	 IF (SELECT jsonb_agg(def ORDER BY def COLLATE "C") FROM
+	    (SELECT pg_get_constraintdef(oid) AS def FROM pg_catalog.pg_constraint
+	     WHERE conrelid='public.data_edits'::regclass) c) IS DISTINCT FROM b->'audit_constraints'
+	 OR (SELECT attidentity FROM pg_catalog.pg_attribute WHERE attrelid='public.data_edits'::regclass AND attname='id') IS DISTINCT FROM 'a'
+	 THEN RAISE EXCEPTION 'I316 audit schema/constraint drift'; END IF;
+	 IF NOT has_column_privilege(current_user,'public.data_edits','note','UPDATE')
+	 OR NOT has_table_privilege(current_user,'public.data_edits','INSERT')
+	 THEN RAISE EXCEPTION 'I316 existing role lacks repair privileges'; END IF;
+	END $checks$;
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	DO $fresh$
+	BEGIN
+	 IF current_setting('afldb.i316.snapshot')::jsonb IS DISTINCT FROM current_setting('afldb.i316.before')::jsonb
+	 THEN RAISE EXCEPTION 'I316 state drift after read-only preflight'; END IF;
+	END $fresh$;
+	SELECT 'I316_LOCKED_OPTIONAL_SCHEMA=' || (current_setting('afldb.i316.snapshot')::jsonb->'optional_schema')::text;
+	
+	
+	-- Exactly two logical writes. No catch block: every exception aborts the transaction.
+	DO $repair$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        audit_id bigint; affected integer; audit_row jsonb;
+	        oldj jsonb; newj jsonb; audit_note text;
+	BEGIN
+	 oldj := jsonb_build_object('target_audit_id',94,'authority_id',93,'note',NULL);
+	 newj := oldj || jsonb_build_object('note',b->>'note','issue',b->>'issue',
+	   'approval_reference',b->>'approval_reference','approval_sha256',b->>'approval_sha256',
+	   'review_manifest_sha256',current_setting('afldb.i316.manifest_sha256'),
+	   'review_record_sha256',current_setting('afldb.i316.review_sha256'),
+	   'execution_operator','Codex, delegated by the retained owner instruction; SSH arm -> sudo postgres',
+	   'database_session_user',session_user,'database_current_user',current_user,
+	   'reason','Approved correction note was missing from the committed audit record; canonical correction state was already separately verified correct. Metadata-only repair.');
+	 audit_note := 'AFLDB-ISSUE-316 metadata-only repair of data_edits 94.note; durable removal authority 93 unchanged. Owner approval OWNER-RULING.md SHA-256 '
+	   || (b->>'approval_sha256') || '; reviewed manifest SHA-256 ' || current_setting('afldb.i316.manifest_sha256')
+	   || '; independent review record SHA-256 ' || current_setting('afldb.i316.review_sha256') || '.';
+	 UPDATE public.data_edits d SET note=b->>'note'
+	 WHERE id=94 AND note IS NULL AND to_jsonb(d)=b->'edit94';
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 THEN RAISE EXCEPTION 'I316 update cardinality %',affected; END IF;
+	 INSERT INTO public.data_edits(table_name,row_id,field_group,old_values,new_values,admin_user_id,note,created_at)
+	 VALUES ('matches',17214,'audit_note_repair',oldj,newj,1,audit_note,transaction_timestamp())
+	 RETURNING to_jsonb(data_edits),id INTO audit_row,audit_id;
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 OR audit_id=94 THEN RAISE EXCEPTION 'I316 insert cardinality/id refused'; END IF;
+	 PERFORM set_config('afldb.i316.receipt',jsonb_build_object('id',audit_id,'row',audit_row)::text,false);
+	END $repair$;
+	
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	-- Read-only assertions: usable before COMMIT and in the independent postcommit transaction.
+	DO $post$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        beforej jsonb := current_setting('afldb.i316.before')::jsonb;
+	        afterj jsonb := current_setting('afldb.i316.snapshot')::jsonb;
+	        receipt jsonb := current_setting('afldb.i316.receipt')::jsonb;
+	        rid bigint := (receipt->>'id')::bigint;
+	        n text; relation text; beforep jsonb := beforej->'protected'; afterp jsonb := afterj->'protected';
+	        postcommit boolean := COALESCE(current_setting('afldb.i316.postcommit',true),'false')='true';
+	        drift boolean := afterj->'optional_schema' IS DISTINCT FROM beforej->'optional_schema';
+	BEGIN
+	 SELECT note INTO n FROM public.data_edits WHERE id=94;
+	 IF n IS DISTINCT FROM b->>'note' OR length(n)<>967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 OR (SELECT to_jsonb(d)-'note' FROM public.data_edits d WHERE id=94) IS DISTINCT FROM (b->'edit94')-'note'
+	 THEN RAISE EXCEPTION 'I316 repaired note/target postcondition refused'; END IF;
+	 IF (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=rid) IS DISTINCT FROM receipt->'row'
+	 OR (SELECT count(*) FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94')) <> 1
+	 OR receipt->'row'->>'field_group' <> 'audit_note_repair'
+	 OR receipt->'row'->>'admin_user_id' <> '1'
+	 OR receipt->'row'->'new_values'->>'approval_sha256' <> b->>'approval_sha256'
+	 OR receipt->'row'->'new_values'->>'review_record_sha256' <> current_setting('afldb.i316.review_sha256')
+	 THEN RAISE EXCEPTION 'I316 linked audit postcondition refused'; END IF;
+	 IF (afterj->'audit_rows')-rid::text-'94' IS DISTINCT FROM (beforej->'audit_rows')-'94'
+	 OR (beforej->'audit_rows') ? rid::text
+	 OR (SELECT count(*) FROM jsonb_object_keys(afterj->'audit_rows')) <>
+	    (SELECT count(*)+1 FROM jsonb_object_keys(beforej->'audit_rows'))
+	 THEN RAISE EXCEPTION 'I316 additional/missing/changed audit row refused'; END IF;
+	 IF postcommit THEN
+	   FOREACH relation IN ARRAY ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	     IF beforep->relation = '{"absent":true}'::jsonb THEN
+	       beforep := beforep-relation; afterp := afterp-relation;
+	     END IF;
+	   END LOOP;
+	 END IF;
+	 IF afterp IS DISTINCT FROM beforep
+	 THEN RAISE EXCEPTION 'I316 protected canonical/derived/history/Brownlow state changed'; END IF;
+	 IF (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority postcondition refused'; END IF;
+	 IF drift AND NOT postcommit THEN RAISE EXCEPTION 'I316 optional schema drift before commit'; END IF;
+	 PERFORM set_config('afldb.i316.environment_status',CASE WHEN drift THEN 'CONCURRENT_SCHEMA_DRIFT' ELSE 'CLEAN' END,false);
+	END $post$;
+	
+	
+	SELECT 'I316_PRECOMMIT=' || current_setting('afldb.i316.receipt');
+	COMMIT;
+	
+	
+2026-10-25 06:52:42.469 AEDT [884816] ERROR:  I316 protected canonical/derived/history/Brownlow state changed
+2026-10-25 06:52:42.469 AEDT [884816] CONTEXT:  PL/pgSQL function inline_code_block line 37 at RAISE
+2026-10-25 06:52:42.469 AEDT [884816] STATEMENT:  
+	BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+	SET LOCAL timezone='UTC';
+	SET LOCAL search_path=pg_catalog,public;
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	SELECT set_config('afldb.i316.postcommit','true',true) AS postcommit_mode ;
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	-- Read-only assertions: usable before COMMIT and in the independent postcommit transaction.
+	DO $post$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        beforej jsonb := current_setting('afldb.i316.before')::jsonb;
+	        afterj jsonb := current_setting('afldb.i316.snapshot')::jsonb;
+	        receipt jsonb := current_setting('afldb.i316.receipt')::jsonb;
+	        rid bigint := (receipt->>'id')::bigint;
+	        n text; relation text; beforep jsonb := beforej->'protected'; afterp jsonb := afterj->'protected';
+	        postcommit boolean := COALESCE(current_setting('afldb.i316.postcommit',true),'false')='true';
+	        drift boolean := afterj->'optional_schema' IS DISTINCT FROM beforej->'optional_schema';
+	BEGIN
+	 SELECT note INTO n FROM public.data_edits WHERE id=94;
+	 IF n IS DISTINCT FROM b->>'note' OR length(n)<>967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 OR (SELECT to_jsonb(d)-'note' FROM public.data_edits d WHERE id=94) IS DISTINCT FROM (b->'edit94')-'note'
+	 THEN RAISE EXCEPTION 'I316 repaired note/target postcondition refused'; END IF;
+	 IF (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=rid) IS DISTINCT FROM receipt->'row'
+	 OR (SELECT count(*) FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94')) <> 1
+	 OR receipt->'row'->>'field_group' <> 'audit_note_repair'
+	 OR receipt->'row'->>'admin_user_id' <> '1'
+	 OR receipt->'row'->'new_values'->>'approval_sha256' <> b->>'approval_sha256'
+	 OR receipt->'row'->'new_values'->>'review_record_sha256' <> current_setting('afldb.i316.review_sha256')
+	 THEN RAISE EXCEPTION 'I316 linked audit postcondition refused'; END IF;
+	 IF (afterj->'audit_rows')-rid::text-'94' IS DISTINCT FROM (beforej->'audit_rows')-'94'
+	 OR (beforej->'audit_rows') ? rid::text
+	 OR (SELECT count(*) FROM jsonb_object_keys(afterj->'audit_rows')) <>
+	    (SELECT count(*)+1 FROM jsonb_object_keys(beforej->'audit_rows'))
+	 THEN RAISE EXCEPTION 'I316 additional/missing/changed audit row refused'; END IF;
+	 IF postcommit THEN
+	   FOREACH relation IN ARRAY ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	     IF beforep->relation = '{"absent":true}'::jsonb THEN
+	       beforep := beforep-relation; afterp := afterp-relation;
+	     END IF;
+	   END LOOP;
+	 END IF;
+	 IF afterp IS DISTINCT FROM beforep
+	 THEN RAISE EXCEPTION 'I316 protected canonical/derived/history/Brownlow state changed'; END IF;
+	 IF (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority postcondition refused'; END IF;
+	 IF drift AND NOT postcommit THEN RAISE EXCEPTION 'I316 optional schema drift before commit'; END IF;
+	 PERFORM set_config('afldb.i316.environment_status',CASE WHEN drift THEN 'CONCURRENT_SCHEMA_DRIFT' ELSE 'CLEAN' END,false);
+	END $post$;
+	
+	SELECT 'I316_POSTCHECK=' || jsonb_build_object('status',CASE WHEN current_setting('afldb.i316.environment_status')='CLEAN' THEN 'PASS' ELSE 'CONCURRENT_SCHEMA_DRIFT' END,'u3_confirmable',current_setting('afldb.i316.environment_status')='CLEAN','receipt',current_setting('afldb.i316.receipt')::jsonb,
+	 'snapshot',current_setting('afldb.i316.snapshot')::jsonb)::text;
+	COMMIT;
+	SELECT current_setting('afldb.i316.environment_status')='CLEAN' AS i316_clean ;
+	
+	
+2026-10-25 06:52:45.082 AEDT [884819] ERROR:  I316 additional/missing/changed audit row refused
+2026-10-25 06:52:45.082 AEDT [884819] CONTEXT:  PL/pgSQL function inline_code_block line 28 at RAISE
+2026-10-25 06:52:45.082 AEDT [884819] STATEMENT:  
+	BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+	SET LOCAL timezone='UTC';
+	SET LOCAL search_path=pg_catalog,public;
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	SELECT set_config('afldb.i316.postcommit','true',true) AS postcommit_mode ;
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	-- Read-only assertions: usable before COMMIT and in the independent postcommit transaction.
+	DO $post$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        beforej jsonb := current_setting('afldb.i316.before')::jsonb;
+	        afterj jsonb := current_setting('afldb.i316.snapshot')::jsonb;
+	        receipt jsonb := current_setting('afldb.i316.receipt')::jsonb;
+	        rid bigint := (receipt->>'id')::bigint;
+	        n text; relation text; beforep jsonb := beforej->'protected'; afterp jsonb := afterj->'protected';
+	        postcommit boolean := COALESCE(current_setting('afldb.i316.postcommit',true),'false')='true';
+	        drift boolean := afterj->'optional_schema' IS DISTINCT FROM beforej->'optional_schema';
+	BEGIN
+	 SELECT note INTO n FROM public.data_edits WHERE id=94;
+	 IF n IS DISTINCT FROM b->>'note' OR length(n)<>967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 OR (SELECT to_jsonb(d)-'note' FROM public.data_edits d WHERE id=94) IS DISTINCT FROM (b->'edit94')-'note'
+	 THEN RAISE EXCEPTION 'I316 repaired note/target postcondition refused'; END IF;
+	 IF (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=rid) IS DISTINCT FROM receipt->'row'
+	 OR (SELECT count(*) FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94')) <> 1
+	 OR receipt->'row'->>'field_group' <> 'audit_note_repair'
+	 OR receipt->'row'->>'admin_user_id' <> '1'
+	 OR receipt->'row'->'new_values'->>'approval_sha256' <> b->>'approval_sha256'
+	 OR receipt->'row'->'new_values'->>'review_record_sha256' <> current_setting('afldb.i316.review_sha256')
+	 THEN RAISE EXCEPTION 'I316 linked audit postcondition refused'; END IF;
+	 IF (afterj->'audit_rows')-rid::text-'94' IS DISTINCT FROM (beforej->'audit_rows')-'94'
+	 OR (beforej->'audit_rows') ? rid::text
+	 OR (SELECT count(*) FROM jsonb_object_keys(afterj->'audit_rows')) <>
+	    (SELECT count(*)+1 FROM jsonb_object_keys(beforej->'audit_rows'))
+	 THEN RAISE EXCEPTION 'I316 additional/missing/changed audit row refused'; END IF;
+	 IF postcommit THEN
+	   FOREACH relation IN ARRAY ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	     IF beforep->relation = '{"absent":true}'::jsonb THEN
+	       beforep := beforep-relation; afterp := afterp-relation;
+	     END IF;
+	   END LOOP;
+	 END IF;
+	 IF afterp IS DISTINCT FROM beforep
+	 THEN RAISE EXCEPTION 'I316 protected canonical/derived/history/Brownlow state changed'; END IF;
+	 IF (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority postcondition refused'; END IF;
+	 IF drift AND NOT postcommit THEN RAISE EXCEPTION 'I316 optional schema drift before commit'; END IF;
+	 PERFORM set_config('afldb.i316.environment_status',CASE WHEN drift THEN 'CONCURRENT_SCHEMA_DRIFT' ELSE 'CLEAN' END,false);
+	END $post$;
+	
+	SELECT 'I316_POSTCHECK=' || jsonb_build_object('status',CASE WHEN current_setting('afldb.i316.environment_status')='CLEAN' THEN 'PASS' ELSE 'CONCURRENT_SCHEMA_DRIFT' END,'u3_confirmable',current_setting('afldb.i316.environment_status')='CLEAN','receipt',current_setting('afldb.i316.receipt')::jsonb,
+	 'snapshot',current_setting('afldb.i316.snapshot')::jsonb)::text;
+	COMMIT;
+	SELECT current_setting('afldb.i316.environment_status')='CLEAN' AS i316_clean ;
+	
+	
+2026-10-25 06:52:47.193 AEDT [884867] ERROR:  I316 protected canonical/derived/history/Brownlow state changed
+2026-10-25 06:52:47.193 AEDT [884867] CONTEXT:  PL/pgSQL function inline_code_block line 37 at RAISE
+2026-10-25 06:52:47.193 AEDT [884867] STATEMENT:  -- Exactly two logical writes. No catch block: every exception aborts the transaction.
+	DO $repair$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        audit_id bigint; affected integer; audit_row jsonb;
+	        oldj jsonb; newj jsonb; audit_note text;
+	BEGIN
+	 oldj := jsonb_build_object('target_audit_id',94,'authority_id',93,'note',NULL);
+	 newj := oldj || jsonb_build_object('note',b->>'note','issue',b->>'issue',
+	   'approval_reference',b->>'approval_reference','approval_sha256',b->>'approval_sha256',
+	   'review_manifest_sha256',current_setting('afldb.i316.manifest_sha256'),
+	   'review_record_sha256',current_setting('afldb.i316.review_sha256'),
+	   'execution_operator','Codex, delegated by the retained owner instruction; SSH arm -> sudo postgres',
+	   'database_session_user',session_user,'database_current_user',current_user,
+	   'reason','Approved correction note was missing from the committed audit record; canonical correction state was already separately verified correct. Metadata-only repair.');
+	 audit_note := 'AFLDB-ISSUE-316 metadata-only repair of data_edits 94.note; durable removal authority 93 unchanged. Owner approval OWNER-RULING.md SHA-256 '
+	   || (b->>'approval_sha256') || '; reviewed manifest SHA-256 ' || current_setting('afldb.i316.manifest_sha256')
+	   || '; independent review record SHA-256 ' || current_setting('afldb.i316.review_sha256') || '.';
+	 UPDATE public.data_edits d SET note=b->>'note'
+	 WHERE id=94 AND note IS NULL AND to_jsonb(d)=b->'edit94';
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 THEN RAISE EXCEPTION 'I316 update cardinality %',affected; END IF;
+	 INSERT INTO public.data_edits(table_name,row_id,field_group,old_values,new_values,admin_user_id,note,created_at)
+	 VALUES ('matches',17214,'audit_note_repair',oldj,newj,1,audit_note,transaction_timestamp())
+	 RETURNING to_jsonb(data_edits),id INTO audit_row,audit_id;
+	 GET DIAGNOSTICS affected=ROW_COUNT;
+	 IF affected <> 1 OR audit_id=94 THEN RAISE EXCEPTION 'I316 insert cardinality/id refused'; END IF;
+	 PERFORM set_config('afldb.i316.receipt',jsonb_build_object('id',audit_id,'row',audit_row)::text,false);
+	END $repair$;
+	
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	-- Read-only assertions: usable before COMMIT and in the independent postcommit transaction.
+	DO $post$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        beforej jsonb := current_setting('afldb.i316.before')::jsonb;
+	        afterj jsonb := current_setting('afldb.i316.snapshot')::jsonb;
+	        receipt jsonb := current_setting('afldb.i316.receipt')::jsonb;
+	        rid bigint := (receipt->>'id')::bigint;
+	        n text; relation text; beforep jsonb := beforej->'protected'; afterp jsonb := afterj->'protected';
+	        postcommit boolean := COALESCE(current_setting('afldb.i316.postcommit',true),'false')='true';
+	        drift boolean := afterj->'optional_schema' IS DISTINCT FROM beforej->'optional_schema';
+	BEGIN
+	 SELECT note INTO n FROM public.data_edits WHERE id=94;
+	 IF n IS DISTINCT FROM b->>'note' OR length(n)<>967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 OR (SELECT to_jsonb(d)-'note' FROM public.data_edits d WHERE id=94) IS DISTINCT FROM (b->'edit94')-'note'
+	 THEN RAISE EXCEPTION 'I316 repaired note/target postcondition refused'; END IF;
+	 IF (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=rid) IS DISTINCT FROM receipt->'row'
+	 OR (SELECT count(*) FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94')) <> 1
+	 OR receipt->'row'->>'field_group' <> 'audit_note_repair'
+	 OR receipt->'row'->>'admin_user_id' <> '1'
+	 OR receipt->'row'->'new_values'->>'approval_sha256' <> b->>'approval_sha256'
+	 OR receipt->'row'->'new_values'->>'review_record_sha256' <> current_setting('afldb.i316.review_sha256')
+	 THEN RAISE EXCEPTION 'I316 linked audit postcondition refused'; END IF;
+	 IF (afterj->'audit_rows')-rid::text-'94' IS DISTINCT FROM (beforej->'audit_rows')-'94'
+	 OR (beforej->'audit_rows') ? rid::text
+	 OR (SELECT count(*) FROM jsonb_object_keys(afterj->'audit_rows')) <>
+	    (SELECT count(*)+1 FROM jsonb_object_keys(beforej->'audit_rows'))
+	 THEN RAISE EXCEPTION 'I316 additional/missing/changed audit row refused'; END IF;
+	 IF postcommit THEN
+	   FOREACH relation IN ARRAY ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	     IF beforep->relation = '{"absent":true}'::jsonb THEN
+	       beforep := beforep-relation; afterp := afterp-relation;
+	     END IF;
+	   END LOOP;
+	 END IF;
+	 IF afterp IS DISTINCT FROM beforep
+	 THEN RAISE EXCEPTION 'I316 protected canonical/derived/history/Brownlow state changed'; END IF;
+	 IF (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority postcondition refused'; END IF;
+	 IF drift AND NOT postcommit THEN RAISE EXCEPTION 'I316 optional schema drift before commit'; END IF;
+	 PERFORM set_config('afldb.i316.environment_status',CASE WHEN drift THEN 'CONCURRENT_SCHEMA_DRIFT' ELSE 'CLEAN' END,false);
+	END $post$;
+	
+	
+	SELECT 'I316_PRECOMMIT=' || current_setting('afldb.i316.receipt');
+	COMMIT;
+	
+	
+2026-10-25 06:52:50.957 AEDT [884937] ERROR:  I316 active/known DDL or unresolved schema transaction: do not execute
+2026-10-25 06:52:50.957 AEDT [884937] CONTEXT:  PL/pgSQL function inline_code_block line 12 at RAISE
+2026-10-25 06:52:50.957 AEDT [884937] STATEMENT:  
+	BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+	SET LOCAL timezone='UTC';
+	SET LOCAL search_path=pg_catalog,public;
+	
+	-- Bounded read-only stop/go observation, not exclusion of future DDL.
+	DO $operational$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM pg_catalog.pg_stat_activity
+	   WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend'
+	   AND (state IN ('idle in transaction','idle in transaction (aborted)')
+	     OR (state='active' AND query ~* '\m(create|alter|drop|truncate|reindex|cluster|vacuum|grant|revoke|comment|security|refresh)\M')))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_locks
+	   WHERE database=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())
+	     AND pid IS DISTINCT FROM pg_backend_pid() AND locktype='relation'
+	     AND mode IN ('AccessExclusiveLock','ShareRowExclusiveLock','ShareUpdateExclusiveLock'))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_prepared_xacts WHERE database=current_database())
+	 THEN RAISE EXCEPTION 'I316 active/known DDL or unresolved schema transaction: do not execute'; END IF;
+	END $operational$;
+	SELECT 'I316_OPERATIONAL_DATABASE_GATE_PASS';
+	
+	-- Expected pre-repair ledger. No migration is run or authorised.
+	DO $migration$
+	DECLARE expected jsonb := current_setting('afldb.i316.expected_migrations')::jsonb;
+	BEGIN
+	 IF (SELECT count(*) FROM afldb_meta.schema_migrations) <> jsonb_array_length(expected)
+	 OR EXISTS (SELECT 1 FROM jsonb_array_elements(expected) e
+	   LEFT JOIN afldb_meta.schema_migrations m ON m.name=e->>'name'
+	   WHERE m.name IS NULL OR NOT (e->'checksums' ? m.checksum))
+	 THEN RAISE EXCEPTION 'I316 expected pre-repair migration/schema version refused'; END IF;
+	END $migration$;
+	
+	-- Read-only checks shared by preflight and the locked repair transaction.
+	DO $checks$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        n text := b->>'note';
+	BEGIN
+	 IF n IS NULL OR length(n) <> 967 OR octet_length(n) <> 967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 THEN RAISE EXCEPTION 'I316 note input refused'; END IF;
+	 IF b->'actor' <> '{"id":1,"email":"stuart.villanti@gmail.com","role":"super_admin"}'::jsonb
+	 OR (SELECT count(*) FROM public.auth_users WHERE id=1 AND email=b->'actor'->>'email'
+	     AND role='super_admin' AND disabled_at IS NULL) <> 1
+	 THEN RAISE EXCEPTION 'I316 actor refused'; END IF;
+	 IF b->>'approval_sha256' IS DISTINCT FROM current_setting('afldb.i316.approval_sha256')
+	 OR b->>'approval_reference' IS DISTINCT FROM 'OWNER-RULING.md (retained 2026-10-25 owner instruction: Accept F-005 as a valid finding against the v3 proof contract.)'
+	 OR b->>'issue' IS DISTINCT FROM 'AFLDB-ISSUE-316'
+	 THEN RAISE EXCEPTION 'I316 approval refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_edits WHERE id=94) <> 1
+	 OR (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=94) IS DISTINCT FROM b->'edit94'
+	 OR (SELECT note FROM public.data_edits WHERE id=94) IS NOT NULL
+	 THEN RAISE EXCEPTION 'I316 target identity/null guard refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_overrides WHERE id=93) <> 1
+	 OR (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94'))
+	 THEN RAISE EXCEPTION 'I316 prior repair refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND NOT tgisinternal)
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class IN ('public.data_edits'::regclass,'public.data_overrides'::regclass))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND (relrowsecurity OR relforcerowsecurity OR relkind<>'r'))
+	 THEN RAISE EXCEPTION 'I316 unexpected audit/authority trigger/rule/RLS/relation'; END IF;
+	 IF (SELECT jsonb_agg(def ORDER BY def COLLATE "C") FROM
+	    (SELECT pg_get_constraintdef(oid) AS def FROM pg_catalog.pg_constraint
+	     WHERE conrelid='public.data_edits'::regclass) c) IS DISTINCT FROM b->'audit_constraints'
+	 OR (SELECT attidentity FROM pg_catalog.pg_attribute WHERE attrelid='public.data_edits'::regclass AND attname='id') IS DISTINCT FROM 'a'
+	 THEN RAISE EXCEPTION 'I316 audit schema/constraint drift'; END IF;
+	 IF NOT has_column_privilege(current_user,'public.data_edits','note','UPDATE')
+	 OR NOT has_table_privilege(current_user,'public.data_edits','INSERT')
+	 THEN RAISE EXCEPTION 'I316 existing role lacks repair privileges'; END IF;
+	END $checks$;
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	SELECT set_config('afldb.i316.before',current_setting('afldb.i316.snapshot'),false) AS retained_preflight ;
+	SELECT 'I316_PREFLIGHT=' || current_setting('afldb.i316.before');
+	SELECT to_regclass('public.brownlow_eligibility_decisions') IS NOT NULL AS i316_optional_0 ;
+	SELECT to_regclass('public.brownlow_correction_receipts') IS NOT NULL AS i316_optional_1 ;
+	COMMIT;
+	
+2026-10-25 06:52:50.967 AEDT [884937] ERROR:  I316 expected pre-repair migration/schema version refused
+2026-10-25 06:52:50.967 AEDT [884937] CONTEXT:  PL/pgSQL function inline_code_block line 8 at RAISE
+2026-10-25 06:52:50.967 AEDT [884937] STATEMENT:  
+	BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+	SET LOCAL timezone='UTC';
+	SET LOCAL search_path=pg_catalog,public;
+	
+	-- Bounded read-only stop/go observation, not exclusion of future DDL.
+	DO $operational$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM pg_catalog.pg_stat_activity
+	   WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend'
+	   AND (state IN ('idle in transaction','idle in transaction (aborted)')
+	     OR (state='active' AND query ~* '\m(create|alter|drop|truncate|reindex|cluster|vacuum|grant|revoke|comment|security|refresh)\M')))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_locks
+	   WHERE database=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())
+	     AND pid IS DISTINCT FROM pg_backend_pid() AND locktype='relation'
+	     AND mode IN ('AccessExclusiveLock','ShareRowExclusiveLock','ShareUpdateExclusiveLock'))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_prepared_xacts WHERE database=current_database())
+	 THEN RAISE EXCEPTION 'I316 active/known DDL or unresolved schema transaction: do not execute'; END IF;
+	END $operational$;
+	SELECT 'I316_OPERATIONAL_DATABASE_GATE_PASS';
+	
+	-- Expected pre-repair ledger. No migration is run or authorised.
+	DO $migration$
+	DECLARE expected jsonb := current_setting('afldb.i316.expected_migrations')::jsonb;
+	BEGIN
+	 IF (SELECT count(*) FROM afldb_meta.schema_migrations) <> jsonb_array_length(expected)
+	 OR EXISTS (SELECT 1 FROM jsonb_array_elements(expected) e
+	   LEFT JOIN afldb_meta.schema_migrations m ON m.name=e->>'name'
+	   WHERE m.name IS NULL OR NOT (e->'checksums' ? m.checksum))
+	 THEN RAISE EXCEPTION 'I316 expected pre-repair migration/schema version refused'; END IF;
+	END $migration$;
+	
+	-- Read-only checks shared by preflight and the locked repair transaction.
+	DO $checks$
+	DECLARE b jsonb := current_setting('afldb.i316.binding')::jsonb;
+	        n text := b->>'note';
+	BEGIN
+	 IF n IS NULL OR length(n) <> 967 OR octet_length(n) <> 967
+	 OR encode(sha256(convert_to(n,'UTF8')),'hex') <> '3d2d25ea4919dcdc1cfd8fcaa1b2ede6941e10ab0d07404fa0e2279fcc33621d'
+	 THEN RAISE EXCEPTION 'I316 note input refused'; END IF;
+	 IF b->'actor' <> '{"id":1,"email":"stuart.villanti@gmail.com","role":"super_admin"}'::jsonb
+	 OR (SELECT count(*) FROM public.auth_users WHERE id=1 AND email=b->'actor'->>'email'
+	     AND role='super_admin' AND disabled_at IS NULL) <> 1
+	 THEN RAISE EXCEPTION 'I316 actor refused'; END IF;
+	 IF b->>'approval_sha256' IS DISTINCT FROM current_setting('afldb.i316.approval_sha256')
+	 OR b->>'approval_reference' IS DISTINCT FROM 'OWNER-RULING.md (retained 2026-10-25 owner instruction: Accept F-005 as a valid finding against the v3 proof contract.)'
+	 OR b->>'issue' IS DISTINCT FROM 'AFLDB-ISSUE-316'
+	 THEN RAISE EXCEPTION 'I316 approval refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_edits WHERE id=94) <> 1
+	 OR (SELECT to_jsonb(d) FROM public.data_edits d WHERE id=94) IS DISTINCT FROM b->'edit94'
+	 OR (SELECT note FROM public.data_edits WHERE id=94) IS NOT NULL
+	 THEN RAISE EXCEPTION 'I316 target identity/null guard refused'; END IF;
+	 IF (SELECT count(*) FROM public.data_overrides WHERE id=93) <> 1
+	 OR (SELECT to_jsonb(o) FROM public.data_overrides o WHERE id=93) IS DISTINCT FROM b->'authority93'
+	 THEN RAISE EXCEPTION 'I316 authority refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM public.data_edits WHERE field_group='audit_note_repair'
+	   AND (old_values->>'target_audit_id'='94' OR new_values->>'target_audit_id'='94'))
+	 THEN RAISE EXCEPTION 'I316 prior repair refused'; END IF;
+	 IF EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND NOT tgisinternal)
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class IN ('public.data_edits'::regclass,'public.data_overrides'::regclass))
+	 OR EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid IN ('public.data_edits'::regclass,'public.data_overrides'::regclass) AND (relrowsecurity OR relforcerowsecurity OR relkind<>'r'))
+	 THEN RAISE EXCEPTION 'I316 unexpected audit/authority trigger/rule/RLS/relation'; END IF;
+	 IF (SELECT jsonb_agg(def ORDER BY def COLLATE "C") FROM
+	    (SELECT pg_get_constraintdef(oid) AS def FROM pg_catalog.pg_constraint
+	     WHERE conrelid='public.data_edits'::regclass) c) IS DISTINCT FROM b->'audit_constraints'
+	 OR (SELECT attidentity FROM pg_catalog.pg_attribute WHERE attrelid='public.data_edits'::regclass AND attname='id') IS DISTINCT FROM 'a'
+	 THEN RAISE EXCEPTION 'I316 audit schema/constraint drift'; END IF;
+	 IF NOT has_column_privilege(current_user,'public.data_edits','note','UPDATE')
+	 OR NOT has_table_privilege(current_user,'public.data_edits','INSERT')
+	 THEN RAISE EXCEPTION 'I316 existing role lacks repair privileges'; END IF;
+	END $checks$;
+	
+	DO $canonical$
+	BEGIN
+	 IF EXISTS (SELECT 1 FROM public.player_match_stats WHERE id=705437 OR (player_id=2121 AND match_id=17214))
+	 OR (SELECT count(*) FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id WHERE m.season=2026) <> 10028
+	 OR (SELECT count(*) FROM public.player_match_stats WHERE match_id=17214 AND club_id=6) <> 23
+	 OR (SELECT count(*) FROM staging.afltables_player_match WHERE season=2026) <> 10028
+	 OR EXISTS (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	   WHERE m.season=2026 AND NOT EXISTS (SELECT 1 FROM staging.afltables_player_match a
+	    WHERE a.season=2026 AND a.match_key=m.match_key AND a.player_id=p.player_id AND a.club_id=p.club_id))
+	 OR EXISTS (SELECT 1 FROM staging.afltables_player_match a WHERE a.season=2026 AND NOT EXISTS
+	   (SELECT 1 FROM public.player_match_stats p JOIN public.matches m ON m.id=p.match_id
+	    WHERE m.season=2026 AND m.match_key=a.match_key AND p.player_id=a.player_id AND p.club_id=a.club_id))
+	 THEN RAISE EXCEPTION 'I316 canonical/count/baseline gate refused'; END IF;
+	END $canonical$;
+	
+	-- Logical row fingerprints, not an eligibility/source census. Hash every column,
+	-- including NULLs and provenance. Ordered row hashes preserve multiplicity without
+	-- aggregating full historical JSON payloads into memory. Full Brownlow representations
+	-- and full protected tables are compared, including optional later-schema tables.
+	DO $snapshot$
+	DECLARE result jsonb := '{}'::jsonb; optional_schema jsonb := '{}'::jsonb; relation text; fingerprint jsonb; schema_state jsonb;
+	        required text[] := ARRAY[
+	 'public.data_overrides','public.matches','public.player_match_stats','public.match_period_scores',
+	 'public.player_match_period_stats','public.player_career_stats','public.player_season_stats',
+	 'public.player_club_season_stats','public.player_clubs','public.players','public.clubs',
+	 'public.club_seasons','public.seasons','public.import_batches','public.import_rejections',
+	 'public.canonical_applications','public.brownlow_season_votes','public.brownlow_round_votes',
+	 'public.brownlow_vote_entry_state','public.brownlow_season_authority','public.auth_audit_log',
+	 'staging.afltables_player_match','staging.afltables_match','staging.afl_api_lineup','staging.afl_api_brownlow_vote','afldb_meta.schema_migrations'];
+	BEGIN
+	 FOREACH relation IN ARRAY required || ARRAY['public.brownlow_eligibility_decisions','public.brownlow_correction_receipts'] LOOP
+	   IF NOT relation=ANY(required) THEN
+	     SELECT jsonb_build_object('present',true,'oid',c.oid,'namespace_oid',c.relnamespace,'kind',c.relkind,
+	       'relation',to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relfrozenxid','relminmxid'],
+	       'columns',(SELECT jsonb_agg(to_jsonb(a) ORDER BY attnum)
+	         FROM pg_catalog.pg_attribute a WHERE attrelid=c.oid AND attnum>0),
+	       'defaults',(SELECT jsonb_agg(pg_get_expr(adbin,adrelid) ORDER BY adnum) FROM pg_catalog.pg_attrdef WHERE adrelid=c.oid),
+	       'indexes',(SELECT jsonb_agg(pg_get_indexdef(indexrelid) ORDER BY indexrelid) FROM pg_catalog.pg_index WHERE indrelid=c.oid),
+	       'triggers',(SELECT jsonb_agg(pg_get_triggerdef(oid) ORDER BY oid) FROM pg_catalog.pg_trigger WHERE tgrelid=c.oid),
+	       'rules',(SELECT jsonb_agg(pg_get_ruledef(oid) ORDER BY oid) FROM pg_catalog.pg_rewrite WHERE ev_class=c.oid),
+	       'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY oid) FROM pg_catalog.pg_constraint WHERE conrelid=c.oid))
+	       INTO schema_state FROM pg_catalog.pg_class c WHERE c.oid=to_regclass(relation);
+	     optional_schema := optional_schema || jsonb_build_object(relation,COALESCE(schema_state,'{"present":false}'::jsonb));
+	   END IF;
+	   IF to_regclass(relation) IS NULL THEN
+	     IF relation=ANY(required) THEN RAISE EXCEPTION 'I316 missing protected relation %',relation; END IF;
+	     result := result || jsonb_build_object(relation,jsonb_build_object('absent',true));
+	   ELSIF current_setting('afldb.i316.postcommit',true)='true'
+	     AND current_setting('afldb.i316.before',true)::jsonb->'protected'->relation = '{"absent":true}'::jsonb THEN
+	     -- Newly appeared unrelated optional table: record schema, do not read its data.
+	     result := result || jsonb_build_object(relation,jsonb_build_object('environment_only',true));
+	   ELSE
+	     EXECUTE format('SELECT jsonb_build_object(''count'',count(*),''sha256'',encode(sha256(convert_to(COALESCE(string_agg(h,'''' ORDER BY h COLLATE "C"),''''),''UTF8'')),''hex'')) FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,''UTF8'')),''hex'') h FROM %s t) rows',to_regclass(relation)) INTO fingerprint;
+	     result := result || jsonb_build_object(relation,fingerprint);
+	   END IF;
+	 END LOOP;
+	 -- Only safe actor identity fields; credentials/session material are never selected.
+	 result := result || jsonb_build_object('repair_actor',(SELECT jsonb_build_object('id',id,'email',email,'role',role,'disabled_at',disabled_at) FROM public.auth_users WHERE id=1));
+	 PERFORM set_config('afldb.i316.snapshot',jsonb_build_object('protected',result,'optional_schema',optional_schema,
+	   'audit_rows',(SELECT COALESCE(jsonb_object_agg(id::text,encode(sha256(convert_to(to_jsonb(d)::text,'UTF8')),'hex')),'{}'::jsonb) FROM public.data_edits d))::text,false);
+	END $snapshot$;
+	
+	SELECT set_config('afldb.i316.before',current_setting('afldb.i316.snapshot'),false) AS retained_preflight ;
+	SELECT 'I316_PREFLIGHT=' || current_setting('afldb.i316.before');
+	SELECT to_regclass('public.brownlow_eligibility_decisions') IS NOT NULL AS i316_optional_0 ;
+	SELECT to_regclass('public.brownlow_correction_receipts') IS NOT NULL AS i316_optional_1 ;
+	COMMIT;
+	
+2026-10-25 06:52:50.990 AEDT [884459] LOG:  received fast shutdown request
+2026-10-25 06:52:50.998 AEDT [884459] LOG:  aborting any active transactions
+2026-10-25 06:52:51.001 AEDT [884459] LOG:  background worker "logical replication launcher" (PID 884465) exited with exit code 1
+2026-10-25 06:52:51.001 AEDT [884460] LOG:  shutting down
+2026-10-25 06:52:51.004 AEDT [884460] LOG:  checkpoint starting: shutdown immediate
+2026-10-25 06:52:51.236 AEDT [884460] LOG:  checkpoint complete: wrote 1686 buffers (10.3%); 0 WAL file(s) added, 0 removed, 2 recycled; write=0.074 s, sync=0.115 s, total=0.235 s; sync files=1456, longest=0.008 s, average=0.001 s; distance=43119 kB, estimate=43119 kB; lsn=0/3F0B3F0, redo lsn=0/3F0B3F0
+2026-10-25 06:52:51.250 AEDT [884459] LOG:  database system is shut down

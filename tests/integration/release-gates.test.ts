@@ -18,6 +18,8 @@
  */
 import './guard';
 
+import { createHash } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
@@ -252,6 +254,40 @@ describe('gate: Advanced Search regression cases', () => {
     return ids;
   }
 
+  /**
+   * Membership digests over the AFL Tables profile identity of a cohort (V2-GAP-029).
+   *
+   * The keys are read in C (byte) order and hashed twice:
+   *  - `canonical`: sha256 of the C-ordered keys. Independent of the database collation, so it is the
+   *    pin for the 2026-10 rebuild that holds 1897-2025.
+   *  - `legacy`: the same keys ordered to reproduce the original pins
+   *    (inferred to be a punctuation-ignoring Linux locale order: `_`, `/` and `.` carry no weight
+   *    at first level, case is folded; the original host collation is not directly evidenced). The
+   *    original pins were reproduced exactly from the locally rebuilt membership under this order, and
+   *    under no other tried ordering; that equality is the proof the cohorts' membership is unchanged,
+   *    and it holds on any database collation because the ordering is applied here, not in SQL.
+   */
+  async function identityDigests(ids: number[]) {
+    const keys = (await sql<{ externalId: string }[]>`
+      SELECT ei.external_id AS "externalId"
+        FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+       WHERE ei.match_method = 'afltables_profile_url'
+         AND ei.status IN ('unique', 'resolved')
+         AND ei.player_id = ANY(${ids})
+       ORDER BY ei.external_id COLLATE "C"
+    `).map((r) => r.externalId);
+    const hash = (ordered: string[]) => createHash('sha256').update(ordered.join(',')).digest('hex').slice(0, 16);
+    const weight = (k: string) => k.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+    const legacyOrder = [...keys].sort((a, b) => {
+      const wa = weight(a);
+      const wb = weight(b);
+      if (wa !== wb) return wa < wb ? -1 : 1;
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
+    return { keys: keys.length, canonical: hash(keys), legacy: hash(legacyOrder) };
+  }
+
   // AFLDB-ISSUE-108: this gate measured the legacy per-game Brownlow correction
   // (269, down from the legacy 750). AFLDB-ISSUE-113 restored the season-grain
   // acquisition and RE-MEASURED the cohort on the canonically rebuilt afldb_test
@@ -271,21 +307,13 @@ describe('gate: Advanced Search regression cases', () => {
     // 750 here; the difference is all polled votes between 1935 and 1983.
     expect(ids.length).toBe(261);
 
-    const [digest] = await sql<{ keys: number; hash: string }[]>`
-      SELECT count(*)::int AS keys,
-             substr(encode(sha256(convert_to(
-               string_agg(ei.external_id, ',' ORDER BY ei.external_id), 'UTF8')),
-               'hex'), 1, 16) AS hash
-        FROM external_identities ei
-        JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
-       WHERE ei.match_method = 'afltables_profile_url'
-         AND ei.status IN ('unique', 'resolved')
-         AND ei.player_id = ANY(${ids})
-    `;
+    const digest = await identityDigests(ids);
     // Every returned player carries one, so a silently dropped identity cannot
     // hide behind a matching digest.
     expect(digest.keys).toBe(261);
-    expect(digest.hash).toBe('ca65f15239aaf0b5');
+    // The original ISSUE-113 pin, reproduced exactly: membership unchanged.
+    expect(digest.legacy).toBe('ca65f15239aaf0b5');
+    expect(digest.canonical).toBe('79d3e6eea83a4620');
   });
 
   it('debuted in the 1960s with exactly two clubs returns the exact 110 players', async () => {
@@ -309,21 +337,13 @@ describe('gate: Advanced Search regression cases', () => {
     // (afltables / afltables_profile_url) is the durable identity the importer
     // resolves players by, so hashing it keeps this an EXACT-membership gate rather
     // than a count, and survives the next rebuild.
-    const [digest] = await sql<{ keys: number; hash: string }[]>`
-      SELECT count(*)::int AS keys,
-             substr(encode(sha256(convert_to(
-               string_agg(ei.external_id, ',' ORDER BY ei.external_id), 'UTF8')),
-               'hex'), 1, 16) AS hash
-        FROM external_identities ei
-        JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
-       WHERE ei.match_method = 'afltables_profile_url'
-         AND ei.status IN ('unique', 'resolved')
-         AND ei.player_id = ANY(${ids})
-    `;
+    const digest = await identityDigests(ids);
     // Every returned player carries one, so a silently dropped identity cannot
     // hide behind a matching digest.
     expect(digest.keys).toBe(110);
-    expect(digest.hash).toBe('4b4c6a2aa975cc17');
+    // The original ISSUE-108 pin, reproduced exactly: membership unchanged.
+    expect(digest.legacy).toBe('4b4c6a2aa975cc17');
+    expect(digest.canonical).toBe('258396e0512a2212');
   });
 });
 
@@ -524,13 +544,23 @@ describe('gate: draft links', () => {
   beforeAll(() => lockDraftTables(integrationDsn), 300_000);
   afterAll(unlockDraftTables);
 
-  it('retains all 6,810 rows, including unresolved ones', async () => {
-    const [row] = await sql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM draft_picks
+  it('retains all 6,810 DraftGuru rows, including unresolved ones, plus durable manual selections', async () => {
+    const [row] = await sql<{ sourceRows: number; manualRows: number; unexpectedRows: number }[]>`
+      SELECT count(*) FILTER (WHERE s.key = 'draftguru')::int AS "sourceRows",
+             count(*) FILTER (WHERE s.key = 'manual_admin_edit')::int AS "manualRows",
+             count(*) FILTER (WHERE s.key IS NULL OR s.key NOT IN ('draftguru', 'manual_admin_edit'))::int AS "unexpectedRows"
+        FROM draft_picks dp LEFT JOIN sources s ON s.id = dp.source_id
+    `;
+    const [durable] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_overrides
+       WHERE entity_type = 'draft_picks' AND field_group = 'selection' AND is_active
     `;
     // An unmatched row is still a fact about the draft. Dropping it
-    // would silently shrink the historical record.
-    expect(row.n).toBe(6_810);
+    // would silently shrink the historical record. GAP-029's eight independently
+    // reviewed additions are manual facts; they cannot change the source denominator.
+    expect(row.sourceRows).toBe(6_810);
+    expect(row.manualRows).toBe(durable.n);
+    expect(row.unexpectedRows).toBe(0);
   });
 
   it('keeps the raw name on every row whether linked or not', async () => {

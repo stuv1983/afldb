@@ -1,0 +1,94 @@
+{
+  "reviewedOn": "2026-10-20",
+  "pass": "One targeted recovery pass per category; no further acquisition attempted",
+  "events": {
+    "findings": 42,
+    "localRecovery": {
+      "trackedLabelExports": "No exact-label legacy CSV/SQLite artifact found among tracked candidates",
+      "documentedLegacyArtifact": ".env.example names /home/arm/projects/sports_data_lab/data/afl/afl.db; it is a remote-host artifact, not accessed",
+      "localLegacyVariable": "AFLDB_LEGACY_SQLITE unset",
+      "documentedCapture": "D:/tmp/afldb-v2-rebuild-capture/afldb_v2_hist_test contains two identity reinstatement reports, not match labels",
+      "retained2026MatchDirectory": "data/sources/afl_api/matches contains no files"
+    },
+    "primarySources": [
+      {
+        "url": "https://www.collingwoodfc.com.au/news/256176/anzac-day-1995-2017",
+        "coverage": "Explicit Anzac results/history for 1995-2017; incomplete for the corpus through 2026"
+      },
+      {
+        "url": "https://www.essendonfc.com.au/news/48589/the-dreamtime-timeline",
+        "coverage": "Early Dreamtime history, including the 2005 inaugural fixture; not a complete through-2025 label export"
+      },
+      {
+        "url": "https://www.afl.com.au/news/625677/big-freeze-match-moves-to-the-scg",
+        "coverage": "Explicitly identifies Melbourne/Collingwood Round 13 on 2021-06-14 at the SCG as the Big Freeze/Queen’s Birthday fixture"
+      },
+      {
+        "url": "https://www.melbournefc.com.au/news/1339279/kings-birthday-blockbuster-sold-out",
+        "coverage": "2023 fixture article states the annual series since 2001 excludes 2020; scheduling exception defeats a universal calendar rule"
+      }
+    ],
+    "appliedLabels": 0,
+    "reason": "Partial histories and one exact fixture do not establish complete event membership. The current corpus presence probe treats any label as dataset presence: installing a partial event family would misrepresent missing labels as negative eligibility. No incomplete source was promoted as complete.",
+    "exactMissingArtifact": "An exact-match event-label export, covering Anzac, Dreamtime and Queen/King’s Birthday/Big Freeze through the corpus cutoff, including 2020 absence and 2021 relocation. Alternatively complete per-edition primary-source evidence reconciled to canonical match identities. No date/clubs/venue-only rule."
+  },
+  "datedMembership": {
+    "findings": 8,
+    "primaryEvidence": [
+      {
+        "name": "Willem Duursma",
+        "aflPlayerId": 11955,
+        "club": "West Coast Eagles",
+        "url": "https://www.afl.com.au/news/1467387/squads-eagles-young-guns-to-debut-dockers-ruck-to-miss",
+        "period": "February 2026 match simulation",
+        "fact": "League team-selection article names him in West Coast colours before the April 1 board; simulation selection does not establish a senior teammate set"
+      },
+      {
+        "name": "Jagga Smith",
+        "aflPlayerId": 9351,
+        "club": "Carlton",
+        "url": "https://www.carltonfc.com.au/news/1963954/afl-team-news-blues-confirm-double-afl-debut",
+        "period": "Before the March 2026 season opener",
+        "fact": "Club announces his senior debut in Opening Round, and identifies his 2024 draft selection; before April 3 board"
+      },
+      {
+        "name": "Jagga Smith",
+        "aflPlayerId": 9351,
+        "club": "Carlton",
+        "url": "https://www.afl.com.au/news/1479587/carlton-blues-young-gun-jagga-smith-earns-deserved-rising-star-nod-for-round-one",
+        "period": "March 2026 Round 1",
+        "fact": "League reports actual opening-round and Round 1 participation, before April 3 board"
+      },
+      {
+        "name": "Malcolm Rosas",
+        "aflPlayerId": 2602,
+        "profile": "players/M/Malcolm_Rosas.html",
+        "club": "Sydney",
+        "url": "https://www.sydneyswans.com.au/news/1964515/team-swans-name-first-team-of-2026",
+        "period": "March 2026 season opener",
+        "fact": "Club announces selection and club debut. Embedded live fixture panels now show a different round, so they are not treated as a frozen opening-round lineup"
+      },
+      {
+        "name": "Finnbar Maley",
+        "aflPlayerId": 8920,
+        "profile": "players/F/Finnbar_Maley.html",
+        "club": "Adelaide",
+        "url": "https://www.afc.com.au/news/1957529/squad-selection-match-simulation",
+        "period": "2026-02-19",
+        "fact": "Club explicitly identifies him as AFL-listed for Adelaide, before May 16 board; SANFL/preseason selection is not proof of senior participation"
+      }
+    ],
+    "stableIdentityBasis": "Official player IDs cross-checked with the retained authentic September roster; that roster supplies identity corroboration, not historical membership proof.",
+    "completeCellsResolved": 0,
+    "exactMissingArtifact": "Canonical registrations for Willem Duursma and Jagga Smith plus authentic AFL match participant/stat snapshots up to boards 990 (2026-04-01), 992 (2026-04-03), 1000 (2026-04-11) and 1035 (2026-05-16), sufficient for complete teammate intersections. Club list membership and preseason/state-league participation cannot be substituted for senior teammate eligibility."
+  },
+  "sibling": {
+    "findings": 21,
+    "evidence": "data/reference/gridley-sibling-eligibility-evidence.json",
+    "oldClassification": "source coverage gap",
+    "newClassification": "criterion disagreement",
+    "ownerApproved": false,
+    "dataMatches": 0,
+    "qualificationCorrection": "No missing qualifying senior games established; no canonical player or sibling row fabricated."
+  }
+}

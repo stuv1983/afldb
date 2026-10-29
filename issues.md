@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 13 (ISSUE-229, ISSUE-266–270 and 7 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294, ISSUE-295, ISSUE-301, ISSUE-304, ISSUE-307, ISSUE-289, ISSUE-277, ISSUE-292 and ISSUE-299 on 2026-10-15, merge-scoped and not deployed, see below; ISSUE-303 on 2026-10-15, DEV-scoped (deployed to DEV and browser-accepted; PROD installation and acceptance pending), see below; ISSUE-308 on 2026-10-15, DEV-scoped (deployed to DEV and accepted under the owner's D-308-3 amendment; PROD installation and acceptance pending), see below; ISSUE-280 on 2026-10-15, DEV-scoped (deployed to DEV and accepted under the owner's D-280-1 and D-280-2 amendments; PROD installation and acceptance pending), see below)
+**Open issues:** 3 (ISSUE-229, ISSUE-316 and ISSUE-321). **On 2026-10-27, under owner decision D-V2-SCOPE-20261027 (approved with amendments; V2 only; `issues/closed/AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md`), 13 issues were resolved.** V2 engineering complete: ISSUE-267, 269, 270, 274, 275, 276, 279 and 328. Superseded by retired V2 runtime paths: ISSUE-266, 268, 271, 272 and 273. No deployment, DEV acceptance or PROD acceptance is claimed, and the outstanding live requirements are kept in that decision's checklist. Earlier history follows: (ISSUE-328, registered 2026-10-27 as a port of the source repository's `6ffb893b` fix (admin settle panels named the text-sorted "latest" batch), see below; ISSUE-325, registered 2026-10-24 for the ISSUE-316 J2 rebuild harness's esbuild sampler exemption (F-J06), was resolved on 2026-10-24 by staged harness revision I325-3, see below; ISSUE-323 and ISSUE-324, registered 2026-10-23 during the ISSUE-316 pre-apply work and by its revision I disposable rebuild, were resolved on 2026-10-24 by the revision J2 disposable rebuild, see below; ISSUE-322, registered 2026-10-23 during the ISSUE-316 pre-apply work, was resolved on 2026-10-24, see below; ISSUE-321, registered 2026-10-23 for the successor source data-quality questions the owner deferred; ISSUE-319 and ISSUE-320, registered 2026-10-23 as ISSUE-316 successor gates, were resolved on 2026-10-23, see below; ISSUE-316, registered 2026-10-18 on the uncommitted branch `opus/afl-api-cutover`; ISSUE-229, ISSUE-266–270 and 7 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294, ISSUE-295, ISSUE-301, ISSUE-304, ISSUE-307, ISSUE-289, ISSUE-277, ISSUE-292 and ISSUE-299 on 2026-10-15, merge-scoped and not deployed, see below; ISSUE-303 on 2026-10-15, DEV-scoped (deployed to DEV and browser-accepted; PROD installation and acceptance pending), see below; ISSUE-308 on 2026-10-15, DEV-scoped (deployed to DEV and accepted under the owner's D-308-3 amendment; PROD installation and acceptance pending), see below; ISSUE-280 on 2026-10-15, DEV-scoped (deployed to DEV and accepted under the owner's D-280-1 and D-280-2 amendments; PROD installation and acceptance pending), see below)
 
 > **2026-10-10 import (tracking only).** ISSUE-271–314 are findings F-006–F-049 of the 2026-10-08 full code review at
 > `20a7a4bb`. Their runbooks were copied unchanged from the review worktree `afldb-review-20261008` into `issues/open/`
@@ -15,19 +15,17 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
-| AFLDB-ISSUE-266 | Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin | High | Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py` | Open (2026-10-08); 2026-10-08 full code review F-001; reproduced DB-free (W1; W2 adds substring injection and an unbound pass); D-266-1 and D-266-2 decided 2026-10-09; implemented and committed as `077af7ee`, merged and pushed to main; pre-commit review fixed two parser gaps (runbook §18.8); DB-free suite 160/160 on Windows Python 3.12.10 and 3.14.4 and on Linux (streamanator, CPython 3.12.3, 2026-10-09; runbook §18.9); **deployed to DEV only** (`7adfb3e8` → `077af7ee`, 2026-10-09; deployed suite 160/160, operator-reported; build and service unchanged; DEV `preflight` BLOCKED by nine untracked settle manifests, not passed; runbook §18.10); PROD inspected, not deployed (held at `cd3cf782` during ISSUE-265 observation); neither host has an intake timer, cron reference, IMAP settings or authserv-id in the places checked, so the fix is dormant; live mail not tested, no host accepted | Before intake is activated on any host: verify the receiving server's header insertion, forged-header removal, authserv-id and a legitimate message's format, set `AFLDB_INTAKE_AUTHSERV_ID`, then `--dry-run` a legitimate and a non-passing message (runbook §18.6, §18.10.8); PROD gets the code after ISSUE-265's observation |
-| AFLDB-ISSUE-267 | Override replay writes NULL period scores from a partial `score` override | High | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-002; implemented 2026-10-09 with ISSUE-269; **operator integration run 2026-10-09 FAILED (6 failed)**: replay `matches_score_components_ck` 23514 (components and totals written in two UPDATEs) and fixture cleanup `club_seasons_season_fkey` (score save derived 2 `club_seasons` rows; baseline 1,624 → 1,626); second fix pass: one atomic UPDATE, cleanup owns the derived ladder rows in one transaction; `py_compile`, `tsc` and source-contract 69/69 green; residue recovery dry run passed and rolled back, commit attempt refused before any DELETE (ladder rows already absent; remover unknown), fresh census empty with `club_seasons_total` 1,624; **second integration run 2026-10-09 10:47:03 PASSED on `afldb_test` (`afldb_owner`): 6 passed, 37 filtered skips, 33.80 s; implementation validated on `afldb_test`**; **DEV exposure census complete 2026-10-09** (operator-run before deployment; `afldb_dev`, `afldb_import`, read-only; 0 active `matches` overrides, sections 1–5 no rows, no replay blockers); **committed as `86e2d19fa6936f73872da45c7b5cb3200e274543`, merged to `main` and pushed; DEV deployed 2026-10-09** (operator-confirmed: `common.py` no working-tree diff from HEAD; migrations 110/110, nothing to apply; build OK, `BUILD_ID` `Jlf_U7HZnqispmedF-TaS`; respawn 844885 → 849656, active since 11:40:00 AEDT; readiness after 2 s; health ok, database ok, 28 ms); the deployment did not exercise the Python matches replay; **PROD exposure census complete 2026-10-09** (operator-run; `afldb_prod` via SSH alias `afldb`, `postgres`, read-only, `== Done.`, psql exit 0; 0 active `matches` overrides, sections 1–5 no rows, no section-3/4 replay blockers; does not establish the fix is installed on PROD); `merge:ready -- --issue 267` READY twice (after a fresh fetch too), 0 blockers, 2 metadata warnings (no `afldb-merge-readiness` JSON block in the ISSUE-267 runbook; no automated unexpected-file classification metadata); PROD installation deferred (PROD held at `cd3cf782` for ISSUE-265's observation; `cd3cf782..86e2d19f` measured at 9 commits, 40 files (assistant read-only review of GitHub's comparison, not operator-run Git evidence), no migration/package/deploy/next.config.ts change, but includes ISSUE-261's settle/retry change); historical corruption not established, historical impact remains unassessed, nothing repaired; runbook `issues/open/AFLDB-ISSUE-267.md` §17.10–§17.15 | The applicable after the ISSUE-265 observation hold at `cd3cf782` lifts, prepare and review a deployment procedure for this release (r6 pack must not be reused; range includes ISSUE-266 and ISSUE-261; preflight manifest FAILs expected), then the PROD deployment acceptance (§17.15: verify the installed `common.py`); then resolve with ISSUE-269 |
-| AFLDB-ISSUE-268 | Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd | High | Legacy intake / NULL-vs-zero — `src/lib/ingest/datasets.ts` | Open (2026-10-08); review F-003. Validator fix, promotion-time re-check of retained cells and tests (DB-free + integration) committed 2026-10-09 as `5659f789`, merged and pushed to `main`, and deployed to DEV 2026-10-09 (installation and operational acceptance complete; attendance validation/promotion not exercised on DEV, ISSUE-107 gate off so no live build-header parity claimed); operator checks at 15:11:57 passed (ingest-datasets 181/181, tsc, eslint, diff-check) and the targeted ISSUE-268 integration cases passed twice on `afldb_test` as the test owner (15:21:42, 15:30:35; restricted-role path and full integration file not validated); both operator-run censuses complete 2026-10-09 (DEV 15:59:22, PROD 16:02:57: no retained submissions, no rows in Sections 2–5, no exposure found in the records checked); historical impact unassessed, nothing repaired, fix not installed by the censuses; not installed on PROD | Operator: PROD installation and acceptance after the unchanged ISSUE-265 hold; D-268-1 and D-268-3 are separate follow-ups, not merge gates |
-| AFLDB-ISSUE-269 | `replay_admin_overrides('matches')` applies only one of a match's active override rows | Medium | Data integrity / admin override replay — `tools/migration/common.py` (`replay_admin_overrides`, matches branch) | Open (2026-10-08); 2026-10-08 full code review F-004; implemented 2026-10-09 with ISSUE-267: active rows merged into one object per `match_key`; equal-authority disagreements and underivable score components refused before any write; shared operator integration run 2026-10-09 FAILED (6 failed); **shared second-pass run 2026-10-09 PASSED on `afldb_test` (6 passed), implementation validated on `afldb_test`** (ISSUE-267); **DEV exposure census complete 2026-10-09** (0 active `matches` overrides, section 2 and all others no rows, no replay blockers); **committed as `86e2d19f`, merged/pushed, DEV deployed 2026-10-09** (shared with ISSUE-267; the deployment did not exercise the Python matches replay); **PROD exposure census complete 2026-10-09** (shared; 0 active `matches` overrides, section 2 and all others no rows, no replay blockers; does not establish the fix is installed on PROD); `merge:ready` READY twice; PROD installation deferred (shared with ISSUE-267, §17.15); historical impact remains unassessed; runbook `issues/open/AFLDB-ISSUE-269.md` §17.6–§17.9 | As ISSUE-267 (deployment procedure prepared and reviewed after the hold lifts, then the applicable PROD deployment acceptance, ISSUE-267 runbook §17.15); resolve any census section-3/4 row before a promotion |
-| AFLDB-ISSUE-270 | A delegated admin manager can take over a peer admin account through a spare invite | Medium | Authentication / administrator lifecycle — `src/app/admin/invite/[token]/actions.ts` (`confirmEnrolment`), `src/db/queries/admin-invites.ts` (new) | Open (2026-10-08); 2026-10-08 full code review F-005, code-proven, not reproduced; **implemented 2026-10-09 in `sonnet/issue-270` (worktree `afldb-issue-270`) and revised the same day for operator decision D-270-2 and then for the independent review (5 s redemption statement timeout, tracked background transactions in the race tests, doc corrections); operator validation COMPLETE for the working tree (runbook §19.9): unit 199/199 at 19:59:08 AEDT, typecheck, four-file lint and diff check (repeated after the final harness correction), and the whole `afldb_test` integration file 37/37 from 20:57:05 AEDT as `afldb_owner` (the earlier 18:50:00 177/177 and 19:32:44 198/198 runs are historical). Committed as `b239e0ac19b04becd4c1bdf26737d806590d8484`, merged to `main` and pushed (merge-readiness READY, 0 blockers, 2 warnings), and installed on DEV three times on 10 October 2026 (runbook §20; latest service start 08:14:38 AEDT, BUILD_ID `caodaX9EgGbJK4cZLFLRk`; all 110 migrations already applied; `/api/health` ok). That is DEV installation and operational acceptance only: no invite redemption exercised on DEV; not shown: restricted `afldb_auth`, real-database Server Action end-to-end, PROD installation or acceptance, historical misuse (not assessed, nothing repaired); ISSUE-107 gate off, so no live build-header parity is claimed**: every redemption requires the stored issuer's current authority under its row lock (D-270-2), free addresses and contributors included; an existing `admin`/`super_admin` is overwritten only for a current super admin, also in the upsert's `ON CONFLICT … WHERE`; refusals write nothing and audit `admin.invite_rejected` with a reason; a lock wait past 5 s rolls back as a generic failure; runbook §17–§20 | PROD installation and any applicable PROD acceptance, behind the unchanged ISSUE-265 hold; close only after that acceptance is complete; D-270-1 remains undecided, not a gate; §19.6 follow-ups recorded |
-| AFLDB-ISSUE-271 | Legacy `match_results` promotion overwrites Data Editor corrections on `matches` | Medium | Legacy CSV intake / admin authority — `src/lib/ingest/datasets.ts` (`match_results`), `src/lib/ingest/pipeline.ts` (validation reader) | Open (2026-10-08); review F-006, code-proven; imported 2026-10-10; **implemented 2026-10-10 with ISSUE-272 in worktree `afldb-issue-271` (`sonnet/issue-271`), uncommitted; operator 10 Oct 2026 on the pre-review-correction tree: DB-free 246/246, TypeScript, five-file ESLint, `git diff --check` passed; integration: first window 10 Oct FAILED 44/45 + 16/16 (historical: one ISSUE-264 F-002 fixture interaction), then after the fixture and runner corrections **PASSED 61/61 (45/45 + 16/16, 0 failed, 0 skipped; `afldb_test` only; State A verified; `D:\tmp\issue271\apply-20261010-122808-24240`; runbook §17.12); still uncommitted**: a supplied value conflicting with active Data Editor authority (score group incl. derived scores, attendance group, manual-edit attendance citation — which also blocks replacing a `match_attendance` figure) is refused at validation (advisory, import-role read-only reader, canonical key) and again under the match lock at promotion, whole submission, left `failed`; unreadable or inconsistent authority refuses; open follow-ups F4 (orphaned overrides, unreachable editor link), F5 (reader bounds), no real Data Editor save-versus-promotion race test, no dedicated manual-attendance-citation DB case (§17.10, §17.12); runbook `issues/open/AFLDB-ISSUE-271.md` §17 | ~~Operator supplies the `merge:ready` result for `d37c1422` or waives it~~ *(withdrawn 10 Oct 2026: no waiver; the historical pre-merge `merge:ready` result for `d37c1422` is recorded as not evidenced and not waived)*. The commit is on `main` and on the live remote, verified by `git ls-remote`, ISSUE-272 §17.16 (the "uncommitted" wording in this row is superseded). ~~Next: the tracking documentation is committed as a documentation-only descendant of `d37c1422`, then fresh readiness of that exact revision and the `-Issue107Gate` host prechecks (shared, ISSUE-272 §17.17), then DEV deployment with build identity;~~ *(done 10 Oct 2026, twelfth pass: `b2939eb7` committed and pushed, fresh readiness PASS, **deployed to DEV**, BUILD_ID `e6baP2aMpe9KQ13d_24BL`, ISSUE-272 §17.18; this issue's code runs on DEV)* Next: a DEV acceptance procedure for this issue's authority refusal is still to be written and run (ISSUE-272's cases exercised round codes only and do **not** accept it); ISSUE-272 DEV census **COMPLETE, 0 candidates** (ISSUE-272 §17.15; it concerns duplicate matches, not ISSUE-271's override authority); DEV acceptance alone does not close the issue; PROD behind the ISSUE-265 hold (D-271-1…4 are the derived implementation basis, runbook §17.7; no open decision) |
-| AFLDB-ISSUE-272 | Legacy `match_results` builds the match key from the raw round code and creates duplicate matches | Medium | Legacy CSV intake / match identity — `src/lib/ingest/datasets.ts` (`match_results`) | Open (2026-10-08); review F-007, reproduced DB-free (review witness W3); imported 2026-10-10; **implemented 2026-10-10 with ISSUE-271 in worktree `afldb-issue-271` (`sonnet/issue-271`), uncommitted; DB-free tests, typecheck, lint and diff check passed (operator, 10 Oct, pre-correction tree); integration: first window 10 Oct FAILED 44/45 + 16/16 (historical: one F-002 fixture interaction with this batch's 2073 Grand Finals), then after the fixture and runner corrections **PASSED 61/61 (45/45 + 16/16, 0 failed, 0 skipped; `afldb_test` only; State A verified; `D:\tmp\issue271\apply-20261010-122808-24240`; runbook §17.14); still uncommitted**: `R1`→`1`, `gf`→`GF`, unsupported text refused; `resolved.round_code` and the canonical key at every key site; pre-fix submissions normalised at promotion when consistent, otherwise refused whole, and refused whole when two rows resolve to one canonical match key (§17.11); updates reach only a compatible canonical name-keyed match; existing non-canonical matches are not repaired and a corrected upload can create a canonical twin; **sixth pass (2026-10-10): committed `d37c1422` on `main`; **seventh pass: local `main`, `origin/main` and the live remote tip (`git ls-remote`) all equal `d37c1422` ~~, a fast-forward of `41cbf730`~~ (eighth pass: only the tip agreement is evidenced; how `main` advanced is not); the five changed files match the 61/61 window's recorded hashes; the historical `merge:ready` result is NOT EVIDENCED and NOT WAIVED (console-only tool; no readiness block; no record); a DEV acceptance procedure is drafted for review, not approved or run (§17.16)**; the read-only DEV duplicate census ran COMPLETE (`D:\tmp\issue272\run-20261010-155649-1780`, `afldb_dev` as `afldb_import`, server identity operator-verified): 17,056 matches, 0 duplicate candidates, 0 round-contract breaches, 0 home/away disagreements, all canonical, all four listings FULL, 11/11 cross-checks, no repair. It shows the DEV data state only, not that the defect is fixed, not that no historical damage occurred, not that PROD is clean; runbook §17.15 holds the criteria table. NOT closed**; **twelfth pass (2026-10-11; runbook §17.18): documentation commit `b2939eb7658a15d7b70bd72be836107482362c0c` (sole parent `d37c1422`) pushed; fresh readiness PASS; DEV deployed (BUILD_ID `e6baP2aMpe9KQ13d_24BL`, 24/24 headers from 4/4 workers); DEV acceptance performed on 2025 fixtures: C3/C4 (submissions 69/70) refused with the expected reasons and rejected, C1/C2 (71/72) passed Gates G1/G2 (30/30 each) and were manually promoted as import batches 113/114; 4 submissions, 12 rows, 2 acceptance batches, 14 acceptance audit rows; `matches` count 17,056, max id and whole-table fingerprint, the 12 covered tables and F1/F2 values unchanged, both fixtures' `xmin` changed; original B3 verdict INCONCLUSIVE (unexpected import batch 115, `settle-afl-api.ts`, 0 canonical writes), separately recorded operator adjudication of batch 115 as unrelated concurrent DEV activity; post-acceptance census of record `D:\tmp\issue272\run-20261011-060523-24228` COMPLETE, exit 0, 0 findings, listings FULL, 17,056 matches (= B0), credential scan clean. DEV acceptance is therefore supported ONLY with the recorded concurrency exception, not an unqualified PASS; ISSUE-271 acceptance, PROD installation and PROD acceptance are not claimed. Historical `merge:ready` stays not evidenced and not waived. A 2026 venue-season defect is drafted and pending registration (no number allocated). STILL OPEN**; **fourteenth pass (2026-10-11; runbook §17.18.10): B3 reconciled. Batch 115 is the only discrepancy; the unmet rule is "one new batch" (§17.17.6), and the adjudication grounds were re-verified. The adjudication authorises the attribution only, so no acceptance outcome is appended. Decision D-272-5 is prepared, not in force. STILL OPEN**; **fifteenth pass (2026-10-11; runbook §17.18.11): operator approved D-272-5: the exact batch-count requirement is waived for batch 115 only, for ISSUE-272 criterion 8 on the existing 2025 fixture evidence (not ISSUE-271, PROD acceptance or issue closure). Criterion 8 is met with a recorded exception. Original B3 verdict stays INCONCLUSIVE; baselines and evidence unchanged. Batch 115: zero canonical writes, 64 `data_issues` rows refreshed, scheduled origin inferred. STILL OPEN; PROD installation and acceptance blocked by the ISSUE-265 hold**; runbook `issues/open/AFLDB-ISSUE-272.md` §17 | ~~Operator supplies the `merge:ready` result for `d37c1422` or waives it in writing; reviews and approves the drafted DEV acceptance procedure (§17.16.4, five choices)~~ ~~Operator settles U-1…U-7 and approves or amends the revised proposal (§17.17)~~ *(ninth pass, §17.17 revised in place)* *(Twelfth pass: everything through the acceptance run and the post-acceptance census is DONE, runbook §17.18; remaining: ~~the operator's closure-time position on the qualified DEV acceptance (fourteenth pass: record the prepared D-272-5, §17.18.10 item 6, or decline it and have a fresh full acceptance run prepared),~~ *(fifteenth pass: D-272-5 approved and recorded, §17.18.11; criterion 8 met with a recorded exception)* PROD installation and PROD acceptance behind the ISSUE-265 hold, the closure procedure, and, separately, registration of the drafted venue-season defect and operator-owned housekeeping.)* ~~Operator reviews §17.17 (no `merge:ready` waiver; the historical result stays not evidenced and not waived); in an isolated child session (E1–E3) commits and pushes the tracking documentation as a documentation-only descendant of `d37c1422` (D0–D5); fresh readiness R0–R7 of that exact revision; read-only host prechecks H-1–H-4 (stop for a separate authorisation if the DEV host lacks `AFLDB_TRACE_REQUESTS=on`); the `-Issue107Gate` DEV deployment with build identity I-1–I-4; then, only if identical-value promotion (U-5) is approved, the acceptance run (the census does not stand in for it, and acceptance alone does not close the issue);~~ PROD installation and acceptance behind the ISSUE-265 hold; a PROD census is optional and not chosen (PROD data state unassessed, not a gate); D-272-1…4 are the derived implementation basis, §17.7; no open decision |
-| AFLDB-ISSUE-273 | Submission validation overwrites a concurrent approve, promote or reject | Medium | Legacy CSV intake / submission lifecycle concurrency — `src/lib/ingest/pipeline.ts` (`validateSubmission`) | Open (2026-10-08); review F-008, code-proven (operator-driven timing); fix implemented 2026-10-11 on `opus/issue-273` (that was the initial state: uncommitted, DB-free checks passing; since superseded, committed as `a34f0721` and merged, see below); `afldb_test` integration passed 2026-10-11 (all 8 ISSUE-273 cases, no skips; only the ISSUE-264 State-B block skipped, environmental); D-273-1 approved and implemented 2026-10-11 (email intake answers 200 `validated: false` after a superseding review decision; DB-free and `afldb_test` pass); §19.5 residual fixed 2026-10-11 (caller-specific start policy: intake validates only from `staged`/`validated`, checked on the initial status/`xmin` read; manual re-validation of `rejected` kept; DB-free and `afldb_test` `email-intake` 20/20 + `submission-promotion` 15/15 pass); final review corrections 2026-10-11 (integration teardown awaits all background work; `afldb_test` 41 passed + 4 expected-fail); committed on `opus/issue-273`; merged to main `a34f0721` 2026-10-11 (readiness accepted with operator exception for 4 untracked files, §22.1); **installed on DEV 2026-10-11 18:13 under scoped deploy-gate exception D-273-DEV-1 (HEAD `a34f0721`, BUILD_ID `L22XfuX2nngl_51zwuzfH`, 4/4 workers, 0 migrations applied; raw clean-tree FAILs preserved at both the merge and deploy gates; §22.1–§22.3) and DEV behavioural acceptance on synthetic fixtures SUPPORTED (submissions 73/74 rejected, 11 expected audits in order, no import batch, `award_winners` 3712, migrations 110, healthy after; §22.4); not exercised on DEV: race guard and decided acknowledgement (`afldb_test` integration evidence only), the poller (offline self-test only), a real mailbox (unexercised anywhere); restricted roles only as narrowly tested on `afldb_test` (§22.4); the refused approve on 74 rests on a saved Playwright page snapshot, not on the database; D-273-DEV-2 approved (account id 4); DEV evidence only, PROD not contacted**; runbook `issues/open/AFLDB-ISSUE-273.md` §17–§22 | PROD installation and acceptance behind the ISSUE-265 hold, then closure (§19.6 item 4); not closed |
-| AFLDB-ISSUE-274 | A settle unit that writes only the `matches` row takes no row lock before its authority read | Medium | Acquisition / settle concurrency / manual authority — `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows`) | Open (2026-10-08); review F-009; fix implemented LOCALLY on `opus/issue-274` (uncommitted at that date; since committed and merged as `6f99b58d`, see runbook §31); 2026-10-12 MO-1 and the focused matches-only integration run PASSED on `afldb_test` (State A; runbook §24), 2026-10-12 §26: lock-removal mutation R1 failed exactly the two discriminator assertions as expected; whole `settle-afltables` R2 exit 1: 67 exercised passed / 1 UNEXPECTED failure (ISSUE-099 O1 text-extraction test) / 1 restricted-role skip / 11 durable cases NOT EXERCISED / 1 todo; censuses identical; 2026-10-12 §27: a DB-free targeted extractor comparison reproduces the same O1 failure on `HEAD` and the patch (independent of this patch; registered as ISSUE-315, Low); `afldb_import` lock test revised, typecheck and ESLint clean, NOT run; 2026-10-12 §28: that test's cleanup corrected (per-run marker required by every DELETE, lost season INSERT reply reported and never removed, primary and cleanup failures both reported; 13 DB-free tests pass); 2026-10-12 §29: the import-role lock test was RUN once on `afldb_test` and PASSED (exit 0, 1 passed, 0 skipped; censuses identical; runtime lock-permission evidence only, not applier acceptance); 2026-10-12 §30: R3 (whole `settle-afl-api.test.ts`) COMPLETED, 72/72 passed once on `afldb_test` (State A; 1 NOT EXERCISED; `club_seasons` 2026 rewritten by the suite's hook); State B, the overlapping-settle cycle and the late-candidate case on PostgreSQL still unrun; **2026-10-12 §31-§32: merged to main as `6f99b58d` (readiness exception), INSTALLED on DEV (BUILD `kKfU7VKifbsWyPAAurnUU`), synthetic acceptance VERDICT FIXED x2; the driver's first cleanup FAILED and rolled back (FK order), owner-authorised cleanup revision 1 also removed derived `club_seasons` 1751/1752 and SUCCEEDED; S-1 vs S-0 compare exit 5 (all 99 table comparisons matched; one review item: `club_seasons_id_seq` advanced by four, 1748 -> 1752, owner-accepted as recorded), `club_seasons` back to 1,640 rows with the identical hash; health PASS**; **2026-10-13 §33: the first scheduled AFL API nightly (05:08:42-05:10:27, batch 121) was OBSERVED with no regression marker against the documented baseline (one night; read-only DEV checks; run revision `6f99b58d` supported by the host reflog, not recorded by the run); repeat night and the listed limits remain**; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-274.md` | The 14 Oct nightly (batch 122) was the combined 274 + 276 observation, graded PASS with no regression; the window is CLOSED (D-OBS-274276-20261014, runbook §33.10; lock execution NOT PROVEN); PROD: the ISSUE-265-specific hold was released by `a862d192`, PROD still needs its own reviewed procedure; separate from ISSUE-275 |
-| AFLDB-ISSUE-275 | A settle can insert period scores under a match it refused because a foreign owner created it concurrently | Medium | Acquisition / canonical ownership / provenance — `src/lib/acquisition/canonical-apply.ts` (`applyCanonicalUnit`) | Open (2026-10-08); review F-010, code-proven mechanism, interleaving not executed; imported 2026-10-10; **implemented 2026-10-13 on `opus/issue-275` (revision 2 the same day: every genuine `matches` refusal withholds, `manual_authority_*` included); committed as `24ca412b`, on `origin/main` (verified 2026-10-14), **installed on DEV 2026-10-14 13:52 AEDT (runbook §30; acceptance NOT met)**; DB-free validation passed; focused `afldb_test` validation PASSED 2026-10-13 (3 selected tests passed, exit 0, `CENSUS IDENTICAL`; same-transaction planted-row witness, not two-session concurrency; no DEV/PROD/State B evidence); full-diff review: no CRIT/HIGH/MED finding; DEV install was held until the observation window closed (now closed, D-OBS-274276-20261014)**; runbook `issues/open/AFLDB-ISSUE-275.md` §26-§28 | Merged, pushed and installed on DEV; open: first attributable nightly (independent continuity evidence), State B, PROD read-only split-ownership census (§15; the DEV census is DONE 2026-10-14 14:09 AEDT, runbook §31: 0 rows with both sources set and different, 0 mixed matches; 134,704 NULL-source legacy rows = unattributed, not proof of authorship) |
-| AFLDB-ISSUE-276 | AFL API period scores that contradict the final score are written | Medium | Acquisition / AFL API settle — `src/lib/acquisition/afl-api-settle-plan.ts`, `afl-api-bundle.ts` | Open (2026-10-08); review F-011, code-proven; implemented 2026-10-12, committed as `5b0ab6dc`, merged to `main` as `3ec76f28`; **installed on DEV 13 October 2026, 06:26:00-06:28:27 AEDT** (operator-verified; installation checks exit 0; BUILD_ID `5sDQtjtkxAIUBO5bVn6mY`; MainPID 2609207); focused `afldb_test` acceptance supported 2026-10-12 (4/4 passed on the second run; first run 3 passed, 1 failed on a test-reader type mismatch); no whole-suite, restricted-role, live-provider, real-data DEV or PROD acceptance; names reviewed and kept; runbook `issues/open/AFLDB-ISSUE-276.md` §17.7, §17.8 | The 14 October nightly (batch 122) was graded PASS, no regression, as the combined observation; the window is CLOSED (D-OBS-274276-20261014, runbook §17.10; guard branch NOT OBSERVED on DEV); PROD installation and acceptance remain |
-| AFLDB-ISSUE-279 | Under Next.js 16 every sitemap segment is empty | Medium | Public site / SEO — `src/app/sitemap.ts` | Open (2026-10-08); review F-014, reproduced DB-free (W6) and confirmed against `next@16.3.1` docs; nothing implemented; imported 2026-10-10; runbook `issues/open/AFLDB-ISSUE-279.md` | DEV sitemap check in a build-time settings window (combined procedure §6); fix merged and installed on DEV |
+| AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); D-229-1..8a decided; B1 COMPLETE; 2026-10-19 (V2 Launch F, `v2/rebuild` `d760280e`): fixture writer built and tested on isolated PostgreSQL 16 (17/17 integration; the 2026 feed dry-runs clean); never applied outside isolation; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture the first authentic 2027 pre-match feed (no 2027 compSeason exists yet), validate-only and dry-run it, then the owner approves the first apply |
+| AFLDB-ISSUE-316 | AFL API cutover: retire AFL Tables network acquisition | Medium | Data acquisition / source retirement | Open. Structural gate CLOSED / ACCEPTED. D/P approved for readiness proof; D 2026-10-27; P `def676517da3955aa18db3606785463aac464188`. U3 CONFIRMED; U4 Route B; Brownlow untouched; production NO-GO. Day-D readiness proof PASS 2026-10-27 (02:00–02:15Z): READY FOR OWNER APPLY DECISION. | Apply and State B validation PASS on 2026-10-27 (D-316-APPLY-B-20261027, 04:52–05:00Z): EXEC in validated inactive State B at isolated binding commit `06e88227…`; production NO-GO. The W1-only approval D-316-ACT-C-20261027 arrived after W1 closed (V0 FAIL, nothing run). **Successor ACTIVATED under D-316-ACT-C-20261028 (2026-10-27 20:09–20:13Z): V0–V7 PASS; EXEC in validated State C at isolated binding commit `75df67db…`, `rebuild-test.ts` `ab734947…`, deactivation dry run proves the recovery binding; RC1 unused; production NO-GO.** Locally integrated 2026-10-28, not pushed: R `c7e17da2`, A `1a6de4b6`, F `955d0e85`; focused checks PASS (499/499, typecheck, V2-GAP-027 1/1); G committed with V2-GAP-027 in `2d0971c7`. The accepted J2 Linux successor rebuild (91 checks PASSED, 1,640 agree) carries forward; readiness, apply, activation, recovery dry run and integration did not re-execute a rebuild or the 91 SQL checks. Linux verification of the integrated tree DONE 2026-10-28: at `c3dea709`, 14,860 / 3 (V2-GAP-029) / 63 plus Coleman 28/28; three Linux regressions fixed locally ([record](docs/v2/linux-verification-2026-10-28.md)). Third Linux pass done (GAP-035 closed `58bd9e4c`; Phase B 11/11; B1 **8/8** after the per-case budget correction `c249be86` (attempts 1–2 failed on budgets)). Current-production shadow acceptance MEASURED 2026-10-29 (D-V2-CURRENT-ACCEPTANCE-RUN-1; archive `a4641ca0…` only): evidence integrity, migration compatibility (no reasons), backend functional and backend acceptance PASS, exit 0; strict FAIL and staged Brownlow INCOMPLETE as expected; privileges integration 42/43, unresolved and not waived ([report](docs/v2/evidence/current-rehearsal-acceptance-2026-10-29.json)). Next (consolidated in [the release choices](docs/v2/owner-decision-release-choices-2026-10-29.md)): the rescued 2026-08-12 Gridley archive for `external-grids-import` (only a later snapshot exists), then the separate push and production-release decisions ([INTEGRATION.md](issues/open/AFLDB-ISSUE-316-integration-20261028/INTEGRATION.md)). [Activation package](issues/open/AFLDB-ISSUE-316-activation-decision-20261027/ACTIVATION-DECISION.md). [Runbook](issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/READINESS-RUNBOOK.md). |
+| AFLDB-ISSUE-321 | Deferred successor source data-quality questions (coach attribution, roster identity, goal/height disagreements, roster completeness) | Low | Source provenance / data quality — `match_coaches`, AFL API roster mapping, height/goal evidence | Open (2026-10-23); split out of ISSUE-319 when the owner decided its §4 items: NM 1940 R8–R18 stays unattributed (multi-coach schema deferred); the 479 unmapped roster ids stay excluded; goal/height disagreements and the 18 rejections stay evidence-only under unchanged authority; the frozen roster is evidence-only with completeness unvalidated; N2/N3 and the +89 delete counter retained. No gate depends on it | Only on new evidence or an owner request: a multi-coach schema/importer design; a named non-name identity source for the 479 ids; a designated adjudicating authority; a separately authorised roster capture with raw retention |
+
+**AFLDB-ISSUE-323 and AFLDB-ISSUE-324 resolved 2026-10-24** (fixes `481511d2`; `82603dc7`, `14abea5e`, `876dadbf`; local, not pushed). The owner ruled on 2026-10-24 that the ISSUE-316 revision J2 disposable rebuild is the J2 proof, and that its 5 sampler anomalies (F-J06) are an evidence-monitor defect, registered as ISSUE-325. That rebuild was the ordinary successor path at pinned `876dadbf`, under the reviewed native closure (policy `a8e586e0…`) with no provenance, against `afldb_v2_rb_i316_revision_j2_test`. It passed the successor preflight and the real execution boundary, and executed the constrained tsx/npm path under enforcement: runner exit 0, 30 stages, 91 checks PASSED, all 1,640 club-seasons equal, `AFLDB-POST PASSED`, 0 native REFUSED lines and 0 provenance mentions. A focused read-only evidence review of the retained artefacts preceded the closure; it is recorded in the ISSUE-316 entry. No push, deployment, apply, activation or census. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entries in this file.
+
+**AFLDB-ISSUE-322 resolved 2026-10-24** (implementation `db541ae3`, integration test `4fcc95ef`, `60eb5e0c`, `dfbfc1ab`; local, not pushed). The owner ruled the treatment on 2026-10-24 (ISSUE-316 revision J): `brownlow_correction_receipts` is classified `reinstate` (operations, productionOnly, compare equal, order 20), stays in `truncatedPublicTables()` and the promotion freeze set (F0 pin 42 → 43), and is excluded only where the TRUNCATE statement is built and validated (`truncateStatementTables()`); after `BEGIN` the plan takes `LOCK TABLE … IN ACCESS EXCLUSIVE MODE` and asserts the candidate copy is empty before any destructive statement, then reinstates the destination's rows and compares them equal. No trigger bypass, `session_replication_role`, `DISABLE TRIGGER` or `ALTER TABLE`. The complete real swap and rollback integration test (`tests/integration/db-promotion-receipts.test.ts`) passed on a disposable isolated cluster with four `afldb_v2_i322_*_test` databases: **7 passed, 0 skipped**; the disposable superuser was used only for cluster provisioning and the two rename executions (swap, rollback). Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entry in this file.
+
+**AFLDB-ISSUE-319 resolved 2026-10-23** (implementation `691bdbae580c32a952411df48d59849f0198683a`, local, not pushed). The owner decided every runbook §4 item: NM 1940 R8–R18 unattributed (multi-coach schema deferred); the 479 unmapped roster ids excluded pending stable identity evidence; conflicting goals/heights evidence-only (authority, rejected matches and missing-value semantics preserved); the frozen roster evidence-only, completeness unvalidated; and the raw-to-parsed coach replay required inside preflight. The replay is implemented (`import_match_coaches.py --require-raw-bundle`, shared parser `tools/rebuild/afltables/coach_snapshot_parser.py`, contract `raw_bundle` pin, `runPreflight` wiring; 5 suites 1,854 passed / 4 skipped, `tsc` 0) and proven inside the enforced v4 rehearsal: `AFLDB-COACH-RAW-REPLAY VERIFIED` at `rebuild.log` line 103, before the first stage, the census and the reset, against the exact parsed bytes the loader consumed; real-launcher controls NCR1 (bundle absent) and NCR2 (one byte changed) refused at preflight with 0 stages. Deferred data-quality questions moved to ISSUE-321. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entry in this file and `issues/closed/AFLDB-ISSUE-319.md` §6.
+
+**AFLDB-ISSUE-320 resolved 2026-10-23, streamanator-scoped** (implementation `041bd585`, `15e43562`; local, not pushed). The owner named DEV `streamanator` as the only environment for both the rollover planner and the post-rollover rebuild, and accepted the §3 boundary (file-backed loading enforced; executable-memory and direct-syscall loading out of scope; static children checked before exec; the verifying launcher outside its own enforcement). Proven there: the enforced v4 rehearsal at `691bdbae` (exit 0, 30 stages, 0 REFUSED, sampler 0 anomalies over 173 processes, 250/250 closure objects unchanged; v3 record `685a281c…`, policy `30199b6a…`), and the planner runtime bound to that record (node, venv `python3.12` → `/usr/bin/python3.12`, tsx, esbuild) with an LD_AUDIT-enforced pinned dry run exit 0 and 0 refusals. **Limits:** no record exists for any other host and this does not authorise protected tools elsewhere (production included); Windows carries no enforcement; esbuild is bound pre-exec only; the planner runs under LD_AUDIT without the launcher guard self-checks. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entry in this file and `issues/closed/AFLDB-ISSUE-320.md` §8.
 
 **AFLDB-ISSUE-303 resolved 2026-10-15, DEV-scoped** (implementation `50f9345b`, merged and pushed; installed on DEV by the gated deployment of `f07c2a74` at 16:30 AEDT; owner-signed-in browser acceptance C-303-1..5 PASS with six screenshots and URL records; post-browser journal check PASS). `/admin/upload` now posts to `POST /admin/upload/stage` and takes the documented 5 MB file. On DEV behind Caddy: a 1,500,359-byte `match_attendance` CSV staged as submission 75 and the browser landed on `/admin/submissions/75`; a 5,244,473-byte file was refused with `The file exceeds the 5 MB limit.` (HTTP 413) with no new submission; the audit trail shows exactly one `upload.staged` row (submission 75) and none for the refusal; submission 75 was rejected through the UI (`submission.rejected`), never validated, approved or promoted. **Not done / limits:** optional C-303-6 (session-ended path) not run; PROD installation and acceptance pending (the PROD Caddy has no body cap on this path); submission 75 stays in the list as REJECTED history. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entry in this file and `issues/closed/AFLDB-ISSUE-303.md` §21–§22.
 
@@ -30481,7 +30479,10 @@ verification.
   (`pipeline.ts`, `datasets.ts`, `csv.ts`), `src/app/api/admin/email-intake/route.ts`,
   `tools/email_intake/`, `auth_users.role='contributor'`, `data_submissions`/`data_submission_rows`.
 - **Status:** Resolved 2026-09-15 (Phase A — account/access retirement — only; Phases B/C
-  deferred, not tracked under a new issue ID). Worktree `D:\dev\afldb-issue-186`, branch
+  deferred, not tracked under a new issue ID). *V2 note (2026-10-27, documentation only):* Phase B's
+  runtime retirement is implemented in V2 (`docs/v2/legacy-disposition.md` L1–L3). The host timer
+  (V2-GAP-013), the pre-V2 production exposure and the unperformed Phase C are recorded in
+  `blockers.md` R23 and R60. Worktree `D:\dev\afldb-issue-186`, branch
   `sonnet/issue-186-retire-contributor-csv`. Operator-verified: `tests/auth.test.ts` 165/165,
   `tests/integration/admin-lifecycle.test.ts` 21/21, `tests/current-season-import.test.ts`
   256 passed/4 skipped/0 failed, `npx tsc --noEmit` PASS. No migration, no schema/grant change,
@@ -41894,6 +41895,18 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 
 ## AFLDB-ISSUE-229 — AFL API fixture ingestion
 
+- **Owner migration-policy separation (2026-10-20):** B2 remains OPEN before wiring/first
+  application of the new-season fixture schedule writer; authentic whole-season/TBC/status/key
+  and venue/round-mapping evidence and first-apply approval remain required. It is not a blanket
+  blocker for an inactive-writer backend preservation rehearsal. No acquisition or apply was
+  authorised. See `docs/v2/migration-acceptance-2026-10-20.md`; ISSUE-316 sequencing unchanged.
+
+- **Local release clarification (2026-10-19):** B2 is the first-season operational acceptance
+  gate, not missing implementation or a hard-coded 2027 technical requirement. Authentic 2026
+  pre-match evidence proves the existing contract; it cannot substitute for the first genuine
+  2027 whole-season/TBC/status/key/mapping check and owner-approved first apply. Still OPEN.
+  Details: `issues/open/AFLDB-ISSUE-229.md`, B2 classification; `docs/v2/local-release-review.md`.
+
 - **Status:** Open (2026-09-23). **Severity:** Medium. **Area:** data acquisition / fixtures:
   `afl_api` season feed → `fixtures`, `canonical_applications`, `admin-fixtures.ts`.
 - **Origin.** Reserved by the frozen ISSUE-228 plan (§13.1, §16 S10) and opened at the ISSUE-228
@@ -42054,6 +42067,46 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     tracked.
   - **Next action:** B2, the first authentic 2027 pre-match feed (TBC representation,
     whole-season shape validation), before the writer is wired or applied.
+- **2026-10-19 (AFLDB V2 Launch F, branch `v2/rebuild`, commit `d760280e`; isolated PostgreSQL 16 only):
+  the fixture writer is BUILT AND TESTED; still Open, because B2 is not captured.**
+  - **Code.**
+    - Pure staging: `packages/acquisition/src/fixture-lifecycle.ts`.
+    - One-transaction writer under the per-season advisory lock:
+      `src/lib/acquisition/afl-api-fixture-writer.ts`.
+    - CLI `npm run settle:afl-api-fixture-schedule -- --label <fixtures-only snapshot>
+      (--validate-only|--dry-run|--apply)`. It verifies the manifest and requires the seed feed,
+      then applies the season seal and the ingestion gate.
+  - **How it works.**
+    - Identity is `(source_id, source_record_id)` (D-229-7).
+    - Clubs and the venue are resolved explicitly; an unresolved or ambiguous one refuses.
+    - It checks I-1/I-2/I-3 against foreign and played rows and never merges a foreign row
+      (D-229-4).
+    - It writes no match-spine rows and runs no absence sweep (D-229-8/8a).
+    - Any refusal writes nothing; no change writes nothing; a replay is idempotent.
+  - **Statuses.**
+    - `SCHEDULED` and `UNCONFIRMED_TEAMS` → scheduled (D-229-1).
+    - `CONCLUDED` → left to the match path.
+    - `POSTPONED`, `CANCELLED` and `ABANDONED` stay unobserved (D-229-3). Each refuses unless
+      the operator names it in a per-run `--acknowledge-unobserved-status`. Even then it only
+      updates an existing provider-owned row (postponed = TBC; cancelled/abandoned =
+      `cancelled` with a reason) and never creates one.
+  - **D-229-6.** `editFixture` refuses a provider-owned row (`provider_owned`, audited).
+  - **Validation.**
+    - `tests/integration/v2-fixture-writer.test.ts`: 17/17 on `afldb_v2_main_test` and on the
+      rebuilt `afldb_v2_hist_test`.
+    - `tests/v2-fixture-contract.test.ts`: 67/67.
+    - `tests/admin-fixture-actions.test.ts`: passes, including a new provider-owned refusal.
+    - tsc 0.
+    - A dry run of the tracked 2026 season feed against the locally rebuilt history: 217
+      CONCLUDED, 1 SCHEDULED, 0 refused; it would create `CD_M20260142901` (clubs and venue
+      resolved); 0 rows were left after the dry run.
+  - **Not done.**
+    - **B2:** a read-only check of the public compSeasons list (2026-10-19) shows no 2027 season
+      yet (latest `CD_S2026014`), so the first authentic 2027 pre-match feed cannot exist.
+    - No apply on any non-isolated database.
+    - No production action.
+  - **Next action:** capture B2 when the 2027 season is published. Run `--validate-only` and
+    `--dry-run` on it and review its TBC representation, then approve the first apply.
 
 ## AFLDB-ISSUE-231 — AFL API source-integrity hardening: retired-identity rekey and match-family absence sweep
 
@@ -46821,6 +46874,14 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-255 — AFL API unused-emergency `player_match_stats` suppression
 
+- **Historical PROD residue discovered 2026-10-24 (ISSUE-316/U3):** the authorised read-only query identified
+  the exact pre-fix Fiorini placeholder as production PMS 705437, application 20834, batch 32, inserted
+  2026-09-27T21:11:30.460661Z. The 2026-10-01 “no residue known”/“no residue to repair” statements below describe
+  knowledge and DEV validation then; they do not establish PROD absence. Suppression implementation remains
+  resolved; production residue/disposition is tracked in ISSUE-316, with an audited Data Editor removal proposed,
+  not executed. See [evidence](docs/v2/issue316-u3-player-row-evidence-2026-10-24.md).
+
+
 - **Status:** RESOLVED (2026-10-01; see *Resolution (2026-10-01)* at the end of this entry).
   Implementation validation COMPLETE (DB-free, typecheck, lint delta, focused `afldb_test`
   integration); committed as `f6d189d0`, deployed to DEV and accepted. It blocked AFLDB-ISSUE-232
@@ -49409,10 +49470,10 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-266 — Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin
 
-- **Status:** Open (2026-10-08). **Severity:** High. **Area:** legacy CSV intake / email ingress / authentication
+- **Status:** **Resolved (2026-10-27), superseded by a retired V2 runtime path** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): V2's poller is a refusing shim and the email-intake route answers 410 unread; fixed code `077af7ee` retained; DEV/PROD acceptance lapse for V2 and are not claimed; timer disablement and the §18.6 activation precondition kept in the decision's checklist item 9. Opened 2026-10-08. **Severity:** High. **Area:** legacy CSV intake / email ingress / authentication
   boundary. Key files: `tools/email_intake/fetch_and_stage.py`, `tools/email_intake/test_fetch_and_stage.py`,
   `src/app/api/admin/email-intake/route.ts` (unchanged).
-- **Runbook:** `issues/open/AFLDB-ISSUE-266.md`.
+- **Runbook:** `issues/closed/AFLDB-ISSUE-266.md`.
 - **Origin.** Full code review of `review/full-code-20261008` at `20a7a4bb`
   (`issues/reviews/2026-10-08-full-code-review.md`, F-001; that review and its other findings are tracked in the
   separate review worktree).
@@ -49478,9 +49539,9 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-267 — Override replay writes NULL period scores from a partial `score` override
 
-- **Status:** Open (2026-10-08). **Severity:** High. **Area:** data integrity / admin override replay (rebuild, reload,
+- **Status:** **Resolved (2026-10-27), V2 engineering complete** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): fix `86e2d19f` in `v2/rebuild`, validated as recorded below and in V2's 20 Oct local run (`data-editor` ISSUE-267 cases 6/6); no deployment or PROD acceptance claimed; the override census before a production promotion and the installed-`common.py` check are kept in checklist item 2; historical impact unassessed. Opened 2026-10-08. **Severity:** High. **Area:** data integrity / admin override replay (rebuild, reload,
   promotion). Key file: `tools/migration/common.py` (`replay_admin_overrides`, matches branch).
-- **Runbook:** `issues/open/AFLDB-ISSUE-267.md` (§0–§16 from the review, §17 implementation).
+- **Runbook:** `issues/closed/AFLDB-ISSUE-267.md` (companions `AFLDB-ISSUE-267-269-*.sql` also in `issues/closed/`) (§0–§16 from the review, §17 implementation).
 - **Origin.** Full code review of `review/full-code-20261008` at `20a7a4bb` (`issues/reviews/2026-10-08-full-code-review.md`,
   F-002; that review and its other findings are tracked in the separate review worktree). Code-proven, not reproduced.
 - **Defect.** The matches replay wrote both clubs' final-period `match_period_scores` rows straight from the `score`
@@ -49583,12 +49644,12 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-268 — Legacy `match_attendance` intake turns a blank cell into a sourced, settle-protected zero crowd
 
-- **Status:** Open (2026-10-08); **validated on `afldb_test`, both censuses complete (2026-10-09); committed (`5659f789`), merged and
+- **Status:** **Resolved (2026-10-27), superseded by a retired V2 runtime path** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): V2 refuses CSV upload, submission review and promotion; fixed code `5659f789` retained and passed in V2's 20 Oct local run; DEV/PROD acceptance lapse for V2 and are not claimed; D-268-1/D-268-3 lapse with the path; historical impact unassessed. History: Open (2026-10-08); **validated on `afldb_test`, both censuses complete (2026-10-09); committed (`5659f789`), merged and
   pushed to `main`, deployed to DEV 2026-10-09 (installation and operational acceptance complete); PROD installation and acceptance
   outstanding behind the unchanged ISSUE-265 hold.**
   **Severity:** High. **Area:** legacy CSV intake / NULL-vs-zero. Key file:
   `src/lib/ingest/datasets.ts` (`match_attendance`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-268.md` (§0–§16 from the review, §15–§16 annotated; §17 implementation record, §17.14 census record, §17.15 commit, merge and DEV deployment record).
+- **Runbook:** `issues/closed/AFLDB-ISSUE-268.md` (census `AFLDB-ISSUE-268-blank-attendance-census.sql` also in `issues/closed/`) (§0–§16 from the review, §15–§16 annotated; §17 implementation record, §17.14 census record, §17.15 commit, merge and DEV deployment record).
 - **Origin.** Full code review of `review/full-code-20261008` at `20a7a4bb` (`issues/reviews/2026-10-08-full-code-review.md`,
   F-003; that review and its other findings are tracked in the separate review worktree). Reproduced DB-free (witness W2).
 - **Defect.** A blank `attendance` cell becomes `Number('') = 0` (`datasets.ts:1312-1313`). The row validates `ok`, so it
@@ -49692,9 +49753,9 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-269 — `replay_admin_overrides('matches')` applies only one of a match's active override rows
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** data integrity / admin override replay (rebuild,
+- **Status:** **Resolved (2026-10-27), V2 engineering complete** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): fix `86e2d19f` in `v2/rebuild`, validated as recorded below and in V2's 20 Oct local run; no deployment or PROD acceptance claimed; live requirement kept in checklist item 2; historical impact unassessed. Opened 2026-10-08. **Severity:** Medium. **Area:** data integrity / admin override replay (rebuild,
   reload, promotion). Key file: `tools/migration/common.py` (`replay_admin_overrides`, matches branch).
-- **Runbook:** `issues/open/AFLDB-ISSUE-269.md` (§0–§16 from the review, §17 implementation).
+- **Runbook:** `issues/closed/AFLDB-ISSUE-269.md` (§0–§16 from the review, §17 implementation).
 - **Origin.** Full code review at `20a7a4bb` (F-004; tracked in the separate review worktree). Code-proven, not
   reproduced.
 - **Defect.** One `data_overrides` row per field group, but a single `UPDATE matches … FROM data_overrides`, so
@@ -49748,10 +49809,10 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-270 — A delegated admin manager can take over a peer admin account through a spare invite
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** authentication / administrator lifecycle. Key files:
+- **Status:** **Resolved (2026-10-27), V2 engineering complete** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): fix `b239e0ac` in `v2/rebuild`, validated as recorded below and in V2's 20 Oct local run (`admin-lifecycle` 37/37, `auth` 203/203); no deployment or PROD acceptance claimed; live requirement kept in checklist item 3; D-270-1 undecided, not a gate. Opened 2026-10-08. **Severity:** Medium. **Area:** authentication / administrator lifecycle. Key files:
   `src/app/admin/invite/[token]/actions.ts` (`confirmEnrolment`), `src/app/admin/admins/invite-actions.ts`
   (`createInvite`), and since the fix `src/db/queries/admin-invites.ts`.
-- **Runbook:** `issues/open/AFLDB-ISSUE-270.md` (§0–§16 from the review, kept as historical; §17 implementation; §18
+- **Runbook:** `issues/closed/AFLDB-ISSUE-270.md` (§0–§16 from the review, kept as historical; §17 implementation; §18
   D-270-2 revision; §19 review follow-up, which governs; §19.9 operator validation results; §20 commit, merge and DEV
   deployment).
 - **Origin.** Full code review at `20a7a4bb` (F-005; partition note R1a-F01; tracked in the separate review worktree).
@@ -49875,9 +49936,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-271 — Legacy `match_results` promotion overwrites Data Editor corrections on `matches`
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** legacy CSV intake / admin authority. Key file:
+- **Status:** **Resolved (2026-10-27), superseded by a retired V2 runtime path** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): the owner-accepted local engineering and local acceptance ruling stands as the engineering record (V2 applicability below and runbook §17.14); V2 refuses `match_results` promotion, so DEV/PROD acceptance lapse for V2 and are not claimed; F4/F5 lapse with the path; historical impact unassessed. Opened 2026-10-08. **Severity:** Medium. **Area:** legacy CSV intake / admin authority. Key file:
   `src/lib/ingest/datasets.ts` (`match_results` `validateRow`, `preparePromotion`, `promoteRow`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-271.md` (review §0–§16; imported unchanged 2026-10-10).
+- **Runbook:** `issues/closed/AFLDB-ISSUE-271.md` (review §0–§16; imported unchanged 2026-10-10).
 - **Origin.** Review F-006 (partition note R5a-F04) at `20a7a4bb`. Code-proven, not reproduced (DB-backed).
 - **Defect.** The `match_results` promotion's `ON CONFLICT (match_key) DO UPDATE` overwrites score, venue, round and
   attendance columns unconditionally; neither validation nor promotion reads `data_overrides`. A Data Editor correction is
@@ -49952,11 +50013,38 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   (original B3 INCONCLUSIVE; operator-adjudicated concurrent batch 115). The historical `merge:ready` result stays not
   evidenced and not waived. Nothing repaired. PROD behind the ISSUE-265 hold. **Still Open.**
 
+- **2026-10-26 local/test tunnel attempt (runbook §17.13):** SSH host reported `streamanator`; session-owned forward bound
+  only `127.0.0.1:55432`, then was stopped and no listener remained. Current checkout has no `.env`, and owner/import/auth
+  test DSNs are unset. **No database operation occurred**; all three read-only identity gates, real `saveEdit` race and
+  manual-attendance citation integration proof remain **NOT RUN**. DB-free ingest 305/305, typecheck and `git diff --check`
+  passed on Windows. No implementation change or acceptance claimed. ~~Next: owner identifies existing test credentials;
+  separately prove every required DSN reaches exact `afldb_test` in a read-only transaction before scoped fixture writes.~~
+  *(withdrawn 2026-10-27, below)* **Still Open.**
+
+- **2026-10-27 V2 applicability (documentation only; runbook §17.14).** The owner stated that ISSUE-271's local
+  engineering and local acceptance are **accepted**. That ruling is respected here and its proofs are not repeated in V2.
+  Its own text and evidence are not recorded in this checkout. The 26 Oct "Next" (test credentials, identity gates, race
+  and citation proofs in V2) is **withdrawn, not run**. V2 facts, verified read-only:
+  - `src/lib/ingest/datasets.ts` (blob `91d01143`) and `pipeline.ts` (`52fddc8e`) are byte-identical to the V2 fork point
+    `ff100dc2`, which contains `d37c1422`.
+  - V2's own local delivery run (`docs/v2/evidence/local-supported-tests-delivered.json`, 20 Oct) passed
+    `match-results-promotion` 46/46 (6 ISSUE-271 cases) and `ingest-datasets` 305/305 (43 ISSUE-271 cases).
+  - V2 runtime cannot reach `match_results` validation or promotion. `runValidation`, `decideSubmission` and
+    `runPromotion` refuse (`src/app/admin/submissions/[id]/actions.ts:27-39`), and the upload and email-intake routes
+    answer 410. `pipeline.ts` has no non-test importer, and the only non-test importer of `datasets.ts` is the offline
+    first-kick-goal import (`resolveClub`/`resolvePlayer` only).
+  - So the DEV acceptance of the authority refusal and PROD acceptance cannot be performed against V2. Their lapse for
+    V2 was **proposed** in `issues/closed/AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md` (Class B); *approved
+    2026-10-27, see Status*.
+  - Exposure on pre-V2 PROD code is kept there (checklist item 10).
+
+  **Still Open.**
+
 ## AFLDB-ISSUE-272 — Legacy `match_results` builds the match key from the raw round code and creates duplicate matches
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** legacy CSV intake / match identity. Key file:
+- **Status:** **Resolved (2026-10-27), superseded by a retired V2 runtime path** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): V2 refuses `match_results` promotion; fixed code `d37c1422` retained and passed in V2's 20 Oct local run; the qualified DEV acceptance (D-272-5) stays as recorded; PROD acceptance and the optional PROD census lapse for V2 and are not claimed; the drafted venue-season registration is dropped (owner amendment 5: tracked as the source repository's ISSUE-327, parked there; no duplicate investigation). Opened 2026-10-08. **Severity:** Medium. **Area:** legacy CSV intake / match identity. Key file:
   `src/lib/ingest/datasets.ts` (`match_results`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-272.md` (review §0–§16; imported unchanged 2026-10-10).
+- **Runbook:** `issues/closed/AFLDB-ISSUE-272.md` (census `AFLDB-ISSUE-272-duplicate-match-census.sql` also in `issues/closed/`) (review §0–§16; imported unchanged 2026-10-10).
 - **Origin.** Review F-007 (partition note R5a-F05) at `20a7a4bb`. Reproduced DB-free by the review (witness W3, not
   imported).
 - **Defect.** Any non-empty `round_code` is accepted and the key is built from the raw string, so `R1`, `gf` or `Round 1`
@@ -50200,9 +50288,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-273 — Submission validation overwrites a concurrent approve, promote or reject
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** legacy CSV intake / submission lifecycle concurrency.
+- **Status:** **Resolved (2026-10-27), superseded by a retired V2 runtime path** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): V2 refuses submission validation, review and promotion and the email-intake route answers 410; fixed code `a34f0721` retained and passed in V2's 20 Oct local run; the DEV acceptance (§22.4) stays as recorded; PROD acceptance lapses for V2 and is not claimed. Opened 2026-10-08. **Severity:** Medium. **Area:** legacy CSV intake / submission lifecycle concurrency.
   Key file: `src/lib/ingest/pipeline.ts` (`validateSubmission`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-273.md`. **Origin.** Review F-008 (R5a-F03) at `20a7a4bb`. Code-proven; the timing
+- **Runbook:** `issues/closed/AFLDB-ISSUE-273.md`. **Origin.** Review F-008 (R5a-F03) at `20a7a4bb`. Code-proven; the timing
   is operator-driven.
 - **Defect.** Status is checked once at start; the final `UPDATE … SET status = 'validated'` has no status predicate, so an
   approve, promote or reject landing during a long validation is silently overwritten.
@@ -50307,9 +50395,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-274 — A settle unit that writes only the `matches` row takes no row lock before its authority read
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** acquisition / settle concurrency / manual authority. Key
+- **Status:** **Resolved (2026-10-27), V2 engineering complete** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): fix `6f99b58d` in `v2/rebuild`, validated as recorded below and in V2's 20 Oct local run; no deployment or PROD acceptance claimed; lock execution on live data NOT PROVEN; live requirement kept in checklist item 4. Opened 2026-10-08. **Severity:** Medium. **Area:** acquisition / settle concurrency / manual authority. Key
   file: `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows`, `applyCanonicalUnit`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-274.md`. **Origin.** Review F-009 (R4a-F01) at `20a7a4bb`. Code-proven mechanism;
+- **Runbook:** `issues/closed/AFLDB-ISSUE-274.md`. **Origin.** Review F-009 (R4a-F01) at `20a7a4bb`. Code-proven mechanism;
   the concurrent interleaving was not executed.
 - **Defect.** A unit with only `matches`/`match_period_scores` targets reads manual authority and re-reads the row unlocked
   before `UPDATE matches`; a Data Editor edit committed in between is overwritten while its override stays active.
@@ -50460,9 +50548,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-275 — A settle can insert period scores under a match it refused because a foreign owner created it concurrently
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** acquisition / canonical ownership / provenance. Key file:
+- **Status:** **Resolved (2026-10-27), V2 engineering complete** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): fix `24ca412b` in `v2/rebuild`, validated as recorded below and in V2's 20 Oct local run; no deployment or PROD acceptance claimed; PROD split-ownership census already done (runbook §34); live requirement kept in checklist items 4–5. Opened 2026-10-08. **Severity:** Medium. **Area:** acquisition / canonical ownership / provenance. Key file:
   `src/lib/acquisition/canonical-apply.ts` (`applyCanonicalUnit`, `readFreshTarget`).
-- **Runbook:** `issues/open/AFLDB-ISSUE-275.md`. **Origin.** Review F-010 (R4a-F02) at `20a7a4bb`. Code-proven mechanism;
+- **Runbook:** `issues/closed/AFLDB-ISSUE-275.md` (companion `AFLDB-ISSUE-275-SD-PROCEDURE.md` also in `issues/closed/`). **Origin.** Review F-010 (R4a-F02) at `20a7a4bb`. Code-proven mechanism;
   the concurrent interleaving was not executed.
 - **Defect.** `matchId` is bound before the `matches` target's owner/baseline gates and not cleared on refusal, so the
   unit's `pending_match` period-score target inserts `afltables`-owned rows under a match another source owns.
@@ -50504,12 +50592,12 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-276 — AFL API period scores that contradict the final score are written
 
-- **Status:** Open (2026-10-08). **Severity:** Medium. **Area:** acquisition / AFL API settle / data integrity. Key files:
+- **Status:** **Resolved (2026-10-27), V2 engineering complete** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): fix `3ec76f28` in `v2/rebuild`, validated as recorded below and in V2's 20 Oct local run (`settle-afl-api-issue276` 4/4); no deployment or PROD acceptance claimed; guard branch NOT OBSERVED on live data; live requirement kept in checklist item 4. Opened 2026-10-08. **Severity:** Medium. **Area:** acquisition / AFL API settle / data integrity. Key files:
   `src/lib/acquisition/afl-api-settle-plan.ts` (`planRosterFamily`), `src/lib/acquisition/afl-api-bundle.ts`.
   **Current (2026-10-12):** implementation committed locally as `5b0ab6dc` on `opus/issue-276-period-score-guard` (base `6f99b58d`); not merged, pushed, installed or deployed;
   focused `afldb_test` acceptance supported (operator acceptance below). The earlier "local, uncommitted" and "NOT RUN" wording in this entry is dated history.
   **Current (13 October 2026):** merged to `main`/`origin/main` as `3ec76f28`; **installed on DEV 13 October 2026, 06:26:00-06:28:27 AEDT** (DEV installation below). Installation established; real-data nightly acceptance pending; still Open.
-- **Runbook:** `issues/open/AFLDB-ISSUE-276.md`. **Origin.** Review F-011 (R4b-F02) at `20a7a4bb`. Code-proven.
+- **Runbook:** `issues/closed/AFLDB-ISSUE-276.md` (companion `AFLDB-ISSUE-276-RESIDUE.sql` also in `issues/closed/`). **Origin.** Review F-011 (R4b-F02) at `20a7a4bb`. Code-proven.
 - **Defect.** The bundle computes `periodScoresReproduceFinalScore` ("§9 assertion 4") but neither the plan nor the writer
   consults it, so contradicting period scores are written to `match_period_scores`.
 - **Implementation (2026-10-12, local, uncommitted).** `planRosterFamily` refuses the roster family
@@ -50623,9 +50711,9 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-279 — Under Next.js 16 every sitemap segment is empty
 
-- **Status:** Open (2026-10-08); implemented 2026-10-14, DB-free validated, **merged to `main` as `cf1d49c3`, not deployed; remains Open pending the DEV check**. **Severity:** Medium. **Area:** public site / SEO / framework upgrade. Key files:
+- **Status:** **Resolved (2026-10-27), V2 engineering complete** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): fix `cf1d49c3` in `v2/rebuild` (`src/app/sitemap.ts:64`), DB-free validated; no deployment or PROD acceptance claimed; **`window-279.sh` (runbook §20, combined procedure §6) WITHDRAWN / UNSAFE, no settings-window authority granted**; the live sitemap check stays outstanding by a method yet to be approved (checklist item 6). History: Open (2026-10-08); implemented 2026-10-14, DB-free validated, **merged to `main` as `cf1d49c3`, not deployed; remains Open pending the DEV check**. **Severity:** Medium. **Area:** public site / SEO / framework upgrade. Key files:
   `src/app/sitemap.ts`, `tests/seo.test.ts`, `tests/e2e/seo.spec.ts`.
-- **Runbook:** `issues/open/AFLDB-ISSUE-279.md`. **Origin.** Review F-014 (R1c-F01) at `20a7a4bb`. Reproduced DB-free by
+- **Runbook:** `issues/closed/AFLDB-ISSUE-279.md` (combined procedure `AFLDB-ISSUE-280-308-279-DEV-ACCEPTANCE.md`, §6 WITHDRAWN / UNSAFE, also in `issues/closed/`). **Origin.** Review F-014 (R1c-F01) at `20a7a4bb`. Reproduced DB-free by
   the review (witness W6, not imported) and confirmed against the installed `next@16.3.1` documentation.
 - **Defect.** Next 16 passes the segment `id` as a `Promise<string>`; `Number(promise)` is `NaN`, so every
   `/sitemap/<n>.xml` is an empty `<urlset>` while the index still advertises them.
@@ -51596,3 +51684,1919 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
   The throwaway users the settle file can create (`issue122-authority-test@example.test`, `issue122-apply-test@example.test`) are covered by `users_n`/`users_fp`; the
   `player_match_stats` / `player_*` rows `cleanup122()` removes by player are covered by `players` (`slug LIKE 'issue122-%'`) being 0.
+
+## AFLDB-ISSUE-316 — AFL API cutover: retire AFL Tables network acquisition
+
+**Successor ACTIVATED (D-316-ACT-C-20261028; EXEC in validated State C `75df67db…`) and LOCALLY INTEGRATED in V2 (2026-10-28; local commits on `v2/rebuild`, not pushed; production NO-GO).** R `c7e17da2` (rollover, 8 paths, byte-equal to `06e88227…`), A `1a6de4b6` (`tools/db/rebuild-test.ts` alone, blob `11308f06…`) and F `955d0e85` (the 16 State C restatements; every blob equals its `C_sha256_lf` pin), with the records in `d504932c`. G, the V2-GAP-027 predecessor adaptation, was committed with the owner's GAP-027 work in `2d0971c7`. Focused checks over the integrated tree passed: five suites 499/499, `npm run typecheck` exit 0, and the V2-GAP-027 integration case 1 passed (73 filtered) on a disposable isolated `_test` clone. **Completed proof.** The accepted J2 Linux successor rebuild carries forward (2026-10-24, streamanator, pinned `876dadbf`: runner exit 0, `AFLDB-FINAL-VALIDATION PASSED: 91 checks`, all 1,640 comparable club-seasons agree; retained evidence 167/167, inputs 264/264). Day-D readiness, the State B apply, the activation, the deactivation (recovery) dry run and the local integration are complete. None of those later operations executed another rebuild or the 91 SQL checks, and none was required (D/P acceptance 2026-10-25: no new rebuild required). In the entries below, "Not proven: the 91 SQL checks and any successor rebuild" means not re-executed by that operation. **Linux verification of the integrated tree DONE (2026-10-28; owner-authorised; fresh verification, not a rebuild; J2 not re-run):** on streamanator against disposable clones of the approved test baseline, the full workflow at `c39d2130` gave 14,856 / 7 / 63. Three of those failures were Linux regressions, fixed locally in `26a089a7` (stale census path), `a0c87fb5` (bridge exporter's fixed port 55432) and `c3dea709` (Gridley answer-key timeout); none is pushed. At `c3dea709` the result is 14,860 passed / 3 failed (the V2-GAP-029 Gridley gates) / 63 skipped, plus Coleman 28/28. The ISSUE-316 suites all pass on Linux. PostgreSQL NL GAP-032/033 hold, frozen V5 is 12,000/12,000, the browser sweep had 0 HTTP/page errors, and R34 is a display-name artifact (681/681 correct ids) ([record](docs/v2/linux-verification-2026-10-28.md)). Third Linux pass (2026-10-28, [record §10](docs/v2/linux-verification-2026-10-28.md)): V2-GAP-035 closed (`58bd9e4c`; rendered gate 1,844/1,844), Brownlow B2 3/3 and B1 **8/8** after the per-case budget correction `c249be86` (attempts 1–2 failed on budgets), `brownlow-pending-populated` 4/4, ISSUE-265 Phase B 11/11 PASS (copied runner, disposable target), shadow report on the retained `a583fc7d…` archive strict FAIL/INCOMPLETE as expected (only the 116/117 deltas). **Current-production shadow acceptance MEASURED (2026-10-29, D-V2-CURRENT-ACCEPTANCE-RUN-1):** the D-V2-CURRENT-REHEARSAL-1 binding (with CURRENT-SCHEMA-1 and BROWNLOW-ALT-3; archive `a4641ca0…` only) over a verified local copy of the retained evidence gave evidence integrity, migration compatibility (no reasons), backend functional and backend acceptance PASS, exit 0; strict FAIL and staged Brownlow comparator INCOMPLETE as expected; privileges integration 42/43, staging default privileges absent, unresolved and not waived ([report](docs/v2/evidence/current-rehearsal-acceptance-2026-10-29.json); record §10 of `docs/v2/owner-decision-current-rehearsal-2026-10-29.md`). **Remaining:** D-V2-RESIDUALS-1 recorded the residuals as known and open on 2026-10-29 (`external-grids-import` NOT RUN because the rescued archive is unavailable; lint 508 / 136; GAP-029 149/99/50; [record](docs/v2/release-residuals-2026-10-29.md)); the read-only host inspection is DONE (2026-10-29, D-V2-HOST-INSPECT-1 with amendments: identity and ledger 110 match, no release drift, host change list HC-1–HC-5 prepared; [findings](docs/v2/host-prerequisites-findings-2026-10-29.md)); D-V2-LOCK-1 (approved 2026-10-29) recorded the owner's visual acceptance (D-V2-VISUAL-1; V2-GAP-022 closed), `beta.afldb.com` through the existing Caddy route, and the withdrawal of "release after C5" (A-AFLT still required before schema/code installation), and authorised the merge, lock and one production-configured build ([record](docs/v2/owner-decision-lock-2026-10-29.md)); next, the separate production approvals listed there. [Integration record](issues/open/AFLDB-ISSUE-316-integration-20261028/INTEGRATION.md).
+
+**State B applied and validated (owner approval D-316-APPLY-B-20261027; 2026-10-27 04:52:41–05:00:14Z, inside the window 04:50–06:45Z): EXEC is in validated inactive State B; production NO-GO; activation and release remain separately governed.** A1–A6 PASS (unchanged day-D controls; policy `dc7b585d…` 251/0 drift; negatives refused; 2,687 blobs equal P; censuses 2.7 h old; no residue). B: identical enforced command plus `--apply`, exit 0, 3/3 gates, 1622→1640, renumbered 4, 91 checks built, WROTE 7 files, INSTALLED and INACTIVE, 0 REFUSED. C: seven finals; six ` M`; `rebuild-test.ts` `320960e4…`, table `{}`, 1622; no residue. E1: tree `a8ce0f34…`, commit `06e88227…`, detached HEAD P→`06e88227…`, no other ref changed. E2: unchanged activation-tool dry run (no `--apply`, no `LD_AUDIT`) validated State B, projected C (1640, 91 checks, SQL not run) and the inactive refusal; nothing written. F: policy/layout re-match, HEAD clean, prod `ff100dc2…` unchanged, no journal, `afldb.service` active. Not proven: the 91 SQL checks and any successor rebuild. Evidence `streamanator:…/apply-B` (`APPLY-B-CLOSING.sha256`, 85 files, `cb7b4f7e…`); local `.local-release/issue316-readiness-20261027/apply-B-evidence/`. Details: `issues/open/AFLDB-ISSUE-316.md` (top). Activation decision PREPARED 2026-10-27 ≈05:30Z (D-316-ACT-C-20261027; review GO, one MED and six LOW applied). The owner approved W1 only (finish 06:45Z on 2026-10-27). The approval reached the session at 19:48:10Z, so V0 (UTC inside the window) failed. Nothing was run: no SSH, no host check, no evidence directory, no `--apply`, commit, ACT-R or RC1, and EXEC was not touched (State B expected, not re-verified). **Re-approved as D-316-ACT-C-20261028 (window to 2026-10-27T23:30:00Z; D unchanged) and executed 20:09:08–20:13:17Z: all V0–V7 PASS.** V0: no apt timer before 23:40Z, no upgrade run (a process-filter false positive on the `unattended-upgrade-shutdown` standby daemon was cleared by a precise re-check). V1: drift checks all equal apply-B/E2, with inventory 2,980 / `bafb7da0…`. V2: the one unenforced write (ACT-L), exit 0, `WROTE`. V3/V4: `ab734947…` / blob `11308f06…`; one-line inventory delta; controls 251/0; `ALREADY ACTIVE` re-check. V5: `write-tree` `4d520565…`, `commit-tree` `75df67db…`, guarded HEAD move. V6: deactivation DRY RUN exit 0 (C activated → B/D INACTIVE, nothing written). V7: closing PASS. RC1 was unused. **EXEC rests in validated State C at `75df67db…`; production NO-GO.** Not proven: the 91 SQL checks and any successor rebuild. Evidence `streamanator:…/activate-C` (`ACTIVATE-C-CLOSING.sha256`, 61 files, `3599bbcd…`); local `.local-release/issue316-readiness-20261027/activate-C-evidence/`. Details: `issues/open/AFLDB-ISSUE-316.md` (top). **Local integration candidate PREPARED (2026-10-28; uncommitted).** Three sets are ported into the V2 working tree. R: 8 rollover paths byte-equal to `06e88227…`. A: `tools/db/rebuild-test.ts` alone, `ab734947…`. F: the 16 approved State C restatements; 13 verbatim, and 3 three-way merged onto owner-modified tests with the changed lines equal to P→C. One adaptation, G, gives two owner-added V2-GAP-027 settle cases the explicit predecessor seasons registry, with no assertion changed. Validation is carried forward from day-D/apply-B/activate-C and accepted C 2992/7/0 + 396/0/0. Required focused checks: the three ported suites, `admin-current-season-settle`, `v2-shadow-parity`, typecheck, and the integration GAP-027 case. Record, patches and the selective Git proposal: `issues/open/AFLDB-ISSUE-316-integration-20261028/INTEGRATION.md`. Next (then): run those checks, then the owner's commit decision; release separate. Both done 2026-10-28; see the entry above.
+
+**Day-D readiness proof PASS (2026-10-27, 02:00:02–02:15:06Z, inside the approved window): READY FOR OWNER APPLY DECISION; production NO-GO.** P `def676517da3955aa18db3606785463aac464188` (EXEC HEAD before and after; 2,687 tracked blobs equal); H `79eb1212bbb03aa64f078807f09c3d643e5ea867` (11/11 helper files byte-equal); A `e91fae88765c5d6d74d4b2c61ee2c4d599fe5d26`; anchor `ffb06267…`. Opening PASS. Host/native policy PASS: day-D policy `dc7b585d…` matches J2 `a8e586e0…` 251/251, differing only in the auditor path (same digest `32d5f6fe…`). Independent review GO in round 2 (round 1 NO-GO on a MED provenance gap, closed by evidence). Three read-only censuses PASS, total 0, scope 1897..2026: prod `b1a6f398…` (02:10:38Z), dev `66037e8b…`, test `1ae06bca…`. Canonical/nightly PASS: batches 62–66 made 0 canonical writes; the only delta is the accepted PMS 705437 removal; `afldb.service` active; deployed `ff100dc2…` unchanged. Enforced dry run PASS 43/43: exit 0; 3/3 gates; 1622→1640; renumbered 4; 91 checks; seven pins match; `rebuild-test.ts` stayed at `320960e4…`; tuple absent; projection equals activate authority `1d133580…`; 0 REFUSED; root unchanged; no residue; prod census age 110 s. Not proven: the 91 SQL checks and State B. Pre-apply finding: the frozen activation authority binds simulated HEAD `06e88227…`, so a real `successor-activation.ts` dry run on the uncommitted State B checkout at P refuses at the HEAD binding. That substitute is withdrawn. The corrected sequence adds an isolated, local-only binding commit recreating `06e88227…` from the actual applied tree (owner decision E1). It then runs the unchanged tool's dry run without `LD_AUDIT`, because `/usr/bin/git` is outside the day-D policy (owner decision E2). See [apply decision package](issues/open/AFLDB-ISSUE-316-apply-decision-20261027/APPLY-DECISION.md). Evidence: `streamanator:/home/arm/afldb-i316-readiness-D-20261027T0200Z` (`CLOSING.sha256`, 95 files, `4ae463bc…`); local copy `.local-release/issue316-readiness-20261027/day-D-evidence/` (`decision/RESULT.md`, `SHA256SUMS`). The frozen package and `readiness/STATUS.json` (bound by the package manifest) are unchanged. No apply, activation, deactivation, deployment, rebuild, push or Brownlow work. Next: a separate owner decision on apply plus State B validation.
+
+**Current owner ruling (2026-10-25):** structural gate **CLOSED / ACCEPTED**; D/P **APPROVED for readiness proof**. **D = 2026-10-27**, window **02:00–04:00 UTC / 13:00–15:00 AEDT (Melbourne)**; exact **P = `def676517da3955aa18db3606785463aac464188`**, implementation `c438f8449e65c28cf9f00879aaa045131b5f0d3a`. A later documentation/evidence commit never becomes P. Authorised in that window: current read-only host/native-policy proof, fresh three-target censuses, required nightly/canonical check and enforced dry run without `--apply`. No apply, activation, deactivation, deployment, disposable rebuild, push or Brownlow work. U3 **CONFIRMED**; U4 **Route B**; ISSUE-316 **OPEN**; production **NO-GO pending separate apply approval**.
+
+**D/P evidence accepted (2026-10-25):** retained J2 167/167 and inputs 264/264; real offline validator exit 0 / 3-of-3 PASS / all pins match; seven-file apply shape; B inactive/rebuild-ineligible; projected C 1,640 rows / 91 checks; exact-P DB-free validation and typecheck PASS. Proposal-only repair supersedes the earlier B 2,956/7/32 failure: broader B **2,966/7/0**, C **2,992/7/0**; focused B **395/0/0**, C **396/0/0**, all exit 0. Fresh-context restatement review GO, no findings. No accepted product/test assertions changed; no new rebuild required. Fresh proof is **NOT RUN**, awaiting the approved day-D window.
+[Approved bindings and day-D procedure](issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/readiness/READINESS-RUNBOOK.md).
+
+**Pre-window local preparation / H freeze (2026-10-25):** detached exact-P tree retained clean; all 2,687 tracked files match P. Original 17 preparation checks plus four H-binding checks: **21 PASS**. H is the separate local helper-freeze commit, never P; opening requires its full SHA and exact helper-file bytes. A records administrative lineage separately, including accepted `ffb06267...`; the two mutable inventory inputs remain bound to that exact commit's blobs. Commit scope is the preparation directory plus the four owner-named tracking files only. No dependencies, credentials, CSVs or historical censuses copied. All fresh production proof remains NOT RUN; production NO-GO. [Preparation, P/A/H model and limits](issues/open/AFLDB-ISSUE-316-readiness-prep-20261025/README.md).
+[Local gate and canonical evidence](issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md).
+
+- **Successor activation separated from the production apply (2026-10-25; current implementation: `c438f844`; tracking/evidence pending separate commit).**
+  - Owner ruling: activation must be controllable independently of the apply. It is bound to the exact candidate,
+    separately testable and reversible, and leaves the J2 rebuild semantics unchanged.
+  - Old mechanism: the apply's write set appended the tuple to `SUCCESSOR_LADDER_TUPLES_JSON`
+    (`tools/db/rebuild-test.ts`, the 8th pinned file), so the apply itself activated the successor.
+  - New mechanism, apply side:
+    - a successor change set writes 7 files and never `rebuild-test.ts`;
+    - the planner only projects the one-line append (`RolloverPlan.activation`);
+    - the dry run validates that projected activated state and prints its pins;
+    - `rebuild-test.ts` is bound read-only through the write;
+    - a change set or planner output naming `rebuild-test.ts` is refused.
+  - New mechanism, activation side: `tools/db/successor-activation.ts` (rules in
+    `src/lib/rollover/successor-activation.ts`) is the only writer of the table. It runs dry by default and needs
+    `--apply` to write. Its authority `afldb.rollover.successor_activation/1` binds:
+    - the decision, season, profile and tuple SHA-256;
+    - the change-set SHA-256;
+    - the rollover date, checked in the applied register and switch;
+    - HEAD exactly, with P as an ancestor;
+    - the migration set;
+    - both `rebuild-test.ts` pins.
+  - A second activation refuses. Deactivation is the exact inverse, D = B, and leaves the rollover files untouched.
+    The rollover journal can never touch the activation state. Rollback order is deactivate, then apply recovery.
+  - No `rebuild-test.ts` code change and no rebuild-input change, so no new rebuild is indicated.
+  - Tests added to `tests/season-rollover.test.ts`: owner requirements 1–8 plus strictness/fault cases.
+  - **Validation (owner-authorised local run, 2026-10-25):** `tests/season-rollover.test.ts` 393/393;
+    `tests/db-test-rebuild.test.ts` + `tests/afl-api-cutover.test.ts` 1539 passed, 5 skipped; `npm run typecheck`
+    exit 0. After the F3 renames (titles/comments only): `season-rollover` 393/393 and typecheck exit 0 again; the
+    rebuild/cutover re-run was blocked by the C: volume filling (`ENOSPC`), and with temp on D: 1517 passed, the
+    only failure being `db-test-rebuild.test.ts:351` (it asserts temp is on `C:\`). A clean re-run of that file
+    needs free space on C:.
+  - Fresh-context independent review: **GO, no CRIT/HIGH.**
+    - MED, **ruled by the owner 2026-10-25**:
+      - F1 **accepted**: State B is *applied / successor installed / inactive / rebuild-ineligible*, intentionally
+        fail-closed; not redesigned; DB rebuild proof waits for State C; B is never labelled as having passed
+        successor database rebuild proof;
+      - F2 **accepted as a valid conflict; the U2 date-only exception is superseded**: the production candidate is
+        structural (7-file write set, new transition/recovery/post-apply semantics, activation authority), never
+        "date-only", and is re-pinned at P with the full J2 DB-free set at P; the decision package's stale
+        §4/§6/§8 text was rewritten;
+      - F3 **accepted**: tests are classified invariant / State B / State C and named by state; no test implies B
+        and C are one tree.
+    - No new disposable rebuild is required on its own (rebuild semantics unchanged); a later change touching
+      rebuild semantics, inputs, reconstruction, canonical data or relied-on validators returns to the owner.
+    - LOW F4–F6 fixed: an activation leftover now blocks the rollover's leftover scan; a test comment overclaimed
+      J2 byte-equality; two stale comments.
+    - INFO F7–F9 recorded.
+  - [Comparison, field enumeration and review record](docs/v2/issue316-successor-activation-separation-2026-10-25.md).
+  - Next phase (not started): finalise the local candidate, choose the real production window and D, derive the
+    structural P, regenerate the production package, establish current native/host policy, take the fresh census,
+    run the enforced dry run, then return for the separate apply decision. Apply and activation stay separate
+    approvals; State B is validated first. U4 stays Route B; Brownlow untouched.
+  - Not authorised: census, D/P choice, seal/rollover, activation, apply, deployment, rebuild, push. Production NO-GO.
+
+- **Metadata repair v5 executed: PASS; U3 CONFIRMED (2026-10-25 Sydney; 2026-10-24T21:26–21:30Z; superseded as current).**
+  The owner ruled: no sudo/NOPASSWD, no frozen v4, a separately hash-bound v5 changing only transport/principal binding.
+  Read-only discovery through the existing `afldb_backup` credential selected the existing non-superuser owner
+  `afldb_owner`. It is the only non-superuser able to update `data_edits.note`, and it was reached through the existing
+  arm-only `.env`. No role, grant, sudo rule, authentication change or credential was created.
+  - Package and review: v5 manifest 3e1e329f…fc06d96 (43 members; lock/snapshot/assertion SQL and note
+    byte-identical to v4); PGlite 20/20, VM wrapper 31/31; private PostgreSQL 16 on streamanator 21 database and
+    transport cases plus static ordering PASS. Fresh-context review GO, 0 stopping findings (decision c365eeb2…8083c;
+    F-006 closed; F-007–F-010 LOW, F-011–F-014 INFO).
+  - Execution: one run with the stages in order. Fresh observation PASS, then read-only prerequisite PASS
+    (attempt not consumed), then ATTEMPT.json, then one write session with all eight markers in order, then
+    independent postcheck PASS. Receipt `data_edits` 95 is linked to 94; the note is set; authority 93 and the
+    protected snapshot and other audit rows are unchanged; optional Brownlow schema absent. Attempt consumed;
+    no retry or reversal.
+  - Standing: U3 confirmed: "2026 is complete, and no further 2026 AFL API settle is needed or will be done only
+    through an audited correction." U4 Route B; Brownlow untouched. No census, seal/rollover, successor activation,
+    production apply, deployment, rebuild or push. Production NO-GO.
+  [V5 record](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V5-RECORD.md).
+
+- **Unprivileged replacement observation PASS; STOP before frozen wrapper (2026-10-25 Sydney; superseded).**
+  The owner accepted the `sudo -n ps` failure as a pre-attempt harness failure. A no-sudo `arm` observation at
+  2026-10-24T20:28Z passed every remote gate: host identity; full `ps` visibility with no hidepid; 0 unsafe processes;
+  services and deploy markers clear; read-only `afldb_backup` identity; all DB activity counts 0. Query text is redacted,
+  but PostgreSQL process titles are visible. The launcher then false-stopped on its own oid type check (fixed). The frozen
+  pins reverify cleanly. STOP: the frozen `run.cjs:69` repair itself needs passwordless `sudo -n -u postgres`
+  (`identity.sql:5` requires session_user postgres) and creates `ATTEMPT.json` before SSH. No production evidence shows
+  that hop is permitted. Not invoked: no ATTEMPT.json, preflight or write; attempt unconsumed. U3 unconfirmed; U4 Route B;
+  Brownlow untouched; NO-GO. Next: owner confirms the postgres sudo hop or chooses a v5 transport.
+  [Record](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-unprivileged-observation-20261025/RECORD.md).
+
+- **V4 production execution authorised; STOP before preflight (2026-10-25 Sydney; superseded).**
+  Final frozen-byte/review/runtime verification PASS (40 manifest members; eight external evidence pins;
+  manifest 829fc30a…848ecf84; decision 39e71a77…04a913a2; report c36dc24a…2374712).
+  Separate fail-closed operational observation at 2026-10-24T20:07:59Z confirmed afldb-prod / arm, then
+  `sudo -n ps` failed: `sudo: a password is required` (SSH exit 1). No process-clear inference;
+  systemd/session checks not reached. No retry/workaround, production DB connection, frozen preflight,
+  wrapper/transaction invocation, ATTEMPT.json or production write. Attempt unconsumed. U3 unconfirmed;
+  U4 Route B; Brownlow untouched; production NO-GO. Next: owner resolves/adjudicates the failed
+  noninteractive read-only observation privilege gate; later resumption repeats all pre-execution gates.
+  [Execution stop evidence](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REPORT.md).
+
+
+- **Owner adjudication accepted canonical correction; read-only completion PASS (2026-10-24; current).**
+  - PMS 705437 removal is accepted as successfully executed. Do not restore Fiorini, repeat removal or Save again.
+    The failure is audit metadata: data_edits 94.note is NULL; authority 93 remains active and unchanged.
+  - Authorised read-only production reconciliation at 11:46:45Z / 11:48:04Z passed: 47 career, 47 season,
+    47 club-season and 59 player-club rows agree; career numbering/spans agree; all 47 rebuild times equal commit.
+    Eight match-17214 period rows, official 69–81 result, both team player totals and relevant club aggregates agree.
+    REPEATABLE READ READ ONLY, identity gated, ROLLBACK, SSH exit 0; no production write.
+  - Live authenticated Playwright confirms the optional form input name=note. Current/deployed note pipeline agrees
+    and passes nonblank notes through; blank becomes NULL. Authority 93 has no note/reason column.
+    No supported audited note amendment workflow found; no metadata repair attempted. Original submitted field
+    value is unavailable, so application defect versus procedural omission remains unestablished; no speculative issue/test.
+  - **F-005 owner scope clarification / v4 validated and frozen (2026-10-25; current).**
+    F-005 accepted against the prior v3 contract: **Resolved by owner scope clarification, subject to v4
+    proving detection and isolation under the revised contract.** V2/v3 remain frozen and unexecuted.
+    V4 removes catalog locks/absence exclusion; existing protected-data locks and unchanged two-write body
+    remain strict. Optional presence/schema is observed internally and postcommit; drift blocks U3 without
+    retry/reversal. Added bounded operational DDL/deployment and expected migration-110 guards.
+    Static ordering PASS; inherited PGlite16 plus three drift cases **19/19 PASS**; wrapper **14/14 PASS**.
+    Owner-authorised synthetic transfer to arm@10.0.40.100 completed: 19 allowlisted members, hashes
+    matched at both ends. PostgreSQL 16.15 **10/10 database cases plus static ordering PASS**, including
+    early-DDL rollback and optional CREATE after all final assertions before COMMIT, then exact metadata/
+    authority/existing-data verification and CONCURRENT_SCHEMA_DRIFT. Private cluster cleanly stopped;
+    no process/socket remains. Harness-only transport/evidence/cleanup changes; all candidate SQL unchanged.
+    Frozen 40-member manifest **829fc30a…848ecf84**. Fresh-context exact-byte independent review
+    **GO, zero stopping findings; F-006 LOW retained** (host ps pipeline may mask producer failure).
+    F-001–F-004 closed as originally stated; revised F-005 proof accepted. No frozen edits after review.
+    Validation-only task complete; no production connection/preflight/attempt/write. U3 unconfirmed; U4 Route B;
+    Brownlow untouched; production NO-GO. No census/rollover/activation/apply/deploy/rebuild/push.
+    [V4 record](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V4-RECORD.md).
+  - **Historical frozen-v3 review (2026-10-25; scope ruling supersedes F-005 disposition).**
+    Owner accepts F-004 as an isolation/proof-ordering finding; the accepted Fiorini correction stands.
+    V2 remains frozen and unexecuted. V3's plain lock prefix closes original F-004 protected-DML ordering.
+    Independent review returns NO-GO: a pre-existing optional-table CREATE may commit after the final
+    in-transaction assertions but before repair COMMIT; catalog SHARE locks do not exclude its commit.
+    Its absence can then be detected only by postcommit verification after metadata commit. This final
+    interleaving is derived from reviewed bytes and measured catalog-lock behaviour, not replayed live.
+    PGlite 16/16 and isolated PostgreSQL16.15 10/10 expectations PASS, but do not prove DDL exclusion.
+    Prior F-001/F-002/F-003 and original F-004 are closed; new F-005 is a stopping DDL-isolation MED.
+    Frozen manifest 5bf64288…54034d remains unchanged. No production connection, attempt or write.
+    Historical next action was owner adjudication; the v4 scope ruling above now governs.
+    [V3 record](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V3-RECORD.md); [independent review](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v3/REVIEW.md).
+    U3 remains unconfirmed; U4 Route B; Brownlow untouched; overall production NO-GO.
+    Day-D nightly and affected-material re-pin controls remain.
+    [Completed verification and limits](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/ADJUDICATION-READONLY-REPORT.md);
+    [metadata repair proposal](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-PROPOSAL.md).
+
+- **Single removal committed; failed note postcondition (historical; superseded by owner adjudication above).**
+  - Manual Match Sheet Save committed at 11:28:46.203865Z after every fresh DB precondition/count passed
+    at 11:26:57.564078Z. The gate completed read-only/ROLLBACK; PowerShell's added trailing CR then caused
+    shell exit 127 (retained, not a clean transport exit). No Computer Use submission or backend write by Codex.
+  - Read-only postcheck 11:30:11.345984Z, ROLLBACK, SSH exit 0: target absent; PMS total 695,499; 2026 10,028;
+    Essendon match 17214 23; zero extra/missing baseline keys. Other PMS IDs, other 2026 PMS rows, all 2026
+    `matches` rows and application 20834 fingerprints equal the fresh baseline. Separate period tables not covered.
+  - Durable removal authority **93**, active lineup `{present:false}`, and required single-removal data edit
+    **94**, actor **1**, exist; scoreUpdated false, 46 players, only player 2121 removed, stable authority key matches.
+    **FAIL: data_edits 94 note is NULL; required approved ISSUE-316 / ISSUE-255 decision note not persisted.**
+    Cause unknown; no application defect inferred. Career rebuilt_at equals commit, career games 125 / 2026 games 2;
+    independent full derived reconciliation, separate period-score comparison and Brownlow-table comparison not completed.
+  - **STOP for owner adjudication. Do not repeat removal, resubmit or repair audit/authority by any mechanism.**
+    The correction is committed but not accepted as successfully verified; U3 remains unconfirmed, U4 Route B,
+    production NO-GO. No census, seal/rollover, activation, production apply, deployment, rebuild or push.
+    Evidence and scope limits: [correction record](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/RECORD.md).
+
+- **Prior authorisation and split-execution preparation (historical; superseded by committed-state record above).**
+  - Owner adjudicated PMS 705437 (Fiorini 2121 / match 17214 / Essendon 6) erroneous canonical data and
+    authorised only audited Data Editor Match Sheet removal, durable removal authority/edit audit with an
+    ISSUE-316 / historical ISSUE-255 decision note, normal derived recomputation and read-only verification.
+    Preserve application 20834, batch 32 and source history; no direct SQL or other write path.
+  - Production precheck snapshot 2026-10-24T10:54:47.941754Z: `afldb_prod` / `afldb_backup`, OID 66668,
+    system ID 7674454702926115004, unchanged retained row and originating application identity; exactly one
+    canonical-only key (target), zero AFL Tables staging-only keys. Counts 695,500 overall / 10,029 in 2026 /
+    24 Essendon match rows. Repeatable-read/read-only, ROLLBACK, completion marker and SSH exit 0.
+  - Frozen J2 CSV SHA-256 reverified. Before fingerprints and raw/parsed logs retained with SHA-256 hashes in
+    [execution record](issues/open/AFLDB-ISSUE-316-u3-correction-20261024/RECORD.md). The initial sandbox
+    connection refusal ran no query. No credential appeared in captured output.
+  - **Manual execution pending (owner-directed split execution):** owner signed in on `beta.afldb.com`;
+    Super admin, Data Editor access, exact Match Sheet 17214, Fiorini and Essendon's 24 rows were observed.
+    Repeated browser-URL confidence stops are an automation limitation only, not an application/production
+    failure or partial correction. No removal staged, save invoked, authority/edit audit or recomputation
+    attempted, and no fresh database gate run. The owner prohibits another Computer Use submission attempt.
+    Deployed source/version remains unverified; authenticated capability and visible sheet were observed.
+    Existing authorisation is unconsumed and persists until execution/verification, failed fresh gate or withdrawal.
+  - **Next:** operator manually prepares only Fiorini's removal and retained note, all other values unchanged,
+    leaves Save unclicked, and confirms readiness. Codex then runs the fresh read-only precondition gate
+    immediately before operator submission, requiring counts 10,029 / Essendon 24 in addition to every identity,
+    retained-value/provenance and baseline-key condition. Any difference stops submission for owner review.
+    On PASS, operator saves once through Match Sheet. After any manual submission, including unclear UI,
+    Codex immediately determines the actual database/audit/derived state; never repeat the removal. Preserve
+    any ambiguous or failed postcondition for adjudication. U3 remains **unconfirmed** until all checks pass.
+    U4 stays Route B; 9,522 Brownlow round-vote rows untouched. Day-D nightly and affected-material re-pin
+    requirements remain. ISSUE-316 OPEN; production **NO-GO**. No census, seal/rollover, activation, production
+    apply, deployment, rebuild or push. No application code changes or Git operations.
+
+- **Owner U4 Route B ruling recorded; U3 exact production row identified, correction proposed only
+  (2026-10-24; previous).**
+  - U4: Brownlow 2026 does not block the ordinary seal. The normal production `settle-afl-api-brownlow.ts`
+    writing path must not run for 2026 after sealing; settlement must not move ahead of C2 to preserve it.
+    The three pending keys remain a separate U4 workstream. Before any correction, map each actual key/decision
+    to `brownlow_authority`, `brownlow_eligibility_decision` (migration 113 first), or `data_editor`, with
+    its required evidence and decision note. These workflows are not interchangeable. The **9,522 AFL Tables
+    round-vote rows are not adjudicated** and no deletion/replacement/publication/alteration is authorised.
+  - U3: the owner accepted the ordinary completeness PASS, but explicitly withheld final confirmation pending
+    identification and adjudication of the extra player row. One further narrowly scoped read-only query was
+    authorised and executed once, snapshot **2026-10-24T10:11:16.291452Z**, `afldb_prod` as `afldb_backup`,
+    OID 66668/system ID 7674454702926115004, identity-gated repeatable-read/read-only, then ROLLBACK.
+  - Exact row: **PMS 705437**, Brayden Fiorini **2121**, Essendon **6**, match **17214**, round 4, **2026-03-28**
+    (Essendon 69–81 North Melbourne). API record `CD_M20260140305 / CD_T50 / CD_I993799`, canonical application
+    **20834**, batch **32**, inserted **2026-09-27T21:11:30.460661Z**. The match remains AFL Tables-owned.
+  - This is the exact unused-emergency case already adjudicated in **ISSUE-255**, inserted before its fix:
+    retained payload EMERG, zero TOG and all projected statistics zero. Stable external identities agree; no
+    alternate Fiorini identity or equivalent AFL Tables participant. No later machine application supersedes it.
+    Current career-game 126 was not in the original application and is derived, not participation evidence.
+  - Two-way 2026 key comparison: canonical 10,029, AFL Tables staging 10,028, **one canonical-only key (this row)**,
+    zero staging-only. Essendon this match 24 versus 23. The independently hashed J2-bound 2026 CSV has 10,028
+    rows, the same 23 Essendon profiles and only Fiorini's genuine rounds 2/3 appearances; it omits this exact row.
+  - Proposed correction: **`data_editor` Match Sheet**, remove only player 2121 from match 17214, same-transaction
+    durable removal override/audit and derived recomputation. The exact proposed decision note and safeguards are
+    in the [evidence report](docs/v2/issue316-u3-player-row-evidence-2026-10-24.md). No correction was executed;
+    preserve source observations/application history. Historical residue is tracked here, not a duplicate issue;
+    ISSUE-255's suppression implementation remains resolved.
+  - Evidence: `C:/Users/stuar/AppData/Local/Temp/afldb-i316-u3-row-20261024-QRgJaq` (`SHA256SUMS`). Raw production records are outside the repository.
+    Failed alias/sandbox connection attempts ran no query. SQL completed and reached the post-ROLLBACK completion
+    marker, no psql ERROR/FATAL; SSH exit **127** is retained because PowerShell appended a CR-only shell command.
+    No rerun; credentials stayed in the child environment and output scan found no DSN/password assignments.
+  - **Day-D control (owner):** the AFL Tables nightly remains an authorised pre-seal writer until retirement/
+    disable. Legitimate pre-seal corrections become current state. Before the enforced dry run, re-check its latest
+    result and require no unexplained canonical change since candidate preparation. On canonical change,
+    regenerate/re-pin every affected production material and review before proceeding; no U2 date-only waiver.
+  - Intended final U3 wording remains conditional: “Ordinary 2026 settlement is complete. No further ordinary 2026
+    AFL API settle is required before the seal. Later 2026 changes require an audited correction. Brownlow 2026
+    is excluded from U3 and proceeds independently under U4 through an approved post-seal audited workflow.”
+  - **Next:** owner adjudication of the exact row/proposed audited correction; separately authorised execution and
+    verification if approved; final U3 only after resolution. Production **NO-GO**. No seal, census, enforced dry run,
+    activation, apply, deployment or push. No code/reference/Brownlow changes, tests, Git or service commands.
+
+
+- **Owner accepted the independent U2 review. A narrow read-only production check finds ordinary 2026 settlement
+  complete (U3 check PASS). U3 is not confirmed (2026-10-24; previous).**
+  - Ruling (owner) on U2: the independent review is accepted, and condition 2 is satisfied. The review is not re-run
+    because one search incidentally surfaced a few earlier ledger lines: the reviewer grounded its result in source,
+    enumerated readers and writers, and found no CRIT, HIGH or MED affecting the date-only classification. U2 stays
+    accepted under the existing ruling, subject to conditions 1 and 3–6 and to the actual semantic diff at D/P.
+  - U3 interpretation (owner): "2026 complete" means the ordinary AFL API season and game settlement is complete,
+    and no further ordinary 2026 AFL API settle is needed before the seal. Brownlow 2026 is excluded and governed by
+    U4. The owner approves the seal only after U4 has established which Brownlow route stays valid after sealing.
+  - **Check (owner-authorised, one execution).**
+    - Run: `afldb-prod`, 2026-10-24T09:51:34–09:51:36Z, at script `u3-prod-check.sh` (`a1144a2c…`), log `a4ae4dce…`.
+    - Evidence: `C:/tmp/afldb-i316-U3-prod-completeness-20261024T0950Z/` (`SHA256SUMS`).
+    - Method: the script was streamed over `ssh afldb bash -s`, so nothing was written on the host. Host facts came
+      from file reads, `systemctl`/`journalctl` queries and `ps`; no git, sudo or service command was used.
+    - Database: one `REPEATABLE READ READ ONLY` transaction as `afldb_backup`, with `default_transaction_read_only=on`,
+      statement and lock timeouts, and no advisory lock. It stopped first if the identity gate failed; the gate passed
+      (`afldb_prod`, OID `66668`, system id `7674454702926115004`). The transaction was rolled back.
+    - The password reached psql only through `PGPASSWORD` in the child environment. The log was scanned for DSNs and
+      passwords: 0 hits.
+    - Not run: no census, settle, dry run, correction, migration, rebuild, activation, apply or deployment.
+  - **Results.**
+    1. **Canonical 2026 is complete.**
+       - 218 matches: 207 home-and-away over rounds 1–25, every one of the 18 clubs with 23 games, plus 2 WF, 2 EF,
+         2 QF, 2 SF, 2 PF and 1 GF. The GF was played 2026-09-26: Brisbane Lions 96 d Fremantle 89.
+       - Every match has its scores (0 NULL components), 8 period-score rows and player rows (0 without), and none
+         is future-dated.
+       - `seasons` 2026: `status` `complete`, `completed_at` 2026-09-26, `last_loaded_round` `GF`, `match_count` 218.
+       - Database totals: 17,056 matches, 695,500 player rows, 1,640 club-seasons.
+       - **Authority.** All 218 matches are owned by `afltables`, and 0 by `afl_api`. That is the design: 2026 stays
+         AFL Tables-owned, and the AFL API corroborates but never re-owns it (runbook §4.3, §7).
+       - Cross-checks. 218 matches and 10,028 AFL Tables player rows equal the c2-2026 final core
+         (17,056 − 16,838 and 695,499 − 685,471). 218 matches and 10,029 player rows equal the AFL API's own complete
+         2026 season feed, measured on DEV (D1b, ISSUE-232 resolution).
+    2. **No 2026 game is incomplete or unsettled.** Every table read was empty:
+       - `fixtures`;
+       - 2026 `staging.external_current_matches`;
+       - 2026 `promotion_candidates`;
+       - unfinished import batches;
+       - open data issues on 2026 matches.
+
+       Staged AFL Tables projections are 218/218 with canonical rows, and 0 scores differ. Nothing is eligible for an
+       ordinary AFL API settle:
+       - PROD has no `data/sources/afl_api` snapshot, no `afldb-settle-afl-api{,-brownlow}` units (`not-found`) and no
+         `acquisition.%`/`current_season%` setting;
+       - an AFL API 2026 write into an `afltables`-owned match is refused as `foreign_source_owner` in any case.
+    3. **A write-capable non-Brownlow path is still live: the AFL Tables nightly.**
+       - The timer is enabled; the next run is 2026-10-25 04:31 AEDT. Every night it writes a snapshot directory
+         and an import batch. Batches 39–63 each read 10,246 records and inserted, updated and rejected 0, and every
+         journal run since 2026-10-20 ends `AFLDB_SETTLE_SUCCESS` with 0 canonical writes.
+       - Its last canonical change was 2026-10-07: 60 `player_match_stats` updates (an AFL Tables revision).
+       - Conclusion: no ordinary settle work remains, but the nightly would still apply any later AFL Tables revision
+         until it is retired (C2) or disabled (C5). No in-flight writer process was running.
+       - The AFL API paths (match, fixtures, fixture schedule) would refuse before writing: there is no snapshot,
+         and the setting is off.
+    4. **The season state is consistent with 2026 being complete, apart from separated workstreams.**
+       - The database marks 2026 `complete`.
+       - The PROD checkout (`ff100dc2`, BUILD `vcxM_SyDxFCP0sj9n9W1t`, no `.rollover-transaction.json`) still says
+         `in_progress_seasons` `[2026]` (`seasons.json` `8c646271…`).
+       - It has no `afltables-network.json` and no `settle-season-seal.ts`. **No seal exists on PROD today.** The
+         seal takes effect only when V2 code with the rollover is deployed (C2 step 5).
+    5. **No acquired or staged 2026 data is waiting for settlement.**
+       - The AFL Tables spine (218 matches, 10,028 player rows, last seen batch 63) equals canonical.
+       - The AFL API spine (217 matches, 217 rosters, 9,983 player rows) comes from historical batch 32
+         (2026-09-27 21:11Z). It is corroboration and has 0 pending candidates.
+       - The 36 open non-Brownlow `canonical_apply_failed` findings (`player_match_stats`, first detected 2026-09-28)
+         are already attributed to batch 32 (historical; ISSUE-265 record above).
+  - Findings, graded (none adjudicated here):
+    - **MED (data provenance, for the seal): one AFL API-sourced canonical `player_match_stats` row in 2026.**
+      - Evidence: `canonical_applications` holds one `afl_api` insert into `player_match_stats` at 2026-09-27 21:11:30Z
+        (the batch-32 timestamp). PROD has 10,029 2026 player rows against 10,028 on the AFL Tables spine. One
+        2026 match-club has 24 player rows; all 435 others have 23.
+      - **Inferred, not verified:** these are the same row.
+      - The D-233-3 census counts `afl_api`-owned *matches* only, so its `total 0` does not cover this row.
+      - A rebuild from the AFL Tables baseline reproduces 10,028 (J2: 695,499 against PROD's 695,500).
+      - Identifying the row needs one further read-only query, which was not run.
+    - **INFO.** The AFL API spine has 217 matches against 218 canonical. Batch 32 predates the 2026-09-26 GF
+      (snapshot `afl-api-2026-2026-09-21-…`), so the missing match is probably the GF. This is inferred.
+  - Brownlow was **excluded** from the verdict. The check read no Brownlow table. The only Brownlow-adjacent figure
+    is `canonical_applications`: 9,522 `afltables` inserts into `brownlow_round_votes`, 2026-09-28. That is
+    consistent with the 2026-10-20 inspection and is not adjudicated.
+  - U4 route facts (from code; no decision taken):
+    - `settle-afl-api-brownlow.ts:286` refuses a sealed season. Its only exception is
+      `--allow-completed-season-backtest`, which proves `current_database()` = `afldb_test` before any write (`:353-367`).
+    - After the seal, a 2026 Brownlow write is possible only through `AUDITED_CORRECTION_WORKFLOWS`
+      (`packages/domain/src/season-seal.ts:23`): `brownlow_authority`, `brownlow_eligibility_decision` (migration
+      113, not on PROD) or `data_editor`.
+    - PROD has no AFL API Brownlow unit or settings, and runbook §7 schedules the Brownlow timer for C8, after C2.
+  - **Verdict: ordinary 2026 completeness PASS.** No write-eligible ordinary 2026 settle work remains. The AFL Tables
+    nightly stays live until C2/C5, and the MED provenance row is open for the owner. Nothing was sealed. U3 is not
+    confirmed, and production stays NO-GO.
+  - Process deviation (§9): this session read repository and evidence files with read-only Git Bash commands
+    (`grep`, `sed`, `cat`, `ls`, `find`, `wc`, `node -e`, `bash -n`, `sha256sum`) as well as native tools. None
+    changed anything.
+  - **Next.** Owner: the U4 Brownlow route decision, then U3 confirmation (draft wording in the session report), and
+    a ruling on the MED row.
+
+- **Independent U2 review: GO, no CRIT, HIGH or MED. U2 condition 2 is satisfied under the owner's ruling
+  (2026-10-24; previous).**
+  - Reviewer: a fresh-context, read-only static review using native Read, Grep and Glob only (Fable, high effort). It
+    ran no commands and wrote nothing.
+  - Its verdict is **GO** on: "a re-pin that changes only D is a date-only change that feeds no condition-2 decision,
+    and categories A/B/C are exhaustive".
+  - **Writers.** D is a pass-through string, checked only by `ISO_DATE` (`season-rollover.ts:103`, `:1555`) and
+    compared with nothing. It is stamped into the four fields (`season-rollover.ts:1794`, `:1927`, `:1960`;
+    `afltables-network-retirement.ts:127`) and echoed on stdout (retirement note, diff lines and `finalHashes`;
+    `rollover-season.ts:518`, `:558`, `:564-566`). It also enters SHA-256 values of whole planned files, which are
+    the binding, `final_sha256` and the journal `newSha256`. There is no database write, because the CLI opens no
+    connection.
+  - **Readers.** Every reader of the three files was enumerated across TS, Python, shell, the app and tests. None
+    consumes `resolved_on`, `accepted_on`, `validated_on` or `changed_at` semantically, outside the two (B) tests.
+    `src/` never reads them, and the static import at `afltables-network.ts:17` reads `status` and `last_season`
+    only.
+  - **Dynamic access.** Each case is the writer itself, a comparison independent of D, or confined to a date-free
+    block:
+    - the spread at `afltables-network-retirement.ts:127` is the writer;
+    - `PLANNER_BOUND_POINTERS` compares base against the pre-apply contract (`transition-change-set.ts:359-367`);
+    - `jsonEqual` covers predecessor entries only, and the new entry is checked for status only
+      (`season-rollover.ts:1412-1426`);
+    - `Object.entries` is confined to `measured` (`rebuild-test.ts:2880`).
+
+    No schema validation or snapshot covers these files.
+  - **Condition 2, all eight categories: No.** Every hash comparison involving a D-derived value is an identity pin
+    re-derived from the same bytes (category A). The J2 final hashes appear in no repository or J2-tree code, test or
+    data.
+  - **Change set.** Only three `final_sha256` values derive from D, plus the change set's own hash. `inputs`,
+    `base`, `replace`, `register_patches`, `write_set`, `ladder_successor_tuple` and the other five finals are
+    independent of D.
+  - **Exhaustiveness.**
+    - The literal (`2026-10-24`, `20261024`, `2026-10-24T`) does not occur in repository code, tests, data or deploy;
+      it occurs only in tracking documents.
+    - The J2 tree has exactly five files carrying it: the three date-bearing finals and the two (B) tests. Both tests
+      use `toBe` or `toMatchObject` on the stamp only.
+    - In the harness: the two `--rollover-date` lines are (C). The pin, stage and bundle files are (A). The
+      "owner ruling 2026-10-24" comments and the run logs are evidence or prose.
+    - Missing category: **none found**.
+  - Graded findings:
+    - **LOW: D is checked for shape only.** A calendar-invalid or implausible date would be stamped. The operator
+      states a real D.
+    - **LOW, not specific to D: Brownlow artefact continuity hash.**
+      `build_brownlow_season_artefact_from_afl_api.py:880`, `:953`, `:980-983` records and re-verifies the
+      whole-file SHA-256 of `fitzroy-contract.json` in AFL API Brownlow season-artefact manifests. The check is
+      `tests/python/brownlow_afl_api_season_rehearsal_contract.py:191`, against an external artefact. Any transition,
+      J2 included, invalidates the continuity provenance of an artefact built before the transition. No such
+      artefact is tracked, and `import_brownlow_season.py` does not read `identity_evidence`. Relevant to U4 (Brownlow
+      2026), not to U2.
+    - INFO:
+      - `ladder_identity_contract.py:399` copies `season_range` but its consumer reads first and last only.
+      - The draftguru review tool's pins (`review_validation_sample.py:112-120`) are already stale and lie outside
+        the rollover path.
+      - The Next.js bundle bytes carry `changed_at`, but nothing reads it and no build-output pin exists.
+      - Harness pins that move with D are all (A) or (C).
+      - `i-make-pinned.py:26-28` is a useful cross-check: only the allowed pins change.
+  - Reviewer's limits:
+    - Static only. Commit 2′ "only the two literals change for D" rests on literal and hash greps of the J2 tree, not a
+      byte diff.
+    - Some J2 harness scripts were checked for the literal only.
+    - `rebuild-test.ts` and `import_fitzroy_core.py` were inspected at every hit, not read end to end.
+  - **Independence note.** One reviewer Grep for the field names incidentally returned about six lines of this
+    ledger's earlier ISSUE-316 analysis. The reviewer reports disregarding them, and every conclusion is cited to
+    code. The orchestrating session spot-checked `season-rollover.ts:1395-1427` and `transition-change-set.ts:355-367`
+    and confirmed them. A re-run is the owner's call.
+  - Effect: under the owner ruling, condition 2 is satisfied. The date-only re-pin exception is accepted for the
+    future production candidate, subject to conditions 1 and 3–6 and to the actual semantic diff at D/P. No D or P was
+    chosen and nothing was regenerated, re-pinned or run. Production NO-GO.
+  - **Next.** U3: owner confirmation that 2026 is complete and needs no further 2026 AFL API settle before the seal.
+
+- **Owner confirmed the three U2 points under condition 3. An independent U2 review was commissioned
+  (2026-10-24; previous).**
+  - Ruling (owner) on the three points. All three are accepted, and each is narrow:
+    1. **Derived pins.** For the U2 exception, "no content pin changes" does not forbid pins whose bytes change only
+       because D changes. These may change as mechanical consequences of D:
+       - the SHA-256 pins of the three date-bearing finals;
+       - the change-set final pin derived from them;
+       - both simulated commit IDs;
+       - both bundle hashes;
+       - any aggregate, stage or package hash that covers those bytes.
+
+       Every non-date input stays unchanged. That covers source artefacts, migration and schema content, ladder
+       tuple content, expected counts, authority rules, executable bindings and every other independently pinned
+       input. The semantic diff must prove the distinction explicitly.
+    2. **Restated test literals.** `tests/afl-api-cutover.test.ts:249` and `tests/db-test-rebuild.test.ts:4159` may be
+       restated to D. They count as date-only only if the assertion semantics stay identical and only the expected
+       stamped date changes. No test may be weakened, skipped, deleted, broadened or otherwise rewritten under this
+       exception.
+    3. **Harness date literals.** A production dry-run harness derived from the J2 scripts replaces the proof-only
+       `--rollover-date 2026-10-24` with D. The resulting changes to script bytes and stage/package hashes are
+       date-derived. This does not permit any other harness edit. The production harness is regenerated into a new
+       record. The frozen J2 evidence is not modified, and its stage hash is not reused.
+  - Independent-review gate (condition 2):
+    - The earlier static verification is not independent, because the same session reached the conclusion.
+    - A fresh-context review was commissioned. It was given the six conditions, the rollover, planner and rebuild
+      source, the J2 change set and harness, and the four date-bearing fields. It was not told an expected answer.
+    - The review must establish independently:
+      - every writer of D and of D-derived values;
+      - every reader of the affected files;
+      - any computed or dynamic-key access;
+      - whether any condition-2 decision can consume D or a D-derived value;
+      - whether the three categories above are exhaustive.
+    - A CRIT or HIGH finding, or a MED that undermines the date-only classification, stops U2 and returns it for a new
+      owner ruling.
+    - GO with no such finding satisfies condition 2. The date-only re-pin exception is then accepted for the future
+      production candidate, subject to the remaining conditions and the actual semantic diff at D/P.
+  - Not done: no D or P chosen; nothing regenerated or re-pinned; no census, dry run, rebuild, activation, apply,
+    deployment or push. ISSUE-316 stays open. Production NO-GO.
+  - **Next.** The independent review result. If it passes, the remaining production-readiness decisions, starting
+    with U3.
+
+- **Owner ruled on U1 and U2. The static U2 verification finds that a production re-pin can be classified date-only,
+  subject to three points the owner must confirm (2026-10-24; previous).**
+  - U1 ruling (owner): D and P are **not set**. `--rollover-date 2026-10-24` and the J2 pins belong to the completed
+    proof only and are not production values.
+    - D and P are created only once the real apply window is scheduled close enough for the evidence to stay fresh.
+    - At that point: choose D; regenerate all transition material D affects; create a new pin P; show the J2 pin and P
+      side by side; produce a semantic diff of exactly what changed; and have that diff independently reviewed before
+      any production-affecting action.
+    - If D moves after the re-pin, regenerate and re-pin again. No production pin is approved.
+  - U2 ruling (owner): option (a), conditional. No new rebuild is needed for a date-only re-pin, provided all six of
+    these hold:
+    1. the delta from J2 is genuinely date-only;
+    2. an independent reviewer confirms, by code and search review, that the changed date fields feed no decision in:
+       the three planner gates, the 91 final checks, the 1,640 comparison, successor eligibility or provenance,
+       migration selection or ordering, write-set construction, activation, or recovery and rollback;
+    3. no source, dependency, migration, schema, expected count, ladder tuple, content pin, executable binding or
+       authority rule changes with the re-pin;
+    4. a fresh enforced dry run at P passes before apply;
+    5. the host's native state is established anew for that window (the expired J2 match is not reused);
+    6. freshness-sensitive censuses are taken only in their own approved window.
+
+    If any date field affects behaviour, validation, expected output or the write set, the exception does not apply:
+    stop and return for a new ruling. Another rebuild is not authorised automatically. The J2 rebuild stays the only
+    J2 rebuild.
+  - **Static U2 verification** (native Read/Grep only, over the working tree and the J2 record
+    `D:/tmp/afldb-i316-J2-20261023T2317Z/`):
+    - **Entry.** The date enters only as `--rollover-date` (`src/lib/rollover/season-rollover.ts:1204`). The only
+      check is the format regex `ISO_DATE` (`:103`, `:1555`). There is no clock read in `src/lib/rollover/`,
+      `tools/db/rollover-season.ts` or `tools/db/rebuild-test.ts`.
+    - **Writes.** Four fields in three planner-owned files, plus one transcript note:
+      - `full_history.season_range.resolved_on` in `tools/rebuild/fitzroy/fitzroy-contract.json` (`season-rollover.ts:1794`);
+      - `accepted_on` and `validation.validated_on` on the new register entry in
+        `data/reference/fitzroy-accepted-baselines.json` (`:1927`, `:1960`);
+      - `changed_at` in `data/reference/afltables-network.json` (`afltables-network-retirement.ts:127`);
+      - the dry-run note text (`afltables-network-retirement.ts:145`), which is printed output only.
+    - **Readers.** No repository code reads any of the four fields: a search for the names across `*.ts`, `*.py`,
+      `*.sh` and `*.sql` finds only the writers, the unit tests, and unrelated admin `password_changed_at` and award
+      `acquired_on` columns. Checked by category:
+      - planner gates: `import_fitzroy_core.py:562-640` (selection and `verify_accepted_binding`) reads
+        `acceptance_status`, `snapshot_label`, the acquisition and raw-artefact hashes and `contract_binding`.
+        `validate_ladder_witness.py:322-330` selects by `acceptance_status`;
+      - 91 final checks: `finalValidationChecks` (`rebuild-test.ts:2862-2896`) builds checks from the accepted
+        entry's `measured` block, plus the DraftGuru, height and ladder inputs;
+      - 1,640 and successor eligibility/provenance: `assertSuccessorTransition` (`ladder-successor.ts:240-306`) and
+        `selectAcceptedBaseline` (`rebuild-test.ts:1133`) read labels, status, hashes, seasons, the exclusion list and
+        witness files and rows;
+      - register-history check (`season-rollover.ts:1395`): compares only the predecessor entries;
+      - base-contract binding: `PLANNER_BOUND_POINTERS` (`transition-change-set.ts:87-97`) includes `resolved_on`,
+        but compares the base against the current contract (the predecessor's value), never against D;
+      - census scope (`afl-api-ownership-census.ts:117`) and the runtime switch reader (`afltables-network.ts:36`)
+        read the season range, exclusions, `status` and `last_season` only;
+      - migration selection and ordering, write-set construction, activation and the recovery journal: none of them
+        reads the fields. The write set is the change set's fixed `write_set`, checked against `PLANNER_OWNED_WRITES`.
+        The successor tuple has no date. The journal records old and new SHA-256 plus the old bytes.
+    - **Change set.** The J2 change set carries no date: its inputs, base, both replacement contracts, register patches,
+      ladder tuple and write set are all date-free. The date reaches only the three planner-written finals, through
+      `final_sha256`. The other five finals should stay byte-equal to J2.
+    - **Points the owner must confirm under condition 3:**
+      - **Necessary pin changes.** The three date-bearing final pins, the change-set pin, both simulated commits and both
+        bundles must change. Condition 3's "content pin" has to be read as excluding these, or the exception can never
+        apply.
+      - **Restated tests.** Commit 2′ restates two tests with the literal date (J2 tree): `tests/afl-api-cutover.test.ts:249`
+        (`changed_at`) and `tests/db-test-rebuild.test.ts:4159` (`accepted_on`). Both assert only the stamped value, and
+        both must be restated for D.
+      - **Harness scripts.** The J2 harness hard-codes `--rollover-date 2026-10-24` (`stage/i-run-linux-enforced.sh:20`,
+        `scripts/run-local-dryrun.sh:13`). Any script reused for the production dry run changes, and so does its stage
+        hash.
+    - **Conclusion.** Statically, the date is stamp-only. No gate, check, expectation, eligibility, migration,
+      write-set, activation or recovery logic reads it. A production re-pin can therefore be classified date-only,
+      provided the owner accepts the three points above and the regenerated semantic diff confirms it.
+    - **Limits.**
+      - This is search-based. Name searches cannot see computed-key access. Every reader found of the three files was
+        inspected, and each uses named fields.
+      - The J2 harness outside the repository was checked only for the literal date.
+      - `ISO_DATE` checks format, not calendar validity (`2026-02-31` passes) and not order. The operator must state a
+        real D (INFO).
+      - Condition 2 asks for an *independent* reviewer. This session's analysis has not been independently reviewed.
+  - Not done: no D or P was chosen, nothing was regenerated or re-pinned, and no census, dry run, activation, apply,
+    deployment, push or production change was made. ISSUE-316 stays open. Production NO-GO.
+  - **Next.** Independent review of this static verification (condition 2), and owner confirmation of the three
+    points. Then the remaining U decisions.
+
+- **Owner accepted the post-restore verification. A production-readiness decision package was prepared read-only
+  (2026-10-24; previous).**
+  - Ruling (owner, 2026-10-24): the Revision J2 proof window is complete and closed:
+    - `POST-RESTORE VERIFIED`; 0 temporary J2 holds; the hold set equals the pre-J2 set;
+    - four apt timers enabled and active;
+    - no install, upgrade or removal during or straight after the restore;
+    - the single rebuild attempt still consumed; no J2 rebuild cluster or listener;
+    - the J2 proof and its retained evidence unchanged.
+
+    No further J2 host action is required.
+  - Limitation recorded (INFO): `apt-auto-upgrade.timer` lists no next trigger. It is enabled and active, and its
+    pre-J2 next trigger was never captured. This gives no reason to change the timer, so normal host maintenance is left
+    alone.
+  - Native policy `a8e586e0…` must not be reused as production or apply evidence. A future production or apply
+    operation establishes the host's native state at that time, and derives and reviews a replacement policy on drift.
+  - I325-3 stays resolved at the staged, tested and reviewed level. It does not block ISSUE-316 now, because no harness
+    reuse is authorised. Before any reuse, it must be hash-verified on Linux and pass its focused Linux validation.
+  - `--rollover-date 2026-10-24` belongs to the J2 proof. If the rollover or apply runs on any other date, the affected
+    transition material is regenerated, re-pinned and reviewed, and the old/new pins are presented before execution.
+  - **Decision package:** `docs/v2/issue316-production-readiness-decision-2026-10-24.md`, prepared with native file reads
+    only.
+    - For each of the six items, it states the existing evidence, what is expired or proof-only, what is regenerated on
+      the day, what is destructive, the stop/go conditions and the owner approval still required. The six items are:
+      date and pin, successor activation, census, apply, deployment and recovery.
+    - Census targets, commands and acceptance criteria are defined, and no census was taken. Freshness (same UTC day,
+      ≤ 6 h before the enforced dry run) is a procedural gate: the planner requires `captured_at_utc` but does not check
+      its age.
+    - Findings surfaced for the owner:
+      - activation is carried inside the apply write set (`tools/db/rebuild-test.ts:1191`, `SUCCESSOR_LADDER_TUPLES_JSON = '{}'`)
+        and cannot be approved apart from it under the current mechanism;
+      - no recorded owner acceptance was found for the commit 2 content (2027 coverage statuses);
+      - no recorded confirmation was found that 2026 is complete and needs no further settle before the seal;
+      - the release vehicle for the rollover (V2 release with 111–117, or another route) is undecided.
+    - The unresolved decisions are listed as U1–U15.
+  - Process deviation (§9): one read-only PowerShell command measured the length of an `IssuesIndex.md` line. It was not
+    authorised and changed nothing.
+  - Not authorised: production, DEV or test census; successor activation; production apply; deployment; rollover
+    execution; another rebuild; push. ISSUE-322 to ISSUE-325 stay resolved. ISSUE-316 stays open. Production NO-GO.
+  - **Next.** Owner review of the package, starting with U1 (date D and pinned commit P) and U2 (whether the J2 proof
+    covers a date-only re-pin).
+
+- **J2 proof-window hold restored by the owner and verified read-only (2026-10-24; previous).**
+  - Owner restore: `j2-hold-restore.sh` (sha256 `dee557de…`, matched) ended `HOLD RESTORED` at 2026-10-24T07:52:08Z.
+    All 63 J2 holds were cancelled, holds equal the pre-J2 set (empty), and the four apt timers are enabled and active
+    again. The restore installed, upgraded and downgraded nothing.
+  - Read-only post-restore verification, as `arm` with no sudo, at 07:54:56Z: **POST-RESTORE VERIFIED**.
+    - `HOLD-STAGE.sha256` 3/3 OK. The log ends `HOLD RESTORED` and holds 63 cancellations; `showhold.restored` equals
+      `showhold.before`.
+    - Live state: 0 holds, so 0 of the 63 are still held. `apt-daily`, `apt-daily-upgrade`, `apt-auto-upgrade` and
+      `apt-auto-reboot-if-required` are enabled and active, as recorded before J2.
+    - No apt/dpkg process and 0 dpkg actions since the restore. The last action (2026-10-23T16:16:57Z,
+      `xserver-xorg-core`) predates the hold.
+    - `REBUILD-ATTEMPT-CONSUMED` is still present; port 55787 is not listening and no J2 rebuild postgres runs.
+    - INFO: `apt-auto-upgrade.timer` lists no next trigger. Its pre-J2 schedule was not captured.
+    - Evidence: `D:/tmp/afldb-i316-J2-20261023T2317Z/runs/post-restore-20261024T075456Z/` (`RECORD.md`, the check
+      `j2-post-restore-verify.sh` `61c88c0e…`, and host copies of the restore and apply logs). The check was written
+      this session because no prepared one existed; the only host write is its copy at `/home/arm/j2-post-restore-verify.sh`.
+  - **Standing.** Automatic apt maintenance from now on is normal post-proof host activity. The J2 native-policy match
+    (`a8e586e0…`) is not preserved past the restore. A future production or apply proof must establish the host's
+    then-current native state, and derive and review a new policy if it has drifted.
+  - The J2 disposable rebuild proof is accepted and unchanged. Its single attempt is consumed and must not be repeated.
+  - Issue state: ISSUE-322, ISSUE-323 and ISSUE-324 resolved. ISSUE-325 resolved at staged, tested and reviewed I325-3,
+    which has not been executed on Linux and must be hash-verified on the host and Linux-validated before any future
+    harness reuse. ISSUE-316 stays open.
+  - Not authorised by the restore: census, successor activation, apply, deployment or any production action.
+    Production NO-GO.
+
+- **Owner ruling on F-J06: the completed J2 disposable rebuild is the Revision J2 proof. ISSUE-323 and ISSUE-324 are
+  resolved, and F-J06 is registered as ISSUE-325 (2026-10-24; previous; hold restored above).**
+  - Ruling (owner, 2026-10-24):
+    - F-J06 is an evidence-monitor defect. It is not a native-enforcement failure or a rebuild failure.
+    - No further disposable rebuild is run because of it. The single authorised attempt is consumed and must not be
+      repeated.
+    - ISSUE-323 and ISSUE-324 may close after a focused evidence review of the retained artefacts. ISSUE-322 stays
+      resolved, and ISSUE-316 stays open for the remaining separately authorised rollover and production work.
+    - The esbuild exemption must be fixed before that rebuild harness is reused, without modifying the retained J2
+      evidence.
+    - Not authorised: push, deploy, apply, successor activation, and production/DEV/test censuses.
+    - The host package/timer hold stays in place. Restoring it is a separate action. Production NO-GO.
+  - **J2 proof as ruled:**
+    - Enforced dry run `20261024T034905Z`: exit 0; 24/24 criteria; 3/3 planner gates; 91 checks; 1,622 → 1,640;
+      0 REFUSED; nothing written; HEAD `876dadbf` unchanged.
+    - Disposable rebuild: all 30 stages, exit 0; 91 final checks PASSED; all 1,640 club-seasons equal;
+      `AFLDB-POST PASSED`, with the 2026 Brownlow pending as expected; clean shutdown.
+    - Evidence scan: no DSN and none of the 6 generated passwords.
+  - **F-J06 evidence adjudication.** This was a read-only review of the retained artefacts, using native file reads
+    only. Nothing was rerun, re-hashed or extracted, and the retained evidence is unchanged. Paths are relative to
+    `D:/tmp/afldb-i316-J2-20261023T2317Z/`.
+    - **Sources:**
+      - `runs/rebuild-20261024T034905Z/rb-collect-20261024T034905Z.tar` (`a81652da…`, 68 members), which holds
+        `logs/enforcement-summary.json` and `logs/enforcement-sampler.log`;
+      - `rb-shutdown.log`, `rb2-bootstrap.log`, `rb2-launch.log`, `rb2-after.log` and `progress.log` in the same
+        directory;
+      - the staged `rbstage2/` files;
+      - the retrieved policy and derivation copies in `host/native-J2/`.
+    - **The five processes.** Each had the same executable and command line:
+      `/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed/node_modules/tsx/node_modules/@esbuild/linux-x64/bin/esbuild --service=0.28.2 --ping`.
+      - Role `protected`; pids 82524, 83926, 85263, 87175 and 87262.
+      - Times: 03:54:24Z (inside rb2-bootstrap, 03:54:18–03:55:03Z); 03:55:20Z (inside rb2-launch before the
+        attempt was consumed, which includes the DB-free `--plan`); 03:55:43Z, 03:57:40Z and 03:57:46Z (runner,
+        started 03:55:34Z). The phases are inferred from timestamps.
+      - `by_exe` counts esbuild as seen 5, auditor 0, env+pin 5, without 5: these five were every esbuild process
+        the sampler saw.
+    - **Path and hash.** The executed path is exactly the object at native-policy line 21:
+      `object e1698a3d5c6c0798fee4fd3b5cc816651f460c63d390a7a26ea4beb0b1884100 …/tsx/node_modules/@esbuild/linux-x64/bin/esbuild`.
+      - Line 22 binds the sibling `…/tsx/node_modules/esbuild/bin/esbuild` with the same digest. The derivation
+        records both at 11,427,952 bytes, nlink 2, and the closure review classifies both as clean-install runtime.
+      - Every record has `unbound_exec_mappings: []`. The sampler (`enforcement-sampler.py:126`) flags any
+        executable mapping whose path is not a bound policy object, or whose inode differs from that path's, so
+        the mapped image was the inode at the line-21 path.
+      - The sampler did not hash the running image. The digest rests on two checks around the run: the layout
+        re-check passed immediately before launch (`rb2-launch.log:21`) and again after the run (`rb2-after.log:2`).
+        Each time it confirmed that the line-21 target is a regular file with sha256 `e1698a3d…`, that the policy
+        digest is `a8e586e0…`, and that lines 21–22 are exactly those bindings (`j2-layout-recheck.sh:36-45`).
+      - `POLICY MATCH OK` held before and after.
+    - **Auditor and policy environment.** Each record has `env_auditor: true` and `env_pin: true`.
+      - That is, `LD_AUDIT` equals the policy's auditor
+        `/home/arm/afldb-i316-J2-native-20261023T2317Z/native/bound/afldb-native-audit.so` (inode 2527874), and
+        `AFLDB_NATIVE_POLICY_SHA256` equals the digest of the policy the sampler loaded:
+        `a8e586e0d729329eafc2773022a3aa3214cdbca9a3f1c6d77c3687cfac4599d4` (summary `policy_sha256`).
+      - `auditor_mapped: false` is expected for the static binary, which has no dynamic loader to honour
+        `LD_AUDIT`. This is the ISSUE-320 §3 boundary: static children are checked before exec.
+      - The sampler does not record each process's parent. Every node process it saw (48/48) had the auditor mapped,
+        and the auditor refuses any unbound exec target. The run had 0 native REFUSED lines in `rebuild.log`/`rebuild.err`, and the only
+        refusal anywhere is the bootstrap wrong-pin control (`rb-post.log:16`, `rb-shutdown.log:25`).
+    - **Unapproved code.** No unapproved code or object load was identified. The summary has 5 anomalies, all of
+      kind "protected process without the auditor"; there are 0 "unbound mapping" and 0 "launcher maps unbound
+      native code" anomalies, 0 sampler errors and 0 credential redactions over 714 samples and 139 processes.
+    - **Exemption mismatch.**
+      - `rbstage2/rb2-bootstrap.sh:14` passes the sampler the single exemption
+        `ESBUILD=…/tsx/node_modules/esbuild/bin/esbuild` (the line-22 path).
+      - `rbstage2/enforcement-sampler.py:199` flags `not auditor_mapped and exe != ESBUILD`, an exact string
+        comparison with `readlink /proc/<pid>/exe`.
+      - tsx's esbuild service ran the line-21 platform-package path instead, so all five were flagged.
+      - Why the earlier ISSUE-320 rehearsals saw no such anomaly was not investigated.
+    - **Conclusion.** The evidence supports the ruling on every point: the policy-authorised line-21 binary ran, with
+      the auditor environment and pin, no unbound load, and no enforcement refusal. The anomalies are a
+      monitor-classification defect, now ISSUE-325.
+  - **Next.** The owner decides on the hold (restoring the package/timer hold is a separate action). Rollover,
+    successor activation, apply, census and deployment remain separate approvals. ISSUE-325 is fixed before the rebuild
+    harness is reused. Production NO-GO.
+
+- **Revision J2, attempt 3 (F-J05): root-evidence criteria repaired and reviewed. The fresh enforced dry run passed
+  24/24, and the single disposable rebuild ran and passed every verdict. The sampler reports 5 esbuild anomalies, which
+  are a classification artefact (F-J06, MED, for the owner). The attempt is consumed (2026-10-24; previous; F-J06
+  ruled in the entry above; supersedes the attempt 2 entry below).**
+  - Record: `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z/`.
+    - Addendum `PROPOSAL_J2-FJ05.md` `0ef0eaa3…`.
+    - `HASHES.sha256` `6d61c1c3…` (167 entries). Also kept: `HASHES.pre-FJ05.sha256` `5a3f813d…` and the reviewed
+      intermediate list `HASHES.FJ05-reviewed.sha256` `40659f8a…`.
+  - Returns in `.phaneslight/returns/i316J-20261024/`:
+    - the owner F-J05 ruling J-17 (verbatim) and plan J-18;
+    - plan review J-19: GO-WITH-CHANGES, LOW only (both adopted);
+    - focused independent review J-20: GO, one LOW, the rest INFO;
+    - orchestrator return J-21.
+  - **Attempt 2 is not a complete proof.** Its planner dry run passed, but 2/24 criteria were defective (F-J05), so
+    the J2 proof did not pass at attempt 2.
+  - The repository pin is unchanged (`876dadbf` / `85b5f05a…`). No repository code changed. No CHANGELOG entry: the
+    change is harness-only and outside the repository.
+  - **Repair (F-J05; `APPLY_PARENT` not moved).**
+    - `j2-listing.sh` `337dd9bf…` → `5e018720…`. For each listed directory it records the directory itself
+      (`find -maxdepth 0`) and a sorted top-level inventory. There is no `.` or `..` record, and nothing of the parent.
+    - Fields:
+      - every old `ls -la` field is kept;
+      - ctime, inode, device and numeric uid/gid are added;
+      - access time, birth time and all parent metadata are excluded.
+    - It is fail-closed on a root that is absent or a symlink, a newline in an entry name, or any find/sort failure.
+    - The criteria (`e8ff3c89…`) and the driver (`c177842d…`) are unchanged. rbstage2 and `J2-FINAL.sha256`
+      (`9d4b4719…`) are unchanged and do not reference the listing.
+    - `STAGE.sha256` `691c27a5…` → `e61cca16…` (23 files). Copies were kept, never moved: `stage-preFJ05/` locally
+      and `dryrun/preFJ05/` on the host.
+    - The attempt-1 (`178d9758…`) and attempt-2 (`6b70a0ca…`) evidence and their host results directories are
+      unchanged.
+  - **Proof.** `j2-listing-selftest.sh`, fixture on WSL ext4, using the staged criteria expressions verbatim:
+    - **36/36 PASS** with GNU coreutils (`listing-run-2.log`) and 36/36 with uutils;
+    - (a) parent changes, including link count ±1, mtime and mode, leave the evidence equal, while the pre-FJ05
+      `ls -la` FAILs them (the mutation check);
+    - (b) changes to a root's own mode, mtime, ctime only or group are detected;
+    - (c) 16 entry additions, removals and changes are each detected;
+    - (d) an unchanged root compares equal;
+    - 4 fail-closed refusals.
+    - Run 1 failed 35/36 because of a test bug (the structure check sorted the native blocks together). It was fixed
+      and superseded. The pre-fix test bytes were not kept.
+    - The unchanged driver self-test passes 44/44 on the re-hashed stage.
+    - Host probe: the candidate ran read-only on the real roots twice, byte-identical. Replay of the attempt-2
+      evidence: R1 the listings are equal without `..`; R2 the new records reproduce both attempt-2 listings; R3 all
+      32 recorded objects predate the attempt-2 start. The repaired mechanism would therefore have passed attempt 2.
+  - **Re-stage and gates.**
+    - dryrun `e61cca16…`: 23/23 OK, and `j2-listing.sh` equals the probed candidate. rbstage2: 30/30 OK.
+    - `HOLD ACTIVE` 63/63; four timers disabled and inactive.
+    - Policy `a8e586e0…`: 251 entries, 0 drifted.
+    - `$PY -I -S` probe OK. Free space: 16.6 GB on `/home/arm` and 937 GB on `/mnt/ssd`.
+  - **J2 enforced dry run attempt 3 (`20261024T034905Z`): driver exit 0, VERDICT PASS, 24/24.**
+    - Every step passed. All four negative inputs were built and verified, and each negative detected its input.
+    - The gate: exit 0; 3/3 gates; 91 checks; 1622 → 1640; renumbered 4; pins match; 0 REFUSED; nothing written;
+      root and git status unchanged; HEAD `876dadbf` before and after.
+    - Both root-evidence criteria PASS.
+    - Evidence: `D:/tmp/afldb-i316-J2-20261023T2317Z/runs/j2-dryrun-attempt3-20261024T034905Z.tgz` `bf2a88ac…` (also in
+      the package).
+  - **The single disposable rebuild, run via rbstage2 exactly as staged.** Root
+    `/mnt/ssd/afldb-i316-rb-J2-20261024T034905Z`, database `afldb_v2_rb_i316_revision_j2_test`, cluster :55787.
+    - Prepare: gates OK; 10 J2 final blobs re-hashed equal.
+    - Bootstrap: OK. The native control and both client smokes passed.
+    - Launch: plan exit 0 (30 stages) and four gates OK. **Attempt consumed at 2026-10-24T03:55:34Z.**
+    - Runner exit 0 (03:55:34Z → 04:06:05Z); no tripwire; peak size 2.54 GB.
+      - 30 stages; `AFLDB-FINAL-VALIDATION PASSED: 91 checks`; all 1640 comparable club-seasons agree;
+      - coach raw replay VERIFIED; the census of the disposable database: `verdict=pass total=0`;
+      - 0 native REFUSED lines; 0 provenance mentions.
+    - After: layout re-check, policy match and hold all PASS.
+    - Post-rebuild checks: `AFLDB-POST PASSED`. The 2026 Brownlow is pending and preserved. The historical projection
+      has 98 seasons, 79,113 votes and 112 winners. The checkout is unchanged.
+    - Shutdown: clean; port free; 0 server-log errors.
+    - Collect: `rb-collect-20261024T034905Z.tar` `a81652da…`. The DSN scan and the scan for the 6 generated
+      passwords both found nothing.
+    - **F-J06 (MED, evidence classification; owner to rule).** The sampler reports 5 anomalies, "protected process
+      without the auditor":
+      - all five are `tsx/node_modules/@esbuild/linux-x64/bin/esbuild --service --ping`, the static binary bound at
+        policy line 21 (`e1698a3d…`);
+      - each process carried the auditor environment and pin, and none had an unbound exec mapping.
+      `rb2-bootstrap.sh` exempts only the line-22 sibling path (`tsx/node_modules/esbuild/bin/esbuild`). It is not an
+      enforcement failure. It was not fixed: rbstage2 is frozen and the rebuild is never rerun.
+    - Left in place: the stopped disposable root on `/mnt/ssd`; the attempt-3 apply root
+      `/home/arm/afldb-i316-apply-876dadbfa024-20261024T034905Z` with its sidecars; the stage's `incoming-FJ05/`.
+  - **Deviations recorded.**
+    - §12: during attempt 2, the orchestrator ran a stray `git -C . show` inside a process substitution in the
+      package directory. It was unauthorised and non-mutating. The main session ran `git status --short` and
+      `git diff --stat` in the repository while orienting for this run, also unauthorised and non-mutating. No Git
+      ran in this run.
+    - Reviewer-model provenance: the pinned alias `fable` resolves to Fable 5.1, while the CLAUDE.md prose says
+      "Fable 5". Nothing was substituted, and no exact-version policy exists. This is recorded for J-14, J-15, J-19
+      and J-20, and the run continued.
+    - The listing self-test fixture ran on WSL ext4, not on the drvfs scratch root, because drvfs lacks directory
+      link-count and ctime semantics.
+    - No step session-summary file: creating one needs `cli.js`, which this task does not authorise.
+  - The hold stays applied. Production NO-GO. ISSUE-322 stays resolved; ISSUE-316, ISSUE-323 and ISSUE-324 stay open.
+  - **Next.** An owner ruling on F-J06: whether the rebuild counts as the J2 proof given the 5 classified sampler
+    anomalies. The rebuild cannot be rerun. Then the owner restores the hold. Successor activation, apply, census
+    and deployment remain separate approvals. Production NO-GO.
+
+- **Revision J2, attempt 2 (F-J04): harness repaired, reviewed and re-staged. The fresh enforced dry run passed every
+  control and the gate, but the criteria returned FAIL 22/24 on the two root listings (F-J05, a criteria defect). The
+  disposable rebuild was not run (2026-10-24; superseded by attempt 3 above).**
+  - Record: `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z/`.
+    - Addendum `PROPOSAL_J2-FJ04.md` `ae41abee…`.
+    - `HASHES.sha256` `5a3f813d…` (125 entries). The pre-repair copy is kept as `HASHES.pre-FJ04.sha256` `665d1285…`.
+  - Returns in `.phaneslight/returns/i316J-20261024/`:
+    - the owner F-J04 ruling (launch brief) and plan J-13;
+    - plan review J-14: GO-WITH-CHANGES, LOW/INFO only;
+    - focused independent review J-15: GO, no CRIT, HIGH or MED;
+    - orchestrator return J-16.
+  - The repository pin is unchanged (`876dadbf` / `85b5f05a…`). No repository code changed.
+  - **Repair (harness and proof material only).**
+    - New `j2-neg-input.py` `bf66be96…`:
+      - It builds each negative input by a structured edit of exactly the field its checker consumes, and writes it to
+        a new file.
+      - It then re-reads both files and verifies: they are byte-different; the consumed field went from the expected
+        value to `0…0`; nothing else changed.
+      - Record: the field is `native_closure.objects[readlink -f node]`, read with the checker's own expression. The
+        record must be deep-equal once that field is restored. The `executables` copy is unchanged (copies 2 → 1).
+    - `j2-drive.sh` `9ce3c6be…` → `c177842d…`:
+      - `neginput` runs before each of the four negatives;
+      - `pinguard` checks the enforcement pin;
+      - a failed construction is a STOP (exit 9) before the checker and before any gate.
+    - `STAGE.sha256` `575898cc…` → `691c27a5…` (23 files).
+    - Self-test `j2-drive-selftest.sh` `bf2fa85e…`, run under WSL Ubuntu.
+      - Inputs: the real record `82e25a10…`, the real policy `a8e586e0…`, and the staged checker's decision code,
+        extracted and run with injected host measurements.
+      - Result: **44/44 PASS** (`run-3.log` `58086f7c…`). The valid record passes, and the helper-built negative fails
+        on node only.
+      - The pre-repair driver reproduces F-J04. The guard refuses the `sed` and `sed …/g` records.
+      - Five construction failures each stop the driver; no later step and no gate runs.
+      - A Python 3.12.10 run of the helper gave byte-identical output.
+    - Evidence copies of the pre-repair driver, stage list and self-test are kept (`stage-preFJ04/`,
+      `*.pre-FJ04.*`). The attempt-1 evidence is unchanged (`178d9758…`).
+  - **Re-stage on streamanator.**
+    - The pre-repair driver and stage list were kept in `dryrun/preFJ04/`.
+    - dryrun `STAGE.sha256` `691c27a5…`: 23/23 OK.
+    - rbstage2: 30/30 OK; `J2-FINAL.sha256` `9d4b4719…` unchanged; no `REBUILD-ATTEMPT-CONSUMED`.
+  - **Gates before the run.**
+    - `HOLD ACTIVE` 63/63; four timers disabled and inactive; dist-upgrade simulation 0.
+    - Policy match `a8e586e0…`: 251 entries, 0 drifted.
+    - `$PY -I -S` probe OK (3.12.3). `/home/arm` free: 18.0 GB.
+  - **J2 enforced dry run attempt 2 (`20261024T025629Z`): driver exit 1, VERDICT FAIL (22/24).**
+    - Every setup step passed. All four negative inputs were built and verified, and every negative detected its
+      input:
+      - policy: DRIFT on node;
+      - runtime: `RUNTIME CHECK FAILED`;
+      - enforcement: both mappings failed under the zero pin;
+      - layout: `PREFLIGHT FAILURE`.
+    - The gate (the enforced planner dry run):
+      - exit 0; 3/3 gates; 91 checks; 1622 → 1640; renumbered 4; pins match; 0 REFUSED;
+      - nothing written; root and git status unchanged; HEAD `876dadbf` before and after;
+      - layout re-checks before and after: PASS; policy match after: PASS.
+    - FAIL: "V4 root listing unchanged" and "J2 native root listing unchanged".
+    - **Cause (F-J05, a criteria defect).** `j2-listing.sh` lists each root with `ls -la`. That includes `..`, which
+      is `/home/arm`, the driver's own `APPLY_PARENT`:
+      - `prepare` created the apply root there, so the link count went 179 → 180;
+      - at 02:59:41Z the gate script wrote `$R.after.sha256` and `$R.git-status.after` there, which moved the mtime.
+      - Apart from the `..` line, both listings are identical before and after. The V4 and native roots did not
+        change.
+    - Evidence: `D:/tmp/afldb-i316-J2-20261023T2317Z/runs/j2-dryrun-attempt2-20261024T025629Z.tgz` `6b70a0ca…` (also
+      in the package).
+    - Left on the host: apply root `/home/arm/afldb-i316-apply-876dadbfa024-20261024T025629Z` (1.4G) with its
+      sidecars; `dryrun/results-20261024T025629Z`; `incoming-FJ04/`.
+  - **Not run:** the disposable rebuild, because the ruling requires every criterion to pass.
+    - No `REBUILD-ATTEMPT-CONSUMED`, no `/mnt/ssd` root, no cluster, no database. The single rebuild attempt is
+      **not consumed**.
+    - The hold stays applied. Production NO-GO. ISSUE-322 stays resolved; ISSUE-323 and ISSUE-324 stay open.
+  - **Next.** An owner ruling on F-J05. One option is to list the roots without their `..` entry, or to move
+    `APPLY_PARENT` out of the roots' shared parent. Then a focused review, re-staging and a fresh J2 dry run. Only if
+    every criterion passes: the one disposable rebuild. Then restore the hold. Production NO-GO.
+
+- **Revision J2: F-J01 fixed and re-pinned, native policy re-derived and reviewed, F-J03 harness; stopped at the hold
+  gate; dry run and rebuild not run (2026-10-24; superseded by revision J2 attempt 2 above).**
+  - Record: `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z/` (`PROPOSAL_J2.md`, `HASHES.sha256`). Owner rulings
+    set 4 verbatim in `.phaneslight/returns/i316J-20261024/J-08`; plan J-09; plan review J-10 (GO-WITH-CHANGES, no
+    CRIT/HIGH); native policy review J-11 (ACCEPT-WITH-CONDITIONS, no CRIT/HIGH); closure J-12 (clean). Scratch
+    `D:/tmp/afldb-i316-J2-20261023T2317Z/`.
+  - **F-J01 (ruling 2), `876dadbf`.** `verifyOrdinaryTsxEntry` walks each `.bin` link chain hop by hop.
+    - Every hop and every absolute link text must stay inside the checkout's real `node_modules`, and so must the
+      final regular file. A chain that leaves and comes back is refused. `realpath` must agree with the walk.
+    - Loops, dangling hops, hops through a file and special files are refused.
+    - Only the two esbuild links keep their exception.
+    - 13 new tests. Against the old code, 8 of them fail, including all three leave-and-return cases.
+    - Affected file 1119 passed / 3 skipped (Windows; the real-symlink test skips with EPERM and was not run on Linux:
+      remote test execution was outside this task's authorisation).
+    - DB-free 11,278 / 0 / 27 (predecessor) and 11,327 / 0 / 27 (successor); tsc 0; changed-line ESLint 0
+      (implementation), 31 `no-explicit-any` in the test file (post-transition, equal to J). api-diff: no surface change.
+  - **Re-pin (not pin-only).** J2 pinned checkout `876dadbf`.
+    - `tools/db/rebuild-test.ts` base pin `96064840…` → `320960e4…`, final pin `55edeab0…` → `ab734947…`.
+    - J-pinned `5c0763fa…` → J2-pinned `85b5f05a…`; the unpinned body is unchanged (`5a410a82…`).
+    - Branch `i316/J2-post-transition-on-876dadbf`: simulated commit 1 `a1e16e67`; commit 2′ `87da1563` (a clean
+      cherry-pick of J's `72e37fa7`; the test change is identical apart from offsets).
+    - Local pinned dry run: 3/3 gates, 1622 → 1640, 4 renumbered, 91 checks, pins match, nothing written.
+  - **Native policy (ruling 1).** Re-derived by the reviewed procedure in the new root
+    `/home/arm/afldb-i316-J2-native-20261023T2317Z`.
+    - Tools byte-verified, v2 record `6c4ea3ea…`, auditor `32d5f6fe…` built twice.
+    - New policy `a8e586e0…`, record `82e25a10…`.
+    - Against V4 (`30199b6a…`/`685a281c…`, unchanged), only the auditor path (same digest) and `libz.so.1.3` differ:
+      `86200da3…` → `f61677c7…`, zlib1g `1:1.3.dfsg-3.1ubuntu2.2` → `2.3`, dpkg md5 equal, upgraded 2026-10-23T16:16Z by
+      the scripted dist-upgrade (noble-security CVE-2026-85091).
+    - No downgrade and no weakening. The host matched the new policy at 23:44Z (251 entries, 0 drifted).
+  - **F-J03 (ruling 3).** New `j2-drive.sh`:
+    - any failed setup or control step stops it with exit 9 before the gate;
+    - four in-driver negative controls must detect a wrong input;
+    - `j2-dryrun-criteria.sh` (24 checks) gives the verdict;
+    - deterministic self-test 15/15. The J record is unchanged.
+    - Rebuild stage `rbstage2` (I pattern, J layout, no npx/npm shims, criteria-gated, one-attempt marker).
+  - **Hold (ruling 1): the remaining gate.** `sudo` on streamanator needs the owner's password, so the hold could not be
+    applied. Prepared: `j2-hold-apply.sh`, which holds the 63 closure-owning packages and disables the four
+    automatic upgrade and reboot timers, recording both lists; `j2-hold-restore.sh`.
+  - **F-401 / F-210: real-symlink test passed on Linux (owner-authorised 2026-10-24).** Script
+    `j2-symlink-test.sh` `ab71ce0d…`, hash-checked on the host before it ran. New root
+    `/home/arm/afldb-i316-J2-symtest-20261024T000215Z`, holding a checkout of `876dadbf` cloned only from the
+    hash-verified staged `post-transition.bundle` (`76653e1c…`) and a private copy of the clean-install `node_modules`.
+    No network, database, install or DSN. Test `1dac2b5e…` and implementation `320960e4…` match the pins.
+    - Command: `npx --no vitest run tests/db-test-rebuild.test.ts -t "real symbolic links"`, Node 22.23.2.
+    - Result: exit 0, 1 passed / 1121 filtered (`✓ … real symbolic links: an inside chain is admitted, a
+      leave-and-return chain refuses`). The test passed rather than skipped: its `skip()` would have reported ↓.
+    - No EPERM. Files changed in the shared clean install: 0. Final `git status --porcelain` of the checkout: empty.
+      `vitest.log` `1b73720b…`; output saved in `D:/tmp/afldb-i316-J2-20261023T2317Z/runs/j2-symtest-20261024T000215Z.out`.
+  - **Hold applied by the owner (2026-10-24).** `j2-hold-apply.sh` `de40408b…`: 63/63 closure packages held, the four
+    apt timers disabled and inactive, dist-upgrade simulation 0 Inst/Remv, `HOLD APPLIED: 63 package(s) newly held, 4
+    timer(s) disabled`. The hold stays in place for the proof window.
+  - **J2 enforced dry run attempt 1 (`20261024T001117Z`): STOPPED, exit 9, before the gate (F-J04, harness defect).**
+    - The host stages were verified against the package first: dryrun `STAGE.sha256` `575898cc…`, rbstage2
+      `734c4934…`, `J2-FINAL.sha256` `9d4b4719…`, every file OK.
+    - Steps passed: stage hashes, runtime pins, hold check (`HOLD ACTIVE`, 63/63), listing, policy match `a8e586e0…`
+      (251 entries, 0 drifted), negative policy match (detected), prepare (2709 files), runtime check.
+    - STOP at `negative control runtime-check did not detect its wrong input`.
+    - Cause (reproduced locally): `runtime-record-v3.json` is single-line JSON, and the node digest `3517c2df…` occurs
+      twice, first under `executables` and then under `native_closure.objects`. The driver's
+      `sed "s/$NODESHA/0…/"` has no `g` and changes only the first occurrence. `j2-planner-runtime-check.sh` reads
+      only `native_closure.objects`, so the "altered" record still binds node and the check correctly reports OK.
+      The 15/15 self-test used stub controls and could not see this. The control script and the host are not at
+      fault, and the driver failed safe as designed.
+    - Not run: the planner dry run, the gates and the rebuild. No `REBUILD-ATTEMPT-CONSUMED`, no `/mnt/ssd` root, no
+      cluster, no database. Left on the host: apply root `/home/arm/afldb-i316-apply-876dadbfa024-20261024T001117Z`
+      (1.4G) with its `.before.sha256` and `.layout-manifest.sha256`, and `dryrun/results-20261024T001117Z`.
+    - Evidence: `D:/tmp/afldb-i316-J2-20261023T2317Z/runs/j2-dryrun-attempt1-20261024T001117Z.tgz` `178d9758…`.
+  - **Not run:** the J2 enforced planner dry run and the disposable rebuild. The single rebuild attempt is not
+    consumed. J, I, H, G and the credential-incident record were verified byte-unchanged.
+  - **Next.** Owner ruling on F-J04: fix `j2-drive.sh` (`g` on the record sed, plus a guard that stops if any altered
+    negative input is byte-equal to its original, or still carries the digest the check reads). Then re-hash and
+    re-stage, extend the self-test with the real record, and run a fresh J2 dry run. The one disposable rebuild runs
+    only if that passes; then restore the hold. Production NO-GO.
+
+- **Revision J: ISSUE-324 fix, esbuild native-binary exception, ISSUE-322 resolved, J pinned; enforced dry run refused
+  on native-closure drift; disposable rebuild not run (2026-10-24; superseded by revision J2 above).**
+  - Record: `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J-20261023T2234Z/` (`PROPOSAL_J.md`, `HASHES.sha256`); owner rulings sets 1-3 verbatim in
+    `.phaneslight/returns/i316J-20261024/` J-02, J-05, J-07. Scratch `D:/tmp/afldb-i316-J-20261023T2154Z/`.
+  - Commits on `v2/rebuild`: `82603dc7` (ISSUE-324), `db541ae3` (ISSUE-322), `14abea5e` (esbuild exception, F-101
+    environment refusals), `4fcc95ef`, `60eb5e0c`, `dfbfc1ab` (ISSUE-322 integration test). **J pinned checkout
+    `dfbfc1ab1640cc2aacb9900758a5af5e202fc824`**, `pinned.bundle` sha256
+    `582b579b3d44698ceec4ac0e9540bd4136ebd85afa1791e70c1ddbb101799f71`.
+  - Pins: J-unpinned = I-unpinned `5a410a82…`; **J-pinned
+    `5c0763fa49f0731889fcd6d2e22f07a11d238eeca482df6a0d95f5aefddf6104`**; only `tools/db/rebuild-test.ts` differs
+    from I (base `960648405df73a11…`, final `55edeab01164a7c5…`). Branch `i316/J-post-transition-on-dfbfc1ab`:
+    SIMULATED commit 1 `31f0ab32` (ten finals), commit 2′ `72e37fa7` (16 files, 14 byte-equal to I).
+  - Tests: DB-free predecessor 11,266 passed / 0 failed / 26 skipped, successor 11,315 / 0 / 26 (skip set = I's);
+    tsc 0; changed-line ESLint unchanged from I (31 `no-explicit-any` in the commit 2′ test file).
+  - Rollover date `--rollover-date 2026-10-24` kept as ruled: the date-bearing blobs are
+    `fitzroy-accepted-baselines.json`, `afltables-network.json` and `fitzroy-contract.json`; any other apply date
+    requires regenerating and re-pinning them (owner ruling, intentional gate). Census: the 2026-10-23T03:28Z JSONs
+    were reused, are outside the 6 h window and are no freshness evidence for any apply; no new census was taken.
+  - Layout (J-06 Q4, owner set 3): the checkout gets its own `node_modules`, copied from the reviewed DEV clean
+    install (`package-lock.json` `984b4422…` and `package.json` byte-equal to the checkout's) with every regular
+    file sha256-verified (22,408), all 8 `.bin` directories omitted, 427 package directories at the locked version
+    (0 extraneous, 0 mismatch, 0 missing; 125 optional other-platform entries absent), and exactly two links: the
+    esbuild native binaries to their policy-bound real paths. The J copies carry no `.bin` link, so no `.bin` target
+    exists to check; every other file is hash-equal to the lock-tied clean install.
+  - **Enforced dry run on streamanator (2026-10-23T22:39Z), fresh mode-700 checkout
+    `/home/arm/afldb-i316-apply-dfbfc1ab1640-20261023T2240Z` from the J bundle: FAILED.** Runtime auditor
+    `32d5f6fe…`, policy `30199b6a…`, record `685a281c…` read from the V4 root (top-level listing unchanged). The
+    layout and esbuild real-path/hash/policy re-check PASSED immediately before and after. Controls: node mapped the
+    auditor and a wrong pin refused 127, but the venv-python positive control refused 127 on libz. The planner then
+    REFUSED at gate 1 (full-history validation, Python, exit 127), exit 2, 1 REFUSED line: `native object bytes
+    differ from the bound sha256: /usr/lib/x86_64-linux-gnu/libz.so.1.3`. Root, git status and HEAD unchanged; no
+    database contact. Cause (read-only scan): 1 of 250 policy objects drifted, libz bound `86200da3…`, now
+    `f61677c7…`, from an `apt-get -y dist-upgrade` at 2026-10-23T16:16:54Z (zlib1g 1:1.3.dfsg-3.1ubuntu2.2 → 2.3;
+    also glib, containerd, tmux, xserver) after revision I's dry run; unattended upgrades are enabled on the host.
+    ISSUE-320's resolution names this limit (an OS package update to a closure object requires re-derivation and
+    review). Evidence `dryrun-results-J.tar` `6a96de119c58b660f5f3a0acfded9be9f367edc570a7e952f42d26be1376e420`
+    (0 password-bearing DSNs).
+  - **Disposable rebuild: NOT run.** The contract runs it only if the dry run passes; the single attempt is not
+    consumed. No D7, 91-check validation or post-rebuild Brownlow evidence exists for J.
+  - Unchanged: Brownlow 2026 pending on all three keys, ET unresolved, ISSUE-321 deferred; successor NOT
+    ACTIVATED; **production NO-GO**.
+  - **Next action:** owner decision on the libz drift (the policy, record, V4 and shared install may not be changed
+    without a ruling; options: re-derive and review a new record for the updated zlib1g, or another remedy; hold OS
+    upgrades on streamanator for the proof window); then repeat the J enforced dry run and, only if it passes, the one
+    disposable rebuild.
+- **Revision I: ISSUE-323 repair, re-pinned transition, enforced dry run and the disposable rebuild (2026-10-23; previous;
+  supersedes the H entry below as the latest state).** Package `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-I-20261023T0905Z/`
+  (`PROPOSAL_I.md`, `HASHES.sha256` 71 files, 1.8 MB); scratch root `D:/tmp/afldb-i316-I-20261023T0820Z/`. H, G, the
+  credential-incident record and V4 verified unchanged; `.codex/` untouched.
+  - **Commits.** `481511d2` on `v2/rebuild`: ISSUE-323 guard repair plus 4 predecessor tests. Branch
+    `i316/I-post-transition-on-481511d2`: SIMULATED commit 1 `14c52a9e` (the ten I final blobs; not an apply) and
+    commit 2′ `6d9b60a2` (16 files; 14 byte-equal to H's `219961ff`; `tests/db-test-rebuild.test.ts` replaces the
+    `it.fails` marker with 27 passing successor tests).
+  - **Package.** I-unpinned `5a410a82…`, I-pinned `e887fa196c3a87ed5c654b45848023d4e07c33c6ed7b20d60bfbb93b5b9e551c` at
+    pinned commit `481511d2` (bundle `18b765d6…`). Only `tools/db/rebuild-test.ts` differs from H: base `8a685c63…`,
+    final `bd8f6b0c…`. Write set 8 files; predecessor constant 1622 retained; successor 1640 from the tuple; 91 checks.
+    Proposed-state validator over the complete I tree: `c2-2026-successor`, 1640, 91 checks. Coverage `--check` ok;
+    2027 `unsupported` ×5; matrix 655.
+  - **DB-free suite** (H's 207 files). Successor `6d9b60a2`: 11,196 pass / 2 fail (ISSUE-322) / 26 skipped.
+    Predecessor `481511d2`: 11,145 / 3 / 27; the extra failure is the pre-existing DraftGuru 11a/11c timing flake and
+    the extra skip the absent gitignored coach raw bundle; both pass on rerun (167/167; 206/206 after the hash-verified
+    copy). The 26 skips equal H's. `tests/integration/` (outside the set): 92 + 2 files refuse without a database URL,
+    11 skips; none claimed. `tsc` 0 on both trees. Changed-line ESLint: 31 `no-explicit-any` in the test file (6
+    inherited from H, 25 new, the file's existing `as any` stub idiom).
+  - **Enforced dry run (streamanator, 08:29:12Z–08:31:34Z).** Fresh checkout
+    `/home/arm/afldb-i316-apply-481511d2f5c0-20261023T0830Z`; exit 0, 3/3 gates, 1622→1640,
+    `players_with_renumbered_profile 4`, 91 checks, pins match, 0 REFUSED, root/HEAD/git status unchanged. Censuses
+    03:28Z inside the 6 h window, not refreshed; no freshness waiver for the apply.
+  - **Disposable rebuild (the one authorised).** Database `afldb_v2_rb_i316_revision_i_test`; new mode-700 root
+    `/mnt/ssd/afldb-i316-rb-I-20261023T0905Z`; new unprivileged cluster :55785; unique credentials; ordinary path under
+    the reviewed closure and watchdog. 08:47:56Z–08:49:50Z, exit 1, 0 stage markers: the ISSUE-323 guard, accepted
+    baseline, ladder witness, coach raw replay and Python validate-only checks passed; then
+    `REFUSED: First-kick-goal preflight failed … Nothing has been destroyed.` (ISSUE-324). Database untouched (0 user
+    relations). No D7, final validation or post-rebuild Brownlow check was obtained; the three 2026 keys stay pending in
+    the tracked registry. Only the new cluster stopped; watchdog peak 730 MB; sampler 0 anomalies; no rerun. Exported
+    tars: 0 password-bearing DSNs, 0 occurrences of the 6 generated passwords.
+  - **Next.** Owner: ISSUE-324 (fix, revision J, dry run, one new disposable rebuild) and ISSUE-322; then
+    `PROPOSAL_I.md` §9 (or J's equivalent). Brownlow 2026 pending; ET unresolved; production NO-GO.
+- **Revision H: complete post-transition state and enforced streamanator dry run (2026-10-23; superseded by revision I
+  above; supersedes the G entry below).** Package `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-H-20261023T0554Z/` (`PROPOSAL_H.md`, `REBUILD_AUTHORISATION_FORM.md`,
+  `PROPOSED-FIX-adopted-successor-rebuild-guard.md`, `HASHES.sha256`); scratch root `D:/tmp/afldb-i316-H-20261023T0554Z/`.
+  - **Scope.** One agent. Commands, read-only Git, scoped local commits and read-only SSH; DEV writes only to the new
+    stage and checkout directories. No `--apply`, rebuild, database connection, settle, Brownlow publication, WSL,
+    cleanup, push or deployment. G and every earlier package preserved (G `HASHES.sha256` 55/55 OK). `.codex/` untouched.
+  - **Sealed-season/Brownlow boundary.** All three AFL API settle CLIs refuse sealed 2026 before any DB client
+    (`refuseSealedSeasonForSettle`, no correction); 2027 stays open. Brownlow acceptance remains possible only through
+    the D-233-2 completed-season artefact loader (owner `pending → complete` decision; refuses pending, in-progress and
+    admin-published seasons) or the audited admin `brownlow_authority` workflow; pending presence never accepts. No
+    defect, no bypass, no authority change. Populated-DB 2026 football completeness is not observed: an owner
+    attestation if it matters.
+  - **Post-transition set.** `63c35bde` on `v2/rebuild` pins the explicit predecessor fixture (the 7 base files,
+    byte-equal to G's base). Branch `i316/H-post-transition-on-63c35bde`: commit 1 simulated `21444ba2` (ten files,
+    every blob equal to the G finals); commit 2 `219961ff` (16 files): 2027 `unsupported` in all five coverage families
+    (policy-determined by ADR 0011; no value/zero/completeness implied), matrix 655 cells, and the 99 assumptions
+    restated semantically (predecessor fixture for mechanics, successor facts for the tracked state, new seal and
+    settle boundary tests). Full DB-free suite: proposed 11,169 pass / 2 fail / 27 skipped; predecessor 11,143 / 2 /
+    26; the 2 are ISSUE-322. `tsc --noEmit` 0. Proposed-state validator: `c2-2026-successor`, 1640, 91 checks.
+  - **Enforced dry run (streamanator, 06:48:49Z–06:51:11Z).** Fresh checkout `/home/arm/afldb-i316-apply-63c35bde2d2f-20261023T0655Z`
+    from a git bundle, HEAD verified, eight base hashes verified, 365 inputs re-hashed; H-pinned `7beb7347…`; v3 record
+    `685a281c…`, auditor `32d5f6fe…`, policy `30199b6a…` (read only from the V4 root; marker untouched). Exit 0; 3/3
+    gates PASSED; `players_with_renumbered_profile 4`; 91 checks; pins match for every file; 0 REFUSED; root, git
+    status and HEAD unchanged. Census records 03:28:51Z/03:28:40Z/03:28:41Z (pass, total 0) were inside 6 h with an
+    unchanged bundle and were not refreshed; they are no freshness waiver for the apply.
+  - **Storage.** C: 1.3 GB (package only); D: ~31 GB (worktree, bundle, runs); DEV 24 GB. All copies hash-verified.
+  - **New issues.** AFLDB-ISSUE-322 (promotion contract leaves `brownlow_correction_receipts` unclassified,
+    pre-existing). AFLDB-ISSUE-323 (adopted successor cannot run the ordinary rebuild; the guard change is drafted, not
+    applied, and needs the owner because it relaxes a safety guard; fixing it re-pins the change set).
+  - **Next.** Owner: ISSUE-323 decision; then `PROPOSAL_H.md` §8 apply authorisation; rebuild only via
+    `REBUILD_AUTHORISATION_FORM.md`. Brownlow 2026 pending; ET unresolved; restrictions unchanged; production NO-GO.
+- **Pre-apply safety: disposable credential containment, Proposal F review, revision G, application and rebuild specifications (2026-10-23; current; supersedes the `691bdbae` entry below as the latest state).**
+  - **Scope.** One agent, no subagents. Local inspection, scoped fixes and local commits, read-only ssh to the retained
+    DEV rehearsal roots, nonsecret marker writes in the two affected disposable roots. No `--apply`, no rebuild, no
+    database connection, no production or application credential/service change, no deployment, push or cleanup.
+    `.codex/` untouched.
+  - **Credential exposure (disposable only), contained.** The V3 and V4 rehearsal harness passed the `afldb_owner`
+    DSN as psql argv (`post-inner.sh`), so the LD_AUDIT sampler logged it: V3 :55773 `afldb_v2_rb_c2cand5_test`, 3
+    records; V4 :55774 `afldb_v2_rb_c2cand6_test`, 2 records. One V4 record was copied into the collected
+    `e8-shutdown.log`.
+    - Only those two disposable passwords were involved. Neither was reused: V3 ≠ V4, and neither matches 10 other
+      retained disposable roots or the DEV application `.env`.
+    - Both clusters are stopped (no `postmaster.pid`, no listener, no process).
+    - DEV originals sit behind mode-700 directories. The three C: originals had inherited Users/Authenticated Users
+      access, now removed with icacls; hashes unchanged.
+    - Markers `CREDENTIALS-EXPOSED` were written, and `tools/v2/isolated-pg.ts` refuses such a root
+      (`0011b985`).
+    - Harness CREDFIX-1:
+      - PGPASSFILE instead of argv;
+      - redact-before-truncate in the sampler;
+      - no log-line echo in shutdown;
+      - 11/11 hygiene tests.
+    - Four sanitised copies were made, and the scans found 0 real occurrences. Originals are preserved; nothing was
+      deleted. Rotation requires the offline single-user procedure and a fresh owner authorisation.
+    - Record: `C:/tmp/afldb-i316-CREDENTIAL-INCIDENT-20261023T0447Z/INCIDENT.md` (`HASHES.sha256`).
+  - **Proposal F review: two planner defects, corrected in `21749f57`.**
+    - (1) F's `CLUB_SEASONS_EXPECTED.rows` 1622 → 1640 came from the planner's unconditional ISSUE-101 constant edit.
+      It gated nothing (stage 9 uses the tuple's `expected_rows`), it falsified the predecessor's fingerprint-bound
+      1622, and it broke `tests/db-test-rebuild.test.ts` pins. A successor transition now leaves the constant
+      unchanged, and the validator refuses one that rewrites it.
+    - (2) F's 90 checks against the rehearsal's 91: `players_with_renumbered_profile = 4` (ISSUE-136) was dropped from
+      the successor fingerprint. The key is unmapped and printed with one separating space. That lost the identity
+      gate in the importer drift check and in final validation. It is now carried, and a dropped outgoing pin is
+      refused.
+    - All other protections were verified present (ownership census, Brownlow pending, identity continuity, ladder
+      pairs, register history and source provenance).
+  - **Revision G** (`C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-G-20261023T0600Z/PROPOSAL_G.md`, F preserved):
+    - The body is unchanged (`5a410a82…`). **G-pinned `7beb7347235f0b25340267b9b2d8dd8c7a58bf4a6c1d76c540d382b35c4a7378`**;
+      only the register (`6a2a4b86…`) and `rebuild-test.ts` (`ec0ce520…`) finals differ from F.
+    - Local Windows dry runs, all exit 0 with 3/3 gates passed:
+      - an F-pinned control reproduces streamanator;
+      - G-pinned: "pins match", 91 checks, root unchanged.
+    - These are not the applying-runtime proof.
+  - **Validation.** Focused suites passed: `tests/season-rollover.test.ts`, `tests/db-test-rebuild.test.ts`,
+    `tests/v2-isolated-test-target.test.ts` and `tests/afl-api-cutover.test.ts`. `tsc --noEmit` exit 0; eslint
+    clean on the changed files.
+  - **Post-apply simulation** (DB-free vitest; base = the `21749f57` archive, applied = + G files):
+    - **Commit 1 must be TEN files.** It needs the eight written files plus the two c2-2026 acquisition manifests
+      (`02bbcf93…`, `65c29907…`). Those manifests are untracked role-bound inputs that the planner does not write; the
+      committed register and contract bind them, and the rebuild requires a tracked manifest.
+    - `COVERAGE_REGISTRY` lacks 2027 entries for five families, so `docs/v2/coverage-matrix.md` must be
+      regenerated; the owner reviews the 2027 statuses.
+    - 99 tests in 16 files pin "2026 in progress" and must be restated without weakening.
+    - After the apply, 2026 is sealed: AFL API settle for 2026 refuses except through an audited correction, so 2026
+      settle completeness is an owner prerequisite.
+  - **Next:**
+    - The owner authorises the G application specification
+      (`C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-G-20261023T0600Z/APPLICATION_SPEC.md`):
+      1. fresh censuses near the window;
+      2. a streamanator LD_AUDIT-enforced dry run of G-pinned at the pinned commit;
+      3. `--apply` on 2026-10-24;
+      4. the named commit scope.
+    - Separately, the owner names the rebuild target database (`REBUILD_SPEC.md`). ISSUE-316 OPEN; successor NOT
+      ACTIVATED; production NO-GO; Brownlow 2026 pending; ET unresolved.
+- **Mandatory coach raw replay, enforced v4 rehearsal, fresh censuses and Proposal F dry runs at `691bdbae` (2026-10-23; previous; superseded by the pre-apply safety entry above).**
+  - **Scope.** One agent, no subagents. Owner-authorised local commands, scoped commits, ssh/scp to DEV, isolated test
+    writes, the three named read-only censuses and evidence preparation. No apply, adoption, production or existing
+    DEV database write, service change, migration, deployment, push or cleanup. All roots and packages retained.
+  - **Owner decisions recorded:** ISSUE-319 §4 items 1–5 (runbook §6.1); planner and rebuild both on `streamanator`;
+    the ISSUE-320 §3 boundary accepted; rollover date 2026-10-24 and D-316-1 retained; adoption conditional on the
+    gates; apply, populated-target rebuild and deployment separately unauthorised.
+  - **G1 / ISSUE-319 RESOLVED:** `691bdbae` makes the coach raw-to-parsed replay mandatory inside the rebuild
+    preflight; deferred data-quality questions are ISSUE-321.
+  - **Enforced v4 rehearsal PASS** (`C:/tmp/afldb-c2-REHEARSAL-V4-691bdbae-20261023T0248Z/`, `HASHES.sha256`
+    `f30a967e…d48a`): package 1,146 files (`2b461d30…`, raw bundle as a source member); production launcher
+    03:28:10Z–04:11:44Z, exit 0, 30 stages; raw replay VERIFIED at log line 103 before census/capture/reset; census
+    `verdict=pass total=0` (fresh database: mechanism only); strict real D7 1,640; `PASSED: 91 checks`;
+    `AFLDB-POST PASSED` (2026 pending on all three keys; historical 98 / 79,113 / 112); 0 REFUSED; 250/250 closure
+    objects unchanged; clean guarded shutdown.
+  - **G2 / ISSUE-320 RESOLVED for streamanator** (runbook §8): rebuild and planner runtimes bound to v3 record
+    `685a281c…`; no other host proven.
+  - **Fresh read-only censuses PASS** (SQL `22c84db5…`, 1897–2026, no exclusions, total 0): `afldb-prod`/`afldb_prod`
+    2026-10-23T03:28:51Z `18b20166…a653`; `streamanator`/`afldb_dev` 03:28:40Z `7a000b93…63af`;
+    `streamanator`/`afldb_test` 03:28:41Z `9eb203a6…fbdb1`. Time-bound.
+  - **Proposal F** (`C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-F-20261023T0312Z/PROPOSAL_F.md`, `HASHES.sha256`
+    `7ef3bc80…53bd`): E plus the AFL Tables contract rebased on `691bdbae` (draft `ca4291cb…`). Change set F
+    `5a410a82…`, **F-pinned `cddde59ef0a8bfe8a55b234b5254dba47474fd1bbb66e4d325a19229e350b253`**. Genuine planner dry
+    runs on streamanator, exit 0 each, nothing written, roots unchanged: run 1 (F, printed pins), run 2 (F-pinned:
+    "final_sha256 pins match this plan for every file"), run 3 (F-pinned under LD_AUDIT, 0 native refusals, plan
+    identical). Base hashes of all eight write-set files equal HEAD.
+  - **Next:** a separate owner authorisation to apply F-pinned on streamanator on 2026-10-24 (same invocation plus
+    `--apply`), commit the written files, then the post-rollover `c2-2026-successor` rebuild on streamanator under a
+    reviewed v3 record. ISSUE-316 OPEN; successor NOT ACTIVATED; production NO-GO; Brownlow 2026 pending; ET unresolved.
+- **v3-enforced rehearsal and Linux planner dry run at `15e43562` (2026-10-23; previous; superseded by the `691bdbae` entry above).**
+  - **Scope.** One agent, no subagents. Owner-authorised ssh/scp to DEV, owned-process commands, the guarded shutdown, the Linux dry run and local commits.
+    - No apply, adoption, production write, deployment, push, retry or cleanup.
+    - All roots retained.
+  - **Rehearsal under the enforced native closure: PASS** (AFLDB-ISSUE-320 runbook §7).
+    - Exit 0, 00:34:56Z–01:17:50Z, 30 stages.
+    - Census `verdict=pass total=0` (fresh database: mechanism only).
+    - Strict real D7, all 1,640; `AFLDB-FINAL-VALIDATION PASSED: 91 checks`; `AFLDB-POST PASSED` (2026 pending on all three keys).
+    - 0 REFUSED in the run; clean guarded shutdown.
+  - **Linux pinned planner DRY RUN on DEV: exit 0** (no `--apply`).
+    - Disposable root from `git archive 15e43562` plus hash-verified inputs and the E-pinned change set `410b0787…`.
+    - Reviewed clean-install `node_modules` and venv Python 3.12.3.
+    - All three pre-apply gates PASSED; `club_seasons expected 1622 -> 1640`; 90 checks built, not executed.
+    - `DRY RUN — nothing was written`; the root was unchanged, 2,695 files re-hashed.
+  - **Census records used:** `afldb_prod` 2026-10-22T21:57:39Z; `afldb_dev` 21:56:37Z; `afldb_test` 21:56:38Z.
+    - No freshness claim and no apply-readiness claim.
+    - DEV is not the applying-runtime proof.
+  - **Next.** ISSUE-319 owner choices; ISSUE-320 per-environment records and §3 acknowledgement; then, near the window, fresh censuses, the applying-runtime dry run and a separate apply authorisation.
+  - Execution record: `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/EXECUTION_RECORD.md`.
+  - ISSUE-316 OPEN; production NO-GO; successor NOT ACTIVATED; 1,640 rehearsal-only; Brownlow 2026 pending; ET unresolved.
+- **Successor readiness E: owner decisions, read-only censuses, enforced native closure, source evidence, dated proposal (2026-10-23; previous; superseded by the v3 rehearsal entry above; supersedes the `a5ec6b0c` entry below).**
+  - **Working scope.** One agent, no subagents. The owner's decisions are recorded verbatim in decision package Revision 6.
+    - Rollover date 2026-10-24.
+    - D-316-1 granted for preparation of that transition.
+    - Successor baseline approved conditionally on the source-evidence and enforced native-library work passing, and not activated early.
+    - Census scope: completed seasons 1897–2026 with no exclusions, on `afldb-prod`/`afldb_prod`, `streamanator`/`afldb_dev` and `streamanator`/`afldb_test`.
+    - Source coverage needs more evidence: **AFLDB-ISSUE-319**.
+    - Enforced native closure is required: **AFLDB-ISSUE-320**.
+    - Brownlow 2026 unapproved (all three keys pending); ET unresolved.
+    - Apply, populated rebuild or reset, production migrations, deployment and push are NOT authorised.
+  - **Censuses: all PASS.** Each was taken after verifying hostname, database, OID and server identity.
+    - Method: the enforcing CLI at `2c871bd3`, `--through-season 2026`, in one `SET TRANSACTION READ ONLY` transaction with `default_transaction_read_only=on`.
+    - Common results: sql `22c84db5…ef07`, scope 1897..2026 with no exclusions, schema present, total 0, ledger 110.
+    - `afldb_prod` (system id 7674454702926115004, OID 66668) at 21:57:39Z, evidence `f9cb8fa7…78a4`.
+    - `afldb_dev` (system id 7673872117032104869, OID 202860) at 21:56:37Z, evidence `39b10324…c2e2`.
+    - `afldb_test` (same cluster, OID 45428) at 21:56:38Z, evidence `33832676…0584`.
+    - These describe those targets at those times only, and freshness must be reassessed near the window.
+  - **Native closure.** Commit `041bd5852f166be76c873fbc45d0c10208a3c3b2` (AFLDB-ISSUE-320) adds the LD_AUDIT auditor, runtime record v3 and the guard self-checks.
+    - DEV proof: experiment 33/33, real-launcher integration 10/10, PostgreSQL fixture.
+    - Still to prove: a complete isolated rehearsal under v3 (bounded proposal prepared, not run) and per-environment records.
+  - **Source evidence (AFLDB-ISSUE-319).** Resolved by evidence:
+    - coach raw→parsed (byte-identical replay with the adapter's parser);
+    - the eight 2026 coach differences (a new labelled capture shows the publisher now lists exactly the core-only finals);
+    - Wikipedia 84/84 stated by the cited revisions;
+    - roster bytes 15/15.
+
+    Still blocked pending adjudication or evidence: NM 1940 R8–R18; 479 unmapped ids; rejected matches and height disagreements; roster completeness and raw; the parsed-only policy.
+  - **Dated proposal.** Package E `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-E-20261023T1045Z/` (45 files, `HASHES.sha256` `2c598adfbae6f0570280666514b070767dd57cd3b73bf750302e320bdb13fe1c`; packages A–D unchanged).
+    - Change set E (`92879ad0…3ebc`) differs from D only by two empty prose lines that the real planner refused in D. E-pinned is `410b0787…1991`.
+    - The genuine `tools/db/rollover-season.ts` **dry run PASSED (exit 0)**: three gates executed, the three censuses accepted, proposed-state validation accepted `c2-2026-successor` with 1,640 rows and 90 checks, and nothing was written.
+    - The pinned dry run exited 0; a tampered pin is refused.
+    - It ran on Windows with local Python, not on the applying Linux runtime. It is **NOT READY**: ISSUE-319 and ISSUE-320 are open.
+  - **Next.** ISSUE-319 adjudication; authorisation of the v3 rehearsal; fresh censuses, a Linux dry run and a separate apply authorisation near the window. Execution record: `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/EXECUTION_RECORD.md`.
+  - ISSUE-316 OPEN; production NO-GO; successor NOT ACTIVATED (the tuple table is `'{}'`).
+- **Runtime evidence, transition change set and revised drafts (2026-10-22; superseded in part by the populated-state entry that follows):** One agent, no subagents. Read-only DEV inspection (identity verified first; no install, database or write): the DEV lock `85809f26…` is retained and classified against the repository lock `984b4422…` (exactly one repository-only devDependency, `@electric-sql/pglite`; 0 of 552 shared entries differ), the Linux esbuild package and four others are tied to lock integrity through cached tarballs, and 2,445 of 2,445 run-record files equal current DEV; Python 3.12.3 / psycopg 3.3.4 recorded. Still unproven: Python archive integrity (no requirements with hashes, no PyPI digest), the run-time lock bytes, native-closure enforcement, a clean `npm ci` ([closure §8.3](docs/v2/issue316-c2-rehearsal-closure-2026-10-22.md#83-read-only-dev-runtime-inspection--what-it-closed-and-what-it-did-not-2026-10-22-later-the-same-day)). **Planner (local commit `5a09f3e5`):** optional `--transition-change-set` carries the complete transition as one hash-bound change set (base contract, replaced contracts, role-bound inputs, `$comment` register patches, full write set, `final_sha256` pins), refuses sentinels, stale or partial input and register-history change, leaves the predecessor coherent until a staged, journaled apply; focused tests added to the existing suites (the two earlier failures in `tests/season-rollover.test.ts` were not "unrelated": causes proven against exact baselines, `stage 9 re-points itself` a fixture gap from `39e80642` and `routes every contract read site` a source defect from `4b5e2490`; both repaired in `c7443fc2` without weakening either protection). The real tool refuses the revised draft on the single remaining sentinel (production ladder profile name); no real-proposal run is possible without the ownership census. Revised drafts and alternatives are in the [decision package](docs/v2/issue316-c2-successor-decision-2026-10-21.md#revision-1--2026-10-22-planner-change-set-runtime-evidence-revised-drafts); owner-only decisions remain (date, production profile mechanism, D-316-1, `issue` attribution, exclusion wording, coach/Wikipedia/roster stance, census targets, native-closure policy). ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending; ET unresolved; restrictions unchanged.
+- **Final technical validation at `96e0922a` (2026-10-23; current; supersedes the populated-state entry below as the latest verdict):** One agent, no subagents; isolated DEV targets only. Commits `dedba57f3650c156ad012ebdec48d6d62f5a7070` (eligibility fixtures seed explicit Brownlow acceptance) and `96e0922a60952e7d441ad2fe5865f4c5d76566d7` (populated planted-vote test). The 40 empty-database Brownlow failures are classified: 21 a true stale-fixture defect (repaired, expectations unchanged), 19 empty-database data preconditions. On a clone of a NEW complete rehearsal: four suites 122/122 and the planted-vote proof 4/4 (pending votes stay out of totals, winners, ranks, eligibility and projections; acceptance exposes exactly the planted rows; restoration exact). Not closed: `v2-brownlow-production-correction` 2 passed / 6 failed (needs the production pre-correction archive state and an unobtainable retained snapshot). **Fresh complete rehearsal PASS at `dedba57f`** through the production launcher (30 stages, strict D7 1,640/1,640, 91 checks, post-rebuild checks, exit 0, clean shutdown; census on a new database, 0 ledger rows). Evidence `C:/tmp/afldb-c2-FINAL-TECHNICAL-VALIDATION-20261023-20261022T122727Z/` (`HASHES.sha256` 1b8774f04ab022f794d44acc1f35c5c81363a403dedb998f6a8c356d528fa4d7). **Next action:** the six owner decisions only. ISSUE-316 OPEN; successor NOT ACCEPTED; production NO-GO; Brownlow 2026 pending; ET unresolved; 1,640 rehearsal-only.
+- **Populated-state proof, proposed-state validation and a Brownlow career-total repair (2026-10-22; previous; supersedes the 'unrelated failures', 'atomic' and 'L1/L7 unchanged' wording above):** One agent, no subagents. **Transition mechanism** (`c7443fc2`): the complete proposed state is judged by the rebuild's own validators (`resolveLadderRebuildExpectation`, `finalValidationChecks`, the importer-shared continuity parser) over the proposed bytes together with no working-tree edit; invalid continuity, height, ladder, expectation or selector combinations refuse even when hashes are consistent; a successful validation is bound to the exact bytes and `applyStagedWrites` refuses drift before and after staging; apply is a journaled, recoverable multi-file operation, NOT a filesystem transaction, and a partial application stays visibly blocked with its journal preserved; database-dependent checks are returned as pending, never proven. **Populated-state proof** (isolated DEV targets only, synthetic data, `93b21a18` then `9b854f9c`): the real capture, reset, migrations, privileges, reference data, registration replay, reinstate and bijection stages round-trip 4 ledger rows, 1 importer row and 3 manual registrations by stable identity (17/17); tampered, forged, other-database, no-pending, changed-marker and plain-capture-over-pending cases refuse and lose nothing; the enforcing census refuses a planted `afl_api` 2026 match under the candidate scope (19/19 with the pending-Brownlow suite); pending Brownlow with unaccepted source votes exposes no authoritative total, winner, rank or publication through the real projections. **Real defect found and repaired** (`81117391`): `recomputeBrownlowCareerTotals` summed raw `brownlow_season_votes`, so a pending season leaked into career totals and the career-minimum grid axis; it now uses the accepted-only filter and `publishBrownlowSeason` re-runs the recomputes once the season is accepted; the same four Brownlow integration files give identical per-test outcomes on the repaired and pre-repair trees. Two stale pins and three empty-database census cases repaired (`9b854f9c`); four `tests/current-season-import.test.ts` settle-script cases fail identically at `a6d486a2` because the legacy settle script is retired in V2 (recorded, not changed). Both clusters stopped with the verified shutdown (`shut down`, no `postmaster.pid`, ports free, watchdogs finished) and all roots retained. Current execution record and semantic diffs: package `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-C-20261022T114149Z/` (`EXECUTION_RECORD.md`; the two earlier packages unchanged). Owner-only decisions that remain: rollover date and D-316-1 grant; production ladder profile mechanism and successor/profile adoption; census target list; coach/Wikipedia/roster stance; exclusion wording and attribution; native-library trust policy and reproducibility requirements. ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending; ET unresolved; restrictions unchanged.
+- **Evidence retention and consolidated successor proposal (2026-10-22; previous):** One agent, no subagents; native inspection, hashing and offline validation only — no host, database, network, install, lockfile edit, rehearsal rerun, source or active-reference change. The twelve supporting evidence documents were reviewed against the closure's §7: every SHA-256 prefix equals the recorded one, 190 of 194 cited 64-hex strings equal retained files (the other four are composite digests, recomputed or located in tracked files), and the key figures were re-measured from the rehearsal package CSVs (132 core and 130 witness files hash-match; 10,028 2026 stats rows; 240,672 quarter cells with 0 failures; 150 blank-`Player` rows on the four renumbered profiles = 52 / 31 / 42 / 25). Five superseded status headlines carry dated retention notes (history preserved); the documents are committed and the closure's §7 now records original and committed hashes ([closure §8](docs/v2/issue316-c2-rehearsal-closure-2026-10-22.md#8-retention-review-and-dependency-lock-findings-2026-10-22)). **Dependency-lock discrepancy:** the DEV lock (`85809f26…`) is not retained, so its difference from the repository lock (`984b4422…`) cannot be classified and is unproven; the JavaScript modules that ran are hash-enforced (postgres 37/37, server-only 3/3, tsx 56/56 non-platform files byte-equal to the local install), but the Linux esbuild native binary is not tied to lock integrity and the Python environment is unpinned (no requirements or lock in the repository). The rehearsal PASS stays qualified and is not upgraded; empty-ledger lifecycle and row-vacuous zero-row Brownlow evidence stay distinct from populated-state proof; four reproducibility steps are listed in closure §8.2. **Successor proposal (not installed):** one consolidated section in the [decision package](docs/v2/issue316-c2-successor-decision-2026-10-21.md#consolidated-successor-proposal--2026-10-22) and a labelled C: package derived from the active repository bytes (54 files, manifest `1d71f4ca…`, 52 offline checks / 0 failures; no runner or planner executed): continuity 52 / 31 / 42 / 25, `baseline_only` height block with no supplement, c2 ladder witness and coverage, `rebuild_expectation` tuple (profile name unresolved), a new register entry beside the retained predecessor and older entries (not the rehearsal's single-entry replacement), the explicit ladder-only Kangaroos rule, byte-unchanged availability, Brownlow pending, measured values as proposed rehearsal-only expectations. The rehearsal overlay contract/register carry cp1252 mojibake (19 / 3 strings) and must not be copied. Unresolved fields U1–U9 are non-runnable sentinels (date, executed-gate verdict, production profile name and others); BLOCKED B1–B8 (no production ladder tuple, planner cannot carry non-planner contract edits, coach raw absent, no live census, tests pin 1,622, manifests and raw data not placed, DEV lock/Python reproducibility). **Next action:** the five consolidated owner decisions at the end of that section (review content; implementation route for B1/B2/B6; production provenance stance; rollover inputs and census targets; runtime reproducibility). ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 and every other rehearsal value rehearsal-only; all three 2026 Brownlow keys pending; ET unresolved; authority, eligibility and ownership restrictions unchanged.
+- **Rehearsal milestone closed (2026-10-22; previous):** Complete isolated C2 rehearsal **PASS at `5643f5c22025223916aa66cad6403a369a90c7cb`**, verified from the retained evidence independently of the producer summary (one agent; native in-process hashing and read-only Git; [closure record](docs/v2/issue316-c2-rehearsal-closure-2026-10-22.md)). Recomputed: package inventory `60758e96…` (1,135 listed = 1,135 on disk, 0 unlisted, 0 mismatches; 765 git-origin files equal to the commit's blobs by SHA-1 plus 5 reviewed overlays), launch spec `47c28cc5…`, runtime record `91c5cdb6…` (schema 2, 2,445 file entries), launcher `dd487c2c…` (external equals packaged); 30 stage banners in planned order, exit 0 (07:51:43Z–08:22:03Z); census scope 1897–2026 pass on an empty database (`schema_absent`); capture file `1c2691a5…` equals the archived reinstated file, recreate recheck logged the capture-bound marker, reinstate cleared it, the `fingerprints` recheck saw the resting marker; strict real D7 (both WF fixtures re-derived from the packaged `results.csv`: Footscray 96–93 Collingwood on 2026-08-28, Carlton 74–55 Melbourne on 2026-08-29; the four affected clubs' logged deltas reproduce arithmetically; all 1,640 comparable club-seasons agree); 91 distinct final checks, every actual equal to its expected, `PASSED: 91 checks` (in `rebuild.err`); post-rebuild checks `AFLDB-POST PASSED` (2026 keys pending, 669 player-seasons pending with NULL votes, projection `accepted=f status=pending`, exposed 2026 rows 0, historical 98 seasons / 79,113 votes / 112 winners; SQL read-only and its expressions equal the helper blob `7dbfc230…`); watchdog peak 1.93 GiB against 15 GiB, minimum free 50.96 GiB against 20 GiB, no trip; attempt 1 artefacts intact (`717ed125…`, `c99a0b30…`); lifecycle 16 / 16. **Corrections:** package composition (765 + 5 overlays, not 770 verified blobs); "Stage 18" is stage 22 of 30; the 91-check line is in `rebuild.err`; resource figures; CHANGELOG runtime-record v2 entry (superseded Linux and test statements). **Qualifiers:** the census proves mechanism and scope on an empty database, not any live target; zero exposed 2026 rows is vacuous at row level (no 2026 vote rows exist) so `accepted=f` / pending carries the evidence; capture/reinstate proven with empty ledger data; the DEV dependency lock (`85809f26…`, producer-reported) differs from the repository lock in the record (`984b4422…`); native-library observations are not enforced closure; test counts (978 / 0 / 2; Linux 958 / 0 / 0) are producer-recorded and were not rerun. **Failures and denials preserved:** attempt 1 REFUSED at stage 3→4 (nothing destroyed), approval-review denials, two Windows-only skips. **Next action:** one decision table (N1–N16) and one next approval prompt (N1–N11 plus one offline drafting authorisation) in the [successor decision package](docs/v2/issue316-c2-successor-decision-2026-10-21.md#current-state-and-remaining-decisions--2026-10-22); Brownlow 2026 publication, active successor adoption, rollover, production census and deployment are five separate approvals. ISSUE-316 OPEN; production NO-GO; 1,640 and every other rehearsal value rehearsal-only; all three 2026 Brownlow keys pending; ET unresolved; authority, eligibility and ownership restrictions unchanged. Closure commit scope and the uncommitted evidence documents: closure record §7.
+- **Capture-marker lifecycle repair and rehearsal attempt 2 (2026-10-22; historical; superseded by the 2026-10-22 closure):** Local commit `5643f5c22025223916aa66cad6403a369a90c7cb` (`tools/db/rebuild-test.ts`, `tools/migration/rebuild_afl_api_adjudications.ts`, `tests/db-test-rebuild.test.ts`): the pre-`recreate` live recheck now accepts the pending rebuild marker only as the genuine marker of the capture this execution's own capture stage just completed (unforgeable binding; file not pre-existing, validated by the existing parser, digests equal the stage's printed ones and the live marker's; cluster/database identity checks stand; capture/final/ordinary rechecks still require the resting comment; safe nonsecret refusal reasons). 978 passed / 0 failed / 2 skipped (+22), `tsc` 0, lint = HEAD basis; real PostgreSQL lifecycle driver on a new disposable cluster 16/16 (real capture tool, marker, facts query, `RESET_SQL`). New package `C:/tmp/afldb-c2-REHEARSAL-ONLY-C-rehearsal-5643f5c2-20261022T074446Z` (1,135 files; inventory `60758e96…c858c3b`; differs from the c6cdb37b package only in bindings and the two repaired files), runtime record re-measured `91c5cdb6…2577`, launch spec `47c28cc5…a60de`. **Attempt 2 COMPLETED all 30 stages, exit 0** (new root/cluster/port 55463/db `afldb_v2_rb_c2cand2_test`, 07:51:43Z–08:22:03Z): 2026-inclusive census pass, capture bound and capture-bound recheck passed, reset, reinstate with marker cleared, **strict real D7 pass (all 1,640 comparable club-seasons)**, **FINAL VALIDATION PASSED: 91 checks (0 mismatches)**; post-rebuild pending-Brownlow/public-projection checks pass (2026 keys pending, 669 player-seasons pending/NULL, 0 exposed 2026 rows, historical 98 seasons/79,113 votes/112 winners). Cluster stopped (pidfile absent, port free, watchdog done, no tripwire); all roots and evidence retained; attempt 1 untouched. Production NO-GO; 1,640 rehearsal-only; unchanged owner decisions: Brownlow 2026 (all three keys pending), ET, missing coach raw, successor/active-reference adoption and rollover, production census/release. See runbook "Single-agent execution record (continued) — capture-marker lifecycle repair and rehearsal attempt 2".
+- **Single-agent continuation (2026-10-22; previous):** Local commits `136e24d0` (runtime-record v2, pre-`os` zip hardening, startup landmarks, listener provenance, four baseline test repairs) and `c6cdb37b` (Linux-found fixes: `python3` selection, declared hard-link counts, bound `PATH` for guarded children); Linux DEV 958 passed / 0 failed / 0 skipped; real import-boundary, native-closure and child-spawn audit recorded. Candidate DOB pins independently derived and persisted-measured equal (13347/0/13347/0/2, rehearsal-only); Coleman 47/47 (no ties, no change needed). New labelled package `C:/tmp/afldb-c2-REHEARSAL-ONLY-C-rehearsal-c6cdb37b-20261022T062732Z` (inventory `e2840ac1…b7a664`). **Rehearsal attempt 1 REFUSED after the 2026-inclusive ownership census and capture passed, before recreate** (launch-provenance live recheck demands the resting isolated comment but the capture has already replaced it with the rebuild marker; implementation defect). Cluster stopped/retained; nothing destroyed; no D7/final-gate result. The owner then authorised the stricter capture-bound repair (resolved by `5643f5c2`; see the next bullet). Production NO-GO; 1,640 rehearsal-only; Brownlow pending; see runbook "Single-agent execution record".
+- **Runtime-record schema v2 implementation (2026-10-22; previous):** Owner-approved bounded G7 implementation
+  at basis `39e80642`, uncommitted, database-free (no real runtime record, DEV access, `ss`, database,
+  loader, census or package). Verifier/guards: version 2 adds an exact inert-link ledger (never followed),
+  `lstat`-ENOENT absent landmarks (dangling link refused), individually hashed node/python/listener
+  executables (parents untrusted, not on `PATH`), and runtime-only hard-link groups (`hardlink_counts` in
+  the Node guard); the Python guard refuses a present or dangling startup zip before its first non-frozen
+  import (defence in depth only; interpreter start-up imports precede it); version 1 verification, package/source
+  link rules and alphabet unchanged; alias not implemented. `isolated-pg.ts` invokes the verified absolute
+  listener (full re-verification against the original pin, preload policy digest, bound path; no `PATH`
+  fallback). Synthetic proof only: marker 210 passed / 1 skipped / 0 failed, isolated-target 25/25,
+  nonincremental `tsc` clean (retained); real dangling-symlink case skipped on Windows. **Bounded re-review
+  2026-10-22: no material defect.** The 4 full-file failures in `tests/db-test-rebuild.test.ts` reproduce
+  identically at the exact basis `39e80642` (introduced by it: `readdirSync`/`runPreflight(…, binding)`
+  call-signature text and a `.mjs` import the I18 walker cannot resolve); obsolete assertions, coverage masked,
+  not caused by this change, not repaired. Not Linux evidence; native-library closure, Node import closure,
+  zoneinfo data, child spawn audit and real-filesystem link behaviour unresolved. Detail: runbook top entry.
+  ISSUE-316 OPEN; Brownlow 2026 pending, ET unresolved, 1,640 rehearsal-only; restrictions unchanged;
+  production NO-GO.
+
+- **Linux runtime-binding Q1-Q3 read-only DEV queries (2026-10-22; previous):** Owner-authorised,
+  `streamanator`/`arm` verified; `lstat`/introspection only, nothing imported, written or executed
+  beyond interpreter attributes. Evidence C: `issue316-q123-20261022-150450/` with SHA-256 sums.
+  **Python alias not required** (Debian `sysconfig` requests the regular
+  `_sysconfigdata__x86_64-linux-gnu.py`; earlier inference corrected); `import psycopg` reaches it via
+  `_tz`→`zoneinfo`→`sysconfig`. Stdlib has exactly 3 links; zip landmark ENOENT; `site-packages` and
+  `/usr/lib/postgresql/16/bin` clean. New blockers: `esbuild_binary` `nlink 2` (hard-link group
+  allowance incl. small Node-guard change) and unscoped `node_modules` (34 `.bin` links, 3 bad names).
+  `/usr/bin/ss` regular but `/usr/bin` has 1,439 entries: direct binding needs absolute invocation
+  (small `isolated-pg.ts` change). Single bounded proposal and uncertainty (native-library closure,
+  Node import closure) in the proposal's G7. No policy adopted. ISSUE-316 OPEN; Brownlow 2026 pending,
+  ET unresolved, 1,640 rehearsal-only; restrictions unchanged; production NO-GO.
+
+- **Linux runtime-binding offline design (2026-10-22; previous):** One agent, native inspection of
+  retained preflight evidence/verifier/guards only; no command, host access, test or implementation.
+  `/usr/lib/python3.12` link list is complete (3). Startup needs none; `sitecustomize.py` and the
+  `libpython` link are unrelated entries; the `_sysconfigdata__linux_…` alias is the name 3.12
+  `sysconfig` requests (reached via `zoneinfo`), psycopg reachability unproven. The absent
+  `python312.zip` landmark is a second blocker. Proposal (schema v2 runtime record only): exact
+  inert-link ledger, `lstat`-ENOENT absent landmarks, file-bound interpreters, conditional
+  same-directory alias; package/source link rules and Node guard unchanged; native loading unproven.
+  Details, tests and read-only DEV query Q1-Q3 in the existing proposal's Linux runtime-binding
+  addendum. Next: owner decision on the query, then bounded implementation. ISSUE-316 OPEN;
+  Brownlow 2026 pending, ET unresolved, 1,640 rehearsal-only; restrictions unchanged; production NO-GO.
+
+- **Scoped commit / Linux runtime preflight (2026-10-22; previous):** One agent committed only
+  the reviewed eight source/test/configuration files plus selected four-file tracking hunks as
+  `39e80642fa0f9c744de9cb42f23940222a5c55c8` (basis `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`).
+  Staged source equality/pins and unrelated working-byte preservation checked; retained 128/0
+  focused Windows results postdate final test edit; fresh nonincremental typecheck exit 0.
+  Read-only DEV preflight: streamanator/arm, about 71 GiB free; Node 22.23.2 synchronous hooks,
+  tsx 4.23.12/nested Linux esbuild, Python 3.12.3/venv psycopg-binary 3.3.4 locations observed.
+  **Linux execution BLOCKED:** required stdlib search directory `/usr/lib/python3.12` contains
+  symlinks; verifier requires complete enumerated roots containing search locations and rejects
+  every symlink. Exact links/mechanism in runbook. No schema expansion, verification root,
+  source transfer, native import, sentinel/child-process phase, application/adapter/runner/census/
+  loader/PostgreSQL launch or DB connection. Initial CRLF preflight exit 127 and earlier Windows
+  failures retained; no automatic failed-phase rerun. Native paths/ownership are metadata only,
+  not content-bound load proof. WSL not started; sandbox-denied listing cannot prove its state.
+  Evidence: C: temp `issue316-commit-linux-20261022-142652/REPORT.md` and retained commands/results,
+  staged patch/hashes, commit and typecheck. Next: offline Linux stdlib/search-landmark/canonical-
+  link binding design review before separately authorised implementation and fresh DB-free proof.
+  No second commit. Candidate census/Brownlow integration, DOB/Coleman and real rehearsal pins
+  remain outstanding; ISSUE-316 OPEN, Brownlow 2026 pending, ET unresolved, 1,640 rehearsal-only;
+  authority/eligibility/ownership unchanged; production NO-GO. Previous checkpoints are history.
+
+- **Bounded re-review / predecessor transition (2026-10-22; historical; superseded by the 2026-10-22 closure):** One-agent review of
+  the actual uncommitted verifier/declaration/guard/runner/tests and approved inventory addendum
+  at basis `b8ea28550a291b766bf7ad9f3b63621e9f9efa81` found no material defect within the
+  reviewed-code/interpreter/OS/native-loader and no-concurrent-writer trust boundaries.
+  Import guards are not an application sandbox. Added only the approved predecessor
+  `datasets.ladder.rebuild_expectation` block: full-history-20260902 / ladder-20260828,
+  exact reviewed manifest/set hashes and independent results/H&A expectation **1,622**.
+  Manifest bytes/set digest verified; all other contract fields equal basis after removing
+  that block. No candidate block/season metadata/accepted successor change. Actual-contract
+  positive planning/resolution and absent/invalid/candidate-on-ordinary-target regressions
+  added to the existing suite. Focused database-free Windows checks **128 passed / 0 failed**,
+  including 18 real interpreter cases; 755 unrelated tests filtered. C: evidence
+  `issue316-predecessor-focused-unrestricted.json`; nonincremental typecheck exit 0 with empty
+  `issue316-predecessor-typecheck.txt`, same retained temp directory. Initial restricted
+  sandbox tsx ENOMEM and corrected new assertion are disclosed in the runbook, not passes.
+  Contract-only semantic comparison and `git diff --check` passed. Previous broader results
+  reused, not repeated. No implementation expansion, package/DB/stage/rehearsal or commit.
+  Next bounded proposal: separately authorised Linux database-free import-boundary/native-
+  extension validation against reviewed existing runtime. Linux/native-extension proof,
+  candidate census/Brownlow parity integration, real package/runtime/target pins and DOB/Coleman
+  remain blockers. ISSUE-316 OPEN; Brownlow 2026 pending, ET unresolved, 1,640 rehearsal-only;
+  authority/eligibility/ownership unchanged; production NO-GO. Exact delta/limits: runbook's
+  current re-review entry.
+
+- **Bounded dependency-resolution repair (2026-10-22; historical; re-reviewed above):**
+  One agent added inventoried `tools/v2/rehearsal-resolution-guard.mjs`, pinned per-file
+  resolution policies and shared launcher/runner interpreter startup wiring. Node main-thread
+  synchronous resolution and loader-worker async resolve/load hooks surround real tsx
+  registration; resolved module files must match inventoried package/separately bound runtime
+  hashes. Python uses isolated/no-site startup with exact reviewed stdlib paths and ongoing
+  origin/hash checks, rejecting unbound imports even after sys.path injection and refusing
+  sourceless bytecode. Runtime v1 records additionally require explicit Node/Python search
+  locations and a bound esbuild native helper; no environment-only or probe-only closure claim.
+  Fixed commands, genuine validators, credential routing, isolation/checkpoints unchanged.
+  Focused ISSUE-316 runner/reference tests: **149 passed / 0 failed**, including **18 real
+  local interpreter cases** (Node 22.21.0, tsx 4.23.12, Python 3.12.10); harmless C: fixtures
+  only, no real rehearsal/DB. Evidence: C: temp `issue316-resolution-focused.json`.
+  Affected nonincremental typecheck passed (exit 0; C: temp `issue316-resolution-typecheck.txt`).
+  Details, mechanism/hash binding and trust limits are in the runbook's current repair entry. Windows results
+  do not establish Linux/native-loader/DB proof. Next: bounded re-review of this exact local
+  helper/verifier/schema/runner/test delta before any predecessor transition or commit.
+  Existing uncommitted/unrelated changes and .codex/ preserved; predecessor contract untouched,
+  missing-block refusal retained. No candidate config/package/runtime/spec prepared. Real pins
+  and DOB/Coleman evidence unsupported; ISSUE-316 OPEN; full rehearsal BLOCKED; 1,640
+  rehearsal-only; Brownlow 2026 pending; ET unresolved; authority/eligibility/ownership unchanged;
+  production NO-GO.
+
+- **Bounded review STOP (2026-10-22; historical finding; local repair awaiting re-review):** HEAD matches basis
+  `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`. Material gate defect:
+  `tools/v2/rehearsal-package.mjs:177–191` hashes declared runtime roots but does not prove
+  actual Node/Python library resolution stays within them; launch lines 234–245 use an
+  absolute loader/sanitised environment without closing ancestor `node_modules` or Python
+  library resolution. Bare `postgres` is imported at `tools/v2/isolated-pg.ts:39` before its
+  probe and `tools/db/migrate.ts:22`; `tools/migration/common.py:29` imports `psycopg`.
+  An unlisted resolved dependency can therefore execute despite package verification.
+  Synthetic placeholder loader/dependency bytes and mocked spawn do not exercise that path.
+  See runbook's current review STOP for evidence/limits. No fix/configuration/test edits;
+  predecessor block withheld and missing-block refusal preserved. Prior 104/283 tests and
+  typecheck are reused historical synthetic results, not runtime/census/rehearsal proof;
+  no rerun for this source-proven STOP. Next: bounded dependency-resolution repair/refusal
+  tests and re-review before predecessor-only transition/commit; separate later rollback-only
+  ownership-census and football/pending-Brownlow integration proof. Real package/runtime/target
+  pins and DOB/Coleman evidence unsupported; ISSUE-316 OPEN; 1,640 rehearsal-only; Brownlow
+  2026 pending, ET unresolved; authority/eligibility/ownership unchanged; production NO-GO.
+
+- **Bounded implementation (2026-10-22; current; supersedes design-only/STOP checkpoints below):**
+  Owner approved the original ladder/season-scope proposal and inventory addendum §§C/E/F at
+  `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`. One agent implemented the closed two-pair
+  resolver, completed-range/census consistency refusal, football-only status/decided-GF checks,
+  `tools/v2/rehearsal-package.mjs`/`.d.mts`, fixed external launcher and runner checkpoints before
+  preflight children/every stage/capture/reset/final/terminal success. Reviewed external spec
+  digest anchors trust; exact raw-byte membership, selected manifest/artifact membership and
+  actual runtime/dependency content are rechecked. Genuine validators/live isolation/census
+  remain independent. Fixed options and altered/shortened plans refuse; capture/markers are
+  retained after drift. Active contract/register/reference/input bytes and isolated-pg.ts/Python
+  unchanged; configuration changes exist only in synthetic fixtures.
+  **Active full runner is not runnable: missing explicit ladder expectation refuses without fallback.**
+  Predecessor block installation remains a separately reviewed configuration transition.
+  Candidate package/spec/launcher/runtime/content/target/path pins remain absent; none fabricated.
+  Focused database-free cases **104 passed**; expanded affected runner/reference/promotion-census
+  set **283 passed / 0 failed**, including predecessor ladder/D7 and D-233-3. C: JSON evidence:
+  `C:/Users/stuar/AppData/Local/Temp/afldb-issue316-ladder-season-scope-tests.json` and
+  `afldb-issue316-affected-tests.json` in the same directory. Nonincremental `tsc --noEmit
+  --incremental false` exit 0 (`afldb-issue316-typecheck.txt`, same C: directory); HEAD equals
+  the stated basis; `git diff --check` clean.
+  No integration/census/stage/package execution. Later rollback-only candidate-2026 ownership
+  and football-complete/pending-Brownlow parity require separate supported Linux/test-DB authority.
+  Next bounded proposal: local diff/verifier-schema/trust-boundary review, then separately scope
+  predecessor transition and integration proof; no package preparation or rehearsal authority.
+  CHANGELOG updated; no commit. ISSUE-316 OPEN; full rehearsal BLOCKED; DOB/Coleman unsupported;
+  1,640 rehearsal-only; all three 2026 Brownlow keys pending, ET unresolved and all
+  authority/eligibility/ownership restrictions unchanged; production NO-GO.
+
+- **Inventory-enforcement design addendum (2026-10-22; historical; superseded by the 2026-10-22 closure):** Added to the [existing ladder/season-scope proposal](docs/v2/issue316-c2-ladder-season-scope-proposal-2026-10-22.md#inventory-enforcement-design-addendum--2026-10-22), resolving the interface-design question from the implementation STOP below. Specifies deterministic complete SHA256SUMS membership, hash-covered rehearsal/pair/target binding, an owner-reviewed external launch spec supplying the expected inventory digest, separately bound runtime/dependencies, external verification before package code and runner rechecks before preflight/every stage/capture/reset/final checks. Defines fail-closed paths/overlap/drift refusals and synthetic initial-substitution/later-drift tests; genuine manifest validators/census remain mandatory. Caller-supplied pins are reviewed execution preconditions, not production approval. Next: owner review then bounded code/interface and synthetic-fixture implementation only; no active contract/reference/register/input edit or package construction. Exact future package/runtime/target pins, DOB/Coleman evidence and real rehearsal remain blocked. No implementation, shell/Git, tests, hashing of retained inputs, host/database/network/WSL or execution; unrelated changes and .codex/ preserved. ISSUE-316 OPEN; 1,640 rehearsal-only; 2026 Brownlow pending, ET unresolved and authority/eligibility/ownership restrictions unchanged; production NO-GO.
+
+- **Bounded implementation STOP (2026-10-22):** Owner approved `docs/v2/issue316-c2-ladder-season-scope-proposal-2026-10-22.md` on basis `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`; read-only Git inspection confirms that HEAD. No implementation started: `tools/db/rebuild-test.ts:207` uses `process.cwd()` as its source root; the selected core and contract are read from that root, while `ResolvedTarget.isolated`, `resolveIsolatedTarget()` and `assertIsolatedTargetLive()` bind/check the database only. Bounded source inspection of the runner, isolated cluster tool and existing runner suite found no complete reviewed inventory/source-copy binding interface. The configuration review's remaining prerequisites 5–6 explicitly defer implementation/configuration/input fingerprint enforcement and source-package/target binding to a future external harness. The existing exact-basis package predates this implementation, recovered inputs are unmerged, and candidate completed-season metadata/expectations are authorised only in synthetic fixtures in this task. A startup hash snapshot could detect subsequent drift but cannot establish that the initial inventory is the independently reviewed package; labels/configuration equality cannot replace byte proofs. Defining a new authoritative inventory format, trusted digest/source-copy identity and external harness handoff would broaden the approved design. Stopped under the owner's explicit inventory/isolation gap condition. No source/contract/reference/register edits, tests, host/database/network access or execution; existing unrelated edits and `.codex/` preserved. Next bounded proposal: offline inventory/enforcement-interface design identifying complete included inputs/executables/configuration, trusted digest authority, source-copy and isolated-target identity, and revalidation before destructive work/final checks, with synthetic refusal tests specified before implementation resumes. No CHANGELOG entry for inspection-only tracking. ISSUE-316 remains OPEN; full rehearsal BLOCKED; 1,640 rehearsal-only, production NO-GO. DOB outcomes and Coleman winners/ties unsupported; all three 2026 Brownlow keys pending, ET unresolved, source-authority/eligibility/ownership restrictions unchanged.
+
+- **Status:** Open (2026-10-18). **Severity:** Medium. **Area:** data acquisition / source retirement.
+- **Origin:** owner change of direction, 2026-10-18: stop AFL Tables acceptance work; remove AFL Tables network calls and use the AFL API for game and Brownlow data. PROD's AFL Tables timer keeps running until the replacement is ready; B1 (ISSUE-265 D-PROD-3) stays in force. ISSUE-238 had already recorded this destination as unallocated.
+- **Done 2026-10-18 (no host contact):** the one-time Windows task `AFLDB-T6-N1-Watcher-20261019` was verified by launcher path and trigger, its definition exported (sha256 `351aa15e…09b1b4`) and **disabled** (never run); no Claude reminder existed; the T6 watcher and N1/N2 capture instructions are **withdrawn** with all evidence preserved (`D:\tmp\prod-release-20261018-p5-t0\t6\withdrawn-20261018\`).
+- **Evidence (runbook §2–§4):** only `acquire_core.R` (fitzRoy), `acquire_club_lists.R` and `acquire_coaches.py` contact afltables.com; only `acquire_core.R` is reachable automatically (nightly timer, Super Admin "start now"). No AFL API path falls back to AFL Tables. Gaps in the AFL API replacement: attendance (no feed field), new-player creation and bios, coaches, Brownlow season totals keyed by AFL Tables profile paths, an incomplete venue map, whole-night completeness rollback, no automatic revalidation (D-232-3), and rollover/rebuild built on an AFL Tables full-history baseline (D-233-3). PROD depends on AFL Tables because the AFL API units were never installed or authorised there, every 2026 match is `afltables`-owned (Q1/Q7: never re-owned), and 2027 is not registered.
+- **Local implementation (branch `opus/afl-api-cutover`, base `ff100dc2`, uncommitted):** `data/reference/afltables-network.json` (shipped `active` with `last_season` 2026; `retired`, missing, malformed or unbounded = refused) gates `deploy/afldb-settle-afltables.sh` (exit 0 + `AFLDB_AFLTABLES_RETIRED` before any step), `acquire_core.R` (before fitzRoy loads), `acquire_club_lists.R` (before httr loads), `acquire_coaches.py` and `startSettleRun()` (`unavailable`, no `systemctl`). An active switch behind the in-progress register is out of bounds: every gate refuses and the unit fails (exit 1, `AFLDB_AFLTABLES_OUT_OF_BOUNDS`). `tools/db/rollover-season.ts` requires `--afltables-retirement-decision`, refuses before any gate unless the switch is `active` and bounded to the completing season, and writes it `retired` before the other rollover files. DB-free readiness report `tools/current-season/afl-api-cutover-readiness.ts --season Y --season-feed <feed>`: in-progress season, season identity, round table, a complete season feed, and feed-derived venue, team and round coverage; the verdict is REPOSITORY READY, never the cutover go (2027 today: NOT READY on all seven).
+- **Validation (Windows workstation, 2026-10-18, after review round 3 and its follow-ups):** `tests/afl-api-cutover.test.ts` 419 passed and 2 POSIX-only skipped, 421, as last executed on 2026-10-19 after follow-up 8 (the final pre-commit audit, which added 115 number-contract tests to follow-up 7's 306), with the seven-suite regression set 829 passed and 2 skipped, 831; run with `vitest run --no-cache --configLoader runner` and `TEMP`/`TMP` redirected into the worktree's `artifacts/f8-validation`, the main checkout's git status, `node_modules/.vite-temp`, `.vite` results cache and `tsconfig.tsbuildinfo` identical before and after every run (superseded history: 304+2 = 306 and 714+2 = 716 after follow-up 7, 291+2 = 293 and 701+2 = 703 after follow-up 5, and the unexecuted 295+2 prediction of follow-up 6) (real Rscript 4.6.1, Python 3.12 and Git sh against temporary trees; mocked `execFile`; the authentic 2026 season feed fixture; the C4b tool over injected effects, its watchdog startup handshake also over the real spawn/file/liveness adapter with a stand-in command, and its step lifecycle over a fake child and a real process, with every terminal path releasing its pipes and the steps started as `node --import <tsx loader>`); the seven suites are the new suite and the existing settle-trigger, fitzRoy acquisition, coaches, club-list, AFL API ingestion-safety and season-rollover suites; `tsc --noEmit` exit 0; ESLint exit 0 on the eight new and changed TypeScript files; `git diff --check` clean. Not run: full suite, integration, build, Linux, the rollover CLI end to end, and the C4b tool against any database or host.
+- **Independent review (runbook §10):** 1 HIGH (the rollover writes `[2027]`, so C2 must stop AFL Tables in the same change), 3 MED, 3 LOW; the code findings are fixed and the procedure corrected.
+- **Review round 2 (owner, 2026-10-18; runbook §10):** (1) C2's coupling is now machine-enforced by the rollover tool, the `last_season` bound and a tracked-file invariant test (D-316-1 option (b) withdrawn); (2) C3 is inert unit installation only, and the ISSUE-232 D1 rehearsal moves to new step C4b (after 2027 registration, before C5) with an on/rehearse/off sequence, HALT criteria and unconditional restoration (new D-316-13); no AFL API timer before C5; (3) readiness now proves feed-derived venue, team and round coverage and reads REPOSITORY READY, not cutover ready.
+- **Review round 3 (owner, 2026-10-18; runbook §10):** (1) the rollover now accepts exactly the decision registered for the season being completed (`D-316-1` for 2026) and refuses any other well-formed id; (2) C4b runs as one command, `tools/current-season/afl-api-c4b-rehearsal.ts`, which restores `acquisition.afl_api_current_season_enabled` to off on success, failure, interruption, deadline or early exit, with a detached watchdog for a killed process (the tool writes nothing and refuses with exit 2 unless the watchdog first proves itself ready with a run-bound, PID-bound marker; a PID alone is not proof) and `--restore-only` for recovery; it keeps the BEFORE/AFTER records, applies the HALT criteria, never touches a timer, and its exit 0 is evidence for the C4b record, not the PASS (D-316-13 updated; not executed at the time, superseded for the tests; the tool itself has never run on Linux, PostgreSQL or PROD); (3) the readiness venues SQL is all or nothing: a malformed or unmapped venue anywhere in the feed gives NOT READY and no SQL.
+- **Round 3 audit follow-ups (2026-10-18; runbook §10, follow-up 4):** the watchdog's `watchdog-result.json` write no longer ends its restore retry loop (evidence is never a precondition); an acquire or settle step ends only on its own exit, never on a `ChildProcess` `error` event, and a step that cannot be confirmed stopped after SIGTERM and SIGKILL is a named HALT (`unconfirmed`) with the setting restored as usual; the AFTER systemd check and readiness evaluation are guarded (HALT reasons after the restore, a refusal before any write); `main()` returns exit 2 (3 for `--restore-only`) for setup failures and 3 for an error escaping the run, instead of an unhandled rejection. Not executed at the time; superseded for the tests (executed 2026-10-19). The C4b tool itself has never run on Linux, PostgreSQL or PROD.
+- **Final pre-commit audit (2026-10-19; runbook §10, follow-up 8):** seven findings fixed. Current validation totals reconciled (above); the `.vite-temp` evidence date corrected to the saved snapshot's 2026-10-18 19:41:39 AEDT; historical "not executed" wording marked superseded for the tests, with the still-true statement kept that the C4b tool itself has never run on Linux, PostgreSQL or PROD; C4b's preconditions split into what the tool enforces before the first setting write (C2 repository state, C3 inert units, setting off) and what the owner confirms (C4 deployed, the season registered, readiness on the retained feed, no 2027 match started), with D-316-13 unavailable before C4; `last_season` and the register read as finite integer-valued JSON numbers in every gate (`2026.0` accepted by the Python gates as it already was by R and TypeScript; the R gates also reject non-finite values); ISSUE-232 §7 E1 superseded for PROD (the Brownlow timer stays disabled until C8; C3 checks `is-enabled` and `is-active`); and copy-ready, placeholder-free owner wording for D-316-1, D-316-2 and D-316-13 in runbook §8. The C4b tool changed by one diagnostic string (sha256 `65550c3f…8485`); no behaviour changed.
+- **Open-issue reassessment (runbook §9):** no open issue is tied solely to AFL Tables; ISSUE-274 and ISSUE-275 keep their code fixes and DEV evidence, and only their proposed "counted AFL Tables nights" PROD route is withdrawn. No criterion was waived and nothing was closed.
+- **V2 local reconciliation (2026-10-21):** source/snapshot 19/19 SHA-256 match; all 19 already imported in `c9cca86d`; intentional V2 quarantine/refusal preserved. Focused local checks 669 passed / 2 POSIX-only skipped, four direct and four packaged shell refusal cases passed; typecheck/lint passed. No DEV/PROD operation; full C0/C1 and C2 pending. See `docs/v2/issue316-c0-c1-approval-2026-10-21.md` for every file disposition, pinned historical artifact and limits.
+- **DEV C1 shell subset (2026-10-21):** owner approved D-V2-316-C0C1-1 and D-DEV-316-C1-REFUSALS-1. Archive SHA-256 `99ec19b1…83b00` verified locally and on DEV (`streamanator`, `arm`); extracted to the new mode-700 `/home/arm/issue316-c1-review-20261021`; run at 2026-10-21T08:35:31+11:00: historical and V2 retired = `AFLDB_AFLTABLES_RETIRED` exit 0, active/2026 with in-progress 2027 = `AFLDB_AFLTABLES_OUT_OF_BOUNDS` exit 1, runner exit 0. No acquisition control, deployed-app or audit behaviour verified; no DB/service/timer/production change. Evidence retained on DEV.
+- **DEV application attempt (2026-10-21):** owner approved D-DEV-316-C1-APP-1 exactly. Repository HEAD `e7be8403`, branch `v2/rebuild`, remotes empty, `.codex/` preserved. DEV `arm@10.0.40.100`, `streamanator`, x86_64, Node 22.23.2, 80,671,028 KiB available, root absent/port 3201 free; passwordless sudo unavailable. Steps 0–2 created root/incoming and transferred the exact 113,830,430-byte archive (local/remote SHA-256 `c829da08…e40b0e`). STOP at step 3: archive contains `kit/node_modules/tsx/node_modules/.bin/esbuild -> ../esbuild/bin/esbuild`, contradicting the reviewed no-symlinks description. No extraction/package execution/DB connection/dump/restore/migration/privilege/app/audit checks. Final port 3201 free, no config/run/extracted directory; WSL stopped; root/archive and C: evidence retained. DEV C1 NOT PASSED. Full measured record and verbatim owner approval: `docs/v2/issue316-c0-c1-approval-2026-10-21.md`.
+- **Amended continuation (2026-10-21):** owner explicitly approved sole documented esbuild link and retained-root reuse. HEAD `636b74ea` verified; no unrelated changes. DEV identity/retained state/database absence and exact archive hash PASS; amended path/link checks PASS; extracted with no overwrite; all 13,209 file hashes and reviewed scripts PASS. Preflight/source guard/config/read-only dump completed. Backup `recovery/afldb_dev-20261021T004611Z.dump`, 39,023,717 bytes, SHA-256 `e271172f…8c32`, 1,549 TOC entries, before/after counts identical. Source ledger 110 and 110/110 checksums match; zero synthetic users/refusal/synthetic actor audit rows. At 00:47:12Z no candidate DB, no pid, port 3201 free; WSL stopped; evidence on C: and DEV retained. PAUSED original step 7 for owner CREATE DATABASE, sole current blocker; no restore/migrations/app/audit/negative controls yet. Full record: `docs/v2/issue316-c0-c1-approval-2026-10-21.md`.
+- **DEV candidate C1 application acceptance PASS (2026-10-21):** owner confirmed creation (“done—resume from step 8”); candidate identity/owner/UTF8/en_US.UTF-8/empty/no other sessions verified. Restore exit 0 with source-equal counts; migrations 111–117 applied, ledger 117; privileges and runner checksum readback PASS (“Nothing to apply”). Candidate health 200, pinned build. One checker invocation PASS: Super Admin exact legacy_retired refusal, exactly one audit row id 1100 at 01:05:09.607Z, actor 20 / synthetic Super Admin, exact detail, 127.0.0.1/32. N1 anonymous and N2 admin no refusal, audit deltas 0. Two users disabled/two sessions revoked, independently read back. Original afldb_dev guard counts identical, ledger/checksums 110/110, zero synthetic/refusal writes. Candidate PID 381367 stopped; no pid/listener on 3201 at 01:06:32Z. Database/root/backup and DEV/C: evidence retained, 13/13 copied evidence hashes match. Candidate default ACLs remain empty (reviewed revocations), correcting predicted difference. No V1 replacement, production, acquisition, API, C2 or timer action. Full record `docs/v2/issue316-c0-c1-approval-2026-10-21.md`.
+- **C2 preparation (2026-10-21; no execution):** baseline v2/rebuild d67c08f6 verified, remotes empty and pre-existing .codex/ preserved. Complete historical c9cca86db2fd60ec42fa777906a2cf2a291d5e4e source archive retained on C: (118046720 bytes; SHA-256 196035d949244f392943224133e71ddf96d62af0846e15811cd63b8221b01f69). Source candidate only: runtime/dependency/endpoint closure, current runner/target and successor evidence missing. Retained authentic 2026 feed has 217 CONCLUDED plus SCHEDULED Grand Final CD_M20260142901; season completion is not demonstrated by existing evidence. Six approval stages and inspection-only wording in `docs/v2/issue316-c2-preparation-2026-10-21.md`. WSL kept stopped; no host/database/acquisition/rollover/cleanup or repeated DEV work.
+- **C2 bounded offline review (2026-10-21):** reused completed inspection at `C:\tmp\afldb-c2-inspection-resume-20261021T134846389\findings.md`; no repeat connection. Identity/ledger 110/inspected ACLs match; 218 stored scored matches, GF Fremantle 89–96 Brisbane, latest retained acquisition explicitly in_season_partial. Historical c9cca86d source archive hash/size/membership and safe member types PASS: 158 exact blobs plus 1731 CRLF-only conversions, zero unexplained differences. R 4.3.3 satisfies fitzRoy's R >=4.1 and all retained constraints across selected fitzRoy/jsonlite/digest 56-package closure; Node 22.23.2 meets later tsx/esbuild requirements. Earlier R 4.6.1/Node 22.21.0 are reference evidence, not required upgrades. Actual fitzRoy 1.8.0 implementation/source hash is absent from bounded local evidence; only AFL Tables path-family and cached afldata provenance can be corroborated, not exhaustive HTTP paths/retries/redirects. Source/native hashes, runner/configuration and accepted final full-history/witness remain missing. C: `offline-review-v2.json` records exact metadata/hash evidence. Documentation only; no acquisition, database, validator, WSL, host or service invocation. Polkit limitation remains solely for later writer retirement.
+- **Approved CRAN source review (2026-10-21):** baseline 5af44c45 verified, one agent, remotes empty/.codex preserved. One GET of exact approved `https://cran.r-project.org/src/contrib/fitzRoy_1.8.0.tar.gz`, HTTP 200/no redirects at 03:30:13–16 UTC; 1222934 bytes, SHA-256 `33ed08177a8301f57644654656221f6e4bd5873018eb11c317d5f2f188d0b54c`; DESCRIPTION fitzRoy 1.8.0. All 194 members safe (182 regular files), extracted only to restricted C: root; no package code execution. Traced historical c9cca86d wrapper's actual arguments: 130 full GitHub parquet downloads, possible tail season/match pages and GitHub mapping CSV, 21 club pages and 131 bg3.txt reads. No package retry/throttle/timeout configuration; URL transport/redirects delegated to R/xml2/readr. Cache-only fallback can conceal failed tail indexes. No fixed wire-request/byte budget or installed-code/source equivalence proven. Provenance/file hashes in `docs/v2/issue316-c2-cran-source-2026-10-21.json`, line references and remaining source requirements in package v3. No AFL requests, dependency downloads, host/database/validator/service/WSL invocation. SHA-256 identifies retrieved bytes, not independent publisher authentication.
+- **C2 consolidated readiness decision (2026-10-21, package v4; baseline 7157be43, no execution):** ready to request one approval, not executable-ready. Runner: DEV `streamanator`, probe-first (R/fitzRoy/reachability there were never inspected; negative probe stops, installation excluded). Recommendation: unchanged acquisition (130 parquet + 131 bg3 reads) with sizes measured by a pre-run HEAD and stop above an owner ceiling; optimisation only as a separately tested fallback. Transport policy bounded by a stdlib run guard (host allowlist, connection/byte caps, AFL Tables pacing, root-size watch) proven per R transport by a no-traffic canary, replacing the three further source reviews. Coverage gap G1: no gate asserts completed-season stats cover every results match and gate 2 is circular; offline checks E1/E2/E4 run between the two acquisition steps, E3 (16838 + 218 = 17056 matches equal to matches with player rows) is a Stage 2/3 criterion; a tested validator gate is separate follow-up. Owner inputs K1–K4 outstanding.
+- **C2 bounded successor-input approvals/local WF implementation (2026-10-21):** owner approved the exact fingerprints/scopes in the offline-analysis REPORT (SHA-256 `7da06978…10285`): two unchanged Jim Stewart drops, three unchanged club normalisations (future register must list ladder-only Kangaroos), display fallback for four profiles, continuity through 2026 at 52/31/42/25 rows, and documented historical comparison finding. Billy Wilson separate; 2026 Brownlow pending/AFL API authority unchanged. Acquisition rechecked 391/391. Current V2 validator replaces the whole-season WF exclusion with exact source/canonical fixture agreement, all-club raw H&A+WF reconstruction, subtraction of only evidenced integer contributions and full-table percentage/rank recomputation, then strict policy comparison. Existing ladder suite extended with local fixtures and fake DB adapter; validation and exact bindings in C2 package v5. No active reference edit, accepted successor entry, 1,640 expectation, host/network/database/WSL operation or import/rollover/deployment authority.
+- **Bounded DEV rehearsal (2026-10-21, commit 4b5e2490):** owner authorised fresh isolated DEV test only. Read-only preflight PASS (streamanator/arm, PG 16.15, existing psycopg 3.3.4, ~75 GiB free, unused loopback 55436). Independent canonical match projection under actual rebuild rules yields 1,640 club-season rows: 17,056 matches, 16,327 H&A matches, distinct season/identity pairs 1,622 through 2025 + 18 in 2026, without witness input. BLOCKED before candidate bindings or cluster: rebuild_derived.py season_metadata makes decided-GF 2026 complete; player_season_stats then sets Brownlow complete if season votes exist, otherwise not_applicable, never pending for a completed season. Default core round-vote materialisation also admits pending coverage. No policy repair/coverage relaxation authorised here. All three candidate gates/import/full derived/actual D7 NOT RUN; no DB connections, DEV writes or new processes. Sanitised report/commands/hashes on `C:\tmp\afldb-c2-dev-rehearsal-20261021\`; original raw evidence unchanged, WSL not invoked.
+- **Pending-Brownlow fix/resumption (2026-10-21):** owner authorised bounded code/tests/one commit and resumed disposable DEV rehearsal, accepting independently derived 1,640 for rehearsal only. Existing coverage/publication decisions gate readiness, full/targeted season/career totals and affected public/medal/ranking projections; pending source presence cannot establish completion. Core canonical match/round imports exclude pending vote values; raw CSV/manifests unchanged. No schema, eligibility/ownership policy, active reference or manufactured authority-metadata change. Four focused suites 310 passed / 1 existing skip, two affected mutation contracts passed; typecheck/lint exit 0. Unrelated stale writer-list test failure retained unchanged in C: evidence. Prior blocked attempt remains history.
+- **Exact-commit disposable DEV PASS (2026-10-21):** implementation `4a2eea89cccc465f2f017fb06ad55a7d4cb7733d`; genuine candidate gates 3/3, 117 migrations, privileges/reference/core/historical Brownlow/full derived all passed once. Real D7: exact two WF fixtures, all 18 raw reconstructed rows and all 1,640 H&A-policy rows match (1,622 ordinary historical rows; Carlton/Collingwood 9/10 -> 10/9). Actual 17,056 matches/695,499 player-match rows. Completed football 2026 retains 669 Brownlow player-seasons pending/NULL, zero canonical 2026 match/round/season votes or publication; committed public predicate exposes zero 2026 rows. Historical projection 98 seasons/79,113 votes/112 winners and 668 complete 2025 player-seasons preserved. 792 source/input hashes unchanged; root peak ~0.96 GiB/free floor ~74 GiB. Own dedicated loopback cluster stopped, PID absent/port free; files/private credentials retained. Sanitised commands/logs/hashes/results on `C:\tmp\afldb-c2-brownlow-fix-20261021\`. No existing DB access, WSL, installation, app/writer, acquisition rerun, cleanup, production adoption/rollover/push/deployment.
+- **Next action (local decision package, 2026-10-21; historical, superseded by the 2026-10-22 decision table):** `docs/v2/issue316-c2-successor-decision-2026-10-21.md` separates completed exact-commit rehearsal evidence from production acceptance and specifies the remaining field/coverage decisions, successor contract/witness/register bindings, fresh scoped D-233-3 census and actual rollover date/status/D-316-1 authority. [Field/coverage worksheet](docs/v2/issue316-c2-field-review-2026-10-21.md) now preserves measured population and a STOP: 47 exact raw match-key nonmatches / 2,162 player rows, not a demonstrated canonical defect. [Linkage review](docs/v2/issue316-c2-linkage-review-2026-10-21.md) (2026-10-21) explains all 47 keys / 2,162 rows as `GWS`/`Footscray` vs `Greater Western Sydney`/`Western Bulldogs` label representation resolved by existing `clubs.json` aliases/era rule. Its §10 stopped on a repository-contract difference and unrecorded per-file policy bindings; §11 (later session) withdrew that stop: consumed rehearsal `clubs.json`/`import_fitzroy_core.py` are byte-identical to commit `4a2eea89…` blobs and the retained bundle inventory, and the repository and hash-bound rehearsal-only contracts are separate artifacts with equal source-club/row-correction rules (provenance PASS). Parsed linkage PASS: each key maps to one unique canonical fixture, 0 round/score/venue/orientation/`Team` failures over 10,028 rows; correction: 9, not 1, empty-`Player` cells in the 2,162 rows (all renumbered-profile rows). The [quarter review](docs/v2/issue316-c2-quarter-review-2026-10-21.md) subsequently verified six input hashes and all 218 groups / 10,028 rows: repeated quarter values, arithmetic, cumulative progression and Q4/finals reconcile, including both WF and nine ordinary finals; all 60,168 ET cells remain unquoted-empty, applicability unresolved. No unexplained discrepancy or owner acceptance. Next: owner may review explicit worksheet §4 results/linkage and quarter-field decisions. The [height applicability review](docs/v2/issue316-c2-height-applicability-2026-10-21.md) verifies all 9,614 predecessor supplement rows already occur in the candidate with identical height-join/coach fields: redundant coverage, incompatible additive height input. The unchanged runner refuses empty supplement pins and also passes them to coaches. The [height source reconciliation](docs/v2/issue316-c2-height-source-reconciliation-2026-10-21.md) now measures 16,713 mapped / 9 unmatched / 9 name_mismatch / 0 ambiguous rows, 15,888 valid HT / 843 empty / 0 invalid, no conflicting raw-URL heights and 9 jumper disagreements. STOP on four unexplained Collingwood goal discrepancies. Next bounded proposal: documentation-only exception/evidence decision review; no runner or source/policy change. Canonical/evidence outcomes and successor stage applicability remain pending. Owner field/21-key choices remain pending; no further measurement or external verification under this session, and no repeated completed analysis/acquisition/rehearsal. Rehearsal-only contract/register hashes and 1,640 do not establish production acceptance; unset date and predecessor descriptions cannot be adopted. Brownlow 2026 authenticity/completeness remains pending, AFL API authority/eligibility/ownership restrictions unchanged. Freeze/recovery and release/deployment remain separate. ISSUE-316 OPEN; production NO-GO.
+- **Height goal verification (2026-10-21; retained evidence):** [Targeted public-page review](docs/v2/issue316-c2-height-goal-verification-2026-10-21.md) confirms returned register values 22/blank/34/181 and same-publisher profile/season values 18/4/35/180 at Collingwood scope, with explicit cache limits and Victor profile access failure. All four causes/historical totals remain unresolved; no correction or approved exception. The earlier predecessor hash check remains incomplete. Historical goal adjudication remains separate; preserve refusals and blank versus zero. (Historical: the implementation proposal named here was later approved, implemented and superseded.) All successor/applicability decisions pending; production NO-GO.
+- **Supplement-free proposal (2026-10-21; historical proposal checkpoint):** Owner permits further candidate assessment with all unmatched/name_mismatch rows still rejected, including the four unresolved Collingwood goal cases; jumper disagreements remain informational. Review the [supplement-free implementation proposal](docs/v2/issue316-c2-supplement-free-proposal-2026-10-21.md) for the bounded runner/test scope. No implementation or stage authority; successor/canonical evidence and all applicability decisions remain pending; production NO-GO.
+- **Supplement-free implementation (2026-10-21; historical; superseded by the 2026-10-22 closure):** Owner approved proposal §§3–5 and database-free affected checks, one agent, basis `4a2eea89cccc465f2f017fb06ad55a7d4cb7733d`. Local runner/tests now support explicit `stats_input_mode` (`supplemented_baseline` / `baseline_only`); baseline-only requires explicit `supplements: []` plus a matching selected `baseline_snapshot_label`. Heights/coaches intentionally share these stats inputs. Legacy supplemented argv/order, manifest proofs, measured expectations and all strict final gates remain. Synthetic configuration only; no successor contract installed. Focused runner 38/38; height/coach suites 27/27; nonincremental `tsc --noEmit --incremental false` exit 0. Full runner 700 passed / 4 existing CLI tests failed at tsx startup (`uv_os_get_passwd ENOMEM`), before CLI execution. Changed-file lint: 8 errors / 13 warnings, exactly reproduced on basis blobs (no new findings); `git diff --check` clean. Bounded review 2026-10-22 found no material correctness/gate issue; scoped local commit authorised. Next: separately approve construction of a provenance-bound canonical export from an isolated clone of retained stopped rehearsal state (runbook §12); no execution/binding approval. All unmatched/name_mismatch rows, including four unresolved Collingwood goal discrepancies, stay rejected; jumpers informational; ET unresolved; all three 2026 Brownlow keys pending; production NO-GO.
+- **Sequential measurement prerequisites (2026-10-22; historical checkpoint, superseded below):** Offline [prerequisite review](docs/v2/issue316-c2-sequential-measurement-prerequisites-2026-10-22.md) (basis `b8ea2855`; static reading, no hashing/execution). Roster and coach manifest pins equal the retained bindings; coach `contract_coaches_version`/family satisfied; coach raw files are required by no applicable gate (loader verifies raw only if `raw/` exists). Runner path stays **BLOCKED**: contract lacks `baseline_only` and its integers, c2 is not the accepted baseline, and roster/coach measured pins (1,824; 32,034/15,817) differ from planning counts (1,916; 32,470/16,035). Wikipedia CSV has no tracked hash pin (tracked in git only); successor coverage of all three inputs unproven. Next: owner decisions D1–D5, then (separately authorised) one direct-loader exploratory clone-only sequential run; no runner, contract edit or acceptance. Rejected height matches, jumpers informational, ET unresolved, 2026 Brownlow pending, 1,640 rehearsal-only; production NO-GO.
+- **Sequential measurement offline review (2026-10-22; historical; superseded by the 2026-10-22 closure):** [Reviewed persisted evidence](docs/v2/issue316-c2-sequential-measurement-review-2026-10-22.md) at implementation `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`; canonical state built under `4a2eea89`. Native in-process SHA-256 checks PASS: sequential 236/236, planning 307/307, canonical export 38/38, bound input tree 162/162. Actual final CSV recount reproduces all five height / eight coach values; NULL-only fills and batch/source links verified. Seven coach planning counters and planned height/API sets reproduce; all thirteen were not measured in planning. Zero open height_conflict records does not mean agreement (737 API / 24 Wikipedia differences). Ten coach discrepancies remain observations: finals arithmetic is not proven page omission; Carter exclusivity withdrawn, Adamson attribution unresolved. Delete counter +89 remains unattributed. Fingerprints cover 106 ordinary tables plus one player-height entry; snapshot equality is not a write audit. Retained shutdown supported; 85 authorised connections corrects 84. Next: owner input/raw/rejection/attribution choices and an offline rehearsal-only baseline_only configuration proposal (§§7–8), then separately authorised fresh exact-commit runner rehearsal. No bindings installed or production choices approved; ET unresolved, all three 2026 Brownlow keys pending, authority/eligibility/ownership restrictions unchanged; 1,640 rehearsal-only; production NO-GO.
+- **Ladder/season-scope offline design (2026-10-22; historical; superseded by the 2026-10-22 closure):** [Bounded proposal](docs/v2/issue316-c2-ladder-season-scope-proposal-2026-10-22.md) completed against the recorded b8ea28550a291b766bf7ad9f3b63621e9f9efa81 source copy. Proposes one explicit expectation block bound to two supported core/witness fingerprint pairs: predecessor 1622, exact isolated candidate 1640 only; existing season fields suffice in a new isolated package, with completed-range/census consistency refusals and mandatory genuine 2026 census. No active reference/package/input/code changes or execution. Recovery and measurements reused, not repeated. Owner implementation/test-package approval and focused negative/positive proof remain required; successor DOB outcomes and Coleman winners/ties remain separate missing evidence. Full rehearsal BLOCKED; all three 2026 Brownlow keys pending, ET unresolved, authority/eligibility/ownership restrictions unchanged; ISSUE-316 OPEN; production NO-GO. This supersedes the prior request to authorize this design review only, not its execution blockers.
+- **Rehearsal-only configuration preparation (2026-10-22; historical; superseded by the 2026-10-22 closure):** [Concrete proposal and all 30 stage/gate states](docs/v2/issue316-c2-rehearsal-configuration-review-2026-10-22.md) at exact implementation `b8ea28550a291b766bf7ad9f3b63621e9f9efa81`. New isolated `C:/tmp/afldb-c2-REHEARSAL-ONLY-config-b8ea2855-20261022/source/`: 2,290 exact Git blobs verified; four test configuration overrides, 2,286 other blobs unchanged; frozen inputs/manifests unchanged. Explicit shared `baseline_only`, matching candidate label, `supplements: []`, thirteen reviewed expectation mechanisms and all three correction scopes (including separate ladder-only Kangaroos) prepared. Test-only accepted selector conveys no canonical acceptance. Full runner BLOCKED: fixed 1,622 ladder gate versus rehearsal 1,640; 2026 season/census scope mismatch; missing 42 birth-date files, 42 DraftGuru pages and first-kick extract; successor DOB/Coleman and other dependent outcomes unverified. No guessed values, bypasses, runner/loader/network/host/database/census/WSL or Git mutation. Next: review exact four-file diff/hashes and resolve blockers offline; no executable full-runner scope at this pin and no rehearsal started. Historical roster/Wikipedia/parsed coaches remain “successor applicability unproven”; raw/coverage/disagreements/coach attribution and production decisions remain open. All refusals, informational jumpers, unresolved ET, pending/suppressed 2026 Brownlow, authority/eligibility/ownership restrictions preserved; 1,640 rehearsal-only; production NO-GO.
+- **Supplemental input recovery (2026-10-22; historical; superseded by the 2026-10-22 closure):** Bounded one-agent native in-process assessment recovered **85/85 PASS, 0 FAIL, 0 MISSING** from exact manifest-relative files already retained in `D:/dev/afldbV2`: 21 DOB CSVs + 21 raw HTML (raw SHA-256; preserve CSV CRLF), 42 `annual-html-20260826` pages (raw SHA-256 and sizes), exact accepted first-kick extract (byte-level CRLF→LF hash; 334 rows/334 active IDs, exact clean-name join). No archive/DEV retrieval needed. New separate `C:/Users/stuar/AppData/Local/Temp/afldb-c2-REHEARSAL-ONLY-supplemental-recovery-20261022/` contains `RECOVERY_INVENTORY.json` (SHA-256 `b55f57892d479abafe2655735f95ef343138a29153f31b6c6cd1ad505023744f`), `REPORT.md`, unchanged binding copies and `SHA256SUMS.txt` (SHA-256 `d265e9e9b0976e5121077992be35dd0d3002f7ce044c99ff67c2d785797d3f5b`; 92 file entries); 17,185,694 input bytes copied/readback-verified. C:/tmp mkdir was denied EPERM; writable C: temporary area used. Existing configuration package unchanged and inputs **not merged**; its missing-input statements remain historical package-local facts. Retained records do **not** establish successor DOB expectations (13255/0/13255/0/2 remain predecessor pins) or candidate Coleman outcomes/ties (47 remains unmeasured assumption); no new target-dependent values calculated. Fixed 1622 versus rehearsal-only 1640 ladder gate and 2026 season/census conflict remain separate blockers. **Next proposal:** separately authorise offline design review of a fail-closed ladder expectation bound to an explicit accepted witness/core pair, preserving all other ladder gates and requiring focused 1622/1640 regression proof before any implementation/new commit; no execution or season/census waiver. No shell/Git/network/host/DB/WSL/install/acquisition/census/runner/stage/rehearsal/cleanup; source/contracts/active references and .codex/ untouched. All pending/suppressed 2026 Brownlow, source authority, eligibility, ownership, rejection and ET restrictions preserved; ISSUE-316 OPEN; production NO-GO.
+- **Exact-implementation rehearsal at `a5ec6b0c` (2026-10-23; previous; superseded by the readiness-E entry at the top): PASS, rehearsal-only.** One agent, no subagents; SSH, package transfer and test-only writes on `streamanator` only. Implementation basis `a5ec6b0cbd0977eea77cd655d28b54b108fdb0bc` (parent `73116273e818c031deaf84f46a514daaf634c14e`, parent `52b971730dc5e4408f9556c599aab7f41c333bd4`; the delta from `73116273` is documentation only, so the packaged code is `73116273`'s); `tsc` 0, three focused suites 1,320 passed / 2 skipped. New labelled package (1,142 files; inventory `83dc9f1c580a1388440fb2019d1021a50d2d3235c8918b36d3c092f67ec0af7c`): the diff from the `dedba57f` package is exactly `rebuild-test.ts`, the launcher (`6f11febd5e20e62485987c3df62a77b42c9988103e5c7a506e438d2948ce84f2`, two more required files), the two new `ladder-successor` modules, four planner/validator files, the Python requirements and the bindings; the four newly pinned Wikipedia-derived inputs verified three ways. Clean-install runtime with its OWN record `6c4ea3ea3fc2e6a12068c739750e64f6180c7016bd27869a652567bafec1add3` (not the old `91c5cdb6…`; tsx/postgres/server-only/pg-bin 100% content-equal, site-packages differ only in `.pyc`/`RECORD`/`REQUESTED`). Coach raw (387/387 equal the manifest) bound as a hashed bundle because the package alphabet refuses the space in `Allan_La Fontaine.html`; the real coach loader verified 387 files with three refusing controls (the rebuild stage itself still ran parsed-only). Fresh cluster (system id `7699599293956459996`) and database `afldb_v2_rb_c2cand4_test` on 127.0.0.1:55751; production launcher 20:59:12Z–21:30:09Z, exit 0: preflight incl. content pins, enforcing census 1897–2026 (`schema_absent`, pass, total 0 — fresh database, mechanism only), capture-bound recheck/reset/reinstate/marker clearance, 30 stages, strict real D7 (both WF fixtures; all 1,640 comparable rows), `AFLDB-FINAL-VALIDATION PASSED: 91 checks`, post-rebuild pending-2026 Brownlow and historical projection checks PASSED; 0 error lines, no tripwire, peak root 2.30 GiB; clean shutdown verified. The successor tuple table is still `'{}'`; `c2-2026-successor` is NOT activated; nothing adopted, rolled over, pushed or deployed. Evidence `C:/tmp/afldb-c2-FINAL-IMPL-VALIDATION-20261023/` (`EXECUTION_RECORD.md`). **Next:** only the owner decisions. ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved.
+- **Successor capability, source evidence, reproducibility, package D (2026-10-23; previous):** `52b97173` adds the fingerprint-bound successor ladder tuple capability, INACTIVE (the repository tuple table is empty, mechanism A, descriptive profile `c2-2026-successor`); `73116273` byte-pins the Wikipedia-derived tracked inputs in preflight and adds hash-pinned Python requirements. Coach raw pages recovered (387/387 hashes equal the manifest; the earlier "absent everywhere" statement is withdrawn); 10 coach-season differences, 479 unmapped roster ids and the rejected identity/height matches stay open. Clean disposable-root installs reproduce the recorded runtime only when esbuild's reviewed postinstall runs; system native libraries remain observation. Package D (`C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-D-20261023T000000Z/`): the genuine successor profile is ACCEPTED by the proposed-state validators and 10/10 negative controls refuse; census target inventory only, no census. [Revision 4](docs/v2/issue316-c2-successor-decision-2026-10-21.md#revision-4--2026-10-23-previous-successor-ladder-capability-source-evidence-reproducibility-package-d). **Next:** only the owner decisions (rollover date and D-316-1; adopt or decline the tuple/profile; census targets; source coverage limitations; native-library trust policy); the fresh isolated rehearsal it required was run and passed (entry above). ISSUE-316 OPEN; production NO-GO; successor NOT ACCEPTED; 1,640 rehearsal-only; Brownlow 2026 pending on all three keys; ET unresolved.
+- **Runbook:** `issues/open/AFLDB-ISSUE-316.md`.
+
+## AFLDB-ISSUE-317 — Isolated rehearsal startup and offline Coleman assume one workstation configuration
+
+- **Status:** Resolved (2026-10-20). **Severity:** Low. **Area:** isolated V2 rehearsal tooling.
+- **Reproduction:** Fresh Ubuntu 24.04 / PostgreSQL 16.15 cluster on owner-approved port 55434
+  failed before restore because the distro socket default requires `/var/run/postgresql` access.
+  After successful restore, three offline Coleman integration cases refused the verified cluster
+  because their Python guard hard-coded 55432, which this rehearsal was explicitly forbidden to use.
+- **Root cause:** TCP-only launcher inherited a distro Unix-socket default; the historical loader
+  did not consume the isolated launcher's port contract.
+- **Fix:** `tools/v2/isolated-pg.ts` disables Unix sockets for fresh dedicated clusters.
+  `tools/migration/import_awards.py` validates the configured isolated port, requires the launcher
+  flag for a nondefault port, and retains loopback/cluster/database-marker checks. Existing
+  `tests/integration/v2-coleman-publication.test.ts` adds seven unsafe-target refusal cases.
+- **Validation:** Real Linux cluster started; archive restored once with exit 0; focused launcher /
+  preservation tests 221/221; Coleman integration 28/28 including the port guard; final TypeScript
+  and changed TypeScript lint exit 0; Python AST parse exit 0. No listener at 55432 was used/changed.
+- **Related restore procedure:** `--no-privileges` also omits migration-014 staging DEFAULT ACLs.
+  Their exact two declarations were reconciled on the mutable rollback copy (43/43 privilege
+  tests), and the rehearsal procedure now calls out this prerequisite. Captured baseline and
+  migration-only copies were retained unchanged; no application grant policy was widened.
+- **Evidence:** `docs/v2/linux-rehearsal-2026-10-20.md`; restricted evidence in the named WSL
+  distribution, `/home/rehearsal/evidence/`. Backend acceptance remains INCOMPLETE for absent
+  authentic staged Brownlow reconciliation. This resolved tooling issue grants no production GO.
+
+## AFLDB-ISSUE-318 — Settlement insertion fixtures collide with restored historical matches
+
+- **Status:** Resolved (2026-10-20). **Severity:** Low. **Area:** settlement integration harness.
+- **Reproduction:** Full settlement file on the production-archive clone: 46 passed / 27 failed.
+  The retained first-case diagnostic and a fresh restored-copy reproduction refuse synthetic
+  Hawthorn–Brisbane PF insertions as `possible_existing_match`: changing date preserves the
+  same season, oriented clubs and round as the authentic 19 September PF. Twenty-five failing
+  assertions share this prerequisite/candidate collision; none demonstrates a weakened or broken
+  application guard. Detailed assertion-level classification is in the linked report.
+- **Other two dispositions:** Provider-evidence SELECT timeout reproduced before ANALYZE and
+  eliminated by preparing restored application-table statistics, at the unchanged statement
+  limit. OD-5 marker refusal is correct for the old shadow database name; use the existing
+  `afldb_v2_rb_*_test` allowlist rather than broadening the destructive-target guard.
+- **Fix:** `tests/integration/settle-afl-api.test.ts` creates/cleans two namespaced synthetic
+  clubs/organisations and supplies only a test-local provider-team map. Dates still distinguish
+  cases; historical rows and tracked identity maps remain unchanged. No assertion removed,
+  skipped or weakened. No application runtime, schema or packaging change.
+- **Validation:** Linux full restored-data suite 73/73, no filtered/skipped cases; TypeScript and
+  changed-file ESLint exit 0. Separate authentic 2026 feed: 217 concluded matches map uniquely
+  through exact keys and observation fallback; audited observation replay 217 unchanged / zero
+  new versions; rejected/corrective/replay stimuli preserve complete canonical table hashes.
+  Brownlow checks 35 integration / 159 unit-report; real stored-only 98-season before/after
+  reports identical with 98 reconciled, zero findings. The original authentic staged Brownlow
+  comparator remains INCOMPLETE; the proposed acceptance amendment is not approved.
+- **Evidence:** `docs/v2/linux-rehearsal-followup-2026-10-20.md`; detailed reports/scripts remain
+  in the authorised WSL rehearsal's restricted `/home/rehearsal/evidence/`. Production NO-GO.
+
+## AFLDB-ISSUE-319 — Successor source-evidence requirements unresolved
+
+- **Status:** Resolved (2026-10-23); previously Open / BLOCKED (2026-10-23). **Severity:** High (an ISSUE-316 successor gate). **Area:** source
+  provenance and coverage: coaches, rosters, heights, identity. **Linked:** AFLDB-ISSUE-316 (gate G1 of package E).
+- **Origin:** owner decision on 2026-10-23: "more evidence is required before acceptance". This tracks, as one issue,
+  every unresolved source-evidence requirement of the successor. Not permitted: documenting the items as closure;
+  accepting observation instead of evidence; inferring identity from names; force-mapping; choosing disputed values;
+  changing authority or eligibility.
+- **Resolved by evidence (2026-10-23):**
+  - Coach raw→parsed provenance: 387/387 raw equal the manifest, and replaying the adapter's own parser regenerates
+    both parsed CSVs byte for byte.
+  - The eight 2026 coach-season differences: the 2026-09-05 pages were a strict subset of the core (each coach's
+    finals missing). A new labelled capture of the ten pages (2026-10-22T22:55Z, HTTP 200) shows the publisher now
+    lists exactly those finals, so page and core agree completely. The cause was the publisher updating its pages
+    late (the QF of 3 Sept and EF of 4 Sept predate the extraction). `source_games_coached` is evidence only.
+  - Wikipedia: all 84 height rows are stated exactly by the revisions they cite (new revid capture).
+  - Roster artefacts: 15/15 equal the manifest (`completeness: unvalidated`).
+- **Blocked (exact questions in the runbook §3):**
+  1. NM 1940 R8–R18 (match ids 3815, 3818, 3828, 3830, 3840, 3843, 3851, 3854, 3862, 3870, 3876). AFL Tables'
+     Adamson and Carter pages, both unchanged today, conflict with its own blank core and with Wikipedia rev
+     1372770354 (Thomas 12, Adamson 6; Carter not in 1940). Needs an adjudication authority.
+  2. 479 unmapped roster provider ids: no non-name identity evidence.
+  3. 18 register rejections, the Collingwood caps, and 737 AFL API plus 24 Wikipedia height disagreements: no
+     designated adjudicator.
+  4. Roster completeness unvalidated, and no raw API responses retained.
+  5. Parsed-only rebuild consumption versus in-run raw verification.
+  6. Retained N2/N3 limitations and the +89 delete counter.
+- **Evidence:** `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/source-evidence/` (scripts, captures with
+  `MANIFEST.tsv`, JSON reports; failed attempts kept and labelled FAILED-NOT-USED). No repository data, contract or
+  authority changed.
+- **Second evidence pass (2026-10-23; runbook §4; nothing adjudicated).** Evidence is in
+  `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/source-evidence-319/` (`SOURCE_QUESTIONS.md`).
+  1. NM 1940.
+     - In the packaged core, the only blank Coach groups after 1922 are exactly these eleven games.
+     - A new capture of the 18 NM 1940 match pages shows each R8–R18 page lists two NM coaches, Carter and Adamson,
+       with joint counters 1 → 11.
+     - `match_coaches (match_id, club_id)` cannot hold two, so a joint attribution would need a design change.
+  2. 479 ids.
+     - The publisher's `debutYear` cannot separate never-debuted ids: 387 of the 1,916 mapped ids also lack it.
+  3. Caps.
+     - The first byte-hashed origin reads of the nine Collingwood pages. Victor Jackson's profile is now read (3
+       games / 4 goals, 1912).
+     - The register against profile disagreement 22/blank/34/181 vs 18/4/35/180 persists (same publisher).
+  4. Roster completeness.
+     - Cannot be established after the fact.
+  5. Parsed-only coaches.
+     - A fail-closed raw-replay preflight prototype verifies the run's parsed inputs against the package's own raw
+       tar, with no package path change.
+     - Positive result equal three ways; 8/8 negative controls refuse.
+     - The implementation option is in `OPTION.md`, NOT implemented.
+- **v3 rehearsal at `15e43562` (2026-10-23; ISSUE-320):** passed, and answers none of the five questions.
+  - The coaches stage ran parsed-only (`raw/ not present`).
+  - The cross-check is 376 / 386, unchanged.
+  - The raw-replay prototype was not executed. Every item stays PENDING.
+- **Next action (historical):** owner answers to runbook §4 items 1–5, or named additional evidence.
+- **Resolution (2026-10-23; runbook §6).**
+  - Owner decisions on §4:
+    1. NM 1940 R8–R18 remains unattributed; multi-coach schema changes deferred.
+    2. The 479 unmapped roster ids remain excluded pending stable identity evidence.
+    3. Conflicting goals/heights remain evidence-only; existing authority, rejected matches and missing-value
+       semantics preserved.
+    4. The frozen roster remains evidence-only, completeness unvalidated; no new broad capture.
+    5. Raw-to-parsed coach replay required inside preflight.
+  - Root cause of the gate: the successor could consume parsed coach CSVs without proving them against raw, and the
+    remaining items lacked an adjudication. The owner's decisions supply the adjudication; no value was chosen,
+    averaged, name-matched or force-mapped.
+  - Fix (`691bdbae580c32a952411df48d59849f0198683a`): the coach parser moved byte-identically into
+    `tools/rebuild/afltables/coach_snapshot_parser.py` (the legacy adapter imports it); `import_match_coaches.py
+    --require-raw-bundle` verifies the pinned raw tar (`coaches-20260905-raw.tar`, `24685690…1e4a`, 387 members) in
+    memory with exact coverage, replays the genuine parser and compares with the manifest and with the bytes the loader
+    reads; `rebuild-test.ts` runs it in `runPreflight` for every profile except `predecessor-1897-2025` and refuses an
+    absent pin or bundle before anything is destroyed. Package alphabet unchanged.
+  - Validation: 5 suites 1,854 passed / 4 skipped; `tsc` 0. Enforced v4 rehearsal
+    (`C:/tmp/afldb-c2-REHEARSAL-V4-691bdbae-20261023T0248Z/`): `VERIFIED` at `rebuild.log` line 103, before the first
+    stage marker (149), the census (150) and the reset (160), and again in the coaches stage; digests equal the
+    installed parsed files after the run; NCR1/NCR2 real-launcher controls refused at preflight with 0 stages (NCR2's
+    first attempt VOID, harness spec lookup, retained).
+  - Follow-up: the deferred questions are ISSUE-321. Brownlow 2026 pending, ET unresolved; apply not authorised.
+- **Runbook:** `issues/closed/AFLDB-ISSUE-319.md`.
+
+## AFLDB-ISSUE-320 — Enforced native-library closure for guarded rehearsal/rebuild processes
+
+- **Status:** Resolved (2026-10-23), streamanator-scoped; previously Open (2026-10-23). **Severity:** High (an ISSUE-316 successor gate). **Area:** V2 rehearsal/rebuild
+  runtime trust boundary. **Linked:** AFLDB-ISSUE-316 (gate G2 of package E).
+- **Origin:** owner decision on 2026-10-23: "enforced closure is required before proceeding". Until now, system
+  native libraries were observation only (the clean-install proof and the `a5ec6b0c` rehearsal).
+- **Implementation (local commit `041bd5852f166be76c873fbc45d0c10208a3c3b2`):**
+  - `tools/v2/native-audit/afldb-native-audit.c` is a glibc rtld-audit module. It enforces a pinned policy of bound
+    sha256/path objects:
+    - the policy pin and self-binding;
+    - no LD_PRELOAD or LD_LIBRARY_PATH;
+    - refusal of unbound search candidates;
+    - main executable, loader and every `DT_NEEDED`/`dlopen` object bound, hash-equal and mapped from the hashed inode;
+    - a mapping sweep;
+    - exec, `posix_spawn`, `system` and `popen` targets bound before exec, with the auditor forced into children.
+  - `derive-closure.py` (per-host transitive closure) and `build-auditor.sh` (reproducible; enforcing build `32d5f6fe…956a`).
+  - Runtime record v3 in `rehearsal-package.mjs`: `native_closure` checks, objects as protected roots, policy
+    written by the launcher. The Node and Python guards self-check.
+  - Focused tests in `tests/db-test-rebuild.test.ts`: the file passed 986 / skipped 2 on Windows; `tsc` clean.
+- **Threat model:** drift, substitution or addition of native code in the guarded tree. Out of scope: a concurrent
+  rewrite of bound files, ptrace, root, and code mapped after startup by direct syscall or `PROT_EXEC` from bound
+  code; the vDSO and JIT. Static children are bound before exec only. Each guarded start costs about 1 s.
+- **Validation (DEV `streamanator`, new disposable roots, no application or database connection):**
+  - mechanism 33/33 (P0–P10, N1–N18);
+  - real-launcher integration 10/10 (guarded TypeScript census CLI, Python with psycopg, psql; unbound dlopen,
+    LD_PRELOAD, a tampered pin and a missing library all refuse with 127; a missing executable is refused before spawn);
+  - PostgreSQL fixture: initdb, postmaster, backends and JIT under the auditor; unbound `LOAD` refused.
+  - A false refusal (`__environ` COPY relocation) was found and fixed before commit.
+- **Complete isolated rehearsal under v3 at `15e43562` (2026-10-23): PASS** (runbook §7; evidence
+  `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/`, `EXECUTION_RECORD.md`, `HASHES.sha256`).
+  - Package: 1,146 files (`e07bcfe1…`). Clean-install v2 record `6c4ea3ea…`, equal before and after the run.
+    Auditor `32d5f6fe…`; v3 record `b4a24773…` (250 objects).
+  - Production launcher 00:34:56Z–01:17:50Z, exit 0, 30 stages.
+    - Census `verdict=pass total=0` (fresh database: mechanism only).
+    - Strict real D7 1,640/1,640, `AFLDB-FINAL-VALIDATION PASSED: 91 checks`, `AFLDB-POST PASSED`.
+  - Enforcement:
+    - 0 REFUSED lines in the run's logs. 250/250 closure objects were unchanged after the run.
+    - The read-only sampler saw 140 protected processes with 0 anomalies; esbuild is bound pre-exec only.
+  - Clean guarded shutdown; root retained.
+  - Pre-launch:
+    - nc3 (one object removed) refused at the verifier rather than the harness-expected auditor 127. The proposal
+      allows either; an auditor-level control refused 127.
+    - A bash psql smoke was refused by the auditor (bash is not bound) and replaced with `/bin/sh`.
+- **Not yet proven:**
+  - v3 records for every environment other than DEV `streamanator` with the clean-install runtime, including the
+    applying runtime and any post-rollover rebuild host. The binding is per host.
+  - Windows carries no enforcement: glibc LD_AUDIT.
+  - Owner acknowledgement of the §3 boundary.
+- **Next action (historical):** the owner names the environments; derive, review and prove a record for each; acknowledge §3.
+- **Resolution (2026-10-23; runbook §8).**
+  - Owner: the rollover planner and the post-rollover rebuild both execute on DEV `streamanator`; the §3 boundary is
+    accepted (file-backed loading enforced; executable-memory/direct-syscall loading out of scope; static children
+    checked before exec; the verifying launcher outside its own enforcement). Not an arbitrary-code sandbox;
+    per-environment records stay mandatory.
+  - Rebuild runtime: enforced v4 rehearsal at `691bdbae`, exit 0, 30 stages, strict D7 1,640, 91 checks,
+    `AFLDB-POST PASSED`; 0 REFUSED; sampler 4,374 samples, 173 processes, 0 anomalies; v2 record `6c4ea3ea…` equal
+    before and after; v3 record `685a281c…` (250 objects, 229 dpkg md5-equal, only the per-root auditor path differs
+    from `b4a24773…`), 250/250 unchanged after; clean guarded shutdown.
+  - Planner runtime: node v22.23.2 `3517c2df…`, venv `python3.12` → `/usr/bin/python3.12` `e50d468e…`
+    (`include-system-site-packages=false`, site-packages a record root), tsx and esbuild `e1698a3d…` all bound in
+    that record; the LD_AUDIT-enforced pinned dry run exited 0 with 0 refusals; a wrong pin refuses 127.
+  - Limits: no other host has a record and this authorises no protected tool elsewhere (production included);
+    Windows unenforced; esbuild bound pre-exec only; the planner runs under LD_AUDIT without the launcher's guard
+    self-checks; an OS package update to a closure object requires re-derivation and review.
+  - Harness note: an ad-hoc post-check wrapper passed the disposable cluster's DSN as psql argv (ISSUE-313's class);
+    the unredacted sampler log stays in the mode-700 DEV root and only a redacted copy was collected.
+- **Runbook:** `issues/closed/AFLDB-ISSUE-320.md`.
+
+## AFLDB-ISSUE-321 — Deferred successor source data-quality questions
+
+- **Status:** Open (2026-10-23). **Severity:** Low. **Area:** source provenance / data quality (`match_coaches`,
+  AFL API roster identity, height and goal evidence). **Linked:** AFLDB-ISSUE-319 (split out on its resolution),
+  AFLDB-ISSUE-316.
+- **Origin:** on 2026-10-23 the owner decided ISSUE-319's questions by retaining these items as recorded limitations
+  rather than accepting the disputed values. They gate nothing in the ISSUE-316 successor.
+- **Items (evidence in `C:/tmp/afldb-c2-SUCCESSOR-READINESS-E-20261023/source-evidence/` and
+  `C:/tmp/afldb-c2-REHEARSAL-V3-15e43562-20261023T0017Z/source-evidence-319/`):**
+  1. NM 1940 R8–R18 (match ids 3815, 3818, 3828, 3830, 3840, 3843, 3851, 3854, 3862, 3870, 3876): the publisher's
+     match pages list joint coaches Carter + Adamson; `match_coaches (match_id, club_id)` holds one. Unattributed
+     today; a multi-coach schema/importer design is deferred.
+  2. 479 unmapped AFL API roster provider ids: excluded from roster corroboration; no name inference.
+  3. Goal/height disagreements: four Collingwood caps goal discrepancies (22/blank/34/181 vs 18/4/35/180), 737 AFL
+     API and 24 Wikipedia height differences, and 18 register rejections. Evidence-only; heights stay AFL Tables;
+     NULL stays NULL.
+  4. Roster `rosters-20260905` completeness unvalidated; raw API responses were not retained.
+  5. Retained N2 (authority, roster completeness) and N3 (publisher authentication, per-quarter data) limitations,
+     and the unattributed +89 delete counter of the sequential measurement.
+- **Not permitted:** inferring identity from names, force-mapping rejected ids, choosing or averaging disputed
+  values, changing authority or eligibility.
+- **Next action:** none scheduled. Reopen work only on new evidence or an owner request: a multi-coach design; a named
+  non-name identity source; a designated adjudicating authority; a separately authorised roster capture with raw
+  retention.
+
+## AFLDB-ISSUE-322 — Production-promotion contract does not classify `brownlow_correction_receipts`
+
+- **Status:** Resolved (2026-10-24); previously Open (2026-10-23). **Severity:** Medium. **Area:** production promotion / Brownlow corrections.
+  **Linked:** AFLDB-ISSUE-316 (found while restating its tests; not caused by it).
+- **Symptom:** `tests/db-promotion-check.test.ts` fails two tests on `v2/rebuild` `f5cb49a6` (predecessor state) and
+  on the post-transition tree alike: "leaves exactly the pinned football tables unclassified" (48 names against the 47
+  pinned) and "classifies every migration-created table the way the live gate does" (`{ kind: 'unclassified' }`).
+- **Cause:** `src/db/migrations/116_brownlow_correction_receipts.sql` (`92ccbf79`, 2026-10-20, guarded Brownlow
+  correction approval package) creates `brownlow_correction_receipts`: owner-operated, append-only (statement trigger
+  refuses UPDATE/DELETE/TRUNCATE), no app/import/auth grants, holding plan digests, approval references and
+  before/after digests. The promotion contract read by `tools/db/promotion-check.ts` names no class for it, so the
+  table falls into the football remainder.
+- **Not done:** no classification was chosen. Which class (preserved owner audit state or otherwise) is a promotion
+  policy decision; adding it to the football pin list would hide the gap.
+- **Trace (2026-10-23, ISSUE-316 revision I; no code change).**
+  - Writer `src/db/queries/brownlow-production-correction.ts` INSERTs receipts, and a reversal reads its original
+    receipt by `plan_digest`: durable audit state that must survive promotion unchanged.
+  - Precedent: append-only owner audit ledgers (`award_proposal_decisions`, `derived_award_results`) are
+    `reinstate` / `operations` / `productionOnly` / `compare: equal`. `rebuilt` or `reset` would discard receipts.
+  - Blocker: `truncateSql()` (`tools/db/promotion-inventory.ts`) empties every non-`rebuilt` table in one TRUNCATE on
+    the candidate, and the receipts trigger refuses TRUNCATE even on an empty table; the plan validator forbids
+    `session_replication_role` and `DISABLE TRIGGER`. A plain `reinstate` would make every promotion fail closed, and
+    no other table has such a trigger, so the existing policy cannot decide.
+- **Recommended treatment (owner choice):** `reinstate` (operations, productionOnly, compare equal, order 20, no
+  `restoreAfter`/`footballRefs`), excluded from the single TRUNCATE in favour of an in-transaction assertion that the
+  candidate copy is empty, then the destination rows reinstated and compared equal. No trigger bypass, no schema
+  change, no overwritten or fabricated receipt. It is a new promotion mechanism, so it needs the owner.
+- **Next action (historical):** owner decision on that treatment; then implement with tests; the two tests then pass.
+- **Resolution (2026-10-24; ISSUE-316 revision J).**
+  - Owner ruling (verbatim in `.phaneslight/returns/i316J-20261024/J-02-owner-rulings.md`): keep
+    `truncatedPublicTables()` unchanged and the table in the freeze set; exclude it only where the TRUNCATE
+    statement is built and validated; take the exclusive lock and assert the candidate is empty after BEGIN and
+    before destructive work; keep every trigger-bypass prohibition; freeze expectation 42 → 43.
+  - Implementation `db541ae3` (`tools/db/promotion-inventory.ts`, `tests/db-promotion-check.test.ts`,
+    `docs/v2/db-ownership-matrix.md`): `reinstate` / operations / productionOnly / compare equal / order 20; closed
+    `EMPTY_ASSERTED_TABLES` (this table only); `truncateStatementTables()`; `emptyAssertionSql()` emits
+    `LOCK TABLE "public"."brownlow_correction_receipts" IN ACCESS EXCLUSIVE MODE;` and a `DO` block that raises
+    when the candidate copy is non-empty, immediately after `BEGIN`; the plan validator refuses a missing, duplicated
+    or misordered lock or assertion and the table back in the TRUNCATE list. The two `db-promotion-check` failures
+    now pass (DB-free suites 0 failed on both J trees).
+  - Real proof (`4fcc95ef`, `60eb5e0c`, `dfbfc1ab`; `tests/integration/db-promotion-receipts.test.ts`): a new
+    disposable unprivileged cluster `/mnt/ssd/afldb-i316-J-int-20261023T2154Z` (127.0.0.1:55811, system id
+    7699985767742577722), databases `afldb_v2_i322_{base,nonempty,live,cand}_test`. The assertion fires on real
+    rows and rolls the transaction back; reinstatement works under the trigger; copies compare equal; the real
+    swap and rollback leave receipts unchanged; the trigger is never bypassed (`'O'` everywhere). Run 3:
+    **7 passed, 0 skipped, exit 0** (run 1 refused read-only in `beforeAll`; run 2 failed two assertions on a
+    double-encoded test marker only, and its three used copies were dropped and re-created from the untouched base).
+  - Superuser use: cluster provisioning (`isolated-pg` init/start/roles/create-db including `CREATE EXTENSION`,
+    re-creates and drop-db) recorded separately from exactly two rename executions (swap: terminate + live→pre,
+    cand→live; rollback: terminate + live→cand, pre→live). All `afldb_*` roles stayed NOSUPERUSER/NOCREATEDB.
+    Cluster stopped, port free, no process references the root, 0 generated-password occurrences in the evidence.
+  - Evidence: `j-int-evidence.tar` `6cc3246f36832fdfb6d7613dfe7ff7c867c0cb29df41d32f8dc6bf6943a1f0bf`
+    (`C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J-20261023T2234Z/``validation/`).
+  - Follow-up (LOW, not tracked): the sibling test title "an old 41-table freeze record" in
+    `tests/db-promotion-check.test.ts` is numerically stale; that file is pinned in the J commit 2′ set, so it is
+    left unchanged.
+
+## AFLDB-ISSUE-323 — Adopted ISSUE-316 successor cannot run the ordinary rebuild
+
+- **Status:** Resolved (2026-10-24); previously Open (2026-10-23). Fix `481511d2`; real enforced preflight and
+  execution proven by the ISSUE-316 revision J2 disposable rebuild (owner ruling 2026-10-24). **Severity:** High
+  (blocks every post-transition rebuild; does not affect the apply). **Area:** rebuild runner
+  `tools/db/rebuild-test.ts`. **Linked:** AFLDB-ISSUE-316, AFLDB-ISSUE-324.
+- **Symptom (reproduced DB-free, every dependency stubbed):** on the applied G state (simulated commit 1 `e001fc55`,
+  worktree `D:/tmp/afldb-i316-H-20261023T0554Z/tree`) the ordinary path `--target afldb_test` resolves source
+  `c2-2026-final-core-v1`, profile `c2-2026-successor`, 1640 rows, then refuses:
+  `PREFLIGHT: Candidate preflight requires external rehearsal provenance.` and
+  `EXECUTE: Candidate execution requires original external provenance.` Repro:
+  `D:/tmp/afldb-i316-H-20261023T0554Z/runs/repro/successor-preflight-repro.test.ts`.
+- **Cause:** two Launch F guards treat the `c2-2026-final-*` labels as candidate-only (`runPreflight` label check;
+  `executeRebuild` argv check) and require rehearsal provenance, while `resolveLadderRebuildExpectation` refuses a
+  successor profile that claims provenance. Once the reviewed tuple is adopted the two cannot both hold. The G dry run
+  validates the proposed state but never runs preflight, so it did not surface this. G listed the two
+  `tests/first-kick-goal-source.test.ts` failures as "rehearsal-provenance expectations differ"; they are this defect.
+- **Proposed fix (NOT applied):** `isAdoptedSuccessorBinding` exempts only a binding that claims no provenance, whose
+  ladder pair is exactly a tuple of the closed successor table and whose source is that tuple's core
+  (`C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-H-20261023T0554Z/PROPOSED-FIX-adopted-successor-rebuild-guard.md`). The
+  session's safety review refused to write it as a guard relaxation, so it awaits the owner.
+- **Recorded in tests (post-transition set, branch `i316/H-post-transition`):** an `it.fails` marker in
+  `tests/db-test-rebuild.test.ts` ("the ordinary rebuild of the adopted successor reaches its stages without rehearsal
+  provenance") states the required behaviour; the first-kick-goal rehearsal gate runs on the explicit predecessor.
+- **Fix (owner-authorised 2026-10-23; `481511d2`).** `isAdoptedSuccessorBinding` exempts a binding only when it claims
+  no provenance, its ladder pair is exactly `successorPair` of a closed `SUCCESSOR_LADDER_TUPLES` entry (own-property
+  lookup), its rows and source label equal that tuple's, and `checkRebuildBinding` re-verifies it against the tracked
+  documents. Preflight exempts only that binding's own source; execution only the plan bound to that exact binding
+  object. Candidate configuration, `rehearsalLaunchSpec`, rehearsal-only profiles and a successor claiming provenance
+  are refused exactly as before. No label or profile grants anything; no caller-controlled bypass.
+- **Tests.** Predecessor state 4 (`481511d2`); successor state 27 (`6d9b60a2`, replacing the marker): the adopted
+  successor runs its bound plan with stubbed dependencies (not execution proof); missing, fabricated, mismatched and
+  13 altered bindings, wrong fingerprints, unsupported tuples, 7 altered tracked documents, copied/altered/retargeted
+  plans, rehearsal-only profiles and provenance claims all refuse at the real `runPreflight`/`executeRebuild`
+  boundaries; the predecessor path is unchanged. `tests/db-test-rebuild.test.ts`: 1,005 passed / 2 skipped
+  (predecessor), 1,036 / 2 (successor).
+- **Real Linux evidence (revision I disposable rebuild, streamanator).** Without provenance, under the reviewed
+  closure, the real CLI resolved `c2-2026-final-core-v1` / `c2-2026-successor` and passed the preflight guard, the
+  accepted baseline, the witness and the coach replay, then refused at ISSUE-324 before any database contact. The
+  execution boundary was not reached for real.
+- **Revision J (2026-10-24).** The J pinned checkout `dfbfc1ab` carries this fix unchanged. The enforced J dry run
+  refused at its first gate on native-closure drift (`/usr/lib/x86_64-linux-gnu/libz.so.1.3`, see ISSUE-316), so the
+  one J disposable rebuild was not run and the real execution boundary is still unproven.
+- **Revision J2 (2026-10-24).** The fix is unchanged in `876dadbf`. The J2 run stopped at the hold gate before the dry
+  run, so the rebuild was not run (see ISSUE-316).
+- **Next action (historical):** close after a real enforced ordinary successor rebuild passes preflight and execution
+  (J2, after the owner's proof-window hold).
+- **Resolution (2026-10-24; owner ruling on ISSUE-316 F-J06).**
+  - The ISSUE-316 revision J2 disposable rebuild ran the fix unchanged, at pinned checkout `876dadbf`. It used the
+    ordinary path against `afldb_v2_rb_i316_revision_j2_test` (fresh isolated cluster :55787, streamanator) under the
+    reviewed native closure, policy `a8e586e0…`, with no provenance.
+  - The DB-free `--plan` resolved fitzRoy label `c2-2026-final-core-v1`, with 30 stages and 7 successor labels in argv
+    (`rb2-launch.log:12-16`).
+  - The real run passed the successor preflight and the execution boundary:
+    - runner exit 0 (03:55:34Z → 04:06:05Z), 30 stages;
+    - `AFLDB-COACH-RAW-REPLAY VERIFIED`;
+    - `AFLDB-FINAL-VALIDATION PASSED: 91 checks`; all 1,640 comparable club-seasons agree;
+    - `AFLDB-POST PASSED`;
+    - 0 native REFUSED lines;
+    - 0 provenance/rehearsal mentions in `rebuild.log`/`rebuild.err` (`rb-post.log:1-17`).
+  - The run's 5 sampler anomalies are a monitor-classification defect, not an enforcement or rebuild failure (owner
+    ruling; focused evidence review in ISSUE-316, registered as ISSUE-325).
+  - Evidence: `D:/tmp/afldb-i316-J2-20261023T2317Z/runs/rebuild-20261024T034905Z/`, collect tar `a81652da…`; J2
+    record `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z/` `HASHES.sha256` `6d61c1c3…`.
+  - Not done here: push, deploy, apply, successor activation and censuses. The rollover and production work stays
+    under ISSUE-316.
+
+## AFLDB-ISSUE-324 — Ordinary rebuild path cannot exec `npx`/`npm` under the reviewed native closure
+
+- **Status:** Resolved (2026-10-24); previously Open (2026-10-23). Fix `82603dc7`, `14abea5e` and `876dadbf`; real
+  enforced execution proven by the ISSUE-316 revision J2 disposable rebuild (owner ruling 2026-10-24). **Severity:** High (blocks every LD_AUDIT-enforced post-transition rebuild; the apply
+  and the dry run are unaffected). **Area:** rebuild runner / native enforcement (`tools/db/rebuild-test.ts`
+  `createCliDeps`, `tools/v2/native-audit/afldb-native-audit.c`). **Linked:** AFLDB-ISSUE-316, AFLDB-ISSUE-323,
+  AFLDB-ISSUE-320.
+- **Symptom.** The ISSUE-316 revision I disposable rebuild (`afldb_v2_rb_i316_revision_i_test`, streamanator, fresh
+  cluster :55785, ordinary path, no provenance) exited 1 at 08:49:50Z with 0 stage markers:
+  `REFUSED: First-kick-goal preflight failed … Nothing has been destroyed.` Database untouched.
+- **Cause.** The auditor interposes `exec*`/`posix_spawn`/`system`/`popen` and refuses with EACCES any target that is
+  not a bound policy object (`afldb-native-audit.c` lines 22–28, 418–426: "There is no override"). The ordinary
+  `createCliDeps(spawnSync)` spawns `npx tsx …` (first-kick-goal validate-only, AFL API adjudication) and
+  `npm run db:migrate:test` / `db:privileges:test` through PATH; npm's `npx`/`npm` are `#!/usr/bin/env node`
+  scripts, and neither they, `/usr/bin/env` nor any harness shim is bound. The rehearsal path avoids this only
+  through `rehearsalSpawn` (bound node + `nodeArgs`), which a successor may never use, so ISSUE-323's repaired path
+  meets it at its first spawn.
+- **Evidence (DEV, retained; collected `C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-I-20261023T0905Z/rebuild-streamanator/`).**
+  `diag-spawn.log`: `spawnSync npx EACCES` from an enforced parent; the identical argv exec'd from the unenforced
+  driver succeeds DB-free (334 rows, exact join), so node and the tsx CLI work under enforcement. The auditor's own
+  refusal line was not captured by the runner's logs.
+- **Proposed fix (NOT applied; needs the owner).** In the ordinary `createCliDeps`, map `npx tsx <args>` to
+  `[process.execPath, <repo>/node_modules/tsx/dist/cli.mjs, ...args]` and `npm run db:migrate:test|db:privileges:test`
+  to the same CLI with their `package.json` script bodies; refuse any other `npx`/`npm` form; `shell: false`;
+  unconditional (no flag). Tests at `createCliDeps` plus a real enforced DB-free probe.
+- **Next action (historical):** owner decision; then implement, re-pin as ISSUE-316 revision J, repeat the enforced dry
+  run and run one new, separately authorised disposable rebuild.
+- **Fix (owner-authorised 2026-10-24; `82603dc7`, `14abea5e`).**
+  - `classifyOrdinaryCommand`: `npx tsx` only with an argument list from the closed `ordinaryTsxArgv()` table, and
+    `npm run db:migrate:test` / `db:privileges:test` only (fixed `package.json` bodies), become
+    `[process.execPath, <checkout>/node_modules/tsx/dist/cli.mjs, …]`, `shell: false`, unconditional; psql and the
+    resolved Python pass through; everything else refuses. `assertOrdinaryStagesAdmissible` classifies every planned
+    stage and verifies the tsx entry before `--plan` reports and before the destructive acknowledgement is consumed.
+  - Intentional behaviour change (owner, J-02): the ordinary CLI refuses `--target code_test_db`
+    (`db:migrate:code-test` / `db:privileges:code-test` are deliberately not in the table; a test pins the refusal);
+    the dedicated `code_test_db` rehearsal tools are unaffected. `docs/deployment.md` §6a updated.
+  - Strict realpath (owner, J-02): `verifyOrdinaryTsxEntry` requires the real path of `node_modules/tsx` and
+    `dist/cli.mjs` inside the pinned checkout, no link on that chain, the lock's tsx version and bin, and walks the
+    whole `node_modules`: a link is admitted only as an npm `.bin/<name>` link whose real file is inside the
+    checkout's own `node_modules`, or as one of the two esbuild native binaries (`ORDINARY_ESBUILD_LINKS`), whose
+    absolute target, real path, sha256 (`ORDINARY_ESBUILD_SHA256` `e1698a3d…`, equal to policy `30199b6a…` lines
+    21-22) and owning package lock version are fixed in code and checked before every execution. A regular file
+    there claims no exception. Owner rulings set 3 (2026-10-24, J-07) clarify that the boundary is the resolved
+    target staying inside the pinned checkout, not a ban on symlinks: only those two binaries may use a symlink whose
+    target leaves the checkout; this supersedes the earlier literal wording that only they could be symlinks.
+  - F-101 (`14abea5e`): the ordinary path refuses (never strips) an inherited `ESBUILD_BINARY_PATH`,
+    `NODE_OPTIONS`, `NODE_PATH` or `TSX_TSCONFIG_PATH`, case-insensitively.
+  - Tests: `tests/db-test-rebuild.test.ts` (ISSUE-324 block); Linux run on a real npm tree with 34 `.bin` links
+    1,109/1,109; DB-free suites 11,266 / 0 / 26 and 11,315 / 0 / 26; tsc 0.
+- **Revision J real proof: not obtained (2026-10-24).** In the enforced J dry run (fresh checkout, checkout-local
+  node_modules with exactly the two esbuild links) tsx ran under LD_AUDIT through the esbuild exception, but the run
+  refused at gate 1 on native-closure drift (`libz.so.1.3`, see ISSUE-316), so the disposable rebuild was not run.
+- **F-J01 fixed (2026-10-24; ISSUE-316 revision J2, owner ruling set 4).**
+  - Defect: a `.bin/<name>` link was judged only by its final realpath, so a chain that left the checkout and came
+    back was admitted.
+  - `876dadbf`: every hop of a `.bin` link chain must stay inside the checkout's real `node_modules` and end at a
+    regular file there; `realpath` must agree; only the two esbuild links keep their exception.
+  - 13 tests, 8 of which fail against the old code; tsc 0; DB-free 11,278 / 0 / 27; api-diff: no surface change.
+  - The real-symlink test skips on Windows. It passed on Linux on 2026-10-24 (owner-authorised, DEV, isolated
+    checkout of `876dadbf`; 1 passed, not skipped, no EPERM; see ISSUE-316 revision J2 F-401).
+  - `docs/deployment.md` states the rule.
+- **Next action (historical):** close after a real enforced ordinary successor rebuild passes the execution boundary
+  (J2, after the owner's proof-window hold).
+- **Resolution (2026-10-24; owner ruling on ISSUE-316 F-J06).**
+  - The ISSUE-316 revision J2 disposable rebuild (pinned `876dadbf`; see ISSUE-323's resolution) ran the constrained
+    ordinary tsx/npm path under LD_AUDIT enforcement (policy `a8e586e0…`) to completion:
+    - runner exit 0, 30 stages, 91 checks PASSED, `AFLDB-POST PASSED`;
+    - 0 native REFUSED lines in `rebuild.log`/`rebuild.err`. The only refusal anywhere is the bootstrap wrong-pin
+      control.
+  - Under enforcement, the prepare step confirmed that `package.json` `db:migrate:test` / `db:privileges:test` equal
+    the ordinary-path mapping (`rb2-prepare.log:11`).
+  - The checkout-local layout re-check (exactly the two esbuild links, real paths and sha256 `e1698a3d…`, policy lines
+    21–22) passed before the launch and after the run.
+  - tsx's esbuild service executed the line-21 binary five times, each with the auditor environment and pin and no
+    unbound mapping. The sampler flagged those executions only because of its single-path exemption (ISSUE-325).
+  - Evidence: as ISSUE-323.
+  - Unchanged: the ordinary CLI still refuses `--target code_test_db` (intentional, J-02).
+
+## AFLDB-ISSUE-325 — Rebuild-harness enforcement sampler exempts only one of the two policy-bound esbuild paths
+
+- **Status:** Resolved (2026-10-24), staged harness revision I325-3; not executed on Linux, because no rebuild is
+  authorised. **Severity:** Medium: it is an evidence and monitor defect, and it gated reuse of the
+  harness. Enforcement and data are unaffected. **Area:** ISSUE-316 J2 rebuild harness. It lives outside the
+  repository, in the staged `rbstage2/` under `D:/tmp/afldb-i316-J2-20261023T2317Z/` and
+  `/home/arm/afldb-i316-J2-stage-20261023T2317Z/` on streamanator. **Linked:** AFLDB-ISSUE-316 (F-J06),
+  AFLDB-ISSUE-320 (origin of the sampler), AFLDB-ISSUE-324.
+- **Symptom.** The J2 disposable rebuild's enforcement sampler reported 5 anomalies, "protected process without the
+  auditor". All five were tsx's esbuild service executing
+  `…/repolock-scripts-reviewed/node_modules/tsx/node_modules/@esbuild/linux-x64/bin/esbuild --service=0.28.2 --ping`.
+  That is the static binary bound at native-policy line 21 (`e1698a3d…`). Each process carried the auditor environment
+  and pin, and none had an unbound executable mapping. Full adjudication: the F-J06 ruling entry in ISSUE-316.
+- **Cause.**
+  - `rb2-bootstrap.sh:14` passes `enforcement-sampler.py` a single exempt path, `…/tsx/node_modules/esbuild/bin/esbuild`
+    (the line-22 sibling, same digest).
+  - `enforcement-sampler.py:199` exempts an auditor-less process only when `readlink /proc/<pid>/exe` equals that one
+    string.
+  - The binary that actually ran is the line-21 path. The monitor therefore over-reports. It cannot hide a process,
+    because every non-esbuild auditor-less process is still flagged, and unbound mappings are flagged independently.
+- **Not changed.** The retained J2 evidence, `rbstage2/` and `STAGE.sha256` are unchanged; they are frozen evidence of
+  the consumed attempt. The J2 proof stands (owner ruling 2026-10-24).
+- **Required fix, before this rebuild harness or sampler is reused:**
+  - In a new, separately staged and hashed harness version, never by editing `rbstage2/` or the retained evidence,
+    replace the single-path exemption with the closed set of policy-bound esbuild objects (policy lines 21–22, both
+    paths).
+  - Admit an auditor-less process only when all of these hold: its executable is in that set; its mapped inode equals
+    the bound path's inode; `unbound_exec_mappings` is empty; `env_auditor` and `env_pin` are both true.
+  - Anything else stays an anomaly. That covers an unbound esbuild copy, a bound esbuild without the pin, and any other
+    static binary.
+  - Extend the sampler's fabricated-`/proc` test (the module is importable for this) with both bound paths and those
+    negative cases.
+  - Review the change before staging it.
+- **Next action (superseded by the resolution below).** Implement and review the fix above when the owner next
+  authorises reuse of the rebuild harness. No rebuild is authorised by this issue.
+- **Fix (2026-10-24, owner-authorised).** The fix is a new staged harness, `D:/tmp/afldb-i316-J2-20261023T2317Z/rbstage3-I325/`
+  (30 files). It differs from `rbstage2/` in exactly three files: `enforcement-sampler.py` `14a3ecd8…`,
+  `rb2-bootstrap.sh` `a14ba487…` and `rb-shutdown.sh` `61f92ab6…`. Its record `STAGE.sha256` is `6e589e77…` and
+  verifies. `rbstage2/` and the J2 evidence are unchanged; `rbstage2/STAGE.sha256` still verifies. Full record:
+  `I325/I325-3-RECORD.md` there.
+  - **Esbuild exemption (I325-1).** The exemption is the closed set of native-policy lines 21–22, bound by exact line
+    text. The sampler refuses to start unless both are regular files with the bound digest, and it records their
+    device and inode. A protected, auditor-less process is exempt only when all of these hold:
+    - its executable is in that set;
+    - its running image has the bound device, inode and digest;
+    - it has no unbound executable mapping;
+    - its environment carries the auditor and the pin.
+    Nothing about the exemption comes from the command line.
+  - **Process instances (I325-2, first-review MED-1/LOW-1).** A process instance is PID plus the start time in
+    `/proc/<pid>/stat` field 22, so a reused PID is always a new instance.
+    - **Re-judgement.** An instance is judged again whenever its proof-state fingerprint changes. The fingerprint is
+      the executable, its device and inode, its digest, whether the auditor is mapped, the auditor environment, the
+      pin, the unbound mappings and which reads failed.
+    - **Cache after judgement.** The fingerprint is cached only after the judgement completes. A failure part way is
+      a sampler error and is judged again on the next sample.
+    - **Fail closed.** Unreadable state or a malformed identity is an anomaly. A PID reused during inspection is an
+      error. Neither is ever exempt.
+  - **Startup (I325-2, LOW-3/LOW-4).** The policy is read once and validated: header, line shape, exactly one auditor.
+    `logs/sampler.ready` is written atomically, only after validation. `rb2-bootstrap.sh` requires its exact text
+    (pid, policy digest, `[21, 22]`) instead of "alive after 2 s", and it refuses a stale marker.
+  - **Second-review fixes (I325-3).**
+    - A process that exits mid-inspection is judged on what was read; it is `vanished` only if every proof read
+      failed. This fixed the second review's MED-1, a regression.
+    - Launcher anomalies carry their record.
+    - Never-inspected zombies are counted once in `exited_unjudged`.
+    - A duplicated `LD_AUDIT` or pin key never matches.
+    - `rb-shutdown.sh` prints `esbuild_exempted`, `vanished` and `exited_unjudged`.
+- **Validation (2026-10-24).**
+  - **Focused test.** `python -I -X dev tests/test_enforcement_sampler_i325.py`, run from `I325/` against a fabricated
+    `/proc` (test sha256 `9d76e7a8…`): 45 tests OK. They cover:
+    - both bound paths and all negative cases;
+    - PID reuse at the same path, without the pin and without the auditor environment;
+    - a same-instance re-exec with a changed pin or environment;
+    - a changed inode at the same path;
+    - an unchanged state not reclassified;
+    - judgement and log-write failures retried on the next sample;
+    - unreadable or malformed identity, an identity change mid-inspection and a partial exit;
+    - startup refusals for each line × digest/non-regular, for the policy shape and for a stale marker;
+    - readiness after validation and before sampling, and the bootstrap's readiness text.
+  - **Reviews.** Three independent reviews ran:
+    - I325-1: one MED and four LOWs, all fixed in I325-2.
+    - I325-2: no CRIT or HIGH, one MED, fixed in I325-3.
+    - I325-3 re-review: no CRIT, HIGH or MED.
+  - **Residual LOWs.** Both are accepted and do not affect the proof property:
+    - LOW-5: a malformed stat hides that process's subtree. It is recorded as a sampler error on every sample.
+    - LOW-N1: a process that exits before its maps read and is reaped before the identity re-check can produce a
+      spurious "without the auditor" anomaly. This over-reports only.
+  - **Not done.** I325-3 has not been executed on Linux (no rebuild authorised). Before any future harness reuse it
+    must be copied and hash-verified on the host, then Linux-validated. (Restated 2026-10-24 after the J2 hold
+    restore; see ISSUE-316.)
+
+## AFLDB-ISSUE-328 — Admin settle panels name the wrong "latest" batch once batch ids pass a digit boundary
+
+- **Status:** **Resolved (2026-10-27), V2 engineering complete** (owner decision D-V2-SCOPE-20261027, approved with amendments; V2 only): committed `e91fae88`, 58/58 with negative control, TypeScript and focused lint passing; no deployment or live verification claimed; the `/admin/current-season` live check is kept in checklist item 7. History: **Open — FIXED LOCALLY IN V2 AND VALIDATED DB-FREE (2026-10-27); not deployed; live verification pending.** **Severity:** Low (display accuracy; no data is written by the affected code).
+- **Area:** admin current-season status — `src/db/queries/settle-runs.ts` (`getLatestSettleRun`), read by `/admin/current-season`.
+- **Origin:** ported from the source repository (`D:\dev\afldb`) commit `6ffb893b89dd00319e38fd16c8fd455c9e785236` (its ISSUE-328; local, unpushed there at the time of the port). Only this fix and its regression coverage were transferred: the source tracking files, its `main` and its other unpushed work were not merged or cherry-picked. The ID is kept for traceability, so V2's ledger has no ISSUE-326 or ISSUE-327: those are the source repository's own, unrelated IDs and are not carried here (the source's ISSUE-327 stays parked there). Duplicate check in V2: `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` and `blockers.md` were searched for `getLatestSettleRun` and `settle-runs.ts`; the matches are historical feature entries (ISSUE-228 S8 records that no test exercised the function) and none concerns ordering.
+- **Evidence:** the DEV observation is the source repository's, not re-measured in V2: on its DEV the page showed AFL API batch 98 and AFL Tables batch 99 while 134 and 107 were newest (read-only DEV queries and page observation, 2026-10-26). In V2 itself the defect was established by reading: `HEAD` `79eb1212` carried the identical bare `ORDER BY id DESC` beside `id::text AS id` (the file was the same blob as the source's pre-fix version, `da313783`). No V2 host or database was accessed.
+- **Defect:** `getLatestSettleRun()` selected `id::text AS id` and ordered with a bare `ORDER BY id DESC`. PostgreSQL binds a bare ORDER BY name to the output column first, so the bigint ids sorted as text and '99' outranked '100' to '134'. It begins once a tool's ids cross a digit boundary.
+- **Affected callers in V2 (inspected, two):** (1) `readSettleRunStatus()` (`src/lib/acquisition/settle-status.ts:67`); (2) `readSettleUnitTableStatus()` (`settle-status.ts:117`, per settle tool). The source repository's third caller, the on-demand refresh baseline `batchIdAtStart`, does not exist here: V2-GAP-013 retired `startSettleRunAction`, which now only refuses, and no V2 code sets `batchIdAtStart`.
+- **Local fix:** `ORDER BY import_batches.id DESC` (qualified to the bigint column). Unchanged: the `id::text AS id` return, the `tool = ${tool}` filter, no status filter (a failed run is still the latest), `LIMIT 1`. The doc comment records the mechanism. The patch was generated read-only from the source commit and applied cleanly.
+- **Tests:** `tests/admin-current-season-settle.test.ts` (V2's existing suite for this function's neighbours) gained the DB-free `describe('AFLDB-ISSUE-328 — latest settle batch ordering')` (5 tests; the source's sixth, the `startSettleRunAction` baseline, is not ported because that action is retired). The real function runs against a fake `sql` that applies the PostgreSQL rule (bare name plus same-named text output alias sorts as text; `import_batches.id` is the bigint column): ids 95/96/98/102/103/106/109/121/134 (AFL API) and 99/100/101/107 (AFL Tables) give '134' and '107'; 98/99/100 give '100'; the id stays decimal text and an absent tool returns null; tool-only filtering with a failed batch 108 as latest; the original query text returns '98' and '99' (proves the fake discriminates); the issued SQL carries the qualified clause. One import (`sql` from `@/db/client`, already mocked in that file) was added.
+- **Validation (local, DB-free, 2026-10-27, executed in V2 with its own installed tools):** `vitest run tests/admin-current-season-settle.test.ts` 58/58 passed (53 existing plus 5 new); with the original `ORDER BY id DESC` restored, 3 of the 58 failed (the other 2 new tests hold either way by design) and the fix was restored byte-for-byte (git blob `27f7740b`, equal to the source's post-fix blob); `node node_modules/typescript/bin/tsc --noEmit` (TypeScript 5.9.3) exit 0; ESLint on the two changed files exit 0. **Not run:** DB-backed and integration tests (none executes this query against PostgreSQL), `next typegen`, build, full suite, browser, any host. The source repository's GREEN static review applied to its commit; it was not repeated for this port.
+- **Pending:** deployment and a live check that `/admin/current-season` names the true latest AFL API and AFL Tables batches, each needing separate authority. No PROD action authorised.
+- **Scope kept:** ISSUE-316's P and H commits, readiness worktrees and evidence are untouched; ISSUE-327 parked; no push, rebuild or deployment.

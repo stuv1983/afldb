@@ -1,18 +1,17 @@
 /**
- * The CSV upload route (`/admin/upload/stage`, AFLDB-ISSUE-303, D-303-1).
+ * The CSV upload route (`/admin/upload/stage`) after AFLDB V2 Stage 5 retired it
+ * (V2-GAP-013, docs/v2/legacy-disposition.md L1).
  *
- * The form promises a 5 MB file; the Server Action it used to post to accepts 1 MB
- * (Next's `serverActions.bodySizeLimit` default, multipart included), so a 1-5 MB file
- * failed at the framework with a generic error. The decision (D-303-1 option c) is a
- * dedicated Route Handler with its own bound, which leaves the global action limit
- * alone and takes over the three jobs the framework did for an action: CSRF, the size
- * bound and, unchanged, authentication and authorisation.
+ * Originally AFLDB-ISSUE-303 (D-303-1): a dedicated Route Handler took the documented 5 MB
+ * file that the 1 MB Server Action refused, and did CSRF, the size bound and authorisation
+ * itself. AFLDB V2 removed the path (CSV never reaches a runtime table), so the route now keeps
+ * only the two checks that stood in front of the old behaviour -- the same-origin check and
+ * `requireCapability('acquisition.legacyIntake')`, in that order -- and then answers HTTP 410
+ * with the typed refusal and one audit row. It never reads the body and never stages anything.
  *
- * These cases drive the REAL route handler and the REAL request helpers with a mocked
- * session and a mocked staging pipeline, so they prove every decision the route makes
- * before it stages anything, and what it stages. They do not prove the framework's
- * body buffering or a real browser's `Origin`: the file's last describe pins the
- * statically checkable facts instead. No database.
+ * These cases drive the REAL route handler, the REAL request helpers and the REAL refusal helper
+ * with a mocked session and a mocked staging pipeline (asserted never called). No database.
+ * The request helpers (`upload-request.ts`) are retained library code and keep their own tests.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -86,6 +85,15 @@ function request(
   } as RequestInit);
 }
 
+/** A body stream that counts how often it is pulled: zero means nothing was read. */
+function countingStream() {
+  const state = { pulled: 0 };
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) { state.pulled += 1; controller.enqueue(new Uint8Array(1024)); },
+  }, { highWaterMark: 0 });
+  return { state, stream };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.requireCapability.mockResolvedValue(ADMIN);
@@ -93,80 +101,73 @@ beforeEach(() => {
   mocks.stageSubmission.mockResolvedValue({ ok: true, submissionId: 41, rowCount: 3, duplicate: false });
 });
 
-describe('a file between 1 MB and 5 MB is staged (the defect)', () => {
-  it('stages a 1.5 MB CSV byte for byte and answers where the review page is', async () => {
-    const csv = csvOf(Math.round(1.5 * MIB));
-    const { bytes, contentType } = await multipart(csv);
+describe('an authorised caller gets the typed refusal (HTTP 410) and nothing is staged', () => {
+  it('answers a well-formed 1.5 MB upload with 410 and the retirement refusal', async () => {
+    const { bytes, contentType } = await multipart(csvOf(Math.round(1.5 * MIB)));
     const response = await POST(request(bytes, contentType, SAME_ORIGIN, bytes.length));
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      ok: true, submissionId: 41, duplicate: false, redirectTo: '/admin/submissions/41',
-    });
-    expect(mocks.stageSubmission).toHaveBeenCalledTimes(1);
-    const [dataset, filename, content, adminId] = mocks.stageSubmission.mock.calls[0];
-    expect([dataset, filename, adminId]).toEqual(['match_results', 'results.csv', 7]);
-    expect(Buffer.compare(content, Buffer.from(csv))).toBe(0);
-    expect(mocks.audit).toHaveBeenCalledWith('upload.staged',
-      { dataset: 'match_results', filename: 'results.csv', submissionId: 41, rows: 3 },
-      { userId: 7, label: 'uploader@example.test' });
-  });
-
-  it('stages a file of exactly 5 MiB, and refuses one byte more', async () => {
-    const exact = await multipart(csvOf(MAX_FILE));
-    expect((await POST(request(exact.bytes, exact.contentType, SAME_ORIGIN, exact.bytes.length))).status).toBe(200);
-    expect(mocks.stageSubmission).toHaveBeenCalledTimes(1);
-
-    mocks.stageSubmission.mockClear();
-    const over = await multipart(csvOf(MAX_FILE + 1));
-    const response = await POST(request(over.bytes, over.contentType, SAME_ORIGIN, over.bytes.length));
-    expect(response.status).toBe(413);
-    expect(await response.json()).toEqual({ error: 'The file exceeds the 5 MB limit.' });
+    expect(response.status).toBe(410);
+    const body = await response.json() as { refused: boolean; code: string; surface: string; error: string };
+    expect(body).toMatchObject({ refused: true, code: 'legacy_retired', surface: 'admin.csv_upload' });
+    expect(body.error).toMatch(/retired/i);
+    expect(body.error).toMatch(/operations\/awards/);
     expect(mocks.stageSubmission).not.toHaveBeenCalled();
   });
 
-  it('records a duplicate and a rejection with the same audit events as the old action', async () => {
+  it('writes exactly one audit row for the refusal, naming the surface and the export', async () => {
     const { bytes, contentType } = await multipart(csvOf(200));
-    mocks.stageSubmission.mockResolvedValueOnce({ ok: true, submissionId: 9, rowCount: 1, duplicate: true });
-    expect(await (await POST(request(bytes, contentType))).json())
-      .toMatchObject({ ok: true, duplicate: true, redirectTo: '/admin/submissions/9' });
-    expect(mocks.audit).toHaveBeenLastCalledWith('upload.duplicate', expect.objectContaining({ submissionId: 9 }), expect.anything());
+    await POST(request(bytes, contentType));
 
-    mocks.stageSubmission.mockResolvedValueOnce({ ok: false, error: 'Missing column: away' });
-    const rejected = await POST(request(bytes, contentType));
-    expect(rejected.status).toBe(422);
-    expect(await rejected.json()).toEqual({ error: 'Missing column: away' });
-    expect(mocks.audit).toHaveBeenLastCalledWith('upload.rejected',
-      { dataset: 'match_results', filename: 'results.csv', error: 'Missing column: away' },
-      { userId: 7, label: 'uploader@example.test' });
+    expect(mocks.audit).toHaveBeenCalledExactlyOnceWith(
+      'admin.legacy_retired_refused',
+      { surface: 'admin.csv_upload', export: 'POST' },
+      { userId: 7, label: 'uploader@example.test' },
+    );
   });
 
-  it('answers a request with no file, no multipart body or an invalid length with a plain 400', async () => {
-    const form = new FormData();
-    form.set('dataset', 'match_results');
-    const noFile = new Response(form);
-    const noFileBytes = new Uint8Array(await noFile.arrayBuffer());
-    const noFileResponse = await POST(request(noFileBytes, noFile.headers.get('content-type')!));
-    expect(noFileResponse.status).toBe(400);
-    expect(await noFileResponse.json()).toEqual({ error: 'Choose a CSV file.' });
+  it('still refuses with 410 when the audit write fails', async () => {
+    mocks.audit.mockRejectedValue(new Error('audit insert failed'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { bytes, contentType } = await multipart(csvOf(200));
 
-    const notMultipart = await POST(request(new Uint8Array([1, 2, 3]), 'text/plain'));
-    expect(notMultipart.status).toBe(400);
-    expect(await notMultipart.json()).toEqual({ error: 'Malformed upload.' });
+    const response = await POST(request(bytes, contentType));
 
+    expect(response.status).toBe(410);
+    expect(JSON.stringify(await response.json())).not.toContain('audit insert failed');
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it('refuses the same way for a malformed body, an oversized declared length or no file at all', async () => {
     const { bytes, contentType } = await multipart(csvOf(100));
-    const badLength = await POST(new Request(URL_, {
-      method: 'POST',
-      headers: { ...SAME_ORIGIN, 'content-type': contentType, 'content-length': '12abc' },
-      body: bytes as BodyInit,
-    }));
-    expect(badLength.status).toBe(400);
+    const cases = [
+      request(new Uint8Array([1, 2, 3]), 'text/plain'),
+      request(bytes, contentType, SAME_ORIGIN, maxUploadBodyBytes(MAX_FILE) + 1),
+      request(new Uint8Array(0), 'multipart/form-data; boundary=x'),
+    ];
+    for (const req of cases) {
+      const response = await POST(req);
+      expect(response.status).toBe(410);
+    }
     expect(mocks.stageSubmission).not.toHaveBeenCalled();
+  });
+
+  it('reads none of the request body, whatever it declares', async () => {
+    const small = countingStream();
+    expect((await POST(request(small.stream, 'multipart/form-data; boundary=x'))).status).toBe(410);
+    expect(small.state.pulled).toBe(0);
+
+    const declaredHuge = countingStream();
+    const response = await POST(request(
+      declaredHuge.stream, 'multipart/form-data; boundary=x', SAME_ORIGIN, maxUploadBodyBytes(MAX_FILE) + 1,
+    ));
+    expect(response.status).toBe(410);
+    expect(declaredHuge.state.pulled).toBe(0);
   });
 });
 
 describe('authentication and authorisation are unchanged', () => {
-  it('asks for the legacy-intake capability and stages nothing when it throws', async () => {
+  it('asks for the legacy-intake capability and refuses nothing, audits nothing, when it throws', async () => {
     const { bytes, contentType } = await multipart(csvOf(100));
     mocks.requireCapability.mockRejectedValueOnce(new Error('NEXT_REDIRECT /admin/login'));
     await expect(POST(request(bytes, contentType))).rejects.toThrow('NEXT_REDIRECT /admin/login');
@@ -176,13 +177,17 @@ describe('authentication and authorisation are unchanged', () => {
   });
 
   it('checks the session before reading any of the body', async () => {
-    let pulled = 0;
-    const stream = new ReadableStream<Uint8Array>({
-      pull(controller) { pulled += 1; controller.enqueue(new Uint8Array(1024)); },
-    }, { highWaterMark: 0 });
+    const { state, stream } = countingStream();
     mocks.requireCapability.mockRejectedValueOnce(new Error('NEXT_REDIRECT /admin/login'));
     await expect(POST(request(stream, 'multipart/form-data; boundary=x'))).rejects.toThrow('NEXT_REDIRECT');
-    expect(pulled).toBe(0);
+    expect(state.pulled).toBe(0);
+  });
+
+  it('turns an under-privileged session away exactly as the page does (a redirect, not a 410)', async () => {
+    mocks.requireCapability.mockRejectedValueOnce(new Error('NEXT_REDIRECT /admin'));
+    const { bytes, contentType } = await multipart(csvOf(100));
+    await expect(POST(request(bytes, contentType))).rejects.toThrow('NEXT_REDIRECT');
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
 });
 
@@ -205,6 +210,7 @@ describe('CSRF: a cross-site request is refused before the session is consulted'
       expect(await response.json()).toEqual({ error: 'This upload did not come from this site.' });
       expect(mocks.requireCapability).not.toHaveBeenCalled();
       expect(mocks.stageSubmission).not.toHaveBeenCalled();
+      expect(mocks.audit).not.toHaveBeenCalled();
     });
   }
 
@@ -228,52 +234,7 @@ describe('CSRF: a cross-site request is refused before the session is consulted'
   });
 });
 
-describe('the size bound holds whatever the client declares', () => {
-  it('refuses a declared length over the file limit plus the envelope without reading the body', async () => {
-    let pulled = 0;
-    const stream = new ReadableStream<Uint8Array>({
-      pull(controller) { pulled += 1; controller.enqueue(new Uint8Array(1024)); },
-    }, { highWaterMark: 0 });
-    const declared = maxUploadBodyBytes(MAX_FILE) + 1;
-    const response = await POST(request(stream, 'multipart/form-data; boundary=x', SAME_ORIGIN, declared));
-    expect(response.status).toBe(413);
-    expect(await response.json()).toEqual({ error: 'The file exceeds the 5 MB limit.' });
-    expect(pulled).toBe(0);
-    expect(mocks.stageSubmission).not.toHaveBeenCalled();
-  });
-
-  it('stops reading a chunked body that never declares a length, one chunk past the bound at most', async () => {
-    const CHUNK = 64 * 1024;
-    let pulled = 0;
-    let cancelled = false;
-    const stream = new ReadableStream<Uint8Array>({
-      // Finite on purpose (about 13 MiB): a read with no bound then fails an assertion
-      // instead of never returning.
-      pull(controller) {
-        pulled += 1;
-        controller.enqueue(new Uint8Array(CHUNK));
-        if (pulled >= 200) controller.close();
-      },
-      cancel() { cancelled = true; },
-    });
-    const response = await POST(request(stream, 'multipart/form-data; boundary=x'));
-    expect(response.status).toBe(413);
-    expect(cancelled).toBe(true);
-    // The bound is 5 MiB + 16 KiB: nothing like the unbounded stream was consumed.
-    expect(pulled * CHUNK).toBeLessThanOrEqual(maxUploadBodyBytes(MAX_FILE) + 2 * CHUNK);
-    expect(mocks.stageSubmission).not.toHaveBeenCalled();
-  });
-
-  it('ignores a declared length that lies low: the read bound still applies', async () => {
-    const big = new Uint8Array(maxUploadBodyBytes(MAX_FILE) + 1);
-    const response = await POST(request(big, 'multipart/form-data; boundary=x', SAME_ORIGIN, 100));
-    // The runtime may reconcile the declared length with the body or not; either way it is refused.
-    expect([400, 413]).toContain(response.status);
-    expect(mocks.stageSubmission).not.toHaveBeenCalled();
-  });
-});
-
-describe('the request helpers on their own', () => {
+describe('the request helpers on their own (retained library code)', () => {
   it('declaredLengthCheck: absent is ok, non-numeric is invalid, over the bound is too large', () => {
     const bound = maxUploadBodyBytes(MAX_FILE);
     expect(bound).toBe(MAX_FILE + UPLOAD_ENVELOPE_SLACK_BYTES);
@@ -302,40 +263,36 @@ describe('what is pinned statically (the framework and the browser are not exerc
   const route = read('src/app/admin/upload/stage/route.ts');
   const code = route.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
-  it('the route checks the origin first, then the session, then the bound, then reads the body', () => {
+  it('the route checks the origin first, then the session, then refuses; it never reads the body', () => {
     const order = [
-      "sameOriginRefusal(request.headers)",
+      'sameOriginRefusal(request.headers)',
       "await requireCapability('acquisition.legacyIntake')",
-      'declaredLengthCheck(request.headers, MAX_BODY_BYTES)',
-      'await readBoundedBody(request, MAX_BODY_BYTES)',
-      'formData()',
-      'await stageSubmission(',
+      "refuseRetiredAdminRoute('admin.csv_upload'",
     ].map((needle) => code.indexOf(needle));
     expect(order.every((i) => i > -1), JSON.stringify(order)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    // The body is never read by anything but the bounded reader before the session is checked.
-    expect(code.indexOf('request.formData')).toBe(-1);
-    expect(code.indexOf('request.json')).toBe(-1);
-    expect(code.indexOf('request.arrayBuffer')).toBe(-1);
+    for (const bodyRead of [
+      'request.formData', 'request.json', 'request.text', 'request.arrayBuffer', 'request.body',
+      'readBoundedBody', 'formData()', 'stageSubmission',
+    ]) {
+      expect(code.indexOf(bodyRead), bodyRead).toBe(-1);
+    }
   });
 
-  it('the limit is the pipeline\'s own 5 MiB, and the global Server Action limit is untouched', () => {
-    expect(read('src/lib/ingest/pipeline.ts')).toContain('export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;');
-    expect(code).toContain('maxUploadBodyBytes(MAX_UPLOAD_BYTES)');
-    // D-303-1 option (c): raising the project-wide limit was the alternative that was NOT chosen.
+  it('imports neither the ingest pipeline nor the dataset registry', () => {
+    expect(route).not.toMatch(/ingest\/pipeline|ingest\/datasets/);
+  });
+
+  it('the form and the 1 MB Server Action it replaced are gone, and the global action limit is untouched', () => {
+    expect(() => read('src/app/admin/upload/UploadForm.tsx')).toThrow();
+    expect(() => read('src/app/admin/upload/actions.ts')).toThrow();
     expect(read('next.config.ts')).not.toMatch(/bodySizeLimit/);
   });
 
-  it('the form posts to the route, and the 1 MB Server Action it replaced is gone', () => {
-    const form = read('src/app/admin/upload/UploadForm.tsx');
-    expect(form).toContain("fetch('/admin/upload/stage'");
-    expect(form).toContain("credentials: 'same-origin'");
-    expect(form).not.toContain('useActionState');
-    expect(form).not.toContain('@/app/admin/upload/actions');
-    expect(() => read('src/app/admin/upload/actions.ts')).toThrow();
-  });
-
-  it('the page still gates on the same capability the route enforces', () => {
-    expect(read('src/app/admin/upload/page.tsx')).toContain("await requireCapability('acquisition.legacyIntake')");
+  it('the page still gates on the capability the route enforces, and renders a notice, not a form', () => {
+    const page = read('src/app/admin/upload/page.tsx');
+    expect(page).toContain("await requireCapability('acquisition.legacyIntake')");
+    expect(page).toMatch(/retired/i);
+    expect(page).not.toMatch(/<form|<input|UploadForm|ingest\/datasets|ingest\/pipeline/);
   });
 });

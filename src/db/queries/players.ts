@@ -1,3 +1,4 @@
+import { acceptedBrownlowRowsSql } from './brownlow-readiness';
 import { randomUUID } from 'node:crypto';
 
 import 'server-only';
@@ -721,7 +722,7 @@ export async function getPlayerBrownlow(playerId: number) {
   }[]>`
     SELECT season, votes, vote_rank AS "voteRank",
            is_winner AS "isWinner", is_ineligible AS "isIneligible"
-      FROM brownlow_season_votes
+      FROM ${sql.unsafe(acceptedBrownlowRowsSql())} brownlow_season_votes
      WHERE player_id = ${playerId} AND votes > 0
      ORDER BY season
   `;

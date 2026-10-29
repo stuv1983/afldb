@@ -39,6 +39,8 @@
  */
 import { execFile } from 'node:child_process';
 
+import { afltablesNetworkRefusal, afltablesNetworkStatus } from './afltables-network';
+
 /** The one unit this module may ever name. Fixed; never configurable. */
 export const SETTLE_UNIT = 'afldb-settle-afltables.service';
 
@@ -327,6 +329,13 @@ export async function readUnitStateOf(
  * module constant. Returns as soon as systemd has queued the job.
  */
 export async function startSettleRun(): Promise<SettleStartOutcome> {
+  // AFL API cutover: a retired (or out-of-bounds) AFL Tables source is refused
+  // before systemd is asked anything, whether or not this host is provisioned
+  // for the trigger.
+  const networkRefusal = afltablesNetworkRefusal(afltablesNetworkStatus());
+  if (networkRefusal !== null) {
+    return { outcome: 'unavailable', reason: networkRefusal };
+  }
   if (!settleTriggerConfigured()) {
     return { outcome: 'unavailable', reason: SETTLE_TRIGGER_UNCONFIGURED };
   }

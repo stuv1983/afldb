@@ -2,6 +2,7 @@ import 'server-only';
 
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
+import { acceptedBrownlowRowsSql } from './brownlow-readiness';
 
 /**
  * Read-only diagnostics for the super-admin "Database Health" page.
@@ -254,7 +255,7 @@ export async function reconcileCareerTotals(): Promise<ReconciliationCheck[]> {
     sql<{ count: string }[]>`
       SELECT count(*) FROM player_career_stats c
       LEFT JOIN (SELECT player_id, sum(votes) AS actual
-                   FROM brownlow_season_votes GROUP BY player_id) b
+                   FROM ${sql.unsafe(acceptedBrownlowRowsSql())} brownlow_season_votes GROUP BY player_id) b
         ON b.player_id = c.player_id
       WHERE c.brownlow_votes <> COALESCE(b.actual, 0)
     `,

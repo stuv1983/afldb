@@ -1,0 +1,18 @@
+{
+  "verified_at": "2026-10-25T03:45:08.480Z",
+  "implementation_candidate": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+  "evidence_tracking_commit": "def676517da3955aa18db3606785463aac464188",
+  "source_P_tracked_files_unchanged": 2687,
+  "original_fixture_files_unchanged": 510,
+  "excluded_files_committed_or_staged": 0,
+  "staged_paths": 0,
+  "current_local_links": 39,
+  "diff_check": {
+    "worktree": "PASS",
+    "cached": "PASS"
+  },
+  "status": "PASS",
+  "structural_gate": "CLOSED / ACCEPTED",
+  "proposal": "PARTIAL / NOT EXECUTION-READY",
+  "production": "NO-GO"
+}

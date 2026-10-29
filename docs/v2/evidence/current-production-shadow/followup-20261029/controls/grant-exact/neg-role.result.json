@@ -1,0 +1,200 @@
+{
+  "decision": "D-V2-CURRENT-SHADOW-FOLLOWUP-1",
+  "item": "4c review disposition MED-3 (local, files only; not in the host manifest)",
+  "input": {
+    "sections": "neg-role.json",
+    "migrations": [
+      "111_curated_award_proposals.sql",
+      "112_derived_award_results.sql",
+      "113_brownlow_eligibility_decisions.sql",
+      "114_award_projections_and_curated_revisions.sql",
+      "115_adjudication_supersession_fk_index.sql",
+      "116_brownlow_correction_receipts.sql",
+      "117_brownlow_provider_eligibility_unknown.sql"
+    ],
+    "pinnedEntries": 29
+  },
+  "counts": {
+    "newObjectLines": 22,
+    "exactMatches": 21
+  },
+  "unmatched": [
+    "GRANT SELECT ON TABLE public.award_proposals TO afldb_app;"
+  ],
+  "rows": [
+    {
+      "line": "GRANT SELECT ON TABLE public.award_proposal_decisions TO afldb_auth;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT,INSERT ON TABLE public.award_proposal_decisions TO afldb_import;",
+      "entries": 2,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT USAGE ON SEQUENCE public.award_proposal_decisions_id_seq TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT ON TABLE public.award_proposals TO afldb_auth;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT,INSERT ON TABLE public.award_proposals TO afldb_import;",
+      "entries": 2,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT ON TABLE public.award_proposals TO afldb_app;",
+      "entries": 1,
+      "exactMatch": false,
+      "files": []
+    },
+    {
+      "line": "GRANT UPDATE(status) ON TABLE public.award_proposals TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT UPDATE(validation_result) ON TABLE public.award_proposals TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT UPDATE(validated_at) ON TABLE public.award_proposals TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT UPDATE(approved_entity_key) ON TABLE public.award_proposals TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT UPDATE(approved_at) ON TABLE public.award_proposals TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT UPDATE(updated_at) ON TABLE public.award_proposals TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT USAGE ON SEQUENCE public.award_proposals_id_seq TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "111_curated_award_proposals.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT ON TABLE public.brownlow_eligibility_decisions TO afldb_auth;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "113_brownlow_eligibility_decisions.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT,INSERT ON TABLE public.brownlow_eligibility_decisions TO afldb_import;",
+      "entries": 2,
+      "exactMatch": true,
+      "files": [
+        "113_brownlow_eligibility_decisions.sql"
+      ]
+    },
+    {
+      "line": "GRANT USAGE ON SEQUENCE public.brownlow_eligibility_decisions_id_seq TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "113_brownlow_eligibility_decisions.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT ON TABLE public.derived_award_projections TO afldb_auth;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "114_award_projections_and_curated_revisions.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT,INSERT ON TABLE public.derived_award_projections TO afldb_import;",
+      "entries": 2,
+      "exactMatch": true,
+      "files": [
+        "114_award_projections_and_curated_revisions.sql"
+      ]
+    },
+    {
+      "line": "GRANT USAGE ON SEQUENCE public.derived_award_projections_id_seq TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "114_award_projections_and_curated_revisions.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT ON TABLE public.derived_award_results TO afldb_auth;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "112_derived_award_results.sql"
+      ]
+    },
+    {
+      "line": "GRANT SELECT,INSERT ON TABLE public.derived_award_results TO afldb_import;",
+      "entries": 2,
+      "exactMatch": true,
+      "files": [
+        "112_derived_award_results.sql"
+      ]
+    },
+    {
+      "line": "GRANT USAGE ON SEQUENCE public.derived_award_results_id_seq TO afldb_import;",
+      "entries": 1,
+      "exactMatch": true,
+      "files": [
+        "112_derived_award_results.sql"
+      ]
+    }
+  ]
+}

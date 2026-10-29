@@ -260,6 +260,14 @@ describe.skipIf(!canRun)(
   afterAll(async () => {
     try {
       if (referenceReady) await releaseAndDeletePlayers(provisionedPlayerIds);
+      // Individual cases deliberately replay without a bridge. Restore the
+      // measured release input before the read-only linkage/corpus suites run.
+      const bridge = process.env.AFLDB_DRAFTGURU_BRIDGE;
+      if (referenceReady && bridge) {
+        expect(existsSync(bridge), 'Required release bridge input is absent').toBe(true);
+        const restored = runImporter(['--bridge', bridge]);
+        expect(restored.status, restored.stdout + restored.stderr).toBe(0);
+      }
     } finally {
       // The advisory lock is session-held; releasing it must not depend on cleanup.
       await unlockDraftTables();
@@ -614,7 +622,8 @@ describe.skipIf(!canRun)(
         }), 'utf8');
 
         const resolve = spawnSync(python, [
-          'tools/rebuild/draftguru/export_person_bridge.py', '--resolve-against', 'afldb_test',
+          'tools/rebuild/draftguru/export_person_bridge.py', '--resolve-against',
+          process.env.AFLDB_V2_ISOLATED_PG === '1' ? 'isolated' : 'afldb_test',
           '--parent', parentPath, '--out', deployPath,
         ], { encoding: 'utf8', cwd: root });
         expect(resolve.stdout + resolve.stderr).not.toMatch(/Traceback/);

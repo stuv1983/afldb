@@ -137,7 +137,7 @@ import {
   CANONICAL_APPLY_ISSUE_TYPE,
   PLAYER_MATCH_STAT_COLUMNS,
   scopeProposalToAuthority,
-} from './settle-afltables';
+} from './settle-shared';
 import {
   acquireSettlePromotionGate,
   affectedPlayerIds,

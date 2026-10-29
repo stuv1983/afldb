@@ -58,13 +58,44 @@
  *
  * MULTI-FILE SAFETY, STATED HONESTLY. The entire successor state is computed
  * and fully validated in memory, and every gate has passed, before a single
- * byte reaches a tracked file. Each file is then written to a temporary file in
- * the same directory and renamed over the original, so no file is ever observed
- * half-written. That is per-file atomicity, NOT a transaction across files:
- * there is no such thing for the filesystem here. If the process dies between
- * two renames, some files are new and some are old — and because every one of
- * them is tracked, Git is the recovery boundary. Review the diff; revert it if
- * it is partial.
+ * byte reaches a tracked file. Apply then (1) stages EVERY new file beside its
+ * target and reads each back, (2) writes a recovery journal naming each file's
+ * old and new SHA-256 and old bytes (`.rollover-transaction.json`), (3) renames
+ * the staged files over their targets, (4) re-reads every target against the
+ * plan, and only then (5) removes the journal. No file is ever observed
+ * half-written, but a rename sequence across files is NOT a transaction: there
+ * is no such thing for the filesystem here, and no intermediate combination of
+ * old and new files is promised to be usable. If the process dies between two
+ * renames some files are new and some old; the journal (or a leftover
+ * `*.rollover-tmp`) makes every later invocation, dry run included, and the
+ * rebuild preflight refuse, printing the per-file state and the exact recovery
+ * steps. The journal holds the old bytes, and Git remains the recovery boundary
+ * for them. Apply is refused if the bytes to write, the bytes they replace, or
+ * any validated document moved after the proposed state was validated.
+ *
+ * THE COMPLETE TRANSITION AS ONE CHANGE SET. `--transition-change-set <file>`
+ * (optional) carries the contract edits the planner cannot compute, and the
+ * other two contracts' measured counts, in the same validated plan instead of
+ * pre-editing the working tree and leaving the predecessor invalid while the
+ * dry run is reviewed. See `src/lib/rollover/transition-change-set.ts`: an
+ * explicit old SHA-256 per file, complete write_set membership, a hash pin of
+ * every byte to be written before `--apply` is accepted, and refusal of any
+ * change set, proposed file or planned output carrying the proposal sentinel
+ * UNRESOLVED:. No gate is relaxed and nothing is written until all of it has
+ * been validated together. With a change set, the complete PROPOSED state (the
+ * register, seasons, fitzRoy contract, both source contracts and the stage-9
+ * constant, exactly as they would be written) is also handed to the rebuild's
+ * own validators in memory (`tools/db/rollover-proposed-state.ts`): the ladder
+ * selector and tuple, the height block, and the check lists built from the
+ * source contracts' measured counts. That needs no database and writes nothing;
+ * what only a database can prove is printed as PENDING, never as passed.
+ *
+ * SUCCESSOR ACTIVATION IS NOT PART OF THE APPLY (AFLDB-ISSUE-316, owner ruling 2026-10-25). A change set
+ * carrying `ladder_successor_tuple` installs the successor's documents and leaves tools/db/rebuild-test.ts,
+ * whose closed SUCCESSOR_LADDER_TUPLES_JSON table is the activation state, unwritten: the successor is
+ * INACTIVE after the apply. The dry run validates the state the activation would complete (these files plus
+ * the projected one-line tuple append) and prints that projection's pins for the activation authority;
+ * `tools/db/successor-activation.ts` is the only writer of the table, under its own bound authority.
  *
  * Usage (dry run):
  *
@@ -76,6 +107,7 @@
  *     --stat-availability artifacts/rollover/stat-availability.json \
  *     --accepted-corrections artifacts/rollover/accepted-corrections.json \
  *     --afl-api-ownership-census artifacts/rollover/afl-api-ownership-census-afldb_test.json \
+ *     --afltables-retirement-decision D-316-1 \
  *     --expected-club-season-rows <n>
  *
  * `--afl-api-ownership-census` (AFLDB-ISSUE-233 D-233-3, required, repeatable: one per
@@ -83,6 +115,13 @@
  * <season>` wrote. The planner refuses, before any gate runs or anything is written, when a
  * season of the successor rebuild scope holds an `afl_api`-owned canonical match, because the
  * post-rollover rebuild would re-own it. This tool still opens no database connection.
+ *
+ * `--afltables-retirement-decision` (AFLDB-ISSUE-316 C2, required) names the owner decision
+ * that retires AFL Tables network fetching, and must be exactly the one registered for
+ * `--season` (`D-316-1` for 2026). The rollover writes `in_progress_seasons: [Y + 1]`,
+ * so it also writes `data/reference/afltables-network.json` to `retired` in the same apply,
+ * before any other file, and refuses before any gate runs unless that switch is `active` with
+ * `last_season` equal to `--season` (see `src/lib/rollover/afltables-network-retirement.ts`).
  *
  * `--retire-status` must name a value the acceptance register declares in
  * `selection_policy.retired_statuses` (today: `retired`). `--accepted-corrections`
@@ -108,12 +147,39 @@ import {
   parseRolloverArgv,
   planSeasonRollover,
   planSuccessorContract,
-  readClubSeasonsExpectedRows,
+  readStageNineExpectedRows,
   type RolloverPlan,
   type ValidatorOverride,
   type ValidatorRun,
 } from '../../src/lib/rollover/season-rollover';
+import {
+  AFLTABLES_NETWORK_PATH,
+  parseAfltablesRetirementDecision,
+  planAfltablesNetworkRetirement,
+} from '../../src/lib/rollover/afltables-network-retirement';
+import type { PlannedFile } from '../../src/lib/rollover/season-rollover';
+import {
+  TRANSITION_FLAG,
+  type ApplyBinding,
+  applyStagedWrites,
+  assertTransitionWriteSet,
+  describeTransitionDiff,
+  formatTransitionDiff,
+  parseTransitionChangeSet,
+  pendingTransactionProblem,
+  prepareTransition,
+  sha256Hex,
+  validateTransitionState,
+  type FileIo,
+  type InputRole,
+  type PreparedTransition,
+} from '../../src/lib/rollover/transition-change-set';
+import {
+  assertInactiveApplyState,
+  formatActivationProjection,
+} from '../../src/lib/rollover/successor-activation';
 import { resolvePython } from './rebuild-test';
+import { validateProposedRebuildState } from './rollover-proposed-state';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
@@ -129,7 +195,7 @@ function readRepoFile(relativePath: string): string {
 }
 
 /** Read an operator-supplied file from anywhere, but never outside the repository. */
-function readEvidenceFile(path: string, what: string): { text: string; relative: string } {
+function readEvidenceFile(path: string, what: string): { text: string; relative: string; bytes: Buffer } {
   const absolute = resolve(REPO_ROOT, path);
   const rel = relative(REPO_ROOT, absolute);
   if (rel.startsWith('..') || rel === '') {
@@ -138,15 +204,16 @@ function readEvidenceFile(path: string, what: string): { text: string; relative:
   if (!existsSync(absolute)) {
     throw new RolloverRefused(`${what} does not exist: ${path}`);
   }
-  return { text: readFileSync(absolute, 'utf8'), relative: rel.split(sep).join('/') };
+  const bytes = readFileSync(absolute);
+  return { text: bytes.toString('utf8'), bytes, relative: rel.split(sep).join('/') };
 }
 
 function parseJsonFile(path: string, what: string): {
-  parsed: Record<string, unknown>; text: string; relative: string;
+  parsed: Record<string, unknown>; text: string; relative: string; bytes: Buffer;
 } {
-  const { text, relative: rel } = readEvidenceFile(path, what);
+  const { text, relative: rel, bytes } = readEvidenceFile(path, what);
   try {
-    return { parsed: JSON.parse(text) as Record<string, unknown>, text, relative: rel };
+    return { parsed: JSON.parse(text) as Record<string, unknown>, text, relative: rel, bytes };
   } catch (error) {
     throw new RolloverRefused(`${what} is not valid JSON (${path}): ${String(error)}`);
   }
@@ -232,16 +299,26 @@ function printPlan(plan: RolloverPlan, apply: boolean): void {
   for (const note of plan.notes) console.log(`  - ${note}`);
 }
 
-/** Write via a sibling temporary file, then rename over the target. */
-function writeAtomicish(relativePath: string, content: string): void {
-  const target = join(REPO_ROOT, relativePath);
-  const temporary = `${target}.rollover-tmp`;
-  writeFileSync(temporary, content, 'utf8');
-  renameSync(temporary, target);
+/** Current bytes of a repository-relative path, or null when absent. */
+function readRepoBytes(relativePath: string): Buffer | null {
+  const absolute = join(REPO_ROOT, relativePath);
+  return existsSync(absolute) ? readFileSync(absolute) : null;
 }
 
+/** The real filesystem under the repository root, for the staged apply and the pending check. */
+const repoIo: FileIo = {
+  read: readRepoBytes,
+  write: (path, content) => writeFileSync(join(REPO_ROOT, path), content, 'utf8'),
+  rename: (from, to) => renameSync(join(REPO_ROOT, from), join(REPO_ROOT, to)),
+  remove: (path) => rmSync(join(REPO_ROOT, path), { force: true }),
+};
+
 function main(argv: string[]): number {
+  // Before anything else, even a dry run: an earlier unfinished apply makes every gate unsafe.
+  const pending = pendingTransactionProblem(repoIo);
+  if (pending !== null) throw new RolloverRefused(pending.join('\n  '));
   const args = parseRolloverArgv(argv);
+  const retirementDecision = parseAfltablesRetirementDecision(argv);
   const { apply } = args;
 
   const core = parseJsonFile(args.coreManifest,
@@ -259,6 +336,17 @@ function main(argv: string[]): number {
     const census = parseJsonFile(path, 'the afl_api ownership census evidence');
     return { path: census.relative, sha256: sha256Of(census.text), record: census.parsed };
   });
+
+  const changeSetFlag = argv.indexOf(TRANSITION_FLAG);
+  if (changeSetFlag >= 0 && argv.indexOf(TRANSITION_FLAG, changeSetFlag + 1) >= 0) {
+    throw new RolloverRefused(`${TRANSITION_FLAG} was given more than once.`);
+  }
+  const changeSetPath = changeSetFlag >= 0 ? argv[changeSetFlag + 1] : undefined;
+  if (changeSetFlag >= 0 && (changeSetPath === undefined || changeSetPath.startsWith('--'))) {
+    throw new RolloverRefused(`${TRANSITION_FLAG} needs a value.`);
+  }
+  const changeSet = changeSetPath === undefined ? null
+    : parseTransitionChangeSet(readEvidenceFile(changeSetPath, 'the transition change set').text);
 
   const candidateLabel = String(core.parsed.snapshot_label ?? '');
   if (!candidateLabel) {
@@ -279,7 +367,7 @@ function main(argv: string[]): number {
     seasons: JSON.parse(sources.seasons) as Record<string, unknown>,
     contract: JSON.parse(sources.contract) as Record<string, unknown>,
     statAvailability: JSON.parse(sources.statAvailability) as Record<string, unknown>,
-    clubSeasonsExpectedRows: readClubSeasonsExpectedRows(sources.rebuild),
+    clubSeasonsExpectedRows: readStageNineExpectedRows(sources.rebuild, JSON.parse(sources.contract)),
   };
   const request = {
     season: args.season,
@@ -304,12 +392,51 @@ function main(argv: string[]): number {
     aflApiOwnershipCensuses,
   };
 
+  // The reviewed transition (optional) is judged against the bytes on disk before anything runs.
+  let prepared: PreparedTransition | null = null;
+  if (changeSet !== null) {
+    const bound = (file: { relative: string; bytes: Buffer }) => ({
+      path: file.relative, sha256: sha256Hex(file.bytes),
+    });
+    const inputs: Record<InputRole, { path: string; sha256: string }> = {
+      core_manifest: bound(core),
+      ladder_manifest: bound(witness),
+      ladder_coverage: bound(coverage),
+      stat_availability: bound(statAvailability),
+      accepted_corrections: bound(acceptedCorrections),
+    };
+    prepared = prepareTransition({
+      changeSet,
+      season: args.season,
+      currentContract: current.contract,
+      readRepo: readRepoBytes,
+      readProposed: (path) => readEvidenceFile(path, 'a proposed transition file').bytes,
+      inputs,
+    });
+  }
+
   // STAGE 1. Every refusal that needs no validator evidence happens here: an
   // incoherent or half-rolled starting state, a candidate covering the wrong
   // span, a fabricated availability document, an inherited corrections block.
   // Nothing has been spawned and nothing has been written.
   const successor = planSuccessorContract({
     request, current, currentSources: sources, evidence: successorEvidence,
+    transition: prepared?.transition,
+  });
+
+  // AFLDB-ISSUE-316 C2: the next in-progress season and the AFL Tables
+  // retirement land in one write. Refuses here, before any gate is spawned,
+  // unless the switch is active and bounded to exactly this season.
+  if (!existsSync(join(REPO_ROOT, AFLTABLES_NETWORK_PATH))) {
+    throw new RolloverRefused(`${AFLTABLES_NETWORK_PATH} does not exist, so the rollover cannot `
+      + 'retire AFL Tables network fetching in the same write as the next in-progress season.');
+  }
+  const networkRetirement = planAfltablesNetworkRetirement({
+    completedSeason: successor.completedSeason,
+    rolloverDate: args.rolloverDate,
+    decision: retirementDecision,
+    currentSource: readRepoFile(AFLTABLES_NETWORK_PATH),
+    currentSeasons: current.seasons,
   });
 
   const temporary = mkdtempSync(join(tmpdir(), 'afldb-rollover-'));
@@ -347,6 +474,7 @@ function main(argv: string[]): number {
       request,
       current,
       currentSources: sources,
+      transition: prepared?.transition,
       evidence: {
         ...successorEvidence,
         coreManifestSha256: sha256Of(core.text),
@@ -396,6 +524,75 @@ function main(argv: string[]): number {
     console.log('\nAll three pre-apply gates PASSED against the computed successor state.');
 
     printPlan(plan, apply);
+    console.log(`  ${networkRetirement.file.path}${networkRetirement.file.reformatted ? '  (JSON reformatted)' : ''}`
+      + '  (AFLDB-ISSUE-316: written first)');
+    console.log(`  - ${networkRetirement.note}`);
+
+    // The write set: the AFL Tables switch first (an interrupted write leaves AFL Tables retired,
+    // never fetching the next season), then whole-file replacements, then the planner's files.
+    // Without a change set it is exactly the planner's own files, as before.
+    let writeSet: PlannedFile[] = [networkRetirement.file, ...plan.files];
+    let binding: ApplyBinding;
+    if (prepared === null) {
+      // No change set: the planner's own output, as before, but still bound to the bytes judged so
+      // a working-tree edit between the gates and the write is refused rather than journaled.
+      binding = validateTransitionState({
+        files: writeSet, readRepo: readRepoBytes, validate: () => null,
+      }).binding;
+    } else {
+      const judged = assertTransitionWriteSet({ prepared, planned: writeSet, apply });
+      writeSet = judged.files;
+
+      // The complete PROPOSED state, judged by the rebuild's own validators before anything is
+      // written and before any hash is offered for pinning. Nothing is written to the working tree.
+      // For a successor the apply leaves rebuild-test.ts unchanged (bound read-only below), and what is
+      // judged is the state the separately authorised ACTIVATION would complete: these files plus the
+      // projected one-line tuple append. The inactive state itself is proven not to resolve the profile.
+      const activation = plan.activation;
+      const validated = validateTransitionState({
+        files: writeSet,
+        readRepo: readRepoBytes,
+        validate: (documents) => {
+          if (activation) assertInactiveApplyState(documents.rebuild, activation);
+          return validateProposedRebuildState({
+            ...documents,
+            ...(activation ? { rebuild: activation.activeContent } : {}),
+            witnessManifest: witness.text, baseRebuild: sources.rebuild,
+          });
+        },
+      });
+      binding = validated.binding;
+      console.log('\nPROPOSED-STATE VALIDATION - the rebuild\'s own validators over the proposed bytes '
+        + '(nothing written; no database)');
+      console.log(`  accepted baseline          ${validated.verdict.acceptedLabel}`);
+      console.log(`  ladder profile (selector)  ${validated.verdict.ladderProfile}`
+        + `${activation ? ' (resolves only once separately activated; INACTIVE after this apply)' : ''}`);
+      console.log(`  club_seasons expected      ${validated.verdict.expectedRows}`);
+      console.log(`  final-validation checks    ${validated.verdict.finalChecks.length} built from the proposal`);
+      console.log('  PENDING - needs the isolated database phase; not proven here:');
+      for (const line of validated.verdict.pendingDatabase) console.log(`    - ${line}`);
+      console.log('  Continuity and the ladder witness were judged by the executed gates above, '
+        + 'against these same contract bytes.');
+
+      console.log('\ntransition change set (every file, old -> new bytes; validated together)');
+      for (const note of prepared.notes) console.log(`  - ${note}`);
+      for (const line of formatTransitionDiff(describeTransitionDiff(writeSet, readRepoBytes))) {
+        console.log(line);
+      }
+      if (prepared.changeSet.finalSha256 === null) {
+        console.log('\nfinal_sha256 (review the diff above, then pin these in the change set; '
+          + '--apply requires them)');
+        for (const [path, hash] of Object.entries(judged.finalHashes)) {
+          console.log(`  "${path}": "${hash}",`);
+        }
+      } else {
+        console.log('\nfinal_sha256 pins match this plan for every file.');
+      }
+      if (activation) {
+        console.log('\nSUCCESSOR ACTIVATION - NOT performed by this apply (a separate, separately authorised step)');
+        for (const line of formatActivationProjection(activation)) console.log(`  ${line}`);
+      }
+    }
 
     if (!apply) {
       console.log('\nDRY RUN — nothing was written. Every gate above still ran. '
@@ -403,13 +600,19 @@ function main(argv: string[]): number {
       return 0;
     }
 
-    // Every check has passed. Only now does anything reach the filesystem.
-    for (const file of plan.files) writeAtomicish(file.path, file.content);
+    // Every check has passed. Only now does anything reach the filesystem: staged, journaled,
+    // renamed, then read back against the plan.
+    applyStagedWrites(repoIo, args.season, writeSet, binding);
 
-    console.log(`\nWROTE ${plan.files.length} files.`);
-    console.log('Review the diff before anything else — Git is the recovery boundary if a '
-      + 'filesystem failure interrupted the sequence.');
-    console.log('\nRemaining proof, which genuinely needs the rebuilt database:');
+    console.log(`\nWROTE ${writeSet.length} files.`);
+    if (plan.activation) {
+      console.log(`The successor ${JSON.stringify(plan.activation.tuple.profile)} is INSTALLED and INACTIVE: `
+        + `${REBUILD} was not written. Activation is tools/db/successor-activation.ts, separately authorised.`);
+    }
+    console.log('Review the diff before anything else. Git is the recovery boundary for the old '
+      + 'bytes; if this process was interrupted the next invocation refuses and prints the steps.');
+    console.log('\nRemaining proof, which genuinely needs the rebuilt database'
+      + `${plan.activation ? ' (refused while the successor is inactive; it applies only after activation)' : ''}:`);
     console.log('  npm run db:test:rebuild -- --acknowledge-destroy afldb_test');
     console.log(`     PRECHECK re-runs ${IMPORTER} --require-accepted-baseline against the `
       + 'landed tracked documents, then the witness --compare cross-check against the '

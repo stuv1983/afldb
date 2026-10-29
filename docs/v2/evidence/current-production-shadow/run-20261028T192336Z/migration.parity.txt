@@ -1,0 +1,26 @@
+AFLDB V2 shadow parity (policy v2.parity.1) generated 2026-10-28T20:00:29Z
+VERDICT: FAIL  (checks: 3 pass, 1 fail, 1 incomplete)
+PASS       historical_manifest  [fail 0, info 0]
+           before: before.manifest.json
+           after : postmig.manifest.json
+FAIL       table_row_counts  [fail 1, info 6]
+           before: before.row-counts.json
+           after : postmig.row-counts.json
+           FAIL  UNEXPECTED_TABLE_ADDED public.brownlow_correction_receipts: absent before, present after (0 rows), and not a V2-added table
+           INFO  ROWS_INCREASED afldb_meta.schema_migrations: rows 110 -> 117
+           INFO  V2_TABLE_ADDED public.award_proposal_decisions: created by the V2 migrations; 0 rows after
+           INFO  V2_TABLE_ADDED public.award_proposals: created by the V2 migrations; 0 rows after
+           INFO  V2_TABLE_ADDED public.brownlow_eligibility_decisions: created by the V2 migrations; 0 rows after
+           INFO  V2_TABLE_ADDED public.derived_award_projections: created by the V2 migrations; 0 rows after
+           INFO  V2_TABLE_ADDED public.derived_award_results: created by the V2 migrations; 0 rows after
+PASS       coleman  [fail 0, info 0]
+           before: before.coleman.json
+           after : postmig.coleman.json
+INCOMPLETE brownlow  [fail 2, info 0]
+           before: (not supplied)
+           after : (not supplied)
+           FAIL  INPUT_MISSING after: no Brownlow reconciliation report was supplied for after
+           FAIL  INPUT_MISSING before: no Brownlow reconciliation report was supplied for before
+PASS       coverage  [fail 0, info 0]
+           before: before.coverage.json
+           after : postmig.coverage.json

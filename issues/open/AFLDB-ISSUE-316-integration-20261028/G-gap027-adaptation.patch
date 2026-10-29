@@ -1,0 +1,44 @@
+--- a/tests/afl-api-settle-cli-gate.test.ts
++++ b/tests/afl-api-settle-cli-gate.test.ts
+@@ -942,6 +942,9 @@
+   function setup(): { projectRoot: string; outDir: string } {
+     const { projectRoot } = makeScratchProject(LABEL, [committedUnit()]);
+     scratchDirs.push(projectRoot);
++    // AFLDB-ISSUE-316: the snapshot settles 2026 as the season IN PROGRESS, so the registry is the explicit
++    // predecessor of the 2026 rollover (the tracked one seals 2026; see the describe at the end of the file).
++    writeFileSync(join(projectRoot, 'data', 'reference', 'seasons.json'), predecessorText('data/reference/seasons.json'));
+     const outDir = join(projectRoot, 'evidence');
+     mkdirSync(outDir);
+     return { projectRoot, outDir };
+--- a/tests/integration/settle-afl-api.test.ts
++++ b/tests/integration/settle-afl-api.test.ts
+@@ -103,6 +103,7 @@
+ import { RESET_SQL } from '../../tools/db/rebuild-test';
+ import { runAflApiSettleCli } from '../../tools/current-season/settle-afl-api';
+ import { writeSnapshot } from '../afl-api-snapshot-fixture';
++import { predecessorText } from '../rollover-predecessor-fixture';
+ import {
+   AflApiReplayAbort,
+   assertAflApiAdjudicationBijection,
+@@ -2489,15 +2490,16 @@
+   it('V2-GAP-027: the settle CLI writes a valid reconciliation report for a real dry-run and a real apply', async () => {
+     const providerId = CASE_IDS.reportOut;
+     const label = `issue228-integration-${providerId}-gap027`;
+-    // A scratch project root: the tracked registry and seasons, and the tracked identities with
+-    // this suite's two synthetic team identities (exactly what `identities` above carries).
++    // A scratch project root: the tracked registry, the seasons registry and the tracked identities
++    // with this suite's two synthetic team identities (exactly what `identities` above carries).
++    // AFLDB-ISSUE-316: the case settles 2026 as the season IN PROGRESS, so the seasons registry is
++    // the explicit predecessor of the 2026 rollover (the tracked one seals 2026).
+     const projectRoot = mkdtempSync(join(tmpdir(), 'afldb-gap027-'));
+     try {
+       const reference = join(projectRoot, 'data', 'reference');
+       mkdirSync(reference, { recursive: true });
+-      for (const name of ['source-families.json', 'seasons.json']) {
+-        writeFileSync(join(reference, name), readFileSync(join(PROJECT_ROOT, 'data', 'reference', name)));
+-      }
++      writeFileSync(join(reference, 'source-families.json'), readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json')));
++      writeFileSync(join(reference, 'seasons.json'), predecessorText('data/reference/seasons.json'));
+       const identityJson = JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'afl-api-identities.json'), 'utf8'));
+       identityJson.teams.CD_T80 = { ...identityJson.teams.CD_T80, hist: HOME_HIST };
+       identityJson.teams.CD_T20 = { ...identityJson.teams.CD_T20, hist: AWAY_HIST };

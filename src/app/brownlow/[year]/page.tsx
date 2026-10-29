@@ -126,13 +126,18 @@ export default async function BrownlowYearPage({
       </div>
 
       <CollapsibleTable title="Full vote count">
+      <p className="muted" data-brownlow-recorded-eligibility="true">
+        Vote ranks include every player, regardless of eligibility. Eligibility labels show recorded
+        flags, which may be preserved while conflicting or missing evidence awaits review; they do
+        not represent a new eligibility determination.
+      </p>
       <div className="table-wrap">
         <SortableTable
           defaultSort="rank"
           defaultDir="asc"
           caption={`${rows.length} players polled votes`}
           columns={[
-            { key: 'rank', label: 'Rank', sortType: 'number', className: 'num' },
+            { key: 'rank', label: 'Vote rank', sortType: 'number', className: 'num' },
             { key: 'player', label: 'Player', sortType: 'text' },
             { key: 'votes', label: 'Votes', sortType: 'number', className: 'num' },
             { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
@@ -145,7 +150,7 @@ export default async function BrownlowYearPage({
               player: row.displayName,
               votes: row.votes,
               games: row.games ?? 0,
-              status: row.isWinner ? 'Winner' : row.isIneligible ? 'Ineligible' : '',
+              status: row.isWinner ? 'Winner' : row.isIneligible ? 'Recorded ineligible' : '',
             },
             element: (
               <tr key={row.playerId}>
@@ -157,7 +162,7 @@ export default async function BrownlowYearPage({
                 <td className="num">{formatNumber(row.games)}</td>
                 <td>
                   {row.isWinner && <strong>Winner</strong>}
-                  {row.isIneligible && <span className="badge badge-warn">Ineligible</span>}
+                  {row.isIneligible && <span className="badge badge-warn">Recorded ineligible</span>}
                 </td>
               </tr>
             ),

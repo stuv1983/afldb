@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "work_directory": "/tmp/i316-f004-pg-8AEBh2",
+  "socket": "/tmp/i316-f004-pg-8AEBh2/socket",
+  "server_pid": 884459,
+  "stopped_utc": "2026-10-24T19:52:51.363Z",
+  "remaining_private_processes": [],
+  "error": null,
+  "retained": "Stopped private data directory and server log; no existing cluster touched"
+}

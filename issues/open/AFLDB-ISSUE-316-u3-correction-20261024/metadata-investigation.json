@@ -1,0 +1,1375 @@
+{
+  "edit94": {
+    "id": 94,
+    "note": null,
+    "row_id": 17214,
+    "created_at": "2026-10-24T22:28:46.203865+11:00",
+    "new_values": {
+      "players": {
+        "2121": {
+          "kind": "remove"
+        }
+      },
+      "playersCount": 46,
+      "scoreUpdated": false,
+      "authorityKeys": [
+        {
+          "action": "mint",
+          "playerId": 2121,
+          "entityKey": "2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html"
+        }
+      ]
+    },
+    "old_values": {
+      "players": {
+        "2121": {
+          "goals": 0,
+          "kicks": 0,
+          "marks": 0,
+          "behinds": 0,
+          "hitouts": 0,
+          "tackles": 0,
+          "club_slug": "essendon",
+          "disposals": 0,
+          "frees_for": 0,
+          "handballs": 0,
+          "frees_against": 0,
+          "jumper_number": "8"
+        }
+      }
+    },
+    "table_name": "matches",
+    "field_group": "match_sheet",
+    "admin_user_id": 1
+  },
+  "columns": [
+    {
+      "data_type": "integer",
+      "table_name": "club_seasons",
+      "column_name": "id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "club_seasons",
+      "column_name": "season",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "club_seasons",
+      "column_name": "club_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "club_seasons",
+      "column_name": "played",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "club_seasons",
+      "column_name": "wins",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "club_seasons",
+      "column_name": "draws",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "club_seasons",
+      "column_name": "losses",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "club_seasons",
+      "column_name": "points_for",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "club_seasons",
+      "column_name": "points_against",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "club_seasons",
+      "column_name": "premiership_points",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "numeric",
+      "table_name": "club_seasons",
+      "column_name": "percentage",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "club_seasons",
+      "column_name": "ladder_rank",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "boolean",
+      "table_name": "club_seasons",
+      "column_name": "wooden_spoon",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "boolean",
+      "table_name": "club_seasons",
+      "column_name": "is_premier",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "club_seasons",
+      "column_name": "finals_played",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "club_seasons",
+      "column_name": "source_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "club_seasons",
+      "column_name": "import_batch_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "data_edits",
+      "column_name": "id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_edits",
+      "column_name": "table_name",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "data_edits",
+      "column_name": "row_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_edits",
+      "column_name": "field_group",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "jsonb",
+      "table_name": "data_edits",
+      "column_name": "old_values",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "jsonb",
+      "table_name": "data_edits",
+      "column_name": "new_values",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "data_edits",
+      "column_name": "admin_user_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_edits",
+      "column_name": "note",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "data_edits",
+      "column_name": "created_at",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "data_overrides",
+      "column_name": "id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_overrides",
+      "column_name": "entity_type",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_overrides",
+      "column_name": "entity_key",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "data_overrides",
+      "column_name": "field_group",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "jsonb",
+      "table_name": "data_overrides",
+      "column_name": "override_values",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "boolean",
+      "table_name": "data_overrides",
+      "column_name": "is_active",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "data_overrides",
+      "column_name": "admin_user_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "data_overrides",
+      "column_name": "created_at",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "data_overrides",
+      "column_name": "updated_at",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "match_period_scores",
+      "column_name": "match_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "match_period_scores",
+      "column_name": "club_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "match_period_scores",
+      "column_name": "period",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "match_period_scores",
+      "column_name": "goals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "match_period_scores",
+      "column_name": "behinds",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "match_period_scores",
+      "column_name": "points",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "match_period_scores",
+      "column_name": "source_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "text",
+      "table_name": "match_period_scores",
+      "column_name": "source_record_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "match_period_scores",
+      "column_name": "import_batch_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "match_period_scores",
+      "column_name": "imported_at",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "player_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "finals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "premierships",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "wins",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "draws",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "losses",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "goals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "behinds",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "kicks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "handballs",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "disposals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "marks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "tackles",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "hitouts",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "behinds_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "kicks_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "handballs_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "disposals_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "marks_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "tackles_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "hitouts_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "brownlow_votes",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_career_stats",
+      "column_name": "brownlow_medals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_career_stats",
+      "column_name": "clubs_played",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_career_stats",
+      "column_name": "seasons_played",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_career_stats",
+      "column_name": "debut_season",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_career_stats",
+      "column_name": "final_season",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "date",
+      "table_name": "player_career_stats",
+      "column_name": "debut_date",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "date",
+      "table_name": "player_career_stats",
+      "column_name": "last_match_date",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_career_stats",
+      "column_name": "best_goals_game",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_career_stats",
+      "column_name": "best_disposals_game",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "player_career_stats",
+      "column_name": "rebuilt_at",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "frees_for",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "frees_against",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_career_stats",
+      "column_name": "frees_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "player_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "season",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "club_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "finals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "wins",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "draws",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "losses",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "goals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "behinds",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "kicks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "handballs",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "disposals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "marks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "tackles",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "hitouts",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "disposals_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "tackles_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "hitouts_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "boolean",
+      "table_name": "player_club_season_stats",
+      "column_name": "is_premier",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "frees_for",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_club_season_stats",
+      "column_name": "frees_against",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_club_season_stats",
+      "column_name": "frees_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_clubs",
+      "column_name": "player_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_clubs",
+      "column_name": "club_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_clubs",
+      "column_name": "games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_clubs",
+      "column_name": "goals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_clubs",
+      "column_name": "first_season",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_clubs",
+      "column_name": "last_season",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_clubs",
+      "column_name": "first_match_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_clubs",
+      "column_name": "last_match_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "player_match_period_stats",
+      "column_name": "id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_match_period_stats",
+      "column_name": "player_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_match_period_stats",
+      "column_name": "match_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_match_period_stats",
+      "column_name": "club_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "period",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "kicks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "marks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "handballs",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "disposals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "goals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "behinds",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "hitouts",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "tackles",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "rebounds",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "inside_50s",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "clearances",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "clangers",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "frees_for",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "frees_against",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "contested",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "uncontested",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "contested_marks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "marks_inside_50",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "one_percenters",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "bounces",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "goal_assists",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_match_period_stats",
+      "column_name": "source_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "player_match_period_stats",
+      "column_name": "import_batch_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "player_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "season",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "primary_club_id",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "club_count",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "finals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "wins",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "draws",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "losses",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "goals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "behinds",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "kicks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "handballs",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "disposals",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "marks",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "tackles",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "hitouts",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "disposals_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "tackles_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "hitouts_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "brownlow_votes",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "USER-DEFINED",
+      "table_name": "player_season_stats",
+      "column_name": "brownlow_status",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "boolean",
+      "table_name": "player_season_stats",
+      "column_name": "is_premier",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "frees_for",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "player_season_stats",
+      "column_name": "frees_against",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "player_season_stats",
+      "column_name": "frees_recorded_games",
+      "table_schema": "public"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "source_id",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "text",
+      "table_name": "afltables_match",
+      "column_name": "family",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "text",
+      "table_name": "afltables_match",
+      "column_name": "external_record_id",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "afltables_match",
+      "column_name": "version_seq",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "season",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "text",
+      "table_name": "afltables_match",
+      "column_name": "round_code",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "round_number",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "USER-DEFINED",
+      "table_name": "afltables_match",
+      "column_name": "round_type",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "boolean",
+      "table_name": "afltables_match",
+      "column_name": "is_final",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "date",
+      "table_name": "afltables_match",
+      "column_name": "match_date",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "text",
+      "table_name": "afltables_match",
+      "column_name": "match_time",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "afltables_match",
+      "column_name": "venue_id",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "text",
+      "table_name": "afltables_match",
+      "column_name": "venue_raw",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "afltables_match",
+      "column_name": "home_club_id",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "afltables_match",
+      "column_name": "away_club_id",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_score",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_score",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "USER-DEFINED",
+      "table_name": "afltables_match",
+      "column_name": "result",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "afltables_match",
+      "column_name": "winner_club_id",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "margin",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "integer",
+      "table_name": "afltables_match",
+      "column_name": "attendance",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "USER-DEFINED",
+      "table_name": "afltables_match",
+      "column_name": "attendance_status",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "attendance_source_id",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q1_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q1_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q1_points",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q2_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q2_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q2_points",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q3_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q3_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q3_points",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q4_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q4_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "home_q4_points",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q1_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q1_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q1_points",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q2_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q2_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q2_points",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q3_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q3_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q3_points",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q4_goals",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q4_behinds",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "smallint",
+      "table_name": "afltables_match",
+      "column_name": "away_q4_points",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "bigint",
+      "table_name": "afltables_match",
+      "column_name": "projected_by_batch_id",
+      "table_schema": "staging"
+    },
+    {
+      "data_type": "timestamp with time zone",
+      "table_name": "afltables_match",
+      "column_name": "projected_at",
+      "table_schema": "staging"
+    }
+  ],
+  "triggers": null,
+  "authority93": {
+    "id": 93,
+    "is_active": true,
+    "created_at": "2026-10-24T22:28:46.203865+11:00",
+    "entity_key": "2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html",
+    "updated_at": "2026-10-24T22:28:46.203865+11:00",
+    "entity_type": "player_match_stats",
+    "field_group": "lineup",
+    "admin_user_id": 1,
+    "override_values": {
+      "present": false
+    }
+  }
+}

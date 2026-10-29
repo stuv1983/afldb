@@ -52,19 +52,14 @@ function visibleLinks(viewer: AdminNavViewer, links: GatedLink[]): AdminNavLink[
 /**
  * The groups, in the order they appear.
  *
- * A contributor sees one item, because there is one they can reach: the
- * upload form. Everything else in the admin area bounces them back to it
- * (`requireAdmin` redirects a contributor to /admin/upload), so listing more
- * would be listing places to be turned away from.
+ * A contributor sees one item: their own password. The upload form they used to
+ * reach is retired (AFLDB V2 Launch F, V2-GAP-013); `requireAdmin` still lands a
+ * contributor on /admin/upload, which only explains the retirement, so a nav link
+ * to it would advertise a control that no longer exists.
  */
 export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
   if (viewer.role === 'contributor') {
     return [
-      {
-        id: 'data',
-        label: 'Data',
-        links: [{ href: '/admin/upload', label: 'Upload a file' }],
-      },
       {
         id: 'account',
         label: 'Account',
@@ -73,11 +68,18 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
     ];
   }
 
+  // Stage 5 (AFLDB V2, plan D9): the operations centre follows the dashboard. It is read-only and
+  // gated on its own capability; the mutations it links to keep theirs.
   const groups: AdminNavGroup[] = [
     {
       id: 'overview',
       label: 'Overview',
-      links: [{ href: '/admin', label: 'Dashboard', exact: true }],
+      links: [
+        { href: '/admin', label: 'Dashboard', exact: true },
+        ...visibleLinks(viewer, [
+          { href: '/admin/operations', label: 'Operations centre', capability: 'operations.centre.read' },
+        ]),
+      ],
     },
   ];
 
@@ -98,9 +100,13 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
   ]);
   if (dataLinks.length > 0) groups.push({ id: 'data', label: 'Data', links: dataLinks });
 
+  // Stage 5 (AFLDB V2, plan D9/D10): the "Legacy file intake" link is gone for an admin and a super
+  // admin. CSV upload to the final tables is a retired runtime path (the page and its route only
+  // refuse or show history); a link to it would advertise a control that no longer exists. The
+  // contributor branch above is untouched: that role is already refused by getAdminUser
+  // (AFLDB-ISSUE-186) and acquisition.legacyIntake stays declared and enforced at the page.
   const acquisitionLinks = visibleLinks(viewer, [
     { href: '/admin/current-season', label: 'Current season', capability: 'acquisition.currentSeason' },
-    { href: '/admin/upload', label: 'Legacy file intake', capability: 'acquisition.legacyIntake' },
   ]);
   if (acquisitionLinks.length > 0) groups.push({ id: 'acquisition', label: 'Acquisition', links: acquisitionLinks });
 

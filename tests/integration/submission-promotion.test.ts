@@ -46,15 +46,22 @@
  * validation is parked inside its validator (the `@/lib/ingest/datasets`
  * wrapper) while a reject, approve, promote or second validation commits,
  * or a validation's write transaction is held on a row lock while an
- * approve queues behind it. Approve and reject go through the real
- * `decideSubmission`; only its session/cache dependencies are stubbed.
+ * approve queues behind it.
+ *
+ * AFLDB V2 Stage 5 retired the `decideSubmission` Server Action (it now only
+ * refuses). The concurrency contracts below belong to the pipeline LIBRARY, so
+ * approve and reject are driven by `decideSubmission` here: a local test helper
+ * that runs the retired action's exact statements on the auth pool, so every
+ * interleaving is still exercised. Unexecuted on the V2 workstation (no
+ * database); the retired action's refusal is proved in
+ * tests/submission-review-actions.test.ts.
  */
 import './guard';
 
 import postgres from 'postgres';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { decideSubmission } from '@/app/admin/submissions/[id]/actions';
+import { authSql } from '@/db/authClient';
 import {
   promoteSubmission,
   SubmissionChangedError,
@@ -415,8 +422,8 @@ describe('AFLDB-ISSUE-175 promotion locking and atomicity', () => {
       status: 'approved', verdict: 'ok', playerId, dob: '2002-03-04',
     });
 
-    // decideSubmission's reject path (src/app/admin/submissions/[id]/actions.ts)
-    // runs this exact statement on the auth pool. Locking is per-row and
+    // The retired decideSubmission's reject path (see the helper above)
+    // ran this exact statement on the auth pool. Locking is per-row and
     // per-transaction, not per-role, so reproducing it here on the owner
     // connection exercises the same PostgreSQL mechanism ISSUE-175 depends
     // on without pulling in session/auth mocking that is out of this
@@ -558,6 +565,48 @@ function decision(id: number, value: 'approve' | 'reject'): FormData {
   form.set('id', String(id));
   form.set('decision', value);
   return form;
+}
+
+/**
+ * The statements of the retired `decideSubmission` action (AFLDB-ISSUE-273: lock the
+ * submission BEFORE the guarded UPDATE), run on the auth pool as the action ran them.
+ * A test fixture for the pipeline library's races, not application code.
+ */
+async function decideSubmission(
+  _previous: object, formData: FormData,
+): Promise<{ message?: string; error?: string }> {
+  const id = Number(formData.get('id'));
+  const verdict = String(formData.get('decision'));
+  if (verdict === 'approve') {
+    const updated = await authSql.begin(async (tx) => {
+      await tx`SELECT id FROM data_submissions WHERE id = ${id} FOR UPDATE`;
+      const [row] = await tx<{ id: number }[]>`
+        UPDATE data_submissions
+           SET status = 'approved', reviewed_by = ${fixtureAdminId}, reviewed_at = now()
+         WHERE id = ${id}
+           AND status = 'validated'
+           AND NOT EXISTS (
+                 SELECT 1 FROM data_submission_rows r
+                  WHERE r.submission_id = ${id} AND (r.verdict = 'error' OR r.verdict IS NULL)
+               )
+        RETURNING id
+      `;
+      return row;
+    });
+    return updated
+      ? { message: 'Approved.' }
+      : { error: 'Only a validated submission with no error rows can be approved.' };
+  }
+  const [rejected] = await authSql<{ id: number }[]>`
+    UPDATE data_submissions
+       SET status = 'rejected', reviewed_by = ${fixtureAdminId}, reviewed_at = now()
+     WHERE id = ${id}
+       AND status IN ('staged', 'validated', 'approved')
+    RETURNING id
+  `;
+  return rejected
+    ? { message: 'Rejected.' }
+    : { error: 'Only a staged, validated, or approved submission can be rejected.' };
 }
 
 describe('AFLDB-ISSUE-273 validation against concurrent review', () => {

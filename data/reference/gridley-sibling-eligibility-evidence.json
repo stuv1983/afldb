@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "reference": "V2-GAP-029",
+  "ownerApproved": false,
+  "classification": "criterion disagreement; remains strict and unapproved",
+  "profile": "players/J/Jarryd_Lyons.html",
+  "gridleyPlayerId": 3746,
+  "sibling": {
+    "name": "Corey Lyons",
+    "aflPlayerId": 1290,
+    "listedClub": "Brisbane Lions",
+    "draftYear": 2016,
+    "aflAppearancesOnDeparture": 0
+  },
+  "sources": [
+    {
+      "url": "https://www.lions.com.au/news/830119/six-depart-the-den",
+      "period": "2020 departure, before 2021 season",
+      "fact": "The club explicitly records no senior appearance during his Brisbane career."
+    },
+    {
+      "url": "https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
+      "period": "2021 mid-season draft coverage",
+      "fact": "The league identifies Jarryd as his older brother and says Corey spent 2017-2020 at Brisbane without an AFL game; the subsequent Aspley NEAFL/VFL statistics describe the state competition, not top-tier historical VFL/AFL appearances."
+    }
+  ],
+  "reviewedOn": "2026-10-20",
+  "rule": "has_brother requires the brother to have player_career_stats.games > 0; an AFL-listed sibling or modern state-league VFL appearances alone do not establish that.",
+  "finding": "Independent evidence explains the listed-but-unplayed relative. No qualifying missing AFL match is established. These are not repaired by inventing a canonical player or sibling pair.",
+  "approvalNeeded": "Approve only the enumerated 21 Jarryd Lyons/brother differences as an external eligibility-population disagreement, while retaining raw strict mismatches and the existing top-tier played-sibling rule. This does not assert Gridley intended listed players or redefine played. No approval is applied.",
+  "cells": [
+    {
+      "board": 562,
+      "cell": "2-1",
+      "date": "2025-01-28",
+      "row": "brother",
+      "col": "BL"
+    },
+    {
+      "board": 564,
+      "cell": "2-2",
+      "date": "2025-01-30",
+      "row": "brother",
+      "col": "games150"
+    },
+    {
+      "board": 606,
+      "cell": "2-2",
+      "date": "2025-03-13",
+      "row": "brother",
+      "col": "2020s"
+    },
+    {
+      "board": 624,
+      "cell": "2-0",
+      "date": "2025-03-31",
+      "row": "brother",
+      "col": "GC"
+    },
+    {
+      "board": 624,
+      "cell": "2-2",
+      "date": "2025-03-31",
+      "row": "brother",
+      "col": "2020s"
+    },
+    {
+      "board": 682,
+      "cell": "2-1",
+      "date": "2025-05-28",
+      "row": "brother",
+      "col": "marks10match"
+    },
+    {
+      "board": 682,
+      "cell": "2-2",
+      "date": "2025-05-28",
+      "row": "brother",
+      "col": "prelimfinals1"
+    },
+    {
+      "board": 693,
+      "cell": "1-0",
+      "date": "2025-06-08",
+      "row": "brother",
+      "col": "games100"
+    },
+    {
+      "board": 728,
+      "cell": "2-2",
+      "date": "2025-07-13",
+      "row": "brother",
+      "col": "2010s"
+    },
+    {
+      "board": 774,
+      "cell": "2-1",
+      "date": "2025-08-28",
+      "row": "brother",
+      "col": "prelimfinals1"
+    },
+    {
+      "board": 774,
+      "cell": "2-2",
+      "date": "2025-08-28",
+      "row": "brother",
+      "col": "games100"
+    },
+    {
+      "board": 779,
+      "cell": "2-0",
+      "date": "2025-09-02",
+      "row": "brother",
+      "col": "AD"
+    },
+    {
+      "board": 779,
+      "cell": "2-1",
+      "date": "2025-09-02",
+      "row": "brother",
+      "col": "handballs20"
+    },
+    {
+      "board": 779,
+      "cell": "2-2",
+      "date": "2025-09-02",
+      "row": "brother",
+      "col": "games150"
+    },
+    {
+      "board": 784,
+      "cell": "2-0",
+      "date": "2025-09-07",
+      "row": "brother",
+      "col": "GC"
+    },
+    {
+      "board": 784,
+      "cell": "2-2",
+      "date": "2025-09-07",
+      "row": "brother",
+      "col": "2010s"
+    },
+    {
+      "board": 792,
+      "cell": "2-1",
+      "date": "2025-09-15",
+      "row": "brother",
+      "col": "disposals25"
+    },
+    {
+      "board": 797,
+      "cell": "2-1",
+      "date": "2025-09-20",
+      "row": "brother",
+      "col": "BL"
+    },
+    {
+      "board": 805,
+      "cell": "2-0",
+      "date": "2025-09-28",
+      "row": "brother",
+      "col": "BL"
+    },
+    {
+      "board": 819,
+      "cell": "2-1",
+      "date": "2025-10-12",
+      "row": "brother",
+      "col": "marks10match"
+    },
+    {
+      "board": 819,
+      "cell": "2-2",
+      "date": "2025-10-12",
+      "row": "brother",
+      "col": "prelimfinals1"
+    }
+  ],
+  "externalCriterion": "Has at least one brother who has played in the VFL/AFL.",
+  "interpretationLimit": "The frozen key lists Jarryd despite no qualifying AFL senior appearance established for Corey. The league documents modern state-league VFL/NEAFL football. The answer key alone does not prove whether Gridley counts listing, state-league VFL, or contains a key error.",
+  "proposedImpact": {
+    "strictFindings": 149,
+    "policyUnapprovedBefore": 71,
+    "policyUnapprovedAfterOwnerApproval": 50,
+    "existingApprovedDeferrals": 78,
+    "newApprovedDisagreementsIfApproved": 21
+  }
+}

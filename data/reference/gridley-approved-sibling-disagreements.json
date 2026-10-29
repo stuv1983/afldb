@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "reference": "V2-GAP-029",
+  "ownerApproved": true,
+  "decision": "D-GAP029-21",
+  "provenance": "docs/v2/owner-instruction-2026-10-20.md",
+  "evidenceCommit": "ed4c429c",
+  "evidence": "data/reference/gridley-sibling-eligibility-evidence.json",
+  "evidenceSha256": "a23fadce6c014404197bf94c698d6a95a60ed10fddce7e74c1d7a8b21b46c6f0",
+  "scope": "Only the 21 enumerated sibling differences, Jarryd Lyons / Corey Lyons, exact board/cell/criterion pair, identity, Gridley-only direction and sole lacking has_brother builder. Duplicate or additional findings remain unapproved.",
+  "dataMatches": 0,
+  "preservedRule": "player_career_stats.games > 0"
+}

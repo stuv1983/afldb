@@ -1,0 +1,12 @@
+{
+  "utc": "2026-10-24T20:28:11.230Z",
+  "destination": "afldb",
+  "user": "arm",
+  "sudo": false,
+  "read_only": true,
+  "script": "operational-observation-v2.sh",
+  "script_sha256": "8ac6c6fea81743595418139bb257903ee8b2bd23881cc66615b4f49fd9e095dc",
+  "launcher": "observe-only.cjs",
+  "launcher_sha256": "2ec301ce3e7fda50d7116d4dc87bb51689445890b9e1dedeaad7a2db5a5cc268",
+  "invokes_frozen_execute": false
+}

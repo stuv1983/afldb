@@ -517,6 +517,22 @@ pre-match season feed, and it must provide:
 - the genuine TBC date/time representation, if present;
 - whole-season validation of the pre-match shape and of any new status or key variants.
 
+**Owner migration-policy separation (2026-10-20):** B2 gates wiring/first applying the new-season
+fixture schedule writer, including authentic TBC/status/key and venue/round-mapping evidence
+and separately approved first apply. It does not prevent an inactive-writer backend migration
+preservation rehearsal. B2 remains OPEN; no feed was acquired and no first apply was authorised.
+See `docs/v2/migration-acceptance-2026-10-20.md`. ISSUE-316 sequencing remains unchanged.
+
+**Local release review (2026-10-19): gate classification.** B2 is first-season operational
+acceptance based on seasonal source evidence, not a code contract that requires the integer
+2027. The implementation's technical contract is already exercised using authentic retained
+2026 `SCHEDULED` and `UNCONFIRMED_TEAMS` bytes (17/17 fixture integration, 67/67 contract tests;
+the 2026 feed dry run is established evidence). Those inputs cannot demonstrate the unseen
+whole-season 2027 shape, genuine TBC representation if present, new status/key variants, or
+the season's venue/round mappings. Therefore B2 and owner-approved first apply remain mandatory.
+The same-day Launch F public season-list check found no 2027 compSeason; this review reused that
+evidence and made no further API request. No simulated 2027 response or owner waiver is implied.
+
 - **D-229-1 — DECIDED (status routing), revised in pass 6 on B1 evidence (§2c).**
   - `SCHEDULED`: eligible for fixture projection, subject to the rest of the contract.
   - `UNCONFIRMED_TEAMS`: **now also eligible** for fixture projection. Authentic B1 bytes show it is
@@ -698,3 +714,71 @@ Pass 7 (B1 retention):
   operator wrote it from the B1 `B64` output. It is byte-exact, sha256 `e39ac375…7da7`, 1,154 bytes.
 - **M** `.gitattributes` (adds `-text -diff !eol` for the `05-…` slice)
 - **M** `tests/afl-api-match.test.ts` (new describe block: three DB-free tests)
+
+## 7. AFLDB V2 Launch F — the writer (2026-10-19, `v2/rebuild` `d760280e`; isolated PostgreSQL 16 only)
+
+The fixture writer is built and tested on isolated PostgreSQL 16 against D-229-1..8a. The issue
+stays open for B2 and the first approved apply.
+
+**Pipeline.** Each stage hands to the next:
+
+1. Immutable fixtures-only snapshot. `verifyManifest` re-hashes every listed file, and the season
+   feed must be among them.
+2. Validation: the season is declared and not sealed, and the ingestion gate is on.
+3. Staging (`stageAflApiFixtureFeed`, pure). It checks the competition and season, refuses feed
+   collisions by name, and sorts its output.
+4. Identity resolution. Clubs resolve via `legacy_club_hist`, the venue via `legacy_name`. A
+   missing or ambiguous identity refuses; nothing is ever created.
+5. Reconciliation against the post-run state (I-1/I-2) and against played `matches` (I-3).
+6. One transaction under the per-season fixture lock (namespace 717275): an `import_batches` row,
+   INSERT/UPDATE of `fixtures`, then the batch is finalised.
+
+Any refusal writes nothing. A run with no change writes nothing and opens no batch. A dry run
+executes every write and then rolls back.
+
+**Lifecycle.**
+
+| Status | What the writer does |
+|---|---|
+| scheduled | created, rescheduled, reinstated or unchanged |
+| `CONCLUDED` | `completed_retained`; never written |
+| `POSTPONED` | refused unless acknowledged; then sets date and time to NULL (TBC) |
+| `CANCELLED` | refused unless acknowledged; then sets `cancelled`, with the provider status and id as the reason |
+| `ABANDONED` | refused unless acknowledged; then sets `cancelled` with an `abandoned:` reason |
+
+Acknowledgement is per run (`--acknowledge-unobserved-status`, exact spellings), which preserves
+D-229-3. An acknowledged transition only updates an existing provider-owned row; it never creates
+one.
+
+**D-229-6.** Admin `editFixture` refuses provider-owned rows (`provider_owned`, audited).
+
+**D-229-7.** Re-ingest after a rebuild matches on `(source_id, source_record_id)`; `fixture_key`
+may be new.
+
+**D-229-8/8a.** No match-spine rows and no absence sweep: provider rows missing from a feed are
+listed, never touched.
+
+**Evidence.**
+- `tests/integration/v2-fixture-writer.test.ts` passes 17/17 on both isolated databases. It covers
+  create, idempotent replay, reschedule, dry run, rebuild re-ingest, each lifecycle case, each
+  refusal, and D-229-6.
+- `tests/v2-fixture-contract.test.ts` passes 67/67.
+- The tracked 2026 feed, dry-run against the locally rebuilt history: 217 CONCLUDED, 1 SCHEDULED,
+  0 refused; it would create `CD_M20260142901`, and leaves 0 rows behind.
+
+**B2 is still open.** A read-only GET of the public compSeasons list (2026-10-19) shows the latest
+season is `CD_S2026014` (2026). No 2027 feed exists to capture.
+
+**Next, in order:**
+1. Capture B2.
+2. Run `--validate-only`, then `--dry-run`.
+3. Review the TBC representation.
+4. The owner approves the first `--apply`.
+
+Files: **N** `packages/acquisition/src/fixture-lifecycle.ts`,
+`src/lib/acquisition/afl-api-fixture-writer.ts`,
+`tools/current-season/settle-afl-api-fixture-schedule.ts`,
+`tests/integration/v2-fixture-writer.test.ts`; **M** `src/db/queries/admin-fixtures.ts`,
+`src/lib/fixtures/spec.ts`, `src/app/admin/fixtures/actions.ts`,
+`tools/current-season/settle-afl-api-fixtures.ts` (`verifyManifest` exported), `package.json`,
+`tests/v2-fixture-contract.test.ts`, `tests/admin-fixture-actions.test.ts`.

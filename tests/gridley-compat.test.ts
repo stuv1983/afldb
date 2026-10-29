@@ -27,13 +27,100 @@ import {
 } from '@/search/gridley-compat';
 import {
   buildCriterionListingIndex, buildResolver, criterionListedElsewhere, knownAnswerAdjudication, knownAnswerEvidence, knownAnswerEvidenceStaleness, nationalPickKeyDisagreement,
-  rookieSourceCoverageGap, teammateListMembership, triageDraftFinding, type KnownAnswerFacts, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
+  rookieSourceCoverageGap, siblingCriterionDisagreement, teammateListMembership, tradesAfterBoard, triageDraftFinding, type KnownAnswerFacts, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
 } from './gridley-corpus-support';
 import { GRIDLEY_KNOWN_ANSWER_COLUMNS, loadGridleyKnownAnswerAdjudications } from './gridley-known-answer-adjudications';
 import { CAPTAIN_CENSUS, classifyIssue225Cell, ISSUE225_GIDS, issue225Population, TEAMMATE_CENSUS } from './issue225-acceptance';
+import { gridleyPolicyResults, loadGridleyDeferrals, type PolicyFinding } from './gridley-release-policy';
 import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from './rookie-relisting-outcomes';
 
 const FIXTURES = join(__dirname, 'fixtures', 'gridley');
+
+describe('GAP-029 release policy', () => {
+  it('accepts only the 21 owner-approved sibling disagreements while retaining every strict finding', () => {
+    const evidence = JSON.parse(readFileSync(join(__dirname, '../data/reference/gridley-sibling-eligibility-evidence.json'), 'utf8'));
+    expect(evidence.ownerApproved).toBe(false);
+    expect(evidence.cells).toHaveLength(21);
+    const base = { ...evidence.cells[0], profile: evidence.profile, gridleyPlayerId: 3746,
+      inGridley: true, inAfldb: false, lackingBuilders: ['has_brother'] };
+    expect(siblingCriterionDisagreement(base)).toContain('criterion disagreement');
+    for (const changed of [{ board: -1 }, { profile: 'players/X/Other.html' }, { gridleyPlayerId: 1 },
+      { inGridley: false }, { inAfldb: true }, { lackingBuilders: ['has_brother', 'played_for_club'] }]) {
+      expect(siblingCriterionDisagreement({ ...base, ...changed })).toBeNull();
+    }
+    const policy = loadGridleyDeferrals();
+    const findings = evidence.cells.map((cell: { board: number; cell: string; row: string; col: string }) => ({
+      ...cell, category: 'criterion disagreement', siblingEvidence: { ...base, ...cell },
+    }));
+    const original = JSON.stringify(findings);
+    const result = gridleyPolicyResults(findings, policy);
+    expect(result.strictCorpusParity.passed).toBe(false);
+    expect(result.strictCorpusParity.findings).toBe(21);
+    expect(result.approvedPolicyConformance.passed).toBe(true);
+    expect(result.approvedDeferrals).toEqual({ findings: 0, dataMatches: 0 });
+    expect(result.approvedDisagreements).toEqual({ findings: 21, dataMatches: 0 });
+    expect(result.approvedTotal).toEqual({ findings: 21, dataMatches: 0 });
+    expect(JSON.stringify(findings)).toBe(original);
+    for (const changed of [{ board: -1 }, { cell: '0-0' }, { row: 'other' }, { col: 'other' },
+      { profile: 'players/X/Other.html' }, { gridleyPlayerId: 1 }, { inGridley: false },
+      { inAfldb: true }, { lackingBuilders: ['has_brother', 'played_for_club'] }]) {
+      const finding = { ...findings[0], siblingEvidence: { ...base, ...changed } };
+      expect(gridleyPolicyResults([finding], policy).approvedPolicyConformance.unapprovedDifferences).toEqual([finding]);
+    }
+    for (const finding of [{ ...findings[0], category: 'dataset gap' },
+      { ...findings[0], siblingEvidence: undefined }, { ...findings[0], board: -1 }]) {
+      expect(gridleyPolicyResults([finding], policy).approvedPolicyConformance.passed).toBe(false);
+    }
+    expect(gridleyPolicyResults([...findings, findings[0]], policy).approvedPolicyConformance.unapprovedDifferences).toEqual([findings[0]]);
+    const remaining = JSON.parse(readFileSync(join(__dirname, '../docs/v2/evidence/gap-029-evidence-strict-final.json'), 'utf8'))
+      .rawStrictFindings.filter((finding: PolicyFinding) => finding.category !== 'criterion disagreement');
+    const all = gridleyPolicyResults([...remaining, ...findings], policy);
+    expect(all.strictCorpusParity).toEqual({ passed: false, findings: 149 });
+    expect(all.approvedTotal).toEqual({ findings: 99, dataMatches: 0 });
+    expect(all.approvedPolicyConformance.unapprovedDifferences).toHaveLength(50);
+  });
+  it('bounds the seven retained deferrals to their original 78 cells and keeps strict results', () => {
+    const policy = loadGridleyDeferrals();
+    expect(policy.criteria).toEqual(['intrulesplayer', 'irish', 'nfl', 'recruitedByDodoro', 'season2024player', 'spoils5season', 'tasmanian']);
+    expect(policy.cells).toHaveLength(78);
+    const boards = loadCorpus();
+    for (const cell of policy.cells) {
+      const board = boards.find((b) => b.board === cell.board)!;
+      const [r, c] = cell.cell.split('-').map(Number);
+      expect([board.rows[r].id, board.cols[c].id]).toEqual([cell.row, cell.col]);
+      const unsupported = [board.rows[r], board.cols[c]]
+        .filter((item) => mapGridleyCriterion(item, STUB_LOOKUPS).status === 'unsupported');
+      expect(unsupported.length).toBeGreaterThan(0);
+      expect(unsupported.every((item) => policy.criteria.includes(item.id))).toBe(true);
+    }
+    const findings = policy.cells.map((cell) => ({ ...cell, category: 'unsupported' }));
+    const original = JSON.stringify(findings);
+    const result = gridleyPolicyResults(findings, policy);
+    expect(result.strictCorpusParity).toEqual({ passed: false, findings: 78 });
+    expect(result.approvedDeferrals).toEqual({ findings: 78, dataMatches: 0 });
+    expect(result.approvedPolicyConformance).toEqual({ passed: true, unapprovedDifferences: [] });
+    expect(JSON.stringify(findings)).toBe(original);
+  });
+
+  it('fails strict parity and policy for unexpected categories, cells and criterion pairs', () => {
+    const policy = loadGridleyDeferrals();
+    const cell = policy.cells[0];
+    const unexpected: PolicyFinding[] = [
+      { ...cell, category: 'incorrect known answer' },
+      { ...cell, category: 'dataset gap' },
+      { ...cell, category: 'source coverage gap' },
+      { ...cell, category: 'unsupported', board: -1 },
+      { ...cell, category: 'unsupported', row: 'new-unsupported-criterion' },
+      { ...cell, category: 'unsupported', cell: 'new-cell' },
+    ];
+    for (const finding of unexpected) {
+      const result = gridleyPolicyResults([finding], policy);
+      expect(result.strictCorpusParity.passed).toBe(false);
+      expect(result.approvedDeferrals.findings).toBe(0);
+      expect(result.approvedPolicyConformance).toEqual({ passed: false, unapprovedDifferences: [finding] });
+    }
+  });
+});
 
 export type CorpusBoard = {
   board: number;
@@ -106,7 +193,8 @@ describe('Gridley corpus fixture', () => {
     }
     expect(cells).toBe(10287);
     expect(entries).toBe(1512436);
-  });
+    // About 1.5M per-entry expectations: 27-35 s on the Linux verification host, astride the 30 s default.
+  }, 120_000);
 });
 
 describe('Gridley compatibility mapping -- exhaustive classification', () => {
@@ -428,6 +516,34 @@ describe('Gridley corpus support (AFLDB-ISSUE-222)', () => {
     // His only pick inside 1-10 is that rookie pick 8: not a national pick.
     expect(triageDraftFinding(gwsSamReid, top10).cause).toBe('non_national_pick_in_range');
     expect(triageDraftFinding(gwsSamReid, { builder: 'national_draft_pick_between', params: { from: '30', to: '40' } }).cause).toBe('satisfied');
+  });
+
+  it('V2-GAP-029: the sourced board-541 adjudication cannot hide another trade discrepancy', () => {
+    // Board 541 (2025-01-07), Western Bulldogs 2020 national pick 1 traded to Gold Coast in the 2025
+    // trade period (official club pages read; see data/reference/gridley-board-541-trade.json).
+    const rows: LinkedDraftRow[] = [
+      { draftYear: 2020, draftKind: 'national', pickNumber: 1, club: 'Western Bulldogs' },
+      { draftYear: 2025, draftKind: 'trade', pickNumber: null, club: 'Gold Coast' },
+    ];
+    const base = { rows, threshold: 1, inGridley: false, inAfldb: true,
+      board: 541, cell: '2-1', row: 'traded1', col: 'WB',
+      profile: 'players/J/Jamarra_Ugle-Hagan.html', gridleyPlayerId: 3663 };
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07' })).toContain('V2-GAP-029 board 541 adjudication');
+    for (const changed of [{ board: 542 }, { cell: '2-0' }, { profile: 'players/X/Someone_Else.html' },
+      { gridleyPlayerId: 1 }, { row: 'traded2' }, { col: 'GC' }, { boardDate: '2025-10-16' }]) {
+      expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', ...changed })).toBeNull();
+    }
+    // Once the 2025 trade period is over the key must contain him: a real disagreement again.
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-11-01' })).toBeNull();
+    expect(tradesAfterBoard({ ...base, boardDate: '2026-08-28' })).toBeNull();
+    // Never the reverse direction, and never a player who is not in AFLDB's set.
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', inGridley: true, inAfldb: false })).toBeNull();
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', inGridley: false, inAfldb: false })).toBeNull();
+    // A prior trade already satisfies the threshold at the board date: Gridley's omission is not explained by timing.
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', rows: [{ draftYear: 2019, draftKind: 'trade', pickNumber: null, club: 'Essendon' }, ...rows] })).toBeNull();
+    // A threshold the player's trades never reach is not a timing matter either, and a draft pick is not a trade.
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', threshold: 2 })).toBeNull();
+    expect(tradesAfterBoard({ ...base, boardDate: '2025-01-07', rows: rows.slice(0, 1) })).toBeNull();
   });
 
   it('D1 (§11.19.12): the national-pick key disagreement fires only for a non-national pick inside a national range', () => {

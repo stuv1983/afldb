@@ -1,0 +1,39 @@
+{
+  "issue": "AFLDB-ISSUE-316",
+  "status": "STOP_BEFORE_FROZEN_PREFLIGHT",
+  "stopped_utc": "2026-10-24T20:07:59.245Z",
+  "manifest_sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+  "review_sha256": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2",
+  "report_sha256": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+  "frozen_package_hashes": "PASS",
+  "manifest_members_verified": 40,
+  "validation_evidence_pins_verified": 8,
+  "host_identity": {
+    "hostname": "afldb-prod",
+    "user": "arm",
+    "status": "PASS"
+  },
+  "operational_observation": {
+    "status": "FAIL",
+    "producer": "sudo -n /usr/bin/ps -eww -o pid=,ppid=,comm=,args=",
+    "exit": 1,
+    "stderr": "sudo: a password is required",
+    "process_output_readable": false,
+    "session_observation": "NOT_REACHED",
+    "systemd_observation": "NOT_REACHED"
+  },
+  "production_database_contact": false,
+  "frozen_preflight_invoked": false,
+  "frozen_wrapper_invoked": false,
+  "reviewed_transaction_invoked": false,
+  "execution_attempt_consumed": false,
+  "attempt_marker_exists": false,
+  "production_writes": 0,
+  "postcheck": "NOT_RUN",
+  "u3_confirmed": false,
+  "u4": "Route B",
+  "brownlow": "untouched",
+  "production_readiness": "NO-GO",
+  "automatic_retry": false,
+  "next_action": "Owner resolves/adjudicates the failed noninteractive read-only host-observation privilege gate; stop here, no bypass or automatic retry. A later resumed execution must repeat all pre-execution gates."
+}

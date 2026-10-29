@@ -1,0 +1,17 @@
+{
+  "started": "2026-10-25T03:30:13.660Z",
+  "ended": "2026-10-25T03:30:57.800Z",
+  "source_commit": "def676517da3955aa18db3606785463aac464188",
+  "command": [
+    "node",
+    "D:\\dev\\afldbV2\\node_modules\\vitest\\vitest.mjs",
+    "run",
+    "tests/draftguru-acquisition.test.ts",
+    "tests/draftguru-import.test.ts",
+    "tests/fitzroy-core-import.test.ts",
+    "--reporter=json",
+    "--outputFile=D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSUE-316-dp-proposal-20261025\\validation\\retained-input-suites.results.json"
+  ],
+  "exit_code": 0,
+  "signal": null
+}

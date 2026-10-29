@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type postgres from 'postgres';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { RESERVED_EXAMPLE_DOMAINS, RESERVED_TEST_TLDS } from '../tools/db/promotion-inventory';
 import {
@@ -46,6 +46,15 @@ import {
   type ProdActorRow,
   type TargetName,
 } from '../tools/rebuild/draftguru/register_issue224_s9_players';
+
+// A DB-free unit file: the paths under test refuse before any query. `@/db/client` builds its pool
+// at import and throws without DATABASE_URL, which the D5 test-DSN policy removes when no test
+// database is configured, so the module is replaced; a test that reached the database would throw.
+vi.mock('@/db/client', () => ({
+  sql: () => {
+    throw new Error('DB-free unit test reached the database client');
+  },
+}));
 
 const VALID_SHA = 'a'.repeat(64);
 const VALID_REVISION = 'a'.repeat(40);
@@ -1014,7 +1023,7 @@ describe('register_issue224_s9_players — assertViableProdActor (AFLDB-ISSUE-25
   it('refuses the exact ISSUE-224/245 recovery/fixture actor shape (disabled, super_admin, no credentials)', () => {
     // insertAttributionOnlyActor (tools/migration/rebuild_manual_registrations.ts) always writes
     // exactly this shape: disabled at creation, NULL password_hash, NULL totp_secret. Confirmed by
-    // the retained ISSUE-251 candidate census (issues/open/AFLDB-ISSUE-251.md §4.2).
+    // the retained ISSUE-251 candidate census (issues/closed/AFLDB-ISSUE-251.md §4.2).
     expect(() => assertViableProdActor({
       id: 99, role: 'super_admin', isActive: false, hasPassword: false, hasTotp: false,
     })).toThrow(/active=false, hasPassword=false, hasTotp=false/);
@@ -1298,7 +1307,7 @@ describe('register_issue224_s9_players — DATABASE_URL import-time requirement 
   const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
   const playersSource = readFileSync(join(REPO_ROOT, 'src', 'db', 'queries', 'players.ts'), 'utf8');
   const clientSource = readFileSync(join(REPO_ROOT, 'src', 'db', 'client.ts'), 'utf8');
-  const runbook = readFileSync(join(REPO_ROOT, 'issues', 'open', 'AFLDB-ISSUE-251.md'), 'utf8');
+  const runbook = readFileSync(join(REPO_ROOT, 'issues', 'closed', 'AFLDB-ISSUE-251.md'), 'utf8');
   const runbookSection = runbook.slice(runbook.indexOf(
     '### 21.0a Shell, host guard, session variables and CLI environment',
   ));

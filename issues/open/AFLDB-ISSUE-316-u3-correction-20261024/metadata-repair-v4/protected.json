@@ -1,0 +1,34 @@
+{
+  "required": [
+    "public.data_overrides",
+    "public.matches",
+    "public.player_match_stats",
+    "public.match_period_scores",
+    "public.player_match_period_stats",
+    "public.player_career_stats",
+    "public.player_season_stats",
+    "public.player_club_season_stats",
+    "public.player_clubs",
+    "public.players",
+    "public.clubs",
+    "public.club_seasons",
+    "public.seasons",
+    "public.import_batches",
+    "public.import_rejections",
+    "public.canonical_applications",
+    "public.brownlow_season_votes",
+    "public.brownlow_round_votes",
+    "public.brownlow_vote_entry_state",
+    "public.brownlow_season_authority",
+    "public.auth_audit_log",
+    "staging.afltables_player_match",
+    "staging.afltables_match",
+    "staging.afl_api_lineup",
+    "staging.afl_api_brownlow_vote",
+    "afldb_meta.schema_migrations"
+  ],
+  "optional": [
+    "public.brownlow_eligibility_decisions",
+    "public.brownlow_correction_receipts"
+  ]
+}

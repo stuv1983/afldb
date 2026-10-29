@@ -18,12 +18,26 @@
  *   --dry-run [--auto-apply] the full write path, rolled back.
  *   --apply [--auto-apply]   the operational path.
  *   --report                 the exception report, read-only.
+ *   --report-out <file>      with --dry-run / --apply: also write the machine-readable
+ *                             `afldb.v2.afl-api-reconciliation-report` (V2-GAP-027). The file
+ *                             is validated and created exclusively BEFORE any connection opens
+ *                             and is never overwritten. A report that cannot be written never
+ *                             undoes or hides the settle's outcome (exit 3 when that is the
+ *                             only failure).
  */
-import { readFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import {
+  closeSync, fsyncSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
+
+import {
+  buildAflApiReconciliationReport,
+  serialiseAflApiReconciliationReport,
+  validateAflApiReconciliationReport,
+} from '@afldb/acquisition';
 
 import { proveAflApiIngestionPreflight } from '../../src/lib/acquisition/afl-api-ingestion-safety';
 import {
@@ -36,6 +50,7 @@ import {
 } from '../../src/lib/acquisition/afl-api-season-enumeration';
 import {
   aflApiSeasonFeedTextFrom,
+  aflApiSnapshotManifestSha256,
   aflApiSnapshotRoot,
   aflApiUnitSourcesFrom,
   verifyAflApiSnapshotManifest,
@@ -67,6 +82,8 @@ import { SETTING_KEYS } from '../../src/lib/site-settings';
 // I244-F029: the shared loader, which honours AFLDB_SKIP_DOTENV so a variable
 // this unit's `UnsetEnvironment=` stripped is not read straight back in.
 import { loadEnv } from './load-env';
+// V2-GAP-006: the seal on historical seasons (docs/v2/historical-baseline.md §2).
+import { refuseSealedSeasonForSettle } from './settle-season-seal';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -78,6 +95,8 @@ export type AflApiSettleCliArgs = {
   report: boolean;
   validateOnly: boolean;
   requireCompleteSource: boolean;
+  /** V2-GAP-027: where to write the reconciliation report, as given; null when not requested. */
+  reportOut: string | null;
 };
 
 function valueFor(argv: readonly string[], flag: string): string | null {
@@ -87,8 +106,9 @@ function valueFor(argv: readonly string[], flag: string): string | null {
 
 const KNOWN_FLAGS = new Set([
   '--label', '--apply', '--dry-run', '--auto-apply', '--report',
-  '--validate-only', '--require-complete-source',
+  '--validate-only', '--require-complete-source', '--report-out',
 ]);
+const VALUE_FLAGS = new Set(['--label', '--report-out']);
 
 export function parseAflApiSettleArgs(argv: readonly string[]): AflApiSettleCliArgs {
   const label = valueFor(argv, '--label');
@@ -101,7 +121,17 @@ export function parseAflApiSettleArgs(argv: readonly string[]): AflApiSettleCliA
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg.startsWith('--') && !KNOWN_FLAGS.has(arg)) throw new Error(`Unknown flag '${arg}'.`);
-    if (arg === '--label') i += 1;
+    if (VALUE_FLAGS.has(arg)) i += 1;
+  }
+  let reportOut: string | null = null;
+  if (argv.includes('--report-out')) {
+    if (argv.indexOf('--report-out') !== argv.lastIndexOf('--report-out')) throw new Error('--report-out given twice.');
+    reportOut = valueFor(argv, '--report-out');
+    if (!reportOut || reportOut.startsWith('--')) throw new Error('--report-out needs a file path.');
+    // The report records a settle RUN; --validate-only and --report open no transaction.
+    if (argv.includes('--validate-only') || argv.includes('--report')) {
+      throw new Error('--report-out applies only to --dry-run or --apply.');
+    }
   }
   return {
     label,
@@ -110,6 +140,7 @@ export function parseAflApiSettleArgs(argv: readonly string[]): AflApiSettleCliA
     report: argv.includes('--report'),
     validateOnly: argv.includes('--validate-only'),
     requireCompleteSource: argv.includes('--require-complete-source'),
+    reportOut,
   };
 }
 
@@ -200,12 +231,112 @@ function counterLines(counters: AflApiSettleCounters): string[] {
   return lines;
 }
 
+/* ------------------------------------------------------------------ *
+ * V2-GAP-027: the reconciliation report (packages/acquisition/src/reconciliation-report.ts)
+ * ------------------------------------------------------------------ */
+
+function manifestSha256(projectRoot: string, label: string): string {
+  return aflApiSnapshotManifestSha256(join(aflApiSnapshotRoot(projectRoot), label));
+}
+
+/** An exclusively created, still empty report file; released by `write` or `abandon`. */
+type ReportDestination = { path: string; fd: number };
+
+/**
+ * Validates `--report-out` and creates the file exclusively, BEFORE any connection opens: the
+ * parent must be an existing directory, the path must lie outside the acquired snapshots (which
+ * are evidence and never written by a settle) and must not exist. Throws on any refusal.
+ */
+function reserveReportDestination(projectRoot: string, reportOut: string): ReportDestination {
+  const path = resolve(reportOut);
+  const fromSnapshots = relative(resolve(aflApiSnapshotRoot(projectRoot)), path);
+  if (fromSnapshots === '' || (!fromSnapshots.startsWith('..') && !isAbsolute(fromSnapshots))) {
+    throw new Error(`--report-out '${reportOut}' lies inside the acquired AFL API snapshots; write the report elsewhere.`);
+  }
+  let parentIsDirectory = false;
+  try {
+    parentIsDirectory = statSync(dirname(path)).isDirectory();
+  } catch {
+    parentIsDirectory = false;
+  }
+  if (!parentIsDirectory) throw new Error(`--report-out '${reportOut}': the parent directory does not exist.`);
+  try {
+    return { path, fd: openSync(path, 'wx') };
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EEXIST') throw new Error(`--report-out '${reportOut}' already exists; reports are never overwritten.`);
+    throw new Error(`--report-out '${reportOut}' cannot be created${typeof code === 'string' ? ` (${code})` : ''}.`);
+  }
+}
+
+/** Closes and removes a reservation the run never filled. Best effort: it must not mask the run's own error. */
+function abandonReportDestination(destination: ReportDestination): void {
+  try { closeSync(destination.fd); } catch { /* already closed */ }
+  try { unlinkSync(destination.path); } catch { /* left for the operator; it is empty or partial */ }
+}
+
+export type AflApiReconciliationReportOutcome = {
+  path: string;
+  written: boolean;
+  /** Why the report was not written; null when it was. */
+  error: string | null;
+};
+
+/**
+ * Builds, validates and writes the report for a settle run that has already finished. Never
+ * throws: by now the run's transaction outcome is known (committed, rolled back or HALTed) and a
+ * file failure must neither undo nor hide it.
+ */
+function writeReconciliationReport(
+  destination: ReportDestination,
+  input: {
+    bundle: AflApiSettleBundle;
+    manifestSha256: string;
+    args: AflApiSettleCliArgs;
+    result: AflApiSettleRunResult;
+    exceptions: SettleExceptionReport | null;
+    now: () => string;
+  },
+  log: (line: string) => void,
+): AflApiReconciliationReportOutcome {
+  const { result } = input;
+  const settled = result.applied
+    ? `the settle committed import batch ${result.batchId} and that commit stands`
+    : 'the settle retained nothing, exactly as reported above';
+  try {
+    const report = buildAflApiReconciliationReport({
+      generatedAt: input.now(),
+      mode: input.args.apply ? 'apply' : 'dry_run',
+      bundle: input.bundle,
+      manifestSha256: input.manifestSha256,
+      run: result,
+      exceptions: input.exceptions,
+    });
+    const text = serialiseAflApiReconciliationReport(report);
+    const problems = validateAflApiReconciliationReport(JSON.parse(text));
+    if (problems.length > 0) throw new Error(`the report failed its own validator (${problems[0]})`);
+    writeFileSync(destination.fd, text, 'utf8');
+    fsyncSync(destination.fd);
+    closeSync(destination.fd);
+    log(`Reconciliation report written: ${destination.path}`);
+    return { path: destination.path, written: true, error: null };
+  } catch (error) {
+    abandonReportDestination(destination);
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    const reason = typeof code === 'string' ? code : error instanceof Error ? error.message : 'unknown failure';
+    log(`RECONCILIATION REPORT NOT WRITTEN (${reason}): ${destination.path}. The run itself is unaffected: ${settled}.`);
+    return { path: destination.path, written: false, error: reason };
+  }
+}
+
 export type AflApiSettleCliDeps = {
   projectRoot?: string;
   sql?: postgres.Sql;
   log?: (line: string) => void;
   /** Test-only escape hatch for the super-admin ingestion gate below; production always reads the database. */
   ingestionControls?: AflApiIngestionControls;
+  /** The ISO-8601 UTC instant stamped into a `--report-out` report; defaults to the clock. */
+  now?: () => string;
 };
 
 export type AflApiSettleCliOutcome = {
@@ -213,6 +344,8 @@ export type AflApiSettleCliOutcome = {
   result: AflApiSettleRunResult | null;
   report: SettleExceptionReport | null;
   sourceCompleteness: SourceCompletenessVerdict | null;
+  /** V2-GAP-027: present exactly when `--report-out` was given and the run finished. */
+  reconciliationReport?: AflApiReconciliationReportOutcome;
 };
 
 /**
@@ -228,6 +361,14 @@ export async function runAflApiSettleCli(
   const args = parseAflApiSettleArgs(argv);
 
   // Offline and fail-closed. No database has been opened yet.
+  let loadedManifestSha256: string | null = null;
+  if (args.reportOut !== null) {
+    try {
+      loadedManifestSha256 = manifestSha256(projectRoot, args.label);
+    } catch {
+      loadedManifestSha256 = null; // the verification below reports the missing or unreadable manifest
+    }
+  }
   const { bundle, inProgressSeasons } = loadAflApiSettleBundle(projectRoot, args.label);
   log(
     `Bundle v${bundle.bundleContractVersion} '${bundle.snapshotLabel}' (season ${bundle.season}): `
@@ -245,6 +386,12 @@ export async function runAflApiSettleCli(
     return { args, result: null, report: null, sourceCompleteness: null };
   }
 
+  // V2-GAP-006 (docs/v2/historical-baseline.md §1-§2): the seal on historical seasons. The season is
+  // the snapshot manifest's; this runs AFTER the offline verification above and BEFORE any database
+  // client is created. A settle is not an audited correction, so none is ever passed.
+  // --report is read-only diagnostics and stays allowed for a sealed season.
+  if (!args.report) refuseSealedSeasonForSettle(projectRoot, bundle.season);
+
   // Test-only gate overrides retain the pre-connection refusal contract. The
   // production path proves the live control/writer database identity below.
   if (!args.report && deps.ingestionControls && !deps.ingestionControls.currentSeasonEnabled) {
@@ -258,8 +405,37 @@ export async function runAflApiSettleCli(
     readJson(join(projectRoot, 'data', 'reference', 'source-families.json')),
   );
 
+  // V2-GAP-027: the snapshot's identity and the report file are settled offline, before any
+  // connection opens. The manifest is hashed again here, after its verification, and must not
+  // have moved since the bundle was built from it.
+  let reportDestination: ReportDestination | null = null;
+  let reportManifestSha256 = '';
+  if (args.reportOut !== null) {
+    reportManifestSha256 = manifestSha256(projectRoot, args.label);
+    if (reportManifestSha256 !== loadedManifestSha256) {
+      throw new Error('manifest.json changed while the snapshot was being verified; refusing to settle it.');
+    }
+    reportDestination = reserveReportDestination(projectRoot, args.reportOut);
+  }
+  const now = deps.now ?? (() => new Date().toISOString());
+  const finished = (outcome: AflApiSettleCliOutcome): AflApiSettleCliOutcome => {
+    if (reportDestination === null || outcome.result === null) return outcome;
+    const reconciliationReport = writeReconciliationReport(reportDestination, {
+      bundle, manifestSha256: reportManifestSha256, args, result: outcome.result,
+      exceptions: outcome.report, now,
+    }, log);
+    reportDestination = null;
+    return { ...outcome, reconciliationReport };
+  };
+
   const ownsClient = deps.sql === undefined;
-  const sql = deps.sql ?? createImportClient();
+  let sql: postgres.Sql;
+  try {
+    sql = deps.sql ?? createImportClient();
+  } catch (error) {
+    if (reportDestination !== null) abandonReportDestination(reportDestination);
+    throw error;
+  }
   try {
     if (args.report) {
       const report = await buildSettleExceptionReport(sql, {
@@ -313,7 +489,7 @@ export async function runAflApiSettleCli(
           + 'tools/current-season/acknowledge-afl-api-match-absence.ts, or the provider lists the id again.',
         );
       }
-      return { args, result, report: null, sourceCompleteness: null };
+      return finished({ args, result, report: null, sourceCompleteness: null });
     }
 
     const sourceCompleteness = result.sourceCompleteness ?? assessSourceCompleteness({
@@ -333,7 +509,7 @@ export async function runAflApiSettleCli(
         + 'The entire transaction was rolled back: no canonical rows, source observations, projections, '
         + 'or import_batches row were retained.',
       );
-      return { args, result, report: null, sourceCompleteness };
+      return finished({ args, result, report: null, sourceCompleteness });
     }
 
     for (const line of counterLines(result.counters)) log(line);
@@ -347,7 +523,7 @@ export async function runAflApiSettleCli(
         + ', then the whole transaction was rolled back. Nothing was retained — not even the '
         + `import_batches row. Re-run with --apply${args.autoApply ? ' --auto-apply' : ''} to keep it.`,
       );
-      return { args, result, report: null, sourceCompleteness };
+      return finished({ args, result, report: null, sourceCompleteness });
     }
 
     log(
@@ -359,16 +535,27 @@ export async function runAflApiSettleCli(
       + `${result.counters.canonicalApplyFailures} unit(s) rolled back.`
       + (args.autoApply ? '' : ' No canonical row was written: the automatic path runs only with --auto-apply.'),
     );
-    const report = await buildSettleExceptionReport(sql, {
-      season: bundle.season,
-      sourceKey: SETTLE_SOURCE_KEY,
-      tool: SETTLE_BATCH_TOOL,
-      disagreementIssueType: SETTLE_ISSUE_TYPE,
-      disagreementIssueOwner: SETTLE_ISSUE_OWNER,
-      deferredRecords: result.counters.recordsDeferred,
-    });
+    let report: SettleExceptionReport;
+    try {
+      report = await buildSettleExceptionReport(sql, {
+        season: bundle.season,
+        sourceKey: SETTLE_SOURCE_KEY,
+        tool: SETTLE_BATCH_TOOL,
+        disagreementIssueType: SETTLE_ISSUE_TYPE,
+        disagreementIssueOwner: SETTLE_ISSUE_OWNER,
+        deferredRecords: result.counters.recordsDeferred,
+      });
+    } catch (error) {
+      // V2-GAP-027: the batch is already committed; record that known outcome (with no exception
+      // section) before the read failure propagates exactly as it always has.
+      finished({ args, result, report: null, sourceCompleteness });
+      throw error;
+    }
     for (const line of renderSettleExceptionReport(report)) log(line);
-    return { args, result, report, sourceCompleteness };
+    return finished({ args, result, report, sourceCompleteness });
+  } catch (error) {
+    if (reportDestination !== null) abandonReportDestination(reportDestination);
+    throw error;
   } finally {
     if (ownsClient) await sql.end({ timeout: 5 });
   }
@@ -382,7 +569,12 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  if (outcome.result?.rollbackReason === 'require_complete_source') process.exitCode = 1;
+  if (outcome.result?.rollbackReason === 'require_complete_source') {
+    process.exitCode = 1;
+    return;
+  }
+  // V2-GAP-027: the run finished as logged, but its requested report is missing.
+  if (outcome.reconciliationReport?.written === false) process.exitCode = 3;
 }
 
 const invokedDirectly = process.argv[1] !== undefined

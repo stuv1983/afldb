@@ -20,15 +20,22 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  CONTRACT_PATH,
   IDENTITY_SCAN_SOURCE_NOTE,
   IMPORTER,
   LADDER_VALIDATOR,
+  REBUILD_PATH,
+  REGISTER_PATH,
   RolloverRefused,
+  SEASONS_PATH,
+  STAT_AVAILABILITY_PATH,
   artefactSetDigest,
   assertCoherent,
   assertIdentityScanMeasured,
   assertLadderValidatorRun,
   assertPreApplyAuthority,
+  applyRegisterPatches,
+  assertRegisterHistoryPreserved,
   assertValidatorRun,
   lineEndingOf,
   manifestRowTotal,
@@ -40,12 +47,58 @@ import {
   planSeasonRollover,
   planSuccessorContract,
   readClubSeasonsExpectedRows,
+  readStageNineExpectedRows,
   retirementVocabulary,
   selectAccepted,
   type RolloverRequest,
+  type TransitionInput,
 } from '../src/lib/rollover/season-rollover';
+import { AFLTABLES_NETWORK_PATH, planAfltablesNetworkRetirement } from '../src/lib/rollover/afltables-network-retirement';
+import {
+  PLANNER_OWNED_WRITES,
+  SENTINEL_MARKER,
+  TRANSACTION_JOURNAL_SCHEMA,
+  TRANSACTION_JOURNAL_PATH,
+  TRANSITION_REPLACEABLE_PATHS,
+  TRANSITION_SCHEMA,
+  plannerOwnedWrites,
+  applyStagedWrites,
+  assertBindingHolds,
+  assertNoSentinel,
+  assertTransitionWriteSet,
+  buildTransactionJournal,
+  classifyTransaction,
+  describeTransitionDiff,
+  formatTransitionDiff,
+  parseTransitionChangeSet,
+  parseTransactionJournal,
+  pendingTransactionProblem,
+  prepareTransition,
+  recoveryRequirements,
+  sha256Hex,
+  validateTransitionState,
+  type ApplyBinding,
+  type FileIo,
+  type InputRole,
+} from '../src/lib/rollover/transition-change-set';
 import { censusRecord, type CensusScope } from '../src/lib/rollover/afl-api-ownership-census';
-import { finalValidationChecks } from '../tools/db/rebuild-test';
+import {
+  LadderSuccessorRefused, assertSuccessorLadderTuple, deriveLadderWitnessRows, parseSuccessorLadderTuples,
+  planSuccessorTuplesEdit, planSuccessorTuplesRemoval, readSuccessorLadderTuplesJson, successorTupleSha256,
+  type SuccessorLadderTuple,
+} from '../src/lib/rollover/ladder-successor';
+import {
+  ACTIVATION_SCHEMA, ACTIVATION_STAGING_PATH, activationPendingProblem, applyActivationWrite, assertCommitBinding,
+  assertInactiveApplyState, assertMigrationBinding, bindActivationChangeSet, classifyActivationState,
+  formatActivationProjection, migrationSetState, parseActivationAuthority, planActivationWrite,
+} from '../src/lib/rollover/successor-activation';
+import {
+  SUCCESSOR_LADDER_TUPLES, SUCCESSOR_LADDER_TUPLES_JSON, finalValidationChecks, resolveLadderRebuildExpectation,
+} from '../tools/db/rebuild-test';
+import {
+  validateActivationStates, validateProposedRebuildState, type ProposedDocuments,
+} from '../tools/db/rollover-proposed-state';
+import { predecessorText } from './rollover-predecessor-fixture';
 
 const root = process.cwd();
 
@@ -463,6 +516,7 @@ type Overrides = {
   rebuildSource?: string;
   clubSeasonsExpectedRows?: number;
   aflApiOwnershipCensuses?: Array<{ path: string; sha256: string; record: unknown }>;
+  transition?: TransitionInput;
 };
 
 /**
@@ -536,6 +590,7 @@ function stageOneInput(over: Overrides = {}) {
         : reviewedCorrections(),
       aflApiOwnershipCensuses: over.aflApiOwnershipCensuses ?? [censusEvidence()],
     },
+    transition: over.transition,
   };
 }
 
@@ -658,6 +713,64 @@ describe('validator evidence', () => {
   it('refuses an unparsable season span', () => {
     expect(() => parseValidatorEvidence(gateOutput({ seasons: '2026' })))
       .toThrow(/not a FIRST-LAST range/);
+  });
+
+  it('carries the ISSUE-136 renumbered-profile count, in the register key order, whenever the validator prints it', () => {
+    const { measured } = parseValidatorEvidence(gateOutput({ players_with_renumbered_profile: 4 }));
+    expect(measured.players_with_renumbered_profile).toBe(4);
+    const keys = Object.keys(measured);
+    expect(keys.indexOf('players_with_renumbered_profile')).toBe(keys.indexOf('players') + 1);
+    expect(parseValidatorEvidence(gateOutput())).not.toHaveProperty('measured.players_with_renumbered_profile');
+    expect(() => parseValidatorEvidence(gateOutput({ players_with_renumbered_profile: 'four' })))
+      .toThrow(/'players_with_renumbered_profile' is "four", which is not a count/);
+  });
+});
+
+describe('the ISSUE-136 renumbered-profile pin survives the rollover', () => {
+  const pinned = () => {
+    const register = baseRegister();
+    ((register.baselines as Array<Record<string, unknown>>)[0].measured as Record<string, unknown>)
+      .players_with_renumbered_profile = 4;
+    return register;
+  };
+  const successorMeasured = (plan: ReturnType<typeof run>) =>
+    (jsonIn(plan, REGISTER_PATH).baselines as Array<Record<string, unknown>>)
+      .find((b) => b.acceptance_status === 'accepted')!.measured as Record<string, unknown>;
+
+  it('refuses a successor fingerprint that would silently drop a pin the outgoing baseline declares', () => {
+    expect(() => run({ register: pinned() }))
+      .toThrow(/pins players_with_renumbered_profile \(AFLDB-ISSUE-136\), but the validator output records none/);
+  });
+
+  it('writes the measured count into the successor record when the validator prints it', () => {
+    const plan = run({ register: pinned(), validatorOutput: gateOutput({ players_with_renumbered_profile: 4 }) });
+    expect(successorMeasured(plan).players_with_renumbered_profile).toBe(4);
+  });
+
+  it('adds nothing for an outgoing record that never pinned it and output that does not print it', () => {
+    expect(successorMeasured(run())).not.toHaveProperty('players_with_renumbered_profile');
+  });
+});
+
+describe('stage 9 club_seasons rows of a state (read without executing the rebuild module)', () => {
+  const contractWith = (profile: unknown) => ({ datasets: { ladder: { rebuild_expectation: { profile } } } });
+  const withTable = (json: string) => `${REBUILD_STUB}export const SUCCESSOR_LADDER_TUPLES_JSON = '${json}';\n`;
+  const tuple = { ...successorFixture().tuple, expected_rows: 1640 };
+
+  it('is CLUB_SEASONS_EXPECTED.rows for the predecessor line, with or without a successor table', () => {
+    expect(readStageNineExpectedRows(REBUILD_STUB, contractWith('predecessor-1897-2025'))).toBe(ROWS_2025);
+    expect(readStageNineExpectedRows(withTable('{}'), contractWith('predecessor-1897-2025'))).toBe(ROWS_2025);
+  });
+
+  it("is the successor tuple's own expected_rows when the contract selects that tuple", () => {
+    const source = planSuccessorTuplesEdit(withTable('{}'), tuple);
+    expect(readStageNineExpectedRows(source, contractWith(tuple.profile))).toBe(1640);
+    expect(readClubSeasonsExpectedRows(source)).toBe(ROWS_2025);
+    expect(readStageNineExpectedRows(source, contractWith('predecessor-1897-2025'))).toBe(ROWS_2025);
+  });
+
+  it('refuses a malformed successor table rather than falling back to the constant', () => {
+    expect(() => readStageNineExpectedRows(withTable('{ nope'), contractWith(tuple.profile))).toThrow(RolloverRefused);
   });
 });
 
@@ -809,7 +922,7 @@ describe('the validator is the authority — a transcript is not', () => {
     const cli = readFileSync(join(root, 'tools', 'db', 'rollover-season.ts'), 'utf8');
     expect(cli).toContain('spawnSync');
     expect(cli.indexOf('assertPreApplyAuthority({'))
-      .toBeLessThan(cli.indexOf('for (const file of plan.files) writeAtomicish'));
+      .toBeLessThan(cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet, binding)'));
     expect(cli.indexOf('planSuccessorContract({'))
       .toBeLessThan(cli.indexOf('runPython(fullHistoryArgv'));
   });
@@ -1073,9 +1186,22 @@ describe('a valid synthetic rollover', () => {
 describe('stage 9 re-points itself — the gate is never edited', () => {
   it('evaluates the accepted-last-season boundary at Y from the successor register', () => {
     const plan = run();
-    const before = finalValidationChecks(baseRegister());
+    // finalValidationChecks() refuses without an explicit ladder expectation (39e80642). The
+    // expectation here is written out from the literal years, NOT read back from the register
+    // under test: the runner cross-checks it against `measured`, so a register whose boundary
+    // did not move would still refuse rather than pass circularly.
+    const expectation = (label: string, lastSeason: number, expectedRows: number) => ({
+      pair: { core_snapshot_label: label },
+      expectedRows, firstSeason: FIRST_SEASON, lastSeason,
+      censusScope: { firstSeason: FIRST_SEASON, lastSeason, excludedSeasons: [] },
+    }) as unknown as Parameters<typeof finalValidationChecks>[3];
+    // The height binding is incidental: the predecessor contract's legacy binding names no baseline label.
+    const heightContract = () => JSON.parse(predecessorText(CONTRACT_PATH));
+    const before = finalValidationChecks(
+      baseRegister(), undefined, heightContract, expectation(RETIRED_LABEL, 2025, ROWS_2025));
     const after = finalValidationChecks(
-      jsonIn(plan, 'data/reference/fitzroy-accepted-baselines.json'));
+      jsonIn(plan, 'data/reference/fitzroy-accepted-baselines.json'),
+      undefined, heightContract, expectation(NEW_LABEL, 2026, ROWS_2026));
 
     const gate = (checks: ReturnType<typeof finalValidationChecks>) =>
       checks.find((c) => c.key === 'matches_after_accepted_last_season')!;
@@ -1415,30 +1541,35 @@ describe('baseline status vocabulary — never invented', () => {
     expect(retirementVocabulary(register)).not.toContain('candidate');
   });
 
-  it('the real register holds one accepted baseline beside one retired one', () => {
+  it('the real register holds one accepted baseline beside the two it retired', () => {
     // AFLDB-ISSUE-101 declared this vocabulary; AFLDB-ISSUE-112 was the first real
-    // retirement to use it. The shape asserted here is the shape the rollover produces:
-    // the outgoing baseline stays in the file as retired, and exactly one stays accepted.
+    // retirement to use it and the 2026 rollover (AFLDB-ISSUE-316 D-316-1) the second. The
+    // shape asserted here is the shape the rollover produces: each outgoing baseline stays in
+    // the file as retired, and exactly one stays accepted.
     const register = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
     const baselines = register.baselines as Record<string, unknown>[];
     const accepted = selectAccepted(register);
-    expect(baselines).toHaveLength(2);
-    expect(baselines.map((b) => b.acceptance_status)).toEqual(['retired', 'accepted']);
-    expect(accepted.snapshot_label).toBe('full-history-20260902');
-    expect((accepted.measured as Record<string, unknown>).seasons_last).toBe(2025);
+    expect(baselines).toHaveLength(3);
+    expect(baselines.map((b) => b.acceptance_status)).toEqual(['retired', 'retired', 'accepted']);
+    expect(accepted.snapshot_label).toBe('c2-2026-final-core-v1');
+    expect((accepted.measured as Record<string, unknown>).seasons_last).toBe(2026);
     expect((accepted.contract_binding as Record<string, Record<string, unknown>>)
-      .required_range).toEqual({ first_season: 1897, last_season: 2025 });
-    // AFLDB-ISSUE-108: the canonical LF hash, not the CRLF-checkout one. AFLDB-ISSUE-112
-    // re-proved that rule - the relabelled manifest was CRLF from the R adapter and had
-    // to be normalised before this binding was pinned.
+      .required_range).toEqual({ first_season: 1897, last_season: 2026 });
+    // AFLDB-ISSUE-108: the canonical LF hash, not the CRLF-checkout one.
     expect((accepted.acquisition as Record<string, unknown>).manifest_sha256)
-      .toBe('2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1');
+      .toBe('02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988');
     expect((accepted.raw_artefacts as Record<string, unknown>).artefact_set_sha256)
-      .toBe('15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c');
+      .toBe('817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e');
 
-    // The retired predecessor keeps its own bindings, untouched by the retirement.
-    const outgoing = baselines.find((b) => b.acceptance_status === 'retired')!;
+    // The 2026 rollover retired full-history-20260902 by its status alone: every binding is the predecessor's.
+    const rolled = baselines.find((b) => b.snapshot_label === 'full-history-20260902')!;
+    const before = selectAccepted(JSON.parse(predecessorText('data/reference/fitzroy-accepted-baselines.json')));
+    expect({ ...rolled, acceptance_status: 'accepted' }).toEqual(before);
+    expect(retirementVocabulary(register)).toContain(rolled.acceptance_status);
+
+    // The earlier retired predecessor keeps its own bindings, untouched by either retirement.
+    const outgoing = baselines.find((b) => b.snapshot_label === 'full-history-20260827')!;
     expect(outgoing.snapshot_label).toBe('full-history-20260827');
     expect(outgoing.superseded_by).toBe('full-history-20260902');
     expect((outgoing.acquisition as Record<string, unknown>).manifest_sha256)
@@ -1948,11 +2079,17 @@ describe('the validator path overrides are additive and fail closed', () => {
   it('writes nothing tracked until every gate has been adjudicated', () => {
     const cli = readFileSync(join(root, 'tools', 'db', 'rollover-season.ts'), 'utf8');
     // One write site, and it is after the authority check and after the dry-run return.
-    expect((cli.match(/writeAtomicish\(file\.path/g) ?? []).length).toBe(1);
+    expect((cli.match(/applyStagedWrites\(repoIo, args\.season/g) ?? []).length).toBe(1);
     expect(cli.indexOf('assertPreApplyAuthority({'))
       .toBeLessThan(cli.indexOf('if (!apply) {'));
     expect(cli.indexOf('if (!apply) {'))
-      .toBeLessThan(cli.indexOf('for (const file of plan.files) writeAtomicish'));
+      .toBeLessThan(cli.indexOf('applyStagedWrites(repoIo, args.season, writeSet, binding)'));
+    // The repository filesystem adapter is only handed to the pending check and the one staged
+    // apply: nothing calls its mutators directly, and it holds the only rename site.
+    expect(cli).not.toMatch(/repoIo\.(write|rename|remove)\(/);
+    expect((cli.match(/renameSync\(/g) ?? []).length).toBe(1);
+    // materialise() in the temporary directory, and the adapter's own write.
+    expect((cli.match(/writeFileSync\(/g) ?? []).length).toBe(2);
     // The temporary successor state never lands inside the repository.
     expect(cli).toContain('mkdtempSync(join(tmpdir()');
     expect(cli).toContain("rmSync(temporary, { recursive: true, force: true })");
@@ -1977,14 +2114,2004 @@ describe('planning writes nothing', () => {
     expect(digest()).toEqual(before);
   });
 
-  it('confirms the real repository boundary is still 2025 / 2026', () => {
+  it('confirms the real repository boundary is 2026 / 2027 since the 2026 rollover (D-316-1)', () => {
     const register = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
     const seasons = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'seasons.json'), 'utf8'));
     expect((selectAccepted(register).measured as Record<string, unknown>).seasons_last)
-      .toBe(2025);
+      .toBe(2026);
+    expect(seasons.last_season).toBe(2027);
+    expect(seasons.in_progress_seasons).toEqual([2027]);
+  });
+
+  it('the explicit predecessor boundary was 2025 / 2026', () => {
+    const register = JSON.parse(predecessorText('data/reference/fitzroy-accepted-baselines.json'));
+    const seasons = JSON.parse(predecessorText('data/reference/seasons.json'));
+    expect((selectAccepted(register).measured as Record<string, unknown>).seasons_last).toBe(2025);
     expect(seasons.last_season).toBe(2026);
     expect(seasons.in_progress_seasons).toEqual([2026]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-316 C2 — the complete transition as ONE validated change set
+// ---------------------------------------------------------------------------
+//
+// Synthetic documents only. No production 1,640 profile, no real predecessor/successor bytes,
+// no proposal file: the real proposal carries `UNRESOLVED:` sentinels precisely so that
+// none of this can be satisfied by it.
+
+const AFL_API_PATH = 'tools/rebuild/afl_api/afl-api-contract.json';
+const AFLTABLES_PATH = 'tools/rebuild/afltables/afltables-contract.json';
+const BASE_PROPOSED = 'artifacts/rollover/fitzroy-contract.base.json';
+const AFL_API_PROPOSED = 'artifacts/rollover/afl-api-contract.json';
+const AFLTABLES_PROPOSED = 'artifacts/rollover/afltables-contract.json';
+const NETWORK_SOURCE = serialiseJson({
+  $comment: 'switch', status: 'active', last_season: COMPLETING, decision: null, changed_at: null,
+});
+
+const TRANSITION_INPUTS: Record<InputRole, { path: string; sha256: string }> = {
+  core_manifest: { path: CORE_MANIFEST_PATH, sha256: sha256Hex('core manifest bytes') },
+  ladder_manifest: { path: LADDER_MANIFEST_PATH, sha256: sha256Hex('ladder manifest bytes') },
+  ladder_coverage: { path: 'artifacts/rollover/ladder-coverage.json', sha256: sha256Hex('coverage') },
+  stat_availability: { path: REVIEWED_STAT_PATH, sha256: sha256Hex('stat availability') },
+  accepted_corrections: { path: 'artifacts/rollover/accepted-corrections.json', sha256: sha256Hex('corrections') },
+};
+
+/** The contract the planner cannot compute: ladder expectation, height block, reason text. */
+function proposedBaseContract(): Record<string, unknown> {
+  const contract = baseContract();
+  nested(contract, 'full_history').current_season_excluded = {
+    seasons: [COMPLETING], reason: 'reviewed successor reason',
+  };
+  nested(nested(nested(contract, 'datasets'), 'ladder'), 'accepted_witness').$comment =
+    'durability binding, restated for the successor';
+  nested(nested(contract, 'datasets'), 'ladder').rebuild_expectation = {
+    profile: 'synthetic-profile', expected_rows: ROWS_2026,
+  };
+  contract.player_details = { height_enrichment: { stage: 'heights', supplements: [] } };
+  return contract;
+}
+
+const NEW_BASELINE_PATCHES = [{
+  pointer: '/acquisition/$comment',
+  old: ['carried acquisition comment'],
+  new: ['reviewed successor acquisition comment'],
+}];
+
+type Scenario = {
+  disk: Map<string, string>;
+  proposed: Map<string, string>;
+  changeSet: Record<string, unknown>;
+};
+
+function scenario(): Scenario {
+  const disk = new Map<string, string>([
+    [REGISTER_PATH, serialiseJson(baseRegister())],
+    [SEASONS_PATH, serialiseJson(baseSeasons())],
+    [CONTRACT_PATH, serialiseJson(baseContract())],
+    [STAT_AVAILABILITY_PATH, serialiseJson(baseStatAvailability())],
+    [REBUILD_PATH, REBUILD_STUB],
+    ['data/reference/afltables-network.json', NETWORK_SOURCE],
+    [AFL_API_PATH, serialiseJson({ measured: { players_with_afl_api_evidence: 1824 } })],
+    [AFLTABLES_PATH, serialiseJson({ measured: { players_with_dob: 13255 } })],
+  ]);
+  const proposed = new Map<string, string>([
+    [BASE_PROPOSED, serialiseJson(proposedBaseContract())],
+    [AFL_API_PROPOSED, serialiseJson({ measured: { players_with_afl_api_evidence: 1916 } })],
+    [AFLTABLES_PROPOSED, serialiseJson({ measured: { players_with_dob: 13347 } })],
+  ]);
+  const ref = (path: string, proposedPath: string) => ({
+    path, old_sha256: sha256Hex(disk.get(path)!), proposed: proposedPath,
+    proposed_sha256: sha256Hex(proposed.get(proposedPath)!),
+  });
+  return {
+    disk, proposed,
+    changeSet: {
+      schema: TRANSITION_SCHEMA,
+      season: COMPLETING,
+      inputs: (Object.keys(TRANSITION_INPUTS) as InputRole[]).map((role) => ({
+        role, path: TRANSITION_INPUTS[role].path, sha256: TRANSITION_INPUTS[role].sha256,
+      })),
+      base: ref(CONTRACT_PATH, BASE_PROPOSED),
+      replace: [ref(AFL_API_PATH, AFL_API_PROPOSED), ref(AFLTABLES_PATH, AFLTABLES_PROPOSED)],
+      register_patches: JSON.parse(JSON.stringify(NEW_BASELINE_PATCHES)),
+      write_set: [...PLANNER_OWNED_WRITES, AFL_API_PATH, AFLTABLES_PATH],
+    },
+  };
+}
+
+const bufferOf = (m: Map<string, string>) => (path: string) =>
+  m.has(path) ? Buffer.from(m.get(path)!) : null;
+
+function prepare(s: Scenario, over: {
+  inputs?: Partial<typeof TRANSITION_INPUTS>; season?: number; text?: string;
+} = {}) {
+  return prepareTransition({
+    changeSet: parseTransitionChangeSet(over.text ?? JSON.stringify(s.changeSet)),
+    season: over.season ?? COMPLETING,
+    currentContract: JSON.parse(s.disk.get(CONTRACT_PATH)!),
+    readRepo: bufferOf(s.disk),
+    readProposed: bufferOf(s.proposed),
+    inputs: { ...TRANSITION_INPUTS, ...over.inputs },
+  });
+}
+
+/** The planner's complete output for a prepared transition, as the CLI assembles it. */
+function planWith(prepared: ReturnType<typeof prepare>) {
+  const plan = run({ transition: prepared.transition });
+  const network = planAfltablesNetworkRetirement({
+    completedSeason: COMPLETING, rolloverDate: DATE, decision: 'D-316-1',
+    currentSource: NETWORK_SOURCE, currentSeasons: { in_progress_seasons: [COMPLETING] },
+  });
+  return { plan, planned: [network.file, ...plan.files] };
+}
+
+describe('transition change set — parsing is strict', () => {
+  it('accepts a complete change set', () => {
+    const parsed = parseTransitionChangeSet(JSON.stringify(scenario().changeSet));
+    expect(parsed.replace).toHaveLength(2);
+    expect(parsed.finalSha256).toBeNull();
+  });
+
+  it.each([
+    ['an unknown top-level field', (c: Record<string, unknown>) => { c.extra = 1; }, /unknown field "extra"/],
+    ['another schema', (c: Record<string, unknown>) => { c.schema = 'x/2'; }, /schema is "x\/2"/],
+    ['a fractional season', (c: Record<string, unknown>) => { c.season = 2026.5; }, /season must be an integer/],
+    ['a missing role', (c: Record<string, unknown>) => { (c.inputs as unknown[]).pop(); }, /each of/],
+    ['a repeated role', (c: Record<string, unknown>) => {
+      (c.inputs as unknown[]).push((c.inputs as unknown[])[0]);
+    }, /each of/],
+    ['a non-hex hash', (c: Record<string, unknown>) => {
+      ((c.inputs as Record<string, unknown>[])[0]).sha256 = 'ABC';
+    }, /lower-case SHA-256/],
+    ['a backslash path', (c: Record<string, unknown>) => {
+      (c.write_set as string[]).push('a\\b.json');
+    }, /normalised repository-relative path/],
+    ['a parent-escaping path', (c: Record<string, unknown>) => {
+      (c.write_set as string[]).push('../x.json');
+    }, /normalised repository-relative path/],
+    ['an empty write_set', (c: Record<string, unknown>) => { c.write_set = []; }, /every file the apply writes/],
+    ['a repeated write_set path', (c: Record<string, unknown>) => {
+      (c.write_set as string[]).push((c.write_set as string[])[0]);
+    }, /twice/],
+    ['an unknown file-ref field', (c: Record<string, unknown>) => {
+      (c.base as Record<string, unknown>).note = 'x';
+    }, /unknown field "note"/],
+  ])('refuses %s', (_label, mutate, message) => {
+    const s = scenario();
+    mutate(s.changeSet);
+    expect(() => parseTransitionChangeSet(JSON.stringify(s.changeSet))).toThrow(RolloverRefused);
+    expect(() => parseTransitionChangeSet(JSON.stringify(s.changeSet))).toThrow(message);
+  });
+
+  it('refuses text that is not JSON', () => {
+    expect(() => parseTransitionChangeSet('{ nope')).toThrow(/not valid JSON/);
+  });
+});
+
+describe('transition change set — a sentinel is never a value', () => {
+  it('names the marker, the line and the reason', () => {
+    expect(() => assertNoSentinel('{\n "a": "UNRESOLVED:OWNER-ROLLOVER-DATE"\n}', 'The file'))
+      .toThrow(/line 2/);
+    expect(() => assertNoSentinel('{\n "a": "UNRESOLVED:OWNER-ROLLOVER-DATE"\n}', 'The file'))
+      .toThrow(/never read as authority or as a value/);
+    expect(() => assertNoSentinel('{"a":"resolved"}', 'The file')).not.toThrow();
+  });
+
+  it('refuses a change set that carries one anywhere, before parsing it', () => {
+    const s = scenario();
+    (s.changeSet.register_patches as Record<string, unknown>[])[0].new = ['UNRESOLVED:OWNER-ROLLOVER-DATE'];
+    expect(() => parseTransitionChangeSet(JSON.stringify(s.changeSet)))
+      .toThrow(new RegExp(SENTINEL_MARKER));
+  });
+
+  it.each([
+    ['the proposed base contract', BASE_PROPOSED],
+    ['a proposed replacement', AFL_API_PROPOSED],
+  ])('refuses %s carrying one, even with a correct hash', (_label, proposedPath) => {
+    const s = scenario();
+    const doc = JSON.parse(s.proposed.get(proposedPath)!);
+    doc.profile = 'UNRESOLVED:PRODUCTION-LADDER-PROFILE-NAME';
+    s.proposed.set(proposedPath, serialiseJson(doc));
+    const refs = [s.changeSet.base, ...(s.changeSet.replace as unknown[])] as Record<string, string>[];
+    const ref = refs.find((r) => r.proposed === proposedPath)!;
+    ref.proposed_sha256 = sha256Hex(s.proposed.get(proposedPath)!);
+    expect(() => prepare(s)).toThrow(/unresolved-proposal marker/);
+  });
+
+  it('refuses a planned output carrying one, so a sentinel can never be written', () => {
+    const s = scenario();
+    const prepared = prepare(s);
+    const { planned } = planWith(prepared);
+    const poisoned = planned.map((f) => f.path === SEASONS_PATH
+      ? { ...f, content: f.content.replace('"2027"', '"UNRESOLVED:OWNER-ROLLOVER-DATE"') } : f);
+    expect(() => assertTransitionWriteSet({ prepared, planned: poisoned, apply: false }))
+      .toThrow(/The planned data\/reference\/seasons\.json still contains/);
+  });
+});
+
+describe('transition change set — stale, substituted and partial inputs refuse', () => {
+  it('accepts the reviewed set and reads, but never writes, the working tree', () => {
+    const s = scenario();
+    const before = new Map(s.disk);
+    const prepared = prepare(s);
+    expect(prepared.transition.contractBase).toEqual(proposedBaseContract());
+    expect(prepared.replacements.map((f) => f.path)).toEqual([AFL_API_PATH, AFLTABLES_PATH]);
+    expect(s.disk).toEqual(before);
+  });
+
+  it.each([
+    ['the base contract', CONTRACT_PATH],
+    ['a replaced contract', AFLTABLES_PATH],
+  ])('refuses when %s moved since review (stale old hash)', (_label, path) => {
+    const s = scenario();
+    s.disk.set(path, `${s.disk.get(path)!} `);
+    expect(() => prepare(s)).toThrow(/is stale — the change set was written against bytes with SHA-256/);
+  });
+
+  it('refuses a proposed file that is not the reviewed document', () => {
+    const s = scenario();
+    s.proposed.set(AFL_API_PROPOSED, serialiseJson({ measured: { players_with_afl_api_evidence: 9999 } }));
+    expect(() => prepare(s)).toThrow(/is not the reviewed document/);
+  });
+
+  it('refuses a missing proposed file and a missing target', () => {
+    const a = scenario();
+    a.proposed.delete(BASE_PROPOSED);
+    expect(() => prepare(a)).toThrow(/proposed file .* does not exist/);
+    const b = scenario();
+    b.disk.delete(AFL_API_PATH);
+    expect(() => prepare(b)).toThrow(/does not exist in the working tree/);
+  });
+
+  it('refuses a no-op replacement and invalid proposed JSON', () => {
+    const a = scenario();
+    a.proposed.set(AFL_API_PROPOSED, a.disk.get(AFL_API_PATH)!);
+    const ref = (a.changeSet.replace as Record<string, string>[])[0];
+    ref.proposed_sha256 = ref.old_sha256;
+    expect(() => prepare(a)).toThrow(/equal the current bytes/);
+    const b = scenario();
+    b.proposed.set(AFL_API_PROPOSED, '{ nope');
+    (b.changeSet.replace as Record<string, string>[])[0].proposed_sha256 = sha256Hex('{ nope');
+    expect(() => prepare(b)).toThrow(/is not valid JSON/);
+  });
+
+  it.each(Object.keys(TRANSITION_INPUTS) as InputRole[])(
+    'refuses a substituted %s input (path or bytes differ from the one reviewed)',
+    (role) => {
+      const s = scenario();
+      expect(() => prepare(s, { inputs: { [role]: { ...TRANSITION_INPUTS[role], sha256: sha256Hex('other') } } }))
+        .toThrow(new RegExp(`Input ${role} is stale or substituted`));
+      expect(() => prepare(s, { inputs: { [role]: { ...TRANSITION_INPUTS[role], path: 'elsewhere.json' } } }))
+        .toThrow(/stale or substituted/);
+    },
+  );
+
+  it('refuses a change set for another season', () => {
+    expect(() => prepare(scenario(), { season: 2027 })).toThrow(/is for season 2026, but --season is 2027/);
+  });
+
+  it.each(PLANNER_OWNED_WRITES)('refuses to replace %s, which the planner writes itself', (path) => {
+    const s = scenario();
+    (s.changeSet.replace as Record<string, unknown>[]).push({
+      path, old_sha256: sha256Hex('x'), proposed: BASE_PROPOSED, proposed_sha256: sha256Hex('y'),
+    });
+    expect(() => prepare(s)).toThrow(/which the rollover planner writes itself/);
+  });
+
+  it('refuses a replacement outside the closed list, a repeat, and a non-contract base', () => {
+    const a = scenario();
+    (a.changeSet.replace as Record<string, unknown>[])[0].path = 'package.json';
+    expect(() => prepare(a)).toThrow(/not one of the replaceable contracts/);
+    const b = scenario();
+    (b.changeSet.replace as unknown[]).push((b.changeSet.replace as unknown[])[0]);
+    expect(() => prepare(b)).toThrow(/names tools\/rebuild\/afl_api\/afl-api-contract\.json twice/);
+    const c = scenario();
+    (c.changeSet.base as Record<string, unknown>).path = AFL_API_PATH;
+    expect(() => prepare(c)).toThrow(/base may only be tools\/rebuild\/fitzroy\/fitzroy-contract\.json/);
+  });
+
+  it.each([
+    ['a planner file', (w: string[]) => w.filter((p) => p !== REGISTER_PATH), /Missing: data\/reference\/fitzroy-accepted-baselines\.json/],
+    ['the AFL Tables switch', (w: string[]) => w.filter((p) => !p.endsWith('afltables-network.json')), /Missing: data\/reference\/afltables-network\.json/],
+    ['a replaced contract', (w: string[]) => w.filter((p) => p !== AFLTABLES_PATH), /Missing: tools\/rebuild\/afltables\/afltables-contract\.json/],
+    ['an unrelated extra', (w: string[]) => [...w, 'package.json'], /Not written by this transition: package\.json/],
+  ])('refuses a write_set that is not the complete membership (%s)', (_label, change, message) => {
+    const s = scenario();
+    s.changeSet.write_set = change(s.changeSet.write_set as string[]);
+    expect(() => prepare(s)).toThrow(RolloverRefused);
+    expect(() => prepare(s)).toThrow(message);
+  });
+});
+
+describe('transition change set — the base may not edit what the planner owns', () => {
+  const edits: Array<[string, (c: Record<string, unknown>) => void]> = [
+    ['/pinned_version', (c) => { c.pinned_version = '9.9.9'; }],
+    ['/full_history/required_datasets', (c) => { nested(c, 'full_history').required_datasets = ['player_stats']; }],
+    ['/full_history/season_range/resolved_on', (c) => {
+      nested(nested(c, 'full_history'), 'season_range').resolved_on = '2026-11-03';
+    }],
+    ['/full_history/season_range/last_season', (c) => {
+      nested(nested(c, 'full_history'), 'season_range').last_season = 2026;
+    }],
+    ['/full_history/current_season_excluded/seasons', (c) => {
+      nested(nested(c, 'full_history'), 'current_season_excluded').seasons = [2027];
+    }],
+    ['/datasets/ladder/accepted_witness/rows', (c) => {
+      nested(nested(nested(c, 'datasets'), 'ladder'), 'accepted_witness').rows = ROWS_2026;
+    }],
+    ['/datasets/ladder/coverage', (c) => {
+      nested(nested(nested(c, 'datasets'), 'ladder'), 'coverage').club_season_rows = ROWS_2026;
+    }],
+  ];
+
+  it.each(edits)('refuses a base that edits %s', (pointer, edit) => {
+    const s = scenario();
+    const doc = JSON.parse(s.proposed.get(BASE_PROPOSED)!);
+    edit(doc);
+    s.proposed.set(BASE_PROPOSED, serialiseJson(doc));
+    (s.changeSet.base as Record<string, string>).proposed_sha256 = sha256Hex(s.proposed.get(BASE_PROPOSED)!);
+    expect(() => prepare(s)).toThrow(new RegExp(`base edits ${pointer.replace(/\//g, '\\/')}`));
+  });
+
+  it('allows a reordered coverage block (not an edit) and unbound fields such as the witness comment', () => {
+    const s = scenario();
+    const doc = JSON.parse(s.proposed.get(BASE_PROPOSED)!);
+    const coverage = nested(nested(nested(doc, 'datasets'), 'ladder'), 'coverage');
+    nested(nested(doc, 'datasets'), 'ladder').coverage = Object.fromEntries(Object.entries(coverage).reverse());
+    s.proposed.set(BASE_PROPOSED, serialiseJson(doc));
+    (s.changeSet.base as Record<string, string>).proposed_sha256 = sha256Hex(s.proposed.get(BASE_PROPOSED)!);
+    expect(() => prepare(s)).not.toThrow();
+  });
+});
+
+describe('planner with a prepared transition — one change set, validated together', () => {
+  it('derives the successor from the reviewed base and still applies every planner edit', () => {
+    const { plan } = planWith(prepare(scenario()));
+    const contract = jsonIn(plan, CONTRACT_PATH);
+    const fh = nested(contract, 'full_history');
+    // the edits only the base can carry
+    expect(nested(nested(contract, 'datasets'), 'ladder').rebuild_expectation)
+      .toEqual({ profile: 'synthetic-profile', expected_rows: ROWS_2026 });
+    expect(nested(fh, 'current_season_excluded').reason).toBe('reviewed successor reason');
+    expect(contract.player_details).toEqual({ height_enrichment: { stage: 'heights', supplements: [] } });
+    // the edits only the planner makes
+    expect(nested(fh, 'season_range').last_season).toBe(2026);
+    expect(nested(fh, 'season_range').resolved_on).toBe(DATE);
+    expect(nested(fh, 'current_season_excluded').seasons).toEqual([2027]);
+    expect(nested(nested(nested(contract, 'datasets'), 'ladder'), 'accepted_witness').snapshot_label)
+      .toBe(NEW_WITNESS);
+    expect(nested(nested(nested(contract, 'datasets'), 'ladder'), 'coverage').club_season_rows)
+      .toBe(ROWS_2026);
+  });
+
+  it('feeds the very same bytes to the gates it later writes (pre-apply authority passes)', () => {
+    const { plan } = planWith(prepare(scenario()));
+    expect(() => proveAuthority(plan)).not.toThrow();
+    expect(plan.authority.successorContractContent).toBe(fileIn(plan, CONTRACT_PATH).content);
+    expect(plan.authority.successorRegisterContent)
+      .toContain('reviewed successor acquisition comment');
+  });
+
+  it('is exactly the unextended plan when no transition is supplied', () => {
+    const plain = run();
+    expect(run({ transition: {} }).files).toEqual(plain.files);
+    expect(run({ transition: { registerPatches: [] } }).files).toEqual(plain.files);
+  });
+
+  it('leaves the predecessor coherent on disk at every step (nothing pre-edits the working tree)', () => {
+    const s = scenario();
+    const current = () => ({
+      register: JSON.parse(s.disk.get(REGISTER_PATH)!), seasons: JSON.parse(s.disk.get(SEASONS_PATH)!),
+      contract: JSON.parse(s.disk.get(CONTRACT_PATH)!), statAvailability: JSON.parse(s.disk.get(STAT_AVAILABILITY_PATH)!),
+      clubSeasonsExpectedRows: readClubSeasonsExpectedRows(s.disk.get(REBUILD_PATH)!),
+    });
+    assertCoherent(current(), 'before');
+    const prepared = prepare(s);
+    assertCoherent(current(), 'after prepare');
+    const { plan } = planWith(prepared);
+    assertCoherent(current(), 'after planning');
+    // the successor is held to the same rules
+    assertCoherent({
+      register: jsonIn(plan, REGISTER_PATH), seasons: jsonIn(plan, SEASONS_PATH),
+      contract: jsonIn(plan, CONTRACT_PATH), statAvailability: jsonIn(plan, STAT_AVAILABILITY_PATH),
+      clubSeasonsExpectedRows: readClubSeasonsExpectedRows(fileIn(plan, REBUILD_PATH).content),
+    }, 'successor');
+  });
+
+  it('keeps the existing gates: a wrong date, status or expectation still refuses with a transition', () => {
+    const prepared = prepare(scenario());
+    const withT = (request: Partial<RolloverRequest>) => () => run({ transition: prepared.transition, request });
+    expect(withT({ rolloverDate: 'UNRESOLVED:OWNER-ROLLOVER-DATE' })).toThrow(/explicit YYYY-MM-DD/);
+    expect(withT({ retirementStatus: 'obsolete' })).toThrow(/not one of the register's declared retired statuses/);
+    expect(withT({ expectedClubSeasonRows: ROWS_2026 + 1 })).toThrow(/disagrees with/);
+    expect(() => run({ transition: prepared.transition, aflApiOwnershipCensuses: [] })).toThrow(/census/i);
+  });
+});
+
+describe('register patches are comment prose only, against an explicit old value', () => {
+  const patch = (over: Partial<{ pointer: string; old: unknown; new: unknown }> = {}) => ({
+    ...NEW_BASELINE_PATCHES[0], ...over,
+  });
+  const planPatches = (patches: unknown[]) =>
+    () => run({ transition: { registerPatches: patches as never } });
+
+  it('applies a reviewed patch to the new entry only and keeps every older entry byte-equal', () => {
+    const plan = run({ transition: { registerPatches: [patch()] } });
+    const baselines = jsonIn(plan, REGISTER_PATH).baselines as Record<string, unknown>[];
+    expect(nested(baselines[1], 'acquisition').$comment).toEqual(['reviewed successor acquisition comment']);
+    expect(nested(baselines[0], 'acquisition').$comment).toEqual(['carried acquisition comment']);
+  });
+
+  it.each([
+    ['a different expected old value', patch({ old: ['something else'] }), /expects a different current comment/],
+    ['a value-bearing field', patch({ pointer: '/measured/matches', old: 17000, new: 1 }), /does not end in \/\$comment/],
+    ['a pointer that does not resolve', patch({ pointer: '/nope/$comment' }), /does not resolve/],
+    ['a number as the new comment', patch({ new: 5 }), /string or a non-empty array of strings/],
+    ['an empty array as the new comment', patch({ new: [] }), /string or a non-empty array of strings/],
+    ['identical text', patch({ new: ['carried acquisition comment'] }), /identical text/],
+    ['a forbidden segment', patch({ pointer: '/__proto__/$comment' }), /forbidden segment/],
+    ['a relative pointer', patch({ pointer: 'acquisition/$comment' }), /not a JSON pointer/],
+  ])('refuses %s', (_label, bad, message) => {
+    expect(planPatches([bad])).toThrow(RolloverRefused);
+    expect(planPatches([bad])).toThrow(message);
+  });
+
+  it('refuses the same pointer twice', () => {
+    expect(planPatches([patch(), patch({ new: ['another'] })])).toThrow(/given twice/);
+  });
+
+  it('does not mutate the entry it patches', () => {
+    const entry = { acquisition: { $comment: ['a'] } };
+    const copy = JSON.parse(JSON.stringify(entry));
+    applyRegisterPatches(entry, [{ pointer: '/acquisition/$comment', old: ['a'], new: ['b'] }]);
+    expect(entry).toEqual(copy);
+  });
+});
+
+describe('the successor register preserves predecessor and older history', () => {
+  const retired = RETIRED_LABEL;
+  const before = () => {
+    const r = baseRegister();
+    const older = { ...(r.baselines as Record<string, unknown>[])[0], snapshot_label: 'older-baseline', acceptance_status: 'retired' };
+    r.baselines = [older, ...(r.baselines as unknown[])];
+    return r;
+  };
+  const advance = (r: Record<string, unknown>) => {
+    const next = JSON.parse(JSON.stringify(r));
+    next.baselines = (next.baselines as Record<string, unknown>[]).map((b) => b.snapshot_label === retired
+      ? { ...b, acceptance_status: 'retired' } : b);
+    next.baselines.push({ snapshot_label: NEW_LABEL, acceptance_status: 'accepted' });
+    return next;
+  };
+
+  it('accepts retirement of the outgoing baseline plus one appended entry', () => {
+    const r = before();
+    expect(() => assertRegisterHistoryPreserved(r, advance(r), retired, 'retired')).not.toThrow();
+  });
+
+  it('is satisfied by every real planner run', () => {
+    expect(() => run()).not.toThrow();
+  });
+
+  it.each([
+    ['an older baseline edited', (n: Record<string, unknown>) => { (n.baselines as Record<string, unknown>[])[0].issue = 'X'; }, /changed history: baseline older-baseline/],
+    ['the predecessor edited beyond its status', (n: Record<string, unknown>) => { (n.baselines as Record<string, unknown>[])[1].accepted_on = '2030-01-01'; }, /changed history: baseline full-history-20250101/],
+    ['a baseline dropped', (n: Record<string, unknown>) => { (n.baselines as unknown[]).splice(0, 1); }, /carries 2 baselines, but exactly 3/],
+    ['a second appended entry', (n: Record<string, unknown>) => { (n.baselines as unknown[]).push({ snapshot_label: 'x', acceptance_status: 'retired' }); }, /carries 4 baselines/],
+    ['a top-level field changed', (n: Record<string, unknown>) => { (n.selection_policy as Record<string, unknown>).retired_statuses = ['retired', 'x']; }, /changes top-level field "selection_policy"/],
+    ['the predecessor left accepted', (n: Record<string, unknown>) => { (n.baselines as Record<string, unknown>[])[1].acceptance_status = 'accepted'; }, /changed history|exactly one accepted/],
+    ['the new entry not accepted', (n: Record<string, unknown>) => { ((n.baselines as Record<string, unknown>[])[2]).acceptance_status = 'candidate'; }, /exactly one accepted baseline/],
+  ])('refuses %s', (_label, mutate, message) => {
+    const r = before();
+    const n = advance(r);
+    mutate(n);
+    expect(() => assertRegisterHistoryPreserved(r, n, retired, 'retired')).toThrow(message);
+  });
+});
+
+describe('the write set is judged whole, ordered, and pinned before apply', () => {
+  const prepared = () => prepare(scenario());
+
+  it('puts the AFL Tables switch first, then replacements, then the planner files', () => {
+    const p = prepared();
+    const { planned } = planWith(p);
+    const { files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    expect(files.map((f) => f.path)).toEqual([
+      'data/reference/afltables-network.json', AFL_API_PATH, AFLTABLES_PATH,
+      REGISTER_PATH, SEASONS_PATH, CONTRACT_PATH, STAT_AVAILABILITY_PATH, REBUILD_PATH,
+    ]);
+  });
+
+  it('a dry run needs no pins and reports every hash to pin', () => {
+    const p = prepared();
+    const { planned } = planWith(p);
+    const { finalHashes, files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    expect(Object.keys(finalHashes).sort()).toEqual([...p.changeSet.writeSet].sort());
+    for (const f of files) expect(finalHashes[f.path]).toBe(sha256Hex(f.content));
+  });
+
+  it('apply without pins refuses; with matching pins for every file it passes', () => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    expect(() => assertTransitionWriteSet({ prepared: p, planned, apply: true }))
+      .toThrow(/--apply needs final_sha256/);
+    const { finalHashes } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    s.changeSet.final_sha256 = finalHashes;
+    const pinned = prepare(s);
+    const result = assertTransitionWriteSet({ prepared: pinned, planned: planWith(pinned).planned, apply: true });
+    expect(result.files).toHaveLength(8);
+  });
+
+  it.each([
+    ['a pin for different bytes', (h: Record<string, string>) => { h[REGISTER_PATH] = sha256Hex('other'); }, /Different bytes: data\/reference\/fitzroy-accepted-baselines\.json/],
+    ['a missing pin', (h: Record<string, string>) => { delete h[REBUILD_PATH]; }, /Unpinned: tools\/db\/rebuild-test\.ts/],
+    ['a pin for a file that is not written', (h: Record<string, string>) => { h['package.json'] = sha256Hex('x'); }, /Pinned but not written: package\.json/],
+  ])('refuses %s', (_label, mutate, message) => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { finalHashes } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    const hashes = { ...finalHashes };
+    mutate(hashes);
+    s.changeSet.final_sha256 = hashes;
+    const pinned = prepare(s);
+    for (const apply of [false, true]) {
+      expect(() => assertTransitionWriteSet({ prepared: pinned, planned: planWith(pinned).planned, apply }))
+        .toThrow(message);
+    }
+  });
+
+  it('refuses a planner that does not produce exactly the owned files', () => {
+    const p = prepared();
+    const { planned } = planWith(p);
+    expect(() => assertTransitionWriteSet({ prepared: p, planned: planned.slice(1), apply: false }))
+      .toThrow(/The planner produced/);
+  });
+
+  it('shows a concrete per-file diff, and register history is untouched in it', () => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    const diffs = describeTransitionDiff(files, bufferOf(s.disk));
+    const by = (path: string) => diffs.find((d) => d.path === path)!;
+
+    expect(by(AFL_API_PATH).changes).toEqual([
+      { where: '/measured/players_with_afl_api_evidence', kind: 'change', before: '1824', after: '1916' },
+    ]);
+    expect(by('data/reference/afltables-network.json').changes.map((c) => c.where).sort())
+      .toEqual(['/changed_at', '/decision', '/status']);
+    expect(by(CONTRACT_PATH).changes.some((c) => c.where === '/datasets/ladder/rebuild_expectation' && c.kind === 'add')).toBe(true);
+    expect(by(REBUILD_PATH).changes).toEqual([
+      { where: expect.stringMatching(/^line \d+$/), kind: 'remove', before: JSON.stringify(`  rows: ${ROWS_2025},`) },
+      { where: expect.stringMatching(/^line \d+$/), kind: 'add', after: JSON.stringify(`  rows: ${ROWS_2026},`) },
+    ]);
+    // Older register history never appears in the diff: only the predecessor's status and the append.
+    const where = by(REGISTER_PATH).changes.map((c) => c.where);
+    expect(where).toContain('/baselines/0/acceptance_status');
+    expect(where.every((w) => w === '/baselines/0/acceptance_status' || w.startsWith('/baselines/1'))).toBe(true);
+    for (const d of diffs) {
+      expect(d.oldSha256).toBe(sha256Hex(s.disk.get(d.path)!));
+      expect(d.newSha256).not.toBe(d.oldSha256);
+    }
+    const text = formatTransitionDiff(diffs).join('\n');
+    expect(text).toContain(`${by(AFL_API_PATH).oldSha256} (`);
+    expect(text).toContain('/measured/players_with_afl_api_evidence');
+  });
+});
+
+describe('the staged apply, its journal and recovery', () => {
+  /** An in-memory filesystem with an optional fault on the Nth rename or on a staged write. */
+  function memoryIo(initial: Map<string, string>, fault: { renameAt?: number; writeOf?: string } = {}) {
+    const fs = new Map(initial);
+    let renames = 0;
+    const io: FileIo = {
+      read: (p) => (fs.has(p) ? Buffer.from(fs.get(p)!) : null),
+      write: (p, c) => {
+        if (fault.writeOf !== undefined && p.startsWith(fault.writeOf)) throw new Error('disk full');
+        fs.set(p, c);
+      },
+      rename: (a, b) => {
+        renames += 1;
+        if (fault.renameAt === renames) throw new Error('rename failed');
+        fs.set(b, fs.get(a)!); fs.delete(a);
+      },
+      remove: (p) => { fs.delete(p); },
+    };
+    return { fs, io };
+  }
+  const files = (): Array<{ path: string; content: string; reformatted: boolean }> =>
+    ['a.json', 'b.json', 'c.json'].map((path) => ({ path, content: `new ${path}`, reformatted: false }));
+  const disk = () => new Map([['a.json', 'old a.json'], ['b.json', 'old b.json'], ['c.json', 'old c.json']]);
+
+  it('a clean apply leaves new bytes, no journal and no staged file', () => {
+    const { fs, io } = memoryIo(disk());
+    applyStagedWrites(io, 2026, files());
+    expect([...fs.entries()].sort()).toEqual([['a.json', 'new a.json'], ['b.json', 'new b.json'], ['c.json', 'new c.json']]);
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('stages and reads back every file before the first rename, and journals before it', () => {
+    const order: string[] = [];
+    const { io } = memoryIo(disk());
+    const traced: FileIo = {
+      ...io,
+      write: (p, c) => { order.push(`write ${p}`); io.write(p, c); },
+      rename: (a, b) => { order.push(`rename ${b}`); io.rename(a, b); },
+    };
+    applyStagedWrites(traced, 2026, files());
+    const firstRename = order.findIndex((o) => o.startsWith('rename'));
+    expect(order.slice(0, firstRename).filter((o) => o.startsWith('write')).length).toBe(4);   // 3 files + journal
+    expect(order[firstRename]).toBe(`rename ${TRANSACTION_JOURNAL_PATH}`);
+    expect(order.slice(firstRename + 1)).toEqual(['rename a.json', 'rename b.json', 'rename c.json']);
+  });
+
+  it('an interrupted rename sequence leaves the journal, so the next invocation refuses with the per-file state', () => {
+    const { fs, io } = memoryIo(disk(), { renameAt: 3 });   // journal=1, a=2, b fails
+    expect(() => applyStagedWrites(io, 2026, files())).toThrow('rename failed');
+    expect(fs.has(TRANSACTION_JOURNAL_PATH)).toBe(true);
+    const problem = pendingTransactionProblem(io)!;
+    expect(problem.join('\n')).toContain('did not finish');
+    expect(problem).toContain('  new     a.json');
+    expect(problem).toContain('  old     b.json');
+    expect(problem.join('\n')).toContain('Files are mixed. Restore EVERY listed file to its old bytes');
+    // every old byte is recoverable from the journal itself
+    const journal = JSON.parse(fs.get(TRANSACTION_JOURNAL_PATH)!);
+    expect(journal.schema).toBe(TRANSACTION_JOURNAL_SCHEMA);
+    expect(Buffer.from(journal.entries[0].oldBase64, 'base64').toString()).toBe('old a.json');
+  });
+
+  it('a failure while staging removes what was staged and renames nothing', () => {
+    const { fs, io } = memoryIo(disk(), { writeOf: 'c.json' });
+    expect(() => applyStagedWrites(io, 2026, files())).toThrow('disk full');
+    expect([...fs.keys()].sort()).toEqual(['a.json', 'b.json', 'c.json']);
+    expect(fs.get('a.json')).toBe('old a.json');
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('a failure writing the journal removes the staged files and leaves the tracked bytes alone', () => {
+    const { fs, io } = memoryIo(disk(), { writeOf: TRANSACTION_JOURNAL_PATH });
+    expect(() => applyStagedWrites(io, 2026, files())).toThrow('disk full');
+    expect([...fs.entries()].sort()).toEqual([['a.json', 'old a.json'], ['b.json', 'old b.json'], ['c.json', 'old c.json']]);
+  });
+
+  it('leftover staged files alone are reported as untouched tracked files', () => {
+    const { io } = memoryIo(new Map([[`${PLANNER_OWNED_WRITES[0]}.rollover-tmp`, 'x']]));
+    expect(pendingTransactionProblem(io)!.join('\n')).toContain('tracked files are untouched');
+  });
+
+  it('classifies old / new / neither / absent and words the recovery for each overall state', () => {
+    const journal = buildTransactionJournal(2026, files(), (p) => Buffer.from(disk().get(p)!));
+    const sha = (m: Record<string, string | null>) => (p: string) => m[p] ?? null;
+    const old = { 'a.json': sha256Hex('old a.json'), 'b.json': sha256Hex('old b.json'), 'c.json': sha256Hex('old c.json') };
+    const next = { 'a.json': sha256Hex('new a.json'), 'b.json': sha256Hex('new b.json'), 'c.json': sha256Hex('new c.json') };
+    expect(classifyTransaction(journal, sha({ ...old, 'a.json': next['a.json'], 'b.json': sha256Hex('weird'), 'c.json': null })))
+      .toEqual([{ path: 'a.json', state: 'new' }, { path: 'b.json', state: 'neither' }, { path: 'c.json', state: 'absent' }]);
+    const wording = (m: Record<string, string>) =>
+      recoveryRequirements(journal, classifyTransaction(journal, sha(m))).join('\n');
+    expect(wording(old)).toContain('Every file still holds the old bytes');
+    expect(wording(next)).toContain('Every file already holds the reviewed new bytes');
+    expect(wording({ ...old, 'a.json': next['a.json'] })).toContain('Files are mixed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-316 C2 — the PROPOSED state is judged by the rebuild's own validators
+// ---------------------------------------------------------------------------
+//
+// The base is the explicit predecessor state (the reviewed transition base bytes, whose manifests are
+// tracked), so every manifest pin is proven against real bytes. Each
+// case then changes one thing and leaves every hash internally consistent, which is exactly what a
+// hash-only check cannot see. Nothing is written anywhere: the validators take the bytes by injection.
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- the cases mutate loosely typed JSON documents */
+type StateDocs = {
+  register: any; seasons: any; contract: any; aflApi: any; afltables: any; rebuild: string;
+};
+const repoText = (path: string) => readFileSync(join(root, path), 'utf8');
+function stateDocs(text: (path: string) => string): StateDocs {
+  return {
+    register: JSON.parse(text(REGISTER_PATH)),
+    seasons: JSON.parse(text(SEASONS_PATH)),
+    contract: JSON.parse(text(CONTRACT_PATH)),
+    aflApi: JSON.parse(text('tools/rebuild/afl_api/afl-api-contract.json')),
+    afltables: JSON.parse(text('tools/rebuild/afltables/afltables-contract.json')),
+    rebuild: text(REBUILD_PATH),
+  };
+}
+/** The CURRENT tracked state; only tests that state a fact about the repository as it ships use it. */
+const realStateDocs = (): StateDocs => stateDocs(repoText);
+/** The EXPLICIT predecessor of the 2026 rollover (2026 in progress): every mechanics case starts here. */
+const predecessorStateDocs = (): StateDocs => stateDocs(predecessorText);
+const asProposed = (d: StateDocs): ProposedDocuments => ({
+  register: JSON.stringify(d.register), seasons: JSON.stringify(d.seasons),
+  contract: JSON.stringify(d.contract), aflApi: JSON.stringify(d.aflApi),
+  afltables: JSON.stringify(d.afltables), rebuild: d.rebuild,
+});
+type Pairs = Parameters<typeof validateProposedRebuildState>[1];
+const validateState = (d: StateDocs, pairs?: Pairs) => validateProposedRebuildState(asProposed(d), pairs);
+const ladderOf = (d: StateDocs) => d.contract.datasets.ladder;
+const acceptedOf = (d: StateDocs) =>
+  d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+
+describe("proposed-state validation — the rebuild's own validators over the proposed bytes", () => {
+  it('state A (explicit predecessor fixture): accepts the state and names what stays pending', () => {
+    const verdict = validateState(predecessorStateDocs());
+    expect(verdict.ladderProfile).toBe('predecessor-1897-2025');
+    expect(verdict.expectedRows).toBe(1622);
+    expect(verdict.finalChecks.length).toBeGreaterThan(80);
+    expect(verdict.finalChecks.map((c) => c.key)).toEqual(expect.arrayContaining([
+      'club_seasons_rows', 'players_with_height', 'players_with_dob_after_birth_dates', 'match_coaches',
+      'players_with_afl_api_height_evidence', 'completed_scope_missing_or_in_progress',
+    ]));
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/NOT executed/);
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/--compare/);
+  });
+
+  it('state C: accepts the real repository state, the adopted c2-2026-successor, and names what stays pending', () => {
+    // Since the 2026 rollover (D-316-1) the tracked state is the successor's. Its witness manifest and the
+    // predecessor rebuild bytes it replaced are supplied explicitly, as the validator requires for a successor.
+    const real = realStateDocs();
+    const verdict = validateProposedRebuildState({ ...asProposed(real),
+      witnessManifest: repoText(ladderOf(real).accepted_witness.manifest), baseRebuild: predecessorText(REBUILD_PATH) });
+    expect(verdict.acceptedLabel).toBe('c2-2026-final-core-v1');
+    expect(verdict.ladderProfile).toBe('c2-2026-successor');
+    expect(verdict.expectedRows).toBe(1640);
+    expect(verdict.finalChecks.length).toBeGreaterThan(80);
+    expect(verdict.finalChecks.map((c) => c.key)).toEqual(expect.arrayContaining([
+      'club_seasons_rows', 'players_with_height', 'players_with_dob_after_birth_dates', 'match_coaches',
+      'players_with_afl_api_height_evidence', 'completed_scope_missing_or_in_progress',
+    ]));
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/NOT executed/);
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/--compare/);
+  });
+
+  it('judges the bytes it is given, not the working tree', () => {
+    const d = predecessorStateDocs();
+    const before = repoText(CONTRACT_PATH);
+    ladderOf(d).rebuild_expectation.profile = 'edited-in-memory';
+    expect(() => validateState(d)).toThrow(RolloverRefused);
+    expect(repoText(CONTRACT_PATH)).toBe(before);
+    expect(() => validateState(predecessorStateDocs())).not.toThrow();
+  });
+
+  it.each([
+    ['the register', 'register'], ['the seasons reference', 'seasons'], ['the fitzRoy contract', 'contract'],
+    ['the AFL API contract', 'aflApi'], ['the AFL Tables contract', 'afltables'],
+  ] as const)('refuses malformed JSON in %s', (_label, key) => {
+    const docs = asProposed(predecessorStateDocs());
+    docs[key] = '{ not json';
+    expect(() => validateProposedRebuildState(docs)).toThrow(/is not valid JSON/);
+  });
+
+  describe('the ladder selector', () => {
+    it('refuses a profile name outside the closed reviewed table even when every hash is consistent', () => {
+      const d = predecessorStateDocs();
+      ladderOf(d).rebuild_expectation.profile = 'owner-chosen-profile';
+      expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('accepts that name only once a reviewed tuple lists it', () => {
+      const d = predecessorStateDocs();
+      const block = ladderOf(d).rebuild_expectation;
+      block.profile = 'owner-chosen-profile';
+      const pairs = {
+        'owner-chosen-profile': {
+          profile: 'owner-chosen-profile',
+          core_snapshot_label: block.core_snapshot_label,
+          core_manifest_sha256: block.core_manifest_sha256,
+          core_artefact_set_sha256: block.core_artefact_set_sha256,
+          witness_snapshot_label: block.witness_snapshot_label,
+          witness_manifest_sha256: block.witness_manifest_sha256,
+          first_season: 1897, last_season: 2025, expected_rows: block.expected_rows,
+        },
+      } as unknown as Pairs;
+      expect(validateState(d, pairs).ladderProfile).toBe('owner-chosen-profile');
+      // …and the tuple is a fingerprint, not a name: change one bound value and it refuses again.
+      block.core_artefact_set_sha256 = 'f'.repeat(64);
+      expect(() => validateState(d, pairs)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('never treats an inherited object key as a reviewed profile', () => {
+      for (const profile of ['constructor', '__proto__', 'toString']) {
+        const d = predecessorStateDocs();
+        ladderOf(d).rebuild_expectation.profile = profile;
+        expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
+      }
+    });
+
+    it('refuses the rehearsal-only profile as an active profile, whatever it carries', () => {
+      const d = predecessorStateDocs();
+      ladderOf(d).rebuild_expectation.profile = 'c2-2026-rehearsal-only';
+      expect(() => validateState(d)).toThrow(/can never be an active contract profile/);
+    });
+
+    it('refuses an absent or non-object expectation block', () => {
+      for (const block of [undefined, null, [], 'predecessor-1897-2025']) {
+        const d = predecessorStateDocs();
+        if (block === undefined) delete ladderOf(d).rebuild_expectation;
+        else ladderOf(d).rebuild_expectation = block;
+        expect(() => validateState(d)).toThrow(/rebuild's own validators/);
+      }
+    });
+  });
+
+  describe('ladder, range and constant combinations', () => {
+    it('refuses a row count the rebuild constant does not share', () => {
+      const d = predecessorStateDocs();
+      d.rebuild = planClubSeasonsConstantEdit(d.rebuild, 1622, 1640);
+      expect(() => validateState(d)).toThrow(/expects 1640 club_seasons rows/);
+    });
+
+    it('refuses a row count the reviewed tuple does not carry', () => {
+      const d = predecessorStateDocs();
+      ladderOf(d).rebuild_expectation.expected_rows = 1640;
+      d.rebuild = planClubSeasonsConstantEdit(d.rebuild, 1622, 1640);
+      expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('refuses an accepted range the ladder expectation does not cover', () => {
+      const d = predecessorStateDocs();
+      acceptedOf(d).measured.seasons_last = 2026;
+      expect(() => validateState(d)).toThrow(/binding mismatch/);
+    });
+
+    it('refuses a witness fingerprint that does not match the proposed contract witness', () => {
+      const d = predecessorStateDocs();
+      ladderOf(d).accepted_witness.manifest_sha256 = '0'.repeat(64);
+      expect(() => validateState(d)).toThrow(/binding mismatch/);
+    });
+
+    it('refuses an approved source gap the completed scope does not allow', () => {
+      const d = predecessorStateDocs();
+      d.contract.full_history.approved_source_gaps.seasons = [1916];
+      expect(() => validateState(d)).toThrow(/binding mismatch/);
+    });
+
+    it('refuses zero or two accepted baselines', () => {
+      for (const count of [0, 2]) {
+        const d = predecessorStateDocs();
+        const accepted = acceptedOf(d);
+        d.register.baselines = Array.from({ length: count }, () => structuredClone(accepted));
+        expect(() => validateState(d)).toThrow(/rebuild's own validators/);
+      }
+    });
+  });
+
+  describe('the height block', () => {
+    const heights = (d: StateDocs) => d.contract.datasets.player_details.height_enrichment;
+
+    it('refuses baseline_only bound to another baseline', () => {
+      const d = predecessorStateDocs();
+      Object.assign(heights(d), {
+        stats_input_mode: 'baseline_only', supplements: [], baseline_snapshot_label: 'some-other-label',
+      });
+      expect(() => validateState(d)).toThrow(/baseline_only requires explicit supplements/);
+    });
+
+    it('refuses baseline_only that still lists a supplement', () => {
+      const d = predecessorStateDocs();
+      Object.assign(heights(d), {
+        stats_input_mode: 'baseline_only', baseline_snapshot_label: acceptedOf(d).snapshot_label,
+      });
+      expect(heights(d).supplements.length).toBeGreaterThan(0);
+      expect(() => validateState(d)).toThrow(/baseline_only requires explicit supplements/);
+    });
+
+    it('accepts baseline_only exactly when it names the selected baseline with an empty list', () => {
+      const d = predecessorStateDocs();
+      Object.assign(heights(d), {
+        stats_input_mode: 'baseline_only', supplements: [], baseline_snapshot_label: acceptedOf(d).snapshot_label,
+      });
+      expect(() => validateState(d)).not.toThrow();
+    });
+
+    it('refuses an empty supplement list that does not declare baseline_only', () => {
+      const d = predecessorStateDocs();
+      heights(d).supplements = [];
+      expect(() => validateState(d)).toThrow(/requires nonempty supplements/);
+    });
+
+    it('refuses an unknown stats_input_mode', () => {
+      const d = predecessorStateDocs();
+      heights(d).stats_input_mode = 'whatever';
+      expect(() => validateState(d)).toThrow(/stats_input_mode must be/);
+    });
+  });
+
+  describe('measured counts and pins in the contracts', () => {
+    const parentOf = (doc: any, path: readonly string[]) => path.slice(0, -1).reduce((o, k) => o[k], doc);
+    it.each([
+      ['aflApi', ['roster', 'accepted_snapshot', 'measured', 'players_with_afl_api_evidence']],
+      ['afltables', ['club_player_lists', 'accepted_snapshot', 'measured', 'players_with_dob']],
+      ['afltables', ['coaches', 'accepted_snapshot', 'measured', 'match_coaches']],
+      ['contract', ['datasets', 'player_details', 'height_enrichment', 'measured', 'players_with_height']],
+    ] as const)('refuses a non-integer or missing %s count %j', (doc, path) => {
+      for (const bad of ['1916', 1.5, null, undefined]) {
+        const d = predecessorStateDocs();
+        const parent = parentOf(d[doc], path);
+        const key = path[path.length - 1];
+        if (bad === undefined) delete parent[key];
+        else parent[key] = bad;
+        expect(() => validateState(d)).toThrow(/rebuild's own validators/);
+      }
+    });
+
+    it.each([
+      ['aflApi', ['roster', 'accepted_snapshot', 'manifest_sha256']],
+      ['afltables', ['club_player_lists', 'accepted_snapshot', 'manifest_sha256_lf']],
+      ['afltables', ['coaches', 'accepted_snapshot', 'manifest_sha256_lf']],
+    ] as const)('refuses a %s pin that no longer matches the manifest it names %j', (doc, path) => {
+      const d = predecessorStateDocs();
+      parentOf(d[doc], path)[path[path.length - 1]] = '0'.repeat(64);
+      expect(() => validateState(d)).toThrow(/hashes to/);
+    });
+
+    it('accepts changed counts that stay integers, because the count is a claim the database must later test', () => {
+      const d = predecessorStateDocs();
+      d.aflApi.roster.accepted_snapshot.measured.players_with_afl_api_evidence += 92;
+      const verdict = validateState(d);
+      expect(verdict.finalChecks.find((c) => c.key === 'players_with_afl_api_height_evidence')!.expected)
+        .toBe(d.aflApi.roster.accepted_snapshot.measured.players_with_afl_api_evidence);
+      expect(verdict.pendingDatabase[0]).toMatch(/claim until the isolated rebuild measures it/);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Validation is bound to the exact proposed bytes
+// ---------------------------------------------------------------------------
+
+describe('a validation verdict is bound to the exact proposed bytes', () => {
+  function validated(over: { drop?: string[] } = {}) {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { files: all } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    const files = all.filter((f) => !(over.drop ?? []).includes(f.path));
+    const seen: Array<Record<string, string>> = [];
+    const result = validateTransitionState({
+      files, readRepo: bufferOf(s.disk), validate: (documents) => { seen.push({ ...documents }); return 'verdict'; },
+    });
+    return { s, files, seen, ...result };
+  }
+
+  it('hands the validator the proposed bytes for written documents and the current bytes for the rest', () => {
+    const { s, files, seen, verdict, binding } = validated({ drop: [AFLTABLES_PATH] });
+    expect(verdict).toBe('verdict');
+    expect(seen).toHaveLength(1);
+    const docs = seen[0];
+    const written = (path: string) => files.find((f) => f.path === path)!.content;
+    expect(docs.register).toBe(written(REGISTER_PATH));
+    expect(docs.seasons).toBe(written(SEASONS_PATH));
+    expect(docs.contract).toBe(written(CONTRACT_PATH));
+    expect(docs.rebuild).toBe(written(REBUILD_PATH));
+    expect(docs.aflApi).toBe(written(AFL_API_PATH));
+    expect(docs.aflApi).not.toBe(s.disk.get(AFL_API_PATH));
+    expect(docs.afltables).toBe(s.disk.get(AFLTABLES_PATH));
+    expect(Object.keys(binding.readOnlySha256)).toEqual([AFLTABLES_PATH]);
+    for (const f of files) {
+      expect(binding.finalSha256[f.path]).toBe(sha256Hex(f.content));
+      expect(binding.oldSha256[f.path]).toBe(sha256Hex(s.disk.get(f.path)!));
+    }
+  });
+
+  it('propagates a refusal from the validator and returns no binding', () => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    expect(() => validateTransitionState({
+      files, readRepo: bufferOf(s.disk),
+      validate: () => { throw new RolloverRefused('the ladder expectation is not reviewed'); },
+    })).toThrow('the ladder expectation is not reviewed');
+  });
+
+  it('refuses when a validated document is missing from the working tree', () => {
+    const s = scenario();
+    const p = prepare(s);
+    const { planned } = planWith(p);
+    const { files } = assertTransitionWriteSet({ prepared: p, planned, apply: false });
+    s.disk.delete(AFLTABLES_PATH);
+    expect(() => validateTransitionState({
+      files: files.filter((f) => f.path !== AFLTABLES_PATH), readRepo: bufferOf(s.disk), validate: () => 1,
+    })).toThrow(/does not exist/);
+  });
+
+  it('holds for the state it validated, and refuses each kind of drift afterwards', () => {
+    const { s, files, binding } = validated({ drop: [AFLTABLES_PATH] });
+    expect(() => assertBindingHolds(binding, files, bufferOf(s.disk))).not.toThrow();
+
+    const target = new Map(s.disk).set(REGISTER_PATH, `${s.disk.get(REGISTER_PATH)} `);
+    expect(() => assertBindingHolds(binding, files, bufferOf(target))).toThrow(/changed after the proposed state was validated/);
+
+    const gone = new Map(s.disk); gone.delete(SEASONS_PATH);
+    expect(() => assertBindingHolds(binding, files, bufferOf(gone))).toThrow(/changed after the proposed state was validated/);
+
+    const readOnly = new Map(s.disk).set(AFLTABLES_PATH, serialiseJson({ measured: { players_with_dob: 1 } }));
+    expect(() => assertBindingHolds(binding, files, bufferOf(readOnly))).toThrow(/validated as part of the proposed state but changed/);
+
+    const altered = files.map((f) => (f.path === CONTRACT_PATH ? { ...f, content: `${f.content} ` } : f));
+    expect(() => assertBindingHolds(binding, altered, bufferOf(s.disk))).toThrow(/are not the bytes that were validated/);
+
+    expect(() => assertBindingHolds(binding, files.slice(1), bufferOf(s.disk))).toThrow(/not the files the validation was bound to/);
+    expect(() => assertBindingHolds(binding, [...files, { path: 'extra.json', content: '{}', reformatted: false }], bufferOf(s.disk)))
+      .toThrow(/not the files the validation was bound to/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The apply: bound, journaled, recoverable — and honest about what that is
+// ---------------------------------------------------------------------------
+
+describe('the bound apply and its failure modes', () => {
+  function memoryFs(initial: Map<string, string>) {
+    const fs = new Map(initial);
+    const io: FileIo = {
+      read: (p) => (fs.has(p) ? Buffer.from(fs.get(p)!) : null),
+      write: (p, c) => { fs.set(p, c); },
+      rename: (a, b) => { fs.set(b, fs.get(a)!); fs.delete(a); },
+      remove: (p) => { fs.delete(p); },
+    };
+    return { fs, io };
+  }
+  const names = ['a.json', 'b.json', 'c.json'];
+  const newFiles = () => names.map((path) => ({ path, content: `new ${path}`, reformatted: false }));
+  const oldDisk = () => new Map(names.map((p) => [p, `old ${p}`] as const));
+  const bindingFor = (files: ReturnType<typeof newFiles>, disk: Map<string, string>): ApplyBinding => ({
+    finalSha256: Object.fromEntries(files.map((f) => [f.path, sha256Hex(f.content)])),
+    oldSha256: Object.fromEntries(files.map((f) => [f.path, sha256Hex(disk.get(f.path)!)])),
+    readOnlySha256: {},
+  });
+
+  it('applies when nothing moved since the verdict', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    applyStagedWrites(io, 2026, newFiles(), bindingFor(newFiles(), oldDisk()));
+    expect(names.map((n) => fs.get(n))).toEqual(names.map((n) => `new ${n}`));
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('refuses before staging anything when a target changed after the verdict', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const binding = bindingFor(newFiles(), oldDisk());
+    fs.set('b.json', 'edited by someone else');
+    expect(() => applyStagedWrites(io, 2026, newFiles(), binding)).toThrow(/b\.json changed after the proposed state was validated/);
+    expect([...fs.keys()].sort()).toEqual(names);
+    expect(fs.get('b.json')).toBe('edited by someone else');
+  });
+
+  it('refuses, unstages and does not overwrite when a target is edited between staging and the journal', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const binding = bindingFor(newFiles(), oldDisk());
+    const racing: FileIo = {
+      ...io,
+      write: (p, c) => { io.write(p, c); if (p === 'c.json.rollover-tmp') fs.set('a.json', 'edited mid-apply'); },
+    };
+    expect(() => applyStagedWrites(racing, 2026, newFiles(), binding)).toThrow(/a\.json changed after the proposed state was validated/);
+    expect([...fs.keys()].sort()).toEqual(names);
+    expect(fs.get('a.json')).toBe('edited mid-apply');
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('refuses when the bytes about to be written are not the validated bytes', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const binding = bindingFor(newFiles(), oldDisk());
+    const altered = newFiles(); altered[2].content = 'something else';
+    expect(() => applyStagedWrites(io, 2026, altered, binding)).toThrow(/not the bytes that were validated/);
+    expect([...fs.entries()].sort()).toEqual([...oldDisk().entries()].sort());
+  });
+
+  it('a cleanup failure never hides the failure that caused it', () => {
+    const owned = PLANNER_OWNED_WRITES.slice(0, 3);
+    const { io } = memoryFs(new Map(owned.map((p) => [p, `old ${p}`] as const)));
+    const failing: FileIo = {
+      ...io,
+      write: (p, c) => { if (p.startsWith(owned[2])) throw new Error('disk full'); io.write(p, c); },
+      remove: () => { throw new Error('cannot remove'); },
+    };
+    const files = owned.map((path) => ({ path, content: `new ${path}`, reformatted: false }));
+    expect(() => applyStagedWrites(failing, 2026, files)).toThrow('disk full');
+    // what the failed cleanup left behind is reported, not silently ignored
+    expect(pendingTransactionProblem(io)!.join('\n')).toContain('Staged rollover files from an earlier run remain');
+  });
+
+  it('an interruption before any target rename leaves the journal, every file old, and the old bytes preserved', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    let renames = 0;
+    const crashing: FileIo = {
+      ...io, rename: (a, b) => { renames += 1; if (renames === 2) throw new Error('killed'); io.rename(a, b); },
+    };
+    expect(() => applyStagedWrites(crashing, 2026, newFiles())).toThrow('killed');
+    const problem = pendingTransactionProblem(io)!.join('\n');
+    expect(problem).toContain('Every file still holds the old bytes');
+    expect(fs.has(TRANSACTION_JOURNAL_PATH)).toBe(true);
+    for (const n of names) expect(fs.get(n)).toBe(`old ${n}`);
+  });
+
+  it('the journal alone reconstructs every old file after a mixed interruption', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    let renames = 0;
+    const crashing: FileIo = {
+      ...io, rename: (a, b) => { renames += 1; if (renames === 3) throw new Error('killed'); io.rename(a, b); },
+    };
+    expect(() => applyStagedWrites(crashing, 2026, newFiles())).toThrow('killed');
+    const journal = parseTransactionJournal(fs.get(TRANSACTION_JOURNAL_PATH)!);
+    expect(fs.get('a.json')).toBe('new a.json');
+    for (const entry of journal.entries) {
+      expect(Buffer.from(entry.oldBase64, 'base64').toString()).toBe(`old ${entry.path}`);
+      expect(entry.oldSha256).toBe(sha256Hex(`old ${entry.path}`));
+      expect(entry.newSha256).toBe(sha256Hex(`new ${entry.path}`));
+    }
+    // and while that state exists, no later invocation is allowed to proceed
+    expect(pendingTransactionProblem(io)!.join('\n')).toContain('Files are mixed');
+  });
+
+  it('a post-write verification failure keeps the journal and reports the file as neither old nor new', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const corrupting: FileIo = {
+      ...io, rename: (a, b) => { io.rename(a, b); if (b === 'b.json') fs.set('b.json', 'torn'); },
+    };
+    expect(() => applyStagedWrites(corrupting, 2026, newFiles())).toThrow(/Post-write verification failed for b\.json/);
+    expect(fs.has(TRANSACTION_JOURNAL_PATH)).toBe(true);
+    const problem = pendingTransactionProblem(io)!;
+    expect(problem).toContain('  neither b.json');
+    expect(problem.join('\n')).toContain('Files are mixed');
+  });
+
+  it('a failure removing the journal after a verified apply still blocks, and says every file holds the new bytes', () => {
+    const { fs, io } = memoryFs(oldDisk());
+    const stuck: FileIo = {
+      ...io, remove: (p) => { if (p === TRANSACTION_JOURNAL_PATH) throw new Error('journal locked'); io.remove(p); },
+    };
+    expect(() => applyStagedWrites(stuck, 2026, newFiles())).toThrow('journal locked');
+    expect(pendingTransactionProblem(io)!.join('\n')).toContain('Every file already holds the reviewed new bytes');
+    expect(names.map((n) => fs.get(n))).toEqual(names.map((n) => `new ${n}`));
+  });
+
+  it('refuses a malformed journal with recovery steps, never a crash', () => {
+    for (const entries of [[{}], [null], [{ path: 'a.json', oldSha256: 'x', newSha256: 'y', oldBase64: '' }]]) {
+      const text = JSON.stringify({ schema: TRANSACTION_JOURNAL_SCHEMA, season: 2026, entries });
+      expect(() => parseTransactionJournal(text)).toThrow(RolloverRefused);
+      expect(() => parseTransactionJournal(text)).toThrow(/is malformed/);
+      const { io } = memoryFs(new Map([[TRANSACTION_JOURNAL_PATH, text]]));
+      expect(() => pendingTransactionProblem(io)).toThrow(RolloverRefused);
+    }
+  });
+
+  it('keeps the interrupted state visible to Git: the journal and staged names are not ignored', () => {
+    const ignore = repoText('.gitignore');
+    expect(ignore).not.toMatch(/rollover-transaction|rollover-tmp/);
+  });
+
+  it('describes apply as journaled and recoverable, never as a transaction or atomic across files', () => {
+    for (const path of ['src/lib/rollover/transition-change-set.ts', 'tools/db/rollover-season.ts']) {
+      const text = repoText(path);
+      expect(text).toMatch(/NOT a filesystem transaction|NOT a transaction/i);
+      expect(text).not.toMatch(/atomic(ally)? (across|multi)/i);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-316 C2 — the successor ladder tuple (mechanism A), synthetic configurations only
+// ---------------------------------------------------------------------------
+//
+// Every value below is synthetic: the profile name, the labels, the fingerprints and the witness manifest
+// exist only in this file. In states A and B (everything before a separately authorised activation) the shipped table
+// is EMPTY, so nothing here activates a successor or accepts a row count. State C (table lists the bound tuple) is
+// proved by the activation tests further down, never by a test that reads the shipped table. Each negative case changes one thing in an otherwise coherent successor transition.
+
+const SYNTHETIC_SUCCESSOR = 'c2-2026-successor';
+const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
+/** The reviewed predecessor tuple, read from the explicit predecessor documents it is bound to. */
+const PREDECESSOR_PAIR = (() => {
+  const d = predecessorStateDocs();
+  const b = acceptedOf(d);
+  const w = ladderOf(d).accepted_witness;
+  return {
+    profile: 'predecessor-1897-2025', core_snapshot_label: b.snapshot_label,
+    core_manifest_sha256: b.acquisition.manifest_sha256, core_artefact_set_sha256: b.raw_artefacts.artefact_set_sha256,
+    witness_snapshot_label: w.snapshot_label, witness_manifest_sha256: w.manifest_sha256,
+    first_season: 1897, last_season: 2025, expected_rows: 1622,
+  };
+})();
+
+type SuccessorFixtureOptions = { claimedRows?: number; manifestRows?: number; last?: number };
+
+function successorFixture(opts: SuccessorFixtureOptions = {}) {
+  const last = opts.last ?? 2026;
+  const claimedRows = opts.claimedRows ?? 1640;
+  const manifestRows = opts.manifestRows ?? 1640;
+  const seasonsCovered = last - 1897 + 1;
+  const files = Array.from({ length: seasonsCovered }, (_, i) => ({
+    dataset: 'ladder', filename: `ladder_${1897 + i}.csv`,
+    row_count: Math.floor(manifestRows / seasonsCovered) + (i < manifestRows % seasonsCovered ? 1 : 0),
+  }));
+  const manifest = { snapshot_label: 'synthetic-ladder-successor', files };
+  const witnessText = JSON.stringify(manifest, null, 2) + '\n';
+  const tuple: SuccessorLadderTuple = {
+    profile: SYNTHETIC_SUCCESSOR, supersedes: 'predecessor-1897-2025',
+    core_snapshot_label: 'synthetic-core-successor',
+    core_manifest_sha256: 'a1'.repeat(32), core_artefact_set_sha256: 'b2'.repeat(32),
+    witness_snapshot_label: manifest.snapshot_label, witness_manifest_sha256: sha(witnessText),
+    first_season: 1897, last_season: last, expected_rows: claimedRows,
+  };
+
+  const d = predecessorStateDocs();
+  const predecessor = acceptedOf(d);
+  const next = structuredClone(predecessor);
+  predecessor.acceptance_status = 'retired';
+  next.snapshot_label = tuple.core_snapshot_label;
+  next.acceptance_status = 'accepted';
+  next.acquisition.manifest_sha256 = tuple.core_manifest_sha256;
+  next.raw_artefacts.artefact_set_sha256 = tuple.core_artefact_set_sha256;
+  next.measured.seasons_last = last;
+  next.contract_binding.required_range.last_season = last;
+  d.register.baselines.push(next);
+
+  d.contract.full_history.season_range.last_season = last;
+  d.contract.full_history.current_season_excluded.seasons = [last + 1];
+  const ladder = ladderOf(d);
+  ladder.accepted_witness = {
+    ...ladder.accepted_witness, snapshot_label: tuple.witness_snapshot_label,
+    manifest: 'docs/rebuild-manifests/afltables_fitzroy_core/synthetic-ladder-successor.json',
+    manifest_sha256: tuple.witness_manifest_sha256, files: seasonsCovered, rows: claimedRows,
+  };
+  ladder.coverage.last_season = last;
+  ladder.rebuild_expectation = {
+    profile: SYNTHETIC_SUCCESSOR, core_snapshot_label: tuple.core_snapshot_label,
+    core_manifest_sha256: tuple.core_manifest_sha256, core_artefact_set_sha256: tuple.core_artefact_set_sha256,
+    witness_snapshot_label: tuple.witness_snapshot_label, witness_manifest_sha256: tuple.witness_manifest_sha256,
+    expected_rows: claimedRows, evidence_ref: 'synthetic successor evidence',
+  };
+  d.seasons.last_season = last + 1;
+  d.seasons.in_progress_seasons = [last + 1];
+  // A successor transition adds only the tuple: CLUB_SEASONS_EXPECTED keeps the predecessor's 1622.
+  const base = d.rebuild;
+  d.rebuild = planSuccessorTuplesEdit(base, tuple);
+  return { d, tuple, witnessText, base };
+}
+
+type SuccessorFixture = ReturnType<typeof successorFixture>;
+const judge = (
+  f: SuccessorFixture,
+  over: {
+    witnessText?: string | null; baseRebuild?: string | null; successors?: Record<string, SuccessorLadderTuple>; pairs?: Pairs;
+  } = {},
+) => {
+  const docs = asProposed(f.d);
+  const witnessManifest = over.witnessText === null ? undefined : (over.witnessText ?? f.witnessText);
+  const baseRebuild = over.baseRebuild === null ? undefined : (over.baseRebuild ?? f.base);
+  return validateProposedRebuildState({ ...docs, witnessManifest, baseRebuild }, over.pairs, over.successors);
+};
+
+describe('successor ladder tuple — the pure module', () => {
+  const tuple = () => successorFixture().tuple;
+
+  it('shipped an EMPTY closed table in the predecessor: no successor was accepted before the owner-reviewed adoption', () => {
+    expect(readSuccessorLadderTuplesJson(predecessorText(REBUILD_PATH))).toBe('{}');
+  });
+
+  it('state C: ships exactly the one separately activated tuple, c2-2026-successor (AFLDB-ISSUE-316 D-316-1), and nothing else', () => {
+    expect(Object.keys(SUCCESSOR_LADDER_TUPLES)).toEqual(['c2-2026-successor']);
+    expect(SUCCESSOR_LADDER_TUPLES['c2-2026-successor']).toEqual({
+      profile: 'c2-2026-successor', supersedes: 'predecessor-1897-2025', core_snapshot_label: 'c2-2026-final-core-v1',
+      core_manifest_sha256: '02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988',
+      core_artefact_set_sha256: '817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e',
+      witness_snapshot_label: 'c2-2026-final-ladder-v1',
+      witness_manifest_sha256: '65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34',
+      first_season: 1897, last_season: 2026, expected_rows: 1640,
+    });
+    expect(Object.isFrozen(SUCCESSOR_LADDER_TUPLES)).toBe(true);
+    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe(SUCCESSOR_LADDER_TUPLES_JSON);
+    // The adoption edited that one literal and nothing else in the runner.
+    expect(repoText(REBUILD_PATH).replace(SUCCESSOR_LADDER_TUPLES_JSON, '{}')).toBe(predecessorText(REBUILD_PATH));
+  });
+
+  it('appends exactly one tuple, keeps earlier entries byte-identical and round-trips', () => {
+    const base = predecessorText(REBUILD_PATH);
+    const once = planSuccessorTuplesEdit(base, tuple());
+    const parsed = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(once));
+    expect(Object.keys(parsed)).toEqual([SYNTHETIC_SUCCESSOR]);
+    expect(parsed[SYNTHETIC_SUCCESSOR]).toEqual(tuple());
+    expect(once.replace(readSuccessorLadderTuplesJson(once), '{}')).toBe(base);
+    const second: SuccessorLadderTuple = { ...tuple(), profile: 'c2-2027-successor', supersedes: SYNTHETIC_SUCCESSOR };
+    const twice = planSuccessorTuplesEdit(once, second);
+    const both = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(twice));
+    expect(Object.keys(both)).toEqual([SYNTHETIC_SUCCESSOR, 'c2-2027-successor']);
+    expect(JSON.stringify(both[SYNTHETIC_SUCCESSOR])).toBe(JSON.stringify(tuple()));
+  });
+
+  it('refuses a duplicate, a missing literal and a second literal', () => {
+    const once = planSuccessorTuplesEdit(predecessorText(REBUILD_PATH), tuple());
+    expect(() => planSuccessorTuplesEdit(once, tuple())).toThrow(/already lists/);
+    expect(() => planSuccessorTuplesEdit('const x = 1;', tuple())).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
+    const doubled = `${predecessorText(REBUILD_PATH)}\nexport const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
+    expect(() => planSuccessorTuplesEdit(doubled, tuple())).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
+    const broken = predecessorText(REBUILD_PATH).replace("SUCCESSOR_LADDER_TUPLES_JSON = '{}'", "SUCCESSOR_LADDER_TUPLES_JSON = '{nope'");
+    expect(() => planSuccessorTuplesEdit(broken, tuple())).toThrow(/not valid JSON/);
+  });
+
+  it.each([
+    ['a rehearsal name', (t: Record<string, unknown>) => { t.profile = 'c2-2026-rehearsal-only'; }, /names a rehearsal|must be the same/],
+    ['a key that is not the profile', (t: Record<string, unknown>) => { t.profile = 'c2-2026-other'; }, /must be the same/],
+    ['a rehearsal predecessor', (t: Record<string, unknown>) => { t.supersedes = 'c2-2026-rehearsal-only'; }, /different, non-rehearsal/],
+    ['a self-superseding tuple', (t: Record<string, unknown>) => { t.supersedes = SYNTHETIC_SUCCESSOR; }, /different, non-rehearsal/],
+    ['an unknown field', (t: Record<string, unknown>) => { t.note = 'x'; }, /unknown field "note"/],
+    ['a missing field', (t: Record<string, unknown>) => { delete t.witness_manifest_sha256; }, /missing "witness_manifest_sha256"/],
+    ['a non-hex fingerprint', (t: Record<string, unknown>) => { t.core_manifest_sha256 = 'ABC'; }, /lower-case SHA-256/],
+    ['a fractional row count', (t: Record<string, unknown>) => { t.expected_rows = 1640.5; }, /positive integer/],
+    ['an empty range', (t: Record<string, unknown>) => { t.last_season = 1800; }, /not a season year|empty/],
+  ])('refuses %s', (_label, mutate, message) => {
+    const t = structuredClone(tuple()) as unknown as Record<string, unknown>;
+    mutate(t);
+    expect(() => assertSuccessorLadderTuple(t, SYNTHETIC_SUCCESSOR)).toThrow(LadderSuccessorRefused);
+    expect(() => assertSuccessorLadderTuple(t, SYNTHETIC_SUCCESSOR)).toThrow(message);
+  });
+
+  it('refuses a rehearsal-named tuple filed under its own name', () => {
+    const t = { ...tuple(), profile: 'c2-2026-rehearsal-only' };
+    expect(() => assertSuccessorLadderTuple(t, 'c2-2026-rehearsal-only')).toThrow(/names a rehearsal/);
+  });
+
+  it('derives the witness row total from the manifest alone and refuses every malformed shape', () => {
+    const { witnessText } = successorFixture();
+    expect(deriveLadderWitnessRows(witnessText, 1897, 2026, 'synthetic-ladder-successor')).toEqual({ files: 130, rows: 1640 });
+    const m = () => JSON.parse(witnessText);
+    const text = (x: unknown) => JSON.stringify(x);
+    const dup = m(); dup.files[1].filename = 'ladder_1897.csv';
+    const gap = m(); gap.files.pop();
+    const outside = m(); outside.files[0].filename = 'ladder_1896.csv';
+    const other = m(); other.files[0].dataset = 'results';
+    const empty = m(); empty.files[0].row_count = 0;
+    expect(() => deriveLadderWitnessRows(text(dup), 1897, 2026)).toThrow(/twice/);
+    expect(() => deriveLadderWitnessRows(text(gap), 1897, 2026)).toThrow(/129 season files, not the 130/);
+    expect(() => deriveLadderWitnessRows(text(outside), 1897, 2026)).toThrow(/outside 1897..2026/);
+    expect(() => deriveLadderWitnessRows(text(other), 1897, 2026)).toThrow(/not a ladder_<season>.csv ladder file/);
+    expect(() => deriveLadderWitnessRows(text(empty), 1897, 2026)).toThrow(/positive integer row_count/);
+    expect(() => deriveLadderWitnessRows(witnessText, 1897, 2026, 'another-label')).toThrow(/labelled/);
+    expect(() => deriveLadderWitnessRows('{ nope', 1897, 2026)).toThrow(/not valid JSON/);
+  });
+
+  it('accepts a change set carrying one reviewed tuple and refuses a malformed one', () => {
+    const s = scenario();
+    (s.changeSet as Record<string, unknown>).ladder_successor_tuple = structuredClone(tuple());
+    expect(parseTransitionChangeSet(JSON.stringify(s.changeSet)).successorLadderTuple).toEqual(tuple());
+    expect(parseTransitionChangeSet(JSON.stringify(scenario().changeSet)).successorLadderTuple).toBeNull();
+    for (const bad of [{ ...tuple(), profile: 'c2-2026-rehearsal-only' }, { ...tuple(), extra: 1 }, 'x', []]) {
+      const t = scenario();
+      (t.changeSet as Record<string, unknown>).ladder_successor_tuple = bad;
+      expect(() => parseTransitionChangeSet(JSON.stringify(t.changeSet))).toThrow(RolloverRefused);
+    }
+  });
+
+  it('PROJECTS the tuple append but never writes the rebuild source for a successor (activation is separate)', () => {
+    const stub = `${REBUILD_STUB}export const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
+    const plain = run({ rebuildSource: stub });
+    expect(fileIn(plain, REBUILD_PATH).content).toContain("SUCCESSOR_LADDER_TUPLES_JSON = '{}'");
+    expect(plain.activation).toBeUndefined();
+    // This scenario's synthetic witness carries ROWS_2026; the tuple must carry the same count.
+    const scenarioTuple = { ...tuple(), expected_rows: ROWS_2026 };
+    const withTuple = run({ rebuildSource: stub, transition: { successorLadderTuple: scenarioTuple } });
+    // The apply's files do not include rebuild-test.ts at all: the successor stays inactive.
+    expect(withTuple.files.map((f) => f.path)).not.toContain(REBUILD_PATH);
+    expect(withTuple.files.map((f) => f.path).sort()).toEqual([REGISTER_PATH, SEASONS_PATH, CONTRACT_PATH, STAT_AVAILABILITY_PATH].sort());
+    // The projection is the reviewed one-line append to the unchanged current bytes, and nothing else.
+    const activation = withTuple.activation!;
+    expect(activation.path).toBe(REBUILD_PATH);
+    expect(activation.inactiveContent).toBe(stub);
+    expect(activation.activeContent).toBe(planSuccessorTuplesEdit(stub, scenarioTuple));
+    expect(parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(activation.activeContent))[SYNTHETIC_SUCCESSOR]).toEqual(scenarioTuple);
+    // Stage 9 reads the successor's count from the tuple; the constant keeps the predecessor's either side.
+    expect(readClubSeasonsExpectedRows(activation.activeContent)).toBe(ROWS_2025);
+    expect(readClubSeasonsExpectedRows(fileIn(plain, REBUILD_PATH).content)).toBe(ROWS_2026);
+    expect(withTuple.notes.join(' ')).toMatch(/successor activation NOT performed/);
+    expect(() => run({ rebuildSource: stub, transition: { successorLadderTuple: { ...tuple(), expected_rows: ROWS_2026 + 1 } } }))
+      .toThrow(/carries expected_rows .* but the ladder witness carries/);
+    expect(() => run({ transition: { successorLadderTuple: scenarioTuple } })).toThrow(/exactly one SUCCESSOR_LADDER_TUPLES_JSON/);
+    // A successor already in the table is active BEFORE the apply: refused.
+    const active = planSuccessorTuplesEdit(stub, scenarioTuple);
+    expect(() => run({ rebuildSource: active, transition: { successorLadderTuple: scenarioTuple } })).toThrow(/already lists/);
+  });
+});
+
+describe("successor ladder tuple — a coherent synthetic transition is judged by the rebuild's own validators", () => {
+  it('accepts the whole proposed state when the tuple comes from the proposed rebuild text', () => {
+    const verdict = judge(successorFixture());
+    expect(verdict.ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
+    expect(verdict.expectedRows).toBe(1640);
+    expect(verdict.finalChecks.length).toBeGreaterThan(80);
+    expect(verdict.pendingDatabase.join(' ')).toMatch(/NOT executed/);
+  });
+
+  it('accepts the same state with the table injected (state C), and refuses it under the empty shipped table (states A and B)', () => {
+    const f = successorFixture();
+    expect(judge(f, { successors: { [SYNTHETIC_SUCCESSOR]: f.tuple } }).ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
+    const unadopted = { ...f, d: { ...f.d, rebuild: f.base } };
+    expect(() => judge(unadopted)).toThrow(/Unsupported ladder expectation/);
+  });
+
+  it('judges the bytes it is given: the working-tree rebuild-test.ts is never consulted for the tuple', () => {
+    const f = successorFixture();
+    const working = readSuccessorLadderTuplesJson(repoText(REBUILD_PATH));
+    // The proposed bytes carry their own table; the working tree's (whatever it lists) is never read for it.
+    expect(readSuccessorLadderTuplesJson(f.d.rebuild)).not.toBe(working);
+    expect(judge(f).ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
+    expect(readSuccessorLadderTuplesJson(repoText(REBUILD_PATH))).toBe(working);
+  });
+
+  it('needs the proposed witness manifest and never reads the working tree instead', () => {
+    expect(() => judge(successorFixture(), { witnessText: null })).toThrow(/needs the proposed witness manifest/);
+  });
+
+  describe('wrong fingerprints refuse even when every other value is consistent', () => {
+    it.each([
+      'core_manifest_sha256', 'core_artefact_set_sha256', 'witness_manifest_sha256',
+      'core_snapshot_label', 'witness_snapshot_label',
+    ])('the contract block disagrees with the tuple on %s', (field) => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation[field] = field.endsWith('label') ? 'another-label' : 'c3'.repeat(32);
+      expect(() => judge(f)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it.each(['core_manifest_sha256', 'core_artefact_set_sha256', 'witness_manifest_sha256'])(
+      'the register or contract disagrees with the tuple on %s', (field) => {
+        const f = successorFixture();
+        const entry = f.d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+        if (field === 'core_manifest_sha256') entry.acquisition.manifest_sha256 = 'c3'.repeat(32);
+        if (field === 'core_artefact_set_sha256') entry.raw_artefacts.artefact_set_sha256 = 'c3'.repeat(32);
+        if (field === 'witness_manifest_sha256') ladderOf(f.d).accepted_witness.manifest_sha256 = 'c3'.repeat(32);
+        expect(() => judge(f)).toThrow(/binding mismatch/);
+      });
+
+    it('the witness manifest bytes are not the manifest the tuple pins', () => {
+      const f = successorFixture();
+      const altered = JSON.parse(f.witnessText);
+      altered.files[0].row_count += 1;
+      expect(() => judge(f, { witnessText: JSON.stringify(altered, null, 2) + '\n' })).toThrow(/not the manifest the tuple pins/);
+    });
+  });
+
+  describe('wrong counts refuse', () => {
+    it('a contract row count the tuple does not carry', () => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation.expected_rows = 1639;
+      expect(() => judge(f)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('a successor transition that rewrites the predecessor constant, to the successor count or any other', () => {
+      for (const next of [1640, 1621]) {
+        const f = successorFixture();
+        f.d.rebuild = planClubSeasonsConstantEdit(f.d.rebuild, 1622, next);
+        expect(() => judge(f)).toThrow(new RegExp(`expects ${next} club_seasons rows in CLUB_SEASONS_EXPECTED, but the base declares 1622`));
+      }
+    });
+
+    it('a successor state judged without the base rebuild bytes it must leave the constant unchanged in', () => {
+      expect(() => judge(successorFixture(), { baseRebuild: null })).toThrow(/base bytes were not supplied/);
+    });
+
+    it('a tuple, contract and constant that agree with each other but not with the witness manifest', () => {
+      const f = successorFixture({ claimedRows: 1641, manifestRows: 1640 });
+      expect(() => judge(f)).toThrow(/derives 1640 rows, not the tuple's 1641/);
+    });
+
+    it('a contract witness record that still describes the predecessor', () => {
+      const f = successorFixture();
+      Object.assign(ladderOf(f.d).accepted_witness, { files: 129, rows: 1622 });
+      expect(() => judge(f)).toThrow(/accepted_witness records 129 files \/ 1622 rows, not 130 \/ 1640/);
+    });
+
+    it('a tuple that does not exceed its predecessor', () => {
+      const f = successorFixture({ claimedRows: 1622, manifestRows: 1622 });
+      expect(() => judge(f)).toThrow(/does not exceed the predecessor's 1622/);
+    });
+  });
+
+  describe('a stale predecessor or an incomplete transition refuses', () => {
+    const predecessorEntry = (f: SuccessorFixture) =>
+      f.d.register.baselines.find((b: any) => b.snapshot_label === 'full-history-20260902');
+
+    it('the predecessor is still accepted (two accepted entries)', () => {
+      const f = successorFixture();
+      predecessorEntry(f).acceptance_status = 'accepted';
+      expect(() => judge(f)).toThrow(/baselines are marked accepted/);
+    });
+
+    it.each([
+      ['removed', (f: SuccessorFixture) => { f.d.register.baselines = f.d.register.baselines.filter((b: any) => b.snapshot_label !== 'full-history-20260902'); }],
+      ['not retired', (f: SuccessorFixture) => { predecessorEntry(f).acceptance_status = 'rehearsal_not_selected'; }],
+      ['re-fingerprinted', (f: SuccessorFixture) => { predecessorEntry(f).acquisition.manifest_sha256 = 'c3'.repeat(32); }],
+      ['re-set', (f: SuccessorFixture) => { predecessorEntry(f).raw_artefacts.artefact_set_sha256 = 'c3'.repeat(32); }],
+    ])('the retired predecessor entry is %s', (_label, mutate) => {
+      const f = successorFixture();
+      mutate(f);
+      expect(() => judge(f)).toThrow(/does not retain the predecessor/);
+    });
+
+    it.each([
+      ['seasons.json last_season not advanced', (f: SuccessorFixture) => { f.d.seasons.last_season = 2026; }, /seasons.json must declare last_season 2027/],
+      ['no season in progress', (f: SuccessorFixture) => { f.d.seasons.in_progress_seasons = []; }, /seasons.json must declare last_season 2027/],
+      ['the completed season still in progress', (f: SuccessorFixture) => { f.d.seasons.in_progress_seasons = [2026]; }, /intersects excluded\/in-progress seasons: 2026/],
+      ['two seasons in progress', (f: SuccessorFixture) => { f.d.seasons.in_progress_seasons = [2027, 2028]; }, /seasons.json must declare last_season 2027/],
+      ['the contract exclusion still names the completed season', (f: SuccessorFixture) => { f.d.contract.full_history.current_season_excluded.seasons = [2026]; }, /intersects excluded\/in-progress seasons: 2026/],
+      ['the contract exclusion is empty', (f: SuccessorFixture) => { f.d.contract.full_history.current_season_excluded.seasons = []; }, /current_season_excluded.seasons must be \[2027\]/],
+      ['the contract range not advanced', (f: SuccessorFixture) => { f.d.contract.full_history.season_range.last_season = 2025; }, /binding mismatch/],
+      ['the witness coverage not advanced', (f: SuccessorFixture) => { ladderOf(f.d).coverage.last_season = 2025; }, /binding mismatch/],
+      ['the selected baseline range not advanced', (f: SuccessorFixture) => { acceptedOf(f.d).contract_binding.required_range.last_season = 2025; }, /binding mismatch/],
+    ])('%s', (_label, mutate, message) => {
+      const f = successorFixture();
+      mutate(f);
+      expect(() => judge(f)).toThrow(message);
+    });
+  });
+
+  describe('unknown or crossed tuples refuse', () => {
+    it('an unknown profile name even with consistent fingerprints', () => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation.profile = 'c2-2026-unreviewed';
+      expect(() => judge(f)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('a successor that supersedes a profile the reviewed table does not hold', () => {
+      const f = successorFixture();
+      const crossed = { ...f.tuple, supersedes: 'some-other-1897-2025' };
+      expect(() => judge(f, { successors: { [SYNTHETIC_SUCCESSOR]: crossed } })).toThrow(/not a reviewed predecessor tuple/);
+    });
+
+    it.each([
+      'core_manifest_sha256', 'core_artefact_set_sha256', 'witness_snapshot_label', 'witness_manifest_sha256',
+    ] as const)('a successor that reuses the predecessor %s', (field) => {
+      const f = successorFixture();
+      const crossed = { ...f.tuple, [field]: PREDECESSOR_PAIR[field] };
+      // every document agrees with the crossed tuple, so only the crossing itself can refuse
+      const entry = f.d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+      if (field === 'core_manifest_sha256') entry.acquisition.manifest_sha256 = PREDECESSOR_PAIR[field];
+      if (field === 'core_artefact_set_sha256') entry.raw_artefacts.artefact_set_sha256 = PREDECESSOR_PAIR[field];
+      if (field === 'witness_snapshot_label') ladderOf(f.d).accepted_witness.snapshot_label = PREDECESSOR_PAIR[field];
+      if (field === 'witness_manifest_sha256') ladderOf(f.d).accepted_witness.manifest_sha256 = PREDECESSOR_PAIR[field];
+      ladderOf(f.d).rebuild_expectation[field] = PREDECESSOR_PAIR[field];
+      expect(() => judge(f, { successors: { [SYNTHETIC_SUCCESSOR]: crossed } }))
+        .toThrow(new RegExp(`reuses the predecessor's ${field}`));
+    });
+
+    it('a range that is not exactly one completed season past the predecessor', () => {
+      const f = successorFixture({ last: 2027 });
+      expect(() => judge(f)).toThrow(/does not extend the predecessor's 1897..2025 by exactly one completed season/);
+    });
+
+    it('the same name listed as both a reviewed pair and a successor tuple', () => {
+      const f = successorFixture();
+      const both = { 'predecessor-1897-2025': PREDECESSOR_PAIR, [SYNTHETIC_SUCCESSOR]: { ...PREDECESSOR_PAIR, profile: SYNTHETIC_SUCCESSOR } };
+      expect(() => judge(f, { pairs: both as unknown as Pairs })).toThrow(/both a reviewed pair and a successor tuple/);
+    });
+
+    it('a rehearsal profile smuggled into an injected successor table', () => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation.profile = 'c2-2026-rehearsal-only';
+      expect(() => judge(f, { successors: { 'c2-2026-rehearsal-only': { ...f.tuple, profile: 'c2-2026-rehearsal-only' } } })).toThrow();
+    });
+  });
+
+  describe('the rehearsal restrictions and the other authorities are unchanged', () => {
+    const resolveDirect = (f: SuccessorFixture, provenance?: { specPath: string; specSha256: string }, injected = true) => {
+      const source = { label: f.tuple.core_snapshot_label, accepted: true, fullHistory: true, acknowledgedPartial: false, selection: 'accepted-baseline' as const };
+      const target = { database: 'afldb_test', adminDsn: '', importDsn: '', importIsOwnerSubstitution: false };
+      const docs = { register: f.d.register, contract: f.d.contract, seasons: f.d.seasons } as never;
+      return resolveLadderRebuildExpectation(source, target, docs, provenance, undefined, undefined,
+        injected ? { [SYNTHETIC_SUCCESSOR]: f.tuple } : undefined, f.witnessText);
+    };
+
+    it('still refuses the rehearsal-only profile as an active profile', () => {
+      const f = successorFixture();
+      ladderOf(f.d).rebuild_expectation.profile = 'c2-2026-rehearsal-only';
+      expect(() => judge(f)).toThrow(/can never be an active contract profile/);
+    });
+
+    it('resolves a coherent successor to a frozen pair without the supersedes link and a complete census scope', () => {
+      const ladder = resolveDirect(successorFixture());
+      expect(ladder.expectedRows).toBe(1640);
+      expect(ladder.censusScope).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
+      expect(Object.isFrozen(ladder.pair)).toBe(true);
+      expect('supersedes' in ladder.pair).toBe(false);
+    });
+
+    it('a successor profile cannot claim rehearsal provenance', () => {
+      expect(() => resolveDirect(successorFixture(), { specPath: '/spec', specSha256: 'a'.repeat(64) }))
+        .toThrow(/cannot claim candidate rehearsal purpose/);
+    });
+
+    it('states A and B: the shipped empty table refuses the same state, so the name alone grants nothing', () => {
+      expect(() => resolveDirect(successorFixture(), undefined, false)).toThrow(/Unsupported ladder expectation/);
+    });
+
+    it('still accepts the predecessor state and refuses the unreviewed successor name', () => {
+      expect(validateState(predecessorStateDocs()).ladderProfile).toBe('predecessor-1897-2025');
+      const d = predecessorStateDocs();
+      ladderOf(d).rebuild_expectation.profile = 'c2-2026-successor';
+      expect(() => validateState(d)).toThrow(/Unsupported ladder expectation/);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-316 — successor ACTIVATION separated from the apply (owner ruling 2026-10-25)
+// ---------------------------------------------------------------------------
+//
+// States: A pre-apply, B applied/inactive, C activated, D deactivated (= B). The apply leaves
+// tools/db/rebuild-test.ts unwritten; only the bound activation changes its closed successor table.
+// Synthetic documents only; nothing is written anywhere but in-memory maps.
+
+describe('successor activation — STATE B: the apply leaves the successor inactive', () => {
+  const STUB = `${REBUILD_STUB}export const SUCCESSOR_LADDER_TUPLES_JSON = '{}';\n`;
+  const scenarioTuple = (): SuccessorLadderTuple => ({ ...successorFixture().tuple, expected_rows: ROWS_2026 });
+
+  function successorScenario(): Scenario {
+    const s = scenario();
+    s.disk.set(REBUILD_PATH, STUB);
+    s.changeSet.ladder_successor_tuple = scenarioTuple();
+    s.changeSet.write_set = (s.changeSet.write_set as string[]).filter((p) => p !== REBUILD_PATH);
+    return s;
+  }
+  function planSuccessor(prepared: ReturnType<typeof prepare>) {
+    const plan = run({ rebuildSource: STUB, transition: prepared.transition });
+    const network = planAfltablesNetworkRetirement({
+      completedSeason: COMPLETING, rolloverDate: DATE, decision: 'D-316-1',
+      currentSource: NETWORK_SOURCE, currentSeasons: { in_progress_seasons: [COMPLETING] },
+    });
+    return { plan, planned: [network.file, ...plan.files] };
+  }
+  /** Dry run, pin, then the pinned apply's judged write set, exactly as the CLI sequences them. */
+  function pinnedApply() {
+    const s = successorScenario();
+    const dry = prepare(s);
+    s.changeSet.final_sha256 = assertTransitionWriteSet({ prepared: dry, planned: planSuccessor(dry).planned, apply: false }).finalHashes;
+    const pinned = prepare(s);
+    const { plan, planned } = planSuccessor(pinned);
+    const { files } = assertTransitionWriteSet({ prepared: pinned, planned, apply: true });
+    return { s, plan, files };
+  }
+
+  it('completes a pinned apply with rebuild-test.ts neither planned, pinned, journaled nor written', () => {
+    const { s, plan, files } = pinnedApply();
+    expect(files.map((f) => f.path)).not.toContain(REBUILD_PATH);
+    expect(files).toHaveLength(7);
+    expect(Object.keys(s.changeSet.final_sha256 as Record<string, string>)).not.toContain(REBUILD_PATH);
+
+    let judgedRebuild: string | undefined;
+    const { binding } = validateTransitionState({
+      files, readRepo: bufferOf(s.disk),
+      validate: (documents) => { judgedRebuild = documents.rebuild; assertInactiveApplyState(documents.rebuild, plan.activation!); return null; },
+    });
+    // The validator reads the UNCHANGED current file, which the binding then holds read-only up to the write.
+    expect(judgedRebuild).toBe(STUB);
+    expect(binding.readOnlySha256[REBUILD_PATH]).toBe(sha256Hex(STUB));
+    expect(binding.finalSha256).not.toHaveProperty([REBUILD_PATH]);
+    // The rollover's recovery journal can never restore (or reverse) the activation state.
+    expect(buildTransactionJournal(COMPLETING, files, bufferOf(s.disk)).entries.map((e) => e.path)).not.toContain(REBUILD_PATH);
+
+    const fs = new Map(s.disk);
+    const io = mapIo(fs);
+    applyStagedWrites(io, COMPLETING, files, binding);
+    for (const f of files) expect(fs.get(f.path)).toBe(f.content);
+    expect(fs.get(REBUILD_PATH)).toBe(STUB);
+    expect(pendingTransactionProblem(io)).toBeNull();
+  });
+
+  it('state B: never populates the selector table: after the apply it is empty and stage 9 still reads the predecessor constant', () => {
+    const { s, plan, files } = pinnedApply();
+    const fs = new Map(s.disk);
+    applyStagedWrites(mapIo(fs), COMPLETING, files);
+    expect(readSuccessorLadderTuplesJson(fs.get(REBUILD_PATH)!)).toBe('{}');
+    expect(readStageNineExpectedRows(fs.get(REBUILD_PATH)!, JSON.parse(fs.get(CONTRACT_PATH)!))).toBe(ROWS_2025);
+    // The projection exists only in the plan, as the reviewed one-line append; it is not a file of the apply.
+    expect(plan.activation!.activeContent).toBe(planSuccessorTuplesEdit(STUB, scenarioTuple()));
+    expect(plan.files.some((f) => f.content === plan.activation!.activeContent)).toBe(false);
+  });
+
+  it('refuses a successor change set that names rebuild-test.ts in its write set or its pins', () => {
+    const inWriteSet = successorScenario();
+    (inWriteSet.changeSet.write_set as string[]).push(REBUILD_PATH);
+    expect(() => prepare(inWriteSet)).toThrow(/never writes that file for a successor/);
+    const pinned = successorScenario();
+    pinned.changeSet.final_sha256 = { [REBUILD_PATH]: sha256Hex('x') };
+    expect(() => prepare(pinned)).toThrow(/never writes that file for a successor/);
+  });
+
+  it('refuses a planner output that would write rebuild-test.ts for a successor', () => {
+    const p = prepare(successorScenario());
+    const { planned } = planSuccessor(p);
+    const smuggled = [...planned, { path: REBUILD_PATH, content: planSuccessorTuplesEdit(STUB, scenarioTuple()), reformatted: false }];
+    expect(() => assertTransitionWriteSet({ prepared: p, planned: smuggled, apply: false })).toThrow(/The planner produced/);
+  });
+
+  it('leaves no other route for the apply to write the activation file', () => {
+    expect(plannerOwnedWrites(true)).not.toContain(REBUILD_PATH);
+    expect(plannerOwnedWrites(false)).toEqual(PLANNER_OWNED_WRITES);
+    expect(TRANSITION_REPLACEABLE_PATHS).not.toContain(REBUILD_PATH);
+    const cli = repoText('tools/db/rollover-season.ts');
+    expect(cli).not.toContain('planSuccessorTuplesEdit');
+    expect(cli).not.toContain('applyActivationWrite');
+  });
+
+  it('refuses an apply-time rebuild source that changed, already lists the profile, or projects anything else', () => {
+    const { plan } = pinnedApply();
+    const a = plan.activation!;
+    expect(() => assertInactiveApplyState(`${STUB}\n`, a)).toThrow(/changed between planning and validation/);
+    expect(() => assertInactiveApplyState(a.activeContent, { ...a, inactiveContent: a.activeContent })).toThrow(/already lists/);
+    expect(() => assertInactiveApplyState(STUB, { ...a, activeContent: `${a.activeContent}\n` })).toThrow(/not the reviewed one-line append/);
+    expect(formatActivationProjection(a).join('\n')).toContain(sha256Hex(a.activeContent));
+  });
+});
+
+describe('successor activation — STATE B to C and back (D): bound, single-file, reversible', () => {
+  const HEAD = 'b'.repeat(40);
+  const SOURCE = 'a'.repeat(40);
+  const MIGRATIONS = [
+    { name: '001_first.sql', text: 'create table a (x int);\n' },
+    { name: '117_last.sql', text: 'select 1;\r\n' },
+  ];
+
+  /** State B: the applied documents of a coherent synthetic successor, its pinned change set, rebuild-test.ts untouched. */
+  function applied() {
+    const f = successorFixture();
+    acceptedOf(f.d).accepted_on = DATE;
+    const appliedFiles = new Map<string, string>([
+      [AFLTABLES_NETWORK_PATH, serialiseJson({ status: 'retired', last_season: 2026, decision: 'D-316-1', changed_at: DATE })],
+      [REGISTER_PATH, serialiseJson(f.d.register)],
+      [SEASONS_PATH, serialiseJson(f.d.seasons)],
+      [CONTRACT_PATH, serialiseJson(f.d.contract)],
+      [STAT_AVAILABILITY_PATH, serialiseJson(baseStatAvailability())],
+    ]);
+    const disk = new Map<string, string>([
+      ...appliedFiles,
+      [AFL_API_PATH, serialiseJson(f.d.aflApi)],
+      [AFLTABLES_PATH, serialiseJson(f.d.afltables)],
+      [ladderOf(f.d).accepted_witness.manifest, f.witnessText],
+      [REBUILD_PATH, f.base],
+      ['src/app/unrelated.ts', 'untouched'],
+    ]);
+    const changeSet: Record<string, unknown> = {
+      schema: TRANSITION_SCHEMA, season: 2026,
+      inputs: (Object.keys(TRANSITION_INPUTS) as InputRole[]).map((role) => ({ role, ...TRANSITION_INPUTS[role] })),
+      replace: [], register_patches: [],
+      write_set: [...appliedFiles.keys()],
+      final_sha256: Object.fromEntries([...appliedFiles].map(([p, c]) => [p, sha256Hex(c)])),
+      ladder_successor_tuple: f.tuple,
+    };
+    return { f, disk, changeSet, changeSetText: JSON.stringify(changeSet, null, 2) };
+  }
+  type Applied = ReturnType<typeof applied>;
+
+  function authorityDoc(a: Applied, over: Record<string, unknown> = {}): Record<string, unknown> {
+    const m = migrationSetState(MIGRATIONS);
+    return {
+      schema: ACTIVATION_SCHEMA, action: 'activate', decision: 'D-316-ACT-1', season: 2026, profile: SYNTHETIC_SUCCESSOR,
+      rollover_date: DATE, source_commit: SOURCE, head_commit: HEAD,
+      transition_change_set_sha256: sha256Hex(a.changeSetText), tuple_sha256: successorTupleSha256(a.f.tuple),
+      migrations: { count: m.count, last: m.last, set_sha256: m.setSha256 },
+      rebuild_sha256: { inactive: sha256Hex(a.f.base), active: sha256Hex(planSuccessorTuplesEdit(a.f.base, a.f.tuple)) },
+      ...over,
+    };
+  }
+
+  /** The CLI's whole judgement, in its order, over an in-memory tree; returns the one write it would make. */
+  function judgeActivation(a: Applied, disk: Map<string, string>, over: {
+    authority?: Record<string, unknown>; changeSetText?: string;
+    git?: { head: string; sourceIsAncestor: boolean }; migrations?: Array<{ name: string; text: string }>;
+  } = {}) {
+    const io = mapIo(disk);
+    const pending = activationPendingProblem(io);
+    if (pending) throw new RolloverRefused(pending.join(' '));
+    const authority = parseActivationAuthority(JSON.stringify(over.authority ?? authorityDoc(a)));
+    const { changeSet, tuple } = bindActivationChangeSet(authority, Buffer.from(over.changeSetText ?? a.changeSetText));
+    assertCommitBinding(authority, over.git ?? { head: HEAD, sourceIsAncestor: true });
+    assertMigrationBinding(authority, migrationSetState(over.migrations ?? MIGRATIONS));
+    const classified = classifyActivationState({ authority, changeSet, tuple, readRepo: io.read });
+    const text = (p: string) => disk.get(p)!;
+    const proof = validateActivationStates({
+      register: text(REGISTER_PATH), seasons: text(SEASONS_PATH), contract: text(CONTRACT_PATH),
+      aflApi: text(AFL_API_PATH), afltables: text(AFLTABLES_PATH),
+      witnessManifest: text(JSON.parse(text(CONTRACT_PATH)).datasets.ladder.accepted_witness.manifest),
+    }, classified.inactiveText, classified.activeText, authority.profile, tuple.expected_rows);
+    return { authority, changeSet, tuple, classified, proof, io, write: planActivationWrite(authority.action, classified) };
+  }
+  const activate = (a: Applied, disk: Map<string, string>, over: Parameters<typeof judgeActivation>[2] = {}) => {
+    const j = judgeActivation(a, disk, over);
+    applyActivationWrite(j.io, j.write, () => undefined);
+    return j;
+  };
+  const changedPaths = (before: Map<string, string>, after: Map<string, string>) =>
+    [...new Set([...before.keys(), ...after.keys()])].filter((p) => before.get(p) !== after.get(p)).sort();
+
+  it('state B: runs the post-apply validation inactive: B classified, projected C resolves, installed B refuses', () => {
+    const a = applied();
+    const before = new Map(a.disk);
+    const j = judgeActivation(a, a.disk);
+    expect(j.classified.state).toBe('applied-inactive');
+    expect(j.proof.active.ladderProfile).toBe(SYNTHETIC_SUCCESSOR);
+    expect(j.proof.active.expectedRows).toBe(1640);
+    expect(j.proof.inactiveRefusal).toMatch(/Unsupported ladder expectation/);
+    expect(readSuccessorLadderTuplesJson(a.disk.get(REBUILD_PATH)!)).toBe('{}');
+    expect(changedPaths(before, a.disk)).toEqual([]);
+  });
+
+  it('state C: activation changes only rebuild-test.ts, from the inactive pin to the active pin, by exactly the bound tuple', () => {
+    const a = applied();
+    const before = new Map(a.disk);
+    const j = activate(a, a.disk);
+    expect(changedPaths(before, a.disk)).toEqual([REBUILD_PATH]);
+    const now = a.disk.get(REBUILD_PATH)!;
+    expect(sha256Hex(now)).toBe(j.authority.rebuildSha256.active);
+    expect(parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(now))).toEqual({ [SYNTHETIC_SUCCESSOR]: a.f.tuple });
+    expect(now.replace(readSuccessorLadderTuplesJson(now), '{}')).toBe(a.f.base);
+    expect(a.disk.has(ACTIVATION_STAGING_PATH)).toBe(false);
+    expect(activationPendingProblem(mapIo(a.disk))).toBeNull();
+    // C is the same one-line edit the coupled apply made on the same base bytes (determinism of that edit; the real
+    // pin is re-derived at P and compared with the authority's rebuild_sha256.active, never assumed from J2).
+    expect(now).toBe(a.f.d.rebuild);
+    expect(judgeActivation(a, a.disk, { authority: authorityDoc(a, { action: 'deactivate' }) }).classified.state).toBe('activated');
+  });
+
+  it('state C: refuses a second activation and writes nothing (never a silent no-op)', () => {
+    const a = applied();
+    activate(a, a.disk);
+    const before = new Map(a.disk);
+    expect(() => judgeActivation(a, a.disk)).toThrow(/ALREADY ACTIVE/);
+    expect(changedPaths(before, a.disk)).toEqual([]);
+  });
+
+  it('state D: deactivation changes only rebuild-test.ts back to the inactive pin (B) and leaves the rollover applied', () => {
+    const a = applied();
+    const appliedState = new Map(a.disk);
+    activate(a, a.disk);
+    const activeState = new Map(a.disk);
+    activate(a, a.disk, { authority: authorityDoc(a, { action: 'deactivate' }) });
+    expect(changedPaths(activeState, a.disk)).toEqual([REBUILD_PATH]);
+    expect(changedPaths(appliedState, a.disk)).toEqual([]);          // D is exactly B
+    for (const [path, pin] of Object.entries(a.changeSet.final_sha256 as Record<string, string>)) {
+      expect(sha256Hex(a.disk.get(path)!)).toBe(pin);                // the rollover itself is not reversed
+    }
+    expect(() => judgeActivation(a, a.disk, { authority: authorityDoc(a, { action: 'deactivate' }) })).toThrow(/ALREADY INACTIVE/);
+    activate(a, a.disk);                                             // and it is reversible again
+    expect(a.disk).toEqual(activeState);
+  });
+
+  describe('refuses a different candidate, and writes nothing', () => {
+    type Case = [string, (a: Applied) => Parameters<typeof judgeActivation>[2] & { disk?: (d: Map<string, string>) => void }, RegExp];
+    const cases: Case[] = [
+      ['another change set', (a) => ({ changeSetText: `${a.changeSetText} ` }), /not the one this authority binds/],
+      ['another profile', (a) => ({ authority: authorityDoc(a, { profile: 'c2-2026-other' }) }), /successor profile is "c2-2026-successor", but the authority names "c2-2026-other"/],
+      ['another tuple', (a) => ({ authority: authorityDoc(a, { tuple_sha256: 'c'.repeat(64) }) }), /tuple hashes to/],
+      ['another season', (a) => ({ authority: authorityDoc(a, { season: 2027 }) }), /is for season 2026, but the authority names 2027/],
+      ['another rollover date', (a) => ({ authority: authorityDoc(a, { rollover_date: '2026-11-04' }) }), /bound to another rollover/],
+      ['another inactive pin', (a) => ({ authority: authorityDoc(a, { rebuild_sha256: { inactive: 'c'.repeat(64), active: sha256Hex(planSuccessorTuplesEdit(a.f.base, a.f.tuple)) } }) }), /neither the authority's inactive pin/],
+      ['another active pin', (a) => ({ authority: authorityDoc(a, { rebuild_sha256: { inactive: sha256Hex(a.f.base), active: 'c'.repeat(64) } }) }), /not the authority's active pin/],
+      ['another HEAD', () => ({ git: { head: 'd'.repeat(40), sourceIsAncestor: true } }), /HEAD is d+, but the authority is bound to b+/],
+      ['a source commit that is not an ancestor', () => ({ git: { head: HEAD, sourceIsAncestor: false } }), /is not an ancestor of HEAD/],
+      ['another migration set', () => ({ migrations: [...MIGRATIONS, { name: '118_new.sql', text: 'select 2;\n' }] }), /migration set is 3 files ending 118_new\.sql/],
+      ['an edited migration', () => ({ migrations: [MIGRATIONS[0], { ...MIGRATIONS[1], text: 'select 3;\n' }] }), /migration set is 2 files/],
+      ['drift in an applied file', () => ({ disk: (d) => d.set(SEASONS_PATH, `${d.get(SEASONS_PATH)}\n`) }), /not the applied state of the bound change set/],
+      ['the pre-apply state A', () => ({ disk: (d) => d.set(REGISTER_PATH, predecessorText(REGISTER_PATH)) }), /not the applied state of the bound change set/],
+      ['a different tuple already in the table', (a) => ({ disk: (d) => d.set(REBUILD_PATH, planSuccessorTuplesEdit(a.f.base, { ...a.f.tuple, expected_rows: 1641 })) }), /neither the authority's inactive pin/],
+      ['a pending rollover apply journal', () => ({ disk: (d) => d.set(TRANSACTION_JOURNAL_PATH, JSON.stringify({ schema: TRANSACTION_JOURNAL_SCHEMA, season: 2026, entries: [] })) }), /did not finish/],
+      ['a leftover staged activation', () => ({ disk: (d) => d.set(ACTIVATION_STAGING_PATH, 'x') }), /staged activation file remains/],
+    ];
+    it.each(cases)('%s', (_label, make, message) => {
+      const a = applied();
+      const over = make(a);
+      over.disk?.(a.disk);
+      const before = new Map(a.disk);
+      expect(() => judgeActivation(a, a.disk, over)).toThrow(message);
+      expect(changedPaths(before, a.disk)).toEqual([]);
+    });
+
+    it.each([
+      ['carries no tuple', (c: Record<string, unknown>) => { delete c.ladder_successor_tuple; }, /carries no ladder_successor_tuple/],
+      ['is not pinned', (c: Record<string, unknown>) => { delete c.final_sha256; }, /no final_sha256/],
+      ['names rebuild-test.ts (a coupled apply)', (c: Record<string, unknown>) => { (c.write_set as string[]).push(REBUILD_PATH); }, /predates the separated activation/],
+    ])('a change set that %s', (_label, mutate, message) => {
+      const a = applied();
+      const changeSet = structuredClone(a.changeSet);
+      mutate(changeSet);
+      const text = JSON.stringify(changeSet);
+      expect(() => judgeActivation(a, a.disk, { changeSetText: text, authority: authorityDoc(a, { transition_change_set_sha256: sha256Hex(text) }) }))
+        .toThrow(message);
+    });
+  });
+
+  it('keeps apply rollback and activation rollback apart: a rolled-back apply cannot be activated or deactivated', () => {
+    const a = applied();
+    activate(a, a.disk);
+    // Apply recovery restores the rollover files only; the table it never wrote stays active, and the activation
+    // tool refuses both directions on that tree (deactivate first, then recover the apply).
+    for (const path of Object.keys(a.changeSet.final_sha256 as Record<string, string>)) a.disk.set(path, `${predecessorText(path)}`);
+    for (const action of ['activate', 'deactivate']) {
+      expect(() => judgeActivation(a, a.disk, { authority: authorityDoc(a, { action }) })).toThrow(/not the applied state/);
+    }
+    expect(ACTIVATION_STAGING_PATH).not.toMatch(/rollover-tmp$/);
+    expect(ACTIVATION_STAGING_PATH).not.toBe(TRANSACTION_JOURNAL_PATH);
+  });
+
+  it('makes a leftover staged activation block the rollover too, not only the activation tool', () => {
+    const fs = new Map([[ACTIVATION_STAGING_PATH, 'x']]);
+    expect(pendingTransactionProblem(mapIo(fs))?.join(' ')).toContain(ACTIVATION_STAGING_PATH);
+  });
+
+  it('re-judges before the rename and leaves the file and no staging behind on any refusal', () => {
+    const a = applied();
+    const j = judgeActivation(a, a.disk);
+    const before = new Map(a.disk);
+    expect(() => applyActivationWrite(j.io, j.write, () => { throw new RolloverRefused('state moved'); })).toThrow(/state moved/);
+    expect(changedPaths(before, a.disk)).toEqual([]);
+    expect(() => applyActivationWrite(j.io, j.write, () => { a.disk.set(REBUILD_PATH, `${a.f.base} `); })).toThrow(/changed after it was judged/);
+    expect(a.disk.has(ACTIVATION_STAGING_PATH)).toBe(false);
+    a.disk.set(REBUILD_PATH, a.f.base);
+    a.disk.set(ACTIVATION_STAGING_PATH, 'x');
+    expect(() => applyActivationWrite(j.io, j.write, () => undefined)).toThrow(/already exists/);
+    expect(a.disk.get(REBUILD_PATH)).toBe(a.f.base);
+  });
+
+  it.each([
+    ['an unknown field', (o: Record<string, unknown>) => { o.force = true; }, /unknown field "force"/],
+    ['a missing field', (o: Record<string, unknown>) => { delete o.head_commit; }, /missing "head_commit"/],
+    ['another schema', (o: Record<string, unknown>) => { o.schema = 'x/2'; }, /schema is "x\/2"/],
+    ['another action', (o: Record<string, unknown>) => { o.action = 'enable'; }, /"activate" or "deactivate"/],
+    ['an unresolved field', (o: Record<string, unknown>) => { o.decision = 'UNRESOLVED: owner'; }, /unresolved-proposal marker/],
+    ['a non-calendar date', (o: Record<string, unknown>) => { o.rollover_date = '2026-02-30'; }, /not a calendar date/],
+    ['a short commit', (o: Record<string, unknown>) => { o.head_commit = 'abc1234'; }, /head_commit is malformed/],
+    ['equal pins', (o: Record<string, unknown>) => { o.rebuild_sha256 = { inactive: 'c'.repeat(64), active: 'c'.repeat(64) }; }, /same bytes/],
+    ['a decision that is not an id', (o: Record<string, unknown>) => { o.decision = 'yes'; }, /decision is malformed/],
+  ])('parses the authority strictly: refuses %s', (_label, mutate, message) => {
+    const o = authorityDoc(applied());
+    mutate(o);
+    expect(() => parseActivationAuthority(JSON.stringify(o))).toThrow(message);
+  });
+
+  it('binds the migration set independent of line endings and order, and refuses malformed sets', () => {
+    const lf = migrationSetState(MIGRATIONS);
+    const crlf = migrationSetState([...MIGRATIONS].reverse().map((m) => ({ ...m, text: m.text.replace(/\r?\n/g, '\r\n') })));
+    expect(crlf).toEqual(lf);
+    expect(lf).toMatchObject({ count: 2, last: '117_last.sql' });
+    expect(() => migrationSetState([])).toThrow(/holds no migration/);
+    expect(() => migrationSetState([{ name: 'notes.sql', text: '' }])).toThrow(/not a migration file name/);
+    expect(() => migrationSetState([MIGRATIONS[0], MIGRATIONS[0]])).toThrow(/twice/);
+  });
+
+  it('removes exactly one reviewed tuple, the exact inverse of the append, and refuses anything else', () => {
+    const { tuple, base } = successorFixture();
+    const other: SuccessorLadderTuple = { ...tuple, profile: 'c2-2027-successor', supersedes: SYNTHETIC_SUCCESSOR };
+    const withOther = planSuccessorTuplesEdit(base, other);
+    const both = planSuccessorTuplesEdit(withOther, tuple);
+    expect(planSuccessorTuplesRemoval(both, tuple)).toBe(withOther);
+    expect(planSuccessorTuplesRemoval(planSuccessorTuplesEdit(base, tuple), tuple)).toBe(base);
+    expect(() => planSuccessorTuplesRemoval(base, tuple)).toThrow(/does not list/);
+    expect(() => planSuccessorTuplesRemoval(planSuccessorTuplesEdit(base, { ...tuple, expected_rows: 1641 }), tuple))
+      .toThrow(/values other than the reviewed tuple/);
+    expect(successorTupleSha256(tuple)).toBe(sha256Hex(JSON.stringify(tuple)));
+  });
+
+  it('has one write site in the CLI, after the dry-run return, and no database, migration or rebuild call', () => {
+    const cli = repoText('tools/db/successor-activation.ts');
+    expect((cli.match(/applyActivationWrite\(repoIo/g) ?? []).length).toBe(1);
+    expect(cli.indexOf('if (!args.apply)')).toBeLessThan(cli.indexOf('applyActivationWrite(repoIo'));
+    expect((cli.match(/renameSync\(/g) ?? []).length).toBe(1);
+    expect(cli).not.toMatch(/repoIo\.(write|rename|remove)\(/);
+    // Imports only: no database client, migration runner, rebuild, rollover CLI or census module.
+    expect(cli).not.toMatch(/from '[^']*(postgres|migrate|rebuild-test|rollover-season|ownership-census)[^']*'/);
+  });
+});
+
+/** A FileIo over a Map, for the activation and apply tests above. */
+function mapIo(fs: Map<string, string>): FileIo {
+  return {
+    read: (p) => (fs.has(p) ? Buffer.from(fs.get(p)!) : null),
+    write: (p, c) => { fs.set(p, c); },
+    rename: (from, to) => { fs.set(to, fs.get(from)!); fs.delete(from); },
+    remove: (p) => { fs.delete(p); },
+  };
+}

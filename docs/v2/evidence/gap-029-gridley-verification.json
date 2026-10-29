@@ -1,0 +1,119 @@
+{
+  "generated": "2026-10-20",
+  "baseHEAD": "1587b0d4",
+  "database": "afldb_v2_gap029_test",
+  "cluster": "afldb_v2_isolated",
+  "port": 55433,
+  "mode": "strict; diagnostic unset",
+  "totals": {
+    "tests": 1388,
+    "passed": 1378,
+    "failed": 3,
+    "skipped": 7
+  },
+  "files": [
+    {
+      "file": "tests/gridley-compat.test.ts",
+      "passed": 58,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/club-comparison-route.test.ts",
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/gridley-corpus.test.ts",
+      "passed": 1206,
+      "failed": 3,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/home-records.test.ts",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/nl-answers-cross-domain.test.ts",
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/integration/release-gates.test.ts",
+      "passed": 59,
+      "failed": 0,
+      "skipped": 7
+    }
+  ],
+  "failures": [
+    {
+      "name": "Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode",
+      "messages": [
+        "AssertionError: expected [ 'anzac-playedin-1', …(5) ] to deeply equal []\n    at D:/dev/afldbV2/tests/integration/gridley-corpus.test.ts:498:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells",
+      "messages": [
+        "AssertionError: expected [ …(40) ] to deeply equal []\n    at D:/dev/afldbV2/tests/integration/gridley-corpus.test.ts:810:152\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode",
+      "messages": [
+        "AssertionError: expected [ …(71) ] to deeply equal []\n    at D:/dev/afldbV2/tests/integration/gridley-corpus.test.ts:819:68\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    }
+  ],
+  "typecheck": {
+    "command": "npm.cmd run typecheck",
+    "exitCode": 0
+  },
+  "changedFileLint": {
+    "files": [
+      "tests/gridley-compat.test.ts",
+      "tests/gridley-corpus-support.ts",
+      "tests/gridley-release-policy.ts",
+      "tests/integration/gridley-corpus.test.ts",
+      "tests/integration/release-gates.test.ts",
+      "tools/v2/repair-gridley-rookies.ts"
+    ],
+    "exitCode": 0,
+    "newFindings": 0
+  },
+  "earlierCombinedRun": {
+    "passed": 1377,
+    "failed": 4,
+    "skipped": 7,
+    "extraFailure": "gate: draft links expected 6810 total rows, got 6818 after legitimate audited additions; corrected to strict source scope plus independent durable-manual accounting"
+  },
+  "strict": {
+    "strict": {
+      "passed": false,
+      "findings": 149
+    },
+    "approved": {
+      "findings": 78,
+      "dataMatches": 0
+    },
+    "policyPassed": false,
+    "unapproved": 71
+  },
+  "sourceSha256": {
+    "tests/gridley-compat.test.ts": "2df869a67c3cbe00ba165826a6ee7b3edfbf59314273af7d795a36323a9d5d5c",
+    "tests/gridley-corpus-support.ts": "96a16cc242d706d5125f8c59eb375b2946424fafe6df7e578b60805198b2e8fe",
+    "tests/gridley-release-policy.ts": "cf1607ae0016cd0b973ad56e7dfeb8d5c5b660d5e9f6d4f5e515b20651ac1bbc",
+    "tests/integration/gridley-corpus.test.ts": "01a4f6ea6ec7f0ecfe86f2f893046e5f65ccbd008e2611cb5ee618121983a228",
+    "tests/integration/release-gates.test.ts": "1b195823bfdf7ed37b6a7beba3bdd45b9aa76f8e5e17fbede334cea5fc7d05e7",
+    "tools/v2/repair-gridley-rookies.ts": "69760bbee720c09e2f02f55f90df0d5ff37e87d0ad7a44f9a616d0e63971d4cb",
+    "data/reference/gridley-approved-deferrals.json": "86d8d05c151d82b2b705f6b201164fdbf86b8ddc4a8fa10137f7649d9a9ac24a",
+    "data/reference/gridley-board-541-trade.json": "e22c9cb0daa8a5ecc9843455c24cb3ef7fbd6cb5ed3f78d701993c752c292078",
+    "data/players/rookie-relisting-outcomes.csv": "c24ea37cce6eb4852ec7d04ab30f82c3be354a942ba3957e4994c2137a5a4b65"
+  },
+  "fullWorkflowRerun": false,
+  "command": "node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts run afldb_v2_gap029_test -- node node_modules/vitest/vitest.mjs run tests/gridley-compat.test.ts tests/integration/gridley-corpus.test.ts tests/integration/club-comparison-route.test.ts tests/integration/home-records.test.ts tests/integration/nl-answers-cross-domain.test.ts tests/integration/release-gates.test.ts --reporter=json --outputFile=.local-release/gap-029-completed-tests.json"
+}

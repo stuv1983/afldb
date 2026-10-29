@@ -779,6 +779,23 @@ describe('afldb_import is confined to the statistical tables', () => {
     // registered import-writable, because the registry loop would hand back
     // UPDATE/DELETE/TRUNCATE and destroy the append-only property. Its exact
     // narrow shape is asserted in AFLDB-ISSUE-235's dedicated test below.
+    //
+    // award_proposals and award_proposal_decisions (migration 111, AFLDB V2 Stage 4) are the
+    // tenth and eleventh: the curated-award proposal table (SELECT, INSERT and a column-scoped
+    // UPDATE of the workflow columns) and its append-only decision ledger. Neither is
+    // registered import-writable, for the same reason; their exact narrow shape is asserted in
+    // the curated-awards test below. NOT RUN on any database from the V2 workstation.
+    //
+    // derived_award_results (migration 112, AFLDB V2 Stage 4) is the twelfth: the append-only
+    // ledger of published derivations (SELECT, INSERT and sequence USAGE only), not registered
+    // import-writable for the same reason. Its shape is asserted in the derived-awards test below.
+    //
+    // brownlow_eligibility_decisions (migration 113, AFLDB V2 Launch F) is the thirteenth: the
+    // append-only ledger of administrator Brownlow eligibility decisions (SELECT, INSERT and
+    // sequence USAGE only). derived_award_projections (migration 114, AFLDB V2 Launch F) is the
+    // fourteenth: the append-only provenance ledger of projecting a published derivation into
+    // award_winners (same shape). Neither is registered import-writable, for the same reason;
+    // their shapes are asserted in the two Launch F tests below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -793,7 +810,11 @@ describe('afldb_import is confined to the statistical tables', () => {
                                'brownlow_vote_entry_state',
                                'brownlow_season_authority',
                                'external_grids', 'external_grid_axes',
-                               'afl_api_identity_adjudications')
+                               'afl_api_identity_adjudications',
+                               'award_proposals', 'award_proposal_decisions',
+                               'derived_award_results',
+                               'brownlow_eligibility_decisions',
+                               'derived_award_projections')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);
@@ -1091,6 +1112,203 @@ describe('afldb_import is confined to the statistical tables', () => {
     expect(others.authSelect).toBe(true);
     expect(others.authWrites).toBe(false);
     // I13.
+    expect(others.appAny).toBe(false);
+    expect(others.appRegistered).toBe(false);
+  });
+
+  // AFLDB V2 Stage 4 (migration 111). The curated-award workflow: award_proposals holds the
+  // proposed value (immutable at the grant level) and award_proposal_decisions is the
+  // append-only decision ledger. Both are written as afldb_import in the same transaction as
+  // the canonical award_winners row an approval creates. NOT RUN from the V2 workstation:
+  // this needs a database migrated through 111 and reconciled by db:privileges.
+  it('writes the curated-award proposals narrowly and can never rewrite the ledger (migration 111)', async () => {
+    const [proposals] = await sql<{
+      selects: boolean; inserts: boolean; tableUpdate: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'award_proposals', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'award_proposals', 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'award_proposals', 'UPDATE')   AS "tableUpdate",
+             has_table_privilege(${IMPORT_ROLE}, 'award_proposals', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'award_proposals', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'award_proposals') AS registered
+    `;
+    // No table-wide UPDATE exists; the workflow columns carry a column-scoped one.
+    expect(proposals).toEqual({
+      selects: true, inserts: true, tableUpdate: false, deletes: false,
+      truncates: false, registered: false,
+    });
+    const updatable = await sql<{ name: string }[]>`
+      SELECT a.attname AS name
+        FROM pg_attribute a
+       WHERE a.attrelid = 'award_proposals'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+         AND has_column_privilege(${IMPORT_ROLE}, 'award_proposals', a.attname, 'UPDATE')
+       ORDER BY 1
+    `;
+    expect(updatable.map((r) => r.name)).toEqual([
+      'approved_at', 'approved_entity_key', 'status', 'updated_at', 'validated_at',
+      'validation_result',
+    ]);
+
+    const [ledger] = await sql<{
+      selects: boolean; inserts: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'award_proposal_decisions', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'award_proposal_decisions', 'INSERT')   AS inserts,
+             (has_table_privilege(${IMPORT_ROLE}, 'award_proposal_decisions', 'UPDATE')
+              OR has_any_column_privilege(${IMPORT_ROLE}, 'award_proposal_decisions', 'UPDATE')) AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'award_proposal_decisions', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'award_proposal_decisions', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'award_proposal_decisions') AS registered
+    `;
+    expect(ledger).toEqual({
+      selects: true, inserts: true, updates: false, deletes: false,
+      truncates: false, registered: false,
+    });
+
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT (has_table_privilege(${AUTH_ROLE}, 'award_proposals', 'SELECT')
+              AND has_table_privilege(${AUTH_ROLE}, 'award_proposal_decisions', 'SELECT')) AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'award_proposals', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'award_proposals', 'UPDATE')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'award_proposal_decisions', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'award_proposal_decisions', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'award_proposals', 'DELETE')
+              OR has_table_privilege(${AUTH_ROLE}, 'award_proposal_decisions', 'DELETE')) AS "authWrites",
+             (has_any_column_privilege(${APP_ROLE}, 'award_proposals', 'SELECT')
+              OR has_any_column_privilege(${APP_ROLE}, 'award_proposal_decisions', 'SELECT')) AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name IN ('award_proposals', 'award_proposal_decisions')) AS "appRegistered"
+    `;
+    expect(others.authSelect).toBe(true);
+    expect(others.authWrites).toBe(false);
+    // Proposals hold unvetted data: never a public read surface.
+    expect(others.appAny).toBe(false);
+    expect(others.appRegistered).toBe(false);
+  });
+
+  // AFLDB V2 Stage 4 (migration 112). The published-derivation ledger: afldb_import inserts a
+  // row per publication (and a new row per supersession) and can never rewrite one. NOT RUN from
+  // the V2 workstation: this needs a database migrated through 112 and reconciled by
+  // db:privileges (the in-memory PGlite proof in tests/v2-coleman-publication-pglite.test.ts runs
+  // the migration's own grants against STUB roles only).
+  it('inserts derived award results and can never rewrite or delete one (migration 112)', async () => {
+    const [results] = await sql<{
+      selects: boolean; inserts: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean; sequenceUsage: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'INSERT')   AS inserts,
+             (has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'UPDATE')
+              OR has_any_column_privilege(${IMPORT_ROLE}, 'derived_award_results', 'UPDATE')) AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_results', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'derived_award_results') AS registered,
+             has_sequence_privilege(${IMPORT_ROLE}, 'derived_award_results_id_seq', 'USAGE') AS "sequenceUsage"
+    `;
+    expect(results).toEqual({
+      selects: true, inserts: true, updates: false, deletes: false,
+      truncates: false, registered: false, sequenceUsage: true,
+    });
+
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'derived_award_results', 'SELECT') AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'derived_award_results', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'derived_award_results', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'derived_award_results', 'DELETE')) AS "authWrites",
+             has_any_column_privilege(${APP_ROLE}, 'derived_award_results', 'SELECT') AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name = 'derived_award_results') AS "appRegistered"
+    `;
+    expect(others.authSelect).toBe(true);
+    expect(others.authWrites).toBe(false);
+    expect(others.appAny).toBe(false);
+    expect(others.appRegistered).toBe(false);
+  });
+
+  // AFLDB V2 Launch F (migration 113). The Brownlow eligibility decision ledger: afldb_import inserts a
+  // row per decision (and a new row per reversal) and can never rewrite one. Needs a database migrated through 113
+  // and reconciled by db:privileges.
+  it('inserts Brownlow eligibility decisions and can never rewrite or delete one (migration 113)', async () => {
+    const [results] = await sql<{
+      selects: boolean; inserts: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean; sequenceUsage: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'brownlow_eligibility_decisions', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'brownlow_eligibility_decisions', 'INSERT')   AS inserts,
+             (has_table_privilege(${IMPORT_ROLE}, 'brownlow_eligibility_decisions', 'UPDATE')
+              OR has_any_column_privilege(${IMPORT_ROLE}, 'brownlow_eligibility_decisions', 'UPDATE')) AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'brownlow_eligibility_decisions', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'brownlow_eligibility_decisions', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'brownlow_eligibility_decisions') AS registered,
+             has_sequence_privilege(${IMPORT_ROLE}, 'brownlow_eligibility_decisions_id_seq', 'USAGE') AS "sequenceUsage"
+    `;
+    expect(results).toEqual({
+      selects: true, inserts: true, updates: false, deletes: false,
+      truncates: false, registered: false, sequenceUsage: true,
+    });
+
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'brownlow_eligibility_decisions', 'SELECT') AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'brownlow_eligibility_decisions', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'brownlow_eligibility_decisions', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'brownlow_eligibility_decisions', 'DELETE')) AS "authWrites",
+             has_any_column_privilege(${APP_ROLE}, 'brownlow_eligibility_decisions', 'SELECT') AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name = 'brownlow_eligibility_decisions') AS "appRegistered"
+    `;
+    expect(others.authSelect).toBe(true);
+    expect(others.authWrites).toBe(false);
+    expect(others.appAny).toBe(false);
+    expect(others.appRegistered).toBe(false);
+  });
+
+  // AFLDB V2 Launch F (migration 114). The award projection provenance ledger: afldb_import inserts a row per
+  // projection and can never rewrite one. Needs a database migrated through 114 and reconciled by db:privileges.
+  it('inserts derived award projections and can never rewrite or delete one (migration 114)', async () => {
+    const [results] = await sql<{
+      selects: boolean; inserts: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean; sequenceUsage: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'derived_award_projections', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_projections', 'INSERT')   AS inserts,
+             (has_table_privilege(${IMPORT_ROLE}, 'derived_award_projections', 'UPDATE')
+              OR has_any_column_privilege(${IMPORT_ROLE}, 'derived_award_projections', 'UPDATE')) AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_projections', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'derived_award_projections', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'derived_award_projections') AS registered,
+             has_sequence_privilege(${IMPORT_ROLE}, 'derived_award_projections_id_seq', 'USAGE') AS "sequenceUsage"
+    `;
+    expect(results).toEqual({
+      selects: true, inserts: true, updates: false, deletes: false,
+      truncates: false, registered: false, sequenceUsage: true,
+    });
+
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'derived_award_projections', 'SELECT') AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'derived_award_projections', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'derived_award_projections', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'derived_award_projections', 'DELETE')) AS "authWrites",
+             has_any_column_privilege(${APP_ROLE}, 'derived_award_projections', 'SELECT') AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name = 'derived_award_projections') AS "appRegistered"
+    `;
+    expect(others.authSelect).toBe(true);
+    expect(others.authWrites).toBe(false);
     expect(others.appAny).toBe(false);
     expect(others.appRegistered).toBe(false);
   });

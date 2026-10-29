@@ -1,0 +1,183 @@
+{
+  "version": "previous",
+  "phase": "baseline",
+  "database": "afldb_v2_prevapp_test",
+  "baseURL": "http://127.0.0.1:3911",
+  "checks": [
+    {
+      "role": "anonymous",
+      "path": "/",
+      "status": 200,
+      "finalPath": "/",
+      "h1": "Every player. Every game. Since 1897."
+    },
+    {
+      "role": "anonymous",
+      "path": "/brownlow",
+      "status": 200,
+      "finalPath": "/brownlow",
+      "h1": "Brownlow Medal"
+    },
+    {
+      "role": "anonymous",
+      "path": "/brownlow/2025",
+      "status": 200,
+      "finalPath": "/brownlow/2025",
+      "h1": "2025 Brownlow Medal"
+    },
+    {
+      "role": "anonymous",
+      "path": "/awards/coleman",
+      "status": 200,
+      "finalPath": "/awards/coleman",
+      "h1": "Coleman Medal"
+    },
+    {
+      "role": "anonymous",
+      "path": "/seasons/2025",
+      "status": 200,
+      "finalPath": "/seasons/2025",
+      "h1": "2025 AFL Season"
+    },
+    {
+      "role": "anonymous",
+      "path": "/search?q=Tony+Lockett",
+      "status": 200,
+      "finalPath": "/search",
+      "h1": "Search"
+    },
+    {
+      "role": "anonymous",
+      "path": "/admin",
+      "status": 200,
+      "finalPath": "/admin/login",
+      "h1": "Administrator sign-in"
+    },
+    {
+      "role": "admin",
+      "path": "/admin",
+      "status": 200,
+      "finalPath": "/admin",
+      "h1": "Administration"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/current-season",
+      "status": 200,
+      "finalPath": "/admin",
+      "h1": "Administration"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/admins",
+      "status": 200,
+      "finalPath": "/admin/admins",
+      "h1": "Administrators"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/settings",
+      "status": 200,
+      "finalPath": "/admin",
+      "h1": "Administration"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin",
+      "status": 200,
+      "finalPath": "/admin",
+      "h1": "Administration"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/current-season",
+      "status": 200,
+      "finalPath": "/admin/current-season",
+      "h1": "Current season"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/admins",
+      "status": 200,
+      "finalPath": "/admin/admins",
+      "h1": "Administrators"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/settings",
+      "status": 200,
+      "finalPath": "/admin/settings",
+      "h1": "Site settings"
+    }
+  ],
+  "before": {
+    "brownlow_season_votes": {
+      "rows": 16120,
+      "digest": "40fccd7714bd5f4cbb80147836963b39"
+    },
+    "brownlow_round_votes": {
+      "rows": 320861,
+      "digest": "d79e6160f4b4fdd8f054532f6e3d8970"
+    },
+    "brownlow_eligibility_decisions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "derived_award_results": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "derived_award_projections": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "award_proposals": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "award_proposal_decisions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "data_edits": {
+      "rows": 2,
+      "digest": "bec2017764b355a58ead0b3aaab35e2e"
+    }
+  },
+  "after": {
+    "brownlow_season_votes": {
+      "rows": 16120,
+      "digest": "40fccd7714bd5f4cbb80147836963b39"
+    },
+    "brownlow_round_votes": {
+      "rows": 320861,
+      "digest": "d79e6160f4b4fdd8f054532f6e3d8970"
+    },
+    "brownlow_eligibility_decisions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "derived_award_results": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "derived_award_projections": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "award_proposals": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "award_proposal_decisions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "data_edits": {
+      "rows": 2,
+      "digest": "bec2017764b355a58ead0b3aaab35e2e"
+    }
+  },
+  "auditPreserved": true,
+  "externalRequests": 0
+}

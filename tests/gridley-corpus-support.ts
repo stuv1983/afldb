@@ -18,6 +18,22 @@
 import { resolveDraftKind, type GridAxisState } from '@/search/grid-solver-spec';
 import { normalisePlayerName, type GridleyPlayerRef } from '@/search/gridley-compat';
 import { KNOWN_ANSWER_EVIDENCE_KIND, type GridleyKnownAnswerAdjudication } from './gridley-known-answer-adjudications';
+import board541Trade from '../data/reference/gridley-board-541-trade.json';
+import siblingEligibility from '../data/reference/gridley-sibling-eligibility-evidence.json';
+
+/** Evidence classification only: strict finding retained; the separate policy checks owner approval. */
+export function siblingCriterionDisagreement(input: {
+  board: number; cell: string; row: string; col: string; profile: string; gridleyPlayerId: number;
+  inGridley: boolean; inAfldb: boolean; lackingBuilders: readonly string[];
+}): string | null {
+  if (!input.inGridley || input.inAfldb || input.profile !== siblingEligibility.profile
+    || input.gridleyPlayerId !== siblingEligibility.gridleyPlayerId
+    || input.lackingBuilders.length !== 1 || input.lackingBuilders[0] !== 'has_brother'
+    || !siblingEligibility.cells.some((cell) => cell.board === input.board && cell.cell === input.cell
+      && cell.row === input.row && cell.col === input.col)) return null;
+  return `criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; `
+    + `has_brother requires games > 0; ${siblingEligibility.sources[0].url}; ${siblingEligibility.sources[1].url}`;
+}
 
 export type PlayerRow = {
   id: number; displayName: string; givenName: string | null; surname: string | null;
@@ -178,6 +194,21 @@ export type DraftTriageCause =
   | 'no_linked_row_matches'
   /** a builder this triage does not read */
   | 'unassessed';
+
+/** GAP-029: the tracked board-541 discrepancy only. A trade year does not prove a universal completion date. */
+export function tradesAfterBoard(input: {
+  board: number; cell: string; row: string; col: string; profile: string; gridleyPlayerId: number;
+  boardDate: string; rows: readonly LinkedDraftRow[]; threshold: number; inGridley: boolean; inAfldb: boolean;
+}): string | null {
+  const record = board541Trade;
+  if (input.inGridley || !input.inAfldb || input.threshold !== 1
+    || input.board !== record.board || input.cell !== record.cell || input.boardDate !== record.boardDate
+    || input.row !== record.row || input.col !== record.col || input.profile !== record.afltablesProfile
+    || input.gridleyPlayerId !== record.gridleyPlayerId) return null;
+  const trades = input.rows.filter((r) => r.draftKind === 'trade');
+  if (trades.length !== 1 || trades[0].draftYear !== record.draftYear || trades[0].club !== record.destination) return null;
+  return `V2-GAP-029 board 541 adjudication: the verified 2025 Gold Coast trade post-dates the frozen 2025-01-07 key; ${record.evidence.join('; ')}`;
+}
 
 export function describeDraftRows(rows: readonly LinkedDraftRow[]): string {
   if (rows.length === 0) return 'no trusted-linked draft row';

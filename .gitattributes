@@ -1,3 +1,12 @@
+# AFLDB V2 Launch F (2026-10-19) — LF everywhere, on every platform.
+#
+# Linux is the supported runtime and every tracked text file is stored with LF. A Windows
+# checkout under a global core.autocrlf=true rewrote working-tree files to CRLF, which broke
+# tests that read source text (docs/v2/evidence/baseline-failures.txt, V2-GAP-003). This line
+# makes the working tree LF regardless of core.autocrlf; the specific rules below still win
+# (later lines override earlier ones), so `-text` captures keep their exact bytes.
+* text=auto eol=lf
+
 # AFLDB-ISSUE-108 — platform-independent bytes for hash-bound artefacts.
 #
 # tools/migration/import_fitzroy_core.py (verify_accepted_binding) and

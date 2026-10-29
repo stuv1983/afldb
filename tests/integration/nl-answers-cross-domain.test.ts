@@ -15,9 +15,12 @@
  * The four rules this suite exists to protect:
  *
  *  - a `coaches` row is an IDENTITY claim and nothing more. 368 linked
- *    coach identities exist; only 367 of those people ever coached a
- *    match. X1 is the 367, and the match_coaches join is the whole
- *    difference;
+ *    coach identities exist; only 365 of those people coached a match
+ *    through season 2025 (Josh Carr and Josh Fraser coached only in 2026,
+ *    so a database holding the 2026 coaching assignments answers 367).
+ *    Jim Adamson (North Melbourne 1940, 11 games) has no per-match
+ *    assignment in the accepted source. X1 is those people, and the
+ *    match_coaches join is the whole difference;
  *  - a coached club is an ORGANIZATION lineage, never a raw
  *    match_coaches.club_id -- real coaches diverge on it (Pagan 3 raw ids
  *    / 2 organizations, Wallace 3/2, Laidley 2/1);
@@ -40,13 +43,16 @@ afterAll(async () => {
   await sql.end();
 });
 
-/** The 2026-09-09 evidence, with X1 rebaselined after accepted 2026 coaching assignments. */
+/**
+ * The 2026-09-09 evidence. X1 is pinned at its through-2025 value (the 2026-09-12 re-pin to 367
+ * added the two people whose only coaching is in 2026: see `expectedX1`; V2-GAP-029).
+ */
 const M_F = {
   coachRows: 386,
   linkedCoaches: 368,
   coachOnly: 18,
-  /** X1: played AND actually coached. NOT 368. */
-  x1: 367,
+  /** X1 through season 2025: played AND actually coached. NOT 368. */
+  x1Through2025: 365,
   /** X2: played Richmond AND coached Richmond. */
   x2Richmond: 27,
   /** Coached Richmond, played anywhere -- the half X2 must not be mistaken for. */
@@ -158,6 +164,32 @@ async function idsOf(p: NlQueryPlan): Promise<Set<number>> {
   return new Set(rows.map((r) => r.playerId));
 }
 
+/**
+ * X1 as it must be on any snapshot: the 365 linked people with a coached match in season 2025 or
+ * earlier, plus (independently, from `match_coaches`) the linked people whose coached matches all
+ * fall in season 2026 or later. Two of those exist once 2026 assignments are loaded (Josh Carr,
+ * Port Adelaide; Josh Fraser, Carlton; AFL Tables coaches-20260905 index: season 2026 only).
+ */
+async function expectedX1(): Promise<number> {
+  const [row] = await sql<{ through2025: string; laterOnly: string }[]>`
+    SELECT count(DISTINCT c.player_id) FILTER (WHERE m.season <= 2025) AS "through2025",
+           count(DISTINCT c.player_id) FILTER (
+             WHERE m.season >= 2026
+               AND NOT EXISTS (
+                 SELECT 1 FROM coaches c2
+                   JOIN match_coaches mc2 ON mc2.coach_id = c2.id
+                   JOIN matches m2 ON m2.id = mc2.match_id
+                  WHERE c2.player_id = c.player_id AND c2.link_status_value = 'unique'
+                    AND m2.season <= 2025)) AS "laterOnly"
+      FROM coaches c
+      JOIN match_coaches mc ON mc.coach_id = c.id
+      JOIN matches m ON m.id = mc.match_id
+     WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+  `;
+  expect(Number(row.through2025)).toBe(M_F.x1Through2025);
+  return Number(row.through2025) + Number(row.laterOnly);
+}
+
 async function scalar(query: Promise<{ n: string | number }[]>): Promise<number> {
   const [row] = await query;
   return Number(row?.n ?? 0);
@@ -201,9 +233,9 @@ describe('the coaching data Phase F was designed against', () => {
 // ------------------------------------------------------------------- T1/T8
 
 describe('X1 -- played and also coached', () => {
-  it('T1: answers 367, and agrees with hand-written coaches ⋈ match_coaches SQL', async () => {
+  it('T1: answers the through-2025 365 plus 2026-only coaches, and agrees with hand-written coaches ⋈ match_coaches SQL', async () => {
     const { total } = await career(x1Plan());
-    expect(total).toBe(M_F.x1);
+    expect(total).toBe(await expectedX1());
     expect(total).toBe(await scalar(sql<{ n: string }[]>`
       SELECT count(DISTINCT c.player_id) AS n
         FROM coaches c
@@ -217,7 +249,7 @@ describe('X1 -- played and also coached', () => {
    * `EXISTS (SELECT 1 FROM coaches WHERE player_id = p.id)` returns 368:
    * one person holds a coach identity and never coached a match.
    */
-  it('T8: is 367 and not the 368 identity-only seam, and the difference is exactly the matchless identities', async () => {
+  it('T8: is not the 368 identity-only seam, and the difference is exactly the matchless identities', async () => {
     const identityOnly = await scalar(sql<{ n: string }[]>`
       SELECT count(DISTINCT c.player_id) AS n FROM coaches c WHERE c.player_id IS NOT NULL
     `);
@@ -246,13 +278,13 @@ describe('X1 -- played and also coached', () => {
     expect(Number(row.n)).toBe(2);
   });
 
-  it('T12: the capped list states its own cap -- 100 of 367, never silently', async () => {
+  it('T12: the capped list states its own cap -- 100 of the X1 total, never silently', async () => {
     const payload = await answerPlayerCareer(x1Plan({ limit: NL_LIMITS.maxListRows }), NL_LIMITS.maxListRows);
     if (payload.kind !== 'player_career') throw new Error('expected player_career');
-    expect(payload.total).toBe(M_F.x1);
+    expect(payload.total).toBe(await expectedX1());
     expect(payload.rows).toHaveLength(NL_LIMITS.maxListRows);
     const caveats = answerCaveats(x1Plan(), payload);
-    expect(caveats.join(' ')).toContain('367 players qualify');
+    expect(caveats.join(' ')).toContain(`${payload.total} players qualify`);
     expect(caveats.join(' ')).toContain(`first ${NL_LIMITS.maxListRows}`);
   });
 });

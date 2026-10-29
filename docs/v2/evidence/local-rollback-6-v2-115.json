@@ -1,0 +1,211 @@
+{
+  "version": "v2",
+  "phase": "after-115-v2",
+  "database": "afldb_v2_rollbackapp_test",
+  "baseURL": "http://127.0.0.1:3912",
+  "checks": [
+    {
+      "role": "anonymous",
+      "path": "/",
+      "status": 200,
+      "finalPath": "/",
+      "h1": "Every player. Every game. Since 1897."
+    },
+    {
+      "role": "anonymous",
+      "path": "/brownlow",
+      "status": 200,
+      "finalPath": "/brownlow",
+      "h1": "Brownlow Medal"
+    },
+    {
+      "role": "anonymous",
+      "path": "/brownlow/2025",
+      "status": 200,
+      "finalPath": "/brownlow/2025",
+      "h1": "2025 Brownlow Medal"
+    },
+    {
+      "role": "anonymous",
+      "path": "/awards/coleman",
+      "status": 200,
+      "finalPath": "/awards/coleman",
+      "h1": "Coleman Medal"
+    },
+    {
+      "role": "anonymous",
+      "path": "/seasons/2025",
+      "status": 200,
+      "finalPath": "/seasons/2025",
+      "h1": "2025 AFL Season"
+    },
+    {
+      "role": "anonymous",
+      "path": "/search?q=Tony+Lockett",
+      "status": 200,
+      "finalPath": "/search",
+      "h1": "Search"
+    },
+    {
+      "role": "anonymous",
+      "path": "/admin",
+      "status": 200,
+      "finalPath": "/admin/login",
+      "h1": "Administrator sign-in"
+    },
+    {
+      "role": "admin",
+      "path": "/admin",
+      "status": 200,
+      "finalPath": "/admin",
+      "h1": "Administration"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/current-season",
+      "status": 200,
+      "finalPath": "/admin",
+      "h1": "Administration"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/admins",
+      "status": 200,
+      "finalPath": "/admin/admins",
+      "h1": "Administrators"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/settings",
+      "status": 200,
+      "finalPath": "/admin",
+      "h1": "Administration"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/operations",
+      "status": 200,
+      "finalPath": "/admin/operations",
+      "h1": "Operations centre"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/operations/brownlow?season=2025",
+      "status": 200,
+      "finalPath": "/admin/operations/brownlow",
+      "h1": "Brownlow reconciliation"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin",
+      "status": 200,
+      "finalPath": "/admin",
+      "h1": "Administration"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/current-season",
+      "status": 200,
+      "finalPath": "/admin/current-season",
+      "h1": "Current season"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/admins",
+      "status": 200,
+      "finalPath": "/admin/admins",
+      "h1": "Administrators"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/settings",
+      "status": 200,
+      "finalPath": "/admin/settings",
+      "h1": "Site settings"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/operations",
+      "status": 200,
+      "finalPath": "/admin/operations",
+      "h1": "Operations centre"
+    },
+    {
+      "role": "super_admin",
+      "path": "/admin/operations/brownlow?season=2025",
+      "status": 200,
+      "finalPath": "/admin/operations/brownlow",
+      "h1": "Brownlow reconciliation"
+    }
+  ],
+  "before": {
+    "brownlow_season_votes": {
+      "rows": 16120,
+      "digest": "40fccd7714bd5f4cbb80147836963b39"
+    },
+    "brownlow_round_votes": {
+      "rows": 320861,
+      "digest": "d79e6160f4b4fdd8f054532f6e3d8970"
+    },
+    "brownlow_eligibility_decisions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "derived_award_results": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "derived_award_projections": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "award_proposals": {
+      "rows": 3,
+      "digest": "17527e6605a116a4e3e6f9a67b9182ee"
+    },
+    "award_proposal_decisions": {
+      "rows": 6,
+      "digest": "368e3372af5ce931c7c8b0fbefa7dddc"
+    },
+    "data_edits": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+  },
+  "after": {
+    "brownlow_season_votes": {
+      "rows": 16120,
+      "digest": "40fccd7714bd5f4cbb80147836963b39"
+    },
+    "brownlow_round_votes": {
+      "rows": 320861,
+      "digest": "d79e6160f4b4fdd8f054532f6e3d8970"
+    },
+    "brownlow_eligibility_decisions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "derived_award_results": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "derived_award_projections": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "award_proposals": {
+      "rows": 3,
+      "digest": "17527e6605a116a4e3e6f9a67b9182ee"
+    },
+    "award_proposal_decisions": {
+      "rows": 6,
+      "digest": "368e3372af5ce931c7c8b0fbefa7dddc"
+    },
+    "data_edits": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+  },
+  "auditPreserved": true,
+  "externalRequests": 0
+}

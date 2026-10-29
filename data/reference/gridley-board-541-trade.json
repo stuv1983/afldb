@@ -1,0 +1,20 @@
+{
+  "reference": "V2-GAP-029",
+  "board": 541,
+  "cell": "2-1",
+  "boardDate": "2025-01-07",
+  "row": "traded1",
+  "col": "WB",
+  "gridleyPlayerId": 3663,
+  "afltablesProfile": "players/J/Jamarra_Ugle-Hagan.html",
+  "draftYear": 2025,
+  "destination": "Gold Coast",
+  "exchangePick": 74,
+  "evidence": [
+    "https://www.westernbulldogs.com.au/news/1915942/ugle-hagan-departs-the-bulldogs",
+    "https://www.goldcoastfc.com.au/news/1915963/ugle-hagan-to-play-for-the-gold-coast-suns-in-2026"
+  ],
+  "reviewedOn": "2026-10-20",
+  "decision": "Verified historical time-of-board discrepancy only; no new unsupported-domain deferral. Both official pages were read directly and identify Jamarra, both clubs and pick 74. Gold Coast names the 2025 draft and Wednesday 15 October trade-period conclusion. Page extraction does not expose publication timestamps; the exact completion day is not independently established here. The verified 2025 trade is later than this January board regardless of its October day.",
+  "expiry": "Applies only to this board, cell, date, profile, Gridley identity, direction and sole linked 2025 Gold Coast trade. Changed evidence or any other discrepancy remains strict. No November cutoff rule."
+}

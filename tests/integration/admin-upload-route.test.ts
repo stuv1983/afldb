@@ -1,4 +1,4 @@
-import './guard';
+import { verifyIsolatedIntegrationDatabase } from './guard';
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -8,14 +8,18 @@ import { authSql } from '@/db/authClient';
 import { POST } from '@/app/admin/upload/stage/route';
 
 /**
- * AFLDB-ISSUE-303 (D-303-1): the REAL upload route and the REAL staging pipeline on
- * `afldb_test`. The decision cases (CSRF, the size bound, the order of the checks) are
- * `tests/admin-upload-route.test.ts`; what only PostgreSQL can show is that a file between
- * 1 MB and 5 MB, which the Server Action refused at the framework, now reaches
- * `data_submissions` intact, with its rows and its audit event.
+ * AFLDB V2 Stage 5 (V2-GAP-013, docs/v2/legacy-disposition.md L1): the CSV upload route
+ * (`/admin/upload/stage`) is RETIRED, against a real `afldb_test`.
  *
- * Only the session is stubbed (the route's `requireCapability` returns a fixture admin); the
- * audit write, the staging transaction and the duplicate check are the real ones.
+ * Replaces the AFLDB-ISSUE-303 (D-303-1) cases that proved a 1.5 MB CSV reached
+ * `data_submissions` intact. The decision cases (CSRF order, no body read, the 410 refusal) are
+ * `tests/admin-upload-route.test.ts`; what only PostgreSQL can show is that an upload the old
+ * route would have staged leaves no `data_submissions` or `data_submission_rows` row, and that the
+ * refusal is audited once, with the real `audit()` write, naming the actor.
+ *
+ * Only the session is stubbed (the route's `requireCapability` returns a fixture admin). NOT
+ * EXECUTED ON THE V2 WORKSTATION: it needs `afldb_test`, which V2 may not reach; like every
+ * integration file it fails at load there (docs/v2/evidence/baseline-failures.txt).
  */
 const control = vi.hoisted(() => ({ admin: { id: 0, email: '' } }));
 vi.mock('@/lib/auth/session', async (importOriginal) => ({
@@ -35,12 +39,10 @@ const SAME_ORIGIN = {
 
 let ownerSql: ReturnType<typeof postgres>;
 let fixtureAdminId = 0;
-const runSubmissionIds = new Set<number>();
 
 beforeAll(async () => {
   ownerSql = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, { max: 1, onnotice: () => {} });
-  const [db] = await ownerSql<{ db: string }[]>`SELECT current_database() AS db`;
-  if (db.db !== 'afldb_test') throw new Error(`REFUSED: connected to ${db.db}, not afldb_test`);
+  await verifyIsolatedIntegrationDatabase(ownerSql);
   // A per-run user, removed (with its audit rows) in afterAll.
   const [created] = await ownerSql<{ id: number }[]>`
     INSERT INTO auth_users (email, role) VALUES (${FIXTURE_EMAIL}, 'super_admin')
@@ -52,11 +54,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   try {
-    if (runSubmissionIds.size > 0) {
-      await ownerSql`DELETE FROM data_submissions WHERE id = ANY(${[...runSubmissionIds]}::int[])`;
-    }
     if (fixtureAdminId > 0) {
       await ownerSql`DELETE FROM auth_audit_log WHERE actor_user_id = ${fixtureAdminId}`;
+      await ownerSql`DELETE FROM data_submissions WHERE uploaded_by = ${fixtureAdminId}`;
       await ownerSql`DELETE FROM auth_users WHERE id = ${fixtureAdminId}`;
     }
   } finally {
@@ -94,66 +94,57 @@ async function upload(csv: Buffer, name = 'attendance.csv'): Promise<Response> {
   }));
 }
 
-describe('POST /admin/upload/stage on afldb_test', () => {
-  it('stages a 1.5 MB CSV: the size the Server Action refused', async () => {
+const submissionsBy = async (userId: number): Promise<number> => {
+  const [row] = await ownerSql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM data_submissions WHERE uploaded_by = ${userId}`;
+  return row.n;
+};
+
+describe('POST /admin/upload/stage on afldb_test: retired', () => {
+  it('answers 410 to a 1.5 MB CSV the old route staged, and stages nothing', async () => {
     const csv = attendanceCsv(1_500_000, `run-${Date.now()}`);
     expect(csv.length).toBeGreaterThan(1024 * 1024);
     expect(csv.length).toBeLessThan(5 * 1024 * 1024);
+    const before = await submissionsBy(fixtureAdminId);
 
     const response = await upload(csv);
-    const body = await response.json() as { ok?: boolean; submissionId?: number; duplicate?: boolean; redirectTo?: string; error?: string };
-    if (typeof body.submissionId === 'number') runSubmissionIds.add(body.submissionId);
-    expect(response.status, JSON.stringify(body)).toBe(200);
-    const submissionId = body.submissionId as number;
-    expect(body).toMatchObject({ ok: true, duplicate: false });
-    expect(body.redirectTo).toBe(`/admin/submissions/${body.submissionId}`);
 
-    const [submission] = await ownerSql<{
-      dataset: string; filename: string; status: string; rowCount: number; sha: string; uploadedBy: number;
-    }[]>`
-      SELECT dataset, filename, status, row_count AS "rowCount", content_sha256 AS sha, uploaded_by AS "uploadedBy"
-        FROM data_submissions WHERE id = ${submissionId}`;
-    expect(submission).toMatchObject({
-      dataset: 'match_attendance', filename: 'attendance.csv', status: 'staged', uploadedBy: fixtureAdminId,
-    });
-    const { createHash } = await import('node:crypto');
-    expect(submission.sha).toBe(createHash('sha256').update(csv).digest('hex'));
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({ refused: true, code: 'legacy_retired', surface: 'admin.csv_upload' });
+    expect(await submissionsBy(fixtureAdminId)).toBe(before);
     const [rows] = await ownerSql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM data_submission_rows WHERE submission_id = ${submissionId}`;
-    expect(rows.n).toBe(submission.rowCount);
-    expect(rows.n).toBe(csv.toString('utf8').split('\n').filter(Boolean).length - 1);
-
-    const audit = await ownerSql<{ action: string }[]>`
-      SELECT action FROM auth_audit_log WHERE actor_user_id = ${fixtureAdminId} ORDER BY id`;
-    expect(audit.map((a) => a.action)).toContain('upload.staged');
-
-    // The same bytes again land on the same submission, as the old action did.
-    const again = await upload(csv);
-    expect(await again.json()).toMatchObject({ ok: true, duplicate: true, submissionId: body.submissionId });
+      SELECT count(*)::int AS n FROM data_submission_rows r
+        JOIN data_submissions s ON s.id = r.submission_id WHERE s.uploaded_by = ${fixtureAdminId}`;
+    expect(rows.n).toBe(0);
   }, 120_000);
 
-  it('refuses a file over 5 MiB with the old message and stages nothing', async () => {
-    const before = await ownerSql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM data_submissions WHERE uploaded_by = ${fixtureAdminId}`;
-    const csv = attendanceCsv(5 * 1024 * 1024 + 1024, 'oversize');
-    const response = await upload(csv);
-    expect(response.status).toBe(413);
-    expect(await response.json()).toEqual({ error: 'The file exceeds the 5 MB limit.' });
-    const after = await ownerSql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM data_submissions WHERE uploaded_by = ${fixtureAdminId}`;
-    expect(after[0].n).toBe(before[0].n);
+  it('answers 410 to a file over 5 MiB too (the size refusal is no longer reached) and stages nothing', async () => {
+    const before = await submissionsBy(fixtureAdminId);
+    const response = await upload(attendanceCsv(5 * 1024 * 1024 + 1024, 'oversize'));
+    expect(response.status).toBe(410);
+    expect(await submissionsBy(fixtureAdminId)).toBe(before);
   }, 120_000);
 
-  it('answers a pipeline rejection (a missing column) with 422 and audits it', async () => {
+  it('writes one audit row per refusal with the real audit(), naming the actor and the surface', async () => {
+    const [before] = await ownerSql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM auth_audit_log
+       WHERE actor_user_id = ${fixtureAdminId} AND action = 'admin.legacy_retired_refused'`;
+
     const response = await upload(Buffer.from('match_id\n1\n'));
-    expect(response.status).toBe(422);
-    expect((await response.json() as { error: string }).error).toContain('Missing required column');
-    const audit = await ownerSql<{ action: string }[]>`
-      SELECT action FROM auth_audit_log WHERE actor_user_id = ${fixtureAdminId}`;
-    expect(audit.map((a) => a.action)).toContain('upload.rejected');
+    expect(response.status).toBe(410);
+
+    const rows = await ownerSql<{ detail: { surface: string; export: string } }[]>`
+      SELECT detail FROM auth_audit_log
+       WHERE actor_user_id = ${fixtureAdminId} AND action = 'admin.legacy_retired_refused' ORDER BY id`;
+    expect(rows).toHaveLength(before.n + 1);
+    expect(rows.at(-1)!.detail).toEqual({ surface: 'admin.csv_upload', export: 'POST' });
+    // The retired audit events of the old route are never written.
+    const old = await ownerSql<{ action: string }[]>`
+      SELECT action FROM auth_audit_log
+       WHERE actor_user_id = ${fixtureAdminId} AND action IN ('upload.staged', 'upload.duplicate', 'upload.rejected')`;
+    expect(old).toEqual([]);
   }, 60_000);
 });
 
-// authSql is a lazy Proxy shared with the route; its pool is left to process exit, as in
-// email-intake.test.ts.
+// authSql is a lazy Proxy shared with the route; its pool is left to process exit.
 void authSql;

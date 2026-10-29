@@ -1,0 +1,42 @@
+{
+  "modified_repository_files": [
+    "IssuesIndex.md",
+    "issues.md",
+    "issues/open/AFLDB-ISSUE-316.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/METADATA-REPAIR-V4-RECORD.md",
+    "docs/v2/issue316-production-readiness-decision-2026-10-24.md"
+  ],
+  "new_evidence_directory": "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z",
+  "frozen_package_modified": false,
+  "changelog_modified": false,
+  "changelog_reason": "Failed operational gate only; no retained application/database behaviour change.",
+  "commands_authorized_by": "Current owner explicit execution authority; no Git or additional production contact.",
+  "new_repository_files": [
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/DRIVER-STOP.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EVIDENCE-HASHES.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/EXECUTION-STATE.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/HASH-VERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/MANIFEST.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/OWNER-EXECUTION-AUTHORITY.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REPORT.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REVIEW.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/REVIEW.md",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/SESSION-FILES.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/execute-authorised-once.cjs",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/final-package-verify.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/observation-launch.json",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.sh",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.sql",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stderr.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.stdout.log",
+    "issues/open/AFLDB-ISSUE-316-u3-correction-20261024/metadata-repair-v4-production-20261024T200631Z/operational-observation.transport.json"
+  ],
+  "final_verification": {
+    "frozen_40_members": "UNCHANGED",
+    "manifest_review_report": "UNCHANGED",
+    "attempt_marker": "ABSENT",
+    "execution_directory": "ABSENT",
+    "tracking": "SYNCHRONISED",
+    "credentials_or_DSN_retained": false
+  }
+}

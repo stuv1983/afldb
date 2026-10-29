@@ -29,7 +29,7 @@ vi.mock('@/lib/ingest/pipeline', () => ({
 }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 
-import { decideSubmission, runValidation } from '@/app/admin/submissions/[id]/actions';
+import { decideSubmission, runPromotion, runValidation } from '@/app/admin/submissions/[id]/actions';
 
 // The module itself is mocked for the action tests above; the validation
 // tests below need the real one, still wired to the mocked authSql/datasets.
@@ -39,20 +39,6 @@ const {
 } = await vi.importActual<
   typeof import('@/lib/ingest/pipeline')
 >('@/lib/ingest/pipeline');
-
-function rejectionForm(id: number): FormData {
-  const formData = new FormData();
-  formData.set('id', String(id));
-  formData.set('decision', 'reject');
-  return formData;
-}
-
-function approvalForm(id: number): FormData {
-  const formData = new FormData();
-  formData.set('id', String(id));
-  formData.set('decision', 'approve');
-  return formData;
-}
 
 function compact(strings: TemplateStringsArray): string {
   return strings.join('?').replace(/\s+/g, ' ').trim();
@@ -64,90 +50,103 @@ beforeEach(() => {
   mocks.audit.mockResolvedValue(undefined);
 });
 
-describe('submission rejection', () => {
-  it('makes the permitted-state check and update one atomic statement', async () => {
-    mocks.authSql.mockResolvedValue([{ id: 17 }]);
+// AFLDB V2 Stage 5 (V2-GAP-013, legacy-disposition L2) RETIRED the three submission review
+// actions. They keep their names and their role guards (the first awaited statement) and REFUSE:
+// no SQL, no pipeline call, no revalidation. The pipeline LIBRARY below is unchanged and keeps
+// its tests: the offline tools still use it, and the ISSUE-273/306 contracts are properties of
+// the library, not of the retired actions that used to call it.
+const ADMIN = { id: 9, email: 'admin@example.test' };
 
-    const result = await decideSubmission({}, rejectionForm(17));
+/** What a stale `useActionState` client posts: (previous state, form data). The actions declare neither. */
+type StaleAction = (previous: object, form: FormData) => Promise<unknown>;
+const staleValidation = runValidation as unknown as StaleAction;
+const staleDecision = decideSubmission as unknown as StaleAction;
+const stalePromotion = runPromotion as unknown as StaleAction;
 
-    expect(result).toEqual({ message: 'Rejected.' });
-    expect(mocks.authSql).toHaveBeenCalledOnce();
-    const [strings, ...values] = mocks.authSql.mock.calls[0];
-    const query = compact(strings);
-    expect(query).toContain("status IN ('staged', 'validated', 'approved')");
-    expect(query).toContain('RETURNING id');
-    expect(values).toEqual([9, 17]);
-    expect(mocks.audit).toHaveBeenCalledWith(
-      'submission.rejected',
-      { submissionId: 17 },
-      { userId: 9, label: 'admin@example.test' },
-    );
-    expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/submissions/17');
-  });
-
-  it('does not claim or audit success when a stale or missing row updates nothing', async () => {
-    mocks.authSql.mockResolvedValue([]);
-
-    const result = await decideSubmission({}, rejectionForm(17));
-
-    expect(result).toEqual({
-      error: 'Only a staged, validated, or approved submission can be rejected.',
-    });
-    expect(mocks.audit).not.toHaveBeenCalled();
-    expect(mocks.revalidatePath).not.toHaveBeenCalled();
-  });
-});
-
-type Tag = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
-
-/** Install `begin` (runs the callback against `tx`) on the mocked authSql. */
-function installBegin(tx: Tag) {
-  const begin = vi.fn(async (callback: (t: unknown) => unknown) => callback(tx));
-  Object.assign(mocks.authSql, { begin });
-  return begin;
+function reviewForm(id: number, decision?: 'approve' | 'reject'): FormData {
+  const formData = new FormData();
+  formData.set('id', String(id));
+  if (decision) formData.set('decision', decision);
+  return formData;
 }
 
-describe('submission approval (AFLDB-ISSUE-273)', () => {
-  it('locks the submission before the guarded approval, in one transaction', async () => {
-    const tx = vi.fn<Tag>()
-      .mockResolvedValueOnce([{ id: 17 }])
-      .mockResolvedValueOnce([{ id: 17 }]);
-    installBegin(tx);
+describe('retired submission review actions (AFLDB V2 Stage 5)', () => {
+  const CALLS = [
+    ['runValidation', () => staleValidation({}, reviewForm(17)), 'requireAdmin'],
+    ['decideSubmission (approve)', () => staleDecision({}, reviewForm(17, 'approve')), 'requireSuperAdmin'],
+    ['decideSubmission (reject)', () => staleDecision({}, reviewForm(17, 'reject')), 'requireSuperAdmin'],
+    ['runPromotion', () => stalePromotion({}, reviewForm(17)), 'requireSuperAdmin'],
+  ] as const;
 
-    const result = await decideSubmission({}, approvalForm(17));
+  beforeEach(() => {
+    mocks.requireAdmin.mockResolvedValue(ADMIN);
+  });
 
-    expect(result).toEqual({ message: 'Approved.' });
+  it('declares no parameters on any of the three actions', () => {
+    expect([runValidation.length, decideSubmission.length, runPromotion.length]).toEqual([0, 0, 0]);
+  });
+
+  it.each(CALLS)('%s answers the typed refusal and never reaches the pipeline, SQL or the cache', async (_name, call) => {
+    const result = await call();
+
+    expect(result).toMatchObject({ refused: true, code: 'legacy_retired', surface: 'admin.submission_review' });
+    expect((result as { error?: string }).error).toMatch(/retired/i);
+    expect(mocks.validateSubmission).not.toHaveBeenCalled();
+    expect(mocks.promoteSubmission).not.toHaveBeenCalled();
     expect(mocks.authSql).not.toHaveBeenCalled();
-    expect(tx).toHaveBeenCalledTimes(2);
-    expect(compact(tx.mock.calls[0][0])).toBe('SELECT id FROM data_submissions WHERE id = ? FOR UPDATE');
-    const update = compact(tx.mock.calls[1][0]);
-    expect(update).toMatch(/^UPDATE data_submissions SET status = 'approved'/);
-    expect(update).toContain("AND status = 'validated'");
-    expect(update).toContain("(r.verdict = 'error' OR r.verdict IS NULL)");
-    expect(update).toContain('RETURNING id');
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('does not audit an approval the guarded update refused', async () => {
-    const tx = vi.fn<Tag>().mockResolvedValueOnce([{ id: 17 }]).mockResolvedValueOnce([]);
-    installBegin(tx);
+  it.each(CALLS)('%s writes exactly one audit row naming the surface and the export', async (name, call) => {
+    await call();
 
-    const result = await decideSubmission({}, approvalForm(17));
+    expect(mocks.audit).toHaveBeenCalledExactlyOnceWith(
+      'admin.legacy_retired_refused',
+      { surface: 'admin.submission_review', export: name.split(' ')[0] },
+      { userId: 9, label: 'admin@example.test' },
+    );
+  });
 
-    expect(result).toEqual({ error: 'Only a validated submission with no error rows can be approved.' });
+  it.each(CALLS)('%s calls its own role guard, and a guard that redirects stops it before the refusal', async (_name, call, guard) => {
+    const redirect = new Error('NEXT_REDIRECT /admin');
+    mocks[guard].mockRejectedValue(redirect);
+
+    await expect(call()).rejects.toThrow('NEXT_REDIRECT');
+
+    expect(mocks[guard]).toHaveBeenCalledOnce();
     expect(mocks.audit).not.toHaveBeenCalled();
+    expect(mocks.promoteSubmission).not.toHaveBeenCalled();
   });
-});
 
-describe('manual validation (AFLDB-ISSUE-273)', () => {
-  it('keeps the review page on the default start policy, which admits a rejected file', async () => {
-    mocks.requireAdmin.mockResolvedValue({ id: 9, email: 'admin@example.test' });
-    mocks.validateSubmission.mockResolvedValue({ ok: 1, warnings: 0, errors: 0, duplicates: 0 });
-    const form = new FormData();
-    form.set('id', '17');
+  it('keeps the validation and promotion guards apart: validation is an admin action, the verdicts are super admin', async () => {
+    await staleValidation({}, reviewForm(17));
+    expect(mocks.requireAdmin).toHaveBeenCalledOnce();
+    expect(mocks.requireSuperAdmin).not.toHaveBeenCalled();
 
-    expect(await runValidation({}, form)).toEqual({ message: 'Validated: 1 ok, 0 warnings, 0 errors.' });
-    // No policy passed: REVIEW_VALIDATION_START_STATUSES, pinned below.
-    expect(mocks.validateSubmission).toHaveBeenCalledWith(17);
+    mocks.requireAdmin.mockClear();
+    await stalePromotion({}, reviewForm(17));
+    await staleDecision({}, reviewForm(17, 'approve'));
+    expect(mocks.requireSuperAdmin).toHaveBeenCalledTimes(2);
+    expect(mocks.requireAdmin).not.toHaveBeenCalled();
+  });
+
+  it('refuses whatever the form carries: no id, a bad id or an unknown decision change nothing', async () => {
+    const odd = new FormData();
+    odd.set('id', 'not-a-number');
+    odd.set('decision', 'delete-everything');
+
+    expect(await staleDecision({}, odd)).toMatchObject({ refused: true, code: 'legacy_retired' });
+    expect(await staleValidation({}, new FormData())).toMatchObject({ refused: true, code: 'legacy_retired' });
+    expect(mocks.authSql).not.toHaveBeenCalled();
+  });
+
+  it('still refuses when the audit write fails', async () => {
+    mocks.audit.mockRejectedValue(new Error('audit insert failed'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await stalePromotion({}, reviewForm(17))).toMatchObject({ refused: true, code: 'legacy_retired' });
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
   });
 });
 

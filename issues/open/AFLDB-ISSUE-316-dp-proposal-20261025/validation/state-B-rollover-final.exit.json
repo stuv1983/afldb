@@ -1,0 +1,8 @@
+{
+  "state": "B",
+  "exit_code": 0,
+  "passed": 395,
+  "failed": 0,
+  "skipped": 0,
+  "scope": "Proposed state-specific rollover suite only; source P and actual checkout untouched"
+}

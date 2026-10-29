@@ -1,0 +1,25 @@
+{
+  "phase": "inspected",
+  "url": "https://beta.afldb.com/admin/data-editor?mode=match-sheet&id=17214",
+  "note": {
+    "name": "note",
+    "type": "text",
+    "maxLength": 2000,
+    "label": "Verification / Audit note (optional)",
+    "formAction": "",
+    "submitLabels": [
+      "Save match sheet & update player stats"
+    ]
+  },
+  "saveClicked": false,
+  "audit": {
+    "url": "https://beta.afldb.com/admin/audit/entity/matches/17214",
+    "text": "Skip to content\nAFLDB\n1897 — PRESENT\nPLAYERS\nCLUBS\nSEASONS\nVENUES\nRECORDS\nCOACHES\nAWARDS\nDRAFT\nAFLW\nSwitch to dark mode\n«\nCollapse the admin menu\nADMIN\nOVERVIEW\nDashboard\nDATA\nData editor\nBrownlow\nPlayer links\nCoaches\nDraft administration\nSeason lists\nFixtures\nAwards & honours\nSpecial records\nACQUISITION\nCurrent season\nLegacy file intake\nPEOPLE & ACCESS\nBeta access\nAdministrators\nSITE\nPage content\nSettings\nOPERATIONS\nData QA search\nDatabase health\nApplication health\nSearch telemetry\nReader feedback\nAudit trail\nACCOUNT\nChange password\n\nstuart.villanti@gmail.com\nSuper admin\n\nView site\nSign out\n\n← DATA EDITS\n\nMatches #17214\n\n1 recorded edit, newest first. Times are UTC.\n\nmatch_sheet 2026-10-24 11:28:46\nby stuart.villanti@gmail.com\nFIELD\tBEFORE\tAFTER\nplayers\t{\"2121\":{\"goals\":0,\"kicks\":0,\"marks\":0,\"behinds\":0,\"hitouts\":0,\"tackles\":0,\"club_slug\":\"essendon\",\"disposals\":0,\"frees_for\":0,\"handballs\":0,\"frees_against\":0,\"jumper_number\":\"8\"}}\t{\"2121\":{\"kind\":\"remove\"}}\nplayersCount\t(not recorded)\t46\nscoreUpdated\t(not recorded)\tfalse\nauthorityKeys\t(not recorded)\t[{\"action\":\"mint\",\"playerId\":2121,\"entityKey\":\"2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html\"}]\n\nAFLDB — Australian Football statistics, 1897 to present. Data derived from publicly available sources including AFL Tables and Wikipedia. About this data →\n\nAFLDB is an independent hobby project, and is not affiliated with the AFL.\n\nContact: admin@afldb.com",
+    "forms": [
+      {
+        "method": "post",
+        "action": ""
+      }
+    ]
+  }
+}

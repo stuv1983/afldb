@@ -1,0 +1,1805 @@
+{
+  "summary": {
+    "database": "afldb_v2_hist_test",
+    "seasons": 98,
+    "determined": 98,
+    "agree": 98,
+    "disagree": 0,
+    "unresolved": 0,
+    "note": "Authoritative local historical totals; stored_totals is NOT API parity. No votes, flags or decisions changed."
+  },
+  "results": [
+    {
+      "season": 1924,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        4083
+      ],
+      "winners": [
+        4083
+      ],
+      "agrees": true,
+      "voteGetters": 37,
+      "rawVotesTotal": 72,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "941eddea45507d543954108c1e4d1597d86613b91fcb3930b0a170f7c593a81e"
+    },
+    {
+      "season": 1925,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3016
+      ],
+      "winners": [
+        3016
+      ],
+      "agrees": true,
+      "voteGetters": 59,
+      "rawVotesTotal": 101,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "ebcb51d80e8b70fbddd14dbaffcc6ccf14b05d65a33ba38a2786ea925f7733d9"
+    },
+    {
+      "season": 1926,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        6111
+      ],
+      "winners": [
+        6111
+      ],
+      "agrees": true,
+      "voteGetters": 54,
+      "rawVotesTotal": 105,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "292305a13eb3c032b71dbfde444d4df61cb0fb116de2e4879aff8076aea5fda6"
+    },
+    {
+      "season": 1927,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        12154
+      ],
+      "winners": [
+        12154
+      ],
+      "agrees": true,
+      "voteGetters": 60,
+      "rawVotesTotal": 108,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "238af839a1de2f86bc69b1476df95f6eb80eebae55dbd2b27a36b6ae21fee0bd"
+    },
+    {
+      "season": 1928,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        6111
+      ],
+      "winners": [
+        6111
+      ],
+      "agrees": true,
+      "voteGetters": 60,
+      "rawVotesTotal": 100,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "1493b7282c9b8a2d13e829c34907fcc7cbe1f2152b8b5447e42a3b1eb3825281"
+    },
+    {
+      "season": 1929,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        213
+      ],
+      "winners": [
+        213
+      ],
+      "agrees": true,
+      "voteGetters": 53,
+      "rawVotesTotal": 95,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "81255bad1d92ca0c5311efc064fce6ecafc3e54609c802d1f3849621f0fe93ad"
+    },
+    {
+      "season": 1930,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        477,
+        5574,
+        11932
+      ],
+      "winners": [
+        477,
+        5574,
+        11932
+      ],
+      "agrees": true,
+      "voteGetters": 67,
+      "rawVotesTotal": 105,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "d01ca1a90b2ad94942041006473f18eae9794955f2b710914eece5c234a7eb04"
+    },
+    {
+      "season": 1931,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5744
+      ],
+      "winners": [
+        5744
+      ],
+      "agrees": true,
+      "voteGetters": 132,
+      "rawVotesTotal": 648,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "2953ee67d95d4b8e8be1c3825e30aa89d3eed608d045ab4582930bdb8094e6ce"
+    },
+    {
+      "season": 1932,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5744
+      ],
+      "winners": [
+        5744
+      ],
+      "agrees": true,
+      "voteGetters": 141,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "83222266871a385fe9ef839b48e36835d26ae4d160054526fb02c79b34cf3a2f"
+    },
+    {
+      "season": 1933,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        13176
+      ],
+      "winners": [
+        13176
+      ],
+      "agrees": true,
+      "voteGetters": 141,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "d7fce6b679c3b74f809208935d4dfa1b033dc1b6841d819bde3571cd876da0e2"
+    },
+    {
+      "season": 1934,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3786
+      ],
+      "winners": [
+        3786
+      ],
+      "agrees": true,
+      "voteGetters": 147,
+      "rawVotesTotal": 648,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "b2deb1cb040581f55307a68ba256d08cf4f37ed8d6b2359baad99b4489e324d7"
+    },
+    {
+      "season": 1935,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5744
+      ],
+      "winners": [
+        5744
+      ],
+      "agrees": true,
+      "voteGetters": 124,
+      "rawVotesTotal": 576,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "5153d2dd95d2d0b0c34e532f806e89e96d5abc37e7b108f887b18ce3b67714bb"
+    },
+    {
+      "season": 1936,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3653
+      ],
+      "winners": [
+        3653
+      ],
+      "agrees": true,
+      "voteGetters": 118,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "88a9ded17c6b7f71e72ed2fbc650fa7f2dbce6d7dff75fbbf1dc014027d08b88"
+    },
+    {
+      "season": 1937,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3786
+      ],
+      "winners": [
+        3786
+      ],
+      "agrees": true,
+      "voteGetters": 137,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "fd80da46c9393c5e3099f2958f8efc9e6318562f203df0e18a181870bf2bddde"
+    },
+    {
+      "season": 1938,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3786
+      ],
+      "winners": [
+        3786
+      ],
+      "agrees": true,
+      "voteGetters": 134,
+      "rawVotesTotal": 611,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "fcacd47edb61178831af270dcf1f58d1a025fadf86d964fb6150a755b3c5d1d4"
+    },
+    {
+      "season": 1939,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        9036
+      ],
+      "winners": [
+        9036
+      ],
+      "agrees": true,
+      "voteGetters": 121,
+      "rawVotesTotal": 576,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "1b39a6faccdd51cd17c5642e991780a54206a1195367521f469e571e0404d9da"
+    },
+    {
+      "season": 1940,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3702,
+        5856
+      ],
+      "winners": [
+        3702,
+        5856
+      ],
+      "agrees": true,
+      "voteGetters": 149,
+      "rawVotesTotal": 648,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "5993f2fbdabbe1ed318e04394af51b2d600abbf3e731423b572dca5591a1a5ea"
+    },
+    {
+      "season": 1941,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10105
+      ],
+      "winners": [
+        10105
+      ],
+      "agrees": true,
+      "voteGetters": 121,
+      "rawVotesTotal": 594,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "83028dc447c215dd0b549482455a8bef41aa0da1b776f0a64b908a76c7a2e94a"
+    },
+    {
+      "season": 1946,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3835
+      ],
+      "winners": [
+        3835
+      ],
+      "agrees": true,
+      "voteGetters": 140,
+      "rawVotesTotal": 648,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "1e3ad447c95b9b7f02876ac86968fb81f042b5c6ad8f37a898a9dcaa58bb4c92"
+    },
+    {
+      "season": 1947,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1216
+      ],
+      "winners": [
+        1216
+      ],
+      "agrees": true,
+      "voteGetters": 133,
+      "rawVotesTotal": 648,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "4510b788d80e956b6e233a97bbdd087a5824485ae497cb3ef0ae9601b0fe713b"
+    },
+    {
+      "season": 1948,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1564
+      ],
+      "winners": [
+        1564
+      ],
+      "agrees": true,
+      "voteGetters": 138,
+      "rawVotesTotal": 648,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "3bbf03cf8cac12fa5f78eed93e77753d9e9ea03ae473db4e0108b856b08f540c"
+    },
+    {
+      "season": 1949,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        2967,
+        11260
+      ],
+      "winners": [
+        2967,
+        11260
+      ],
+      "agrees": true,
+      "voteGetters": 136,
+      "rawVotesTotal": 609,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "968a7574e12dcb7939eed1bcfe9073d8d877210bacfb0c60e23e82451d0bdf3b"
+    },
+    {
+      "season": 1950,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        174
+      ],
+      "winners": [
+        174
+      ],
+      "agrees": true,
+      "voteGetters": 136,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "3ea0b27c4ec45a98c6a7074a8819aaae1f2f20cf6e144e475d5eb2a72c00ecac"
+    },
+    {
+      "season": 1951,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1181
+      ],
+      "winners": [
+        1181
+      ],
+      "agrees": true,
+      "voteGetters": 131,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "037c0103d5fbec27334474abdc96b51bb7efc633a5616d771c0822a5c8375ca6"
+    },
+    {
+      "season": 1952,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1476,
+        11498
+      ],
+      "winners": [
+        1476,
+        11498
+      ],
+      "agrees": true,
+      "voteGetters": 129,
+      "rawVotesTotal": 600,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "3395c6a8a67c485d830c8fc67406a3d17fe26bad1309e50d259beac5eadd3742"
+    },
+    {
+      "season": 1953,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1476
+      ],
+      "winners": [
+        1476
+      ],
+      "agrees": true,
+      "voteGetters": 132,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "a16c7148e30ac00f6cc9cef4749c5e0e34d1686dfa86a444073004df7550244f"
+    },
+    {
+      "season": 1954,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11498
+      ],
+      "winners": [
+        11498
+      ],
+      "agrees": true,
+      "voteGetters": 131,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "3b2b4cf4bef7f72ef0976b67f1cd58210d783e07f52ee4e4682daf225c4a13e0"
+    },
+    {
+      "season": 1955,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        4568
+      ],
+      "winners": [
+        4568
+      ],
+      "agrees": true,
+      "voteGetters": 130,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "cdeb4605c7e13ceb4d9c13131701099703061977c938b59b92014efc7aa84b63"
+    },
+    {
+      "season": 1956,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10462
+      ],
+      "winners": [
+        10462
+      ],
+      "agrees": true,
+      "voteGetters": 140,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "a0bd453a01da304a24702b7d19b4d56576393fba2e66f97c38b6f35eea84654d"
+    },
+    {
+      "season": 1957,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        2263
+      ],
+      "winners": [
+        2263
+      ],
+      "agrees": true,
+      "voteGetters": 129,
+      "rawVotesTotal": 576,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "7fc7d764f803f88c6f7364ae2da0285fd49831a951de2f55e4491071a252ab0d"
+    },
+    {
+      "season": 1958,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        9862
+      ],
+      "winners": [
+        9862
+      ],
+      "agrees": true,
+      "voteGetters": 137,
+      "rawVotesTotal": 648,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "983d76b4790df30d4102fd67049ef82e65d973cdf47c7562976fefaba2c141f0"
+    },
+    {
+      "season": 1959,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1979,
+        12916
+      ],
+      "winners": [
+        1979,
+        12916
+      ],
+      "agrees": true,
+      "voteGetters": 140,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "b8e048e280993cd8ce3c8902e08805370265c2d6b2a2d07d3a67f58f0af82672"
+    },
+    {
+      "season": 1960,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        7711
+      ],
+      "winners": [
+        7711
+      ],
+      "agrees": true,
+      "voteGetters": 140,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "5935003eb51fb51a7109aa03f47ad1a8e0418a89b4a7e8c416f4dff6c76ef4cf"
+    },
+    {
+      "season": 1961,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        7593
+      ],
+      "winners": [
+        7593
+      ],
+      "agrees": true,
+      "voteGetters": 140,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "b25cebbde3038d1d9dc896007d4e63b8ed8d69beadfb262a133cbf5261ce05ac"
+    },
+    {
+      "season": 1962,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        442
+      ],
+      "winners": [
+        442
+      ],
+      "agrees": true,
+      "voteGetters": 134,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "55bd87ab7a21b7d85a5588619f2e03f75e5fd9f639f9dde68eade0c02eb653de"
+    },
+    {
+      "season": 1963,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1979
+      ],
+      "winners": [
+        1979
+      ],
+      "agrees": true,
+      "voteGetters": 145,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "3e768cf3812926c17626972cdd97c09c7b01d8acc3aa59c6e3bf6cac00ece8db"
+    },
+    {
+      "season": 1964,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5209
+      ],
+      "winners": [
+        5209
+      ],
+      "agrees": true,
+      "voteGetters": 152,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "7e59137ad286798f81e1dbbf3e12ac3253821747d29490c806abe2ae05ebfb0a"
+    },
+    {
+      "season": 1965,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        6055,
+        10006
+      ],
+      "winners": [
+        6055,
+        10006
+      ],
+      "agrees": true,
+      "voteGetters": 147,
+      "rawVotesTotal": 612,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "623abaacc03200a36e4ab3110aab1e6834713d9c5b83b418f6ba4878fa2672ef"
+    },
+    {
+      "season": 1966,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        6055
+      ],
+      "winners": [
+        6055
+      ],
+      "agrees": true,
+      "voteGetters": 150,
+      "rawVotesTotal": 576,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "772d37f71f25cca794b17ccc9d7777d38c36e5d76b6bdb4b1fba318b2efc747c"
+    },
+    {
+      "season": 1967,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11413
+      ],
+      "winners": [
+        11413
+      ],
+      "agrees": true,
+      "voteGetters": 145,
+      "rawVotesTotal": 611,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "fe3e5268cf64aca5347b21c42002ffa6623e2b1acd938b01451395784e1aa89d"
+    },
+    {
+      "season": 1968,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1979
+      ],
+      "winners": [
+        1979
+      ],
+      "agrees": true,
+      "voteGetters": 148,
+      "rawVotesTotal": 684,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "8e1ff0aabab83425659edcdb6c761187003f181602f4ba6fedb42144113a4577"
+    },
+    {
+      "season": 1969,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        8265
+      ],
+      "winners": [
+        8265
+      ],
+      "agrees": true,
+      "voteGetters": 155,
+      "rawVotesTotal": 684,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "ac8f5d32b0c92faa211878ca313108f9306ddeda7fa879bfda4fd0027fb820af"
+    },
+    {
+      "season": 1970,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10451
+      ],
+      "winners": [
+        10451
+      ],
+      "agrees": true,
+      "voteGetters": 167,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "04a14b4c28f73a55d0cb1d69ab9eccafdc3564aa49c453056132fa0d60e00abc"
+    },
+    {
+      "season": 1971,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        6055
+      ],
+      "winners": [
+        6055
+      ],
+      "agrees": true,
+      "voteGetters": 162,
+      "rawVotesTotal": 756,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "c97ac9118c28e3d026243c2b3acbfafebf5ddd0ce6fcd5374d95ecd31d56dd25"
+    },
+    {
+      "season": 1972,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        8549
+      ],
+      "winners": [
+        8549
+      ],
+      "agrees": true,
+      "voteGetters": 154,
+      "rawVotesTotal": 756,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "f22da25939d994f6994449295b9ad17224a30d123faa411d27ba22adeb39351c"
+    },
+    {
+      "season": 1973,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        8009
+      ],
+      "winners": [
+        8009
+      ],
+      "agrees": true,
+      "voteGetters": 153,
+      "rawVotesTotal": 756,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "3448e67c9c042379eebb378e9aab71cfde8f1bcdc483995e31ef67b629177a0b"
+    },
+    {
+      "season": 1974,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        8009
+      ],
+      "winners": [
+        8009
+      ],
+      "agrees": true,
+      "voteGetters": 165,
+      "rawVotesTotal": 720,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "c1935985f56adc326a9993d50a958a50b67a7b39b127cb41aa5e4ad902c8ecc7"
+    },
+    {
+      "season": 1975,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        4715
+      ],
+      "winners": [
+        4715
+      ],
+      "agrees": true,
+      "voteGetters": 164,
+      "rawVotesTotal": 756,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "08a7fd96fe73626e2dcd94f1ee0fb9f6ceb2a2b66eb8bc665ef5be1d8d55e423"
+    },
+    {
+      "season": 1976,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5358
+      ],
+      "winners": [
+        5358
+      ],
+      "agrees": true,
+      "voteGetters": 200,
+      "rawVotesTotal": 1512,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "9b823e410767b13a61abad58bf966fe92d2faba57e72e29fc9dd6e88554d3df1"
+    },
+    {
+      "season": 1977,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5370
+      ],
+      "winners": [
+        5370
+      ],
+      "agrees": true,
+      "voteGetters": 189,
+      "rawVotesTotal": 1512,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "e41fcf1dc7b3facef40de33dc295420cbd7f5187c5936c9563ef5fa1ff3522f1"
+    },
+    {
+      "season": 1978,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        9001
+      ],
+      "winners": [
+        9001
+      ],
+      "agrees": true,
+      "voteGetters": 163,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "9eef8e4535000db521a3619aee9b9d4484a7dab6ad6ab0f76ce8bfc9e65ab7c4"
+    },
+    {
+      "season": 1979,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10590
+      ],
+      "winners": [
+        10590
+      ],
+      "agrees": true,
+      "voteGetters": 172,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "1b16f146abf782f1765b7bd0e7840ba49c418e72da5b1622bdc3bfedd663e9e0"
+    },
+    {
+      "season": 1980,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        8069
+      ],
+      "winners": [
+        8069
+      ],
+      "agrees": true,
+      "voteGetters": 170,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "6227006f104a83d80850e5caf1f94ad949759722312ba96e9fa5e8a14222800b"
+    },
+    {
+      "season": 1981,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1030,
+        1177
+      ],
+      "winners": [
+        1030,
+        1177
+      ],
+      "agrees": true,
+      "voteGetters": 165,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "2214738de89a72f50119d0ad746125b4b89ae586538e68ef88d114c571bd147b"
+    },
+    {
+      "season": 1982,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        2329
+      ],
+      "winners": [
+        2329
+      ],
+      "agrees": true,
+      "voteGetters": 160,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "cd5ac8b2030d339a40612042c7d05fe6637c457a2d0d806e1dbb9ffec7c65841"
+    },
+    {
+      "season": 1983,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11402
+      ],
+      "winners": [
+        11402
+      ],
+      "agrees": true,
+      "voteGetters": 173,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "3553b3500e8d9edd525438b64d1969d5b50ec8ea559559ff7c7d9aa1374656b0"
+    },
+    {
+      "season": 1984,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10590
+      ],
+      "winners": [
+        10590
+      ],
+      "agrees": true,
+      "voteGetters": 178,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "148ac4d1d9b168d3eb2f2dcba374047153eab33c2f15dedff90851d4f484c9de"
+    },
+    {
+      "season": 1985,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        2064
+      ],
+      "winners": [
+        2064
+      ],
+      "agrees": true,
+      "voteGetters": 177,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "feba82a7dcd863f3b6cafd98e18f538e54ba1030cd89ea466c4be30e5ac826ff"
+    },
+    {
+      "season": 1986,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5450,
+        11076
+      ],
+      "winners": [
+        5450,
+        11076
+      ],
+      "agrees": true,
+      "voteGetters": 171,
+      "rawVotesTotal": 792,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "1e41c7835ed75765ed7b697890e989cd55bc5aaa3e2913531952f16ddcc466a2"
+    },
+    {
+      "season": 1987,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        7684,
+        12780
+      ],
+      "winners": [
+        7684,
+        12780
+      ],
+      "agrees": true,
+      "voteGetters": 200,
+      "rawVotesTotal": 924,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "36a94e7c34c8b8b5a1d7c2c88403b2b0c42657bb8efb17a45b3d1e6143ae7276"
+    },
+    {
+      "season": 1988,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5116
+      ],
+      "winners": [
+        5116
+      ],
+      "agrees": true,
+      "voteGetters": 201,
+      "rawVotesTotal": 924,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "4db904d0d8543126e17481bc8c1c78d5c99b3f8843e1ed8f0f79472d2df947fb"
+    },
+    {
+      "season": 1989,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10279
+      ],
+      "winners": [
+        10279
+      ],
+      "agrees": true,
+      "voteGetters": 199,
+      "rawVotesTotal": 924,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "c5351bccc4f33be9503b775e6846aa715d3fc6c5d83c2d4ba7b59518f2493bde"
+    },
+    {
+      "season": 1990,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        12779
+      ],
+      "winners": [
+        12779
+      ],
+      "agrees": true,
+      "voteGetters": 208,
+      "rawVotesTotal": 924,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "48faeb759bc3cb43fa49d25aefaf55de03f0098c1f3c52badb6d63109738fa35"
+    },
+    {
+      "season": 1991,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        7192
+      ],
+      "winners": [
+        7192
+      ],
+      "agrees": true,
+      "voteGetters": 203,
+      "rawVotesTotal": 990,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "6f2c11fb8fde6844ea3610b2136cc4f5f147ede3ddbe8dc1a6d5e6d316748211"
+    },
+    {
+      "season": 1992,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11740
+      ],
+      "winners": [
+        11740
+      ],
+      "agrees": true,
+      "voteGetters": 215,
+      "rawVotesTotal": 990,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "452ece0bc3d7212c11c028aa357a75ded0cb480eef9f104f49df61cdde01dd8b"
+    },
+    {
+      "season": 1993,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        4766
+      ],
+      "winners": [
+        4766
+      ],
+      "agrees": true,
+      "voteGetters": 203,
+      "rawVotesTotal": 900,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "df4635fe0fa85e7a59e2782a9c2559faf9a8801968cdf3033590d9292b519358"
+    },
+    {
+      "season": 1994,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        5450
+      ],
+      "winners": [
+        5450
+      ],
+      "agrees": true,
+      "voteGetters": 206,
+      "rawVotesTotal": 990,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "64697650606f313e7e86b6bb49f93754413c9e6593798e8716d2c61ad7d7fdcf"
+    },
+    {
+      "season": 1995,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10311
+      ],
+      "winners": [
+        10311
+      ],
+      "agrees": true,
+      "voteGetters": 218,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "a0fc30bdca824670b0ba163e03bcb034e84fac76a3a97159f8c5e150f8e8da84"
+    },
+    {
+      "season": 1996,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        6722,
+        9596
+      ],
+      "winners": [
+        6722,
+        9596
+      ],
+      "agrees": true,
+      "voteGetters": 208,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "1fe31da138a6837fc823b54162927d6a05b420aef36ac1a6246770d80e4c6933"
+    },
+    {
+      "season": 1997,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11096
+      ],
+      "winners": [
+        11096
+      ],
+      "agrees": true,
+      "voteGetters": 217,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "8d4cbc0664a353f63f4cc7608e89b174f38b582399b0215e6a656ed6168f15f2"
+    },
+    {
+      "season": 1998,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11096
+      ],
+      "winners": [
+        11096
+      ],
+      "agrees": true,
+      "voteGetters": 223,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "044ab1f390a03850004605a7fa6c2d8ee2640fbe3b1fef0cb87bdb891dcb9653"
+    },
+    {
+      "season": 1999,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11778
+      ],
+      "winners": [
+        11778
+      ],
+      "agrees": true,
+      "voteGetters": 217,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "22dd05af87bd0af69c008f2e3c8b764318252bdc71e4b531048a289512801d40"
+    },
+    {
+      "season": 2000,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11821
+      ],
+      "winners": [
+        11821
+      ],
+      "agrees": true,
+      "voteGetters": 203,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "bd2c87f7a305e02ac62ae9693c2ed53f46d38ecce176946db23d266c8b34a94e"
+    },
+    {
+      "season": 2001,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        6824
+      ],
+      "winners": [
+        6824
+      ],
+      "agrees": true,
+      "voteGetters": 209,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "a9a479cd28a98eb5942be9a26dc388438396c642b1c705c91794d05cb821ecd7"
+    },
+    {
+      "season": 2002,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11866
+      ],
+      "winners": [
+        11866
+      ],
+      "agrees": true,
+      "voteGetters": 227,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "456763ad9405b42e43b1bac56625f9c19242aab2bf1a3055a14b50555869be8a"
+    },
+    {
+      "season": 2003,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        35,
+        9127,
+        9773
+      ],
+      "winners": [
+        35,
+        9127,
+        9773
+      ],
+      "agrees": true,
+      "voteGetters": 203,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "af59f9d226c73ff85e220a89fff612eaac74cc92bedd1d7f0fce8b875ba94256"
+    },
+    {
+      "season": 2004,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        2772
+      ],
+      "winners": [
+        2772
+      ],
+      "agrees": true,
+      "voteGetters": 201,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "a3d8adafd74f6f50a1158f2382f8f2c13e6f353a99fc3a4880563532e3d40ae4"
+    },
+    {
+      "season": 2005,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        1072
+      ],
+      "winners": [
+        1072
+      ],
+      "agrees": true,
+      "voteGetters": 202,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "7844f378617cdddc132db42b7fd44434d825c512c1e744239526a2848fc0ae64"
+    },
+    {
+      "season": 2006,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        35
+      ],
+      "winners": [
+        35
+      ],
+      "agrees": true,
+      "voteGetters": 212,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "7c5cef9dd57a71d756dabc705a5d9893469145c9c1e222eef566158704d40528"
+    },
+    {
+      "season": 2007,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        7231
+      ],
+      "winners": [
+        7231
+      ],
+      "agrees": true,
+      "voteGetters": 203,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "9da5b3ab598a083771036cded03976615b89dc3eb7d24ffc58c0a1a38ab617f2"
+    },
+    {
+      "season": 2008,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        33
+      ],
+      "winners": [
+        33
+      ],
+      "agrees": true,
+      "voteGetters": 208,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "0661d963ac8891918d8a77aa08247f38bfee8bad188b053cc7e0ed37099d1829"
+    },
+    {
+      "season": 2009,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        4701
+      ],
+      "winners": [
+        4701
+      ],
+      "agrees": true,
+      "voteGetters": 201,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "13e61d10a3166433ef46903e995271cc779bd81587298e363776b6e98dd7db60"
+    },
+    {
+      "season": 2010,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        2772
+      ],
+      "winners": [
+        2772
+      ],
+      "agrees": true,
+      "voteGetters": 197,
+      "rawVotesTotal": 1056,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "8ae4a580208ba7be0845bc127dd1f2eb14431ef286a4f8575562fefb57260724"
+    },
+    {
+      "season": 2011,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3207
+      ],
+      "winners": [
+        3207
+      ],
+      "agrees": true,
+      "voteGetters": 216,
+      "rawVotesTotal": 1122,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "f261dd4ac14aba2194a3bc3908685d89eeecb01bcb8d218852130e6666d2692b"
+    },
+    {
+      "season": 2012,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        11659,
+        12820
+      ],
+      "winners": [
+        11659,
+        12820
+      ],
+      "agrees": true,
+      "voteGetters": 216,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "1d201dce5c726cf663fa9db5532b059394019c2f04c28e1130259921689cb20c"
+    },
+    {
+      "season": 2013,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        4701
+      ],
+      "winners": [
+        4701
+      ],
+      "agrees": true,
+      "voteGetters": 215,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "c5df66ab2803d625efdfb2b5f31662bb7d2187d844249ede96847227f1a9e9e5"
+    },
+    {
+      "season": 2014,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        9231
+      ],
+      "winners": [
+        9231
+      ],
+      "agrees": true,
+      "voteGetters": 205,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "aa9d7923fa9a1b1361568035892625d7799e7e27f194c4feed66ce3f27496216"
+    },
+    {
+      "season": 2015,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        9762
+      ],
+      "winners": [
+        9762
+      ],
+      "agrees": true,
+      "voteGetters": 199,
+      "rawVotesTotal": 1182,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "be642402107d5461692ee96400f5a49b736fa32a0bc353e2debdd04f705e8209"
+    },
+    {
+      "season": 2016,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10244
+      ],
+      "winners": [
+        10244
+      ],
+      "agrees": true,
+      "voteGetters": 204,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "32754adc3602a88d11f52dced8ef8481a7469d72cdb147e64a0f0a50728fab3f"
+    },
+    {
+      "season": 2017,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        3994
+      ],
+      "winners": [
+        3994
+      ],
+      "agrees": true,
+      "voteGetters": 198,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "c40b2eb6b5b05043a5177fbddeb02f9b86bec1d7ca3f5a6c6b0773f590c79018"
+    },
+    {
+      "season": 2018,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        12620
+      ],
+      "winners": [
+        12620
+      ],
+      "agrees": true,
+      "voteGetters": 210,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "e9bf323621400535630b21289a01af20d91e3c6bdc16064959e28bec368d4210"
+    },
+    {
+      "season": 2019,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        9762
+      ],
+      "winners": [
+        9762
+      ],
+      "agrees": true,
+      "voteGetters": 198,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "1b55d65c7d7b2a665893353d96925a0fe7623805cbd741b37ee16fde258f6975"
+    },
+    {
+      "season": 2020,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        8354
+      ],
+      "winners": [
+        8354
+      ],
+      "agrees": true,
+      "voteGetters": 207,
+      "rawVotesTotal": 918,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "9d80ee46a852221f8199ae96bc971e75ba9b246a5fbf5bf4e699a2a9dce3ba86"
+    },
+    {
+      "season": 2021,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10130
+      ],
+      "winners": [
+        10130
+      ],
+      "agrees": true,
+      "voteGetters": 200,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "b70f85073aa27b1fa3b75a4930f1c418830dc93b15dd5c7094e1c9ce671d2d47"
+    },
+    {
+      "season": 2022,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10243
+      ],
+      "winners": [
+        10243
+      ],
+      "agrees": true,
+      "voteGetters": 207,
+      "rawVotesTotal": 1188,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "64e25942efc4038215d6ba4377bbabc1734146333c8c2e6f0f9e7ac09b2fe116"
+    },
+    {
+      "season": 2023,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        8354
+      ],
+      "winners": [
+        8354
+      ],
+      "agrees": true,
+      "voteGetters": 201,
+      "rawVotesTotal": 1242,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "9996b42d1a8ee5de02b72f8a882e362bf1f2d9f78a8dcfbd1cb0e59c3889ea3e"
+    },
+    {
+      "season": 2024,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        10243
+      ],
+      "winners": [
+        10243
+      ],
+      "agrees": true,
+      "voteGetters": 196,
+      "rawVotesTotal": 1242,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "56217f666375c747ae449c3fd19f75ffb2fd8251845a8710d5e9386dd5839332"
+    },
+    {
+      "season": 2025,
+      "basis": "stored_totals",
+      "status": "determined",
+      "storedWinners": [
+        9235
+      ],
+      "winners": [
+        9235
+      ],
+      "agrees": true,
+      "voteGetters": 188,
+      "rawVotesTotal": 1242,
+      "missingEligibility": 0,
+      "review": [],
+      "blocking": [],
+      "inputChecksum": "f3ffd6d1d3879310f6270226cab961d629c7ca8ad428d64a2ccb07b332322cd9"
+    }
+  ]
+}

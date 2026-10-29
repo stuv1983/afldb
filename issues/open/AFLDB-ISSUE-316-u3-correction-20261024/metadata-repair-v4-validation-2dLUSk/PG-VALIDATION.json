@@ -1,0 +1,74 @@
+{
+  "status": "PASS",
+  "revised_f005_contract": "No catalog locks. An optional CREATE beyond the final assertion may commit independently. Real synchronized late-DDL test proves exact metadata commit, unchanged authority and existing protected rows, CONCURRENT_SCHEMA_DRIFT and no retry/reversal. Earlier visible DDL causes rollback.",
+  "engine": "postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "identity": {
+    "db": "i316_f004_test",
+    "data": "/tmp/i316-f004-pg-8AEBh2/data",
+    "cluster": "i316-f004-private",
+    "addr": null,
+    "version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)"
+  },
+  "work_directory": "/tmp/i316-f004-pg-8AEBh2",
+  "scope": "Fresh private Unix-socket PostgreSQL cluster and synthetic shapes. Exact shared SQL excluding production-only identity; psql client directives expanded for known fixture optional presence. No production transport/live-schema acceptance. No rebuild or shared database touched.",
+  "completed_utc": "2026-10-24T19:52:50.977Z",
+  "passed": 11,
+  "results": [
+    {
+      "name": "exact pre-lock ordering and unchanged protected inventory",
+      "status": "PASS",
+      "protected_relations": 28,
+      "scope": "Static ordering/inventory only. Does not simulate locks or snapshots."
+    },
+    {
+      "name": "active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes",
+      "status": "PASS",
+      "duration_ms": 822
+    },
+    {
+      "name": "active protected writer exceeds approved two-second lock timeout: zero metadata writes",
+      "status": "PASS",
+      "duration_ms": 2429
+    },
+    {
+      "name": "writers and guarded DDL after all locks are excluded until repair commit",
+      "status": "PASS",
+      "duration_ms": 15238
+    },
+    {
+      "name": "linked-audit INSERT failure rolls back preceding note UPDATE",
+      "status": "PASS",
+      "duration_ms": 804
+    },
+    {
+      "name": "successful two-write repair; independent postcheck; second repair refuses",
+      "status": "PASS",
+      "duration_ms": 1587
+    },
+    {
+      "name": "Brownlow mutation after commit is detected by independent postcheck",
+      "status": "PASS",
+      "duration_ms": 1582
+    },
+    {
+      "name": "extra audit-row mutation after commit is detected",
+      "status": "PASS",
+      "duration_ms": 1584
+    },
+    {
+      "name": "pre-existing optional DDL commit is caught by in-transaction assertion; metadata rolls back",
+      "status": "PASS",
+      "duration_ms": 1198
+    },
+    {
+      "name": "optional CREATE after final assertions before COMMIT: exact repair commits, drift detected, U3 blocked, no retry or reversal",
+      "status": "PASS",
+      "duration_ms": 1978
+    },
+    {
+      "name": "operational preflight refuses known active optional DDL and wrong schema version",
+      "status": "PASS",
+      "duration_ms": 28
+    }
+  ]
+}

@@ -2,31 +2,26 @@
 
 import { revalidatePath } from 'next/cache';
 
-import {
-  getCurrentSeasonReport,
-  parseCurrentSeasonSources,
-  runCurrentSeasonRefresh,
-  validateCurrentSeasonYear,
-  type CurrentSeasonReport,
-  type CurrentSeasonRunResult,
-} from '@/lib/external-afl/current-season-import';
-import { getLatestSettleRun } from '@/db/queries/settle-runs';
+import type { RetiredAdminRefusal } from '@afldb/domain';
+
 import { isAflApiBrownlowEnabled } from '@/lib/acquisition/afl-api-brownlow';
 import {
   combineAflApiBrownlowGates,
   type AflApiBrownlowEffectiveState,
 } from '@/lib/acquisition/afl-api-ingestion-control';
 import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/settle-status';
-import { SETTLE_UNIT, startSettleRun } from '@/lib/acquisition/settle-trigger';
 import { authSql } from '@/db/authClient';
+import { refuseRetiredAdminAction } from '@/lib/admin/retired-admin';
 import { audit, requireCapability } from '@/lib/auth/session';
 import { parseSiteSettings, SETTING_KEYS } from '@/lib/site-settings';
 
+/**
+ * The state a (retired) Squiggle/Kali control used to render. V2 Stage 5 retired the control;
+ * the type stays so a stale `useActionState` client still type-checks against `error`.
+ */
 export type CurrentSeasonAdminState = {
   error?: string;
   message?: string;
-  result?: CurrentSeasonRunResult;
-  report?: CurrentSeasonReport;
 };
 
 /** AFLDB-ISSUE-127 — what the on-demand settle panel renders. */
@@ -44,176 +39,41 @@ export type SettleRunAdminState = {
   batchIdAtStart?: string | null;
 };
 
-function parseYear(formData: FormData): number {
-  return validateCurrentSeasonYear(Number(formData.get('year') ?? new Date().getFullYear()));
-}
-
-export async function runCurrentSeasonAdminAction(
-  _previous: CurrentSeasonAdminState,
-  formData: FormData,
-): Promise<CurrentSeasonAdminState> {
+/**
+ * RETIRED (AFLDB V2 Stage 5, V2-GAP-013, legacy-disposition L6). The Squiggle / Kali refresh and
+ * staged report were removed from the admin surface: Squiggle and Kali are retired sources
+ * (AFLDB-ISSUE-122/128, plan D10). The existing guard stays the first statement, so who is
+ * refused, and who is redirected away, is unchanged; an authorised caller gets the typed
+ * refusal and one audit row. The importer library is NOT called: this module no longer imports
+ * it, and tests/v2-module-boundaries.test.ts keeps it that way.
+ *
+ * It declares no parameters: a stale `useActionState` client still posts (previous state, form
+ * data), which JavaScript ignores, so nothing the form carried can reach any code here.
+ */
+export async function runCurrentSeasonAdminAction(): Promise<CurrentSeasonAdminState | RetiredAdminRefusal> {
   const admin = await requireCapability('acquisition.currentSeason');
-  const mode = String(formData.get('mode') ?? 'report');
-
-  try {
-    const year = parseYear(formData);
-    if (mode === 'report') {
-      const report = await getCurrentSeasonReport(year);
-      await audit('current_season.reported', { year }, { userId: admin.id, label: admin.email });
-      return {
-        message: `Loaded current-season staging report for ${year}.`,
-        report,
-      };
-    }
-
-    // AFLDB-ISSUE-128. The legacy `auto` mode is GONE. It meant "refresh Kali
-    // and persist", which is the shape of the pre-ISSUE-122 automatic writer
-    // and was the last thing on this page still calling a deprecated fallback
-    // provider "automatic". Automatic current-season ingestion is the AFL
-    // Tables settle chain and nothing else; a `mode=auto` post is now refused
-    // rather than quietly reinterpreted, so an old bookmark or a stale client
-    // cannot resurrect the behaviour by name.
-    if (mode !== 'manual') {
-      throw new Error(
-        `Unknown current-season fallback mode '${mode}'. Automatic current-season ingestion `
-        + 'is the AFL Tables settle chain, not a Squiggle/Kali refresh; the only fallback '
-        + 'modes here are manual diagnostics and report.',
-      );
-    }
-    const sources = parseCurrentSeasonSources(String(formData.get('source') ?? ''));
-    const apply = formData.get('apply') === 'on';
-    const insertMissingMatches = false;
-
-    const result = await runCurrentSeasonRefresh({
-      year,
-      sources: [...sources],
-      apply,
-      insertMissingMatches,
-    });
-    const report = await getCurrentSeasonReport(year);
-
-    await audit('current_season.refreshed', {
-      year,
-      mode,
-      sources,
-      apply,
-      insertMissingMatches,
-      observationsFetched: result.observationsFetched,
-      sourceCounts: result.sourceCounts,
-      independenceGroupCounts: result.independenceGroupCounts,
-      completeObservations: result.completeObservations,
-      observationsWithScores: result.observationsWithScores,
-      observationsStaged: result.observationsStaged,
-      observationVersionsInserted: result.observationVersionsInserted,
-      observationsMarkedAbsent: result.observationsMarkedAbsent,
-      canonicalMatchesResolved: result.canonicalMatchesResolved,
-      canonicalRowsInserted: result.canonicalRowsInserted,
-      canonicalRowsUpdated: result.canonicalRowsUpdated,
-      unresolvedObservations: result.unresolvedObservations,
-      incompleteSourceRecords: result.incompleteSourceRecords,
-      rejectedOrConflicted: result.rejectedOrConflicted,
-      sourceDisagreements: result.sourceDisagreements,
-      sameGroupConflicts: result.sameGroupConflicts,
-    }, { userId: admin.id, label: admin.email });
-
-    revalidatePath('/admin/current-season');
-
-    return {
-      message: result.applied
-        ? `Refreshed ${year} fallback evidence from ${sources.join(', ')}: staged ${result.observationsStaged} observations and resolved ${result.canonicalMatchesResolved} local matches for diagnostics. Canonical current-season rows were not changed; only the AFL Tables settle chain writes those.`
-        : `Dry run for ${year} over ${sources.join(', ')}: fetched ${result.observationsFetched} observations; nothing was written.`,
-      result,
-      report,
-    };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
+  return refuseRetiredAdminAction('admin.squiggle_kali_refresh', admin, 'runCurrentSeasonAdminAction');
 }
 
 /* ------------------------------------------------------------------ *
- * AFLDB-ISSUE-127 — on-demand AFL Tables current-season refresh
+ * RETIRED (AFLDB V2 Stage 5, V2-GAP-013, legacy-disposition L5): the on-demand AFL Tables settle
+ * trigger. The nightly AFL Tables settle still runs on the host behind AFLDB-ISSUE-316 until the
+ * owner's ISSUE-316 decisions retire it (D-316-1 at C2; the timer is disabled by C5 under D-316-4);
+ * V2 neither starts nor stops it, and this admin control no longer starts it either.
  * ------------------------------------------------------------------ */
 
 /**
- * Start one run of the approved AFLDB-ISSUE-122 chain, now.
+ * Refuse the retired AFL Tables settle trigger.
  *
- * SUPER ADMIN ONLY, enforced here on the server.
- * `requireCapability('acquisition.currentSeason')` -- a super-admin-only
- * capability, the same boundary requireSuperAdmin() drew before
- * AFLDB-ISSUE-158 -- is the first statement and redirects a plain admin, a
- * contributor and an unauthenticated visitor before anything else happens —
- * the disabled button in the UI is a courtesy, never the control.
- *
- * NO ARGUMENTS — structurally, not by convention. This action takes none, so
- * there is no season, label, path, source, force or bypass value to validate
- * and no `FormData` for a crafted field to ride in on. It is called directly
- * from the panel rather than bound to a form for exactly that reason. Every
- * argument the host boundary passes is a module constant in
- * `settle-trigger.ts`.
- *
- * NOT SYNCHRONOUS. `startSettleRun()` returns once systemd has queued the
- * job. A season backfill took about an hour (`AFLDB-ISSUE-123`); no HTTP
- * request is held open for it. The panel polls `refreshSettleRunStatusAction`
- * for the result.
- *
- * AUDIT. One `auth_audit_log` row per attempt, carrying the actor, the unit,
- * the outcome and the pre-start batch id. It is written AFTER the boundary
- * returns, so it records what actually happened rather than an intent; it
- * cannot be transactional with a systemd job, and a failure to write it is
- * deliberately not swallowed.
+ * SUPER ADMIN ONLY, enforced here on the server: `requireCapability('acquisition.currentSeason')`
+ * is the first statement and redirects a plain admin, a contributor and an unauthenticated
+ * visitor exactly as before. It still takes no arguments, so there is nothing for a crafted
+ * request to carry. An authorised caller gets the typed refusal and one audit row; the systemd
+ * boundary (`startSettleRun`) is not imported by this module and is never called.
  */
-export async function startSettleRunAction(): Promise<SettleRunAdminState> {
+export async function startSettleRunAction(): Promise<SettleRunAdminState | RetiredAdminRefusal> {
   const admin = await requireCapability('acquisition.currentSeason');
-
-  // Captured before the start so the panel can tell this run's batch from the
-  // previous one. Just the batch id, not the whole status: the unit state is
-  // read again below and once by the boundary itself. A failed read is not a
-  // reason to refuse to start.
-  let batchIdAtStart: string | null = null;
-  try {
-    batchIdAtStart = (await getLatestSettleRun())?.batchId ?? null;
-  } catch {
-    batchIdAtStart = null;
-  }
-
-  const started = await startSettleRun();
-
-  await audit('current_season.settle_triggered', {
-    unit: SETTLE_UNIT,
-    outcome: started.outcome,
-    batchIdAtStart,
-  }, { userId: admin.id, label: admin.email });
-
-  const status = await readSettleRunStatus();
-
-  switch (started.outcome) {
-    case 'started':
-      return {
-        outcome: 'started',
-        batchIdAtStart,
-        status,
-        message:
-          `Started ${SETTLE_UNIT}. AFL Tables is being acquired, adjudicated and settled by `
-          + `the same pipeline the nightly timer runs. Refresh the status below for the `
-          + `result; a full pass can take a while.`,
-      };
-    case 'already-running':
-      return {
-        outcome: 'already-running',
-        batchIdAtStart,
-        status,
-        message:
-          `A settle run is already in progress (${started.unit.activeState}). Nothing was `
-          + `started — systemd runs this unit once at a time, so a scheduled run and a `
-          + `manual one can never overlap.`,
-      };
-    case 'unavailable':
-      return { outcome: 'unavailable', batchIdAtStart, status, error: started.reason };
-    default:
-      return { outcome: 'error', batchIdAtStart, status, error: started.reason };
-  }
+  return refuseRetiredAdminAction('admin.afltables_settle_trigger', admin, 'startSettleRunAction');
 }
 
 /**

@@ -1,0 +1,775 @@
+{
+  "source": "Expected pre-repair ledger 110: docs/v2/issue316-production-readiness-decision-2026-10-24.md section 7; checksums from current repository migrations, accepted raw/LF/CRLF representations only",
+  "rows": [
+    {
+      "name": "001_foundations.sql",
+      "checksums": [
+        "284df16b28d16e5f2f811141e8f19807fb633ec9a8ae1c4e80d8084bc5e38d3e",
+        "7cd73ef24a5f8d83f28198f02e4cfcb2ac182eaf2ce885715914b5a93caae7db"
+      ]
+    },
+    {
+      "name": "002_core_entities.sql",
+      "checksums": [
+        "45b05eb67b11ad4a505e05fec21942afb50a7c105345bf98b36d934d9fd174a3",
+        "b9a5c755fdf8a48cda87c35219fc5d42f1999a82cd1cdffaa5798412b9e1020d"
+      ]
+    },
+    {
+      "name": "003_matches.sql",
+      "checksums": [
+        "3adbeb84e9b1cc23eda4899dc25248765746e7abe9308a4b25c34dfedf06f626",
+        "199a4c3d4229a6f32de41236e6ae97b274d6f88787aa48beb00b6398cb3c9fda"
+      ]
+    },
+    {
+      "name": "004_player_match_stats.sql",
+      "checksums": [
+        "c614bed4692b2cc5a23ad1301e801091e7fad8a8b235697794c1f450e86ba109",
+        "d84251cbe9f34c68e91d17dfb6eaade8abfda514300b1b07a95a0054393f2e82"
+      ]
+    },
+    {
+      "name": "005_brownlow_awards.sql",
+      "checksums": [
+        "77b403b87ba9b5548f1e8eaf1e6a222bf3a4ecf0068097b1954e9b9eaad7e0dc",
+        "26ff2b64b00d5ed86627b4c8ba5ed461fc56d9e0d5e46ebbc4c6e58a25c3d931"
+      ]
+    },
+    {
+      "name": "006_draft_relationships.sql",
+      "checksums": [
+        "4f35deff6de4dcb944ca93ddf893f142f5bfaeb1098755e622ad9487d4980ddb",
+        "40717087c385bea56f1da1975579167c7f59df3506e51420a0e9a7238b62f6d0"
+      ]
+    },
+    {
+      "name": "007_derived_stats.sql",
+      "checksums": [
+        "5cb8073b62bf452e2bc479bd3b8457d8bebca149268b966b092c768d55b354fc",
+        "a1d81dccc0cc63741c2d815574ebd43c5c5def93d6eb55994a3f60dc4a970d4d"
+      ]
+    },
+    {
+      "name": "008_search.sql",
+      "checksums": [
+        "e91257dd0dd5c03c935ae4e42e04d6b9b5ab113e0135d1f12db52c8bf4bfce0c",
+        "a8ac70b9f46c1ed0306d2865dc39b7a2479d3e91c195d14599a3d19d25667256"
+      ]
+    },
+    {
+      "name": "009_fix_name_normalisation.sql",
+      "checksums": [
+        "537982d82f21f02cb15360e9e63fb4bed286da4cbb74cc2a87375b3c1f5f3fad",
+        "b457511d6fb84d4efb2e932a999a3335fadac96ff04d31b0118c1f54b8751b6d"
+      ]
+    },
+    {
+      "name": "010_import_role_truncate.sql",
+      "checksums": [
+        "b94e5524419eca7d9f6fba4fce59e40b1c828b2e5d7f87ee15359c4e885e9ad1",
+        "a6ed93004932d4a7bac3ae8a445d678af61187ae9f3efd0573586a4221ed0e17"
+      ]
+    },
+    {
+      "name": "011_import_role_sequences.sql",
+      "checksums": [
+        "42390940940f0cb2dc304be1550b22b10c7443cc362b5deba371a9f22ffaa70b",
+        "4fc8ec3a9d5e9440e8220540fa8c36712ec2d0a241ffceeb4b4dd12f9d1bb60d"
+      ]
+    },
+    {
+      "name": "012_clubs_deferrable_identity.sql",
+      "checksums": [
+        "cde9bc0ba6e6a7b0b7e97130e654ce8dee062926b607dc89e23d54ef8dd3a657",
+        "00a2ebccb3dc293587f9ef9fd3753a5cdfb58cb786e746475fe825eaca2129e0"
+      ]
+    },
+    {
+      "name": "013_drop_season_premier_fk.sql",
+      "checksums": [
+        "d27b895e34e0d72e4a84b935ae585b69bc296bb4e54055c8698c42242a5a2ac8",
+        "d288c0badf791c752c64f476054a8df235459c297737afdd5b8f18f29c8b3d79"
+      ]
+    },
+    {
+      "name": "014_staging_schema.sql",
+      "checksums": [
+        "44e4d170e46c070342a6bdbb7119b7cdebd14fd4e0ec284680e6f7061c192494",
+        "428169c94a5c1f981714d495922996fdfa1dc9c69190a27e61276ccd31a79fe4"
+      ]
+    },
+    {
+      "name": "015_brownlow_grain_and_coverage.sql",
+      "checksums": [
+        "771a54bbc6269f237dc0da2eddc82948ea2adaa87a6b5420e9a3cb88fdf0ac60",
+        "b9e4fa56b61be99bc1b10bb227665ac9d3919bfad1e28cc3f8e7a335893e8fd9"
+      ]
+    },
+    {
+      "name": "016_brownlow_grain_availability.sql",
+      "checksums": [
+        "209aa9ef3e0bd4ea2be6fc90ba25b7e4392d05dc38281cf75dba19df876fc566",
+        "2117c2168717e89d6b4d44655a9a7a4afed35eba62ad32d6a8c2cde8c9847ebd"
+      ]
+    },
+    {
+      "name": "017_club_organizations.sql",
+      "checksums": [
+        "764f5c4acdfad42c332cb05742df7e6ce5c3c7daa64bbfbfac79fa04c3e62940",
+        "60217e2f420dcba3156682dc787199bd0fd26a52d71fdd9674d9a909d0f8b0c0"
+      ]
+    },
+    {
+      "name": "018_player_birth_evidence.sql",
+      "checksums": [
+        "65626b912727547aaab94c69215a4e2d92d93cd3ee1b5e91263fc007666a1468",
+        "56dd166e15f8152edf70254b08b75e2675a012cfb265555b32ffc2bced81a8f7"
+      ]
+    },
+    {
+      "name": "019_draft_persons.sql",
+      "checksums": [
+        "8b7e41d6228d1c0b59e6f061239c1adeac93575bd9723b3c5cdb6804a67ae230",
+        "5f51247a1d64ee0103cc5f3b717c90d547db976800cad6a20de7ffe592526cde"
+      ]
+    },
+    {
+      "name": "020_attendance_provenance.sql",
+      "checksums": [
+        "dbdf06873cf3ff92838ed60f7589ca7b7c6a23f0f4746ed0d98f75e2d3d35a8e",
+        "9d837b8b1f374959a8ba17b7ec0a81530fa1f4aea57227c138e460043af53a26"
+      ]
+    },
+    {
+      "name": "021_club_organizations_reloadable.sql",
+      "checksums": [
+        "dc45e47cb16d871a07e401178a986f747212f2ccb9dd337d0b0b14ceac82ac3c",
+        "523c46d6f9fd7390156c64f2cc30cc022c7586c19793eeb3b6275366a6a8a956"
+      ]
+    },
+    {
+      "name": "022_match_result_integrity.sql",
+      "checksums": [
+        "df348b3a0b654dfdd5f6bd29c695aba5f5890d446e168266c0c7ada9391b5bf5",
+        "cabba015b790d7aa1b0ffab84df11b2f99411a35827d55773a0c60c3a39c3bf3"
+      ]
+    },
+    {
+      "name": "023_auth_submissions.sql",
+      "checksums": [
+        "ab2eb589b6a2f79baf4a24d92ad2888b336858f5974fff591d82f8b30707786f",
+        "2856bcfcea36d5b883279f958afb9d869f9fb52efb4cbb8d540cd6390c3cd743"
+      ]
+    },
+    {
+      "name": "024_beta_join_requests.sql",
+      "checksums": [
+        "cd52575d41484ffa4578ef5632a997456a839a8f6fb3de592bddfb1b8c751bf3",
+        "13838a93556f1877ec324b31a64011071e620ed2f3f8463138516e1ff78edcef"
+      ]
+    },
+    {
+      "name": "025_staging_aflw.sql",
+      "checksums": [
+        "657104e582b62ebd7089ea781f17873e29ef22bc6779c1f23a4ff34c7b5c3bf4",
+        "c81ba862a4bae862ba5ba816da2585ccb09cfbab8103f549e5ab4e1f389f0436"
+      ]
+    },
+    {
+      "name": "026_aflw_read_model.sql",
+      "checksums": [
+        "434b3f97b299cbdd7148169bc1582568620bc7c2868178066a6a5ea860c9b964",
+        "4381a86b7921cb6725d180cc808de929905ab676cc8a1fc70be2622d827e7504"
+      ]
+    },
+    {
+      "name": "027_aflw_read_model_fixes.sql",
+      "checksums": [
+        "b7cd930f03a7aecc6b4a5f0860a79ec2adeeebcf5751da50c076e80ee221ea2d",
+        "7332a2587735c59165004d6992f35487b593f0e20654d10df95a27447c036967"
+      ]
+    },
+    {
+      "name": "028_totp_replay_guard.sql",
+      "checksums": [
+        "5726c21ffd28b131835b7a95b3669d777e32ae825d2379bcb84e082a34f99305",
+        "9e182997926d6914eaea5456bc89a8e07a8d361742bf3e898281ca4a246a0787"
+      ]
+    },
+    {
+      "name": "029_admin_roles.sql",
+      "checksums": [
+        "a0c66ff5117acbed00f35b83d741b227ac06e7ee2fa0eb8a5d0c36845bcf3e72",
+        "05b29337b4fec1b05453ee4948eb29b8a1aa85e641b02cc20378a6d3d92b4098"
+      ]
+    },
+    {
+      "name": "030_admin_invites.sql",
+      "checksums": [
+        "21b2fa8dc2d65968312c891958f5cbfa6d4b6c80cf5273488c06b0ba804cdcfe",
+        "4ec4779eb73cb623120dcdbe05b1ce4d5367b269c2396a1c38e61b47d35f67d4"
+      ]
+    },
+    {
+      "name": "031_afldb_app_read_only_fix.sql",
+      "checksums": [
+        "04e5465f733b10492fdc9fd6dd3a94f8d1dc116c5c63a448821c63c94791dd71",
+        "fc2aa22d79ae9f9f3df7ffe326979f2066c977f8a4d26725ab481b298d8dcf99"
+      ]
+    },
+    {
+      "name": "032_auth_reads_matches_venues.sql",
+      "checksums": [
+        "0a3870e7c01a05d03069f2dc9ef3bbb7f25a91324fe20df9d0aa5ed341170f03",
+        "873d6807df643b4f1557a67b3b3b3b179c74868bc0f83c84425fbd4390aae9e3"
+      ]
+    },
+    {
+      "name": "033_contributor_role.sql",
+      "checksums": [
+        "ab25ff0e9a7fe6f9a5086689131eb67ba4a5452d8e3825bdab260e9e72a4fef9",
+        "c68983f842c5350b8979446a6c6ca572e7b7d8afaaf425ab77bbc24831102927"
+      ]
+    },
+    {
+      "name": "034_site_settings.sql",
+      "checksums": [
+        "19036e4ae13d675fa56d002e5dbedbd1031f4aeb88db73a3d5d0d62b63fea625",
+        "49127b63b940796e2dcffe41a8a4c83cccdfd855aabc45da89694bd5eed29928"
+      ]
+    },
+    {
+      "name": "035_early_access_answers.sql",
+      "checksums": [
+        "842cb61c5a587f870465528e4afcefbe66014e2bbf3a7a23747bea2044f774d8",
+        "9393a40096b690562117ae0543a764394e6820e80a4428d1473d8bc7967c441b"
+      ]
+    },
+    {
+      "name": "036_unlimited_access_codes.sql",
+      "checksums": [
+        "28d6adf97e2e9bb9edf5a091a2c45565e892ea1d2d88353ea49748fc4d9272aa",
+        "1b2ff68f36d4acba624f86a0246c5104e5c9dc2e232f2373036a19b4416ab438"
+      ]
+    },
+    {
+      "name": "037_site_media.sql",
+      "checksums": [
+        "340c2db457bdd143a80501aa400df1453bb601f3fa800a96c9a64d6a08ded877",
+        "323b3a5d7403222e6a2aafa342506b84b599c1ca4a1703a5547604a80730f229"
+      ]
+    },
+    {
+      "name": "038_site_media_not_public.sql",
+      "checksums": [
+        "f8be74853c956a82cac426930f7722fb92ef89ea2b64c4a99e10d3a5e53fcf5e",
+        "547f2cb4b1a3668d33fead7fb12482122f6368b6493b7a6f63a1559b6ca4698c"
+      ]
+    },
+    {
+      "name": "039_app_read_is_fail_closed.sql",
+      "checksums": [
+        "1129690fc95d9abaecce347183cc928d3ae0fe2f98f0c73e30f4c8d72e11b5d2",
+        "66bf66bb6533b6c8da3c2d65b467fe47b527acd331e9631a6878dc549c769342"
+      ]
+    },
+    {
+      "name": "040_password_reset.sql",
+      "checksums": [
+        "29d455efa2179727d14f74ffa53f52a0356d040e1c61069c84cd53a07eb9fb8c",
+        "978bd3ea9ddb0c806a3c0352e049a2da84e69b4392f73471ecffcada5f8b9d33"
+      ]
+    },
+    {
+      "name": "041_fk_indexes_and_dead_indexes.sql",
+      "checksums": [
+        "71531ff44dd353d161742a499c8dc9aa00f5359b3e32fe12ac357a138d376e93",
+        "bd0f74e9abba34b105516b1d15c62d1c88d0acf9ff885aa50a4cb57267e606f5"
+      ]
+    },
+    {
+      "name": "042_awards_natural_keys.sql",
+      "checksums": [
+        "f8adcd1b4b012593542556d3dc744e5d4cd54d08abc0dc079e1b712ee54d66e2",
+        "2b190d5f5e02804e348336724096ecde6b0d13455aba1d12feed02d17eb34863"
+      ]
+    },
+    {
+      "name": "043_submission_content_lookup.sql",
+      "checksums": [
+        "5dbb1c90cbe48004151f4c7ebefa06e52c5ab967843ea8e755ebd0aba4a0e159",
+        "631cf1ac5aef549a0f00149857fc27f537ad79db807bebb8d69e3f0d94e41e3a"
+      ]
+    },
+    {
+      "name": "044_schema_integrity.sql",
+      "checksums": [
+        "c2877cf58668b53430b0377330d390cd0e42f09dd1fd1c9d5f3beb32a69dec2c",
+        "babf92be71ebe6d227b0d69cfa34f5e9b5a5a1575c735b344bb8bd111b75f26f"
+      ]
+    },
+    {
+      "name": "045_import_write_is_fail_closed.sql",
+      "checksums": [
+        "a4b27ee1c7dd2b84ba3bedfc7af6d207c616882e3d6fbc0398302e94dc7f4bea",
+        "09e56eff785b1d1e951f720f92c19d80f4aa9101ccb2ba07b28385ef9504472e"
+      ]
+    },
+    {
+      "name": "046_nl_search_log.sql",
+      "checksums": [
+        "8b5583c10cfc2d1658264bcc1ec363b025acb8bc574668d3674a9526c3e9534f",
+        "1d1f3aa8b64f44bdf61a2b31405cc8413123b3cbdd45509e2f0d0dce4bdfae9d"
+      ]
+    },
+    {
+      "name": "047_nl_search_log_observability.sql",
+      "checksums": [
+        "ebcd0366210faf65d4cb1a84de70a353b79a878f8636c76ae776d3a418a8da39",
+        "4ab8539a625b1755c76b9fa8ce30d00d60093a0d746497236853908530bf97d7"
+      ]
+    },
+    {
+      "name": "048_nl_search_log_jsonb_repair.sql",
+      "checksums": [
+        "eb06869b8144eb25b1966df44e7382738f12fd52d151fa6d1acd14ed4a63c076",
+        "cef0fe456dec28c66591ef5dd7af7b737b5ecc8108b8a1d37f709310eea16471"
+      ]
+    },
+    {
+      "name": "049_nl_search_feedback.sql",
+      "checksums": [
+        "6cbd0f8115b1eb283634ee5eb3d8aa43afe4b357275bbc9893f7c2fca0083acd",
+        "da45d5d3d968ee99b613f846ea5491d9f4f9e954fa6232a9ad8e2dd79dc457bd"
+      ]
+    },
+    {
+      "name": "050_nl_search_fk_indexes.sql",
+      "checksums": [
+        "b940cda2bc33e234ff4966093450ff5af114d116e363411c9edb7b107f7bc718",
+        "8cfc69baf05a36e0a2ca4ecc46641ca78c00d7bcd72d7789c25b38fb18431c92"
+      ]
+    },
+    {
+      "name": "051_nl_search_run_tag.sql",
+      "checksums": [
+        "ae66d5392c291340182a55779c880a37bc33b6829a2d5fe91c1dfe2463c38116",
+        "daa9b61f38acb45d14a02860784e6f3738148aae037eef74e2b0f20e4c717d7c"
+      ]
+    },
+    {
+      "name": "052_app_health_events.sql",
+      "checksums": [
+        "42e5d7872599ced4b62300e97662dd74abc0f791465d7512ddd9b44864cdfd5e",
+        "17ca6fcd17f3ca4e0d7300ae0977829b0e20e903e68d1f5249ce383f9bf28b5a"
+      ]
+    },
+    {
+      "name": "053_player_achievements.sql",
+      "checksums": [
+        "fcf7e15fdc67803c10dcf525583ae642f74fe285b49282ca8a9a2692b69ecd38",
+        "219f6db73436c7b73832b662f46807dcc30b9a3418fac3cc97048535da1590d2"
+      ]
+    },
+    {
+      "name": "054_fix_player_achievement_comments.sql",
+      "checksums": [
+        "39b498b4e4092347517046d369cf25e5e0f92ba034ba09b510e42e1abcc74d10",
+        "f0cc08cc6f918cb9e51fae672267c317830538b16cc39ca96f1c37fab6c336e8"
+      ]
+    },
+    {
+      "name": "055_nl_search_log_achievement_grain.sql",
+      "checksums": [
+        "85b8d1a37c9b415516848517dd92a81db123ffb9d61d514c64270e86d5bfc037",
+        "272e6b914a079f3af304ebc0aa2aa3374f0509da57b91dd7bf69ed371ac79dff"
+      ]
+    },
+    {
+      "name": "056_player_link_review.sql",
+      "checksums": [
+        "74b6cd3cba421b8fdd96ba906bb4ac0aa81a6f1f34f96b4ebff8875abb4f1088",
+        "c9a4c4b79f8415f7dd42392e0f205b44468e063602151e8801c9fa5e05523f98"
+      ]
+    },
+    {
+      "name": "057_data_edits.sql",
+      "checksums": [
+        "4964f7b15c2d2dafe73f31a194a0e9c089cd01da9e1411a14293af3b7a29e720",
+        "2543afaf6e64b34723a9391d2b83d2c43680a66a92a7a1ed5acbc4a9862e1059"
+      ]
+    },
+    {
+      "name": "058_data_edits_editor_entities.sql",
+      "checksums": [
+        "66d8f6f01c96b0d3f8654256f8ebf46bca6fddd1ea9ee0ffbe7a42a876c6da09",
+        "4e6d8e9a098f39d53d0189b37eec7b38d53cdfdfce012555195140a337bbbab1"
+      ]
+    },
+    {
+      "name": "059_honour_team_member_identity.sql",
+      "checksums": [
+        "041b6e6a8726c5eeb9e22f75f78ba6cb15fbd3855fa334197309d213b3f0f9b5",
+        "d1ae08853ba5937608634b53b84470d79ea879eccbb9447404d03c4bb16febad"
+      ]
+    },
+    {
+      "name": "060_wikipedia_22_under_22_source.sql",
+      "checksums": [
+        "dcc7cd29a565ca15f118d47328536e751af73aff685fe58008b62eab47521339",
+        "3ed89f036ed76011cdb9766776af51faabb186165eb62b5be3ce941957dd0b5c"
+      ]
+    },
+    {
+      "name": "061_award_winner_sort_order.sql",
+      "checksums": [
+        "e76db3161fe57757700f01502e6d079049153bfbaa59f2c989c32e39b398a657",
+        "6f67ff064f41047c7686a11621dedd58a9d3addceb3a74879deef65770f87070"
+      ]
+    },
+    {
+      "name": "062_player_match_period_stats.sql",
+      "checksums": [
+        "bb32da1ad62813cbe3c04fd9d5abe4900820cdf3637ccd2af7f22ec81d0000bd",
+        "5408eb1409c7ffe48759c5a25162cd22b9d47f03fb854d078416b1916c4f7224"
+      ]
+    },
+    {
+      "name": "063_external_current_match_sources.sql",
+      "checksums": [
+        "61c528d1179bf4293324075061ba789080355019c2eb40eca132d809104ce1ef",
+        "aaae97f87d22d8ac79c7894d3a7706089ca0d88849cc6ceccfb8e6c19c6d2a42"
+      ]
+    },
+    {
+      "name": "064_matches_external_provenance.sql",
+      "checksums": [
+        "3d177424c17f9989343e719e5ddfbc2935b42e45d8f168814fb2ea120d9471b9",
+        "6ad27a1eebae2a5ef8b564e2e9e32c329d9a9c2fe7cee5c3e619e486990aec5c"
+      ]
+    },
+    {
+      "name": "065_career_frees_derived.sql",
+      "checksums": [
+        "1e2e507716868cdc59cc67ddbbeb7723a0931da4b8680b0caa89eea20cc43371",
+        "d339bbc1c4b5fd4f30f4366d15907f7bac10061f6916873e53b7c92d7a173531"
+      ]
+    },
+    {
+      "name": "066_atomic_audit_import_grants.sql",
+      "checksums": [
+        "58ee0417e79748a7dcb15a40c396fcbd5d2fc87936a608d6a4c87d2fa9478c16",
+        "8419dbf3b83613dbe220df7aee4e24e351f16aad1bcce70c0af9d6a2d0ba381c"
+      ]
+    },
+    {
+      "name": "067_player_link_match_candidates.sql",
+      "checksums": [
+        "6153713be84e0cc118ed5901051e8bce96a6132836979afe8dd6e4f43cd0b585",
+        "ff1e108d08b153c58a815d24d80d7d9418bfaa0f5d8926f38be87eaa2a0d0aa9"
+      ]
+    },
+    {
+      "name": "068_import_reads_link_resolutions.sql",
+      "checksums": [
+        "9ce1e4dfc764d53372ca39f4cabb56722684a5203ac566c6ed092e39772afbe7",
+        "761bc9757fa1773ee9510695378103df96943ae0f0423220d0dbc28ba1316f18"
+      ]
+    },
+    {
+      "name": "069_draft_source_identity.sql",
+      "checksums": [
+        "54970eefe0a7e97dedf57babefbd65b6353fd195ec005d16d3f9f2e6e6ce4bf5",
+        "aeb5b496f7c6336f8988715ace09c176bb32405e5bcb4117b09f0d355af39c52"
+      ]
+    },
+    {
+      "name": "070_import_reads_link_suggestions.sql",
+      "checksums": [
+        "cf04a7cd9d3e511a7583c92167ab1de6c63c3271ee2821bf22de7b14c5e0088e",
+        "f87537444b6c3324f8287b3643cc56fa0aafd2000ddb13693d685dde98456e44"
+      ]
+    },
+    {
+      "name": "071_audit_link_fk_indexes.sql",
+      "checksums": [
+        "87a8c7e3602f9c2a9f4c4cbac69b9046c78d395f352a09aa9f676d6213549ec6",
+        "c402cefd7d359c50e0992c8cf1bbd83a0d784611706f7ca5ad25d0906a14011a"
+      ]
+    },
+    {
+      "name": "072_dob_conflict_ownership.sql",
+      "checksums": [
+        "da42510d2b44459b59abafb45d846a9bfc1364cbed04afcc3f367618d5451e4a",
+        "859b6b0169024b4da3ae672e05e4ef90d5c3496fb0835388acc906788b919323"
+      ]
+    },
+    {
+      "name": "073_data_overrides.sql",
+      "checksums": [
+        "778c5bfb7964263127c7e2a061eb2745548452bfe8bba4dd94ebbc03dca93bc9",
+        "08076fcc1eb71c05613a10452f214a632a70ae23ff10b3fd8c1827258f5e455a"
+      ]
+    },
+    {
+      "name": "074_source_observation_spine.sql",
+      "checksums": [
+        "2c2ffd32029b02738a1a9887fa03ff604d70279e05b7ef56dc689c3a39e963ce",
+        "f44bb0e65c6d527c35213b9c4554d3330665dd71a23d3a95c22ee332abc4a22a"
+      ]
+    },
+    {
+      "name": "075_data_overrides_fk_index.sql",
+      "checksums": [
+        "eb79f48aab3c488edde49f2e978dc5ddfa2447b01ac0a17e828465825dcd7e2a",
+        "0959284b25d53fc8de00f3ba991247422509e936c7ae95fc72eb48e182729810"
+      ]
+    },
+    {
+      "name": "076_afltables_settle_projections.sql",
+      "checksums": [
+        "cc77f18d9053d62226ac6d50f1e0e38a76b43fdaacab4d9853ed9995118c3bf4",
+        "32309e010f47cf151ab504816ce093e0dd1a81f00a23731984ff184a97471620"
+      ]
+    },
+    {
+      "name": "077_afl_api_lineups.sql",
+      "checksums": [
+        "19387ac09bfb4e7ba7b206ed4821a4d192f86b0d359df29607fb90607ecafef8",
+        "6b3c02b48f21d2375ee4f45c3cca20c4eed3753f4269fab7f90f8ec6f16dc770"
+      ]
+    },
+    {
+      "name": "078_data_overrides_admin_write.sql",
+      "checksums": [
+        "8bb13cc0f73a27ab20df9fb76e9e7f74e3a268c9795e949987802fa0875d9a6c",
+        "22578d4f9824ffdbbe159601ac69a85b1dbaee631d1a8f3e0bbb49e4af141b4c"
+      ]
+    },
+    {
+      "name": "079_nl_search_log_head_to_head_grain.sql",
+      "checksums": [
+        "e58d19bd350109619061d6a8bea02c4386a8a22ab1239fe56725c2bea13f78fb",
+        "417654c5b5f52a9e3054e66cdb5c3af72ee07d65340eac67c59694de865bd4b5"
+      ]
+    },
+    {
+      "name": "080_external_grids.sql",
+      "checksums": [
+        "0801b8a9161a09988235ff5774cd412e142a34328d7779de83f4df9cd4a37c23",
+        "351ca57f097ed2cc6ea2f68fbf70bfcbe420bb2d2f2befcf2bb5d094c3c1f9a8"
+      ]
+    },
+    {
+      "name": "081_nl_search_telemetry_clear.sql",
+      "checksums": [
+        "b476b653dfa6896fa63a7f510c8319936da82beb7ca01a8e2daf47df0d41a9da",
+        "72216ee77d6369ca8182c36d767c0064f93dd55d5b3bdcc5ede10986ac47953a"
+      ]
+    },
+    {
+      "name": "082_auth_audit_log_jsonb_repair.sql",
+      "checksums": [
+        "355f158f88a255728bbdb4fdd18f0c649b49f06520b8aefb272eed2b24503a5c",
+        "6bc699c1f7a1b431d5ab312b9d0c9979e9d71843193434fef30ac423c9b6ac80"
+      ]
+    },
+    {
+      "name": "083_canonical_auto_apply.sql",
+      "checksums": [
+        "3c959e4e91beeec4323194f90123dafc7e4c353c6b70ea46406810a919358fd3",
+        "4610e4bdb8a0be25478eb64035afcbc1d72e055f42d70e7b4331c743e9fc15ee"
+      ]
+    },
+    {
+      "name": "084_round_type_wildcard_final.sql",
+      "checksums": [
+        "dff6b429404773498ce2ddc7626b30078e556dbea6e2e0582d29af389fd24b52",
+        "63e23e3d0b9308f560a8f7ba3fe810aeef37d91fd64ae653d80dbc3f5605b568"
+      ]
+    },
+    {
+      "name": "085_matches_is_finals_series.sql",
+      "checksums": [
+        "289d129dd303d04040d0c1469187c3d31043b985b406844f19d738b81f0ac130",
+        "4dcbd9ce308c2a2bf7d52b8e32b3d72b99301664f035c7f3c5d81fc303075f27"
+      ]
+    },
+    {
+      "name": "086_player_height_evidence.sql",
+      "checksums": [
+        "c2905d005fd6ad052ec86ebd5a0d7de028b3f41ffa5074e31d06b50a01bf45f6",
+        "110130a1730baeb78b289bb2fc4ef4348e446ea71e0e85b6a14e619e52c9fff6"
+      ]
+    },
+    {
+      "name": "087_coaches.sql",
+      "checksums": [
+        "8752b8f5d128728c5360add741263f683357b9a5e6c4166a9f93b0e9fc836777",
+        "647baf2fdb4167d684e937ca0f3e1a8dcd636ac554dbbe8af75be6411b44cb3d"
+      ]
+    },
+    {
+      "name": "088_father_son_link_checks.sql",
+      "checksums": [
+        "cb2eab2c3b729289aa1c745d6ccdb5d06c160c40e83807c0233924571d28528e",
+        "0d1e3b985e8721491a0a281878767c7729bbb0a2cf386f33f96a34029edfd04c"
+      ]
+    },
+    {
+      "name": "089_after_siren_kicks.sql",
+      "checksums": [
+        "8868bedeec464790dc8f1d556155499f0a05570b9844da89e41014c5619019e8",
+        "7f8a14e0ff341ad43595638311dd27b790f79a8a5e3114e3e9a5fa15eab9f6ed"
+      ]
+    },
+    {
+      "name": "090_players_height_evidence_fk_index.sql",
+      "checksums": [
+        "a8b9853c58c71363c0a0321793527c6f9178f996fd77a1acdf771506f8c82d29",
+        "2bdc3ec15d90aad103671e9583b502cc35d35541ebc54b6b0782eb637c6e2534"
+      ]
+    },
+    {
+      "name": "091_access_code_delete.sql",
+      "checksums": [
+        "0c7b2a11443a7e9f3c32201932a9bbce98429b287231594f60e2a15a2f9cf94b",
+        "86653c987d90529ebb358f95748dbf3ef7f675fda72bc990e90ead7d66f988e1"
+      ]
+    },
+    {
+      "name": "092_nl_search_log_coach_record_grain.sql",
+      "checksums": [
+        "7d84c4825bf86732d907a3b8343c7c94acc442cc76d4735a7ea33770ecab5a7c",
+        "fe4639df9ee0f26fe586d544cd73fce3e4885ce55d53bb79ac62bd8fc5542989"
+      ]
+    },
+    {
+      "name": "093_nl_search_log_after_siren_grain.sql",
+      "checksums": [
+        "a31d075a13fca2f7cb64ad5faccaa4dccf4319eb23bba6eb2374cddc818127c6",
+        "31cd7423834420bba11f24aebee6a52f43be45acd6c230fb47bc979f25565789"
+      ]
+    },
+    {
+      "name": "094_brownlow_admin_workflow.sql",
+      "checksums": [
+        "9957a2cb5f1d74f862b73a08d7984f866044f458433c8335e28b9668da2b3c63",
+        "616d50709d4c552bbaaa97df01049a3c6c8a999ccbdcb64364778d543736209a"
+      ]
+    },
+    {
+      "name": "095_coach_admin_overrides.sql",
+      "checksums": [
+        "e1d5739f8ca9c4b5249fa94b03199daa4f085afe0a3b58b0a438f75107471abe",
+        "adef259b05e5594bb9fe3ac308322a9cb66e5d67bd9db4f85c78cb1de85b1e98"
+      ]
+    },
+    {
+      "name": "096_season_list_members.sql",
+      "checksums": [
+        "409beea7a2e43decce47ee663007cc6c91fc3f7e79745d2ebb460b8181117ab4",
+        "bd2e149747c52b80e09cb9b4b0c940a629106cf8aa92ba31f4206ed8f3ff3901"
+      ]
+    },
+    {
+      "name": "097_fixtures.sql",
+      "checksums": [
+        "aba275cf1504d21714c2b60f2d4dec5f007e3735e2a8d23a962bed63811653f0",
+        "3a4ba86c99009e95af688418feb53fd02d1cb9e241b78b8c4ffb31ab38439276"
+      ]
+    },
+    {
+      "name": "098_club_leadership.sql",
+      "checksums": [
+        "ab2b1ba7be162329a04035bc7b1cfe19f8fae2e55b8fd4798a994f0b12cbdd22",
+        "d5132d9ddd17731a4f8d5654209f83438fd22a842062dc1d19d39400d117558f"
+      ]
+    },
+    {
+      "name": "099_normalise_unicode_whitespace.sql",
+      "checksums": [
+        "ecd04743701f5f8b09eb71f42c9edc1b36e6ae12aa976dd2fb03440ca5d172bf",
+        "5597c6bb81e317e412242a607a93fa98126fa496af43fc2994ee5fdfdc89f409"
+      ]
+    },
+    {
+      "name": "100_nl_search_log_family_grain.sql",
+      "checksums": [
+        "225a64f837ff13008aaf9eca0a39bb0be8bd2f7f32669b6dd43eeb8d059677d4",
+        "b7712bf486e7f0a018ca79bd2723e01838abbeef60c93adba401f48536ab1978"
+      ]
+    },
+    {
+      "name": "101_awards_honours_lifecycle.sql",
+      "checksums": [
+        "c8aa7eaef9dd28e4b39a05c472b6f35c00192c90df57cdc8ab2938bd5814ee6b",
+        "7726bf6cd828d8a6e6ce5be280e9c89fbee20d2eb52ff97059976b6d171dd93b"
+      ]
+    },
+    {
+      "name": "102_special_records_lifecycle.sql",
+      "checksums": [
+        "dec12080ca270d7dcdd32c026a11b0025cc2352e0c0d247b11af1aa701f5f173",
+        "6ee627d659933a7c192bc07d671cffee66cac0ac7da3f48ea0c936096688f38f"
+      ]
+    },
+    {
+      "name": "103_afl_api_match_projections.sql",
+      "checksums": [
+        "86faa3bb3e13228ff7194618a6a2fdb5dbdb0ea4d9a378d7706e9ced3a69e619",
+        "32b0cc0e7ae3b01974294787b18353db452db2c92eba0742fe02028333cc3d6c"
+      ]
+    },
+    {
+      "name": "104_afl_api_identity_adjudications.sql",
+      "checksums": [
+        "30dc447215fa4dddcc3da2e5fa85727f18b5fb64a8dbf921ccfd6750a74bfd24",
+        "3c0fdb8f9b01701ed4fec4a5a6e2013adb56138b3c52fc521254349903c545f4"
+      ]
+    },
+    {
+      "name": "105_prod_actor_lifecycle_assertion.sql",
+      "checksums": [
+        "89f61d66bfb45e1975304e1b5cb67e2c296bc0d1085083734837e581535004d9",
+        "9bafee5aac830d364d4317d6996db8e94f1fe3b8b9449b053603a58b87a584e4"
+      ]
+    },
+    {
+      "name": "106_afl_api_identity_corrected_action.sql",
+      "checksums": [
+        "6b3446da5f51bac2ef568fe1cdbbcfef0e0a7f67aba5941f1b82e805c70b8cf4",
+        "2ccd920db5f0e057f06960c1a00bd9978a3552266a76a5d5ff870308e4174379"
+      ]
+    },
+    {
+      "name": "107_canonical_applications_delete_audit.sql",
+      "checksums": [
+        "cc81c1fbca3436271db3acaac1a28cfdb6b7938ce1c523524e2afd690fb9e2ab",
+        "69ddf74589bbae2c811c837398da4005dedc2236946a31ca4e350d664ba872a0"
+      ]
+    },
+    {
+      "name": "108_import_reads_data_edits.sql",
+      "checksums": [
+        "4cb44be26631bc61cb5e82dc0babfd06bf64435a51b3a014367d1619a338500e",
+        "32d3723c41aad09e14f78337286d57a86137b5f1ba63d37512879d6ca94f1643"
+      ]
+    },
+    {
+      "name": "109_import_reads_player_match_period_stats.sql",
+      "checksums": [
+        "0d5d1976cc9bced3baf6731188f924460e30bbb7c59b8b4bfcca01085c0f6772",
+        "390b1da10975c117529f4053897f8b50cbbed79c053d63aa472417e0c239b592"
+      ]
+    },
+    {
+      "name": "110_match_sheet_player_match_stats_authority.sql",
+      "checksums": [
+        "6a59d49e7945e7fadd6c2a986fbb3e7d052af58a0d98e65491816c0e25411d5c",
+        "cc8f9a670dcf68c678c2888eed546ffbfd68394efd0edb70589c120614c3f65d"
+      ]
+    }
+  ]
+}

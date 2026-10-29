@@ -1,0 +1,26 @@
+{
+  "state": "VALIDATED_FROZEN_INDEPENDENT_GO_VALIDATION_ONLY_COMPLETE",
+  "manifest_sha256": "829fc30ae553106baa2281710bb7ba5c9288ccd331c0e846e18ed408848ecf84",
+  "members": 40,
+  "validation": {
+    "real_postgresql_cases": 10,
+    "static": 1,
+    "pglite_retained": 19,
+    "wrapper_retained": 14,
+    "cleanup": "PASS",
+    "evidence_directory": "metadata-repair-v4-validation-2dLUSk"
+  },
+  "production_contact": false,
+  "production_attempt": false,
+  "u3_confirmed": false,
+  "next": "Validation-only milestone complete. No production connection/preflight/repair authorised by this task; U3 unconfirmed, U4 Route B, Brownlow untouched, production NO-GO.",
+  "review": {
+    "verdict": "GO",
+    "stopping_findings": 0,
+    "low_findings": [
+      "F-006"
+    ],
+    "report_sha256": "c36dc24a0d4fac7f5aa5374e7a5b0a6ed7f9442334cad390a4cf078322374712",
+    "decision_sha256": "39e71a77aa6e26127369647ab2f09a9c25f53af3567567372dc1d86e04a913a2"
+  }
+}

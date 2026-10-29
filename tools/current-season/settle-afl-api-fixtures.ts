@@ -53,6 +53,8 @@ import { SETTING_KEYS } from '../../src/lib/site-settings';
 // (the O1 fixture-identity refresh), so its old private loader would have
 // read the unit's `UnsetEnvironment=` credentials straight back in.
 import { loadEnv } from './load-env';
+// V2-GAP-006: the seal on historical seasons (docs/v2/historical-baseline.md §2).
+import { refuseSealedSeasonForSettle } from './settle-season-seal';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -110,7 +112,7 @@ type ManifestFile = { file: string; sha256: string; status?: string };
  * accidentally treated as fixtures-only, silently discarding its roster/
  * stats evidence).
  */
-function verifyManifest(snapshotDir: string): { manifest: Record<string, unknown>; files: readonly ManifestFile[] } {
+export function verifyManifest(snapshotDir: string): { manifest: Record<string, unknown>; files: readonly ManifestFile[] } {
   const manifestPath = join(snapshotDir, 'manifest.json');
   if (!existsSync(manifestPath)) {
     throw new Error(`No manifest.json under ${snapshotDir} — the acquisition did not complete (§5.4/§7.1).`);
@@ -237,6 +239,11 @@ export async function runAflApiFixturesSettleCli(
       args, counters: null, buildFailures: buildFailures.length, batchId: null,
     };
   }
+
+  // V2-GAP-006 (docs/v2/historical-baseline.md §1-§2): the seal on historical seasons. The season is
+  // the snapshot manifest's; this runs AFTER the offline verification above and BEFORE any database
+  // client is created. A settle is not an audited correction, so none is ever passed.
+  refuseSealedSeasonForSettle(projectRoot, season);
 
   // AFLDB-ISSUE-228 follow-up (§C, §E, §F) — same gate as settle-afl-api.ts:
   // this tool has no `--report` mode, so every path past --validate-only is

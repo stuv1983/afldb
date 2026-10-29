@@ -1,0 +1,131 @@
+{
+  "schema": "afldb.issue316.activation-committed-evidence/1",
+  "generated_at": "2026-10-24T23:51:42.901Z",
+  "commit": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+  "parent": "2156539e3a060b6eed31d652348113f9b52c37b5",
+  "commit_tree": "51543a0b0c6c49f5b9c75320d3e2aabcef44616c",
+  "hash_semantics": {
+    "git_blob_oid": "Git object ID (SHA-1 including Git blob header), from the committed object database",
+    "sha256_committed_blob_bytes": "SHA-256 over exact raw committed blob bytes from git cat-file blob; no checkout, filters or newline conversion",
+    "patch_sha256": "SHA-256 over the materialised retained patch bytes; generated directly as binary stdout from Git"
+  },
+  "patch": {
+    "path": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/activation-separation.patch",
+    "sha256": "65f692a9e0e70d5e848208bc8a40aaa26840caa2dbedc012a24056c87f4b5bd6",
+    "bytes": 303266,
+    "command": [
+      "git",
+      "--attr-source=c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+      "diff",
+      "--binary",
+      "--full-index",
+      "--no-ext-diff",
+      "--no-textconv",
+      "2156539e3a060b6eed31d652348113f9b52c37b5",
+      "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+      "--"
+    ],
+    "scope": "Complete parent-to-candidate diff, including the legacy evidence files as they existed in the candidate commit",
+    "attribute_source": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+    "regeneration_note": "Git attributes are explicitly sourced from the accepted commit so later repository metadata cannot change the representation of its committed diff. Retained patch bytes and SHA-256 are unchanged."
+  },
+  "verification": {
+    "method": "Read parent tree into isolated alternate index/object directory; git apply --cached --check then --cached; git write-tree equals candidate tree",
+    "reconstructed_tree": "51543a0b0c6c49f5b9c75320d3e2aabcef44616c",
+    "pass": true,
+    "working_tree_untouched": true,
+    "rechecked_at": "2026-10-25T01:09:28.959Z"
+  },
+  "supersedes": "SUPERSEDED ? NOT CANONICAL: the original working-tree/CRLF-derived SHA256SUMS and activation-separation.patch. Their exact original committed bytes remain preserved in legacy-c438f844/ and inside the canonical full committed diff. This record and the regenerated patch are canonical. Candidate entries for the old evidence paths describe their bytes INSIDE c438f844, not regenerated current files.",
+  "files": [
+    {
+      "path": "docs/v2/issue316-production-readiness-decision-2026-10-24.md",
+      "git_blob_oid": "b6cafa2d27f00ac96ce67c3ef3cee07948c13ecf",
+      "sha256_committed_blob_bytes": "96cce1d8cff0a92ae24c3b9f07942a0a075d14a4057df845a68efefb17f7a142",
+      "bytes": 38061
+    },
+    {
+      "path": "docs/v2/issue316-successor-activation-separation-2026-10-25.md",
+      "git_blob_oid": "49178c3739adf6e063c6ea7dbccc3cd637e8672e",
+      "sha256_committed_blob_bytes": "e8e6684cf1db33f86aafc680760e5b047fe5c3ea9473455459496aa18e6c62fa",
+      "bytes": 20170
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/SHA256SUMS",
+      "git_blob_oid": "06225cfd2b549ac5c0398b0e6d0cb67b59e1c2cc",
+      "sha256_committed_blob_bytes": "affc2957d7abe5de6b35acaf6861c7eb769b26aae42c0037404fc535d981c224",
+      "bytes": 1420
+    },
+    {
+      "path": "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/activation-separation.patch",
+      "git_blob_oid": "99f6e35b33a71e9e2688d4dfed1fd2b1c65990bd",
+      "sha256_committed_blob_bytes": "3d70adec493ccd486838658816fc526a68e85908fa54cc0ed93582e4abfd5b29",
+      "bytes": 148860
+    },
+    {
+      "path": "src/lib/rollover/ladder-successor.ts",
+      "git_blob_oid": "85f66e100d61af0ac23a60d835fb23c6ceef7cbb",
+      "sha256_committed_blob_bytes": "c3a6f66ea81169427c9d149f470c74e9a28a671649c2e316b13c1b07e28d7faf",
+      "bytes": 18205
+    },
+    {
+      "path": "src/lib/rollover/season-rollover.ts",
+      "git_blob_oid": "cd61bc83c7dd22607f8be4f9acc45953c6d6f4a4",
+      "sha256_committed_blob_bytes": "78cbedbf40aa0356ed166d5ac635d38046aec67c043ca4087d71eab25a0ddc2e",
+      "bytes": 105309
+    },
+    {
+      "path": "src/lib/rollover/successor-activation.ts",
+      "git_blob_oid": "100c33f52c6320c21e6499881cf73de3acde6137",
+      "sha256_committed_blob_bytes": "054d41a688f32f445f6c724bfa79ca30659a9d3be867f6a724bb05a42c514480",
+      "bytes": 21636
+    },
+    {
+      "path": "src/lib/rollover/transition-change-set.ts",
+      "git_blob_oid": "4bf0021bc4365cef9e71f7c2b1e5d3917e955dc9",
+      "sha256_committed_blob_bytes": "59c57aabd73beae6e39fa6698645420402e09760171537ed40b0d71483599f25",
+      "bytes": 40264
+    },
+    {
+      "path": "tests/db-test-rebuild.test.ts",
+      "git_blob_oid": "483576cd36bca3115f469982672b988936b2569e",
+      "sha256_committed_blob_bytes": "d771b6090b459d5f4c919afc0dab6e073cc9e2daa926c2db7ed678c23f21faa1",
+      "bytes": 890182
+    },
+    {
+      "path": "tests/rollover-predecessor-fixture.ts",
+      "git_blob_oid": "c498684edc7b27e8d57349148ed81dce5112206a",
+      "sha256_committed_blob_bytes": "14b852d3bfdead5f3e16b412b1164f2610c169eaa2ca766ae6cceaf08c818824",
+      "bytes": 3127
+    },
+    {
+      "path": "tests/season-rollover.test.ts",
+      "git_blob_oid": "9d8f74a50dfc4edae5a37cefc432bfe007614843",
+      "sha256_committed_blob_bytes": "a5a8d043f5e2b00fa7af4516246658f26212c4ad15ff2f38990bd2a1b98dfda3",
+      "bytes": 204649
+    },
+    {
+      "path": "tools/db/rollover-proposed-state.ts",
+      "git_blob_oid": "b67a0c0a9c29b313a3d5163a8532cdcaac8d9c9b",
+      "sha256_committed_blob_bytes": "1965901f5b7c01b7ae3a6ecc9ea8ec1caa092f188c506600b533f31cf1bceaf9",
+      "bytes": 11514
+    },
+    {
+      "path": "tools/db/rollover-season.ts",
+      "git_blob_oid": "6a00521bc6b15ee4eb28bfb5480b9516a5e505b6",
+      "sha256_committed_blob_bytes": "a3bf84bf3da582bcc7fb5b097b58593d2a506d2a0860a0c522bf56011430ad5f",
+      "bytes": 30768
+    },
+    {
+      "path": "tools/db/successor-activation.ts",
+      "git_blob_oid": "1fae78990b456d2cdf38de856d03c7d40e897133",
+      "sha256_committed_blob_bytes": "d2e8f73cde13caafae5b55f894a3f74d031367581c492dfc4ce65f183419026e",
+      "bytes": 11311
+    }
+  ],
+  "legacy_preservation": {
+    "classification": "SUPERSEDED ? NOT CANONICAL",
+    "directory": "legacy-c438f844",
+    "source": "Exact blobs extracted from c438f844, not working-tree copies"
+  }
+}

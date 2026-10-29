@@ -1,0 +1,17 @@
+{
+  "started": "2026-10-25T03:21:47.615Z",
+  "ended": "2026-10-25T03:28:13.719Z",
+  "source_commit": "def676517da3955aa18db3606785463aac464188",
+  "command": [
+    "node",
+    "D:\\dev\\afldbV2\\node_modules\\vitest\\vitest.mjs",
+    "run",
+    "--exclude",
+    "tests/integration/**",
+    "--reporter=json",
+    "--outputFile=D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSUE-316-dp-proposal-20261025\\validation\\full-db-free.results.json"
+  ],
+  "exit_code": 1,
+  "signal": null,
+  "database": "No .env in source archive; DSN/libpq variables scrubbed; integration excluded"
+}

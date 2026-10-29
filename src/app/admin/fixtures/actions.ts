@@ -38,7 +38,8 @@ import { optionalText, parseInteger, parsePositiveInt, requiredText } from './va
 function shouldAuditRefusal(reason: FixtureRefusalReason): boolean {
   return reason === 'duplicate_fixture' || reason === 'club_already_scheduled'
     || reason === 'already_played' || reason === 'played_locked'
-    || reason === 'stale' || reason === 'stale_preview' || reason === 'forbidden';
+    || reason === 'stale' || reason === 'stale_preview' || reason === 'forbidden'
+    || reason === 'provider_owned';
 }
 
 async function auditRefusal(

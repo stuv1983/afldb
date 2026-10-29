@@ -1,0 +1,49 @@
+[
+  {
+    "name": "initdb",
+    "args": [
+      "-D",
+      "/tmp/i316-v5-pg-R7Deke/data",
+      "-U",
+      "i316_fixture_owner",
+      "--auth-local=trust",
+      "--auth-host=scram-sha-256",
+      "--no-locale",
+      "--encoding=UTF8"
+    ],
+    "status": 0,
+    "error": null,
+    "stdout": "The files belonging to this database system will be owned by user \"arm\".\nThis user must also own the server process.\n\nThe database cluster will be initialized with locale \"C\".\nThe default text search configuration will be set to \"english\".\n\nData page checksums are disabled.\n\ncreating directory /tmp/i316-v5-pg-R7Deke/data ... ok\ncreating subdirectories ... ok\nselecting dynamic shared memory implementation ... posix\nselecting default max_connections ... 100\nselecting default shared_buffers ... 128MB\nselecting default time zone ... Australia/Melbourne\ncreating configuration files ... ok\nrunning bootstrap script ... ok\nperforming post-bootstrap initialization ... ok\nsyncing data to disk ... ok\n\nSuccess. You can now start the database server using:\n\n    /usr/lib/postgresql/16/bin/pg_ctl -D /tmp/i316-v5-pg-R7Deke/data -l logfile start\n\n",
+    "stderr": ""
+  },
+  {
+    "name": "pg_ctl",
+    "args": [
+      "-D",
+      "/tmp/i316-v5-pg-R7Deke/data",
+      "-l",
+      "/tmp/i316-v5-pg-R7Deke/server.log",
+      "-w",
+      "start"
+    ],
+    "status": 0,
+    "error": null,
+    "stdout": "waiting for server to start.... done\nserver started\n",
+    "stderr": ""
+  },
+  {
+    "name": "pg_ctl",
+    "args": [
+      "-D",
+      "/tmp/i316-v5-pg-R7Deke/data",
+      "-w",
+      "-m",
+      "fast",
+      "stop"
+    ],
+    "status": 0,
+    "error": null,
+    "stdout": "waiting for server to shut down.... done\nserver stopped\n",
+    "stderr": ""
+  }
+]

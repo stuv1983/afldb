@@ -1,0 +1,13 @@
+{
+  "$comment": "AFLDB season range (AFLDB-ISSUE-093 Phase 1). Replaces the legacy-derived season enumeration in import_legacy_afl.py with the trivial range generation the ISSUE-093 runbook prescribes (VFL/AFL has run every season since 1897, war years included). Measured columns (first/last match date, match/club counts, data_through_date) are owned by the later match-import and season_metadata phases and are loaded as NULL here. last_season and in_progress_seasons are an explicit snapshot so the load stays deterministic; update them when a new season is acquired.",
+  "first_season": 1897,
+  "last_season": 2026,
+  "league_eras": [
+    { "league": "VFL", "first_season": 1897, "last_season": 1989 },
+    { "league": "AFL", "first_season": 1990, "last_season": null }
+  ],
+  "in_progress_seasons": [2026],
+  "season_notes": {
+    "2026": "Season in progress at time of import."
+  }
+}

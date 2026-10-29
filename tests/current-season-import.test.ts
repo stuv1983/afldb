@@ -39,10 +39,9 @@ function readSource(path: string): string {
   return readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 }
 
-const tool = readSource('tools/current-season/update-current-season.ts');
+const tool = readSource('legacy/offline/tools/current-season/update-current-season.ts');
 const importer = readSource('src/lib/external-afl/current-season-import.ts');
 const adminAction = readSource('src/app/admin/current-season/actions.ts');
-const adminControls = readSource('src/app/admin/current-season/CurrentSeasonControls.tsx');
 const adminPage = readSource('src/app/admin/current-season/page.tsx');
 const adminNav = readSource('src/app/admin/nav-model.ts');
 const migration = readSource('src/db/migrations/063_external_current_match_sources.sql');
@@ -173,6 +172,16 @@ describe('current-season external source import contracts', () => {
     expect(importer).toContain('localClubNameCandidate(raw)');
   });
 
+  it('has no default source: a refresh without --source is refused (AFLDB V2 finding F-001)', () => {
+    expect(tool).not.toContain("?? 'squiggle'");
+    expect(tool).toContain('--source is required for a refresh');
+    expect(tool).toContain('Squiggle and Kali are retired sources');
+    expect(tool).toContain('AFLDB V2 plan D10');
+    expect(tool).toContain('docs/v2/legacy-disposition.md');
+    // The read-only report must keep working without a source.
+    expect(tool).toContain('const sources = report ? [] : parseCurrentSeasonSources(sourceValue ?? \'\');');
+  });
+
   it('can report staged resolution counts without fetching or mutating source rows', () => {
     expect(tool).toContain("argv.includes('--report')");
     expect(tool).toContain('Staged external current-match rows for ${args.year}:');
@@ -190,50 +199,46 @@ describe('current-season external source import contracts', () => {
     expect(importer).toContain('${sourceId}, ${match.externalGameId}');
   });
 
-  it('exposes the refresh only through a super-admin server action', () => {
+  it('no longer exposes the refresh through any admin server action (AFLDB V2 Stage 5, V2-GAP-013)', () => {
+    // The Squiggle/Kali refresh and staged report were removed from the admin surface
+    // (docs/v2/legacy-disposition.md L6): the action keeps its super-admin guard (the capability's
+    // role list is held by tests/auth.test.ts) and REFUSES. Its behaviour is proved in
+    // tests/admin-current-season-settle.test.ts; what is pinned here is that the quarantined CLI's
+    // importer is no longer reachable from it.
     expect(adminAction).toContain("'use server'");
-    // acquisition.currentSeason is super-admin-only (AFLDB-ISSUE-158); the
-    // capability's role list is held by tests/auth.test.ts.
     expect(adminAction).toContain("requireCapability('acquisition.currentSeason')");
-    expect(adminAction).toContain('runCurrentSeasonRefresh');
+    expect(adminAction).toContain("refuseRetiredAdminAction('admin.squiggle_kali_refresh'");
+    expect(adminAction).not.toContain('current-season-import');
+    expect(adminAction).not.toContain('runCurrentSeasonRefresh');
     expect(adminPage).toContain("requireCapability('acquisition.currentSeason')");
+    expect(adminPage).not.toContain('current-season-import');
     expect(adminNav).toContain("href: '/admin/current-season'");
   });
 
-  it('keeps the admin path server-side and staging/diagnostic only', () => {
-    // AFLDB-ISSUE-128 supersedes the old assertions here. The admin action
-    // used to carry `mode === 'auto'` mapping to `['kali'] as const` — the
-    // legacy automatic Kali writer's shape. There is no automatic mode on
-    // this surface any more: automatic current-season ingestion is the AFL
-    // Tables settle chain, and a `mode=auto` post is REFUSED rather than
-    // reinterpreted, so a stale client cannot resurrect it by name.
+  it('keeps the admin path free of every automatic or writing Squiggle/Kali shape', () => {
+    // AFLDB-ISSUE-128 removed `mode === 'auto'` (the legacy automatic Kali writer's shape);
+    // AFLDB V2 Stage 5 removed the manual mode with the control. Neither can come back by name.
     expect(adminAction).not.toContain("mode === 'auto'");
     expect(adminAction).not.toContain("['kali'] as const");
-    expect(adminAction).toContain("if (mode !== 'manual')");
-    expect(adminAction).toContain('Unknown current-season fallback mode');
     expect(adminAction).not.toContain('updateMatches');
-    expect(adminControls).not.toContain('updateMatches');
-    expect(adminControls).not.toContain('Overwrite existing resolved final scores');
-    expect(adminPage).toContain('deprecated fallback sources');
-    expect(adminPage).toContain('no canonical-write authority');
+    expect(adminAction).not.toContain('insertMissingMatches');
+    expect(adminPage).not.toContain('deprecated fallback sources');
+    expect(adminPage).not.toContain('Deprecated fallback diagnostics');
+    expect(() => readSource('src/app/admin/current-season/CurrentSeasonControls.tsx')).toThrow();
   });
 
-  it('names AFL Tables/fitzRoy as the primary current-season source in the admin UI', () => {
-    // AFLDB-ISSUE-128 Stage 4. The observed defect was a page that said
-    // "Auto update uses Kali AFL Stats". The page must now state provider
-    // precedence, and must not offer AFL Tables in the fallback source list —
-    // AFL Tables is not acquired through that code path, and adding it there
-    // would be a second ingestion implementation.
-    expect(adminPage).toContain('AFL Tables, acquired via fitzRoy, is the primary');
+  it('states the AFL Tables position truthfully in the admin UI instead of offering a Squiggle/Kali control', () => {
+    // AFLDB-ISSUE-128 required the page to state provider precedence (the observed defect was
+    // "Auto update uses Kali AFL Stats"). After Stage 5 the page states that the nightly AFL
+    // Tables settle remains on the host behind AFLDB-ISSUE-316 until the ISSUE-316 decisions retire
+    // it (D-316-1 at C2, the timer by C5 under D-316-4; plan section 7 R-042), and that the admin
+    // trigger and the Squiggle/Kali controls are retired.
+    expect(adminPage).toContain('AFLDB-ISSUE-316');
+    expect(adminPage).toContain('D-316-1');
+    expect(adminPage).not.toContain('D-316-2');
+    expect(adminPage).toContain('Squiggle and Kali controls are retired');
     expect(adminPage).not.toContain('Auto update uses Kali');
-    expect(adminControls).not.toContain('Auto update from API');
-    expect(adminControls).not.toContain('Refresh Kali fallback staging');
-    expect(adminControls).toContain('There is deliberately no automatic option here');
-    for (const value of ['"squiggle"', '"kali"', '"all"']) {
-      expect(adminControls).toContain(`<option value=${value}`);
-    }
-    expect(adminControls).not.toContain('value="afltables"');
-    expect(adminControls).not.toContain('value="fitzroy"');
+    expect(adminPage).not.toContain('CurrentSeasonControls');
   });
 
   it('has no default fallback source: Kali is never what "unspecified" means', () => {
@@ -5980,10 +5985,10 @@ describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
         expect(start).toBeGreaterThan(0);
         const block = settle.slice(start, settle.indexOf('\n      }', start));
         const order = [
-          'recomputeSeasonMetadata(tx, bundle.season)',
-          'recomputeClubSeasons(tx, bundle.season)',
-          'recomputePlayerDerivedStats(tx, playerIds, bundle.season)',
-          'recomputeSeasonBrownlowStatus(tx, bundle.season)',
+          'recomputeSeasonMetadata(scope, bundle.season)',
+          'recomputeClubSeasons(scope, bundle.season)',
+          'recomputePlayerDerivedStats(scope, playerIds, bundle.season)',
+          'recomputeSeasonBrownlowStatus(scope, bundle.season)',
         ];
         let cursor = 0;
         for (const call of order) {
@@ -6413,8 +6418,14 @@ describe('AFLDB-ISSUE-130 — the R runtime declaration', () => {
         `${fragment}\necho "AFLDB_TEST_FRAGMENT_ROOT=$PWD"\n`,
       );
       writeFileSync(join(root, 'data', 'reference', 'seasons.json'), '{"in_progress_seasons":[]}\n');
+      // The fake interpreter answers the AFL Tables switch read (AFLDB-ISSUE-316) with an explicit
+      // 'active', independent of the tracked switch; any other answer is retired (fail closed) and
+      // stops the script before the fragment. Every other read gets the season gate's AMBIGUOUS:0.
       const python = join(root, 'fake-python');
-      writeFileSync(python, '#!/bin/sh\ncat >/dev/null\necho AMBIGUOUS:0\n');
+      writeFileSync(
+        python,
+        '#!/bin/sh\ncase "$(cat)" in\n  *afltables-network.json*) echo active ;;\n  *) echo AMBIGUOUS:0 ;;\nesac\n',
+      );
       chmodSync(python, 0o755);
       return root;
     }

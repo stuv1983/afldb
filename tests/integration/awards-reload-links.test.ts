@@ -61,8 +61,11 @@ const NAMED_MEDALS_DEFS_CSV = join(
 );
 
 // The dev host keeps psycopg in the repo virtualenv; a bare python3 there
-// cannot import it.
-const venvPython = join(root, '.venv', 'bin', 'python');
+// cannot import it. .venv layout differs by platform: POSIX venvs put the
+// interpreter under bin/, Windows venvs under Scripts/ with a .exe suffix.
+const venvPython = process.platform === 'win32'
+  ? join(root, '.venv', 'Scripts', 'python.exe')
+  : join(root, '.venv', 'bin', 'python');
 const python = process.env.AFLDB_PYTHON
   ?? (existsSync(venvPython)
     ? venvPython
@@ -155,7 +158,8 @@ function runImporter(
 ) {
   return importRole.spawn(
     python,
-    ['tools/migration/import_awards.py', '--groups', ...groups, ...extra],
+    ['tools/migration/import_awards.py', '--groups', ...groups, ...extra,
+      ...(groups.includes('coleman') || extra.includes('--rekey-coleman') ? ['--offline-historical'] : [])],
     {
       cwd: root,
       env: {
@@ -1135,7 +1139,7 @@ describe.skipIf(!canRunCaptainciesImporter)(
       await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
     });
 
-    it('reloads the full 1,375-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset', async () => {
+    it('reloads the full current manifest as afldb_import with AFLDB_LEGACY_SQLITE unset', async () => {
       const [before] = await sql<{ id: string }[]>`
         SELECT coalesce(max(id), 0)::text AS id FROM import_batches
       `;
@@ -1162,7 +1166,7 @@ describe.skipIf(!canRunCaptainciesImporter)(
       `;
       expect(batch, 'the captaincies batch must be recorded').toBeDefined();
       expect(batch.status).toBe('completed');
-      expect(Number(batch.recordsRead)).toBe(1375);
+      expect(Number(batch.recordsRead)).toBe(1781);
       expect(Number(batch.recordsRejected)).toBe(0);
 
       const [counts] = await sql<{
@@ -1178,7 +1182,7 @@ describe.skipIf(!canRunCaptainciesImporter)(
          WHERE source_id = ${wikipediaId}
       `;
       expect(counts).toEqual({
-        total: 1375, linked: 1375, unlinked: 0, clubs: 18, seasons: 130,
+        total: 1781, linked: 1781, unlinked: 0, clubs: 24, seasons: 130,
       });
     }, 120_000);
 
@@ -2689,7 +2693,9 @@ describe.skipIf(!canRunNamedMedalsImporter)(
       // be CSV-quoted, so a quote-aware split is required.
       const manifestPlayerIds = readFileSync(NAMED_MEDALS_CSV, 'utf8')
         .trimEnd().split(/\r?\n/).slice(1)
-        .map((line) => splitCsv(line)[5])
+        .map((line) => splitCsv(line))
+        .filter((cells) => cells[10] === 'draftguru')
+        .map((cells) => cells[5])
         .filter((cell) => cell !== '')
         .map(Number);
       expect(manifestPlayerIds).toHaveLength(863);
@@ -2751,7 +2757,7 @@ describe.skipIf(!canRunNamedMedalsImporter)(
       expect(run.status, importRole.diagnostics(run)).toBe(0);
 
       nmAwardIds = await loadNamedMedalAwardIds();
-      expect(nmAwardIds).toHaveLength(17);
+      expect(nmAwardIds).toHaveLength(24);
 
       const [batch] = await sql<{
         status: string; recordsRejected: string;
@@ -2774,7 +2780,7 @@ describe.skipIf(!canRunNamedMedalsImporter)(
         SELECT slug, first_season AS first, last_season AS last
           FROM awards WHERE slug = ANY(${namedMedalSlugs})
       `;
-      expect(defs).toHaveLength(17);
+      expect(defs).toHaveLength(24);
       for (const def of defs) {
         const [span] = await sql<{ mn: number; mx: number }[]>`
           SELECT min(season)::int AS mn, max(season)::int AS mx
@@ -2789,6 +2795,10 @@ describe.skipIf(!canRunNamedMedalsImporter)(
       expect(counts.tiedSeasons).toBeGreaterThanOrEqual(6);
       expect(counts.linked).toBe(expectedLinked);
       expect(counts.unlinked).toBe(979 - expectedLinked);
+      const [transcribed] = await sql<{ total: number; linked: number }[]>`
+        SELECT count(*)::int AS total, count(player_id)::int AS linked FROM award_winners
+        WHERE award_id = ANY(${nmAwardIds}) AND source_id = (SELECT id FROM sources WHERE key = 'wikipedia')`;
+      expect(transcribed).toEqual({ total: 328, linked: 328 });
     }, 120_000);
 
     it('re-resolves each era identity from the source club string, season-aware', async () => {
@@ -3818,7 +3828,7 @@ type ColemanRun = {
 function runColeman(): ColemanRun {
   const run = importRole.spawn(
     python,
-    ['tools/migration/import_awards.py', '--groups', 'coleman'],
+    ['legacy/offline/coleman.py', '--groups', 'coleman'],
     { cwd: root, env: { AFLDB_LEGACY_SQLITE: undefined } },
   );
   const signal = COLEMAN_SIGNAL.exec(run.stdout);
@@ -4915,7 +4925,7 @@ type RekeyRun = { status: number | null; output: string };
 function runRekey(): RekeyRun {
   const run = importRole.spawn(
     python,
-    ['tools/migration/import_awards.py', '--rekey-coleman'],
+    ['tools/migration/import_awards.py', '--rekey-coleman', '--offline-historical'],
     { cwd: root, env: { AFLDB_LEGACY_SQLITE: undefined } },
   );
   return { status: run.status, output: run.stdout + run.stderr };

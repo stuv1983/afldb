@@ -56,11 +56,12 @@ import { type GridAxisState } from '@/search/grid-solver-spec';
 import { loadAnswers, loadCorpus, type CorpusBoard } from '../gridley-compat.test';
 import {
   buildCoachResolver, buildCriterionListingIndex, buildResolver, CLUB_COUNT_BUILDER, criterionListedElsewhere, knownAnswerAdjudication,
-  knownAnswerEvidenceStaleness, LIST_MEMBERSHIP_LACKING_BUILDER, nationalPickKeyDisagreement, playerRegisterHorizon, type CoachRow, rookieSourceCoverageGap, teammateListMembership, triageDraftFinding, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
+  knownAnswerEvidenceStaleness, LIST_MEMBERSHIP_LACKING_BUILDER, nationalPickKeyDisagreement, playerRegisterHorizon, type CoachRow, rookieSourceCoverageGap, siblingCriterionDisagreement, teammateListMembership, tradesAfterBoard, triageDraftFinding, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
 } from '../gridley-corpus-support';
 import { loadGridleyKnownAnswerAdjudications } from '../gridley-known-answer-adjudications';
 import { adjudicationStaleness, loadHeightAdjudications, type HeightAdjudication } from '../height-adjudications';
 import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from '../rookie-relisting-outcomes';
+import { gridleyPolicyResults, loadGridleyDeferrals } from '../gridley-release-policy';
 
 afterAll(async () => {
   await sql.end();
@@ -110,18 +111,22 @@ type CellFinding = {
   category: 'parse' | 'unsupported' | 'dataset gap' | 'partial dataset' | 'query failure' | 'timeout' | 'empty answer'
     | 'incorrect known answer' | 'count mismatch' | 'time of board' | 'list membership'
     | 'external source disagreement' | 'source conflict' | 'adjudicated source conflict' | 'source coverage gap'
-    | 'adjudicated key disagreement';
+    | 'adjudicated key disagreement' | 'criterion disagreement';
   row: string;
   col: string;
   rowAxis: string;
   colAxis: string;
   detail: string;
+  siblingEvidence?: Parameters<typeof siblingCriterionDisagreement>[0];
 };
 
 const boards: CorpusBoard[] = loadCorpus();
 const answers = loadAnswers();
 const criteria = new Map<string, CriterionRecord>();
 const findings: CellFinding[] = [];
+const deferralPolicy = loadGridleyDeferrals();
+const afltablesProfiles = new Map<number, string>();
+const memberships = new Map<string, { expectedGridleyIds: number[]; actualAfldbIds: number[] | null }>();
 const unresolvedLog: string[] = [];
 const gapLog: string[] = [];
 let gaps: DatasetGaps = { maxSeason: 0, registerSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true, siblings: true, afterSiren: true };
@@ -338,6 +343,7 @@ beforeAll(async () => {
     const l = heightEvidence.get(e.playerId) ?? []; l.push({ source: e.source, height: e.height }); heightEvidence.set(e.playerId, l);
   }
   const byProfile = new Map(profiles.map((r) => [r.profile, r]));
+  for (const profile of profiles) afltablesProfiles.set(profile.playerId, profile.profile);
   for (const adj of loadHeightAdjudications()) {
     const row = byProfile.get(adj.afltablesProfile);
     if (!row) continue; // this database has no afltables identity for the profile: nothing to adjudicate
@@ -526,6 +532,8 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
       const colRec = criteria.get(colItem.id)!;
       const base = { board: board.board, cell, row: rowItem.id, col: colItem.id, rowAxis: describeAxis(rowRec.mapping), colAxis: describeAxis(colRec.mapping) };
       const gridleyIds = key[r][c];
+      const membership = { expectedGridleyIds: gridleyIds, actualAfldbIds: null as number[] | null };
+      memberships.set(`${board.board}:${cell}`, membership);
 
       if (rowRec.mapping.status === 'unsupported' || colRec.mapping.status === 'unsupported') {
         const reason = [rowRec, colRec].filter((x) => x.mapping.status === 'unsupported')
@@ -569,6 +577,8 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         return;
       }
 
+      membership.actualAfldbIds = [...expected].sort((a, b) => a - b);
+      // IDs use the AFLDB namespace; the report preserves Gridley IDs separately.
       // The production call. For a freebie cell the other axis is paired
       // with itself, which the AND-fold makes a no-op.
       const started = performance.now();
@@ -630,8 +640,22 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
             inGridley, inAfldb, gridleyListsElsewhere: (criterion) => criterionListedElsewhere(criterionListing, gid, criterion, board.board, cell),
           })
           : null;
+        // V2-GAP-029: a traded cell whose qualifying trade post-dates the board (tests/gridley-corpus-support.ts).
+        const tradedIdx = axisBuilders.indexOf('traded_min_times');
+        const tradedMapping = tradedIdx >= 0 ? [rowRec, colRec][tradedIdx].mapping : null;
+        const tradeDated = tradedMapping?.status === 'mapped'
+          ? tradesAfterBoard({
+            board: board.board, cell, row: rowItem.id, col: colItem.id,
+            profile: afltablesProfiles.get(afldbId) ?? '', gridleyPlayerId: gid,
+            boardDate: board.date, rows: linkedDraftRows.get(afldbId) ?? [], threshold: Number(tradedMapping.axis.params.times), inGridley, inAfldb,
+          })
+          : null;
         let category: CellFinding['category'] = 'incorrect known answer';
         if (partial) category = 'partial dataset';
+        else if (tradeDated !== null && !(finalSeason === null || finalSeason >= boardYear || boardYear > gaps.maxSeason || inductedAfterBoard)) {
+          findings.push({ ...base, category: 'time of board', detail: `${detail}; ${tradeDated}` });
+          continue;
+        }
         else if (finalSeason === null || finalSeason >= boardYear || boardYear > gaps.maxSeason || inductedAfterBoard) category = 'time of board';
         // ISSUE-118 Stage E2: coached_by is the same shape. Gridley's "has played on a
         // team coached by X" counts a player listed by the club in a season X coached a
@@ -669,7 +693,12 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         else if (category === 'incorrect known answer' && axisBuilders.includes('has_brother')
                  && ((!inAfldb && lackingIdx.includes(axisBuilders.indexOf('has_brother'))) || (inAfldb && !inGridley && brotherEvidence.has(afldbId)))) {
           if (!inAfldb) {
-            findings.push({ ...base, category: 'source coverage gap', detail: `${detail}; no canonical brothers row links him to a VFL/AFL player` });
+            const siblingEvidence = { ...base, profile: afltablesProfiles.get(afldbId) ?? '',
+              gridleyPlayerId: gid, inGridley, inAfldb, lackingBuilders: lackingIdx.map((i) => axisBuilders[i]) };
+            const disagreement = siblingCriterionDisagreement(siblingEvidence);
+            findings.push({ ...base, category: disagreement ? 'criterion disagreement' : 'source coverage gap',
+              ...(disagreement ? { siblingEvidence } : {}),
+              detail: `${detail}; ${disagreement ?? 'no canonical brothers row links him to a VFL/AFL player'}` });
           } else {
             findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; canonical brothers row: ${brotherEvidence.get(afldbId)}` });
           }
@@ -757,6 +786,9 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
     for (const f of findings) byCategory.set(f.category, (byCategory.get(f.category) ?? 0) + 1);
     const slowCells = cellStats.filter((s) => s.ms > 1000).sort((a, b) => b.ms - a.ms);
     const report = {
+      releaseOutcomes: gridleyPolicyResults(findings.filter((f) => !Object.hasOwn(INFORMATIONAL, f.category)), deferralPolicy),
+      residualMemberships: [...new Set(findings.filter((f) => !Object.hasOwn(INFORMATIONAL, f.category)).map((f) => `${f.board}:${f.cell}`))]
+        .sort().map((key) => ({ key, ...memberships.get(key) })),
       boards: boards.length,
       cells: boards.length * 9,
       solvedCells: cellStats.length,
@@ -785,5 +817,11 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
     expect(failing).toHaveLength(0);
     // Over 1 s is flagged in the report; over 4 s (the ISSUE-076 margin) fails.
     expect(slowCells.filter((s) => s.ms > 4000).map((s) => `#${s.board} ${s.cell}: ${Math.round(s.ms)} ms`)).toEqual([]);
+  });
+
+  it('conforms to the bounded approved-deferral policy, independently of diagnostic mode', () => {
+    const strict = findings.filter((f) => !Object.hasOwn(INFORMATIONAL, f.category));
+    const result = gridleyPolicyResults(strict, deferralPolicy);
+    expect(result.approvedPolicyConformance.unapprovedDifferences).toEqual([]);
   });
 });

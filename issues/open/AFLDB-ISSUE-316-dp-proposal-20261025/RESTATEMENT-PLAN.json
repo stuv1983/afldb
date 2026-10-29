@@ -1,0 +1,263 @@
+{
+  "classification": "Owner-authorised proposal-only B/C restatement repair; accepted checkout remains unchanged",
+  "accepted_base": "a1e16e674a1c3f552e5299883650602f3db36a2b",
+  "accepted_restatement": "87da156357b55f42176f5128a9be49a386c9a6a3",
+  "files": [
+    "docs/v2/coverage-matrix.md",
+    "packages/domain/src/coverage-registry.ts",
+    "tests/afl-api-cutover.test.ts",
+    "tests/afl-api-settle-cli-gate.test.ts",
+    "tests/db-promotion-check.test.ts",
+    "tests/db-test-rebuild.test.ts",
+    "tests/first-kick-goal-source.test.ts",
+    "tests/fitzroy-acquisition.test.ts",
+    "tests/fitzroy-core-import.test.ts",
+    "tests/reference-data.test.ts",
+    "tests/season-rollover.test.ts",
+    "tests/v2-admin-operations-ui.test.ts",
+    "tests/v2-admin-operations.test.ts",
+    "tests/v2-coverage-registry.test.ts",
+    "tests/v2-historical-manifest.test.ts",
+    "tests/v2-season-seal.test.ts"
+  ],
+  "literal_2026_10_24": [
+    {
+      "path": "tests/afl-api-cutover.test.ts",
+      "line": 249,
+      "text": "expect(control.changed_at).toBe('2026-10-24');"
+    },
+    {
+      "path": "tests/db-test-rebuild.test.ts",
+      "line": 4159,
+      "text": "expect(accepted[0]).toMatchObject({ accepted_on: '2026-10-24',"
+    }
+  ],
+  "states": {
+    "A": "Unmodified P; complete DB-free matrix validated",
+    "B": "Seven applied reference finals, inactive tuple. Preserve empty-table assertions and require successor refusal; never label B rebuild-proven.",
+    "C": "B plus exact one-file tuple append. Preserve populated-table binding assertions and 1640-row projection.",
+    "invariant": "Retain all provenance, input, Brownlow, ownership, refusal, and reconstruction assertions. Restate state-A fixture-dependent tests using explicit predecessor inputs, following accepted J2 material."
+  },
+  "status": "All B/C checks and fresh restatement review accepted by owner; D/P approved; await approved 2026-10-27 proof window",
+  "broader_validation": {
+    "state_B": {
+      "passed": 2966,
+      "skipped": 7,
+      "failed": 0,
+      "exit_code": 0,
+      "result": "validation/restatement-repair/state-B-broader-final.exit.json",
+      "full_results": "validation/restatement-repair/state-B-broader-2.results.json"
+    },
+    "state_C": {
+      "passed": 2992,
+      "skipped": 7,
+      "failed": 0,
+      "exit_code": 0,
+      "result": "validation/restatement-repair/state-C-broader-final.exit.json",
+      "full_results": "validation/restatement-repair/state-C-broader-2.results.json"
+    },
+    "historical_stopping_record": "STOP-RECORD.md",
+    "owner_repair_authorised": true,
+    "owner_DP_adjudication_required": false
+  },
+  "preview_files": [
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/docs/v2/coverage-matrix.md"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/docs/v2/coverage-matrix.md"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/packages/domain/src/coverage-registry.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/packages/domain/src/coverage-registry.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/afl-api-cutover.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/afl-api-cutover.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/afl-api-settle-cli-gate.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/afl-api-settle-cli-gate.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/db-promotion-check.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/db-promotion-check.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/db-test-rebuild.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/db-test-rebuild.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/first-kick-goal-source.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/first-kick-goal-source.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/fitzroy-acquisition.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/fitzroy-acquisition.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/fitzroy-core-import.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/fitzroy-core-import.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/reference-data.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/reference-data.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/season-rollover.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/season-rollover.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-admin-operations-ui.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-admin-operations-ui.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-admin-operations.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-admin-operations.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-coverage-registry.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-coverage-registry.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-historical-manifest.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-historical-manifest.test.ts.txt"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/v2-season-seal.test.ts.txt"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/v2-season-seal.test.ts.txt"
+    }
+  ],
+  "conflict_resolutions": [
+    {
+      "path": "tests/db-test-rebuild.test.ts",
+      "conflicts": 1,
+      "state_B": "Retain current P empty-table / pre-activation assertion blocks",
+      "state_C": "Retain accepted J2 active-state blocks; explicitly label state C"
+    },
+    {
+      "path": "tests/season-rollover.test.ts",
+      "conflicts": 2,
+      "state_B": "Retain current P empty-table / pre-activation assertion blocks",
+      "state_C": "Retain accepted J2 active-state blocks; explicitly label state C"
+    },
+    {
+      "path": "tests/db-test-rebuild.test.ts",
+      "repair": "Restore complete P inactive helpers/refusals to B; J2 adopted setup and assertions C-only; explicit predecessor invariants in both states",
+      "evidence": "restatements/REPAIR-RECORD.md"
+    }
+  ],
+  "regenerated_date_assertions": [
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/afl-api-cutover.test.ts.txt",
+      "replacements": 1,
+      "reason": "Real proposed changed_at / accepted_on assertion restated for D; accepted proof stays unchanged"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/afl-api-cutover.test.ts.txt",
+      "replacements": 1,
+      "reason": "Real proposed changed_at / accepted_on assertion restated for D; accepted proof stays unchanged"
+    },
+    {
+      "state": "B",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-B/tests/db-test-rebuild.test.ts.txt",
+      "replacements": 1,
+      "reason": "Real proposed changed_at / accepted_on assertion restated for D; accepted proof stays unchanged"
+    },
+    {
+      "state": "C",
+      "path": "issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/restatements/state-C/tests/db-test-rebuild.test.ts.txt",
+      "replacements": 1,
+      "reason": "Real proposed changed_at / accepted_on assertion restated for D; accepted proof stays unchanged"
+    }
+  ],
+  "preview_literal_2026_10_24_remaining": [],
+  "rollover_validation": {
+    "B": {
+      "passed": 395,
+      "skipped": 0,
+      "failed": 0,
+      "exit_code": 0,
+      "result": "validation/restatement-repair/state-B-focused-final.exit.json",
+      "full_results": "validation/restatement-repair/state-B-focused-1.results.json"
+    },
+    "C": {
+      "passed": 396,
+      "skipped": 0,
+      "failed": 0,
+      "exit_code": 0,
+      "result": "validation/restatement-repair/state-C-focused-final.exit.json",
+      "full_results": "validation/restatement-repair/state-C-focused-1.results.json"
+    }
+  },
+  "state_B_additional_reconciliation": "Preserve state-A acceptance using explicit predecessorStateDocs; add distinct real-state-B empty-table and unsupported-profile refusal. Existing assertions retained.",
+  "restatement_map": "restatements/RESTATEMENT-MAP.json",
+  "fixture_repairs": "restatements/REPAIR-RECORD.md",
+  "fresh_read_only_review": "validation/restatement-repair/REVIEW.json",
+  "owner_DP_approval": "APPROVED FOR READINESS PROOF ONLY",
+  "readiness_approval": "readiness/APPROVAL.json"
+}

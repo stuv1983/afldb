@@ -15,6 +15,12 @@
  *     npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db \
  *       --rehearsal-stop-after recreate
  *
+ * AFLDB-ISSUE-324 (intentional, recorded behaviour change): the ORDINARY CLI (no rehearsal provenance) now
+ * refuses `--target code_test_db` before anything is destroyed, because its `db:migrate:code-test` /
+ * `db:privileges:code-test` children are deliberately not authorised under the native exec closure; the two
+ * code_test_db invocations above are therefore not runnable through this CLI. The dedicated code_test_db
+ * rehearsal tools (e.g. tools/records/first-kick-goal-rehearsal.ts, which calls createCliDeps directly) are unaffected.
+ *
  * This is the ONE supported rebuild entry point. It runs the fixed dependency order,
  * fails closed at the first problem, and never touches `afldb_dev` or production. The
  * destructive targets are an explicit allowlist (REBUILD_TARGETS); the default is still
@@ -72,8 +78,17 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { isAbsolute, join, relative } from 'node:path';
+// `listDirectorySync` is readdirSync under another name: the ISSUE-324 tsx-entry walk (not a label selection) uses it,
+// and a source pin in tests/db-test-rebuild.test.ts forbids the plain name between selectAcceptedBaseline and the stage graph.
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readdirSync as listDirectorySync, readlinkSync, realpathSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { freezeBinding, verifyRehearsalPackage, resolutionLaunch, assertRehearsalResolution, type RehearsalPair, type RehearsalRequest } from '../v2/rehearsal-package.mjs';
+
+import {
+  ISOLATED_DATABASE_MARKER, ISOLATED_SERVER_FACTS_SQL, checkIsolatedTestDsn, checkIsolatedTestServer,
+  type IsolatedServerFacts, type IsolatedTargetFinding,
+} from '@afldb/domain';
 
 import {
   AflApiOwnershipCensusError, CENSUS_MARKER as AFL_API_OWNERSHIP_CENSUS_MARKER,
@@ -84,8 +99,16 @@ import {
   SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
 } from '../records/first-kick-goal-source';
 import {
-  PsqlCredentialRefused, psqlConnection, runPsql, withoutLibpqRouting, type SpawnSyncLike,
+  LadderSuccessorRefused, assertSuccessorTransition, parseSuccessorLadderTuples,
+  type SuccessorLadderTuple,
+} from './ladder-successor';
+import {
+  PSQL_BIN, PsqlCredentialRefused, psqlConnection, redact, runPsql, withoutLibpqRouting, type SpawnSyncLike,
 } from './psql';
+import {
+  bindCompletedCapture, captureBoundMarkerProblems, captureDirectory, pendingCaptureAbsent,
+  type CompletedCapture,
+} from '../migration/rebuild_afl_api_adjudications';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -138,6 +161,12 @@ export type ResolvedTarget = {
   importDsn: string;
   /** True when importDsn is the owner DSN under an explicit acknowledgement. */
   importIsOwnerSubstitution: boolean;
+  /**
+   * V2 Launch F: set ONLY by resolveIsolatedTarget(), for a database on the isolated local
+   * cluster (tools/v2/isolated-pg.ts). executeRebuild() re-proves the DSNs and the live server
+   * against this before any stage runs.
+   */
+  isolated?: { port: number };
 };
 
 export type FitzroySource = {
@@ -151,6 +180,8 @@ export type FitzroySource = {
 };
 
 export type Options = {
+  rehearsalLaunchSpec?: string;
+  rehearsalLaunchSpecSha256?: string;
   /** `--target`; absent means DEFAULT_TARGET (afldb_test). Never inferred from a DSN. */
   target?: string;
   fitzroyLabel?: string;
@@ -242,6 +273,99 @@ function describeRebuildTargets(): string {
 
 /** Refused by name, whatever the DSN claims. */
 const FORBIDDEN_DATABASES = ['afldb_dev', 'afldb_prod'];
+
+/**
+ * AFLDB V2 Launch F — the ISOLATED rebuild target (docs/v2/isolated-rebuild.md).
+ *
+ *     npx tsx tools/v2/isolated-pg.ts run afldb_v2_hist_test -- \
+ *       node node_modules/tsx/dist/cli.mjs tools/db/rebuild-test.ts \
+ *       --target isolated --acknowledge-destroy afldb_v2_hist_test
+ *
+ * Not an entry in REBUILD_TARGETS: it is a FAMILY of databases on the loopback-only cluster that
+ * tools/v2/isolated-pg.ts provisions, and it is admissible only when every one of these holds:
+ *
+ *   1. `--target isolated` AND `--acknowledge-destroy <name>` — the operator names the database;
+ *      it is never inferred from a DSN;
+ *   2. `AFLDB_V2_ISOLATED_PG=1` and a valid `AFLDB_V2_ISOLATED_PORT` (what `isolated-pg run` sets);
+ *   3. the name is exactly ISOLATED_REBUILD_DATABASE or matches ISOLATED_REBUILD_NAME_PATTERN;
+ *   4. AFLDB_TEST_DATABASE_URL and AFLDB_TEST_IMPORT_DATABASE_URL both name that database on the
+ *      same host and port, and each passes `checkIsolatedTestDsn` (loopback, the isolated port,
+ *      an `afldb_v2_*_test` name, no libpq redirection) as well as every existing DSN refusal;
+ *   5. before ANY stage (so before the census, the capture and the reset), the live server
+ *      passes `checkIsolatedTestServer`: cluster_name `afldb_v2_isolated`, the isolated-pg
+ *      marker comment on the database, and current_database() equal to the name.
+ *
+ * The schema and privilege stages reuse the `test` package scripts, because `isolated-pg run`
+ * points AFLDB_TEST_DATABASE_URL at the verified isolated database and resolveIsolatedTarget()
+ * has proven that variable names the acknowledged one.
+ */
+export const ISOLATED_REBUILD_TARGET = 'isolated';
+export const ISOLATED_REBUILD_DATABASE = 'afldb_v2_hist_test';
+export const ISOLATED_REBUILD_NAME_PATTERN = /^afldb_v2_rb_[a-z0-9_]+_test$/;
+export const ISOLATED_REBUILD_SPEC = {
+  role: 'V2 isolated local rebuild (tools/v2/isolated-pg.ts cluster)',
+  adminEnv: 'AFLDB_TEST_DATABASE_URL',
+  importEnv: 'AFLDB_TEST_IMPORT_DATABASE_URL',
+  migrateScript: 'db:migrate:test',
+  migrateTarget: 'test',
+  privilegesScript: 'db:privileges:test',
+} as const;
+
+type RebuildSpec = (typeof REBUILD_TARGETS)[RebuildTargetName] | typeof ISOLATED_REBUILD_SPEC;
+
+export function isIsolatedRebuildName(name: string): boolean {
+  return name === ISOLATED_REBUILD_DATABASE || ISOLATED_REBUILD_NAME_PATTERN.test(name);
+}
+
+/**
+ * The isolated cluster's port when the environment declares an isolated run
+ * (`AFLDB_V2_ISOLATED_PG=1` and a valid unprivileged `AFLDB_V2_ISOLATED_PORT` other than 5432),
+ * otherwise null. Mirrors tools/v2/isolated-pg.ts resolveConfig().
+ */
+export function isolatedRunPort(env: Readonly<Record<string, string | undefined>>): number | null {
+  if (env.AFLDB_V2_ISOLATED_PG !== '1') return null;
+  const raw = env.AFLDB_V2_ISOLATED_PORT ?? '';
+  if (!/^\d+$/.test(raw)) return null;
+  const port = Number(raw);
+  return port >= 1024 && port <= 65535 && port !== 5432 ? port : null;
+}
+
+/**
+ * V2 Launch F: the database comment a rebuild target holds when NO rebuild is in flight. The
+ * AFLDB-ISSUE-235/237 rebuild marker is the database comment, and so is the isolated-pg marker
+ * (`afldb-v2-isolated-test`) that tools/v2/isolated-pg.ts verifies before every run and drop.
+ * For an isolated-family name the adjudication tool therefore reads the resting marker as "no
+ * rebuild marker", may replace it with the rebuild marker, and restores it (not NULL) when Stage
+ * 18 clears the rebuild marker. Every other target rests at NULL, exactly as before.
+ */
+export function restingDatabaseComment(database: string): string | null {
+  return isIsolatedRebuildName(database) ? ISOLATED_DATABASE_MARKER : null;
+}
+
+/** Findings as one refusal line; names the checks only, never a DSN. */
+function describeFindings(findings: readonly IsolatedTargetFinding[]): string {
+  return findings.map((f) => `${f.check} (${f.detail})`).join('; ');
+}
+
+/**
+ * V2 Launch F: refuse a DSN that is not an isolated-cluster DSN for `port`. Also used by the
+ * adjudication stage tool, so a child stage handed an isolated name proves its own DSN too.
+ */
+export function assertIsolatedRebuildDsn(dsn: string, port: number, name: string): void {
+  const findings = checkIsolatedTestDsn(dsn, port);
+  if (findings.length) {
+    throw new RebuildRefused(
+      `${name} is not an isolated-cluster DSN: ${describeFindings(findings)}. Nothing has been destroyed.`);
+  }
+}
+
+/** The stage-graph spec for a resolved target: an allowlisted one, or the isolated family. */
+export function rebuildSpecFor(target: ResolvedTarget): RebuildSpec {
+  if (target.isolated && isIsolatedRebuildName(target.database)) return ISOLATED_REBUILD_SPEC;
+  if (!target.isolated && isRebuildTarget(target.database)) return REBUILD_TARGETS[target.database];
+  throw new RebuildRefused(
+    `No stage graph for '${target.database}': it is not an explicit rebuild target.`);
+}
 
 /** Labels known NOT to be full-history acquisitions. */
 const KNOWN_TRIAL_LABELS = ['trial-2024'];
@@ -607,8 +731,10 @@ export const REBUILD_IDENTITY_MARKER = 'AFLDB-REBUILD-IDENTITY';
  * `database` must be an allowlisted rebuild target, so it is a plain identifier that is safe to
  * inline. `RESET_SQL` itself is not altered: the proof embeds it verbatim.
  */
-export function rebuildIdentityGuardSql(database: string): string {
-  assertRebuildTargetName(database);
+export function rebuildIdentityGuardSql(
+  database: string, env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  assertRebuildTargetName(database, env);
   if (!/^[a-z][a-z0-9_]*$/.test(database)) {
     throw new RebuildRefused(`Refusing to assert identity for '${database}': not a plain identifier.`);
   }
@@ -639,7 +765,9 @@ END $afldb_identity$;
  * call this, so the proof cannot drift into a weaker duplicate of the rebuild's own
  * refusals. Never includes a DSN or password in any message.
  */
-export function assertRebuildTargetName(database: string): void {
+export function assertRebuildTargetName(
+  database: string, env: Readonly<Record<string, string | undefined>> = process.env,
+): void {
   if (FORBIDDEN_DATABASES.includes(database)) {
     throw new RebuildRefused(
       `Refusing to rebuild '${database}': this database is rejected by name.`);
@@ -654,7 +782,11 @@ export function assertRebuildTargetName(database: string): void {
   }
   // An allowlist, not a suffix rule: `random_test` is refused exactly as `afldb_scratch`
   // is. The former `_test` suffix check is subsumed — every allowed name is listed.
-  if (!isRebuildTarget(database)) {
+  // V2 Launch F: the isolated family is admitted by NAME only inside an isolated run
+  // (isolatedRunPort); resolveIsolatedTarget() and executeRebuild() add the DSN and live-server
+  // proofs, and a child stage handed an isolated name proves its own DSN (assertIsolatedRebuildDsn).
+  const isolatedName = isIsolatedRebuildName(database) && isolatedRunPort(env) !== null;
+  if (!isRebuildTarget(database) && !isolatedName) {
     throw new RebuildRefused(
       `Refusing to rebuild '${database}': the only explicit rebuild targets are `
       + `${describeRebuildTargets()}. A target is never inferred from a DSN.`);
@@ -672,8 +804,11 @@ export function assertRebuildTargetName(database: string): void {
  */
 export function resolveTarget(
   env: Record<string, string | undefined>,
-  opts: { target?: string; allowOwnerImportDsn?: boolean } = {},
+  opts: { target?: string; allowOwnerImportDsn?: boolean; acknowledgeDestroy?: string } = {},
 ): ResolvedTarget {
+  // V2 Launch F: the isolated family has its own, stricter resolution. Only the literal
+  // `--target isolated` reaches it; every other value takes the unchanged path below.
+  if (opts.target === ISOLATED_REBUILD_TARGET) return resolveIsolatedTarget(env, opts);
   const requested = opts.target ?? DEFAULT_TARGET;
   assertRebuildTargetName(requested);
   if (!isRebuildTarget(requested)) {
@@ -748,6 +883,198 @@ export function resolveTarget(
   }
 
   return { database, adminDsn, importDsn, importIsOwnerSubstitution };
+}
+
+/** host:port of a DSN as postgres.js and the isolated guard read it (already proven to parse). */
+function serverOf(dsn: string): string {
+  const url = new URL(dsn);
+  return `${url.hostname}:${url.port}`;
+}
+
+/**
+ * V2 Launch F: resolve `--target isolated`. Every condition in the ISOLATED_REBUILD_TARGET
+ * comment is checked here except the live-server one, which executeRebuild() runs before any
+ * stage. Order: the environment declares an isolated run, then the operator's NAMED database,
+ * then each DSN. Messages never contain a DSN.
+ */
+export function resolveIsolatedTarget(
+  env: Record<string, string | undefined>,
+  opts: { allowOwnerImportDsn?: boolean; acknowledgeDestroy?: string } = {},
+): ResolvedTarget {
+  const port = isolatedRunPort(env);
+  if (port === null) {
+    throw new RebuildRefused(
+      `--target ${ISOLATED_REBUILD_TARGET} runs only inside an isolated run: AFLDB_V2_ISOLATED_PG=1 and a `
+      + 'valid AFLDB_V2_ISOLATED_PORT must be set, as `npx tsx tools/v2/isolated-pg.ts run <name> -- ...` '
+      + 'sets them. Nothing has been destroyed.');
+  }
+  if (opts.allowOwnerImportDsn) {
+    throw new RebuildRefused(
+      `--allow-owner-import-dsn is refused with --target ${ISOLATED_REBUILD_TARGET}: the isolated cluster `
+      + 'always has the restricted afldb_import credential. Nothing has been destroyed.');
+  }
+  const named = opts.acknowledgeDestroy;
+  if (!named) {
+    throw new RebuildRefused(
+      `--target ${ISOLATED_REBUILD_TARGET} needs --acknowledge-destroy <database>: the operator names the `
+      + 'isolated database; it is never inferred from a DSN. Nothing has been destroyed.');
+  }
+  assertRebuildTargetName(named, env);
+  if (!isIsolatedRebuildName(named)) {
+    throw new RebuildRefused(
+      `Refusing to rebuild '${named}' as an isolated target: the only isolated rebuild databases are `
+      + `'${ISOLATED_REBUILD_DATABASE}' and names matching ${String(ISOLATED_REBUILD_NAME_PATTERN)}. `
+      + 'Nothing has been destroyed.');
+  }
+
+  const spec = ISOLATED_REBUILD_SPEC;
+  const adminDsn = env[spec.adminEnv];
+  if (!adminDsn) {
+    throw new RebuildRefused(`${spec.adminEnv} is not set (target ${ISOLATED_REBUILD_TARGET} '${named}').`);
+  }
+  let database: string;
+  try {
+    database = databaseOf(adminDsn);
+  } catch {
+    throw new RebuildRefused(`${spec.adminEnv} is not a valid connection URL.`);
+  }
+  if (database !== named) {
+    throw new RebuildRefused(
+      `${spec.adminEnv} names database '${database}', not the acknowledged isolated database '${named}'. `
+      + 'Nothing has been destroyed.');
+  }
+  assertIsolatedRebuildDsn(adminDsn, port, spec.adminEnv);
+  assertPsqlCanCarry(adminDsn, spec.adminEnv);
+  assertDsnPinsTarget(adminDsn, spec.adminEnv);
+
+  const importDsn = env[spec.importEnv];
+  if (!importDsn) {
+    throw new RebuildRefused(
+      `${spec.importEnv} is not set, so there is no restricted import credential for the data stages `
+      + `of '${named}'. Nothing has been destroyed.`);
+  }
+  let importDatabase: string;
+  try {
+    importDatabase = databaseOf(importDsn);
+  } catch {
+    throw new RebuildRefused(`${spec.importEnv} is not a valid connection URL.`);
+  }
+  if (importDatabase !== database) {
+    throw new RebuildRefused(
+      `${spec.importEnv} names a different database from ${spec.adminEnv}. Both must point at '${named}'.`);
+  }
+  assertIsolatedRebuildDsn(importDsn, port, spec.importEnv);
+  assertDsnPinsTarget(importDsn, spec.importEnv);
+  if (serverOf(importDsn) !== serverOf(adminDsn)) {
+    throw new RebuildRefused(
+      `${spec.importEnv} and ${spec.adminEnv} name different servers. Both must name the isolated `
+      + 'cluster the same way. Nothing has been destroyed.');
+  }
+
+  return { database, adminDsn, importDsn, importIsOwnerSubstitution: false, isolated: { port } };
+}
+
+/**
+ * V2 Launch F: the read-only stream behind Deps.isolatedServerFacts — the one row of
+ * ISOLATED_SERVER_FACTS_SQL as COPY text, so nothing but data reaches stdout.
+ */
+export const ISOLATED_SERVER_FACTS_COPY_SQL =
+  `COPY (${ISOLATED_SERVER_FACTS_SQL}) TO STDOUT;\n`;
+
+/** Parse the COPY text row (tab-separated, `\N` for NULL). Throws on anything but one row of three. */
+export function parseIsolatedServerFacts(stdout: string): IsolatedServerFacts {
+  const lines = stdout.split(/\r?\n/).filter((line) => line !== '');
+  const fields = lines.length === 1 ? lines[0].split('\t') : [];
+  if (fields.length !== 3) {
+    throw new RebuildRefused(
+      `The isolated server facts query returned ${lines.length} line(s), not one row of three fields. `
+      + 'Nothing has been destroyed.');
+  }
+  const value = (field: string) => (field === '\\N' ? null : field);
+  return {
+    clusterName: value(fields[0]),
+    databaseComment: value(fields[1]),
+    currentDatabase: value(fields[2]),
+  };
+}
+
+/** Name-check environment for an isolated target, derived from the resolved target only. */
+function isolatedNameEnv(target: ResolvedTarget): Record<string, string | undefined> {
+  return target.isolated
+    ? { AFLDB_V2_ISOLATED_PG: '1', AFLDB_V2_ISOLATED_PORT: String(target.isolated.port) }
+    : process.env;
+}
+
+/**
+ * V2 Launch F: the isolated target's last gate, run by executeRebuild() before ANY stage. It
+ * re-proves both DSNs (a ResolvedTarget can be built by hand) and asks the live server who it
+ * is. Any doubt is a refusal; nothing has run when it throws.
+ */
+export function assertIsolatedTargetLive(
+  target: ResolvedTarget, deps: Deps, completedCapture?: CompletedCapture,
+): void {
+  if (!target.isolated) {
+    throw new RebuildRefused(
+      `'${target.database}' is an isolated-cluster name but the target was not resolved by `
+      + `--target ${ISOLATED_REBUILD_TARGET}. Nothing has been run.`);
+  }
+  if (!isIsolatedRebuildName(target.database)) {
+    throw new RebuildRefused(
+      `'${target.database}' is not an isolated rebuild database. Nothing has been run.`);
+  }
+  const { port } = target.isolated;
+  for (const [dsn, name] of [[target.adminDsn, 'The admin DSN'], [target.importDsn, 'The import DSN']] as const) {
+    assertIsolatedRebuildDsn(dsn, port, name);
+    if (databaseOf(dsn) !== target.database) {
+      throw new RebuildRefused(`${name} does not name '${target.database}'. Nothing has been run.`);
+    }
+  }
+  if (serverOf(target.importDsn) !== serverOf(target.adminDsn)) {
+    throw new RebuildRefused('The admin and import DSNs name different servers. Nothing has been run.');
+  }
+  if (!deps.isolatedServerFacts) {
+    throw new RebuildRefused(
+      'An isolated rebuild needs the live server check (Deps.isolatedServerFacts) and none is wired. '
+      + 'Nothing has been run.');
+  }
+  let facts: IsolatedServerFacts;
+  try {
+    facts = deps.isolatedServerFacts(target.adminDsn);
+  } catch (error) {
+    throw new RebuildRefused(
+      `Could not read the isolated server facts: ${(error as Error).message}. Nothing has been run.`);
+  }
+  const findings = checkIsolatedTestServer(target.database, facts);
+  if (completedCapture === undefined) {
+    if (findings.length) {
+      throw new RebuildRefused(
+        `The server behind '${target.database}' is not the isolated cluster: ${describeFindings(findings)}. `
+        + 'Nothing has been run.');
+    }
+    deps.log(`    isolated server verified: cluster ${facts.clusterName}, marker present, `
+      + `current_database ${facts.currentDatabase}`);
+    return;
+  }
+  // Between the capture and the reset the comment is the rebuild marker, not the resting marker.
+  // Only that one finding is set aside, and only for a binding the capture stage itself issued:
+  // the cluster and current_database checks stand, and the comment must be the genuine pending
+  // marker of exactly the capture just completed (digests, time, target and the file's bytes).
+  const identity = findings.filter((finding) => finding.check !== 'database_marker');
+  if (identity.length) {
+    throw new RebuildRefused(
+      `The server behind '${target.database}' is not the isolated cluster: ${describeFindings(identity)}. `
+      + 'Nothing has been run.');
+  }
+  const problems = captureBoundMarkerProblems({
+    bound: completedCapture, database: target.database, comment: facts.databaseComment,
+  });
+  if (problems.length) {
+    throw new RebuildRefused(
+      `The pending rebuild marker on '${target.database}' is not the one this execution's capture stage produced: `
+      + `${problems.join('; ')}. Nothing has been run.`);
+  }
+  deps.log(`    isolated server verified: cluster ${facts.clusterName}, capture-bound rebuild marker `
+    + `(file sha256 ${completedCapture.fileSha256.slice(0, 12)}…), current_database ${facts.currentDatabase}`);
 }
 
 /**
@@ -836,6 +1163,630 @@ export function selectAcceptedBaseline(
       + 'accepted.');
   }
   return { label: String(accepted[0].snapshot_label) };
+}
+
+const LADDER_PAIRS: Readonly<Record<string, RehearsalPair>> = freezeBinding({
+  'predecessor-1897-2025': {
+    profile: 'predecessor-1897-2025', core_snapshot_label: 'full-history-20260902',
+    core_manifest_sha256: '2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1',
+    core_artefact_set_sha256: '15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c',
+    witness_snapshot_label: 'ladder-20260828', witness_manifest_sha256: '604a8a162543e19060f426bd189222d32d07726a0b134bdf4f910175cb7a8d3f',
+    first_season: 1897, last_season: 2025, expected_rows: 1622,
+  },
+  'c2-2026-rehearsal-only': {
+    profile: 'c2-2026-rehearsal-only', core_snapshot_label: 'c2-2026-final-core-v1',
+    core_manifest_sha256: '02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988',
+    core_artefact_set_sha256: '817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e',
+    witness_snapshot_label: 'c2-2026-final-ladder-v1', witness_manifest_sha256: '65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34',
+    first_season: 1897, last_season: 2026, expected_rows: 1640,
+  },
+});
+/**
+ * The closed table of reviewed SUCCESSOR ladder tuples (AFLDB-ISSUE-316 C2, mechanism A), as a JSON literal so
+ * the rollover planner can read and edit it without executing this module. EMPTY until an owner-reviewed
+ * adoption supplies a tuple: an empty table accepts no successor profile, so nothing here activates 1,640 or
+ * any other count. A tuple is judged only together with the register, contract, witness and `seasons.json`
+ * it must agree with (`assertSuccessorTransition`); its name alone grants nothing.
+ */
+export const SUCCESSOR_LADDER_TUPLES_JSON = '{"c2-2026-successor":{"profile":"c2-2026-successor","supersedes":"predecessor-1897-2025","core_snapshot_label":"c2-2026-final-core-v1","core_manifest_sha256":"02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988","core_artefact_set_sha256":"817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e","witness_snapshot_label":"c2-2026-final-ladder-v1","witness_manifest_sha256":"65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34","first_season":1897,"last_season":2026,"expected_rows":1640}}';
+export const SUCCESSOR_LADDER_TUPLES: Readonly<Record<string, SuccessorLadderTuple>> =
+  freezeBinding(parseSuccessorLadderTuples(SUCCESSOR_LADDER_TUPLES_JSON));
+export type LadderRebuildExpectation = Readonly<{
+  pair: RehearsalPair; expectedRows: number; firstSeason: number; lastSeason: number;
+  censusScope: CensusScope;
+}>;
+type LadderDocuments = { register: Record<string, any>; contract: Record<string, any>; seasons: Record<string, any> };
+function ladderDocuments(): LadderDocuments {
+  const read = (p: string) => JSON.parse(readFileSync(join(REPO_ROOT, p), 'utf8'));
+  return { register: read(ACCEPTED_BASELINES), contract: read(FITZROY_CONTRACT), seasons: read(SEASONS_REFERENCE) };
+}
+export type RehearsalProvenance = Readonly<{ specPath: string; specSha256: string }>;
+
+function successorPair(t: SuccessorLadderTuple): RehearsalPair {
+  return {
+    profile: t.profile, core_snapshot_label: t.core_snapshot_label, core_manifest_sha256: t.core_manifest_sha256,
+    core_artefact_set_sha256: t.core_artefact_set_sha256, witness_snapshot_label: t.witness_snapshot_label,
+    witness_manifest_sha256: t.witness_manifest_sha256, first_season: t.first_season, last_season: t.last_season,
+    expected_rows: t.expected_rows,
+  };
+}
+/** A successor's witness manifest from the tracked path, LF-normalised exactly as its pin is computed; undefined when unreadable. */
+function readTrackedWitnessManifest(path: unknown): string | undefined {
+  if (typeof path !== 'string' || isAbsolute(path) || path.split(/[\\/]/).some((p) => !p || p === '..' || p === '.')) return undefined;
+  const full = join(REPO_ROOT, path);
+  return existsSync(full) ? readFileSync(full).toString('utf8').replace(/\r\n/g, '\n') : undefined;
+}
+
+/** Closed reviewed tuples. Counts, labels and metadata alone confer no new authority. */
+export function resolveLadderRebuildExpectation(
+  source: FitzroySource, target: ResolvedTarget, documents: LadderDocuments = ladderDocuments(),
+  provenance?: RehearsalProvenance,
+  verify: typeof verifyRehearsalPackage = verifyRehearsalPackage,
+  /** The closed table of reviewed tuples. Only a test or an owner-reviewed code change supplies another. */
+  pairs: Readonly<Record<string, RehearsalPair>> = LADDER_PAIRS,
+  /** The closed table of reviewed successor tuples; empty in the repository until an owner-reviewed adoption. */
+  successors: Readonly<Record<string, SuccessorLadderTuple>> = SUCCESSOR_LADDER_TUPLES,
+  /** Witness manifest bytes for a successor's independent row derivation; read from the tracked path when absent. */
+  witnessManifestText?: string,
+): LadderRebuildExpectation {
+  const { register, contract, seasons } = documents;
+  const label = selectAcceptedBaseline(register).label;
+  if (!source.accepted || !source.fullHistory || source.acknowledgedPartial || source.label !== label) {
+    throw new RebuildRefused('Ladder expectation requires the exactly-one accepted full-history source.');
+  }
+  const baseline = register.baselines.find((b: any) => b.snapshot_label === label);
+  const ladder = contract.datasets?.ladder;
+  const block = ladder?.rebuild_expectation;
+  if (!block || typeof block !== 'object' || Array.isArray(block)) throw new RebuildRefused('Missing explicit ladder rebuild_expectation; no default is authorised.');
+  const successor = typeof block.profile === 'string' && Object.hasOwn(successors, block.profile)
+    ? successors[block.profile] : undefined;
+  if (successor && Object.hasOwn(pairs, successor.profile)) {
+    throw new RebuildRefused('Ladder profile is listed as both a reviewed pair and a successor tuple.');
+  }
+  const supported: RehearsalPair | undefined = successor
+    ? successorPair(successor)
+    : typeof block.profile === 'string' && Object.hasOwn(pairs, block.profile) ? pairs[block.profile] : undefined;
+  const keys = ['profile', 'core_snapshot_label', 'core_manifest_sha256', 'core_artefact_set_sha256', 'witness_snapshot_label', 'witness_manifest_sha256', 'expected_rows', 'evidence_ref'];
+  if (!supported || Object.keys(block).length !== keys.length || keys.some((k) => !(k in block))
+      || typeof block.evidence_ref !== 'string' || !block.evidence_ref.trim()
+      || keys.filter((k) => k !== 'evidence_ref').some((k) => block[k] !== supported[k as keyof RehearsalPair])) {
+    throw new RebuildRefused('Unsupported ladder expectation schema/fingerprint tuple/row count.');
+  }
+  const range = baseline.contract_binding?.required_range;
+  const scope = rebuildCensusScope(contract, seasons);
+  if (label !== supported.core_snapshot_label || baseline.acquisition?.manifest_sha256 !== supported.core_manifest_sha256
+      || baseline.raw_artefacts?.artefact_set_sha256 !== supported.core_artefact_set_sha256
+      || ladder.accepted_witness?.snapshot_label !== supported.witness_snapshot_label
+      || ladder.accepted_witness?.manifest_sha256 !== supported.witness_manifest_sha256
+      || [range?.first_season, baseline.measured?.seasons_first, scope.firstSeason, ladder.coverage?.first_season].some((v) => v !== supported.first_season)
+      || [range?.last_season, baseline.measured?.seasons_last, scope.lastSeason, ladder.coverage?.last_season].some((v) => v !== supported.last_season)
+      || !Array.isArray(contract.full_history?.approved_source_gaps?.seasons)
+      || contract.full_history.approved_source_gaps.seasons.length) {
+    throw new RebuildRefused('Ladder core/witness/completed range/census binding mismatch.');
+  }
+  if (successor) {
+    if (provenance) throw new RebuildRefused('A successor profile cannot claim candidate rehearsal purpose.');
+    try {
+      assertSuccessorTransition({
+        successor, predecessor: Object.hasOwn(pairs, successor.supersedes) ? pairs[successor.supersedes] : undefined,
+        register, contract, seasons,
+        witnessManifestText: witnessManifestText ?? readTrackedWitnessManifest(ladder.accepted_witness?.manifest),
+      });
+    } catch (error) {
+      if (error instanceof LadderSuccessorRefused) throw new RebuildRefused(`Successor ladder transition refused: ${error.message}`);
+      throw error;
+    }
+  }
+  const result = freezeBinding({ pair: { ...supported }, expectedRows: block.expected_rows,
+    firstSeason: supported.first_season, lastSeason: supported.last_season, censusScope: scope });
+  if (supported.profile === 'c2-2026-rehearsal-only') {
+    if (!target.isolated || !isIsolatedRebuildName(target.database) || target.importIsOwnerSubstitution || !provenance) {
+      throw new RebuildRefused('Candidate ladder requires isolated target and external rehearsal provenance.');
+    }
+    verify(rehearsalRequest(provenance, result, target, 'resolve'));
+  } else if (provenance) throw new RebuildRefused('Predecessor cannot claim candidate rehearsal purpose.');
+  return result;
+}
+function rehearsalRequest(p: RehearsalProvenance, ladder: LadderRebuildExpectation, target: ResolvedTarget, checkpoint: string): RehearsalRequest {
+  return { ...p, checkpoint, sourceRoot: REPO_ROOT, cwd: process.cwd(), modulePath: fileURLToPath(import.meta.url), pair: ladder.pair, target };
+}
+export type RebuildBinding = Readonly<{
+  source: FitzroySource; target: ResolvedTarget; ladder: LadderRebuildExpectation; provenance?: RehearsalProvenance;
+}>;
+const boundPlans = new WeakMap<Stage[], { bytes: string; identity: string; binding: RebuildBinding }>();
+function assertCandidateOptions(opts: Options, binding: RebuildBinding, source?: FitzroySource): void {
+  if (!binding.provenance) return;
+  if (source?.label !== binding.source.label || !source.accepted || source.acknowledgedPartial || !source.fullHistory
+      || opts.target !== 'isolated' || opts.acknowledgeDestroy !== binding.target.database || opts.planOnly
+      || opts.draftguruLabel !== DEFAULT_DRAFTGURU_LABEL || opts.fitzroyLabel || opts.draftguruBridge
+      || opts.acknowledgePartialFitzroy || opts.allowOwnerImportDsn || opts.recoverAflApiAdjudications || opts.rehearsalStopAfter
+      || opts.rehearsalLaunchSpec !== binding.provenance.specPath || opts.rehearsalLaunchSpecSha256 !== binding.provenance.specSha256) {
+    throw new RebuildRefused('Candidate invocation does not match the reviewed fixed full-runner options/source.');
+  }
+}
+/** Re-read original documents; never adopt a new pair midway through a run. */
+export function checkRebuildBinding(binding: RebuildBinding, checkpoint: string,
+  /** The tracked documents; only `isAdoptedSuccessorBinding`'s own tests supply others. */
+  documents: LadderDocuments = ladderDocuments()): void {
+  if (binding.ladder.pair.profile === 'c2-2026-rehearsal-only' && !binding.provenance) throw new RebuildRefused('Missing candidate provenance.');
+  if (binding.provenance) {
+    const v = verifyRehearsalPackage(rehearsalRequest(binding.provenance, binding.ladder, binding.target, checkpoint));
+    assertRehearsalResolution(v);
+    if (process.execPath !== v.runtime.node || resolvePython() !== v.runtime.python
+        || process.env[CAPTURE_ROOT_ENV] !== v.spec.capture_root || process.env.AFLDB_V2_PG_ROOT !== v.spec.cluster_root
+        || Number(process.env.AFLDB_V2_PG_PORT) !== v.target.port) throw new RebuildRefused('Runtime/capture/cluster binding mismatch.');
+  }
+  const selected = documents.register.baselines.find((b: any) => b.snapshot_label === binding.source.label);
+  const witness = documents.contract.datasets?.ladder?.accepted_witness;
+  for (const [path, digest] of [[selected?.acquisition?.manifest_path, binding.ladder.pair.core_manifest_sha256],
+    [witness?.manifest, binding.ladder.pair.witness_manifest_sha256]]) {
+    if (typeof path !== 'string' || isAbsolute(path) || path.split(/[\\/]/).some((p) => !p || p === '..' || p === '.')
+        || manifestSha256(join(REPO_ROOT, path)) !== digest) throw new RebuildRefused('Pinned core/witness manifest bytes changed.');
+  }
+  const fresh = resolveLadderRebuildExpectation(binding.source, binding.target, documents, binding.provenance);
+  if (JSON.stringify(fresh) !== JSON.stringify(binding.ladder)) throw new RebuildRefused('Frozen ladder/scope drift.');
+}
+
+/**
+ * AFLDB-ISSUE-323: the ORDINARY rebuild of an ADOPTED successor. Its core and witness carry the c2-2026-final-*
+ * labels that, before adoption, only a candidate rehearsal could run, and a successor may never claim rehearsal
+ * provenance, so without this the adopted state could never rebuild. True only when every one of these holds,
+ * re-derived here from the CLOSED successor table and the tracked documents (never a caller's table, never the
+ * `Deps.checkBinding` seam): the binding claims no provenance; its profile is a reviewed successor tuple and its pair
+ * is exactly that tuple; its source is that tuple's core; the pinned core and witness manifest bytes still hash to
+ * the tuple; and a fresh resolution of the documents (`assertSuccessorTransition` included) equals the binding's
+ * frozen ladder. A label, profile name or row count alone grants nothing. Anything else, a refusal or an error
+ * included, is false, and the candidate guards refuse exactly as before. With the shipped empty table it is false.
+ */
+export function isAdoptedSuccessorBinding(binding?: RebuildBinding, documents?: LadderDocuments): boolean {
+  if (!binding || binding.provenance) return false;
+  const { pair } = binding.ladder;
+  const tuple = Object.hasOwn(SUCCESSOR_LADDER_TUPLES, pair.profile) ? SUCCESSOR_LADDER_TUPLES[pair.profile] : undefined;
+  if (!tuple || JSON.stringify(pair) !== JSON.stringify(successorPair(tuple))
+      || binding.ladder.expectedRows !== tuple.expected_rows || binding.source.label !== tuple.core_snapshot_label) return false;
+  try {
+    checkRebuildBinding(binding, 'adopted-successor', documents ?? ladderDocuments());
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The environment of every guarded child. PATH is the bound cluster-client directory ONLY, set here rather than
+ * inherited, so a bare `psql` inside a guarded tool (privileges, census, reset proof) can never resolve
+ * through an ambient directory; ambient module/Python/loader search overrides are dropped.
+ */
+export function rehearsalChildEnv(inherited: Record<string, string | undefined> | undefined, enforcement: Record<string, string>, pgBin: string): NodeJS.ProcessEnv {
+  const env = { ...inherited, ...enforcement } as NodeJS.ProcessEnv;
+  for (const key of ['NODE_OPTIONS', 'NODE_PATH', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONUSERBASE', 'ESBUILD_BINARY_PATH', 'TSX_TSCONFIG_PATH']) delete env[key];
+  for (const key of Object.keys(env)) if (key.toUpperCase() === 'PATH') delete env[key];
+  env.PATH = pgBin;
+  return env;
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-324 -- the ORDINARY (no rehearsal provenance) child-process boundary
+// ---------------------------------------------------------------------------
+//
+// Under the native LD_AUDIT closure every exec target must be a policy-bound object. `npx` and `npm` are
+// `#!/usr/bin/env node` scripts and are not, so the plan's `npx tsx ...` / `npm run db:migrate:test` children
+// were refused with EACCES. The rehearsal path avoids that with `rehearsalSpawn`; the ordinary path may not
+// reuse it (it needs verified rehearsal provenance), so this is its own, deliberately narrower mapping:
+//
+//   * the ONLY npx form is `npx tsx <argv>` where <argv> equals, element for element, one entry of the closed
+//     table `ordinaryTsxArgv()` (derived from the argv builders, so the plan and the table cannot drift);
+//   * the ONLY npm form is `npm run <name>` (exactly two arguments) with <name> an entry of the closed table
+//     ORDINARY_NPM_SCRIPTS, whose package.json bodies are also fixed here and re-verified;
+//   * both run as `process.execPath <checkout>/node_modules/tsx/dist/cli.mjs ...`, and only after
+//     `verifyOrdinaryTsxEntry` proves the executed tsx code is physically inside THIS checkout;
+//   * `psql` and the planner's Python interpreter pass through unchanged; every other command is refused.
+//
+// This is not an npm/npx-through-node bypass: no caller-controlled executable, package, script name or argument
+// reaches `process.execPath`. `--target code_test_db` plans use `db:migrate:code-test` / `db:privileges:code-test`,
+// which are deliberately NOT in the table: the ordinary CLI refuses that target under native enforcement (an
+// intentional, recorded behaviour change); the dedicated code_test_db rehearsal tool is unaffected.
+//
+// The DISCLOSED esbuild native-binary exception (owner ruling, ISSUE-316 revision J): every JavaScript/TypeScript
+// package file under the checkout's `node_modules` must be physically inside the checkout, and the whole tree is
+// walked. Exactly two lexical paths -- tsx's own esbuild native binaries, ORDINARY_ESBUILD_LINKS -- MAY instead be
+// absolute symlinks, and then only to the exact policy-bound real path fixed here, whose bytes must hash to
+// ORDINARY_ESBUILD_SHA256 before every execution. The table is keyed by lexical path, never by target; no package
+// directory, tsx file or other binary receives it. An npm `.bin/<name>` link is admitted only when EVERY hop of its
+// chain -- each directory the resolution passes through and each link it reads -- stays within the checkout's own
+// real node_modules and the chain ends in a regular file there (it claims no exception; a chain that leaves and
+// returns refuses). No environment variable selects an executable or module location: ORDINARY_FORBIDDEN_ENV is
+// refused, never stripped.
+
+/** The `tsx` argument lists (everything after `npx tsx`) the ordinary plan issues. A new step fails to compile. */
+export function ordinaryTsxArgv(): string[][] {
+  const steps: Record<AflApiAdjudicationStep, null> = {
+    capture: null, 'registrations-reinstate': null, 'registrations-verify': null, reinstate: null, bijection: null,
+  };
+  return [
+    ...(Object.keys(steps) as AflApiAdjudicationStep[]).map((step) => aflApiAdjudicationArgv(step).slice(2)),
+    aflApiAdjudicationArgv('capture', true).slice(2),
+    firstKickGoalArgv().slice(2),
+    firstKickGoalValidateArgv().slice(2),
+  ];
+}
+
+/** The only package scripts the ordinary path may run: name -> the `tsx` argument list its fixed body runs. */
+const ORDINARY_NPM_SCRIPTS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['db:migrate:test', ['tools/db/migrate.ts', '--target', 'test']],
+  ['db:privileges:test', ['tools/db/privileges.ts', '--target', 'test']],
+]);
+
+/** The fixed package.json body of each permitted script. */
+export function ordinaryNpmScriptBodies(): Record<string, string> {
+  return Object.fromEntries([...ORDINARY_NPM_SCRIPTS].map(([name, argv]) => [name, `tsx ${argv.join(' ')}`]));
+}
+
+/**
+ * The esbuild native-binary exception (see the header). Constants, not derived from the native policy: the policy
+ * reaches this process only through the harness environment, so deriving from it would let the caller choose the
+ * target. These are reviewed in the diff, pinned with this file, and independently re-bound (path + digest) by the
+ * host's reviewed native policy (two `object` lines). A moved install or an esbuild bump refuses until re-reviewed.
+ */
+export const ORDINARY_ESBUILD_SHA256 = 'e1698a3d5c6c0798fee4fd3b5cc816651f460c63d390a7a26ea4beb0b1884100';
+const ORDINARY_ESBUILD_INSTALL = '/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed';
+export const ORDINARY_ESBUILD_LINKS: readonly { readonly path: string; readonly target: string; readonly lockKey: string }[] = Object.freeze([
+  'node_modules/tsx/node_modules/@esbuild/linux-x64',
+  'node_modules/tsx/node_modules/esbuild',
+].map((lockKey) => Object.freeze({
+  path: `${lockKey}/bin/esbuild`,
+  target: `${ORDINARY_ESBUILD_INSTALL}/${lockKey}/bin/esbuild`,
+  lockKey,
+})));
+
+/** Environment keys that would select an executable or load code from outside the checkout: refused, never stripped. */
+export const ORDINARY_FORBIDDEN_ENV: readonly string[] = Object.freeze(['ESBUILD_BINARY_PATH', 'NODE_OPTIONS', 'NODE_PATH', 'TSX_TSCONFIG_PATH']);
+
+/** Refuse when the environment a child would receive names any ORDINARY_FORBIDDEN_ENV key (case-insensitively). */
+export function assertOrdinaryEnvironment(env: Readonly<Record<string, string | undefined>> | undefined): void {
+  const present = Object.keys(env ?? {}).filter((key) => ORDINARY_FORBIDDEN_ENV.includes(key.toUpperCase()));
+  if (present.length) {
+    throw new RebuildRefused(`The ordinary path refuses an inherited ${present.join(', ')}: no environment variable may select `
+      + 'an executable or a module location (AFLDB-ISSUE-324). Unset it and retry. Nothing was run.');
+  }
+}
+
+const sameArgv = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
+
+export type OrdinaryChild = { kind: 'passthrough' } | { kind: 'node'; argv: string[] };
+
+/**
+ * The single decision point: what an ordinary-path command becomes, or a refusal. Nothing is spawned here, so
+ * the same decision serves the spawn wrapper and the pre-destruction admissibility check.
+ */
+export function classifyOrdinaryCommand(command: unknown, args: unknown, python: string = resolvePython()): OrdinaryChild {
+  if (typeof command !== 'string' || !Array.isArray(args) || args.some((a) => typeof a !== 'string')) {
+    throw new RebuildRefused('Unbound child executable. Nothing was run.');
+  }
+  const argv = args as string[];
+  if (command === PSQL_BIN) return { kind: 'passthrough' };
+  if (command === 'npx') {
+    const rest = argv.slice(1);
+    if (argv[0] === 'tsx' && ordinaryTsxArgv().some((entry) => sameArgv(entry, rest))) return { kind: 'node', argv: rest };
+    throw new RebuildRefused('Unbound npx invocation. Nothing was run.');
+  }
+  if (command === 'npm') {
+    const script = argv.length === 2 && argv[0] === 'run' ? ORDINARY_NPM_SCRIPTS.get(argv[1]) : undefined;
+    if (script) return { kind: 'node', argv: [...script] };
+    // Message only: these two names are NEVER looked up as permitted (see the header comment above).
+    const codeTestScripts: string[] = [REBUILD_TARGETS.code_test_db.migrateScript, REBUILD_TARGETS.code_test_db.privilegesScript];
+    const codeTest = argv.length === 2 && argv[0] === 'run' && codeTestScripts.includes(argv[1]);
+    throw new RebuildRefused('Unbound package script. Nothing was run.'
+      + (codeTest ? ' The ordinary CLI does not run --target code_test_db under native enforcement '
+        + '(AFLDB-ISSUE-324, intentional); the dedicated code_test_db rehearsal tool is unaffected.' : ''));
+  }
+  if (command === python) {
+    if (!argv.length || argv[0].startsWith('-')) throw new RebuildRefused('Unbound Python invocation. Nothing was run.');
+    return { kind: 'passthrough' };
+  }
+  throw new RebuildRefused('Unbound child executable. Nothing was run.');
+}
+
+/** The file-system and root facts `verifyOrdinaryTsxEntry` reads. A test seam only: never a CLI or env switch. */
+export type OrdinaryIo = {
+  realpathSync: (path: string) => string;
+  lstatSync: (path: string) => { isSymbolicLink(): boolean; isDirectory(): boolean; isFile(): boolean };
+  readFileSync: (path: string, encoding: 'utf8') => string;
+  listDirectory: (path: string) => string[];
+  readlinkSync: (path: string) => string;
+  /** sha256 (hex) of a file's bytes. */
+  sha256File: (path: string) => string;
+  /** The working directory the children run in. */
+  repoRoot: string;
+  /** The checkout that contains THIS module (tools/db/rebuild-test.ts). */
+  moduleRoot: string;
+};
+
+const MODULE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+
+function defaultOrdinaryIo(): OrdinaryIo {
+  return {
+    realpathSync: (path) => realpathSync(path),
+    lstatSync: (path) => lstatSync(path),
+    readFileSync: (path, encoding) => readFileSync(path, encoding),
+    listDirectory: (path) => listDirectorySync(path),
+    readlinkSync: (path) => readlinkSync(path),
+    sha256File: (path) => createHash('sha256').update(readFileSync(path)).digest('hex'),
+    repoRoot: REPO_ROOT,
+    moduleRoot: MODULE_ROOT,
+  };
+}
+
+/**
+ * Prove, before anything is spawned, that the `tsx` code the ordinary path would execute is this checkout's own:
+ * the working directory is the checkout containing this module; `node_modules/tsx` and its `dist/cli.mjs`
+ * RESOLVE (real path, not just lexical path) inside that checkout; no symbolic link or junction lies on the
+ * `node_modules` -> `tsx` -> `dist` chain or anywhere under `dist`; the installed tsx is the version and `bin`
+ * `package-lock.json` pins; the two npm scripts have exactly the fixed bodies; and every entry of the whole
+ * `node_modules` tree is a regular file or directory, a `.bin` link whose every hop stays in-checkout, or one of the two esbuild
+ * native-binary exception links exactly as fixed (target, real path, sha256, lock version). A checkout-local link to
+ * a shared installation fails these on purpose. Returns the verified `cli.mjs` path; refuses on any failure.
+ */
+export function verifyOrdinaryTsxEntry(io: OrdinaryIo = defaultOrdinaryIo()): string {
+  const refuse = (check: string): never => {
+    throw new RebuildRefused(`Ordinary tsx entry point refused: ${check}. Nothing was run.`);
+  };
+  const attempt = <T>(check: string, body: () => T): T => {
+    try { return body(); } catch (error) {
+      if (error instanceof RebuildRefused) throw error;
+      return refuse(`${check} (${(error as NodeJS.ErrnoException).code ?? 'unreadable'})`);
+    }
+  };
+  const strictlyInside = (base: string, path: string): boolean => {
+    const rel = relative(base, path);
+    return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+  };
+
+  // (a) root binding
+  const realRoot = attempt('the working directory cannot be resolved', () => io.realpathSync(io.repoRoot));
+  const realModuleRoot = attempt('the module checkout cannot be resolved', () => io.realpathSync(io.moduleRoot));
+  if (relative(realRoot, realModuleRoot) !== '') refuse('the working directory is not the checkout that contains this module');
+
+  // (b) the fixed lexical entry point
+  const nodeModules = join(io.repoRoot, 'node_modules');
+  const tsxDir = join(nodeModules, 'tsx');
+  const distDir = join(tsxDir, 'dist');
+  const cli = join(distDir, 'cli.mjs');
+
+  // (c) the REAL path of the executed code is inside the pinned checkout, and no link lies on the chain
+  const realTsx = attempt('node_modules/tsx cannot be resolved', () => io.realpathSync(tsxDir));
+  if (!strictlyInside(realRoot, realTsx)) refuse('node_modules/tsx resolves outside the pinned checkout');
+  const realCli = attempt('node_modules/tsx/dist/cli.mjs cannot be resolved', () => io.realpathSync(cli));
+  if (!strictlyInside(realTsx, realCli)) refuse('node_modules/tsx/dist/cli.mjs resolves outside node_modules/tsx');
+  const regular = (path: string, label: string, want: 'directory' | 'file'): void => {
+    const stat = attempt(`${label} cannot be inspected`, () => io.lstatSync(path));
+    if (stat.isSymbolicLink()) refuse(`${label} is a symbolic link or junction`);
+    if (want === 'directory' ? !stat.isDirectory() : !stat.isFile()) refuse(`${label} is not a regular ${want}`);
+  };
+  const walk = (dir: string, label: string): void => {
+    for (const name of attempt(`${label} cannot be listed`, () => io.listDirectory(dir))) {
+      const child = `${label}/${name}`;
+      const stat = attempt(`${child} cannot be inspected`, () => io.lstatSync(join(dir, name)));
+      if (stat.isSymbolicLink()) refuse(`${child} is a symbolic link or junction`);
+      if (stat.isDirectory()) walk(join(dir, name), child);
+      else if (!stat.isFile()) refuse(`${child} is not a regular file`);
+    }
+  };
+  const manifest = join(tsxDir, 'package.json');
+  const rootManifest = join(io.repoRoot, 'package.json');
+  const lockFile = join(io.repoRoot, 'package-lock.json');
+  regular(nodeModules, 'node_modules', 'directory');
+  regular(tsxDir, 'node_modules/tsx', 'directory');
+  regular(distDir, 'node_modules/tsx/dist', 'directory');
+  regular(cli, 'node_modules/tsx/dist/cli.mjs', 'file');
+  regular(manifest, 'node_modules/tsx/package.json', 'file');
+  regular(rootManifest, 'package.json', 'file');
+  regular(lockFile, 'package-lock.json', 'file');
+  walk(distDir, 'node_modules/tsx/dist');
+
+  // (d) the installed tsx is the one the lock pins
+  const json = (path: string, label: string): Record<string, unknown> => attempt(`${label} cannot be read as JSON`, () => {
+    const value: unknown = JSON.parse(io.readFileSync(path, 'utf8'));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('not an object');
+    return value as Record<string, unknown>;
+  });
+  const installed = json(manifest, 'node_modules/tsx/package.json');
+  const lock = json(lockFile, 'package-lock.json');
+  const packages = lock.packages;
+  const locked = packages && typeof packages === 'object' && Object.hasOwn(packages, 'node_modules/tsx')
+    ? (packages as Record<string, unknown>)['node_modules/tsx'] : undefined;
+  if (!locked || typeof locked !== 'object') refuse('package-lock.json has no node_modules/tsx entry');
+  const pinned = locked as Record<string, unknown>;
+  const binOf = (bin: unknown): string | undefined => {
+    const value = typeof bin === 'string' ? bin
+      : bin && typeof bin === 'object' && Object.hasOwn(bin, 'tsx') ? (bin as Record<string, unknown>).tsx : undefined;
+    return typeof value === 'string' ? value.replace(/^\.\//, '') : undefined;
+  };
+  if (installed.name !== 'tsx') refuse('node_modules/tsx/package.json is not the tsx package');
+  if (typeof installed.version !== 'string' || installed.version !== pinned.version) {
+    refuse('the installed tsx version differs from package-lock.json');
+  }
+  if (binOf(installed.bin) !== 'dist/cli.mjs' || binOf(pinned.bin) !== 'dist/cli.mjs') {
+    refuse('the tsx bin entry is not dist/cli.mjs in both the installed package and package-lock.json');
+  }
+
+  // (e) the fixed npm-script bodies
+  const scripts = json(rootManifest, 'package.json').scripts;
+  for (const [name, body] of Object.entries(ordinaryNpmScriptBodies())) {
+    if (!scripts || typeof scripts !== 'object' || !Object.hasOwn(scripts, name)
+        || (scripts as Record<string, unknown>)[name] !== body) {
+      refuse(`package.json script ${name} differs from its fixed body`);
+    }
+  }
+
+  // (f) ALL package code is physically inside the checkout: walk the whole of node_modules. A link is admitted only
+  // as (1) one of the two esbuild native-binary exception entries, exactly as fixed, or (2) an npm `.bin/<name>`
+  // link whose WHOLE chain stays inside this checkout's real node_modules (binChain). Anything else refuses.
+  const realNodeModules = attempt('node_modules cannot be resolved', () => io.realpathSync(nodeModules));
+  // An npm `.bin/<name>` chain (owner ruling, ISSUE-316 J2, F-J01): every hop is checked, not only the final real
+  // path. Resolution is emulated component by component as the kernel performs it, from the link's own directory:
+  // every directory the walk stands in (`..` included) must lie within the real node_modules (equality allowed);
+  // every link read is therefore inside it; an absolute link text is admitted only when it names a path under the
+  // canonical real node_modules component by component (so no component outside is consulted); the chain must end in
+  // a regular file. A chain that leaves and later returns refuses at its first step outside. The kernel's own answer
+  // (realpath) must then agree with the walk. `tree` refuses every other link, so a hop can only be a `.bin` entry or
+  // an esbuild exception link, whose absolute outside target refuses here (the exception is the two binaries alone).
+  const MAX_BIN_HOPS = 40;
+  const within = (base: string, path: string): boolean => relative(base, path) === '' || strictlyInside(base, path);
+  const components = (text: string): string[] => text.split(sep === '\\' ? /[\\/]/ : '/');
+  const binChain = (lexical: string, child: string): void => {
+    const leaves = (): never => refuse(`${child} link chain leaves the checkout's node_modules`);
+    let dir = join(realNodeModules, relative(nodeModules, dirname(lexical)));
+    if (!within(realNodeModules, dir)) leaves();
+    const pending = [basename(lexical)];
+    const onlyDots = (): boolean => pending.every((part) => part === '' || part === '.');
+    let hops = 0;
+    let final: string | undefined;
+    while (pending.length && final === undefined) {
+      const name = pending.shift() as string;
+      if (name === '' || name === '.') continue;
+      if (name === '..') {
+        dir = dirname(dir);
+        if (!within(realNodeModules, dir)) leaves();
+        continue;
+      }
+      const at = join(dir, name);
+      const stat = attempt(`${child} link chain cannot be inspected`, () => io.lstatSync(at));
+      if (stat.isSymbolicLink()) {
+        if (++hops > MAX_BIN_HOPS) refuse(`${child} link chain has too many links`);
+        const text = attempt(`${child} link chain cannot be read`, () => io.readlinkSync(at));
+        const parts = components(text);
+        if (isAbsolute(text)) {
+          const base = components(realNodeModules);
+          if (parts.length < base.length || base.some((part, index) => parts[index] !== part)) leaves();
+          dir = realNodeModules;
+          pending.unshift(...parts.slice(base.length));
+        } else {
+          pending.unshift(...parts);
+        }
+      } else if (stat.isDirectory()) {
+        if (onlyDots()) refuse(`${child} does not resolve to a regular file`);
+        dir = at;
+      } else if (stat.isFile()) {
+        if (pending.length) refuse(`${child} link chain passes through a regular file`);
+        final = at;
+      } else {
+        refuse(`${child} link chain reaches a special file`);
+      }
+    }
+    if (final === undefined) return refuse(`${child} does not resolve to a regular file`);
+    const real = attempt(`${child} cannot be resolved`, () => io.realpathSync(lexical));
+    if (!strictlyInside(realNodeModules, real)) refuse(`${child} resolves outside the checkout's node_modules`);
+    if (relative(final, real) !== '') refuse(`${child} resolution disagrees with its link chain`);
+  };
+  const exceptions = new Map(ORDINARY_ESBUILD_LINKS.map((entry) => [entry.path, entry]));
+  const esbuildLink = (entry: (typeof ORDINARY_ESBUILD_LINKS)[number], lexical: string): void => {
+    const label = `${entry.path} (esbuild native-binary exception)`;
+    const text = attempt(`${label} cannot be read as a link`, () => io.readlinkSync(lexical));
+    if (text !== entry.target) refuse(`${label} does not link to its fixed target`);
+    const real = attempt(`${label} target cannot be resolved`, () => io.realpathSync(lexical));
+    if (real !== entry.target) refuse(`${label} does not resolve to its fixed real path`);
+    const stat = attempt(`${label} target cannot be inspected`, () => io.lstatSync(entry.target));
+    if (stat.isSymbolicLink() || !stat.isFile()) refuse(`${label} target is not a regular file`);
+    const digest = attempt(`${label} target cannot be hashed`, () => io.sha256File(entry.target));
+    if (digest !== ORDINARY_ESBUILD_SHA256) refuse(`${label} target bytes differ from the fixed sha256`);
+    const owner = json(join(io.repoRoot, ...entry.lockKey.split('/'), 'package.json'), `${entry.lockKey}/package.json`);
+    const pinnedOwner = (packages as Record<string, unknown> | undefined)?.[entry.lockKey];
+    const lockedVersion = pinnedOwner && typeof pinnedOwner === 'object' ? (pinnedOwner as Record<string, unknown>).version : undefined;
+    if (typeof owner.version !== 'string' || owner.version !== lockedVersion) refuse(`${entry.lockKey} version differs from package-lock.json`);
+  };
+  const tree = (dir: string, label: string): void => {
+    for (const name of attempt(`${label} cannot be listed`, () => io.listDirectory(dir))) {
+      const child = `${label}/${name}`;
+      const path = join(dir, name);
+      const stat = attempt(`${child} cannot be inspected`, () => io.lstatSync(path));
+      const exception = exceptions.get(child);
+      if (exception) {
+        if (stat.isSymbolicLink()) esbuildLink(exception, path);
+        else if (!stat.isFile()) refuse(`${child} is not a regular file`);
+      } else if (stat.isSymbolicLink()) {
+        if (!/\/\.bin\/[^/]+$/.test(child)) refuse(`${child} is a symbolic link or junction outside the esbuild native-binary exception`);
+        binChain(path, child);
+      } else if (stat.isDirectory()) tree(path, child);
+      else if (!stat.isFile()) refuse(`${child} is not a regular file`);
+    }
+  };
+  tree(nodeModules, 'node_modules');
+  return cli;
+}
+
+/**
+ * The ORDINARY plan must be admissible BEFORE anything is destroyed (and before `--plan` reports success):
+ * every planned command stage is classified against the closed tables (nothing is spawned) and the tsx entry
+ * point is verified. A refusal names the stage and says nothing has been destroyed.
+ */
+export function assertOrdinaryStagesAdmissible(
+  stages: readonly Stage[], io?: OrdinaryIo, env: Readonly<Record<string, string | undefined>> = process.env,
+): void {
+  try {
+    assertOrdinaryEnvironment(env);
+    for (const stage of stages) {
+      if (!stage.argv) continue;
+      try { classifyOrdinaryCommand(stage.argv[0], stage.argv.slice(1)); }
+      catch (error) {
+        if (error instanceof RebuildRefused) throw new RebuildRefused(`Stage '${stage.id}': ${error.message}`);
+        throw error;
+      }
+    }
+    verifyOrdinaryTsxEntry(io);
+  } catch (error) {
+    if (error instanceof RebuildRefused) throw new RebuildRefused(`${error.message} Nothing has been destroyed.`);
+    throw error;
+  }
+}
+
+/**
+ * The ordinary spawn wrapper: `npx tsx` and the two `npm run` scripts become the approved node binary plus the
+ * verified repository-local tsx entry; `psql` and Python pass through; everything else is refused before any spawn.
+ * `options` is passed through untouched (the caller's environment is never rebuilt here); only `shell` and `cwd` are fixed.
+ */
+export function ordinarySpawn(spawn: typeof import('node:child_process').spawnSync, io?: OrdinaryIo): typeof spawn {
+  return ((command: string, args: string[], options: import('node:child_process').SpawnSyncOptions) => {
+    assertOrdinaryEnvironment(options?.env ?? process.env);   // read only: an absent env means the child inherits this one
+    const child = classifyOrdinaryCommand(command, args);
+    if (child.kind === 'passthrough') return spawn(command, args, options);
+    const cli = verifyOrdinaryTsxEntry(io);
+    return spawn(process.execPath, [cli, ...child.argv], { ...options, cwd: io?.repoRoot ?? REPO_ROOT, shell: false });
+  }) as typeof spawn;
+}
+
+/** Preserve genuine commands but remove PATH/shim/shell resolution for the candidate. */
+function rehearsalSpawn(spawn: typeof import('node:child_process').spawnSync, binding: RebuildBinding): typeof spawn {
+  return ((command: string, args: string[], options: Record<string, any>) => {
+    checkRebuildBinding(binding, 'subprocess');
+    const v = verifyRehearsalPackage(rehearsalRequest(binding.provenance!, binding.ladder, binding.target, 'subprocess-runtime'));
+    const r = v.runtime;
+    const enforcement = resolutionLaunch(v);
+    let executable = command, argv = [...args];
+    if (command === 'psql') executable = join(r.pg_bin, process.platform === 'win32' ? 'psql.exe' : 'psql');
+    else if (command === 'npx' && argv.shift() === 'tsx') {
+      executable = r.node; argv = [...enforcement.nodeArgs, ...argv];
+    } else if (command === 'npm' && argv[0] === 'run') {
+      const scripts: Record<string, string[]> = {
+        'db:migrate:test': ['tools/db/migrate.ts', '--target', 'test'],
+        'db:privileges:test': ['tools/db/privileges.ts', '--target', 'test'],
+      };
+      if (argv.length !== 2 || !scripts[argv[1]]) throw new RebuildRefused('Unbound package script.');
+      executable = r.node; argv = [...enforcement.nodeArgs, ...scripts[argv[1]]];
+    } else if (command === r.python) {
+      if (!argv.length || argv[0].startsWith('-')) throw new RebuildRefused('Unbound Python invocation.');
+      argv = [...enforcement.pythonArgs, ...argv];
+    } else throw new RebuildRefused('Unbound child executable.');
+    const env = rehearsalChildEnv(options.env, enforcement.env, r.pg_bin);
+    const result = spawn(executable, argv, { ...options, env, cwd: REPO_ROOT, shell: false });
+    try { checkRebuildBinding(binding, 'after-subprocess'); }
+    catch (error) {
+      if (result.status === 0) throw error;
+      process.stderr.write('Rehearsal terminal provenance refused after subprocess failure\n');
+    }
+    return result;
+  }) as typeof spawn;
 }
 
 /**
@@ -954,22 +1905,28 @@ export function resolvePython(
  * stages, so ordering and command construction are tested without running anything.
  */
 export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
-                           opts: Options): Stage[] {
+                           opts: Options, readHeightContract?: HeightContractReader,
+                           binding?: RebuildBinding, documents?: LadderDocuments,
+                           check: typeof checkRebuildBinding = checkRebuildBinding): Stage[] {
+  const ladder = binding?.ladder ?? resolveLadderRebuildExpectation(fitzroy, target, documents);
+  if (binding) {
+    if (binding.target !== target) throw new RebuildRefused('Plan target differs from frozen binding.');
+    assertCandidateOptions(opts, binding, fitzroy);
+    check(binding, 'plan');
+  }
   const dataEnv = { AFLDB_IMPORT_DATABASE_URL: target.importDsn };
   // One resolution for the whole graph, so no two stages can disagree.
   const python = resolvePython();
+  const statsInputs = heightStatsInputDescription(fitzroy.label, readHeightContract);
 
   // The schema and privilege stages run through package scripts, and each target has its
   // own pair bound to its own DSN variable. A ResolvedTarget only ever carries an
-  // allowlisted name, but the graph refuses rather than guesses if it does not.
-  if (!isRebuildTarget(target.database)) {
-    throw new RebuildRefused(
-      `No stage graph for '${target.database}': it is not an explicit rebuild target.`);
-  }
-  const spec = REBUILD_TARGETS[target.database];
-  const censusScope = aflApiOwnershipCensusScope();
+  // allowlisted name, but the graph refuses rather than guesses if it does not. V2 Launch F:
+  // an isolated target (resolved only by resolveIsolatedTarget) uses ISOLATED_REBUILD_SPEC.
+  const spec = rebuildSpecFor(target);
+  const censusScope = ladder.censusScope;
 
-  return [
+  const stages: Stage[] = [
     {
       id: 'precheck',
       name: 'PRECHECK — every required input, before anything is destroyed',
@@ -1047,14 +2004,14 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // AFLDB-ISSUE-118 §23.19. players.height_cm from the accepted baseline's own AFL
       // Tables player_details register, reconciled to the snapshot's per-match rows and
       // joined to players ONLY through the afltables profile-url identities `fitzroy`
-      // registered — so it must follow fitzroy and needs nothing later. The in-season
-      // supplement it reads beside the baseline is pinned in the fitzRoy contract
+      // registered — so it must follow fitzroy and needs nothing later. The configured
+      // stats inputs shared with coaches are pinned in the fitzRoy contract
       // (datasets.player_details.height_enrichment), never chosen here. No network.
       id: 'heights',
-      name: `HEIGHTS — AFL Tables register (${fitzroy.label} + ${heightEnrichmentPins().supplements.map((s) => s.label).join(', ')})`,
+      name: `HEIGHTS — AFL Tables register (${statsInputs})`,
       kind: 'data',
       run: 'command',
-      argv: heightsImportArgv(fitzroy.label, python),
+      argv: heightsImportArgv(fitzroy.label, python, readHeightContract),
       envOverlay: dataEnv,
     },
     {
@@ -1105,12 +2062,14 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // column, reconciled to the pages by exact string. Manifest-pinned snapshot
       // (afltables-contract.json coaches.accepted_snapshot); the tracked parsed
       // artefacts are the input bytes. Needs matches, clubs and identities: after
-      // fitzroy; nothing later reads it. No network.
+      // fitzroy; nothing later reads it. No network. AFLDB-ISSUE-319: outside the
+      // predecessor the stage replays the pinned raw bundle again, in the loading process.
       id: 'coaches',
-      name: `COACHES — AFL Tables coach pages ${afltablesCoachesPin().label} + ${fitzroy.label} Coach column`,
+      name: `COACHES — AFL Tables coach pages ${afltablesCoachesPin().label} + shared height/coach stats (${statsInputs}) Coach column`
+        + (coachRawReplayRequired(ladder.pair.profile) ? ' + mandatory raw replay' : ''),
       kind: 'data',
       run: 'command',
-      argv: coachesImportArgv(fitzroy.label, python),
+      argv: coachesImportArgv(fitzroy.label, python, readHeightContract, coachRawReplayRequired(ladder.pair.profile)),
       envOverlay: dataEnv,
     },
     {
@@ -1314,7 +2273,7 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: 'COLEMAN — leading home-and-away goalkicker, derived',
       kind: 'data',
       run: 'command',
-      argv: [python, 'tools/migration/import_awards.py', '--groups', 'coleman'],
+      argv: [python, 'legacy/offline/coleman.py', '--groups', 'coleman'],
       envOverlay: dataEnv,
     },
     {
@@ -1343,11 +2302,11 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // This is a VALIDATION stage, not a data stage: D6's "no tenth data stage" holds —
       // nothing here imports, and the validator opens its one connection read-only.
       id: 'ladder-witness',
-      name: `LADDER WITNESS — cross-check club_seasons against ${ladderWitnessLabel()}`,
+      name: `LADDER WITNESS — cross-check club_seasons against ${ladder.pair.witness_snapshot_label}`,
       kind: 'validation',
       run: 'command',
       argv: [python, LADDER_WITNESS_VALIDATOR,
-             '--label', ladderWitnessLabel(), '--compare'],
+             '--label', ladder.pair.witness_snapshot_label, '--compare'],
       envOverlay: dataEnv,
     },
     {
@@ -1355,9 +2314,11 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: 'FINAL VALIDATION — per-domain row counts against the accepted contracts',
       kind: 'validation',
       run: 'validate',
-      sql: finalValidationSql(opts.draftguruBridge),
+      sql: finalValidationSql(opts.draftguruBridge, ladder, documents?.register, readHeightContract),
     },
   ];
+  if (binding) boundPlans.set(stages, { bytes: JSON.stringify(stages), identity: JSON.stringify(binding), binding });
+  return stages;
 }
 
 /**
@@ -1887,10 +2848,23 @@ const MEASURED_NOT_DB_GATED: Record<string, string> = {
 
 export type FinalCheck = { key: string; sql: string; expected: number };
 
+/**
+ * Where the AFL API and AFL Tables source contracts are read from. Absent means the working
+ * tree, exactly as before. The rollover supplies readers over PROPOSED bytes so the real
+ * check builders judge a successor state without it being written anywhere first.
+ */
+export type SourceContractReaders = {
+  aflApi?: () => Record<string, unknown> | null;
+  afltables?: () => Record<string, unknown> | null;
+};
+
 /** Build the check list from the tracked register. Refuses rather than guessing. */
 export function finalValidationChecks(
   register: Record<string, unknown> | null,
   draftguru: { persons: number; picks: number; bridged?: number } = DRAFTGURU_EXPECTED,
+  readHeightContract?: HeightContractReader,
+  ladder?: LadderRebuildExpectation,
+  readers: SourceContractReaders = {},
 ): FinalCheck[] {
   const label = selectAcceptedBaseline(register).label;
   const baseline = ((register!.baselines ?? []) as Array<Record<string, unknown>>)
@@ -1921,8 +2895,7 @@ export function finalValidationChecks(
     checks.push({ key, sql, expected: value });
   }
 
-  // Not a `measured` key, and the one gate the brief names outright: 2026 belongs to
-  // current-season ingestion and must never appear in the historical core (§H4).
+  // Only the explicitly bound completed range belongs to this historical core.
   checks.push({
     key: 'matches_after_accepted_last_season',
     sql: `SELECT count(*) FROM matches WHERE season > ${
@@ -1949,7 +2922,12 @@ export function finalValidationChecks(
   // AFLDB-ISSUE-095 D7. The club_seasons gate §8 of the runbook deferred until the
   // domain had a canonical contract. It now has one — the table is derived from this
   // same match set — so a zero-row club_seasons is a rebuild FAILURE, not a known gap.
-  for (const check of clubSeasonChecks(Number(measured.seasons_last))) checks.push(check);
+  if (!ladder) throw new RebuildRefused('Final checks require a resolved explicit ladder expectation.');
+  if (ladder.pair.core_snapshot_label !== label || ladder.firstSeason !== measured.seasons_first || ladder.lastSeason !== measured.seasons_last) {
+    throw new RebuildRefused('Final checks do not match the frozen ladder/core range.');
+  }
+  for (const check of clubSeasonChecks(ladder.lastSeason, ladder.expectedRows)) checks.push(check);
+  checks.push(...completedSeasonChecks(ladder));
 
   // AFLDB-ISSUE-111. Added together with the COLEMAN stage, never before it: a gate
   // whose data source does not yet exist would fail every rebuild (the ISSUE-093 §H15.5
@@ -1971,15 +2949,15 @@ export function finalValidationChecks(
 
   // AFLDB-ISSUE-118 §23.19. Added together with the HEIGHTS stages, for the same
   // §H15.5 reason. The expected values are read from the contracts' pin blocks.
-  for (const check of heightChecks()) checks.push(check);
+  for (const check of heightChecks(label, readHeightContract, readers.aflApi)) checks.push(check);
 
   // AFLDB-ISSUE-118 §23.24. Added together with the BIRTH DATES stage, for the same
   // §H15.5 reason. The expected values are read from the AFL Tables contract's pin block.
-  for (const check of birthDateChecks()) checks.push(check);
+  for (const check of birthDateChecks(readers.afltables)) checks.push(check);
 
   // AFLDB-ISSUE-118 §23.27. Added together with the COACHES stage, for the same §H15.5
   // reason. The expected values are read from the AFL Tables contract's coaches pin.
-  for (const check of coachChecks()) checks.push(check);
+  for (const check of coachChecks(label, readHeightContract, readers.afltables)) checks.push(check);
 
   // AFLDB-ISSUE-118 §23.29. Added together with the FATHER–SON stage, for the same §H15.5
   // reason. The expected values are read from the tracked artefact itself.
@@ -2102,11 +3080,11 @@ export const CLUB_SEASONS_EXPECTED = {
 };
 
 /** Structural invariants for the derived ladder. Read-only scalar counts. */
-export function clubSeasonChecks(acceptedLastSeason: number): FinalCheck[] {
+export function clubSeasonChecks(acceptedLastSeason: number, expectedRows: number): FinalCheck[] {
   return [
     { key: 'club_seasons_rows',
       sql: 'SELECT count(*) FROM club_seasons',
-      expected: CLUB_SEASONS_EXPECTED.rows },
+      expected: expectedRows },
 
     // The identity invariant. The derivation reads matches, which already store the
     // HISTORICAL identity, so it never re-points through afldb_identity_for_season.
@@ -2140,9 +3118,7 @@ export function clubSeasonChecks(acceptedLastSeason: number): FinalCheck[] {
          + " (SELECT id FROM clubs WHERE slug = 'brisbane-lions')",
       expected: CLUB_SEASONS_EXPECTED.brisbaneLionsFirstSeason },
 
-    // 2026 is the current-season pipeline's (AFLDB-ISSUE-098/-099/-101), never this
-    // path's. The derivation carries no hard-coded year: it produces nothing for 2026
-    // because the accepted core contains no 2026 match. This gate proves that.
+    // No season beyond the explicitly bound accepted core may appear.
     { key: 'club_seasons_after_accepted_last_season',
       sql: `SELECT count(*) FROM club_seasons WHERE season > ${acceptedLastSeason}`,
       expected: 0 },
@@ -2193,11 +3169,12 @@ export const FINAL_VALIDATION_MARKER = 'AFLDB-FINAL-VALIDATION';
  * `bridges.length`, never a typed constant, so the offline dataset and the database gate
  * cannot drift apart.
  */
-export function finalValidationSql(draftguruBridgePath?: string): string {
+export function finalValidationSql(draftguruBridgePath?: string, ladder?: LadderRebuildExpectation,
+                                   suppliedRegister?: Record<string, unknown>, readHeightContract?: HeightContractReader): string {
   const path = join(REPO_ROOT, ACCEPTED_BASELINES);
-  const register = existsSync(path)
+  const register = suppliedRegister ?? (existsSync(path)
     ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
-    : null;
+    : null);
   let draftguru: { persons: number; picks: number; bridged?: number } = DRAFTGURU_EXPECTED;
   if (draftguruBridgePath) {
     const bridgeAbs = isAbsolute(draftguruBridgePath)
@@ -2213,7 +3190,17 @@ export function finalValidationSql(draftguruBridgePath?: string): string {
     }
     draftguru = { ...DRAFTGURU_EXPECTED, bridged: bridgeDoc.bridges.length };
   }
-  return buildFinalValidationSql(finalValidationChecks(register, draftguru));
+  return buildFinalValidationSql(finalValidationChecks(register, draftguru, readHeightContract, ladder));
+}
+
+/** Football completion is proved separately; Brownlow availability grants nothing here. */
+export function completedSeasonChecks(ladder: LadderRebuildExpectation): FinalCheck[] {
+  return [{ key: 'completed_scope_missing_or_in_progress', expected: 0,
+    sql: `SELECT count(*) FROM generate_series(${ladder.firstSeason}, ${ladder.lastSeason}) y(year)
+      LEFT JOIN seasons s ON s.year = y.year WHERE s.year IS NULL OR s.status <> 'complete'` },
+    { key: 'completed_scope_latest_decided_grand_final', expected: 1,
+      sql: `SELECT CASE WHEN EXISTS (SELECT 1 FROM matches WHERE season = ${ladder.lastSeason}
+        AND round_type = 'grand_final' AND result <> 'draw') THEN 1 ELSE 0 END` }];
 }
 
 /**
@@ -2309,6 +3296,8 @@ END $$;
 export type RunResult = { status: number; stdout: string; stderr: string };
 
 export type Deps = {
+  /** In-process synthetic adapter seam; the CLI always uses the genuine verifier. */
+  checkBinding?: typeof checkRebuildBinding;
   runCommand: (argv: string[], env: Record<string, string>) => RunResult;
   /** The DESTRUCTIVE reset, and nothing else. */
   runSql: (dsn: string, sql: string) => void;
@@ -2316,6 +3305,12 @@ export type Deps = {
   runValidation: (dsn: string, sql: string) => void;
   fileExists: (path: string) => boolean;
   log: (line: string) => void;
+  /**
+   * V2 Launch F, isolated targets only: what the live server says about itself
+   * (ISOLATED_SERVER_FACTS_SQL), read-only. Absent on a non-isolated run; an isolated run
+   * without it is refused before any stage.
+   */
+  isolatedServerFacts?: (dsn: string) => IsolatedServerFacts;
 };
 
 export type ExecutionReport = {
@@ -2346,9 +3341,27 @@ const REHEARSAL_REQUIRED_PREFIX = [
  */
 export function executeRebuild(
   stages: Stage[], target: ResolvedTarget, deps: Deps,
-  control: { rehearsalStopAfter?: RehearsalStopBoundary } = {},
+  control: { rehearsalStopAfter?: RehearsalStopBoundary; binding?: RebuildBinding } = {},
 ): ExecutionReport {
   const executed: string[] = [];
+  const binding = control.binding;
+  const candidateConfigured = ladderDocuments().contract.datasets?.ladder?.rebuild_expectation?.profile === 'c2-2026-rehearsal-only';
+  const planned = boundPlans.get(stages);
+  // AFLDB-ISSUE-323: the c2-2026-final-* argv no longer means "candidate" once the successor is adopted, but only
+  // for the exact plan bound to an adopted-successor binding; the checkpoint below re-proves that plan's bytes.
+  const candidateArgv = stages.some((s) => s.argv?.some((a) => a.startsWith('c2-2026-final-')));
+  if ((candidateConfigured || planned?.binding.provenance || binding?.provenance
+      || (candidateArgv && !(planned?.binding === binding && isAdoptedSuccessorBinding(binding)))) && !binding?.provenance) {
+    throw new RebuildRefused('Candidate execution requires original external provenance.');
+  }
+  const checkpoint = (name: string) => {
+    if (!binding) return;
+    if (binding.target !== target || !planned || planned.binding !== binding || planned.identity !== JSON.stringify(binding) || planned.bytes !== JSON.stringify(stages)) {
+      throw new RebuildRefused('Rebuild target/plan changed or required full topology omitted.');
+    }
+    (deps.checkBinding ?? checkRebuildBinding)(binding, name);
+  };
+  checkpoint('execute-entry');
 
   // AFLDB-ISSUE-313: whoever built the target (the CLI, the first-kick-goal rehearsal, a
   // test), the first stage — never mind the destructive one — waits for this.
@@ -2358,7 +3371,12 @@ export function executeRebuild(
   // `target.database` is the acknowledged, allowlisted name; the guard is built (and refuses a
   // name outside the allowlist) before any stage, then leads EVERY stream psql is given.
   assertDsnPinsTarget(target.adminDsn, 'The admin DSN');
-  const identityGuard = rebuildIdentityGuardSql(target.database);
+
+  // V2 Launch F: an isolated target proves its DSNs and the LIVE server before any stage — so
+  // before the census, the capture and the destructive reset. An isolated-family name that did
+  // not come through resolveIsolatedTarget() is refused here too.
+  if (target.isolated || isIsolatedRebuildName(target.database)) assertIsolatedTargetLive(target, deps);
+  const identityGuard = rebuildIdentityGuardSql(target.database, isolatedNameEnv(target));
 
   if (control.rehearsalStopAfter !== undefined) {
     assertRehearsalStop({ target: target.database, rehearsalStopAfter: control.rehearsalStopAfter }, target.database);
@@ -2370,7 +3388,23 @@ export function executeRebuild(
     }
   }
 
+  // Set only by the capture stage's own success in THIS execution (never a parameter), and used
+  // only for the recreate recheck that directly follows it.
+  let completedCapture: CompletedCapture | undefined;
   for (const stage of stages) {
+    checkpoint(`before:${stage.id}`);
+    if (binding?.provenance && ['afl-api-adjudications-capture', 'recreate', 'fingerprints'].includes(stage.id)) {
+      const captureBound = stage.id === 'recreate' && executed[executed.length - 1] === 'afl-api-adjudications-capture'
+        ? completedCapture : undefined;
+      try { assertIsolatedTargetLive(target, deps, captureBound); }
+      catch (error) {
+        // A fixed, nonsecret reason (check names, digests' mismatch phrases); never a DSN or a captured value.
+        const reason = error instanceof RebuildRefused
+          ? redact(error.message.replace(/\s*Nothing has been run\.$/, '')) : 'unexpected failure';
+        throw new RebuildRefused(`Live isolated-target recheck refused before ${stage.id}: ${reason}. Prior completed stages remain applied; capture/marker state has not been cleared.`);
+      }
+      checkpoint(`after-live:${stage.id}`);
+    }
     deps.log(`==> ${stage.name}`);
     executed.push(stage.id);
 
@@ -2398,15 +3432,36 @@ export function executeRebuild(
     }
 
     if (stage.run === 'command') {
+      const bindsCapture = Boolean(binding?.provenance) && stage.id === 'afl-api-adjudications-capture';
+      let captureDir = '';
+      let absentBeforeCapture = false;
+      if (bindsCapture) {
+        captureDir = captureDirectory(resolveCaptureRoot(process.env, REPO_ROOT), target.database);
+        absentBeforeCapture = pendingCaptureAbsent(captureDir);
+      }
       const result = deps.runCommand(stage.argv!, { ...(stage.envOverlay ?? {}) });
       if (result.status !== 0) {
         deps.log(`    FAILED: ${stage.id} exited ${result.status}`);
         return { executed, failedStage: stage.id, ok: false };
       }
+      if (bindsCapture) {
+        try {
+          completedCapture = bindCompletedCapture({
+            dir: captureDir, database: target.database, absentBeforeCapture, captureStdout: result.stdout,
+          });
+        } catch (error) {
+          deps.log(`    FAILED: ${stage.id} exited 0 but ${redact((error as Error).message)}`);
+          return { executed, failedStage: stage.id, ok: false };
+        }
+        deps.log(`    capture bound: file sha256 ${completedCapture.fileSha256}, payload ${completedCapture.payloadSha256} `
+          + `(${completedCapture.ledgerRows} ledger, ${completedCapture.importerRows} importer, `
+          + `${completedCapture.registrations} registration row(s))`);
+      }
       continue;
     }
   }
 
+  checkpoint('execute-terminal');
   return { executed, ok: true };
 }
 
@@ -2425,13 +3480,62 @@ export function fitzroyValidateArgv(source: FitzroySource): string[] {
 }
 
 /**
+ * An interrupted rollover apply leaves the tracked reference files a mixed old/new set and a journal
+ * naming them. The rollover CLI refuses on it; so must the rebuild, which reads every one of those
+ * files as its authority. `exists` is injectable so the refusal is testable without touching the tree.
+ */
+export function assertNoPendingRolloverApply(
+  exists: (path: string) => boolean = (path) => existsSync(join(REPO_ROOT, path)),
+): void {
+  if (exists('.rollover-transaction.json')) {
+    throw new RebuildRefused('.rollover-transaction.json exists: an earlier rollover apply did not finish, so '
+      + 'the tracked reference files may be a mixed old/new set. Run `npx tsx tools/db/rollover-season.ts` (any '
+      + 'arguments) to print the per-file state and recovery steps; the rebuild will not read them until it is resolved.');
+  }
+}
+
+/**
  * The preflight stage's own work, kept separate so it is testable in isolation.
  *
  * It takes the SAME `Options` object planStages() builds the data stages from, so the
  * snapshot this proves and the snapshot the rebuild then imports cannot be different
  * selections. See draftguruValidateArgv().
  */
-export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource): void {
+export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource,
+                             readHeightContract?: HeightContractReader, binding?: RebuildBinding): void {
+  assertNoPendingRolloverApply();
+  const candidateConfigured = ladderDocuments().contract.datasets?.ladder?.rebuild_expectation?.profile === 'c2-2026-rehearsal-only';
+  // AFLDB-ISSUE-323: the successor's core label refuses here unless the preflighted source IS the adopted
+  // successor binding's own source; a rehearsal launch spec still always demands provenance.
+  const candidateLabel = source?.label === 'c2-2026-final-core-v1'
+    && !(JSON.stringify(source) === JSON.stringify(binding?.source) && isAdoptedSuccessorBinding(binding));
+  if ((candidateConfigured || candidateLabel || opts.rehearsalLaunchSpec) && !binding?.provenance) {
+    throw new RebuildRefused('Candidate preflight requires external rehearsal provenance.');
+  }
+  if (binding) {
+    assertCandidateOptions(opts, binding, source);
+    const identity = JSON.stringify({ binding, opts, source });
+    const check = (checkpoint: string) => {
+      if (identity !== JSON.stringify({ binding, opts, source })) throw new RebuildRefused('Frozen preflight invocation drift.');
+      (deps.checkBinding ?? checkRebuildBinding)(binding, checkpoint);
+    };
+    check('preflight-entry');
+    if (binding.provenance) {
+      assertIsolatedTargetLive(binding.target, deps);
+      check('after-preflight-live');
+    }
+    const original = deps;
+    deps = { ...original, runCommand: (argv, env) => {
+      check('preflight-child');
+      const result = original.runCommand(argv, env);
+      try { check('after-preflight-child'); }
+      catch (error) {
+        if (result.status === 0) throw error;
+        original.log('Rehearsal provenance also refused after failed preflight child.');
+      }
+      return result;
+    } };
+  }
   // Before anything else. Every stage below this line is a Python child process, and a
   // missing interpreter surfaces on Windows as nothing but "The system cannot find the
   // path specified." — attributed to whichever stage happened to run first, which is how
@@ -2443,6 +3547,8 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
   // worktree is guaranteed to find whatever this run leaves pending.
   resolveCaptureRoot(process.env, REPO_ROOT);
 
+  // Validate shared stats bindings even when no source label was supplied.
+  heightEnrichmentPins(readHeightContract, source?.label);
   const python = resolvePython();
   if (!deps.fileExists(python)) {
     const overridden = (process.env.AFLDB_PYTHON ?? '').trim() !== '';
@@ -2526,19 +3632,18 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + `Nothing has been destroyed.\n${brownlow.stdout}${brownlow.stderr}`);
   }
 
-  // AFLDB-ISSUE-118 §23.19. The height stages read two acquired snapshots beside the
-  // baseline — the pinned in-season supplement and the pinned AFL API roster set —
+  // AFLDB-ISSUE-118 §23.19. Heights read the baseline register/stats, any configured
+  // supplements shared with coaches, and the separately pinned AFL API roster set —
   // whose raw bytes are gitignored. Prove the manifest bindings (done inside the pin
   // readers, which refuse on a missing or mismatched manifest) and every artefact hash
   // offline, before destruction, exactly as the ladder witness is proven.
   if (source) {
-    const heights = deps.runCommand(heightsValidateArgv(source.label), {});
+    const heights = deps.runCommand(heightsValidateArgv(source.label, python, readHeightContract), {});
     if (heights.status !== 0) {
       throw new RebuildRefused(
         `Height preflight failed (${HEIGHT_LOADER} --validate-only). The fitzRoy contract `
-        + 'pins the in-season supplement(s) '
-        + `${heightEnrichmentPins().supplements.map((s) => `'${s.label}'`).join(', ')}, `
-        + 'but the register or a supplement is missing, incomplete or does not match its '
+        + `pins baseline/register and shared height/coach stats (${heightStatsInputDescription(source.label, readHeightContract)}), `
+        + 'but the baseline register/stats or a configured supplement is missing, incomplete or does not match its '
         + 'manifest. Nothing has been destroyed.\n'
         + `${heights.stdout}${heights.stderr}`);
     }
@@ -2548,6 +3653,7 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       `Wikipedia height preflight: required tracked input is missing: ${WIKIPEDIA_HEIGHT_CSV}. `
       + 'Nothing has been destroyed.');
   }
+  assertReviewedInputPins();
   const wikipedia = deps.runCommand(wikipediaHeightsValidateArgv(), {});
   if (wikipedia.status !== 0) {
     throw new RebuildRefused(
@@ -2573,21 +3679,27 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       `Birth-date preflight failed (${BIRTH_DATE_LOADER} --validate-only). The AFL Tables `
       + `contract pins '${afltablesClubListPin().label}', but its acquired bytes are missing, `
       + 'incomplete or do not match the manifest. Re-acquire it with '
-      + 'tools/rebuild/afltables/acquire_club_lists.R. Nothing has been destroyed.\n'
+      + 'legacy/offline/tools/rebuild/afltables/acquire_club_lists.R. Nothing has been destroyed.\n'
       + `${birthDates.stdout}${birthDates.stderr}`);
   }
   // AFLDB-ISSUE-118 §23.27. The coaches stage reads the pinned coach-page snapshot (its
-  // parsed artefacts tracked, raw bytes gitignored) and the baseline's own player_stats
-  // files: prove the pin binding (inside afltablesCoachesPin) and every hash offline.
+  // parsed artefacts tracked, raw bytes gitignored) and the shared height/coach stats
+  // inputs: prove the pin binding (inside afltablesCoachesPin) and every hash offline.
+  // AFLDB-ISSUE-319: outside the predecessor, the loader must also replay the pinned raw
+  // bundle into exactly the parsed bytes the stage loads; a missing pin or bundle refuses
+  // here, before the census, the capture or the reset. Parsed-only is never a fallback.
+  const requireCoachRaw = coachRawReplayPreflight(
+    binding ? binding.ladder.pair.profile : ladderDocuments().contract.datasets?.ladder?.rebuild_expectation?.profile,
+    deps.fileExists);
   if (source) {
-    const coaches = deps.runCommand(coachesValidateArgv(source.label), {});
+    const coaches = deps.runCommand(coachesValidateArgv(source.label, python, readHeightContract, requireCoachRaw), {});
     if (coaches.status !== 0) {
       throw new RebuildRefused(
-        `Coaches preflight failed (${COACH_LOADER} --validate-only). The AFL Tables contract `
+        `Coaches preflight failed (${COACH_LOADER} --validate-only${requireCoachRaw ? ' --require-raw-bundle' : ''}). The AFL Tables contract `
         + `pins '${afltablesCoachesPin().label}', but its tracked artefacts, the baseline's `
-        + 'player_stats files or a pinned supplement are missing, incomplete or do not match '
-        + 'their manifests. Re-acquire the coach pages with '
-        + 'tools/rebuild/afltables/acquire_coaches.py. Nothing has been destroyed.\n'
+        + `shared height/coach stats (${heightStatsInputDescription(source.label, readHeightContract)}) are missing, incomplete or do not match `
+        + `their manifests${requireCoachRaw ? ', or the pinned raw bundle does not replay into the parsed bytes the stage loads' : ''}. Re-acquire the coach pages with `
+        + 'legacy/offline/tools/rebuild/afltables/acquire_coaches.py. Nothing has been destroyed.\n'
         + `${coaches.stdout}${coaches.stderr}`);
     }
   }
@@ -2675,6 +3787,41 @@ function manifestSha256(path: string): string | null {
   return createHash('sha256').update(bytes, 'utf8').digest('hex');
 }
 
+/**
+ * ISSUE-316 source-evidence prerequisite. The tracked, Wikipedia-derived artefacts the rebuild
+ * loads had no byte pin: their loaders check shape, not content. These pins are LF-normalised
+ * sha256 of the reviewed bytes. A pin proves the bytes are the reviewed ones; it does NOT prove
+ * the artefact's authenticity or completeness. Changing a pinned file is a deliberate, reviewed
+ * edit of this table.
+ */
+export const REVIEWED_INPUT_PINS: Readonly<Record<string, string>> = Object.freeze({
+  [WIKIPEDIA_HEIGHT_CSV]: '3d809e60afe996b8d939ae6348d26386ccc2b844954bfcef0ae7d9ada115a13b',
+  [FATHER_SON_CSV]: 'dbba21cb64d74e943d431d696d9e435632cb3dfa4030c49f0a84f309fe833d27',
+  [SIBLINGS_CSV]: 'dc8d618015125103c42b66acd243962277185e703c7ecca3c428042b0c650bab',
+  [AFTER_SIREN_CSV]: 'f3fd67e23e65c552db3976b212dc3422acf9cb20b72da4ca40ba0f1502365527',
+});
+
+export function assertReviewedInputPins(
+  pins: Readonly<Record<string, string>> = REVIEWED_INPUT_PINS,
+  readText: (path: string) => string | null = (path) => {
+    const abs = join(REPO_ROOT, path);
+    return existsSync(abs) ? readFileSync(abs).toString('utf8') : null;
+  },
+): void {
+  for (const [path, expected] of Object.entries(pins)) {
+    const text = readText(path);
+    if (text === null) {
+      throw new RebuildRefused(`Reviewed input pin: ${path} is not in this checkout. Nothing has been destroyed.`);
+    }
+    const actual = createHash('sha256').update(text.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+    if (actual !== expected) {
+      throw new RebuildRefused(
+        `Reviewed input pin: ${path} sha256 ${actual.slice(0, 12)}… does not match the reviewed pin `
+        + `${expected.slice(0, 12)}…. Nothing has been destroyed.`);
+    }
+  }
+}
+
 export type PinnedManifest = { label: string; manifest: string; sha256: string };
 
 /** Refuses unless the pinned manifest exists and hashes to its binding. */
@@ -2693,39 +3840,70 @@ function provePin(pin: PinnedManifest, what: string): void {
   }
 }
 
+/** Stats inputs intentionally shared by heights and coaches; measurements never default. */
 export type HeightEnrichmentPins = {
+  statsInputMode: 'supplemented_baseline' | 'baseline_only';
+  baselineSnapshotLabel: string | null;
   supplements: PinnedManifest[];
   measured: { playersWithHeight: number; heightWithoutEvidence: number; heightConflictsOpen: number };
 };
 
+export type HeightContractReader = () => Record<string, unknown> | null;
+
+function readHeightContract(): Record<string, unknown> | null {
+  const path = join(REPO_ROOT, FITZROY_CONTRACT);
+  return existsSync(path)
+    ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+    : null;
+}
+
 /**
- * The in-season supplement(s) and measured outcome the HEIGHTS stage is bound to, read
- * from the fitzRoy contract (datasets.player_details.height_enrichment). Never a
- * default: no pin, no stage. Each supplement's manifest binding is proven on read.
+ * Shared height/coach baseline stats inputs and exact measured height outcomes.
+ * Legacy nonempty supplements retain their behavior. Baseline-only requires an
+ * explicit empty list bound to the selected baseline; every supplement proves its manifest.
  */
 export function heightEnrichmentPins(
-  readContract: () => Record<string, unknown> | null = () => {
-    const path = join(REPO_ROOT, FITZROY_CONTRACT);
-    return existsSync(path)
-      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
-      : null;
-  },
+  readContract: HeightContractReader = readHeightContract,
+  selectedBaselineLabel?: string,
 ): HeightEnrichmentPins {
   const contract = readContract();
   const datasets = contract?.datasets as Record<string, Record<string, unknown>> | undefined;
   const block = datasets?.player_details?.height_enrichment as Record<string, unknown> | undefined;
-  const supplements = block?.supplements as Array<Record<string, unknown>> | undefined;
+  const supplements = block?.supplements;
   const measured = block?.measured as Record<string, unknown> | undefined;
-  if (!block || !Array.isArray(supplements) || supplements.length === 0 || !measured) {
+  if (!block || !Array.isArray(supplements) || !measured) {
     throw new RebuildRefused(
       `${FITZROY_CONTRACT} records no height enrichment binding `
-      + '(datasets.player_details.height_enrichment with supplements and measured). '
-      + 'AFLDB-ISSUE-118 §23.19 binds the in-season supplement explicitly; the rebuild '
-      + 'will not pick one.');
+      + '(datasets.player_details.height_enrichment with explicit supplements and measured). '
+      + 'The rebuild will not guess shared height/coach stats inputs.');
   }
-  const pins: PinnedManifest[] = supplements.map((s) => ({
-    label: String(s.snapshot_label), manifest: String(s.manifest), sha256: String(s.manifest_sha256),
-  }));
+  const mode = Object.hasOwn(block, 'stats_input_mode')
+    ? block.stats_input_mode : 'supplemented_baseline';
+  if (mode !== 'supplemented_baseline' && mode !== 'baseline_only') {
+    throw new RebuildRefused('height_enrichment.stats_input_mode must be supplemented_baseline or baseline_only.');
+  }
+  let baselineSnapshotLabel: string | null = null;
+  if (mode === 'baseline_only') {
+    const label = block.baseline_snapshot_label;
+    if (supplements.length !== 0 || typeof label !== 'string' || label.trim() === ''
+        || !selectedBaselineLabel || label !== selectedBaselineLabel) {
+      throw new RebuildRefused('height_enrichment baseline_only requires explicit supplements: [] and '
+        + 'baseline_snapshot_label matching the selected baseline for both heights and coaches.');
+    }
+    baselineSnapshotLabel = label;
+  } else if (supplements.length === 0) {
+    throw new RebuildRefused('height_enrichment supplemented_baseline requires nonempty supplements; '
+      + 'an empty list requires explicit baseline_only and a selected baseline binding.');
+  }
+  const pins: PinnedManifest[] = supplements.map((value: unknown) => {
+    const s = value as Record<string, unknown> | null;
+    if (!s || typeof s.snapshot_label !== 'string' || !s.snapshot_label.trim()
+        || typeof s.manifest !== 'string' || !s.manifest.trim()
+        || typeof s.manifest_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(s.manifest_sha256)) {
+      throw new RebuildRefused('height_enrichment supplements require snapshot_label, manifest and manifest_sha256.');
+    }
+    return { label: s.snapshot_label, manifest: s.manifest, sha256: s.manifest_sha256 };
+  });
   for (const pin of pins) provePin(pin, 'The fitzRoy contract height_enrichment block');
   const int = (key: string): number => {
     const v = measured[key];
@@ -2735,6 +3913,8 @@ export function heightEnrichmentPins(
     return v;
   };
   return {
+    statsInputMode: mode,
+    baselineSnapshotLabel,
     supplements: pins,
     measured: {
       playersWithHeight: int('players_with_height'),
@@ -2742,6 +3922,11 @@ export function heightEnrichmentPins(
       heightConflictsOpen: int('height_conflicts_open'),
     },
   };
+}
+
+function heightStatsInputDescription(label: string, readContract?: HeightContractReader): string {
+  const pins = heightEnrichmentPins(readContract, label);
+  return [label, ...pins.supplements.map((s) => s.label)].join(' + ');
 }
 
 export type AflApiRosterPin = PinnedManifest & { measured: { playersWithAflApiEvidence: number } };
@@ -2776,18 +3961,20 @@ export function aflApiRosterPin(
   return { ...pin, measured: { playersWithAflApiEvidence: n } };
 }
 
-/** The HEIGHTS data stage: the baseline register plus every pinned supplement. */
+/** The HEIGHTS data stage: baseline register/stats plus configured shared stats supplements. */
 export function heightsImportArgv(fitzroyLabel: string,
-                                  python: string = resolvePython()): string[] {
+                                  python: string = resolvePython(),
+                                  readContract?: HeightContractReader): string[] {
   const argv = [python, HEIGHT_LOADER, '--label', fitzroyLabel];
-  for (const s of heightEnrichmentPins().supplements) argv.push('--supplement-label', s.label);
+  for (const s of heightEnrichmentPins(readContract, fitzroyLabel).supplements) argv.push('--supplement-label', s.label);
   return argv;
 }
 
 /** The same argv plus --validate-only: manifests and artefact hashes, no database. */
 export function heightsValidateArgv(fitzroyLabel: string,
-                                    python: string = resolvePython()): string[] {
-  return [...heightsImportArgv(fitzroyLabel, python), '--validate-only'];
+                                    python: string = resolvePython(),
+                                    readContract?: HeightContractReader): string[] {
+  return [...heightsImportArgv(fitzroyLabel, python, readContract), '--validate-only'];
 }
 
 export function aflApiHeightsArgv(python: string = resolvePython()): string[] {
@@ -2834,9 +4021,10 @@ export function wikipediaHeightRows(
  * produced them, so a rebuild that silently drops the stage (or reproduces fewer
  * identities) fails here rather than being noticed by a Gridley cell weeks later.
  */
-export function heightChecks(): FinalCheck[] {
-  const pins = heightEnrichmentPins();
-  const roster = aflApiRosterPin();
+export function heightChecks(selectedBaselineLabel?: string, readContract?: HeightContractReader,
+                             readAflApi?: SourceContractReaders['aflApi']): FinalCheck[] {
+  const pins = heightEnrichmentPins(readContract, selectedBaselineLabel);
+  const roster = aflApiRosterPin(readAflApi);
   return [
     { key: 'players_with_height',
       sql: 'SELECT count(*) FROM players WHERE height_cm IS NOT NULL',
@@ -2934,8 +4122,8 @@ export function birthDatesValidateArgv(python: string = resolvePython()): string
  * produced them. A rebuild that silently drops the stage, resolves fewer identities, or
  * starts overwriting fitzRoy dates fails here.
  */
-export function birthDateChecks(): FinalCheck[] {
-  const pin = afltablesClubListPin();
+export function birthDateChecks(readAfltables?: SourceContractReaders['afltables']): FinalCheck[] {
+  const pin = afltablesClubListPin(readAfltables);
   const clubListEvidence = "player_birth_evidence e JOIN sources s ON s.id = e.source_id "
     + "WHERE s.key = 'afltables' AND e.evidence_type = 'afltables_club_list'";
   return [
@@ -2959,7 +4147,10 @@ export function birthDateChecks(): FinalCheck[] {
   ];
 }
 
+/** AFLDB-ISSUE-319: the contract-pinned raw bundle of the accepted coach capture. */
+export type CoachRawBundlePin = Readonly<{ filename: string; sha256: string; bytes: number; members: number }>;
 export type AflTablesCoachesPin = PinnedManifest & {
+  rawBundle?: CoachRawBundlePin;
   measured: {
     coaches: number;
     coachesLinkedToPlayers: number;
@@ -2988,7 +4179,7 @@ export function afltablesCoachesPin(
   const block = contract?.coaches as Record<string, unknown> | undefined;
   const accepted = block?.accepted_snapshot as
     { label?: unknown; manifest?: unknown; manifest_sha256_lf?: unknown;
-      measured?: Record<string, unknown> } | undefined | null;
+      measured?: Record<string, unknown>; raw_bundle?: unknown } | undefined | null;
   if (!accepted?.label || !accepted.manifest || !accepted.manifest_sha256_lf
       || !accepted.measured) {
     throw new RebuildRefused(
@@ -3011,6 +4202,7 @@ export function afltablesCoachesPin(
   };
   return {
     ...pin,
+    ...(accepted.raw_bundle === undefined ? {} : { rawBundle: coachRawBundlePin(accepted.raw_bundle) }),
     measured: {
       coaches: int('coaches'),
       coachesLinkedToPlayers: int('coaches_linked_to_players'),
@@ -3023,16 +4215,67 @@ export function afltablesCoachesPin(
   };
 }
 
-/** The COACHES data stage: the pinned coach pages, the baseline and every pinned supplement. */
-export function coachesImportArgv(fitzroyLabel: string, python: string = resolvePython()): string[] {
+/** A present raw_bundle pin is exact or refused; it is never partly read. */
+function coachRawBundlePin(value: unknown): CoachRawBundlePin {
+  const v = value as Record<string, unknown> | null;
+  const keys = v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).filter((k) => k !== '$comment').sort() : [];
+  if (keys.join(' ') !== 'bytes filename members sha256'
+      || typeof v!.filename !== 'string' || !/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.tar$/.test(v!.filename)
+      || typeof v!.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(v!.sha256)
+      || !Number.isInteger(v!.bytes) || (v!.bytes as number) <= 0
+      || !Number.isInteger(v!.members) || (v!.members as number) <= 0) {
+    throw new RebuildRefused('coaches.accepted_snapshot.raw_bundle is not exactly {filename, sha256, bytes, members}.');
+  }
+  return { filename: v!.filename, sha256: v!.sha256, bytes: v!.bytes as number, members: v!.members as number };
+}
+
+/**
+ * AFLDB-ISSUE-319 (owner decision 2026-10-23: "Require raw-to-parsed coach replay inside preflight").
+ * Every ladder profile except these replays the pinned raw bundle in preflight and in the stage;
+ * the predecessor keeps its reviewed parsed-only behaviour. An unknown profile is never exempt.
+ */
+export const COACH_RAW_REPLAY_EXEMPT_PROFILES: readonly string[] = Object.freeze(['predecessor-1897-2025']);
+export function coachRawReplayRequired(profile: unknown): boolean {
+  return !(typeof profile === 'string' && COACH_RAW_REPLAY_EXEMPT_PROFILES.includes(profile));
+}
+
+/**
+ * Preflight half of AFLDB-ISSUE-319: whether `profile` requires the raw replay, and if so that the
+ * contract pins a raw bundle and the file is in the checkout. Refuses before any destructive step;
+ * the loader then proves the bytes (`--require-raw-bundle`).
+ */
+export function coachRawReplayPreflight(profile: unknown, fileExists: (path: string) => boolean,
+                                        readAfltables?: () => Record<string, unknown> | null): boolean {
+  if (!coachRawReplayRequired(profile)) return false;
+  const pin = afltablesCoachesPin(readAfltables);
+  if (!pin.rawBundle) {
+    throw new RebuildRefused(
+      `Coaches preflight: ladder profile '${String(profile)}' requires the mandatory raw replay `
+      + `(AFLDB-ISSUE-319), but ${AFLTABLES_CONTRACT} coaches.accepted_snapshot has no raw_bundle pin. `
+      + 'Nothing has been destroyed.');
+  }
+  const bundle = join('data', 'sources', 'afltables', 'coaches', pin.label, pin.rawBundle.filename);
+  if (!fileExists(bundle)) {
+    throw new RebuildRefused(
+      `Coaches preflight: the mandatory raw bundle ${bundle} is missing (AFLDB-ISSUE-319; profile `
+      + `'${String(profile)}'). Nothing has been destroyed.`);
+  }
+  return true;
+}
+
+/** The COACHES data stage: pinned coach pages and the same declared stats inputs as heights. */
+export function coachesImportArgv(fitzroyLabel: string, python: string = resolvePython(),
+                                  readContract?: HeightContractReader, requireRawBundle = false): string[] {
   const argv = [python, COACH_LOADER, '--label', afltablesCoachesPin().label, '--fitzroy-label', fitzroyLabel];
-  for (const s of heightEnrichmentPins().supplements) argv.push('--supplement-label', s.label);
+  for (const s of heightEnrichmentPins(readContract, fitzroyLabel).supplements) argv.push('--supplement-label', s.label);
+  if (requireRawBundle) argv.push('--require-raw-bundle');
   return argv;
 }
 
 /** The same argv plus --validate-only: manifests and artefact hashes, no database. */
-export function coachesValidateArgv(fitzroyLabel: string, python: string = resolvePython()): string[] {
-  return [...coachesImportArgv(fitzroyLabel, python), '--validate-only'];
+export function coachesValidateArgv(fitzroyLabel: string, python: string = resolvePython(),
+                                    readContract?: HeightContractReader, requireRawBundle = false): string[] {
+  return [...coachesImportArgv(fitzroyLabel, python, readContract, requireRawBundle), '--validate-only'];
 }
 
 /**
@@ -3041,8 +4284,10 @@ export function coachesValidateArgv(fitzroyLabel: string, python: string = resol
  * 'unique' status), the assignment count and the source's own coverage shape. A rebuild
  * that drops the stage, links by name, or loses assignments fails here.
  */
-export function coachChecks(): FinalCheck[] {
-  const pin = afltablesCoachesPin();
+export function coachChecks(selectedBaselineLabel?: string, readContract?: HeightContractReader,
+                            readAfltables?: SourceContractReaders['afltables']): FinalCheck[] {
+  heightEnrichmentPins(readContract, selectedBaselineLabel);
+  const pin = afltablesCoachesPin(readAfltables);
   const perMatch = 'SELECT m.id, count(mc.match_id) AS n FROM matches m '
     + 'LEFT JOIN match_coaches mc ON mc.match_id = m.id GROUP BY m.id';
   return [
@@ -3435,6 +4680,10 @@ export function parseArgs(argv: string[]): Options {
       }
       opts.target = value;
       i += 1;
+    } else if (arg === '--rehearsal-launch-spec' || arg === '--rehearsal-launch-spec-sha256') {
+      const key = arg === '--rehearsal-launch-spec' ? 'rehearsalLaunchSpec' : 'rehearsalLaunchSpecSha256';
+      if (opts[key] || !argv[i + 1] || argv[i + 1].startsWith('--')) throw new RebuildRefused('Rehearsal provenance options require one value each.');
+      opts[key] = argv[++i];
     } else if (arg === '--fitzroy-label') opts.fitzroyLabel = argv[++i];
     else if (arg === '--draftguru-label') opts.draftguruLabel = argv[++i];
     else if (arg === '--draftguru-bridge') opts.draftguruBridge = argv[++i];
@@ -3457,6 +4706,10 @@ export function parseArgs(argv: string[]): Options {
       i += 1;
     } else if (arg === '--plan') opts.planOnly = true;
     else throw new RebuildRefused(`Unknown argument: ${arg}`);
+  }
+  if (Boolean(opts.rehearsalLaunchSpec) !== Boolean(opts.rehearsalLaunchSpecSha256)
+      || (opts.rehearsalLaunchSpecSha256 && !/^[a-f0-9]{64}$/.test(opts.rehearsalLaunchSpecSha256))) {
+    throw new RebuildRefused('Rehearsal specification and reviewed digest must be supplied together.');
   }
   return opts;
 }
@@ -3532,6 +4785,13 @@ export function createCliDeps(spawnSync: typeof import('node:child_process').spa
     // the repo root unconditionally would have rejected every valid override.
     fileExists: (path) => existsSync(isAbsolute(path) ? path : join(REPO_ROOT, path)),
     log: (line) => console.log(line),
+    // V2 Launch F: read-only, through the same pinned psql path; only used for isolated targets.
+    isolatedServerFacts: (dsn) => {
+      const result = runPsql(dsn, ISOLATED_SERVER_FACTS_COPY_SQL,
+        { spawn: spawnSync as SpawnSyncLike, cwd: REPO_ROOT, pinned: true });
+      if (result.status !== 0) throw new Error(`psql exited ${result.status}: ${result.stderr.trim()}`);
+      return parseIsolatedServerFacts(result.stdout);
+    },
   };
 }
 
@@ -3543,6 +4803,13 @@ export default { planStages, resolveTarget, resolveFitzroySource, executeRebuild
 
 async function main(): Promise<number> {
   const { spawnSync } = await import('node:child_process');
+  const opts = parseArgs(process.argv.slice(2));
+  const provenance = opts.rehearsalLaunchSpec ? freezeBinding({ specPath: opts.rehearsalLaunchSpec,
+    specSha256: opts.rehearsalLaunchSpecSha256! }) : undefined;
+  if (provenance) {
+    if (readdirSync(REPO_ROOT).some((n) => n === '.env' || n.startsWith('.env.'))) throw new RebuildRefused('Ambient environment files refused in rehearsal mode.');
+    verifyRehearsalPackage({ ...provenance, checkpoint: 'main-entry', sourceRoot: REPO_ROOT, cwd: process.cwd(), modulePath: fileURLToPath(import.meta.url) });
+  }
 
   // .env without a dotenv dependency, matching tests/setup.ts.
   try {
@@ -3554,19 +4821,19 @@ async function main(): Promise<number> {
     }
   } catch { /* CI supplies the variables directly */ }
 
-  const opts = parseArgs(process.argv.slice(2));
   // AFLDB-ISSUE-237 L2: the rehearsal control is checked on the NAME before any DSN is read,
   // and again on the resolved database.
   assertRehearsalStop(opts);
   const target = resolveTarget(process.env, opts);
   assertRehearsalStop(opts, target.database);
   const fitzroy = resolveFitzroySource(opts);
-
-  const deps = createCliDeps(spawnSync);
+  const ladder = resolveLadderRebuildExpectation(fitzroy, target, ladderDocuments(), provenance);
+  const binding: RebuildBinding = freezeBinding({ source: fitzroy, target, ladder, provenance });
+  const deps = createCliDeps(provenance ? rehearsalSpawn(spawnSync, binding) : ordinarySpawn(spawnSync));
 
   console.log('AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)');
   // Names only — never a DSN, host or credential.
-  const spec = REBUILD_TARGETS[target.database as RebuildTargetName];
+  const spec = rebuildSpecFor(target);
   console.log(`  target        : ${target.database} (${spec.role}; `
     + `${opts.target ? '--target' : 'default'})`);
   console.log(`  credentials   : ${spec.adminEnv}`
@@ -3591,7 +4858,12 @@ async function main(): Promise<number> {
       + 'A missing afldb_import grant will not be caught — see AFLDB-ISSUE-083.');
   }
 
-  const stages = planStages(target, fitzroy, opts);
+  const stages = planStages(target, fitzroy, opts, undefined, binding);
+
+  // AFLDB-ISSUE-324: the ordinary path proves every planned command and the repository-local tsx entry
+  // BEFORE the --plan report and before the destructive acknowledgement is consumed, so a refusal
+  // (including --target code_test_db) leaves the database untouched.
+  if (!provenance) assertOrdinaryStagesAdmissible(stages);
 
   if (opts.planOnly) {
     console.log('\n--plan: the stage graph only, nothing executed and nothing destroyed.\n');
@@ -3605,10 +4877,11 @@ async function main(): Promise<number> {
 
   // Preflight runs BEFORE the acknowledgement is even consumed, so a missing input is
   // reported without the operator having to authorise destruction first.
-  runPreflight(deps, opts, fitzroy);
+  runPreflight(deps, opts, fitzroy, undefined, binding);
+  checkRebuildBinding(binding, 'after-preflight');
   assertDestructiveAcknowledgement(target, opts.acknowledgeDestroy);
 
-  const report = executeRebuild(stages, target, deps, { rehearsalStopAfter: opts.rehearsalStopAfter });
+  const report = executeRebuild(stages, target, deps, { rehearsalStopAfter: opts.rehearsalStopAfter, binding });
   if (report.rehearsalHalt) {
     const remaining = stages.map((s) => s.id).filter((id) => !report.executed.includes(id));
     console.error(`\nAFLDB-ISSUE-237 REHEARSAL HALT after '${report.rehearsalHalt}' on ${target.database} `

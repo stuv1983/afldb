@@ -4,11 +4,12 @@
  * ISSUE-228 S8 built `readSettleUnitTableStatus()` (`settle-status.ts`) and
  * left it unrendered. This shows its two AFL API rows: what systemd says each
  * unit is doing, and the newest `import_batches` row each settle CLI wrote.
- * The AFL Tables row is not repeated here; `SettleRunPanel` already owns it.
+ * The AFL Tables row is not shown: its on-demand panel was retired in AFLDB V2 Stage 5 (the
+ * nightly AFL Tables settle stays behind AFLDB-ISSUE-316).
  *
  * It starts nothing and takes no input. The two facts stay separate for the
- * same reason `SettleRunPanel` keeps them apart: a run in flight has not
- * committed its batch yet, so the batch shown is the previous run's.
+ * same reason the retired AFL Tables panel kept them apart: a run in flight has
+ * not committed its batch yet, so the batch shown is the previous run's.
  *
  * A server component with no client state: every value is rendered from the
  * props, so this adds no Server Action and no new authority to the page.

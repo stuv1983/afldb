@@ -1,0 +1,1183 @@
+# AFLDB V2 — known gaps, blockers and deferred work
+
+**Isolated follow-up complete:** [independent migration 116 preservation/privilege/rerun and final combined correction verification](brownlow-isolated-verification-2026-10-20.md): 8/8 PostgreSQL cases together, 98/98 focused units, typecheck/lint PASS. Receipts and protected rows retained. This grants no production connection/schema/execution authority and does not extend D-V2-BROWNLOW-ALT-1.
+
+**Current bounded acceptance (2026-10-20, D-GAP029-21):** 149 strict findings;
+99 approved (78 deferrals + 21 exact sibling disagreements), **0 data matches**;
+50 unapproved (42 event + eight board-date membership). Both gates remain failed.
+All six dedicated local credentials rotated on ownership-verified 55433; new logins
+pass and old logins reject. Backend functionality, shared-data coverage limits,
+unchanged release blockers and the next separate owner decision are distinguished in
+[the current readiness record](gap-029-readiness.md). [Source requests](gap-029-source-requests.md).
+Earlier run counts and unapproved-sibling proposals below are historical where superseded.
+
+Current local-release follow-up: see `local-release-review.md` for final verification. Gap 014
+and 021 and 028 are closed locally; 016 has its publication and 98-season evidence complete but remains
+open for production-dump/owner release acceptance. Gap 022 is closed by the owner's visual acceptance
+(D-V2-VISUAL-1, 2026-10-29). Gap 026 now requires the host/production-data rehearsal, not local
+application rollback. The historical Launch F counts below are retained as history.
+Current register: **38 total / 23 closed / 15 open**, counted from the table rows on 2026-10-30 after the owner's
+D-V2-VISUAL-1 verdict (D-V2-LOCK-1, 2026-10-29) closed 022. Before it: 38 / 22 / 16, after the
+release-hardening fix closed 036, 037 and 038 locally. The candidate visual recapture (D-V2-VISUAL-RECAPTURE-1)
+had opened them earlier that day (38 / 19 / 19; before it, 35 / 19 / 16). It includes the
+separately tracked strict historical-source/membership verification gap 029. The earlier "18 / 17" was not updated
+when `58bd9e4c` closed 035 in the table. Gap 020 was closed on 2026-10-27 as an accepted product constraint
+(owner decision). Gaps 032, 033 and 034 were found and closed locally on 2026-10-28 (the R43b NL inspection, the
+R32/ISSUE-208 cross-domain analysis and the R32/ISSUE-090 D4 item). The 2026-10-28
+[Linux verification](linux-verification-2026-10-28.md) closed 001 and 003 locally, narrowed 009 to the
+production-dump replay, and opened 035 (an owner decision on 29 UI-gate expectations). 035 was closed later
+that day after the owner chose to restate the expectations. No remaining failed test is treated as green.
+
+`V2-GAP-NNN` entries (ADR 0003). Each states what is missing, why, the evidence, and what would
+close it. A gap is marked CLOSED only when its closing evidence exists; closed entries are kept
+with that evidence. **State at the close of Launch F (2026-10-19): 28 gaps.**
+- **Closed (6), each on the isolated PostgreSQL 16 cluster:** 002, 012, 017, 018, 019 and 024.
+- **Open (22).** The remaining **production-only** cutover blockers are 008 (B2), 011 and 013.
+  Their reversible steps are documented; none was executed.
+- Each closure below names its evidence. "Isolated" means the loopback-only cluster of
+  `tools/v2/isolated-pg.ts` (`docs/v2/isolated-rebuild.md`), never production.
+
+Production-blocker classes (`docs/v2/go-no-go.md` §3): **cutover** — structural, must be resolved
+before an AFL API-only production pipeline; **rehearsal** — closed only by executing the isolated
+shadow rehearsal (`docs/v2/shadow-rehearsal.md`) and recording its evidence; **reconciliation** —
+award results must be shown reconcilable before production; **no** — not a production blocker.
+
+| ID | Severity | Area | Production blocker | State | Owner action |
+|---|---|---|---|---|---|
+| V2-GAP-001 | Medium | test safety | rehearsal | **CLOSED locally (2026-10-28, Linux)**: the full default workflow ran on streamanator with present `_test` DSNs and the strip active; no suite reached a non-`_test` database and no failure came from the strip ([Linux verification](linux-verification-2026-10-28.md)) | none |
+| V2-GAP-002 | Medium | frontend build | no | **CLOSED (Launch F)**: `npm run build` exit 0 against the isolated `afldb_v2_visual_test`, telemetry disabled | none |
+| V2-GAP-003 | Medium | environment | rehearsal | **CLOSED locally (2026-10-28, Linux)**: full default workflow on streamanator at `c3dea709` 14,860 passed / 3 failed / 63 skipped plus Coleman 28/28; the only failures are listed `gridley-corpus` (V2-GAP-029); three Linux regressions were fixed first. Not run: 11 Brownlow dedicated-clone tests, 45 opt-in tests ([Linux verification](linux-verification-2026-10-28.md)). A second pass (§9 there) ran the eligible opt-in suites: receipts 7/7, import lock 1/1, populated lifecycle 17/17, oracle reports pass. The Brownlow clones, Phase B, populated-pending and external-grids remain blocked, with their reasons recorded | none |
+| V2-GAP-004 | Low | source worktree hygiene | no | open: owner action | fix or disable the user-level Read/Grep/Glob hook; decide whether to delete the stray `supplies` |
+| V2-GAP-005 | Low | historical baseline scope | no | open: AFLW not covered by the manifest | decide whether AFLW joins the manifest |
+| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open | decide on database-level seal enforcement |
+| V2-GAP-007 | Medium | historical baseline | rehearsal | open, narrowed (Launch F): the producer ran repeatedly on the isolated rebuild with identical results; no real-baseline manifest | approve the shadow captures (§4), then a read-only production run (cutover runbook step 3) |
+| V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
+| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed: the two formerly name-pinned files pass locally and on Linux (2026-10-28: backtest 6/6, state-b 1/1, under the guarded isolated target); strict isolated proofs replace the name pin | production-dump replay under the same guarded target contract |
+| V2-GAP-010 | Medium | AFL API coverage | no (coverage is not claimed) | open: 2012-2025 API coverage has no committed evidence | decide which seasons to evidence |
+| V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains | approve A-AFLT (disable the timer in the window); the alternative "release after C5" was withdrawn by the owner on 2026-10-29 (D-V2-LOCK-1), so A-AFLT is required before production schema/code installation |
+| V2-GAP-012 | Medium | legacy runtime | no | **CLOSED (Launch F)**: helpers moved to `settle-shared.ts`, both edges removed from the ratchet, settle integration suites pass on isolated PG16 | none |
+| V2-GAP-013 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): the poller refuses in V2; the preflight refuses the release while the email-intake timer runs | approve the release window (step 4, 4a) |
+| V2-GAP-014 | Low | legacy quarantine | no | **CLOSED locally**: acquisition implementations quarantined, refusing old entry points; deterministic rebuild retained and verified | no live retirement authorised |
+| V2-GAP-015 | Medium | Coleman | reconciliation | open, narrowed (Launch F): 46/46 seasons (1980-2025) agree on the locally rebuilt history; production data not compared | approve the shadow Coleman capture on the production dump (§4/§8) |
+| V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed: atomic audited public publication implemented; 98/98 local seasons agree, none unresolved; archive-scoped migration evidence accepted (D-V2-BROWNLOW-ALT-1: stored-only, identical 98-season before/after; D-V2-BROWNLOW-ALT-3 for current-production archive `a4641ca0…`, 2026-10-29, migration evidence only, privileges 42/43 not waived) and an **authentic 2025 API snapshot reconciles** (207/207 matches, 188 players, 621 votes, totals, ranks and winner; [record](brownlow-authentic-reconciliation-2026-10-20.md)) **except 12 players the provider marks ineligible whom the stored table holds eligible (policy/rulings approved under D-V2-BROWNLOW-ELIGIBILITY-1; the tri-state runtime is implemented locally and isolated-verified ([record](brownlow-eligibility-implementation-2026-10-20.md)); production recording and rollout pending; exact citations preserved: [ruling](brownlow-eligibility-ruling-2026-10-20.md))** | review the local runtime commit and **new migration 117**; separately approve schema installation (116 + 117), exact production recording and reconciliation acceptance ([checklist](release-requirements-checklist-2026-10-20.md) item 1) |
+| V2-GAP-017 | Medium | Stage 4-5 SQL | no | **CLOSED (Launch F)**: 111-114 applied, privileges run, `privileges` and awards integration suites pass, operations pages rendered (isolated PG16) | none |
+| V2-GAP-018 | Low | curated awards | no | **CLOSED (Launch F)**: `reviseApprovedProposal` (ADR 0008), PostgreSQL-tested | none |
+| V2-GAP-019 | Medium | curated awards | no | **CLOSED (Launch F)**: four-eyes with a recorded self-approval attestation (ADR 0008, owner decision), PostgreSQL-tested | none |
+| V2-GAP-020 | Low | curated awards | no | **CLOSED (2026-10-27, owner decision): accepted product constraint.** A winner still needs a resolved durable player identity before approval; the supported workflow is to link the player first, then propose. No identity was resolved and identity-less approval is not built | none |
+| V2-GAP-021 | Medium | Coleman | no | **CLOSED locally**: explicit guarded offline bootstrap refuses publisher-owned seasons; session locks survive batch commits; 27/27 publication tests | production comparison remains gap 015 |
+| V2-GAP-022 | Medium | admin UI | rehearsal | **CLOSED (2026-10-29, owner decision D-V2-VISUAL-1 under D-V2-LOCK-1)**: the owner accepted ALL screens and states presented for acceptance in the [review sheet](owner-visual-review-candidate-2026-10-29.md), covering the corrected candidate and the synthetic UI evidence; authentic provider reconciliation and production acceptance are not claimed ([record](owner-decision-lock-2026-10-29.md) §2). History: candidate `592c6c16` recaptured from a production build on 2026-10-29 (12 stale screens plus every §6 state producible with synthetic fixtures; 160 images, 0 external requests). Its defects 036/037/038 are fixed and the affected screens recaptured from the corrected production build (34 images, 0 external requests). The staged leaderboard, the derived 18-team mapping and their refusals are now captured on the same build from SYNTHETIC fixtures on a new disposable clone (24 images, 0 external requests; UI evidence only, not authentic reconciliation). The seven † Brownlow images were recaptured on the corrected build (14 images, 0 failures); every image linked for acceptance is the corrected candidate or a component proven unchanged. The owner's verdict closed it | none; authentic reconciliation stays with gate 7 (016, 023's production step, 030, 031) |
+| V2-GAP-023 | Low | Brownlow | no | **CLOSED in code, verified on a disposable clone of the authentic 2025 data (2026-10-20)**: the settle stages the API leaderboard on the observation spine and the reconciliation derives the 18-team provider-team-to-club mapping from the committed identities, corroborated by the fixtures; the operations centre shows both. Production staging still needs one operator-run settle with this code (owner action; nothing was run against production) | none for migration; the stage runs when the operator next settles a Brownlow snapshot |
+| V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
+| V2-GAP-025 | Low | admin UI | no | **CLOSED locally (2026-10-27)**: read-only `/admin/operations/afl-api-refusals` linked from the overview; real-PostgreSQL test 2/2 as `afldb_import` on a disposable isolated `_test` database; page rendered signed in at 1280x800 and 390x844 (populated, empty, second page, failed read). Not deployed | optional owner eyeball of `docs/v2/evidence/gap025-visual/` |
+| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 passes on a populated copy (2026-10-20); populated-ledger DB reversal and archive recovery restore everything exactly on a synthetic copy | approve host backup/rollback and production-dump rehearsal |
+| V2-GAP-027 | Low | AFL API reconciliation report | no | **CLOSED locally (2026-10-27)**: `settle-afl-api.ts --report-out` writes the report (destination checked before any connection, never overwritten, outcome preserved on a write failure); opt-in parity policy `v2.parity.2` compares it, `v2.parity.1` unchanged; real-PostgreSQL dry-run and apply 1/1 on a disposable isolated `_test` copy. Not deployed | decide whether a rehearsal adopts `v2.parity.2` |
+| V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs; Linux 200/200 (2026-10-28) | none |
+| V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived); **Linux 2026-10-28 reproduces the accepted strict set key for key (149/99/50)** after the eight-selection rookie replay; separation also approved for current-production archive `a4641ca0…` 110 → 117 (D-V2-CURRENT-REHEARSAL-1, 2026-10-29; [record](owner-decision-current-rehearsal-2026-10-29.md); measured run PASS 2026-10-29, D-V2-CURRENT-ACCEPTANCE-RUN-1). Gridley findings unchanged and not waived; recorded as a known, open release residual by D-V2-RESIDUALS-1 (2026-10-29, [record](release-residuals-2026-10-29.md)) |  approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
+| V2-GAP-030 | Medium | Brownlow data | migration | open, rehearsed: every archived `brownlow_round_votes.match_id` is NULL because migration 094 ran over an empty table; reviewed reversible backfill built and verified on a clone (330,383/330,383 repairable, 0 excluded, idempotent, exact reversal); 1984–2025 policy approved under D-V2-BROWNLOW-MATCH-BACKFILL-1; 2026 excluded; execution pending | fresh counts/unique mapping plan, owner review of the guarded production runner, migration 116 and exact execution approval ([package](brownlow-production-approval-package-2026-10-20.md)) |
+| V2-GAP-031 | High | Brownlow ingestion | operational | open: all 207 2025 vote sets refuse `ownership_indeterminate` (source-less legacy rows); canonical ingestion verified on a clean target; reviewed reversible legacy-ownership adoption demonstrated on a clone only (207/207 sets, 621 rows); production adoption unapplied | OD-BROWNLOW-OWNERSHIP-1 approved as policy only; guarded runner/schema review and fresh execution approval pending ([package](brownlow-production-approval-package-2026-10-20.md)) |
+| V2-GAP-032 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: an unclaimed bare number is a leftover token (parser v67), so `<club> <stat> 200 40` declines and `in 1980 to 1989` is the inclusive range, not 1980 alone; whole malformed_input population (10,179) declines; 17 NL suites 1,638/1,638; typecheck exit 0. **PostgreSQL/Linux 2026-10-28:** 40/40 range rows equal their `between` rewrites (pre-fix: 36 different answers); V5 frozen 12,000/12,000 and V6 unchanged row for row; browser sweep 0 HTTP/page errors. Not deployed | none |
+| V2-GAP-033 | Medium | NL search | no | **CLOSED locally (2026-10-28)**: "played N games for <club> and also coached <club>" no longer counts career games at every club; `validatePlan` refuses a games condition when the played club is a builder parameter; the cross-domain opponent window is kept wide on purpose; 17 NL suites 1,641/1,641; typecheck exit 0. **PostgreSQL/Linux 2026-10-28:** the composition is refused (pre-fix: 6 players, one with 11 Richmond games); controls 27/365/107 unchanged. Not deployed | none |
+| V2-GAP-034 | Low | Birth-date enrichment | no | **CLOSED locally (2026-10-28)**: `enrich_birth_dates.py` no longer files a new open `external_identity_conflict` on every re-run; scoped delete-then-refile over the run's asserted profiles (ISSUE-090 §18 idiom), resolved history and other sources untouched; integration test 28 failed before (2 rows) and the file passes 28/28 on a disposable local `_test` copy, and 28/28 on Linux (2026-10-28). Not deployed | none |
+| V2-GAP-035 | Low | NL browser gate | no | **CLOSED locally (2026-10-28, owner decision: restate)**: the 27 ISSUE-190 career-count rows now expect `decline` and `rel_dec_001`/`rel_dec_002` expect `plan` (ISSUE-153 Stage 6), each pinned against its owning decision in `tests/nl-ui-corpus.test.ts`; no behaviour changed and the optional career-total mapping was not built. Focused Linux suites 1,002/1,002; rendered gate on Linux: 1,844/1,844 pass, 0 fail, 0 HTTP or page errors (before: 1,815 / 29) | none |
+| V2-GAP-036 | High | Coleman derivation | reconciliation | **CLOSED locally (2026-10-29)**: `prepare-standalone.mjs` copies the 7 runtime reference files (`tools/build/standalone-runtime-files.mjs`) and refuses to ship unless each is byte-identical; a source scan test keeps the list complete. Production build `XtSgl4BOQZXC2G8qIWJdV` compared and published Coleman 2023 on the disposable clone with nothing copied by hand. Not deployed | none; the fix reopens the artifact lock |
+| V2-GAP-037 | Medium | admin UI / error handling | no | **CLOSED locally (2026-10-29)**: registry, contract and provider-identity failures show fixed text with the stable code; the detail is logged server-side; still refused before any connection. Missing-registry and missing-contract paths verified in the production build, no path or OS error rendered, 0px overflow at 390px. Not deployed | none |
+| V2-GAP-038 | Low | admin UI (Brownlow) | no | **CLOSED locally (2026-10-29)**: the status and rule cells wrap (`overflow-wrap: anywhere`); 1996 and 2023 recaptured at 390px and 1280px with 0px overflow and nothing hidden. Not deployed | none |
+
+## V2-GAP-001 — The present-DSN branch of the test DSN policy is unverified on a live database
+
+- **CLOSED locally, 2026-10-28 (Linux).** The full default Vitest workflow ran on streamanator.
+  Each run went through `isolated-pg run`, so `_test` DSNs were present and the policy strip was
+  active. All DSNs named disposable `afldb_v2_*_test` clones on 127.0.0.1:55461, and the live
+  identity was proved before writes. No suite reached a non-`_test` database, and no failure came
+  from the strip: all seven S1 failures are classified in
+  [the Linux verification](linux-verification-2026-10-28.md) §2. The close condition named
+  `afldb_test`; the 2026-10-20 follow-up below replaced that with the supported Linux environment.
+- **Current local follow-up (2026-10-20):** the present-DSN path runs against native isolated
+  PostgreSQL with explicit owner/import/auth role DSNs and live identity proofs. The remaining
+  acceptance condition is the supported Linux environment, not a database literally named
+  `afldb_test`. Stage 6's absent-database statements below are historical.
+
+- **Launch F (2026-10-19).** 26 integration files ran on isolated PG16 databases with `AFLDB_TEST_DATABASE_URL` present and the strip active. No suite reached a non-`_test` database. A Linux `afldb_test` run is still needed.
+- **What.** When `AFLDB_TEST_DATABASE_URL` names a `_test` database, `applyTestDsnPolicy`
+  (`packages/testing/src/dsn-policy.ts`) now also removes every other `*DATABASE_URL*` variable
+  that does not name a `_test` database (for example an operator `.env`'s
+  `AFLDB_IMPORT_DATABASE_URL=…/afldb_dev` or `AFLDB_AUTH_DATABASE_URL`). Inside a test process
+  `src/db/client.ts` and `src/db/authClient.ts` refuse non-`_test` databases.
+- **Why open.** Proved only on env objects and on this workstation, which has no database
+  (`tests/dsn-policy.test.ts`). On the Linux dev host, an integration suite that relied on a
+  non-`_test` import or auth DSN from `.env` (instead of setting it from the test DSN, as the
+  integration files under `tests/integration/` do) would now fail closed with a "not set" error
+  instead of reaching that database. That is the intended direction, but it has not been observed.
+- **Close.** Run the integration suite against an isolated `afldb_test` (outside V2's authority)
+  and record the result; any failure caused by the strip is a suite that was reaching a non-test
+  database and should set its DSN from `AFLDB_TEST_DATABASE_URL`.
+
+## V2-GAP-002 — The production frontend build is unexecuted in V2
+
+- **CLOSED, Launch F (2026-10-19).** `npm run build` (`next build --webpack`, then `prepare-standalone`) exited 0 against the isolated, disposable `afldb_v2_visual_test`, with `NEXT_TELEMETRY_DISABLED=1`. It prerendered all 1,516 static pages. The captures in `docs/v2/evidence/launchF-visual/` were served from that build.
+- **What.** `npm run build` (`next build --webpack`) was not run.
+- **Why.** It needs a database: ten routes export `generateStaticParams` that query PostgreSQL
+  (for example `src/app/seasons/[year]/page.tsx:54`, `src/app/venues/[slug]/page.tsx:35`), and
+  `src/db/client.ts` builds its pool at import and throws without `DATABASE_URL`. No database is
+  available to V2, and pointing a build at any real database is forbidden (plan §1).
+- **What was run instead.** `next typegen` and `tsc --noEmit --incremental false` (both exit 0 at
+  the Stage 1 close; see `docs/v2/progress.md`).
+- **Close.** A build against an isolated, disposable database with `NEXT_TELEMETRY_DISABLED=1`.
+
+## V2-GAP-003 — Integration, Linux and POSIX behaviour is not exercised on the V2 workstation
+
+- **CLOSED locally, 2026-10-28 (Linux).** On streamanator (Ubuntu 24.04.5, Node 22.23.2, PostgreSQL
+  16.15), the full default workflow at `c39d2130` gave 14,856 passed / 7 failed / 63 skipped. Three
+  of the failures were Linux regressions, fixed in `26a089a7`, `a0c87fb5` and `c3dea709`. At
+  `c3dea709` the result is **14,860 passed / 3 failed / 63 skipped**, plus Coleman 28/28. The three
+  failures are the listed `gridley-corpus` strict gates (V2-GAP-029), so the gate holds: no failure
+  outside the baseline list, no listed test weakened. Every Windows/POSIX unit case in
+  `baseline-failures.txt` passes on Linux. Not run, and not counted as passing: 11 Brownlow
+  dedicated-clone tests (the correction package was excluded) and 45 opt-in tests. See
+  [the Linux verification](linux-verification-2026-10-28.md).
+- **Launch F (2026-10-19).** The integration suites ran on Windows against isolated PG16; results are in `docs/v2/final-report.md` §3. Linux and POSIX are still unexercised.
+- **What.** 85 integration suites refuse to load without a `_test` database; 15 unit cases fail
+  for Windows-checkout or POSIX-execution reasons or because git-ignored evidence is absent from a
+  fresh clone (exact list: `docs/v2/evidence/baseline-failures.txt`).
+- **Why.** Environmental, inherited unchanged from the source (`docs/v2/baseline.md`).
+- **Close.** A run on Linux against an isolated `afldb_test`. The V2 gate meanwhile is: no failure
+  outside the baseline list, and no listed test weakened.
+
+## V2-GAP-004 — A stray empty file `supplies` exists at the source worktree root
+
+- **What.** `D:\dev\afldb-afl-api-cutover\supplies` (0 bytes, created 2026-10-19 09:18:47 +11:00)
+  appears as `?? supplies` in the source's `git status`, which therefore no longer equals the
+  launch snapshot `D:\tmp\afldbV2-source-snapshot-20261019\status.txt`.
+- **Why.** Consistent with the documented workstation `Read`/`Grep` hook defect (it runs `cmd.exe`
+  in the session cwd, which is the source worktree, and a redirect-like token in a payload creates
+  an empty file). It appeared during the Launch A plan review. V2 work never writes to the source.
+- **Close.** Owner removes the file (V2 agents are forbidden to modify the source) and, ideally,
+  fixes or disables the hook.
+
+## V2-GAP-005 — AFLW is outside the historical baseline manifest
+
+- **What.** `HISTORICAL_TABLES` covers the AFL/VFL canonical tables only; `staging_aflw.*` and the
+  `aflw.*` views are not fingerprinted (`docs/v2/historical-baseline.md` §3).
+- **Why.** AFLW has its own loader (`tools/aflw/`) and modelling rules (`docs/aflw.md`) and is not
+  part of the V2 AFL API scope.
+- **Close.** An owner decision to cover AFLW, then a spec-version bump adding its tables.
+
+## V2-GAP-006 — The seal on historical seasons is enforced only at the AFL API settle entry points
+
+- **Stage 3 (2026-10-19) closed part of it.** `packages/domain/src/season-seal.ts`
+  (`evaluateSeasonWrite`) decides a write against the seal from `data/reference/seasons.json`
+  (sealed today: 1897-2025). The three AFL API settle CLIs
+  (`tools/current-season/settle-afl-api.ts`, `settle-afl-api-fixtures.ts`,
+  `settle-afl-api-brownlow.ts`, through `tools/current-season/settle-season-seal.ts`) refuse a
+  sealed season in every writing mode before any database client is created; `--validate-only`
+  and `--report` stay allowed. The one exception is the Brownlow completed-season backtest
+  (`--allow-completed-season-backtest`): it opens a client first, admits the sealed season only
+  after the live `afldb_test` proof passes, and logs it as a non-correction basis. Settle is never a correction
+  workflow: the refusal names the audited workflows of `docs/v2/historical-baseline.md` §2.
+  Tests: `tests/v2-season-seal.test.ts`, the "V2-GAP-006" block of
+  `tests/afl-api-settle-cli-gate.test.ts` (refusal before the SQL stub is touched; negative
+  control recorded in `docs/v2/progress.md`).
+- **Still open.** (1) No database constraint or trigger: a writer that bypasses these CLIs
+  (the library `runSettleAflApi`/`runSettleAflApiBrownlow` called directly, as rehearsal tools
+  under `tools/db/` do; the AFL Tables settle; legacy loaders) is stopped only by the existing
+  per-target `season_not_in_progress` gate in `src/lib/acquisition/canonical-apply.ts` (canonical
+  writes only; staging, candidates, `data_issues` and `applyAttendanceEnrichment` are not covered by
+  it). (2) The CLIs' real database paths are unexecuted (ordering proved through a throwing SQL
+  stub only).
+- **Stage 4 (2026-10-19) narrowed it further.** Two new V2 writers consult the seal before any
+  write: the Coleman publisher (`publishColemanResult`, workflow `derived_award_publication`) and
+  curated award approval (`approveProposal`, workflow `curated_award_approval`, which needs a
+  decision note of 20-2000 characters for a sealed season). Both workflows are rows of
+  `docs/v2/historical-baseline.md` §2. Tests: `tests/v2-coleman-publication*.test.ts`,
+  `tests/v2-curated-awards*.test.ts` (unit and in-memory PGlite).
+- **Still open after Stage 4.** The existing admin editors (data editor, award editor and others in
+  `src/db/queries/`) and the legacy runtime writers (V2-GAP-011, V2-GAP-013) do not call
+  `evaluateSeasonWrite`; the Stage 4 disposition classified the legacy writers but did not remove
+  them.
+- **Close.** An owner decision on database-level enforcement (an additive migration under plan
+  D4), Stage 5 for the admin editors, and the ISSUE-316 cutover plus Stage 5 for the legacy
+  writers.
+
+## V2-GAP-007 — No manifest of the real baseline exists yet
+
+- **Launch F (2026-10-19).** `historical-manifest.ts produce` ran on isolated copies of the locally rebuilt history (32 tables, 1,376 buckets). The before and after manifests around migrations 111-114 compared identical. No manifest of the real baseline exists.
+- **What.** The producer (`tools/v2/historical-manifest.ts produce`) is tested only through a fake
+  query function; its SQL has never executed on PostgreSQL, so a server-side error (for example a
+  column privilege, or the memory cost of `string_agg` on the largest season) is possible.
+- **Why.** Plan §7 R-007: never run in Launch A; V2 has no database access.
+- **Close.** An authorised run against an isolated `afldb_test`, twice, with identical results,
+  then (owner decision) a read-only run against the live source. Record timings and both manifests'
+  locations, outside the repository.
+
+## V2-GAP-008 — CUTOVER BLOCKER: AFL API pre-match fixtures are not ingestible (AFLDB-ISSUE-229)
+
+- **Launch F (2026-10-19, `d760280e`).** The writer is built and tested (AFLDB-ISSUE-229 runbook §7). Only B2, the first authentic 2027 pre-match feed, and the owner's first-apply approval remain. A read-only check of the public compSeasons list shows no 2027 season yet.
+- **What.** The AFL API cannot yet create or update AFLDB `fixtures` rows. AFLDB-ISSUE-229 is open
+  (`issues.md` ~:41898; runbook `issues/open/AFLDB-ISSUE-229.md`). Genuinely unresolved, so V2
+  did not invent the answer:
+  1. **B2**: the first authentic pre-match season feed (the 2027 feed) has not been observed
+     (`issues.md` ~:42056-42057; runbook ~:515-518), so the genuine TBC date/time representation,
+     whole-season pre-match shape and new statuses/key variants are unknown; placeholder
+     start-time detection is undecided (`issues.md` ~:41963).
+  2. Provider statuses `LIVE`, `POSTPONED`, `CANCELLED`, TBC and any unseen string are
+     unobserved and stay unsupported; nothing maps to `cancelled`/`void` (D-229-3, runbook
+     ~:135-139, ~:538-541). D-229-2's pre-match score rule is not generalised to `LIVE`/`POSTGAME`.
+  3. The fixtures writer is unbuilt: the second `fixtures` writer with ISSUE-162 §7 precedence,
+     the source-agnostic I-1/I-2/I-3 and `foreign_owned_collision` checks against existing rows
+     (D-229-4), the D-229-6 `editFixture()` guard, the D-229-7 preconditions, `fixture_key`
+     minting and upsert by `(afl_api, providerId)`, and the fixture-only audit model (D-229-8a).
+  4. The D-229-5 venue precondition is only half expressible offline: the provider venue must map
+     in `data/reference/afl-api-identities.json` (checked), and its `legacy_name` must match a
+     `venues` row (database work, unexecuted).
+  5. Related existing behaviour (LOW, unchanged): the fixtures-only settle has no status gate of its
+     own (`tools/current-season/settle-afl-api-fixtures.ts`; only the CONCLUDED default selection
+     and the score-required build refusal keep pre-match records out of the match spine), and the
+     match resolver does not refuse two different provider ids resolving to one canonical row
+     through `match_key` (`src/lib/acquisition/afl-api-match-resolver.ts` ~:181-190).
+- **What V2 built instead (Stage 3).** `packages/acquisition/src/fixture-contract.ts`: the
+  recorded decisions as pure refusal contracts (status classification, projection preconditions,
+  collision refusals incl. duplicate provider id, two ids for one fixture and swapped orientation),
+  tested on the committed 2026 feed and pre-match slices (`tests/v2-fixture-contract.test.ts`).
+  No writer is wired to it.
+- **Close.** Capture B2 under AFLDB-ISSUE-229, decide the open items there, build and test the
+  writer against an isolated `afldb_test`. Until then the production go/no-go for an AFL API-only
+  fixture pipeline is **no-go**.
+
+## V2-GAP-009 — Transactional preservation of promoted data is not executed on PostgreSQL
+
+- **Current local follow-up (2026-10-20):** all seven AFL API integration files pass locally:
+  backtest 6, Brownlow reschedule 3, Brownlow 21, fixtures 16, issue276 4, state-B 1, main 73
+  (**124/124**). The former name pin is replaced with strict isolated proofs. Remaining:
+  supported Linux/production-dump rehearsal under that same target contract, not a name bypass.
+
+- **Launch F (2026-10-19).** On the isolated rebuild, `settle-afl-api.test.ts` (73 tests), `-brownlow`, `-brownlow-reschedule`, `-fixtures` and `-issue276` pass. `-brownlow-backtest` and `-state-b` refuse any database not named `afldb_test`, by design.
+- **What.** "Preserve previous promoted data when validation fails" is proved at the plan level
+  only (`tests/v2-acquisition-replay.test.ts`: a unit that fails validation is a build failure and
+  is never planned; the full-rollback counter normalisation zeroes every durable counter). The
+  settle's own transaction and rollback (`runSettleAflApi`'s `sql.begin`, the require-complete
+  rollback) are covered by integration suites under `tests/integration/`, which need an
+  `afldb_test` database and were not run here.
+- **Why.** No database is available to V2. PGlite (plan D2) was not installed: the settle needs the
+  full 110-migration schema with its roles and grants, and plan D2 forbids extending PGlite to the
+  existing migrations' roles/grants.
+- **Close.** Run the AFL API integration suites (`tests/integration/settle-afl-api*.test.ts`)
+  against an isolated `afldb_test` and record the result.
+
+## V2-GAP-010 — AFL API coverage of 2012-2025 is not backed by committed evidence
+
+- **What.** The coverage registry (`docs/v2/coverage-matrix.md`) labels every season before 2026
+  `historical_baseline` (or `unsupported` for Brownlow without a medal). 2022-2025 are registered
+  in `data/reference/afl-api-identities.json` with round vocabularies, and a 2022-2025 Brownlow
+  backtest is documented (`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` ~:2079-2086), but no
+  stored snapshot or test for those seasons is committed; 2012-2021 appear only in the provider's
+  season listing. Even 2026 is `api_verified` only for results; fixtures, match stats, player stats
+  and Brownlow are `api_partial`.
+- **Why.** Raw acquisitions under `data/sources/afl_api/` are git-ignored; V2 may not fetch.
+- **Close.** Commit sanitised stored snapshots for each season to be claimed, with tests, then
+  regenerate the matrix (`tools/v2/coverage-matrix.ts --write`). Never relabel without evidence.
+
+## V2-GAP-011 — CUTOVER BLOCKER: the AFL Tables runtime remains until the ISSUE-316 retirement
+
+- **Launch F (2026-10-19).** A V2 checkout refuses the AFL Tables settle: `npm run settle:afltables`, and the deploy script after its out-of-season exit. `tools/v2/cutover-preflight.ts legacy-writers` refuses the release while the timer is enabled, a unit is running or the on-demand polkit rule remains. The reversible window commands are cutover-runbook step 4a; none was executed. Production-only remainder: disable the timer (approval A-AFLT, or ISSUE-316 C5).
+- **What.** The AFL Tables nightly settle (`deploy/afldb-settle-afltables.timer` -> `.sh` ->
+  `acquire_core.R` -> `import_fitzroy_core.py` -> `tools/current-season/settle-afltables.ts` ->
+  `src/lib/acquisition/settle-afltables.ts`), `npm run settle:afltables`, and the admin trigger
+  (`src/app/admin/current-season/actions.ts` `startSettleRunAction` -> `settle-trigger.ts`) are
+  still runtime paths in V2 (`docs/v2/legacy-disposition.md` L4, L5). They write the match spine,
+  staging, promotion and derived tables (`legacy-disposition.md` §5).
+- **Why.** Retiring them is the owner's ISSUE-316 sequence, which V2 may not execute: D-316-1 (C2)
+  writes the AFL Tables switch `retired` in the 2026 rollover (and optionally disables the timer),
+  and the timer must be disabled by C5 under D-316-4, which needs a recorded C4b PASS (D-316-13,
+  never before C4 is deployed). Stage 6 correction (plan §7 R-042): this entry previously named
+  D-316-2, which is the inert AFL API unit installation (C3), not the AFL Tables retirement
+  (`issues/open/AFLDB-ISSUE-316.md` §7-§8). The shell script, the trigger and the network register are frozen ISSUE-316 files.
+  The register (`data/reference/afltables-network.json`, gates in
+  `src/lib/acquisition/afltables-network.ts`) already makes every network path refuse once
+  retired.
+- **Guard.** `tests/v2-module-boundaries.test.ts` ratchets the known legacy runtime edges
+  (`legacyRuntimeEdges`, `publicRuntimeLegacyReach`, `scheduledLegacyReferences`): a new edge
+  fails the test.
+- **Stage 5 (Launch D).** The admin trigger is retired: `startSettleRunAction` keeps its
+  `acquisition.currentSeason` guard and then refuses (`legacy_retired`, surface
+  `admin.afltables_settle_trigger`, one `admin.legacy_retired_refused` audit row) and never reaches
+  `startSettleRun`; the start panel (`SettleRunPanel.tsx`) is deleted. The operations centre shows
+  the AFL Tables unit's status only. `settle-trigger.ts` stays (frozen; read by
+  `AflApiSettleUnitsPanel.tsx`, `current-season/page.tsx` type-only and `settle-status.ts`).
+- **Stage 6 (Launch E).** No change to the runtime: the AFL Tables timer belongs to ISSUE-316, so
+  the V2 cutover runbook deliberately leaves it alone and requires its state to be unchanged across
+  the V2 release window (`docs/v2/cutover-runbook.md` §1, step 8).
+- **Close.** The owner executes the ISSUE-316 sequence (D-316-1 at C2, the C4b PASS under
+  D-316-13, D-316-4 at C5). Until then the production go/no-go for an AFL API-only pipeline is
+  **no-go**.
+
+## V2-GAP-012 — The AFL API settle depends on helpers that live in `settle-afltables.ts`
+
+- **CLOSED, Launch F (2026-10-19, `aeea63d1`).** The helpers are now in `src/lib/acquisition/settle-shared.ts`; `settle-afl-api.ts` and `settle-report.ts` import it, and their ratchet edges are removed. The settle integration suites pass on isolated PG16 (see 009).
+- **What.** `src/lib/acquisition/settle-afl-api.ts:134-140` imports
+  `automaticProposalUnderAuthority`, `scopeProposalToAuthority`, `PLAYER_MATCH_STAT_COLUMNS`,
+  `CANONICAL_APPLY_ISSUE_OWNER` and `CANONICAL_APPLY_ISSUE_TYPE`, and
+  `src/lib/acquisition/settle-report.ts:46-53` imports the canonical-apply and settle issue keys,
+  `MATCH_TARGET_TABLES` and `SETTLE_SOURCE_KEY`, from `src/lib/acquisition/settle-afltables.ts`.
+  This is a code dependency on the module, not a data dependency on AFL Tables.
+- **Why.** Moving the helpers is a refactor of shared settle code that the integration suites
+  (which need a database) must cover; Stage 4 did not attempt it.
+- **Close.** Move the helpers into a source-neutral module, re-point both settles, run the settle
+  integration suites on an isolated `afldb_test`, then `settle-afltables.ts` can be quarantined
+  with L4.
+
+## V2-GAP-013 — CUTOVER BLOCKER: the email-intake timer still runs; the CSV, email and Squiggle/Kali admin paths now refuse
+
+- **Launch F (2026-10-19).** `tools/email_intake/fetch_and_stage.py`, executed directly, refuses before reading the environment or the mailbox. The cutover preflight refuses the release while the email-intake timer can run. Production-only remainder: cutover-runbook step 4, not executed.
+- **What.** CSV upload (`src/app/admin/upload/**`), CSV submission review and promotion
+  (`src/app/admin/submissions/[id]/actions.ts` -> `src/lib/ingest/pipeline.ts` ->
+  `datasets.ts`), the email intake route (`src/app/api/admin/email-intake/route.ts`, fed by
+  `deploy/afldb-email-intake.timer`) and the Squiggle/Kali admin refresh
+  (`src/app/admin/current-season/actions.ts` -> `src/lib/external-afl/current-season-import.ts`)
+  are still reachable (`legacy-disposition.md` L1-L3, L6). On promotion the CSV path writes
+  `matches`, `player_match_stats`, `players`, `award_winners` and `award_nominations` directly.
+- **Why.** These are admin routes and server actions; Stage 5 owns the admin surface. Disabling the
+  email intake timer is a deployment act (Stage 6). Stage 4 retired only the Squiggle/Kali CLI
+  (quarantined to `legacy/offline/`, package script refuses).
+- **Guard.** The legacy runtime edges are ratchet-listed in `tests/v2-module-boundaries.test.ts`.
+- **Stage 5 (Launch D).** Every admin path refuses after its unchanged guard, with the typed
+  refusal `legacy_retired` from `RETIRED_ADMIN_SURFACES` (`packages/domain/src/legacy-retirement.ts`)
+  and one best-effort `admin.legacy_retired_refused` audit row: `runCurrentSeasonAdminAction`
+  (Squiggle/Kali), `runValidation`, `decideSubmission`, `runPromotion` (submissions) and the upload
+  route (HTTP 410 after its same-origin check and `acquisition.legacyIntake`). The email-intake
+  route answers 410 without reading the request, comparing the secret, touching the database or
+  auditing (an unattributable caller must not write audit rows). The upload form, the review
+  controls and the Squiggle/Kali controls are deleted; no admin file imports the pipeline,
+  `datasets.ts` or the Squiggle/Kali libraries (`tests/v2-module-boundaries.test.ts`). The
+  libraries stay because offline tools use them. The replacement is the curated award entry
+  (`/admin/operations/awards`) and the existing audited editors.
+- **Still open.** `deploy/afldb-email-intake.timer` still polls every 5 minutes: each message now
+  gets 410 and the poller files it to its Errors folder, kept, never deleted
+  (`tools/email_intake/fetch_and_stage.py:606-607`, `:742-744`), so disable the timer in the same
+  window as the Stage 5 deploy or accept the pile-up. The changed integration suites
+  (`tests/integration/{admin-upload-route,email-intake,submission-promotion}.test.ts`) are
+  unexecuted (V2-GAP-003); route-level ISSUE-273/304 coverage was retired with the routes, the
+  library-level race coverage is kept through a test-local helper.
+- **Stage 6 (Launch E).** `docs/v2/cutover-runbook.md` step 4 disables
+  `afldb-email-intake.timer` in the same window as the V2 code deploy, before the code, with
+  `is-enabled`/`is-active` gates; `docs/v2/rollback-runbook.md` §4.3 covers re-enabling it on a
+  rollback. **Written, not executed.** The three integration suites are steps of
+  `docs/v2/shadow-rehearsal.md` §7, also not executed.
+- **Close.** The owner approves the release window and the operator runs step 4; an operator runs
+  the three integration suites on an isolated copy (the shadow rehearsal) and records the result.
+
+## V2-GAP-014 — Python and R legacy tools are not physically quarantined
+
+- **CLOSED locally, 2026-10-19.** Six acquisition implementations/poller moved under
+  `legacy/offline/tools/`; original entry points refuse. Offline deterministic replay remains
+  reproducible: fresh 30-stage rebuild, 89 validation checks. No normal runtime/package/deploy
+  caller can import legacy code. `legacy/offline/README.md` records entry points and boundaries.
+  The historical rationale below is superseded; no live timer/service was touched.
+
+- **What.** `tools/migration/*`, `tools/rebuild/**` and `tools/email_intake/*` stay in place
+  (`legacy-disposition.md` L8-L10). Only the TypeScript CLI `update-current-season.ts` moved to
+  `legacy/offline/`.
+- **Why.** The sealed historical rebuild (`tools/db/rebuild-test.ts`) invokes them by path, and V2
+  cannot execute Python or R to prove a moved script still runs. Three are frozen ISSUE-316 files
+  (`tools/rebuild/afltables/acquire_club_lists.R`, `acquire_coaches.py`,
+  `tools/rebuild/fitzroy/acquire_core.R`).
+- **Guard.** No runtime TypeScript imports them (guard e in `legacy-disposition.md` §2).
+- **Close.** Move them with the rebuild's path references updated, then run the rebuild on an
+  isolated `afldb_test` to prove it still completes.
+
+## V2-GAP-015 — The Coleman derivation has run on synthetic inputs only
+
+- **Launch F (2026-10-19).** `shadow-award-reports.ts coleman` on the locally rebuilt history (1980-2025) reports agree 46, disagree 0, not derivable 0. Comparing production data still needs the shadow rehearsal.
+- **What.** `deriveColeman` and the comparison report (`@afldb/derived`, ADR 0006) are tested on
+  SYNTHETIC inputs (`tests/v2-coleman.test.ts`). No real season has been derived, and no
+  comparison against the stored Coleman `award_winners` rows has been produced.
+- **Why.** The repository has no committed per-match goal data, and V2 may not read a database.
+- **Close.** Export the home-and-away goal facts and identities for the sealed seasons from an
+  isolated `afldb_test` (read-only), run the derivation and the comparison report, and review
+  every `disagree` and `not_derivable` row before any publication.
+
+## V2-GAP-016 — OWNER DECISION: Brownlow eligibility rule for API-era seasons
+
+- **Final local regression complete, 2026-10-20.** P2/OD-5 causes proved on parent and current code and
+  resolved by explicit isolated-target preparation (strict assertions/guards retained). Complete admin
+  46/46, settlement 73/73, eligibility integration 47/47, unit 65/65 and authentic twelve-ruling rehearsal
+  3/3 pass. Browser-discovered publication-order and public recorded-flag wording defects are fixed;
+  final Linux production build and actual operations/public publication, permission, audit, cache and
+  raw-vote checks pass. No local blocker remains for this task. [Measured record](brownlow-eligibility-implementation-2026-10-20.md#final-local-regression-2026-10-20).
+  **Still open for production:** separate schema approvals for 116 and 117 with fresh backup/restore,
+  deployment authority, exact per-operation execution approvals and reconciliation acceptance. Original
+  archive acceptance covers only 110 → 115; neither later migration inherits it. 2026 remains excluded.
+
+- **Owner policy decisions recorded, 2026-10-20:** [content-bound decisions and provenance](brownlow-policy-decisions-2026-10-20.md). BP-2025-ELIGIBILITY-v1 and all twelve 2025 rulings, 2025 adoption (621 positives / 207 sets; 8,901 zeros preserved), and 1984–2025 match-ID policy are approved. Production execution is pending; 2026 is excluded. Counts require fresh evidence; no live plan or execution approval exists. **Runtime status (distinguished):** *implemented* — eligible/ineligible/unknown are represented distinctly end to end, unknown can block a winner or ranking, and migration 117 makes the staged provider flag nullable; *isolated-verified* — disposable PostgreSQL copies, the authentic 2025 snapshot and the twelve rulings applied only in a labelled isolated copy ([record](brownlow-eligibility-implementation-2026-10-20.md)); *pending production rollout* — schema approval for 116 + 117, deployment, and the separate per-operation execution approvals. V2-GAP-016 stays open for that rollout and for reconciliation acceptance.
+
+- **2026-10-20 owner-review update:** every original official AFL citation was read directly and
+  final-outcome/served-ban follow-ups checked. All twelve proposed ineligible rulings are supported,
+  including Neale's confirmed unappealed ban. The precise policy
+  distinguishes explicit provider eligibility, audited corrections and unknowns. Policy and production
+  execution approvals are separate; see the [final ruling](brownlow-eligibility-ruling-2026-10-20.md),
+  the [implementation and isolated-verification record](brownlow-eligibility-implementation-2026-10-20.md)
+  and [approval package](brownlow-production-approval-package-2026-10-20.md). This gap remains open.
+
+- **Local follow-up, 2026-10-19.** Publication now shares the authorised decision transaction,
+  updates only metadata, requires the data-edit audit, refuses unresolved leaders and supports
+  joint eligible winners. Public queries demonstrably change after a decision; raw values and
+  provenance remain identical. 98/98 locally available seasons determined/agreed; none unresolved.
+  `evidence/local-brownlow-history-final.json`, ADR 0014 amendment. No bulk historical rewrite.
+  Remaining: owner release acceptance and production-dump comparison, NOT implementation/count.
+  Final follow-up also closes legacy generic Brownlow read exposure: old URLs redirect to the
+  canonical pages, generic award criteria use published flags, and every rank-one criterion
+  refuses an unresolved tied leader. Actual public joint winners and unchanged raw votes are
+  covered by the final 324/324 focused checks.
+
+- **Launch F (2026-10-19).** The rule is decided and implemented (ADR 0014; `brownlow_eligibility_decisions`, migration 113; PostgreSQL-tested). It stays open per ADR 0014's disposition: the projection path and the blast-radius count remain.
+- **What.** The reconciliation (`@afldb/derived`, ADR 0007) refuses a leader determination when an
+  ineligible player polled votes, unless the caller selects `stored_eligible_rank_one` (the
+  stored-table rule in `src/lib/brownlow/entry.ts`). No rule is recorded for API-era seasons, or
+  for retrospective and vacated awards.
+- **Why.** Naming a winner is a product rule; V2 does not invent one (plan §7 R-023).
+- **Close.** The owner states the rule; it is added as an explicit `eligibilityRule` with tests.
+  Related: V2-GAP-010 (API coverage of 2012-2025 has no committed evidence), so even with a rule
+  the API-era reconciliation has no committed inputs yet.
+
+## V2-GAP-017 — The Stage 4 migrations and grants are unexecuted on PostgreSQL
+
+- **CLOSED, Launch F (2026-10-19).** Migrations 001-114 were applied by the runner and `tools/db/privileges.ts` ran on isolated `afldb_v2_*_test` databases. `privileges.test.ts` and the V2 awards suites passed 134/134. Every operations-centre page rendered against them from the production build. The 111-114 reversal was rehearsed (`docs/v2/rollback-runbook.md` §7). A database named `afldb_test` was not used: the isolated cluster's `_test` databases served instead.
+- **What.** `src/db/migrations/111_curated_award_proposals.sql` and
+  `112_derived_award_results.sql`, their `tools/maintenance/privileges.sql` blocks, the two new
+  `tests/integration/privileges.test.ts` cases, the promotion inventory with its two extra tables
+  (the F0 pin is now 40), the server-only promotion port (`src/db/queries/award-proposals.ts`,
+  which calls the real `insertAwardWinner`), the Coleman publisher SQL and the postgres.js adapter
+  (`packages/db/src/sql-executor.ts`) have not run against PostgreSQL. Both migrations ran only on
+  in-memory PGlite over labelled stub prerequisites and stub roles
+  (`tests/v2-curated-awards-pglite.test.ts`, `tests/v2-coleman-publication-pglite.test.ts`).
+- **Stage 5 additions, also unexecuted on PostgreSQL.** The operations-centre read loaders
+  `src/db/queries/coleman-inputs.ts` and `src/db/queries/brownlow-reconciliation-inputs.ts`, the
+  callers in `src/lib/admin/operations-centre.ts` (every database call goes through the
+  `afldb_import` connection opened by `withAwardProposalExecutor`, including the reads of
+  `staging.afl_api_brownlow_vote`, `brownlow_season_votes`, `matches` and the Coleman goal
+  facts) and the activity-trail writes. They ran only against PGlite over the same stubs and
+  against in-memory fakes (`tests/v2-admin-operations.test.ts`).
+- **Why.** No database is reachable from V2 (plan §1); PGlite is not evidence for PostgreSQL
+  (plan §7 R-020).
+- **Close.** An operator applies the migrations to an isolated `afldb_test`, runs
+  `npm run db:privileges`, and runs `tests/integration/privileges.test.ts` and the awards
+  integration suites, then exercises each operations-centre page once (V2-GAP-022); record the
+  result here.
+
+## V2-GAP-018 — Revising an approved curated award is refused
+
+- **CLOSED, Launch F.** `reviseApprovedProposal` (migration 114, ADR 0008) records the revision and its ledger row in one transaction. `tests/integration/v2-curated-awards.test.ts` passes on isolated PG16.
+- **What.** `reviseProposal` refuses an approved proposal (`approved_revision_unsupported`).
+  Correcting a promoted winner today uses the existing replace/correct lifecycle in
+  `src/db/queries/admin-awards.ts`, which does not link back to the proposal chain.
+- **Close.** A wrapper over the existing replace/correct functions that records the new revision
+  and its ledger row in the same transaction. Not built in Stage 5: the approval card says an
+  approved winner is corrected only through `/admin/awards`.
+
+## V2-GAP-019 — No four-eyes rule on curated award approval
+
+- **CLOSED, Launch F.** Owner decision (ADR 0008): the creator may approve only with a written self-approval attestation recorded in the ledger. Tested on PGlite and isolated PG16; rendered in `docs/v2/evidence/launchF-visual/04-*`.
+- **What.** A holder of `data.awards.edit` may approve a proposal they created themselves. Every
+  transition is still attributed in the append-only ledger.
+- **Why.** No existing AFLDB workflow enforces separation of duties, and the owner has not asked
+  for it; V2 did not invent one (plan §7 R-024).
+- **Close.** Owner decision; if wanted, refuse approval by the creator in `approveProposal` and
+  add the test.
+
+## V2-GAP-020 — Curated winners need a resolved player identity
+
+- **CLOSED, 2026-10-27, as an accepted product constraint (owner decision).** The owner kept the
+  requirement that a winner have a resolved durable player identity before approval. The
+  supported workflow is to link the player first, then propose the winner. Closing the gap does
+  not claim that any outstanding identity was resolved, and identity-less approval is not
+  implemented. Documentation only: no code, test or data changed.
+- **What.** A proposal whose player has no durable identity (`afltables:` or `manual_admin_edit:`)
+  is refused at validation, so an identity-less legacy player cannot be approved as a winner.
+- **Close.** Link the player first through the existing identity tools, then propose.
+
+## V2-GAP-021 — Published Coleman results are not projected into `award_winners`
+
+- **CLOSED locally, 2026-10-19.** Existing canonical projection retained; offline loader now
+  requires the explicitly named offline bootstrap, dedicated isolated DSN and live identity
+  proofs. It shares canonical season locks and refuses publisher-owned seasons. Real PostgreSQL
+  publication suite 27/27 after migration 115 (`evidence/local-coleman-complete.json`), including
+  a commit between acquisition and a competing lock probe; protection lasts until session close.
+
+- **Launch F (2026-10-19).** The projection into `award_winners` is built (ADR 0015, `derived_award_projections`, migration 114) and PostgreSQL-tested. Still open: the offline loader's coleman group is not retired (the rebuild's `coleman` stage still runs it), and production execution is pending.
+- **What.** `publishColemanResult` writes only the `derived_award_results` ledger (migration 112).
+  The Coleman `award_winners` rows the public site reads remain owned by the offline
+  `tools/migration/import_awards.py` coleman group. Nothing reads `derived_award_results` yet, and
+  no admin route, server action or script calls the publisher.
+- **Why.** Writing `award_winners` for a sealed season needs an owner-chosen correction workflow
+  and a `player_name_raw` the pure derivation has no table for (ADR 0006 divergence 8); the admin
+  surface is Stage 5's. V2-GAP-015 (no real season derived yet) comes first.
+- **Stage 5 (Launch D).** Narrowed: `/admin/operations/coleman` compares a season (read-only,
+  `data.awards.read`) and publishes it (`data.awards.edit`, a 20-2000 character note, the
+  operator's settled attestation) through `publishColemanSeason` in
+  `src/lib/admin/operations-centre.ts`, evidence reference
+  `coleman_derivation:<season>:<inputChecksum>`. Decision (plan §7 R-035): still **no** projection
+  into `award_winners`; the page says so.
+- **Close.** A projection into `award_winners` calls `assertSeasonWritable` with a correction and
+  supplies names (owner-chosen workflow); then the offline loader's coleman group is retired for
+  seasons the publisher covers.
+
+## V2-GAP-022 — The Stage 5 admin pages have never been rendered (VISUAL: UNVERIFIED)
+
+- **CLOSED, 2026-10-29 (owner decision D-V2-VISUAL-1, given within D-V2-LOCK-1).**
+  - The owner accepted ALL screens and states presented for acceptance in
+    [the review sheet](owner-visual-review-candidate-2026-10-29.md): every §1a, §1b and §1c item, §2 row and §3 item
+    of the corrected candidate (application tree `7670441b`, build `XtSgl4BOQZXC2G8qIWJdV`), including the synthetic
+    UI evidence. No row was rejected.
+  - Out of scope by the owner's wording: authentic provider reconciliation and production acceptance. The submitted
+    "Revise approved winner" action (sheet §4) was not presented and is not accepted; the panel is.
+  - The verdict is the owner's; no agent verdict stands in for it. [Record](owner-decision-lock-2026-10-29.md) §2.
+
+- **Staged leaderboard and provider mapping captured, 2026-10-29 (still OPEN, owner acceptance only).**
+  - The same build `XtSgl4BOQZXC2G8qIWJdV` was reused, not rebuilt: no application file is newer than it, and the bundled
+    reference files are byte-identical. It served the new disposable `afldb_v2_visual_leaderboard_test`, cloned from
+    `afldb_v2_visual2_test` through `isolated-pg.ts`. Identity, marker and listener were proven before writes.
+  - Producer: the CLI route is refused for every AFL API season by the V2-GAP-006 seal (2022–2026 sealed, no 2027
+    vocabulary). That refusal was logged and not bypassed. Instead, `tools/v2/candidate-visual-leaderboard.mts` drives the
+    real writers exactly as `tests/integration/settle-afl-api-brownlow.test.ts` does: synthetic voters,
+    `runSettleAflApi` (one canonical synthetic match, `inProgressSeasons: [2026]` as the suite passes), then
+    `runSettleAflApiBrownlow` with autoApply off. No canonical Brownlow row was written, and no guard, rule or query
+    was changed or mocked.
+  - Captured: not staged; refused (unresolved player, `provider_team_unmapped`); staged with `derived: 18 teams`,
+    Super Admin and Admin; the 18 teams expanded; anonymous; identities unavailable. 24 images, 0 external requests.
+    The fixtures are synthetic, so this is UI evidence and not authentic reconciliation.
+  - The two case-sensitive L1 assertions of the corrected run now read text with `text-transform` neutralised; L1 was
+    rerun and passes.
+  - The source clone and its template have identical fingerprints before and after.
+  - The seven Brownlow season images from `592c6c16` that predated the raw-totals label fix (formerly †: 09, S06,
+    S04, B6, B7, B8, B9) were recaptured on the same corrected build (`tools/v2/candidate-visual-brownlow-recapture.mts`,
+    sheet §1c), desktop and mobile, including the Admin `requires_review` view and the decision error and success
+    states, on equivalent synthetic records (2021, 2020) of the leaderboard clone. 0 failures after one corrected
+    check; the source clone and template are unchanged. Every image linked for acceptance is now the corrected
+    candidate or a component proven unchanged (sheet §0a).
+  - Remaining: the owner's verdict only.
+  - No agent verdict is recorded.
+
+- **Corrected candidate recaptured, 2026-10-29 (still OPEN, owner acceptance only).**
+  - V2-GAP-036/037/038 were fixed. The affected screens were recaptured from the corrected production build
+    `XtSgl4BOQZXC2G8qIWJdV` on the same clone: 17 states, 34 images, 0 external requests
+    (`evidence/candidate-visual-20261029-corrected/`).
+  - The pass-2 K, W, U5, S03 and B9–B11 images are kept as labelled diagnostic history. They prove nothing about
+    the corrected candidate.
+  - Still unavailable: the staged API leaderboard and the 18-team mapping. The only existing producer of that state
+    is the real settle writers over `tests/fixtures/afl_api`, which also apply canonical match and vote rows; no
+    fixture stages leaderboard rows alone. Their rendering is covered only by synthetic-props component tests.
+  - No agent verdict is recorded.
+
+- **Candidate recaptured, 2026-10-29 (D-V2-VISUAL-RECAPTURE-1; still OPEN, owner acceptance only).** Candidate
+  `592c6c16`, one production build (1516 pages) served from the disposable `afldb_v2_visual2_test` (from
+  `afldb_v2_rollbackapp_test`, migrated to 117) on 127.0.0.1:55433. `candidate-visual-capture.mts` ran once unchanged
+  (12 images, history fingerprint unchanged, `evidence/candidate-visual-20261029/`). The new
+  `candidate-visual-states.mts` produced the remaining §6 states with synthetic fixtures and test actions, each logged
+  with its expected and observed effect (two passes, 148 images, `evidence/candidate-visual-20261029-states*/`).
+  It found V2-GAP-036 (Coleman refused in the production bundle), 037 (server paths in refusal notices) and 038
+  (390px overflow). Unavailable: the staged API leaderboard and 18-team mapping (no staged votes in the clone).
+  Owner sheet: [owner-visual-review-candidate-2026-10-29.md](owner-visual-review-candidate-2026-10-29.md).
+- **Owner checklist prepared, 2026-10-29 (still OPEN).** [owner-visual-review-2026-10-29.md](owner-visual-review-2026-10-29.md)
+  lists every screen with links and criteria. Against candidate `461f4372`, captures 01/02 (new refusals link,
+  `c78e9e9b`) and 08/09 including the `local-visual` recaptures (V2-GAP-023 leaderboard/mapping and the
+  eligibility tri-state, both 2026-10-20) are stale; `/admin/operations/afl-api-refusals` has no capture; six
+  further §6 states are uncaptured. No agent verdict is recorded; the owner decides (D-V2-VISUAL-1).
+- **Correction and recapture proposal, 2026-10-29 (still OPEN).** The refusals page is not uncaptured:
+  `evidence/gap025-visual/` holds 14 `next dev` captures (2026-10-27, `c78e9e9b`; no admin code has changed
+  since), but none from a production build. A production-build recapture of 01/02/08/09 and the refusals empty
+  states is prepared and not run ([checklist §5](owner-visual-review-2026-10-29.md), new
+  `tools/v2/candidate-visual-capture.mts`).
+
+- **Technically inspected, 2026-10-19.** All 26 Launch F images opened and reviewed for
+  readability/mobile/permissions/action wording/status clarity; material Brownlow wording and
+  missing-API clarity corrected. Four affected screenshots recaptured and opened after final
+  build, `evidence/local-visual/`. Assessment: `local-release-review.md`. Owner acceptance pending.
+
+- **Launch F (2026-10-19).** The real pages were served by the production build from the isolated database, with synthetic staff, synthetic proposals and locally rebuilt history. 13 screens were captured as Super Admin and Admin at 1280x800 and 390x844, in `docs/v2/evidence/launchF-visual/` with `capture-log.txt`: HTTP 200, 0 horizontal overflow, 0 console errors and 0 external requests on every capture. The agent inspected the images and fixed one stale-copy defect. The owner's verdict is still required to close this gap.
+- **What.** No real page of the operations centre (`/admin/operations`, `/awards`, `/awards/[id]`,
+  `/coleman`, `/brownlow`) and none of the changed admin pages (`/admin`, `/admin/current-season`,
+  `/admin/upload`, `/admin/submissions/[id]`, the sidebar) has been rendered in a browser: each needs
+  a database and a staff session. The run-status rows read systemd through `settle-status.ts`; on a
+  host without it they show "not available", which is intended but unproven on the real host.
+- **Evidence that exists.** Component-level captures of the presentational components from
+  SYNTHETIC props (`tests/fixtures/v2/operations-centre/props.synthetic.ts`) with the repository's
+  own CSS, at 1280x800 and 390x844, offline (local Playwright Chromium, every non-file request
+  aborted, 0 attempted): `docs/v2/evidence/stage5-visual/` (12 images and `capture-log.txt`). An
+  automated check found horizontal overflow on one capture (a long durable identity, +29px at
+  390px); it was fixed with `overflow-wrap` and the re-capture shows none. The images have not been
+  inspected by any agent or person. They are not the pages: no layout shell, no session, no data.
+- **Close.** The owner eyeballs the screens listed in `docs/v2/admin-operations.md` §6 on an
+  isolated environment at desktop and mobile widths, and records the result here.
+
+## V2-GAP-023 — Brownlow reconciliation view: no staged leaderboard, no provider-team mapping
+
+- **CLOSED in code, 2026-10-20; verified on a disposable clone, not on production.**
+- **What was wrong.** `src/db/queries/brownlow-reconciliation-inputs.ts` passed `leaderboard: null`
+  (migration 103 declares no typed leaderboard projection) and mapped no provider team id to a club,
+  so the leaderboard comparison was "not supplied" and every vote set raised `club_unverifiable`
+  (207 for 2025).
+- **What closes it.**
+  - *Staged leaderboard.* `stageAflApiBrownlowLeaderboard`
+    (`src/lib/acquisition/afl-api-brownlow.ts`) persists each leaderboard player as a versioned
+    `brownlow_leaderboard` record on the generic observation spine (scope `season=<year>`, key the
+    provider player id, payload the parsed entry plus the feed status). It runs inside the settle's
+    own transaction, so a dry run rolls it back, an unchanged replay appends nothing, and a player
+    the feed stops listing is stamped `absent_since` (never deleted; an empty feed never retires a
+    staged board). No migration: the family was already declared in `data/reference/source-families.json`.
+  - *Mapping.* `src/lib/brownlow/provider-team-club-map.ts` (pure) derives provider team to club from
+    the committed `data/reference/afl-api-identities.json` teams, resolved through
+    `clubs.legacy_club_hist`, and corroborates each team against the provider's own home/away team ids
+    in the fixtures observation of every voted match. It is all-or-nothing and refuses with a specific
+    code: `provider_team_unmapped`, `provider_team_identity_conflict`, `club_identity_unresolved`,
+    `club_identity_ambiguous`, `provider_teams_share_club`, `fixture_evidence_conflict`,
+    `fixture_team_unmapped`. A refused mapping leaves every vote's club NULL, so `club_unverifiable`
+    is kept, never suppressed.
+  - *Operations centre.* `/admin/operations/brownlow` (existing `data.brownlow.read`) now shows the
+    staged-leaderboard summary and the mapping (or its refusal codes) and no longer states that the
+    leaderboard is not staged when it is.
+- **Evidence (clone of the settled authentic 2025 data, observe-only settle then read-only
+  reconciliation).** 188 leaderboard entries staged (CONCLUDED, 12 ineligible, 1 winner, 0
+  unresolved players); a replay appended 0 and left 188 unchanged. Mapping derived for all 18
+  teams, each corroborated by 23 fixture slots (207 matches x 2 = 414 = 18 x 23). Leaderboard
+  comparison: 188 compared, 0 mismatches. `club_unverifiable`: 207 before, **0 after** (no
+  `vote_club_not_in_match` either). The only remaining findings are the 12 `eligibility_flag_inconsistent`
+  discrepancies and their 12 `eligibility_rule_unrecorded` refusals, which are the subject of
+  `brownlow-eligibility-ruling-2026-10-20.md`.
+- **Not done.** The production database has no staged leaderboard until an operator runs the Brownlow
+  settle once with this code (`--observe-only` is enough). That is an owner/operator action.
+
+## V2-GAP-024 — Approving a curated award does not refresh the cached public award pages
+
+- **CLOSED, Launch F.** Approval returns the server-computed revalidation paths, which the page posts to `/admin/awards/revalidate` (ADR 0008). Tested on isolated PG16 (`v2-curated-awards`).
+- **What.** An approval writes `award_winners` through `insertAwardWinner`, but the operations
+  centre does not trigger revalidation of the public award pages (`src/app/awards/**` use
+  `revalidate = 86400`), so a new winner can be missing from those pages for up to a day per
+  worker. The existing awards admin posts its server-computed paths to `/admin/awards/revalidate`
+  after the action returns (`src/app/admin/awards/submit-helper.ts`); the operations centre does
+  not yet.
+- **Why.** The curated services return no revalidation paths; adding them crosses the
+  `@afldb/admin` promotion port and was not in Stage 5's reviewed scope.
+- **Close.** Return the paths `insertAwardWinner` already computes through the promotion port and
+  post them to `/admin/awards/revalidate` after a successful approval, as `/admin/awards` does.
+
+## V2-GAP-025 — The operations centre has no view of AFL API settle refusals
+
+- **What.** Plan D9 lists "reconciliation failures". The overview shows each settle unit's run
+  status and links to the existing inspection tools; the Brownlow reconciliation has its own page.
+  The AFL API settle's per-unit refusals (`canonical_applications`, `data_issues`, the settle
+  reports) have no read-only view in the operations centre.
+- **Close.** A read-only, capability-guarded view over the refused `canonical_applications` rows
+  and the open settle `data_issues`, linked from the overview.
+- **CLOSED locally, 2026-10-27.** Implemented, then verified on real PostgreSQL and rendered (below).
+  Not deployed; no shared DEV or production acceptance is claimed.
+  `/admin/operations/afl-api-refusals` (`operations.centre.read`, the overview's own capability;
+  "AFL API settle refusals" under Inspection tools). The guard is the page's first statement and
+  `listAflApiSettleFindingsForAdmin` (`src/lib/admin/operations-centre.ts`) checks the capability
+  again before it opens a connection. The reader is `src/db/queries/afl-api-settle-findings.ts`.
+  - **Scope correction.** `canonical_applications` records only writes that happened
+    (verb insert/update/delete). A refused or rolled-back application leaves no row there. The settle
+    records it as an open `data_issues` finding of type `canonical_apply_failed`, owned by
+    `AFLDB-ISSUE-122` (I244-F009). So the "refused canonical applications" section reads those
+    findings where `details.source_key = 'afl_api'`. AFL Tables' findings share the type and owner
+    and are excluded.
+  - **Open settle findings.** Every other open finding owned by `settle-afl-api.ts` or
+    `settle-afl-api-brownlow.ts` with source `afl_api`.
+  - **What it shows and never shows.** It shows named columns only: id, type, severity, first
+    detection, the writer's description (truncated to 500 characters), record and target identity,
+    the refusal or reason code, and up to 20 field names. It never shows `details`, the failure
+    `error` text, conflicting or proposed values, or payloads.
+  - **Order and paging.** Newest first by `id`, with a keyset cursor and 50 rows per page. The counts
+    and the page come from one `REPEATABLE READ, READ ONLY` transaction.
+  - **Read-only.** No form, no button, no retry and no audit row.
+  - **Evidence.** `tests/v2-admin-operations.test.ts` (PGlite: stub `data_issues` as `afldb_import`)
+    covers scoping and exclusions, an honest empty state, keyset stability when a newer row arrives,
+    bounds, the read-only transaction, a contributor refused before any connection, bad section and
+    cursor values refused, and a drift guard against the writers' constants. A negative control
+    passed: with the `source_key` filter removed, the scoping test fails.
+    `tests/v2-admin-operations-ui.test.ts` covers parsing, views, empty, failure and pager states, the
+    page guard-first contract, and the overview link. Both suites plus `tests/auth.test.ts`: 396/396.
+    `tsc --noEmit` and focused ESLint pass.
+  - **Real PostgreSQL (2026-10-27).** `tests/integration/v2-afl-api-settle-findings.test.ts` first
+    hardened: both test DSNs required, the `afldb_owner`/`afldb_import` role-parity validation always
+    runs (no owner-role fallback for the reader), `verifyIsolatedIntegrationDatabase` runs on the
+    fixture connection and the reader's connection before any write, fixtures carry a per-run marker,
+    and teardown deletes only the ids its own INSERTs returned and writes nothing unless identity
+    passed. No startup purge. Target: port 55432 was still `ssh.exe` and was not contacted. The
+    preserved local cluster (`D:\tmp\afldb-v2-pg16`, `afldb_v2_isolated`) was started on loopback
+    55433. The runner proved the postmaster owned the listener before sending credentials. A new
+    disposable `afldb_v2_gap025_test` was created and migrated 001-117. Through
+    `isolated-pg run`: **2/2 passed**. That proves the `afldb_import` SELECT on `data_issues`, the
+    NULL and decimal-text cursors, the jsonb field list and `READ ONLY` inside `sql.begin`. Fixture
+    residue afterwards: 0.
+  - **Rendered (2026-10-27).** A loopback-only `next dev` (127.0.0.1:3100) ran through the same
+    runner against that database, signed in through `/admin/login` (password + TOTP) as a
+    synthetic `admin` created there. The repository's Playwright 1.62.1 was used; no Playwright MCP
+    was available in the session. Captures at 1280x800 and 390x844 are in
+    `docs/v2/evidence/gap025-visual/` with `capture-log.txt`:
+    - both sections empty, with honest empty text and "none open" counts;
+    - 60 refusals plus 3 findings. Page 1 had 50 rows (ids 64→15), and Older → went to
+      `before=15`. Page 2 had the remaining 10 (14→5) and ← Newest, with no row repeated or skipped.
+      The AFL Tables decoy was not shown and not counted;
+    - a failed read, with `afldb_import`'s SELECT revoked and then restored. It shows only the
+      generic inline notice: no nav, no pager and no false empty claim. The server log has the real
+      `42501`.
+
+    No state showed the planted `error` text, a permission/SQL message, a horizontal page overflow
+    or a page-level form or button. The disposable database (and the synthetic admin) was dropped
+    and the cluster stopped afterwards.
+  - **Limitations.** Windows only (Linux remains gap 003). Synthetic rows only, not real settle
+    output. The 9-column table scrolls inside its `.table-wrap` at both widths; the right-hand
+    columns were captured scrolled (`07`, `08`). The site-wide cookie banner and the dev-only Next
+    indicator overlay part of some captures; neither belongs to this page.
+
+## V2-GAP-026 — The shadow rehearsal, the parity and capture tools on real data, and both rollback paths have never run
+
+- **Local application rollback demonstrated, 2026-10-19.** Archived previous compatible app
+  `ff100dc2` (no new worktree), V2, previous retaining additive schema, then V2: all start and
+  pass critical public/admin permission checks. Final post-115 previous 15/15 and V2 19/19.
+  Raw vote hashes and ledgers unchanged across phases; three proposals/six decisions retained.
+  Evidence `local-rollback-*.json`. This does not demonstrate pre-migration schema 110, host
+  systemd/Caddy/TLS/backup, production data or destructive reversal with populated new ledgers.
+
+- **Populated-ledger rollback rehearsal, 2026-10-20** (`docs/v2/rollback-populated-rehearsal-2026-10-20.md`).
+  Synthetic identities on an archive-derived isolated PG16 copy: 8 proposals, 21 decisions, 2
+  derived results, 4 eligibility decisions, 2 projections. Application rollback previous → V2 →
+  previous → V2 (18/24/18/24 checks) left ledgers, public pages, permissions and audit unchanged.
+  Reversal of 111–115 then data-only `pg_dump -Fc` / `pg_restore` recovery restored every row, id,
+  reference, sequence and public result exactly (fail-closed on rerun, schema and grants identical
+  after reapplication). The CSV-only procedure the runbook previously described did NOT restore
+  identity sequences (the next audited write failed); the runbook now uses the archive. Not shown:
+  a production dump, the host backup, systemd/Caddy/TLS, a real previous-release redeploy, and
+  V2 writes between export and drop (lost by design). Application rollback with the additive schema
+  retained stays the demonstrated route.
+
+- **Launch F (2026-10-19).** The mechanics and the DB reversal were rehearsed on isolated PG16 with local data, NOT a production dump (see `rollback-runbook.md` §7 and `docs/v2/evidence/launchF/`). The synthetic shadow copy went through 111-114 pending → applied, and parity returned VERDICT PASS (5/5). For the reversal, the 001-114 → 001-110 schema is identical and re-forward is identical. Still open: the production-dump rehearsal, real-data parity, the application rollback (§4, redeploying `PREV`) and the backup step (§2).
+- **What.** Stage 6 wrote the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`), the
+  parity tool (`tools/v2/shadow-parity.ts`, policy `v2.parity.1`), the capture tools
+  (`tools/v2/shadow-capture.ts`, `tools/v2/shadow-award-reports.ts`), the target guard
+  (`tools/v2/shadow-guard.ts`), the cutover runbook and the rollback runbook. The tools are unit
+  tested on committed synthetic inputs, fakes and in-memory PGlite only; no command in any of the
+  three documents has been run, so the rollback is untested (an owner no-go condition) and the
+  parity thresholds have never met real data.
+- **Why.** V2 has no database, host or network access (plan §1); restoring a production dump and
+  creating databases need the owner's approval (`docs/v2/go-no-go.md` §4, S-A1..S-A5).
+- **Close.** An operator runs the rehearsal under those approvals, the parity verdict is PASS (or
+  every FAIL is reconciled by the owner), both rollback paths are rehearsed, and the record in
+  `docs/v2/shadow-rehearsal.md` §10 is filled in.
+
+## V2-GAP-027 — The AFL API reconciliation report has no producer in the settle CLIs
+
+- **CLOSED locally, 2026-10-27.** Both close conditions are met. Not deployed.
+  - **Producer.** `tools/current-season/settle-afl-api.ts --report-out <file>` (with `--dry-run` or
+    `--apply`; refused with `--validate-only`/`--report`) writes
+    `afldb.v2.afl-api-reconciliation-report` v1 through the Stage 3 builder, serialiser and
+    validator. `manifestSha256` is the snapshot's manifest hash, taken around its verification.
+    The format is unchanged.
+  - **Before any mutation.** After the offline verification, the seal and the gate refusals, and
+    before a database client exists, the destination is validated and created exclusively. Its
+    directory must exist, the file must not exist, and it may not lie inside the acquired snapshots.
+    A refusal or an error before the run finishes removes the reservation.
+  - **Outcome preservation.** The report is written only after the transaction outcome is known
+    (HALT, completeness rollback, dry-run or commit). A build, validation or write failure is logged
+    with the committed batch, never thrown; the CLI returns the full outcome and exits 3 only when
+    nothing else failed. If the post-commit exception read throws, the committed run is recorded
+    first (no exception section) and the error then propagates as before.
+  - **Parity (new policy version).** `v2.parity.2` = `v2.parity.1` plus a required
+    `afl_api_reconciliation` check (pair by season; FAIL on snapshot, mode, applied, HALT, rollback,
+    any counter, season feed, build failures, refusals or exception counts changing; `generatedAt`
+    and `batchId` ignored). Opt-in through `--policy v2.parity.2 --afl-api-before/--afl-api-after`.
+    `v2.parity.1` stays the default and is byte-identical; AFL API inputs are refused under it.
+    The validator accepts both policies against their own check lists, and the retained real
+    v2.parity.1 report (`evidence/fresh-rehearsal-acceptance-2026-10-21.json`) still validates.
+    `@afldb/derived` receives the report validator from the CLI (plan D1).
+  - **Evidence.** `tests/afl-api-settle-cli-gate.test.ts` +12 (destination refusals before any
+    connection, sealed-season precedence, reservation release, dry-run/apply/HALT reports, write and
+    validator failures preserving a committed outcome, exception-read failure; run results are
+    SYNTHETIC over the committed provider fixture snapshot). `tests/v2-shadow-parity.test.ts` +13.
+    The five focused suites pass 331/331; `tsc --noEmit` and focused ESLint pass. Real PostgreSQL:
+    a new case in `tests/integration/settle-afl-api.test.ts` drives the CLI through a real dry-run
+    and a real apply. Both reports validate and carry the run's counters, and the apply carries its
+    batch and the real exception report. It ran on disposable `afldb_v2_gap027_test` (a template
+    copy of `afldb_v2_rb_release_test`, at migration 115, loopback 55433, `isolated-pg run`): 1/1,
+    residue 0, then dropped. Port 55432 (an `ssh.exe` listener) was not contacted.
+  - **Not done.** No rehearsal or production run uses the report yet. Adopting `v2.parity.2` for a
+    rehearsal, and where its before report is captured, is an owner decision
+    (`shadow-rehearsal.md` §8).
+
+- **What.** `packages/acquisition/src/reconciliation-report.ts` (Stage 3) defines the
+  machine-readable `afldb.v2.afl-api-reconciliation-report` with a builder, validator and JSON
+  Schema, but no settle CLI emits it: the only callers are the package index, the stage contract and
+  the tests. A rehearsal therefore reads the AFL API settle's outcome from its printed counters and
+  exception report (`tools/current-season/settle-afl-api.ts` `counterLines`), not from that file,
+  and the parity tool does not take it as an input.
+- **Why.** Wiring it into the frozen-adjacent settle CLIs was not in any stage's reviewed scope;
+  found while designing the Stage 6 parity inputs.
+- **Close.** Emit the report from `settle-afl-api.ts` (an `--report-out <file>` option), test it,
+  and add it to the parity inputs under a new policy version.
+
+## V2-GAP-028 — Four integration files disagree with the rebuilt history and current code
+
+- **CLOSED locally, 2026-10-20.** All original cases and teardowns pass on the freshly rebuilt
+  `afldb_v2_rb_release_test`: admin-draft **46**, admin-season-lists **40**, awards-reload-links
+  **107**, match-admin-delete **7** (**200/200**). Exact original 14 failures are preserved in
+  `evidence/local-verification-initial.json`. Illegal test picks corrected inside the real
+  <=200 production constraint; registered-season appearances explicitly seeded; captaincy and
+  named-medal assertions reconciled by actual source scope; test-owned deletion audit cleaned
+  before deleting its administrator. No production rule/assertion was disabled.
+  Brownlow backtest/state-B also pass **6/6 + 1/1** without a literal `afldb_test`: loopback,
+  approved port, `_test` name, cluster, live current database and marker are all required.
+  Frozen DraftGuru provenance/sample checks pass independently of the checkout prefix. Linux
+  remains a distinct platform gate, not a condition for closing this demonstrated local defect.
+  The final verification follow-up also corrected a counterfactual test's unsupported deadlock
+  victim assumption; 46/46 cases retain deadlock, atomicity, timeout and retry assertions for
+  both outcomes permitted by PostgreSQL. No runtime guard or role privilege changed.
+
+- **What.** These failures appeared on the isolated rebuild `afldb_v2_hist_test` (2026-10-19):
+  - `tests/integration/admin-draft.test.ts`: 11 failures. Manual picks 301/210 are refused with
+    "Pick number must be at most 200", and the dependent cases fail after them.
+  - `awards-reload-links.test.ts`: 1 failure. The pins are stale: 1,375 captaincies records
+    against 1,781 loaded, and 863 named-medal ids against 1,191 read.
+  - `admin-season-lists.test.ts`: 2 failures. The appearances projection for `maxYear` is empty.
+  - `match-admin-delete.test.ts`: its tests pass, but the teardown FK
+    (`data_edits_admin_user_id_fkey`) fails.
+
+  No file involved changed in V2 (`git diff 0f46c3ae..` is empty for them).
+- **Why open.** It is unknown whether a Linux `afldb_test` rebuilt at the same commit reproduces
+  them. The isolated rebuild ran without the DraftGuru bridge dataset.
+- **Close.** Run the four files on Linux `afldb_test` (S-A5). Fix each test or the code at its
+  cause, and never weaken an assertion.
+
+## V2-GAP-029 — Strict baseline/reference evidence differs from locally reproduced history
+
+- **Owner decision 2026-10-20:** OPEN as data quality debt. D-V2-MIGRATION-SEPARATION approves
+  distinct backend and exact-reference criteria, conditional on existing records, IDs,
+  relationships, event/registration/participation coverage and public results being preserved;
+  functional ingestion/publication, permissions, audit and rollback must hold. New discrepancies
+  block migration. 149 strict, 99 approved, 50 unapproved unchanged; no additional approvals.
+  Production compatibility was INCOMPLETE (no approved local backup) at that time. Production NO-GO.
+  [Decision](migration-acceptance-2026-10-20.md), [commands](production-shadow-commands.md).
+- **Migration acceptance 2026-10-20 (D-V2-BROWNLOW-ALT-1):** the approved archive was rehearsed;
+  preservation PASS and, with the scoped Brownlow alternative, migration compatibility PASS for that
+  archive and 110 → 115 only. This does not resolve, waive or reclassify any Gridley finding: the
+  **50 unapproved findings remain unapproved** (149 strict / 99 approved) and GAP-029 stays OPEN.
+  Newly introduced data loss, coverage regression or an unexplained query difference would still block.
+  [Decision](owner-decision-brownlow-alternative-2026-10-20.md).
+
+- **Current acceptance:** D-GAP029-21 implemented; 149 strict, 99 approved, 50 unapproved. No data match or release waiver. [Readiness](gap-029-readiness.md), [verification](evidence/gap-029-acceptance-verification.json). The seven-file run below predates this bounded follow-up.
+
+- **Status:** Partly resolved 2026-10-20. Latest seven-file relevant run: **1,397 passed / 3 failed / 7 skipped** on the preserved isolated clone `afldb_v2_gap029_test`. Two original strict Gridley assertions and the new policy-conformance assertion remain failed. Strict: **149 findings**; approved deferrals: **78 (0 data matches)**; unapproved: **71**. Rookie coverage repaired: **23 findings / 7 distinct cells**. No new deferral or production waiver. Detailed evidence: [Gridley closeout](gap-029-gridley-resolution.md), `evidence/gap-029-evidence-verification.json`.
+- **Previous full-workflow result (unchanged until rerun):** 13,740 passed / 9 failed / 31 skipped;
+  Coleman 27/27; original gap-028 files 200/200. **Focused result after the repairs** (the six GAP-029
+  files together on `afldb_v2_rb_final_test`, strict, `evidence/gap-029-focused-tests.json`): 1,374 passed /
+  2 failed / 7 skipped of 1,383 (the 7 skips are the existing release-gates skips). Typecheck clean;
+  changed-file lint 0 errors / 0 new findings. The full workflow was not rerun: only test files changed.
+
+### Resolved (previous expectation → corrected expectation → why)
+
+1. **club-comparison-route (2 assertions): 42 → 41 through 2025, plus independent later meetings.**
+   Adelaide v Brisbane Lions has 41 meetings 1997-2025 in the AFL Tables `results.csv`
+   (`full-history-20260902`, 16,838 rows to 2025; its 1991-96 rows are Brisbane Bears, a distinct
+   organisation). Independent SQL on organisation slugs gives the same 41. The retained 2026 AFL API feed
+   holds two further meetings (Round 7, 2026-04-26; Semi Final, 2026-09-12). The 2026-09-15 pin of 42
+   (commit `d9105aba`) was 41 plus one 2026 meeting; which one is not recorded. Not an application defect.
+   Regression: the test asserts `through2025 = 41` strictly and `summary.meetings = 41 + season>=2026`.
+2. **home-records venue totals: 3200 / 485 → 3151 / 484 through 2025, plus independent 2026.** Source
+   `M.C.G.` rows: 3,151 matches, 484 finals; the DB agrees (119 grand finals and max attendance 121,696
+   unchanged). The retained 2026 feed has 49 concluded MCG matches by 2026-09-14, exactly 3151 + 49 = 3200,
+   and one finals-series match (the 2026-09-04 qualifying/elimination final; Wildcard Finals are
+   `is_finals_series = false`), 484 + 1 = 485. The pin was the 2026-09-14 snapshot (`e4f872b9`). Not a defect.
+3. **X1 played-and-coached (2 assertions): 367 → 365 through 2025, plus independent 2026-only coaches.**
+   The 2026-09-09 evidence was **365** with three matchless coach identities (the original test header
+   said so); the 2026-09-12 re-pin to 367 added Josh Carr (Port Adelaide, 23 games, season 2026 only) and
+   Josh Fraser (Carlton, 15 games, 2026 only) when 2026 coaching assignments were loaded (AFL Tables
+   `coaches_index.csv`). Jim Adamson (North Melbourne 1940, 11 games) is matchless in both snapshots: the
+   per-match `Coach` column of `player_stats_1940.csv` is blank for North Melbourne rounds 8-18 (11 matches,
+   matching his 11 games) and names Len Thomas for rounds 1-7. **Not repaired:** attributing those 11
+   matches to Adamson would be an inference beyond the accepted source (owner decision if wanted; X1 would
+   then be 366). Regression: `through2025 = 365` strictly; total = 365 + linked people whose only coached
+   matches are 2026+.
+4. **release-gates exact 261 / 110 digests (2 assertions): membership UNCHANGED; ordering-only
+   disagreement.** The pinned digests are reproduced exactly from the local membership when the AFL Tables
+   profile keys are ordered ignoring punctuation (`_`, `/`, `.`) and case — an order inferred to match a punctuation-ignoring
+   Linux locale; the original host collation is not directly evidenced, for `string_agg(... ORDER BY external_id)` — and under none of the
+   other orderings tried (C, case-folded, ICU `en`/`en-US`/`sv`/`und` at four strengths, numeric on/off;
+   only the punctuation-ignoring variants match). The earlier note that locale ordering is not the cause had
+   tried only punctuation-significant orders. Membership difference against the reference: **none** (261 =
+   261 and 110 = 110 keys; the two original digests are the reference). The V1 host collation itself is not
+   observable here. Fix: the test reads keys in C order, asserts the original pins from the legacy ordering
+   applied in code (so it holds on any collation) and pins the canonical C-order digests
+   `79d3e6eea83a4620` / `258396e0512a2212`. Key lists retained: `evidence/gap-029-identity-cohorts.json`.
+5. **Gridley board 541, cell 2-1:** both official club pages were read directly. The 2025 Gold Coast trade follows the 2025-01-07 board. Extracted pages do not expose publication timestamps, so the previous exact completion-day claim is not independently verified here. The general 1-November cutoff was replaced by the narrowly tracked, evidence-checked board/cell/profile/direction record in `data/reference/gridley-board-541-trade.json`; unrelated discrepancies stay strict.
+
+### Latest Gridley closeout
+
+The prior 172 “cells” are **172 findings in 156 distinct cells**. The single machine-readable inventory, `evidence/gap-029-gridley-residual-inventory.json`, retains board dates, criteria, expected-membership references, evaluated actual memberships, observed identity differences, adjudications and exact required evidence; unavailable memberships remain UNKNOWN. No existing raw strict finding was overwritten.
+
+- **Rookie draft:** eight retained independently sourced selections repaired through the established audited manual writer, on an isolated clone. Eight audits, eight durable replay records; second apply is idempotent. **23 findings / 7 cells resolved.** Phil Davis now has directly-read primary evidence. The draft release pin is 6,810 **DraftGuru** rows plus independently accounted durable manual selections, with unexpected sources rejected.
+- **Existing deferrals:** §23.36 W.2/W.3 and §23.38 record acceptance of seven still-unsupported criteria, 26 occurrences / 78 cells. The bounded manifest enumerates all 78 and pins the corpus. No calendar expiry was recorded; changed support/scope/evidence requires review. Approved decisions count as **0 data matches** and still fail strict parity. Policy reporting fails on every unapproved difference, independently of diagnostic mode. No new owner approval is needed to represent the existing decisions.
+- **42 event cells remain:** no recoverable exact labelled match source was found in the scoped tracked/documented artifacts. Canonical matches have no labels. Need a sourced exact-match export or event evidence; no date/clubs/venue inference.
+- **8 registration/2026 cells remain:** the authentic September roster was hash-verified but post-dates the April/May boards. Malcolm Rosas and Finnbar Maley already have canonical identities; Willem Duursma and Jagga Smith do not. Need board-dated registrations and participation, not current memberships.
+- **21 sibling cells remain as unapproved criterion disagreements:** direct club and league records establish no senior AFL appearance during Corey’s Brisbane career and distinguish subsequent state-league VFL/NEAFL football. No missing qualifying AFL game is established. Preserve `games > 0`; exact bounded owner proposal and its 71 → 50 policy impact are in the closeout. No approval is applied.
+
+Final strict result: **149 findings / 149 cells = 50 dataset gaps + 78 unsupported + 21 unapproved criterion disagreements**. Policy result: **FAIL, 71 unapproved**. Known-answer errors and solver timeouts: **0**. Full workflow remains the historical result above, not rerun. Typecheck and changed-file lint pass. Original database, SSH listener, credentials and authentication are preserved; the dedicated cluster is verified on loopback **55433** because 55432 belongs to ssh.exe. See [closeout](gap-029-gridley-resolution.md) for exact evidence, commands and owner decision wording.
+
+### Evidence investigation and port-incident follow-up
+
+Launcher authentication on 55432 contacted the documented shared development endpoint through the SSH forward. Local PID/start time, forwarding arguments, SSH configuration and retained failure log support that finding; remote cluster/database identity, authentication method and logs remain unknown. Earlier blanket no-production/shared-contact wording is withdrawn. No new tunnel connection or SSH process change was made. New launcher preflight proves PID/executable/data-directory/loopback ownership before credentials, then retains SQL identity checks. Guard regressions 17/17; positive 55433 and negative 55432 checks pass.
+
+The actual committed `common.py` rookie replay restores 8/8 removed selections on a dedicated rollback-only clone, remains idempotent, preserves eight audits/eight overrides and rolls the fixture back. The baseline and repair clone are unchanged. One targeted recovery pass found partial official event histories/two exact fixtures and dated affiliations for the four 2026 players, but no complete event-label artifact or complete board-date teammate snapshots; no partial dataset was promoted. See `gap-029-targeted-recovery.json`, `gap-029-port-incident.json`, `gap-029-rookie-actual-replay.json`, and latest `gap-029-evidence-verification.json`. Typecheck and changed-file lint pass; full workflow not run.
+
+## V2-GAP-030 — `brownlow_round_votes.match_id` was never backfilled
+
+- **Owner policy decisions recorded, 2026-10-20:** [content-bound decisions and provenance](brownlow-policy-decisions-2026-10-20.md). BP-2025-ELIGIBILITY-v1 and all twelve 2025 rulings, 2025 adoption (621 positives / 207 sets; 8,901 zeros preserved), and 1984–2025 match-ID policy are approved. Production execution is pending; 2026 is excluded. Counts require fresh evidence; no live plan or execution approval exists. **Runtime status (distinguished):** *implemented* — eligible/ineligible/unknown are represented distinctly end to end, unknown can block a winner or ranking, and migration 117 makes the staged provider flag nullable; *isolated-verified* — disposable PostgreSQL copies, the authentic 2025 snapshot and the twelve rulings applied only in a labelled isolated copy ([record](brownlow-eligibility-implementation-2026-10-20.md)); *pending production rollout* — schema approval for 116 + 117, deployment, and the separate per-operation execution approvals. V2-GAP-016 stays open for that rollout and for reconciliation acceptance.
+
+- **Owner review package prepared:** [production correction package](brownlow-production-approval-package-2026-10-20.md)
+  adds separately guarded entry points and migration 116 receipts; isolated-only CLIs remain unchanged.
+  Proposed execution is narrowed to 1984–2025 (expected 320,861 rows); 2026 is outside this package.
+  Fresh live identity, backup/restore baseline, exact digest/revision execution approval remain required.
+
+- **Rehearsed on a clone, 2026-10-20; production unchanged.** Migration 094's ledger row proves only that
+  its statements ran; they ran over an empty table, so all 330,383 archived rows have a NULL `match_id`.
+- Reviewed, digest- and database-pinned, all-or-nothing, reversible backfill
+  (`src/db/queries/brownlow-round-vote-match-backfill.ts`, `tools/v2/brownlow-round-vote-match-backfill.ts`):
+  330,383 repairable, 0 excluded, replay a no-op, fingerprints differ only in `mapped_rows`, exact reversal.
+  Full counts, the rule, and the non-executed production proposal:
+  [brownlow-round-vote-match-backfill-2026-10-20.md](brownlow-round-vote-match-backfill-2026-10-20.md).
+
+## V2-GAP-031 — Brownlow canonical ingestion is blocked by legacy ownership
+
+- **Owner policy decisions recorded, 2026-10-20:** [content-bound decisions and provenance](brownlow-policy-decisions-2026-10-20.md). BP-2025-ELIGIBILITY-v1 and all twelve 2025 rulings, 2025 adoption (621 positives / 207 sets; 8,901 zeros preserved), and 1984–2025 match-ID policy are approved. Production execution is pending; 2026 is excluded. Counts require fresh evidence; no live plan or execution approval exists. **Runtime status (distinguished):** *implemented* — eligible/ineligible/unknown are represented distinctly end to end, unknown can block a winner or ranking, and migration 117 makes the staged provider flag nullable; *isolated-verified* — disposable PostgreSQL copies, the authentic 2025 snapshot and the twelve rulings applied only in a labelled isolated copy ([record](brownlow-eligibility-implementation-2026-10-20.md)); *pending production rollout* — schema approval for 116 + 117, deployment, and the separate per-operation execution approvals. V2-GAP-016 stays open for that rollout and for reconciliation acceptance.
+
+- **Owner review package prepared:** guarded 2025-only adoption, observation, eligibility and named
+  issue resolution; no production operation approved. Eligibility review supports all 12 proposed
+  ineligible corrections; policy decisions are now approved; production execution remains pending. See the [approval package](brownlow-production-approval-package-2026-10-20.md).
+
+- **Open.** All 207 2025 vote sets refuse `ownership_indeterminate` on production-shaped data. Ordinary
+  canonical ingestion is verified on a clean isolated target (621 inserts, hash-identical to the legacy
+  positive rows, replay a no-op). The narrowest transition (separate module, two keys, no force flag,
+  ledgered, reversible until the API writes) is demonstrated on a clone only; production adoption still needs
+  separately approved schema, fresh target/backup/baseline and exact execution approval. The 207 `afl_api_brownlow_settle` data issues are
+  not auto-resolved by a successful settle.
+  [brownlow-legacy-ownership-transition-2026-10-20.md](brownlow-legacy-ownership-transition-2026-10-20.md).
+
+## V2-GAP-032 — NL search silently discarded numbers no extractor claimed
+
+- **CLOSED locally, 2026-10-28** (found by the R43b inspection in `blockers.md`). Parser v67. Not deployed.
+- **What.** `meaningfulTokens()` keeps bare numbers out of the confidence ledger, so a number that no
+  extractor read cost the parse nothing. Two silent wrong answers resulted:
+  - the exploratory `malformed_input` template 3, `<club> <stat> 200 40 [time]`, executed at
+    confidence 1.00 as the club's leaderboard with both numbers discarded;
+  - the real-user corpus's `user_range_leaders` form `most <stat> in 1980 to 1989` (40 rows) answered
+    1980 alone, because `BARE_YEAR_RE` took the first year and the second was dropped.
+- **Case set (R43b).** The ISSUE-206 V1 corpus CSV is held only on the host, and no V5 baseline is
+  retained locally. A replay of the unchanged generator without V5 gives a different digest
+  (`ee0ae7c0…`, not `45c4dabb…`), so the exact 550 rows and the 114 accepted ones cannot be
+  reconstructed here. The family is five templates over fixed pools, so the whole population, 10,179
+  distinct questions, was inspected instead. It contains every original row. Under the v66 parser,
+  templates 0, 1, 2 and 4 declined throughout, and template 3 was accepted in all 3,042 cases. That
+  is consistent with 114/550 being about one template in five.
+- **Fix** (`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`). `strayNumberTokens()` reads the
+  bare numbers left in the residual text once every extractor has run. They count against the token
+  ratio and as leftover tokens, exactly as an unexplained word does. `extractMarqueeMatches` now
+  strips the digit count it reads ("3+ anzac day games"); it had relied on digits being invisible.
+  `YEAR_TO_YEAR_RE` reads "1980 to 1989" as the inclusive range `BETWEEN_RE` already gives
+  "between 1980 and 1989".
+- **Validation (DB-free, Windows workstation).** All 10,179 population questions now decline. A
+  differential of the v66 and v67 parsers over the 1,844 retained UI-corpus questions changes
+  exactly the 40 range rows, which stay plans with the range corrected. The 17 parser-dependent
+  suites pass 1,638/1,638, including 7 new cases in `tests/nl-parser.test.ts`. `npm run typecheck`
+  exited 0. Not run: the browser NL stress runner, PostgreSQL answers and the frozen V5 corpus.
+- **PostgreSQL, frozen V5 and browser validation (Linux, 2026-10-28;
+  [record](linux-verification-2026-10-28.md) §3–4).** These ran on a disposable clone of the approved
+  test baseline, with HEAD (v67) and the pre-fix tree (v66) on the same data:
+  - The 40 range rows now give the same scope and answer as their `between` rewrites, 40/40. Before
+    the fix, all 40 planned a single year and 36 gave a different answer.
+  - The `200 40` forms now decline; before the fix they executed.
+  - Frozen V5 is 12,000/12,000 clean and V6 is 11,997/3 (a 2025 data-scope tie), both unchanged
+    row for row.
+  - Of the exploratory corpora, exactly 151 rows changed between the trees, every one a GAP-032/033
+    decline; all 550 `malformed_input` rows decline.
+  - Browser sweep: 1,844/1,844 observed, with 0 HTTP or page errors.
+
+## V2-GAP-033 — A played-and-coached question counted career games for "N games for <club>"
+
+- **CLOSED locally, 2026-10-28** (found while analysing the ISSUE-208 item of `blockers.md` R32). Not
+  deployed.
+- **What.** The cross-domain reading (AFLDB-ISSUE-152 Phase F) turns the played club into a
+  `played_for_club` builder parameter and clears `scope.clubFor`. `player_career` holds a `games`
+  condition to a club only through `scope.clubFor` (`conditionSql`,
+  `src/db/queries/nl/player-career.ts:107-108`). So "players who played 200 games for richmond and
+  also coached richmond" planned with career games ≥ 200 at every club. A player with 150 Richmond
+  games and 60 elsewhere would qualify. That is a silent wrong answer, against Phase F's own rule
+  that every rule refuses and none drops a filter.
+- **Fix** (`src/search/nl/plan.ts`). `validatePlan` refuses a `games` career condition when
+  `crossDomainClubs` names the played club. Without a named club (X1) the condition is unchanged.
+- **Not changed, deliberately.** `assignCrossDomainClubs` keeps its 20-character opponent window. It
+  is a refusal guard, so its false positives ("over 200 games for richmond") only decline. The
+  nearest-token test that ISSUE-208 gave `extractClubs` would let "coached against arch rival
+  carlton" bind Carlton as the coached club. A test pins both.
+- **Validation (DB-free).** 17 NL suites 1,641/1,641, with 3 new cases in `tests/nl-parser.test.ts`
+  and `tests/nl-plan.test.ts`. `npm run typecheck` exit 0. No retained corpus expects the composition
+  to answer. Not run: PostgreSQL answers.
+- **PostgreSQL validation (Linux, 2026-10-28; [record](linux-verification-2026-10-28.md) §3).** The
+  composition is refused at `validatePlan`. Before the fix it answered 6 players, one of them with
+  11 Richmond games. The controls are unchanged at both trees: played and coached Richmond 27,
+  played and coached 365, 200 games and coached 107. Twenty-nine "played and also coached … with
+  at least/no more than N games" exploratory rows now decline (`coverage_unavailable`).
+
+## V2-GAP-034 — The birth-date enricher filed a new open `external_identity_conflict` on every re-run
+
+- **CLOSED locally, 2026-10-28** (the ISSUE-090 D4 item of `blockers.md` R32; recorded at ISSUE-090
+  §18 as "not raised as a tracked issue"). Not deployed.
+- **What.** `tools/migration/enrich_birth_dates.py` wrote `external_identity_conflict` (a stored AFL
+  Tables profile link that disagrees with the register) with an unconditional `INSERT` and no
+  clearing step. Each re-run of a still-conflicting profile added another open `data_issues` row,
+  and a conflict that had cleared stayed open. This was reproduced on a disposable local database:
+  two runs gave 2 open rows for one profile.
+- **Fix.** This is the ISSUE-090 §18 idiom that the same file already uses for
+  `dob_internal_conflict`. Before refiling, the run deletes the unresolved
+  `external_identity_conflict` rows for the profiles it asserts, and new rows record `source_id` in
+  `details`. Resolved rows are never touched, and a row naming another `source_id` is not this run's
+  to delete. Older rows carry no `source_id` and are treated as the running source's.
+- **Validation.** `tests/integration/dob-enrichment-issues.test.ts` test 28 (new) covers four things:
+  two runs leave one open row; a resolved row is kept while the still-holding conflict is refiled; a
+  cleared conflict is withdrawn; another source's row is untouched. It failed before the fix (2
+  rows) and passes after. The whole file passed 28/28 on the disposable `afldb_v2_d4_test`, created
+  from the isolated `afldb_v2_rb_final_test` (cluster `afldb_v2_isolated`, 127.0.0.1:55433), and that
+  database was dropped afterwards. `py_compile` passed. `draftguru-import` and `fitzroy-core-import`
+  passed 162 (1 skipped). Not run: Linux, `release-gates`.
+- **Linux (2026-10-28).** `dob-enrichment-issues.test.ts` passes 28/28 in the full workflow at both
+  `c39d2130` and `c3dea709`; `release-gates` passes 59 (7 static skips)
+  ([record](linux-verification-2026-10-28.md)).
+
+## V2-GAP-035 — The rendered NL gate scores 29 rows whose expectations conflict with accepted behaviour
+
+- **CLOSED locally (2026-10-28).** Found by the Linux browser sweep; not a production blocker. The owner decided to
+  restate the expectations and not to build the optional career-total mapping. Record:
+  [linux-verification §10.1](linux-verification-2026-10-28.md).
+- **What.** The sweep of all 12 tracked UI corpora (1,844 questions; 0 HTTP or page errors) scored
+  1,815 pass / 29 fail. Each failure behaves the same through the engine at the pre-GAP-032 tree,
+  so none comes from GAP-032/033, and none is a crash or a wrong answer:
+  - **27 rows** of `afldb-ui-questions-1440-real-user-v3-20260822.csv` ("how many career
+    <goals|games|kicks|handballs|disposals|marks> did <player> have") expect a plan. They decline at
+    `validatePlan` (`src/search/nl/plan.ts:2075-2081`, "no defined total to count"). ISSUE-190
+    (Resolved 2026-09-15, `3748e134`) introduced that refusal deliberately: a metric-bearing
+    `player_career` count used to answer with the rank-one leader. Its optional "how many <career
+    column> has <player>" → career-total mapping "was not built", and "Follow-up: none opened". The
+    corpus predates the decision. The bare forms ("Dustin Martin career goals") answer.
+  - **2 rows** of `afldb-ui-questions-relationships-decline-v1-20260909.csv` (`rel_dec_001`
+    "biggest football families", `rel_dec_002` "families with three AFL players") expect a
+    decline. They answer with "Ablett — 906 combined career games" and "43 families qualify".
+    ISSUE-153's acceptance (`issues.md:22429`) records exactly these answers as intended, but its
+    re-pin `25beb99c` moved only `rel_dec_003`–`006` to `plan`.
+- **Resolution.** Each restated row was checked against its owning decision, never against observed output:
+  - the 27 career-count rows expect `decline`. A pin parses each to a metric-bearing `player_career` count and asserts
+    `validatePlan` returns the exact ISSUE-190 refusal;
+  - `rel_dec_001` and `rel_dec_002` expect `plan`. A pin asserts both parse to grain `family` and validate (ISSUE-153
+    §11.14, C1/C5).
+  - IDs, question text, categories, tags and every unrelated assertion are unchanged. The Phase G builder counts and the
+    corpus runner headers were restated to match.
+- **Validation.**
+  - Locally: four NL suites 913/913.
+  - On Linux: five NL suites 1,002/1,002.
+  - Rendered gate on Linux, all 12 tracked UI corpora: 1,844/1,844 pass, 0 fail, 0 HTTP or page errors (before: 1,815 / 29).
+
+## V2-GAP-036 — The production bundle cannot read the Coleman derivation contract
+
+- **CLOSED locally (2026-10-29, release hardening; not deployed).** Production-blocker class: reconciliation.
+  - **Root cause.** Output file tracing is not a contract. It traced `seasons.json` (also imported as a module) but
+    not the contract, which only a spread of path segments names. The same scan found two more runtime reads that
+    were absent from the bundle and degraded silently: `data/reference/draftguru-event-kinds.json` and
+    `tools/rebuild/draftguru/draftguru-contract.json` (`src/db/queries/admin-draft.ts`).
+  - **Fix.** `tools/build/standalone-runtime-files.mjs` lists the 7 files the server reads through
+    `process.cwd()`. `prepare-standalone.mjs` copies them and refuses to ship if `server.js` is not at the bundle
+    root or if any file is missing or differs from the repository copy. It runs in `npm run build`,
+    `deploy/sync-dev.ps1` and `tools/v2/local-release.mjs`.
+  - **Regression coverage.** `tests/deploy-web-unit.test.ts`:
+    - scans `src/` for segment-list and whole-string `data/`/`tools/` JSON paths and requires each to be listed;
+      `src/lib/rollover/` is excluded, and the test asserts that no other `src/` module imports it;
+    - copies into a scratch bundle and loads the Coleman contract and the season registry from it;
+    - reports a missing, differing or repository-absent file;
+    - pins the copy-then-refuse order in `prepare-standalone.mjs`.
+  - **Validation.**
+    - Focused suites 245/245; wider V2/Coleman/Brownlow/admin unit run 48 files, 2,100/2,100; typecheck and lint
+      exit 0.
+    - Production build (`local-release.mjs build v2`), BUILD_ID `XtSgl4BOQZXC2G8qIWJdV`, 1516/1516 pages.
+      `prepare-standalone` printed "copied and verified 7 runtime reference files".
+    - The bundle's contract SHA-256 `93702c71…` equals the repository file. Nothing was copied by hand.
+    - Served on 127.0.0.1:3912 from `afldb_v2_visual2_test`, `tools/v2/candidate-visual-corrected.mts`
+      (`evidence/candidate-visual-20261029-corrected/`):
+      - compared 2024 as Super Admin and Admin, 2027, unattested and 1975 (`season_before_contract`);
+      - refused an unattested publish of 2023 with nothing written;
+      - published 2023: +1 `derived_award_results`, +1 `derived_award_projections`, `award_winners` unchanged;
+      - every capture group's expected effect matched its observed effect.
+  - **Not done.** DEV or production deployment, and the DEV smoke of the newly bundled draft and coach contracts.
+- **Original record (OPEN, found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** The release candidate was deliberately
+  left unchanged at the time.
+- **What.** `loadColemanContract()` (`src/db/queries/coleman-inputs.ts:47`) reads
+  `join(process.cwd(), 'data', 'reference', 'coleman-derivation.json')`. The standalone `server.js` runs
+  `process.chdir(__dirname)`, so the working directory is `.next/standalone`. The build's file trace for
+  `/admin/operations/coleman` (`page.js.nft.json`) includes `data/reference/seasons.json` and
+  `afltables-network.json` but not the contract, and `tools/build/prepare-standalone.mjs` does not copy it. Every
+  compare and publish is therefore refused with `coleman_contract_unavailable`. Production serves the same bundle
+  (`deploy/afldb.service` → `deploy/server-cluster.mjs` → `.next/standalone/server.js`).
+- **Evidence.** Build BUILD_ID `ivryI9oSx3g1fpqeB65oJ` at `592c6c16`: `.next/standalone/data/reference/` holds three
+  files and no contract. Captures `evidence/candidate-visual-20261029-states2/K1`–`K4`. With the tracked file copied
+  into the build output, the same build derived, compared and published 2024 normally (W1–W7, labelled as a workaround).
+  The Coleman integration suites (28/28 on Linux) run from the repository root, so they cannot see this.
+- **Close by.** Include the contract in the standalone output (trace include or explicit copy in
+  `prepare-standalone.mjs`), add a check that the bundle contains every `data/reference` file a server path reads,
+  and prove compare and publish from a production build. This reopens the artifact lock.
+
+## V2-GAP-037 — Refusal notices render the absolute server path
+
+- **CLOSED locally (2026-10-29, release hardening; not deployed).**
+  - **Fix.** `toFailure` (`src/lib/admin/operations-centre.ts`) maps the two codes to fixed text:
+    `SEASON_REGISTRY_REFUSAL` and `COLEMAN_CONTRACT_REFUSAL`. Each names the repository-relative file and says
+    nothing was changed and the detail is in the server log. The thrown error is logged with `console.error`
+    ("Operations centre: … unavailable"), the module's existing convention. The independent review found the same
+    leak in the Brownlow provider-team mapping (`readProviderTeamIdentities`); it now shows
+    `PROVIDER_TEAM_IDENTITIES_UNAVAILABLE` and logs the detail too.
+  - **Unchanged.** The codes, and the refusal before any connection is opened. Audit rows carry codes only.
+  - **Validation.**
+    - `tests/v2-admin-operations.test.ts` asserts the fixed text, the absence of `ENOENT` and the path, the log
+      call, the code-only audit row and no connection opened (approval, publish, compare, identities).
+    - Production build `XtSgl4BOQZXC2G8qIWJdV`, with the bundle's file hidden and restored byte for byte:
+      - G1: approving proposal #5 is refused `season_registry_unavailable`;
+      - G2: a compare is refused `season_registry_unavailable`;
+      - G3 and G4: a compare and an attested publish are refused `coleman_contract_unavailable`.
+    - Each rendered the generic text and none of `ENOENT`, "no such file", `standalone` or the repository path.
+      Nothing was written, and the overflow was 0px at 390px.
+    - The server log holds the detail (`evidence/candidate-visual-20261029-corrected/server-log-excerpt.txt`).
+- **Original record (OPEN, found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** Not a production blocker on its own.
+- **What.** `SeasonRegistryError` (`src/lib/seasons/sealed-seasons.ts:53`) and `ColemanContractError`
+  (`src/db/queries/coleman-inputs.ts:52`) embed the first line of the underlying error, e.g. `ENOENT: no such file or
+  directory, open 'D:\dev\afldbV2\.next\standalone\data\reference\seasons.json'`. The pages render it verbatim
+  (`season_registry_unavailable`, `coleman_contract_unavailable`). This exposes the server's filesystem layout to staff
+  and contradicts the generic-text rule (`admin-operations.md` §2). The unbroken path also widens the page by 13px at
+  390px.
+- **Evidence.** `evidence/candidate-visual-20261029-states2/U5` (mobile, overflow 13px) and `K1`.
+- **Close by.** Render a generic reason with the code and log the detail on the server; recapture U5 and K1.
+
+## V2-GAP-038 — A Brownlow status token overflows the page at 390px
+
+- **CLOSED locally (2026-10-29, release hardening; not deployed).**
+  - **Fix.** The "Award-result presentation" status and eligibility-rule cells use `overflow-wrap: anywhere`, the
+    page's existing idiom. A UI test pins both cells.
+  - **Validation.** Production build `XtSgl4BOQZXC2G8qIWJdV`: B12 (1996), B13 and B14 (2023 after the decision,
+    Super Admin and Admin), at 1280x800 and 390x844. Every capture shows 0px horizontal overflow, and the full
+    `refused_eligibility_rule_unrecorded` text is present.
+  - **Related display defect (fixed in the same change).** The raw vote totals printed the reconciliation's folded
+    evidence flag (`BrownlowPlayerTotal.eligible`: "no source marks the player ineligible") under "Eligible", as
+    "eligible". The ADR 0014 determination on the same page can say "unknown (not recorded)" for that player. The
+    two are different concepts, so the column was mislabelled; no rule or data was wrong.
+    - Now: the column is "Ineligibility evidence" (not marked ineligible / marked ineligible / provider flag
+      unknown), with a note that it is not an eligibility status.
+    - Captured as L1 (2022, one reversible `eligible_rank` fixture, restored byte for byte).
+    - Medal rules, eligibility policy and vote data are unchanged.
+- **Original record (OPEN, found 2026-10-29 by D-V2-VISUAL-RECAPTURE-1).** Low; not a production blocker.
+- **What.** In "Award-result presentation" the monospace status `refused_eligibility_rule_unrecorded` cannot wrap. At
+  390px it widens the page by 28px (G1), whenever the default `unrecorded` rule refuses (for example 1996, and 2023
+  after an ineligibility decision).
+- **Evidence.** Overflow named by the capture tool: `span.mono "refused_eligibility_rule_unrecorded"` right edge 418px.
+  Captures `evidence/candidate-visual-20261029-states2/S03`, `B9`, `B10`, `B11` (mobile).
+- **Close by.** Allow the token to wrap (`overflow-wrap: anywhere`) and recapture at 390px.

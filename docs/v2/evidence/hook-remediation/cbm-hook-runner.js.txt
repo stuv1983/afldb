@@ -1,0 +1,83 @@
+// codebase-memory-mcp hook runner (replaces the cmd.exe transport, 2026-10-19).
+//
+// Why: the previous hook command was `cmd.exe /d /v:off /s /c '""...gate.cmd""'`.
+// Claude Code runs Windows hook commands through Git Bash, whose MSYS argument
+// conversion rewrites `/d` `/s` `/c` into drive paths, so cmd.exe never saw `/c`,
+// started interactively and EXECUTED the hook's JSON stdin (tool input, and for
+// PostToolUse:Read the whole file content) as command lines. `>`, `&`, `|` in that
+// text became redirections and commands; that is how the stray 0-byte
+// D:\dev\afldb-afl-api-cutover\supplies was created.
+//
+// Design: no shell anywhere. This file is started by an absolute node.exe path with
+// a constant label argument; the payload is read from stdin as bytes and written to
+// the binary's stdin; the binary is spawned with shell:false and constant argv.
+// Untrusted text is never placed on a command line and never parsed by cmd or bash.
+//
+// Fail-open: always exits 0 (never 2, which would block a tool call). Failures are
+// reported as one line on stderr, naming the cause.
+"use strict";
+
+const { spawn } = require("child_process");
+const fs = require("fs");
+
+const BIN =
+  process.env.CBM_HOOK_BIN ||
+  "C:\\Users\\stuar\\AppData\\Local\\Programs\\codebase-memory-mcp\\codebase-memory-mcp.exe";
+const LABEL = /^[a-z-]{1,40}$/.test(process.argv[2] || "") ? process.argv[2] : "hook";
+const TIMEOUT_MS = Number(process.env.CBM_HOOK_TIMEOUT_MS) || 4000;
+const MAX_STDIN = 64 * 1024 * 1024;
+
+function done(message) {
+  if (message) process.stderr.write(`cbm-hook[${LABEL}]: ${message} (fail-open, tool call not blocked)\n`);
+  process.exitCode = 0;
+}
+
+const chunks = [];
+let size = 0;
+let overflow = false;
+process.stdin.on("data", (c) => {
+  size += c.length;
+  if (size > MAX_STDIN) overflow = true;
+  else chunks.push(c);
+});
+process.stdin.on("error", () => {});
+process.stdin.on("end", () => {
+  if (overflow) return done(`stdin exceeded ${MAX_STDIN} bytes; skipped`);
+  if (!fs.existsSync(BIN)) return done(`binary not found at ${BIN}; skipped`);
+
+  let child;
+  try {
+    child = spawn(BIN, ["hook-augment"], {
+      shell: false,
+      windowsHide: true,
+      windowsVerbatimArguments: false,
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+  } catch (e) {
+    return done(`spawn failed: ${e && e.message}`);
+  }
+
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    try { child.kill(); } catch {}
+    done(`hook-augment timed out after ${TIMEOUT_MS} ms`);
+  }, TIMEOUT_MS);
+
+  child.stdout.on("data", (d) => { if (!settled) process.stdout.write(d); });
+  child.on("error", (e) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    done(`spawn error: ${e && e.message}`);
+  });
+  child.on("close", (code) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    done(code === 0 ? "" : `hook-augment exited ${code}`);
+  });
+  child.stdin.on("error", () => {});
+  child.stdin.end(Buffer.concat(chunks));
+});

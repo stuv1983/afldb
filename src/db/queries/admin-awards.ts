@@ -861,7 +861,8 @@ async function refuseClaimedKey(
  * An award whose last active winner is voided ends with NULL on both halves —
  * honest ("no winner is recorded") rather than a stale span kept for tidiness.
  */
-async function recomputeAwardSpan(tx: Tx, awardId: number): Promise<void> {
+// Exported, behaviour unchanged, for AFLDB V2 Launch F (award projection and approved-revision correction).
+export async function recomputeAwardSpan(tx: Tx, awardId: number): Promise<void> {
   await tx`
     UPDATE awards a
        SET first_season = span.first_season,
@@ -890,7 +891,8 @@ async function recomputeAwardSpan(tx: Tx, awardId: number): Promise<void> {
  * `/hall-of-fame` is `force-dynamic` and needs no invalidation; it is listed
  * so the set reads as the complete consumer list rather than a filtered one.
  */
-function awardWinnerPaths(row: {
+// Exported, behaviour unchanged, for AFLDB V2 Launch F (award projection and approved-revision correction).
+export function awardWinnerPaths(row: {
   awardSlug: string; season: number | null; playerId: number | null;
   playerSlug: string | null; clubSlug: string | null;
 }): string[] {
@@ -967,7 +969,7 @@ export type HonourEditBase = {
   note?: string | null;
 };
 
-async function runHonourEdit<TRow>(input: HonourEditBase & {
+type HonourEditSpec<TRow> = HonourEditBase & {
   table: HonourTable;
   fieldGroup: string;
   lock: (tx: Tx, rowId: number) => Promise<LockResult<TRow>>;
@@ -978,54 +980,66 @@ async function runHonourEdit<TRow>(input: HonourEditBase & {
     overrideGroup: HonourFieldGroup;
     overridePayload: Record<string, unknown>;
   }>;
-}): Promise<HonourMutationResult> {
+};
+
+/**
+ * The body of one edit, on a transaction the CALLER owns. Pre-write refusals are returned; post-write
+ * refusals throw (RollbackRefusal) so the caller's transaction rolls back. Extracted unchanged from
+ * runHonourEdit for AFLDB V2 Launch F (approved-revision correction, V2-GAP-018), which must run it
+ * inside the curated-award revision's own transaction.
+ */
+async function runHonourEditInTx<TRow>(tx: Tx, input: HonourEditSpec<TRow>): Promise<HonourMutationResult> {
+  const locked = await input.lock(tx, input.rowId);
+  if (locked === null) return refuse('not_found', 'That record no longer exists.');
+  if (isRefusal(locked)) return locked;
+  const row = locked;
+
+  if (row.updatedAt !== input.expectedUpdatedAt) {
+    return refuse('stale',
+      'That record changed while this page was open. Reload it and try again.');
+  }
+
+  if (input.precheck) {
+    const refusal = await input.precheck({ tx, row });
+    if (refusal) return refusal;
+  }
+
+  // Everything above refused before a write. From here, any refusal throws.
+  const applied = await input.apply({ tx, row });
+
+  await writeOverride(tx, {
+    entityType: input.table,
+    entityKey: row.entityKey,
+    fieldGroup: applied.overrideGroup,
+    payload: applied.overridePayload,
+    adminUserId: input.adminUserId,
+  });
+
+  await recordDataEdit(tx, {
+    tableName: input.table,
+    rowId: row.id,
+    fieldGroup: input.fieldGroup,
+    oldValues: applied.oldValues,
+    newValues: { ...row.auditIdentity, ...applied.newValues },
+    adminUserId: input.adminUserId,
+    note: input.note,
+  });
+
+  return {
+    ok: true as const,
+    table: input.table,
+    rowId: row.id,
+    entityKey: row.entityKey,
+    revalidatePaths: row.revalidatePaths,
+  };
+}
+
+async function runHonourEdit<TRow>(input: HonourEditSpec<TRow>): Promise<HonourMutationResult> {
   return withImportConnection(async (importSql) => {
     try {
-      return await importSql.begin(async (tx) => {
-        const locked = await input.lock(tx as Tx, input.rowId);
-        if (locked === null) return refuse('not_found', 'That record no longer exists.');
-        if (isRefusal(locked)) return locked;
-        const row = locked;
-
-        if (row.updatedAt !== input.expectedUpdatedAt) {
-          return refuse('stale',
-            'That record changed while this page was open. Reload it and try again.');
-        }
-
-        if (input.precheck) {
-          const refusal = await input.precheck({ tx: tx as Tx, row });
-          if (refusal) return refusal;
-        }
-
-        // Everything above refused before a write. From here, any refusal throws.
-        const applied = await input.apply({ tx: tx as Tx, row });
-
-        await writeOverride(tx as Tx, {
-          entityType: input.table,
-          entityKey: row.entityKey,
-          fieldGroup: applied.overrideGroup,
-          payload: applied.overridePayload,
-          adminUserId: input.adminUserId,
-        });
-
-        await recordDataEdit(tx as Tx, {
-          tableName: input.table,
-          rowId: row.id,
-          fieldGroup: input.fieldGroup,
-          oldValues: applied.oldValues,
-          newValues: { ...row.auditIdentity, ...applied.newValues },
-          adminUserId: input.adminUserId,
-          note: input.note,
-        });
-
-        return {
-          ok: true as const,
-          table: input.table,
-          rowId: row.id,
-          entityKey: row.entityKey,
-          revalidatePaths: row.revalidatePaths,
-        };
-      }) as HonourMutationResult;
+      return await importSql.begin(
+        async (tx) => runHonourEditInTx(tx as Tx, input),
+      ) as HonourMutationResult;
     } catch (error) {
       return rolledBackRefusal(error) ?? refuse('failed', mutationFailure(error));
     }
@@ -1158,11 +1172,12 @@ export type CorrectAwardWinnerInput = HonourEditBase & {
   fields: AwardWinnerCorrection;
   /** Named only so a caller sending one gets a sentence rather than silence. */
   identityAttempt?: Partial<Record<(typeof AWARD_WINNER_IDENTITY_FIELDS)[number], unknown>>;
+  /** Extra keys merged into the `data_edits.new_values` audit row only (never the durable payload). */
+  auditExtra?: Record<string, unknown>;
 };
 
-export async function correctAwardWinner(
-  input: CorrectAwardWinnerInput,
-): Promise<HonourMutationResult> {
+/** The refusals that need no database: shared by the standalone correction and its tx-level variant. */
+function correctAwardWinnerRefusal(input: CorrectAwardWinnerInput): HonourRefusal | null {
   const attempted = Object.keys(input.identityAttempt ?? {});
   if (attempted.length > 0) {
     return refuse('forbidden', identityFieldRefusal(attempted.join(', '), 'award winner'));
@@ -1185,8 +1200,34 @@ export async function correctAwardWinner(
   if (Object.keys(f).length === 0) {
     return refuse('validation', 'Nothing was changed.');
   }
+  return null;
+}
 
-  return runHonourEdit({
+export async function correctAwardWinner(
+  input: CorrectAwardWinnerInput,
+): Promise<HonourMutationResult> {
+  const refusal = correctAwardWinnerRefusal(input);
+  if (refusal) return refusal;
+  return runHonourEdit(correctAwardWinnerEdit(input));
+}
+
+/**
+ * The same correction on a transaction the CALLER owns (AFLDB V2 Launch F, V2-GAP-018: the curated
+ * award approved-revision writes it in the revision's own transaction). Identical rules and writes to
+ * {@link correctAwardWinner}; a returned refusal made no write, a thrown RollbackRefusal rolls the
+ * caller's transaction back.
+ */
+export async function correctAwardWinnerInTx(
+  tx: Tx, input: CorrectAwardWinnerInput,
+): Promise<HonourMutationResult> {
+  const refusal = correctAwardWinnerRefusal(input);
+  if (refusal) return refusal;
+  return runHonourEditInTx(tx, correctAwardWinnerEdit(input));
+}
+
+function correctAwardWinnerEdit(input: CorrectAwardWinnerInput): HonourEditSpec<AwardWinnerRow> {
+  const f = input.fields;
+  return {
     ...input,
     table: 'award_winners',
     fieldGroup: 'award_winner_corrected',
@@ -1294,7 +1335,7 @@ export async function correctAwardWinner(
 
       return {
         oldValues,
-        newValues,
+        newValues: { ...newValues, ...(input.auditExtra ?? {}) },
         overrideGroup: isManual(w.sourceKey) ? 'record' : 'correction',
         overridePayload: isManual(w.sourceKey)
           ? awardWinnerRecordPayload({
@@ -1313,7 +1354,7 @@ export async function correctAwardWinner(
           : delta,
       };
     },
-  });
+  };
 }
 
 export type VoidHonourInput = HonourEditBase & { reason: string };
@@ -1411,7 +1452,9 @@ export type CreateAwardWinnerInput = {
 
 type CreatedWinner = { rowId: number; entityKey: string; sourceRecordId: string };
 
-async function insertAwardWinner(tx: Tx, input: CreateAwardWinnerInput & {
+// Exported, behaviour unchanged, for the AFLDB V2 curated-award approval: src/db/queries/award-proposals.ts
+// promotes an approved proposal through this function on the same transaction (ADR 0008).
+export async function insertAwardWinner(tx: Tx, input: CreateAwardWinnerInput & {
   replacesKey?: string | null;
   auditExtra?: Record<string, unknown>;
 }): Promise<CreatedWinner> {
@@ -1625,7 +1668,8 @@ export async function createAwardWinner(
   });
 }
 
-async function readAwardWinnerInTx(tx: Tx, id: number): Promise<AwardWinnerRow | null> {
+// Exported, behaviour unchanged, for AFLDB V2 Launch F (award projection and approved-revision correction).
+export async function readAwardWinnerInTx(tx: Tx, id: number): Promise<AwardWinnerRow | null> {
   const rows = await tx.unsafe(
     `SELECT ${AWARD_WINNER_COLUMNS} WHERE w.id = $1`, [id],
   ) as unknown as AwardWinnerRow[];
@@ -1635,6 +1679,8 @@ async function readAwardWinnerInTx(tx: Tx, id: number): Promise<AwardWinnerRow |
 export type ReplaceAwardWinnerInput = HonourEditBase & {
   reason: string;
   replacement: Omit<CreateAwardWinnerInput, 'adminUserId'>;
+  /** Extra keys merged into the replacement row's `data_edits.new_values` creation audit only. */
+  auditExtra?: Record<string, unknown>;
 };
 
 export type HonourReplacementResult = HonourMutationEnvelope & {
@@ -1660,89 +1706,208 @@ export async function replaceAwardWinner(
 ): Promise<HonourMutationResult<HonourReplacementResult>> {
   const reason = input.reason.trim();
   if (!reason) return refuse('validation', 'Give a reason for replacing this award winner.');
-  const replacementId = randomUUID();
 
   return withImportConnection(async (importSql) => {
     try {
-      return await importSql.begin(async (tx) => {
-        const locked = await lockAwardWinner(tx as Tx, input.rowId);
-        if (locked === null) return refuse('not_found', 'That award winner no longer exists.');
-        if (isRefusal(locked)) return locked;
-        const row = locked;
-        if (row.updatedAt !== input.expectedUpdatedAt) {
-          return refuse('stale',
-            'That record changed while this page was open. Reload it and try again.');
-        }
-        if (row.status !== 'active') {
-          return refuse('invalid_transition',
-            'That award winner is already void, so there is nothing to replace.');
-        }
-
-        // Everything above refused before a write. From here, any refusal throws.
-        await (tx as Tx)`
-          UPDATE award_winners
-             SET status = 'void', status_reason = ${reason}, updated_at = now()
-           WHERE id = ${row.id}
-        `;
-
-        const created = await insertAwardWinner(tx as Tx, {
-          ...input.replacement,
-          adminUserId: input.adminUserId,
-          adminNote: input.note,
-          replacesKey: row.entityKey,
-          auditExtra: { replacement_id: replacementId, replaces: row.entityKey },
-        });
-
-        // The voided payload is written LAST so it can name what replaced it:
-        // the cross-reference only exists once both keys do.
-        await writeOverride(tx as Tx, {
-          entityType: 'award_winners',
-          entityKey: row.entityKey,
-          fieldGroup: 'lifecycle',
-          payload: {
-            status: 'void',
-            status_reason: reason,
-            replaced_by_key: created.entityKey,
-          },
-          adminUserId: input.adminUserId,
-        });
-
-        await recordDataEdit(tx as Tx, {
-          tableName: 'award_winners',
-          rowId: row.id,
-          fieldGroup: 'award_winner_voided',
-          oldValues: { status: row.status, status_reason: row.statusReason },
-          newValues: {
-            ...row.auditIdentity,
-            status: 'void',
-            status_reason: reason,
-            replacement_id: replacementId,
-            replaced_by_key: created.entityKey,
-          },
-          adminUserId: input.adminUserId,
-          note: input.note,
-        });
-
-        await recomputeAwardSpan(tx as Tx, row.row.awardId);
-
-        const createdRow = await readAwardWinnerInTx(tx as Tx, created.rowId);
-        return {
-          ok: true as const,
-          table: 'award_winners' as const,
-          rowId: created.rowId,
-          entityKey: created.entityKey,
-          voidedEntityKey: row.entityKey,
-          voidedRowId: row.id,
-          replacementId,
-          revalidatePaths: replacementPaths(
-            row.revalidatePaths, createdRow ? awardWinnerPaths(createdRow) : [],
-          ),
-        };
-      }) as HonourMutationResult<HonourReplacementResult>;
+      return await importSql.begin(
+        async (tx) => replaceAwardWinnerInTx(tx as Tx, input),
+      ) as HonourMutationResult<HonourReplacementResult>;
     } catch (error) {
       return rolledBackRefusal(error) ?? refuse('failed', mutationFailure(error));
     }
   });
+}
+
+/**
+ * {@link replaceAwardWinner} on a transaction the CALLER owns (AFLDB V2 Launch F, V2-GAP-018). The body
+ * is the original begin() callback, unchanged except for `auditExtra`: a returned refusal made no write;
+ * a thrown RollbackRefusal rolls the caller's transaction back.
+ */
+export async function replaceAwardWinnerInTx(
+  tx: Tx, input: ReplaceAwardWinnerInput,
+): Promise<HonourMutationResult<HonourReplacementResult>> {
+  const reason = input.reason.trim();
+  if (!reason) return refuse('validation', 'Give a reason for replacing this award winner.');
+  const replacementId = randomUUID();
+
+  const locked = await lockAwardWinner(tx, input.rowId);
+  if (locked === null) return refuse('not_found', 'That award winner no longer exists.');
+  if (isRefusal(locked)) return locked;
+  const row = locked;
+  if (row.updatedAt !== input.expectedUpdatedAt) {
+    return refuse('stale',
+      'That record changed while this page was open. Reload it and try again.');
+  }
+  if (row.status !== 'active') {
+    return refuse('invalid_transition',
+      'That award winner is already void, so there is nothing to replace.');
+  }
+
+  // Everything above refused before a write. From here, any refusal throws.
+  await tx`
+    UPDATE award_winners
+       SET status = 'void', status_reason = ${reason}, updated_at = now()
+     WHERE id = ${row.id}
+  `;
+
+  const created = await insertAwardWinner(tx, {
+    ...input.replacement,
+    adminUserId: input.adminUserId,
+    adminNote: input.note,
+    replacesKey: row.entityKey,
+    auditExtra: { ...(input.auditExtra ?? {}), replacement_id: replacementId, replaces: row.entityKey },
+  });
+
+  // The voided payload is written LAST so it can name what replaced it:
+  // the cross-reference only exists once both keys do.
+  await writeOverride(tx, {
+    entityType: 'award_winners',
+    entityKey: row.entityKey,
+    fieldGroup: 'lifecycle',
+    payload: {
+      status: 'void',
+      status_reason: reason,
+      replaced_by_key: created.entityKey,
+    },
+    adminUserId: input.adminUserId,
+  });
+
+  await recordDataEdit(tx, {
+    tableName: 'award_winners',
+    rowId: row.id,
+    fieldGroup: 'award_winner_voided',
+    oldValues: { status: row.status, status_reason: row.statusReason },
+    newValues: {
+      ...row.auditIdentity,
+      status: 'void',
+      status_reason: reason,
+      replacement_id: replacementId,
+      replaced_by_key: created.entityKey,
+    },
+    adminUserId: input.adminUserId,
+    note: input.note,
+  });
+
+  await recomputeAwardSpan(tx, row.row.awardId);
+
+  const createdRow = await readAwardWinnerInTx(tx, created.rowId);
+  return {
+    ok: true as const,
+    table: 'award_winners' as const,
+    rowId: created.rowId,
+    entityKey: created.entityKey,
+    voidedEntityKey: row.entityKey,
+    voidedRowId: row.id,
+    replacementId,
+    revalidatePaths: replacementPaths(
+      row.revalidatePaths, createdRow ? awardWinnerPaths(createdRow) : [],
+    ),
+  };
+}
+
+// --- approved curated-award revision (AFLDB V2 Launch F, V2-GAP-018) ----
+
+export type ReviseApprovedWinnerInput = {
+  /** The approved proposal's `approved_entity_key`: `<sources.key>:<source_record_id>`. */
+  approvedEntityKey: string;
+  adminUserId: number;
+  /** The revision's decision note: the canonical audit rows' administrator note and the void reason. */
+  adminNote: string;
+  auditExtra: Record<string, unknown>;
+  mode: 'correct' | 'replace';
+  /** `correct`: the fields to change. */
+  correction?: AwardWinnerCorrection;
+  /** `replace`: the new row. */
+  replacement?: Omit<CreateAwardWinnerInput, 'adminUserId'>;
+};
+
+export type ReviseApprovedWinnerResult = {
+  mode: 'correct' | 'replace';
+  rowId: number;
+  /** The canonical row's durable key after the revision (the new key for `replace`). */
+  entityKey: string;
+  voidedEntityKey: string | null;
+  revalidatePaths: string[];
+};
+
+/**
+ * Apply an approved curated-award revision to the canonical row on the CALLER's transaction: locate
+ * the row by its durable key, lock it, take the compare-and-swap value from the locked row itself and
+ * run the tx-level correct or replace. EVERY refusal THROWS (RollbackRefusal): reason `not_found` or
+ * `invalid_transition` means the approved winner is missing or void; anything else is the existing
+ * lifecycle's own refusal. The caller's transaction rolls back on any throw.
+ */
+export async function reviseApprovedAwardWinnerInTx(
+  tx: Tx, input: ReviseApprovedWinnerInput,
+): Promise<ReviseApprovedWinnerResult> {
+  const split = input.approvedEntityKey.indexOf(':');
+  if (split < 1) {
+    throw new RollbackRefusal('not_found', 'The approved proposal records no usable canonical entity key.');
+  }
+  const sourceKey = input.approvedEntityKey.slice(0, split);
+  const sourceRecordId = input.approvedEntityKey.slice(split + 1);
+  const [found] = await tx<{ id: number }[]>`
+    SELECT w.id::int AS id
+      FROM award_winners w
+      JOIN sources s ON s.id = w.source_id
+     WHERE s.key = ${sourceKey} AND w.source_record_id = ${sourceRecordId}
+       FOR UPDATE OF w
+  `;
+  if (!found) {
+    throw new RollbackRefusal('not_found',
+      `The award winner ${input.approvedEntityKey} no longer exists, so the approved proposal cannot be revised.`);
+  }
+  const locked = await lockAwardWinner(tx, found.id);
+  if (locked === null) {
+    throw new RollbackRefusal('not_found', 'The approved award winner no longer exists.');
+  }
+  if (isRefusal(locked)) throw new RollbackRefusal(locked.reason, locked.error, locked.subjects);
+  if (locked.status !== 'active') {
+    throw new RollbackRefusal('invalid_transition',
+      'The approved award winner is void, so the approved proposal cannot be revised. '
+      + 'Reinstate it in /admin/awards first, or record a new proposal.');
+  }
+
+  if (input.mode === 'correct') {
+    if (!input.correction) throw new RollbackRefusal('validation', 'A correction names the fields to change.');
+    const corrected = await correctAwardWinnerInTx(tx, {
+      rowId: locked.id,
+      expectedUpdatedAt: locked.updatedAt,
+      adminUserId: input.adminUserId,
+      note: input.adminNote,
+      fields: input.correction,
+      auditExtra: input.auditExtra,
+    });
+    if (!corrected.ok) throw new RollbackRefusal(corrected.reason, corrected.error, corrected.subjects);
+    // A club change moves a second club's page: union the pre-change paths with the row as it now is.
+    const after = await readAwardWinnerInTx(tx, locked.id);
+    return {
+      mode: 'correct',
+      rowId: locked.id,
+      entityKey: corrected.entityKey,
+      voidedEntityKey: null,
+      revalidatePaths: replacementPaths(corrected.revalidatePaths, after ? awardWinnerPaths(after) : []),
+    };
+  }
+
+  if (!input.replacement) throw new RollbackRefusal('validation', 'A replacement names the new award winner.');
+  const replaced = await replaceAwardWinnerInTx(tx, {
+    rowId: locked.id,
+    expectedUpdatedAt: locked.updatedAt,
+    adminUserId: input.adminUserId,
+    note: input.adminNote,
+    reason: `Replaced by an approved curated-award revision: ${input.adminNote}`.slice(0, 500),
+    replacement: input.replacement,
+    auditExtra: input.auditExtra,
+  });
+  if (!replaced.ok) throw new RollbackRefusal(replaced.reason, replaced.error, replaced.subjects);
+  return {
+    mode: 'replace',
+    rowId: replaced.rowId,
+    entityKey: replaced.entityKey,
+    voidedEntityKey: replaced.voidedEntityKey,
+    revalidatePaths: replaced.revalidatePaths,
+  };
 }
 
 // =========================================================================

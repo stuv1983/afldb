@@ -480,7 +480,7 @@ def load_round_vote_seasons(availability_path: Path | None = None) -> set[int]:
     """Seasons allowed to carry brownlow_round_votes rows.
 
     stat-availability.json is the coverage authority: only seasons whose
-    brownlow_round_votes coverage is complete/partial/pending may derive
+    brownlow_round_votes coverage is complete/partial may derive
     round-vote rows. 1931-1934 match votes stay in player_match_stats
     only, matching the baseline's round-vote coverage (1984+).
 
@@ -493,16 +493,32 @@ def load_round_vote_seasons(availability_path: Path | None = None) -> set[int]:
     record a fingerprint the very next run disagrees with. ``None`` keeps the
     tracked document, so every existing caller is unchanged.
     """
+    return load_vote_seasons("brownlow_round_votes", availability_path)
+
+
+def load_vote_seasons(stat_key: str, availability_path: Path | None = None) -> set[int]:
+    """Only explicitly recorded coverage may populate canonical vote columns.
+
+    Pending source bytes remain in the immutable acquisition, not in a canonical
+    vote projection. Match and round grains keep their separate coverage decisions.
+    """
     path = availability_path or AVAILABILITY_JSON
     dataset = json.loads(path.read_text(encoding="utf-8"))
     if dataset.get("status") != "READY":
         raise SnapshotValidationError(f"{path} is not READY")
     seasons: set[int] = set()
     for r in dataset["coverage_ranges"]:
-        if (r["stat_key"] == "brownlow_round_votes"
-                and r["coverage"] in ("complete", "partial", "pending")):
+        if (r["stat_key"] == stat_key
+                and r["coverage"] in ("complete", "partial")):
             seasons.update(range(r["first_season"], r["last_season"] + 1))
     return seasons
+
+
+def canonical_stat_value(row: dict, source_column: str, season: int,
+                         match_vote_seasons: set[int]) -> int | None:
+    if source_column == "Brownlow.Votes" and season not in match_vote_seasons:
+        return None
+    return to_int(row[source_column])
 
 
 # ---------------------------------------------------------------------------
@@ -3116,6 +3132,7 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
 
     player_map = load_player_map(pg, args)
     match_map = load_match_map(pg, matches, clubs)
+    match_vote_seasons = load_vote_seasons("brownlow_match_votes")
     club_ids = refs["clubs"]
     with pg.cursor() as cur:
         cur.execute("SELECT id FROM sources WHERE key = %s", (SOURCE_KEY_FITZROY,))
@@ -3151,7 +3168,8 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
                     player_id, match_map[key],
                     club_ids[clubs.resolve(row["Playing.for"], season, "player_stats")],
                     to_int(row["Career.Games"]), clean(row["Jumper.No."]),
-                    *(to_int(row[src]) for src, _ in STAT_MAP),
+                    *(canonical_stat_value(row, src, season, match_vote_seasons)
+                      for src, _ in STAT_MAP),
                     fitzroy_id, batch.id,
                 )
 

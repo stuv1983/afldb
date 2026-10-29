@@ -1,0 +1,24 @@
+AFLDB V2 shadow parity (policy v2.parity.1) generated 2026-10-19T08:40:14Z
+VERDICT: PASS  (checks: 5 pass, 0 fail, 0 incomplete)
+PASS       historical_manifest  [fail 0, info 0]
+           before: before.manifest.json
+           after : after.manifest.json
+PASS       table_row_counts  [fail 0, info 6]
+           before: before.row-counts.json
+           after : after.row-counts.json
+           INFO  ROWS_INCREASED afldb_meta.schema_migrations: rows 110 -> 114
+           INFO  V2_TABLE_ADDED public.award_proposal_decisions: created by the V2 migrations; 0 rows after
+           INFO  V2_TABLE_ADDED public.award_proposals: created by the V2 migrations; 0 rows after
+           INFO  V2_TABLE_ADDED public.brownlow_eligibility_decisions: created by the V2 migrations; 0 rows after
+           INFO  V2_TABLE_ADDED public.derived_award_projections: created by the V2 migrations; 0 rows after
+           INFO  V2_TABLE_ADDED public.derived_award_results: created by the V2 migrations; 0 rows after
+PASS       coleman  [fail 0, info 0]
+           before: before.coleman.json
+           after : after.coleman.json
+PASS       brownlow  [fail 0, info 1]
+           before: before.brownlow-2025.json
+           after : after.brownlow-2025.json
+           INFO  PREEXISTING_DISCREPANCIES season 2025: outcome discrepancies in both; listed for owner reconciliation
+PASS       coverage  [fail 0, info 0]
+           before: before.coverage.json
+           after : after.coverage.json

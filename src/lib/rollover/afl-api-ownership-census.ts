@@ -123,11 +123,18 @@ export function rebuildCensusScope(contract: Json, seasons: Json): CensusScope {
     ...seasonList(seasons.in_progress_seasons ?? [], 'seasons.json in_progress_seasons'),
     ...seasonList(excludedBlock?.seasons ?? [], 'full_history.current_season_excluded.seasons'),
   ];
-  return assertScope({
+  const scope = assertScope({
     firstSeason: season(range.first_season, 'full_history.season_range.first_season'),
     lastSeason: season(range.last_season, 'full_history.season_range.last_season'),
     excludedSeasons: excluded,
   });
+  if (season(seasons.first_season, 'seasons.json first_season') > scope.firstSeason
+      || season(seasons.last_season, 'seasons.json last_season') < scope.lastSeason) {
+    fail('seasons.json does not cover the completed full-history range.');
+  }
+  const conflict = scope.excludedSeasons.filter((s) => s >= scope.firstSeason && s <= scope.lastSeason);
+  if (conflict.length) fail(`completed full-history range intersects excluded/in-progress seasons: ${conflict.join(', ')}.`);
+  return scope;
 }
 
 /**

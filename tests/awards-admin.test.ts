@@ -677,7 +677,9 @@ describe('honour-team advisory-lock identity contract (AFLDB-ISSUE-080 §5.3)', 
     // request, and a hashed identity could silently diverge between the
     // two languages.
     expect(importer).toContain('pg_advisory_xact_lock');
-    expect(importer).not.toContain('hashtext');
+    // The Coleman publisher has a separate text namespace. The honour-team
+    // lock itself must retain its shared numeric identity across both languages.
+    expect(importer).not.toMatch(/pg_advisory_xact_lock\(hashtext\([^\n]*honour/i);
 
     for (const [path, role] of LOCK_WRITERS) {
       const admin = readFileSync(join(process.cwd(), ...path.split('/')), 'utf8');

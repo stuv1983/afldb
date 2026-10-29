@@ -1,0 +1,4 @@
+PASS active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes
+PASS active protected writer exceeds approved two-second lock timeout: zero metadata writes
+PASS writers and guarded DDL after all locks are excluded until repair commit
+VALIDATION_PACKAGE_RETAINED /tmp/i316-f004-package-gD1hPl

@@ -1,0 +1,192 @@
+{
+  "schema": "afldb.issue316.readiness-approval/1",
+  "recorded_at_utc": "2026-10-25T07:57:18.040Z",
+  "owner_ruling_date": "2026-10-25",
+  "status": "APPROVED FOR READINESS PROOF ONLY",
+  "D": "2026-10-27",
+  "P": "def676517da3955aa18db3606785463aac464188",
+  "implementation_commit": "c438f8449e65c28cf9f00879aaa045131b5f0d3a",
+  "evidence_tracking_commit": "def676517da3955aa18db3606785463aac464188",
+  "readiness_window": {
+    "start_utc": "2026-10-27T02:00:00Z",
+    "end_utc": "2026-10-27T04:00:00Z",
+    "Melbourne_AEDT": "2026-10-27 13:00–15:00"
+  },
+  "P_must_not_advance_for_documentation_commit": true,
+  "accepted_package": {
+    "manifest": "APPROVED-PACKAGE.sha256",
+    "sha256": "b708d8eb0b1fe198a1fd7677e0ba5a3b739c93a48f6883d710217f77126fb8b6",
+    "members": 201
+  },
+  "transition_change_set_sha256": "d55875cbfa686ac47511eca2e2ac7026cfadefd1fd4e7ab1b31c322f7359644b",
+  "tuple_sha256": "a78d36ee7e689b7bb5978335bff5e6bdd54f368572df5f2f01d10caf35a373aa",
+  "rebuild": {
+    "accepted_J2_active_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338",
+    "inactive_at_P_sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8",
+    "projected_active_at_P_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338"
+  },
+  "migrations": {
+    "count": 117,
+    "last": "117_brownlow_provider_eligibility_unknown.sql",
+    "set_sha256": "647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72"
+  },
+  "authorities": [
+    {
+      "action": "activate",
+      "authority_sha256": "1d133580f526131cf31136df042b372047b170e9925db525a21ef80c5658f65f",
+      "simulated_head": "06e882277644731d665c148970b96ab214f42701",
+      "from": "applied-inactive",
+      "to": "activated",
+      "path": "tools/db/rebuild-test.ts",
+      "before_sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8",
+      "after_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338"
+    },
+    {
+      "action": "deactivate",
+      "authority_sha256": "fc45063484cfd6a07b0c716345898399298d2cc62d6b4c406846f554b96dee8c",
+      "simulated_head": "75df67dbed56ecd2d3906d561bbdafd53fff9f12",
+      "from": "activated",
+      "to": "applied-inactive",
+      "path": "tools/db/rebuild-test.ts",
+      "before_sha256": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338",
+      "after_sha256": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8"
+    }
+  ],
+  "apply_write_set": [
+    {
+      "path": "data/reference/afltables-network.json",
+      "base_sha256": "19721801ac4df60e78299b461c97e87d252ad65d5fd394643448be54c3b5c838",
+      "final_sha256": "04e2a269559cbc09a590e22e46207cd199d78eb60dbdc49c605bb2e724d3b897"
+    },
+    {
+      "path": "tools/rebuild/afl_api/afl-api-contract.json",
+      "base_sha256": "8ed96ed4cca6fe4fb8da63c05a383af4dc8bbdc4b9dacfca5c490cf74ea5e208",
+      "final_sha256": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148"
+    },
+    {
+      "path": "tools/rebuild/afltables/afltables-contract.json",
+      "base_sha256": "5d29e7d255de2b49d38d06eafe1841bf66fe936a63ec7dd0db167d8580debeca",
+      "final_sha256": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f"
+    },
+    {
+      "path": "data/reference/fitzroy-accepted-baselines.json",
+      "base_sha256": "c68083aed64e894566054404b93032698e9664d79db377080ad795724d032eef",
+      "final_sha256": "0d4f7b3067112d8cf7fb3acc97b73ffb909b51cee09d8c4f59c326beb7e4f05f"
+    },
+    {
+      "path": "data/reference/seasons.json",
+      "base_sha256": "8c6462713cb0489d0aa2938c6b735ad65e9f7794f0665fccc3a951065a0004f9",
+      "final_sha256": "1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0"
+    },
+    {
+      "path": "tools/rebuild/fitzroy/fitzroy-contract.json",
+      "base_sha256": "39689ddfd252a358026fb9e3b0d32f1f2383cc00116016f89ee8366b7f773de2",
+      "final_sha256": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5"
+    },
+    {
+      "path": "data/reference/stat-availability.json",
+      "base_sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8",
+      "final_sha256": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8"
+    }
+  ],
+  "approved_artifact_files": {
+    "PIN-TABLE.json": "1ceafac36ea804b8634872ade7bc154f3865dbb6025c3902eb2c4d33130835e6",
+    "transition-change-set.json": "d55875cbfa686ac47511eca2e2ac7026cfadefd1fd4e7ab1b31c322f7359644b",
+    "successor-tuple.json": "b95d07e1ac0bc6163f83e23678eb0e5ade11e4c03dd4ce53d81db27dcdb5525e",
+    "migration-binding.json": "ab067616868d833b5e0d9c7464ce2a7716ff2ab04d7567d1f3e00844bffe09cd",
+    "activate-authority.PROPOSED.json": "1d133580f526131cf31136df042b372047b170e9925db525a21ef80c5658f65f",
+    "deactivate-authority.PROPOSED.json": "fc45063484cfd6a07b0c716345898399298d2cc62d6b4c406846f554b96dee8c",
+    "pins/rebuild-test.inactive.ts.txt": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8",
+    "pins/rebuild-test.projected-active.ts.txt": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338",
+    "SEMANTIC-DIFF.json": "74ae4219b29526798893e93fbda8e98f19edfaf2bb4397e5eea1246bfdd48871",
+    "SIMULATED-TREES-AND-AUTHORITIES.json": "970ef06e66beab1d8544d9063095fd35b329547981fe25084174ef18bd1080dd",
+    "BUNDLES.json": "b8f67d4e63267f344ba097a850114c9f5f2779edc174b4a757f21e958ad69546",
+    "finals/data/reference/afltables-network.json": "04e2a269559cbc09a590e22e46207cd199d78eb60dbdc49c605bb2e724d3b897",
+    "finals/tools/rebuild/afl_api/afl-api-contract.json": "1453fffaa50dee67c369967ef397c666c180241978f5ffb22c842255af5f5148",
+    "finals/tools/rebuild/afltables/afltables-contract.json": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f",
+    "finals/data/reference/fitzroy-accepted-baselines.json": "0d4f7b3067112d8cf7fb3acc97b73ffb909b51cee09d8c4f59c326beb7e4f05f",
+    "finals/data/reference/seasons.json": "1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0",
+    "finals/tools/rebuild/fitzroy/fitzroy-contract.json": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5",
+    "finals/data/reference/stat-availability.json": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8",
+    "inputs/ladder-coverage.json": "00a4957e08da19b6aeb7c2b85e9682f6253552688b999cac9fb9f17c9ec86f30",
+    "inputs/stat-availability.json": "e2900084ebd7e9505239b82aef8f8665fcf7939e7b84b94b13e110fa6cfcc2b8",
+    "inputs/accepted-corrections.json": "3a938b52b8a26342d3455edd792b39cf23a21966a45d1e37c910ea23d025715f",
+    "bundles/proposed-BC.bundle": "a4f633e946383a7ed40913cdfce7ee3a96fd204b5db1c3ffebf69e56b04b60ce",
+    "bundles/source-P.bundle": "246d49362e1ccec6b89791597caa9386421de101406f6c87470bc430643f064b",
+    "inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988",
+    "inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-ladder-v1.json": "65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34",
+    "inputs/fitzroy-contract-base.json": "f2e75cc0e6a64d6fbb9539bd99f60aacbf7b2bb7d5186a7672468d4735af4624"
+  },
+  "accepted_evidence": {
+    "structural_gate": "CLOSED / ACCEPTED",
+    "J2_package": "167/167 PASS",
+    "successor_inputs": "264/264 PASS",
+    "offline_validator": "exit 0 / 3-of-3 PASS / all pins match",
+    "B": "installed / inactive / rebuild-ineligible",
+    "C_projection": "1640 rows / 91 checks",
+    "exact_P_DB_free": "11318 passed / 31 expected skipped / 0 failed",
+    "typecheck": "PASS",
+    "broader_B": {
+      "passed": 2966,
+      "skipped": 7,
+      "failed": 0,
+      "exit": 0
+    },
+    "broader_C": {
+      "passed": 2992,
+      "skipped": 7,
+      "failed": 0,
+      "exit": 0
+    },
+    "focused_B": {
+      "passed": 395,
+      "failed": 0,
+      "exit": 0
+    },
+    "focused_C": {
+      "passed": 396,
+      "failed": 0,
+      "exit": 0
+    },
+    "fresh_restatement_review": "GO / no findings",
+    "earlier_restatement_failures": "SUPERSEDED by owner-authorised proposal-only repair"
+  },
+  "authorised": [
+    "current read-only host/native-policy proof",
+    "fresh read-only three-target censuses",
+    "required read-only nightly/canonical check",
+    "enforced dry run without --apply",
+    "separate local documentation/evidence commit"
+  ],
+  "not_authorised": [
+    "--apply",
+    "production rollover/seal mutation",
+    "successor activation",
+    "activation commit/deployment",
+    "deactivation",
+    "production deployment",
+    "disposable rebuild",
+    "push",
+    "Brownlow settlement/correction",
+    "OS package hold/install or timer mutation"
+  ],
+  "stop_rules": [
+    "outside approved D/window",
+    "product/test/structural P change",
+    "approved artifact mismatch or substitution",
+    "candidate-affecting canonical drift",
+    "native enforcement CRIT/HIGH or MED affecting completeness/visibility/provenance/isolation",
+    "census identity/failure/nonzero candidate total or missing result",
+    "production census older than 6 hours at dry-run start",
+    "pending rollover/activation transaction artifact",
+    "dry run misses any required gate/pin/result",
+    "any attempted production write"
+  ],
+  "native_drift": "Fresh actual inventory/policy plus normal enforcement/self-check and independent read-only review. Fully captured ordinary version drift with review GO needs no extra owner round-trip; no policy/timer mutation is authorised.",
+  "structural_gate": "CLOSED / ACCEPTED",
+  "U3": "CONFIRMED",
+  "U4": "Route B",
+  "Brownlow": "untouched",
+  "issue_316": "OPEN",
+  "production": "NO-GO pending separate apply approval"
+}

@@ -103,6 +103,8 @@ import { SETTING_KEYS } from '../../src/lib/site-settings';
 // I244-F029: the shared loader, which honours AFLDB_SKIP_DOTENV so a variable
 // this unit's `UnsetEnvironment=` stripped is not read straight back in.
 import { loadEnv } from './load-env';
+// V2-GAP-006: the seal on historical seasons (docs/v2/historical-baseline.md §2).
+import { isSettleSeasonSealed, refuseSealedSeasonForSettle } from './settle-season-seal';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -198,7 +200,7 @@ export type LoadedBrownlowSnapshot = {
   leaderboardStatus: string | null;
 };
 
-function loadSnapshot(projectRoot: string, label: string, registry: SourceFamilyRegistry): LoadedBrownlowSnapshot {
+export function loadSnapshot(projectRoot: string, label: string, registry: SourceFamilyRegistry): LoadedBrownlowSnapshot {
   const snapshotDir = join(snapshotRootOf(projectRoot), label);
   const { manifest } = verifyManifest(snapshotDir);
   const season = manifest.season;
@@ -237,6 +239,9 @@ function counterLines(counters: AflApiBrownlowSettleCounters): string[] {
   ]);
   group('Data issues', ['dataIssuesOpened', 'dataIssuesRefreshed']);
   group('Leaderboard reconciliation', ['leaderboardPlayersCompared', 'leaderboardMismatches']);
+  group('Leaderboard staging', [
+    'leaderboardObservationsSeen', 'leaderboardVersionsAppended', 'leaderboardObservationsUnchanged', 'leaderboardMarkedAbsent',
+  ]);
   return lines;
 }
 
@@ -271,6 +276,14 @@ export async function runAflApiBrownlowSettleCli(
     log('--validate-only: manifest, registry and record parse verified. No connection opened.');
     return { args, result: null };
   }
+
+  // V2-GAP-006 (docs/v2/historical-baseline.md §1-§2): the seal on historical seasons. The season is
+  // the snapshot manifest's; this runs AFTER the offline verification above and BEFORE any database
+  // client is created. A settle is not an audited correction, so none is ever passed.
+  // The one exception is --allow-completed-season-backtest: its live afldb_test proof runs FIRST
+  // (unchanged, below) and only after it succeeds is a sealed season admitted, on a logged
+  // test-database-backtest basis. It is never an audited correction.
+  if (!args.allowCompletedSeasonBacktest) refuseSealedSeasonForSettle(projectRoot, snapshot.season);
 
   // AFLDB-ISSUE-228 follow-up (§D two-key safety) — BOTH the outer
   // deployment gate and the inner super-admin DB switch must be true. A
@@ -346,6 +359,12 @@ export async function runAflApiBrownlowSettleCli(
       log('COMPLETED-SEASON BROWNLOW BACKTEST');
       log(`database: ${completedSeasonBacktestAuthority.verifiedDatabase}`);
       log('season-in-progress gate bypass authorised for this Brownlow run only');
+      if (isSettleSeasonSealed(projectRoot, snapshot.season)) {
+        log(
+          `SEALED SEASON ${snapshot.season} admitted on basis 'test_database_backtest' (V2-GAP-006): the live `
+          + `current_database() proof above is the only authority. This is not an audited correction.`,
+        );
+      }
     }
 
     // I244-F006: read-only, BEFORE the run opens its transaction (no import

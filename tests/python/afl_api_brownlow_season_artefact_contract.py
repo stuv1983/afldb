@@ -136,6 +136,15 @@ check("leaderboard status carried through", lb_status == "CONCLUDED")
 check("eligible=false carried", entries[1].eligible is False)
 check("eligible defaults true", entries[0].eligible is True)
 
+# BP-2025-ELIGIBILITY-v1: an absent, null or non-boolean value is UNKNOWN (None), never read as false.
+unknown_entries, _ = m.parse_leaderboard(leaderboard_payload("CONCLUDED", [
+    {**leaderboard_entry("CD_I1", 3.0), "eligible": None},
+    {**leaderboard_entry("CD_I2", 2.0), "eligible": "false"},
+    {k: v for k, v in leaderboard_entry("CD_I3", 1.0).items() if k != "eligible"},
+]))
+check("null / non-boolean / absent leaderboard eligibility parses as UNKNOWN (None), not False",
+      [e.eligible for e in unknown_entries] == [None, None, None])
+
 check("duplicate leaderboard player refuses",
       raises(m.BrownlowArtefactSourceError, m.parse_leaderboard,
              leaderboard_payload("CONCLUDED", [leaderboard_entry("CD_I1", 3.0), leaderboard_entry("CD_I1", 1.0)])))
@@ -402,6 +411,16 @@ check("only the leaderboard-ineligible player is flagged", ineligible == {102})
 check("a tallied player missing from the leaderboard refuses",
       raises(m.BrownlowArtefactSourceError, m.resolve_ineligible_player_ids,
              {101, 999}, {**bridge_full, "CD_I9": 999}, lb_mixed))
+
+lb_unknown = m.parse_leaderboard(leaderboard_payload("CONCLUDED", [
+    leaderboard_entry("CD_I1", 3.0, eligible=True),
+    {**leaderboard_entry("CD_I2", 2.0), "eligible": None},
+    leaderboard_entry("CD_I3", 1.0, eligible=True),
+]))[0]
+check("a tallied player with UNKNOWN eligibility refuses rather than being treated as eligible or ineligible",
+      raises(m.BrownlowArtefactSourceError, m.resolve_ineligible_player_ids, {101, 102, 103}, bridge_full, lb_unknown))
+check("an unknown-eligibility entry nobody tallied does not block the build",
+      m.resolve_ineligible_player_ids({101, 103}, bridge_full, lb_unknown) == set())
 
 
 # ---------------------------------------------------------------------------
@@ -767,6 +786,81 @@ with tempfile.TemporaryDirectory() as tmp:
                               "--stat-availability", str(complete_2026)])
     check("D-233-2 CLI: --validate-only reports the loaded artefact as JSON evidence",
           status == 0 and json.loads(captured.getvalue())["afl_api_artefacts"][0]["season"] == 2026)
+
+
+# ---------------------------------------------------------------------------
+# AFLDB-ISSUE-316: the season boundary at the database half of the gate
+# (check_database_coverage, the last check before the first write). A fake
+# cursor answers exactly the four reads it makes. After the rollover seals
+# 2026 (seasons.status 'completed'), an AFL API 2026 artefact is admissible
+# only where stat_availability already says 'complete'; while 2026 is in
+# progress it is refused even then; pending availability never admits it;
+# and an admin-published season still outranks any artefact.
+# ---------------------------------------------------------------------------
+
+section("ISSUE-316: database coverage gate across the 2026 season boundary")
+
+
+class _BoundaryCursor:
+    def __init__(self, state: dict) -> None:
+        self.state, self.rows = state, []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        return False
+
+    def execute(self, sql: str, params=None) -> None:
+        text = " ".join(sql.split())
+        if "JOIN sources" in text:
+            self.rows = [(s,) for s in self.state["manual_seasons"]]
+        elif "FROM stat_availability" in text:
+            self.rows = [(s,) for s in self.state["complete"]]
+        elif "status = 'in_progress'" in text:
+            self.rows = [(s,) for s, status in self.state["seasons"].items() if status == "in_progress"]
+        elif text == "SELECT year FROM seasons":
+            self.rows = [(s,) for s in self.state["seasons"]]
+        else:
+            raise AssertionError(f"unexpected read in check_database_coverage: {text}")
+
+    def fetchall(self) -> list:
+        return self.rows
+
+
+class _BoundaryDb:
+    def __init__(self, **state) -> None:
+        self.state = state
+
+    def cursor(self) -> _BoundaryCursor:
+        return _BoundaryCursor(self.state)
+
+
+def boundary_refusal(db: _BoundaryDb, declared: set[int]) -> str:
+    try:
+        loader.check_database_coverage(db, declared)
+    except loader.BrownlowSeasonLoadRefused as exc:
+        return str(exc)
+    return ""
+
+
+decided = set(range(2020, 2026))
+sealed_2026 = {**{s: "completed" for s in decided}, 2026: "completed", 2027: "in_progress"}
+open_2026 = {**{s: "completed" for s in decided}, 2026: "in_progress"}
+check("ISSUE-316 sealed 2026 + reviewed availability complete: the AFL API 2026 rows are admissible",
+      boundary_refusal(_BoundaryDb(manual_seasons=[], complete=decided | {2026}, seasons=sealed_2026),
+                       decided | {2026}) == "")
+check("ISSUE-316 sealed 2026 + availability still pending: an artefact for 2026 is refused (presence never accepts)",
+      "beyond" in boundary_refusal(_BoundaryDb(manual_seasons=[], complete=decided, seasons=sealed_2026),
+                                   decided | {2026}))
+check("ISSUE-316 2026 in progress: even 'complete' availability cannot admit its rows",
+      "in-progress season(s) [2026]" in boundary_refusal(
+          _BoundaryDb(manual_seasons=[], complete=decided | {2026}, seasons=open_2026), decided | {2026}))
+check("ISSUE-316 sealed 2026 published by an admin: the reload is refused, the authority decision stands",
+      "admin-published" in boundary_refusal(
+          _BoundaryDb(manual_seasons=[2026], complete=decided | {2026}, seasons=sealed_2026), decided | {2026}))
+check("ISSUE-316 sealed 2026 without an artefact row: pending 2026 needs nothing and refuses nothing",
+      boundary_refusal(_BoundaryDb(manual_seasons=[], complete=decided, seasons=sealed_2026), decided) == "")
 
 
 # ---------------------------------------------------------------------------

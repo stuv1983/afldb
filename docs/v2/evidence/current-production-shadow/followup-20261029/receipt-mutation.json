@@ -1,0 +1,234 @@
+{
+  "decision": "D-V2-CURRENT-SHADOW-FOLLOWUP-1",
+  "item": "4b receipt actual-role mutation probe (disposable clone)",
+  "database": "afldb_v2_shadow_current_fuprobe_test",
+  "attempts": [
+    {
+      "role": "afldb_app",
+      "op": "INSERT",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_app",
+      "op": "UPDATE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_app",
+      "op": "DELETE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_app",
+      "op": "TRUNCATE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_import",
+      "op": "INSERT",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_import",
+      "op": "UPDATE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_import",
+      "op": "DELETE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_import",
+      "op": "TRUNCATE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_auth",
+      "op": "INSERT",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_auth",
+      "op": "UPDATE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_auth",
+      "op": "DELETE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_auth",
+      "op": "TRUNCATE",
+      "refused": true,
+      "sqlstate": "42501",
+      "message": "permission denied for table brownlow_correction_receipts",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_owner",
+      "op": "UPDATE",
+      "refused": true,
+      "sqlstate": "P0001",
+      "message": "Brownlow correction receipts are append-only",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_owner",
+      "op": "DELETE",
+      "refused": true,
+      "sqlstate": "P0001",
+      "message": "Brownlow correction receipts are append-only",
+      "rowCountIfAllowed": null
+    },
+    {
+      "role": "afldb_owner",
+      "op": "TRUNCATE",
+      "refused": true,
+      "sqlstate": "P0001",
+      "message": "Brownlow correction receipts are append-only",
+      "rowCountIfAllowed": null
+    }
+  ],
+  "ownerSynthetic": {
+    "insertedAndVisibleInside": 1,
+    "updateWithRowPresent": {
+      "sqlstate": "P0001",
+      "message": "Brownlow correction receipts are append-only"
+    }
+  },
+  "counts": {
+    "before": 0,
+    "after": 0
+  },
+  "checks": [
+    {
+      "id": "deny.afldb_app.INSERT",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_app.UPDATE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_app.DELETE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_app.TRUNCATE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_import.INSERT",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_import.UPDATE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_import.DELETE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_import.TRUNCATE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_auth.INSERT",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_auth.UPDATE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_auth.DELETE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "deny.afldb_auth.TRUNCATE",
+      "ok": true,
+      "detail": "42501 permission denied for table brownlow_correction_receipts"
+    },
+    {
+      "id": "owner-refused.UPDATE",
+      "ok": true,
+      "detail": "P0001 Brownlow correction receipts are append-only"
+    },
+    {
+      "id": "owner-refused.DELETE",
+      "ok": true,
+      "detail": "P0001 Brownlow correction receipts are append-only"
+    },
+    {
+      "id": "owner-refused.TRUNCATE",
+      "ok": true,
+      "detail": "P0001 Brownlow correction receipts are append-only"
+    },
+    {
+      "id": "owner.synthetic-insert-visible-inside",
+      "ok": true,
+      "detail": "{\"insertedAndVisibleInside\":1,\"updateWithRowPresent\":{\"sqlstate\":\"P0001\",\"message\":\"Brownlow correction receipts are append-only\"}}"
+    },
+    {
+      "id": "owner.update-refused-with-row-present",
+      "ok": true,
+      "detail": "{\"sqlstate\":\"P0001\",\"message\":\"Brownlow correction receipts are append-only\"}"
+    },
+    {
+      "id": "owner.rolled-back-count-unchanged",
+      "ok": true,
+      "detail": "{\"before\":0,\"after\":0}"
+    }
+  ],
+  "denials": 12,
+  "ownerRefusals": 3,
+  "allChecksOk": true,
+  "failed": []
+}

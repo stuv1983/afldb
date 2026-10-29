@@ -1,0 +1,14 @@
+{
+  "database": "afldb_v2_gap029_replay_test",
+  "port": 55433,
+  "removed": 8,
+  "restored": 8,
+  "secondReplayIdempotent": true,
+  "auditsUnchanged": 8,
+  "durableOverridesUnchanged": 8,
+  "fixtureRolledBack": true,
+  "baselinePreserved": "afldb_v2_rb_final_test",
+  "sourceSha256": "c24ea37cce6eb4852ec7d04ab30f82c3be354a942ba3957e4994c2137a5a4b65",
+  "semanticSha256": "3e1acb9da675b91dce6d0873025e1a61e35a786eaf77f6e5b7a2ccb53ccad51f",
+  "replay": "tools/migration/common.py replay_admin_overrides(draft_picks)"
+}

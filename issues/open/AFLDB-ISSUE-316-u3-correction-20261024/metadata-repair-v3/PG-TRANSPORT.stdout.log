@@ -1,0 +1,90 @@
+START active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes
+PASS active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes
+START active protected writer exceeds approved two-second lock timeout: zero metadata writes
+PASS active protected writer exceeds approved two-second lock timeout: zero metadata writes
+START writers and guarded DDL after all locks are excluded until repair commit
+PASS writers and guarded DDL after all locks are excluded until repair commit
+START absent optional relation cannot be created after locks
+PASS absent optional relation cannot be created after locks
+START linked-audit INSERT failure rolls back preceding note UPDATE
+PASS linked-audit INSERT failure rolls back preceding note UPDATE
+START successful two-write repair; independent postcheck; second repair refuses
+PASS successful two-write repair; independent postcheck; second repair refuses
+START Brownlow mutation after commit is detected by independent postcheck
+PASS Brownlow mutation after commit is detected by independent postcheck
+START extra audit-row mutation after commit is detected
+PASS extra audit-row mutation after commit is detected
+START pre-existing optional DDL commit is caught by in-transaction assertion; metadata rolls back
+PASS pre-existing optional DDL commit is caught by in-transaction assertion; metadata rolls back
+{
+  "status": "PASS",
+  "catalog_ddl_limit": "An already-executed but uncommitted optional CREATE does not retain catalog RowExclusiveLock. It can commit while repair holds catalog SHARE locks. Live catalog name resolution makes the in-transaction assertion detect it and roll back both metadata writes. This case is additional evidence for independent review, not a claim that catalog locks exclude every already-executed DDL commit.",
+  "engine": "postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "identity": {
+    "db": "i316_f004_test",
+    "data": "/tmp/i316-f004-pg-UpmlC7/data",
+    "cluster": "i316-f004-private",
+    "addr": null,
+    "version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)"
+  },
+  "work_directory": "/tmp/i316-f004-pg-UpmlC7",
+  "scope": "Fresh private Unix-socket PostgreSQL cluster and synthetic shapes. Exact shared SQL excluding production-only identity; psql client directives expanded for known fixture optional presence. No production transport/live-schema acceptance. No rebuild or shared database touched.",
+  "completed_utc": "2026-10-24T13:04:35.212Z",
+  "passed": 10,
+  "results": [
+    {
+      "name": "exact pre-lock ordering and unchanged protected inventory",
+      "status": "PASS",
+      "protected_relations": 27,
+      "scope": "Static ordering/inventory only. Does not simulate locks or snapshots."
+    },
+    {
+      "name": "active Brownlow writer commits while repair waits: fresh guard refuses; zero metadata writes",
+      "status": "PASS",
+      "duration_ms": 812
+    },
+    {
+      "name": "active protected writer exceeds approved two-second lock timeout: zero metadata writes",
+      "status": "PASS",
+      "duration_ms": 2429
+    },
+    {
+      "name": "writers and guarded DDL after all locks are excluded until repair commit",
+      "status": "PASS",
+      "duration_ms": 14833
+    },
+    {
+      "name": "absent optional relation cannot be created after locks",
+      "status": "PASS",
+      "duration_ms": 1675
+    },
+    {
+      "name": "linked-audit INSERT failure rolls back preceding note UPDATE",
+      "status": "PASS",
+      "duration_ms": 768
+    },
+    {
+      "name": "successful two-write repair; independent postcheck; second repair refuses",
+      "status": "PASS",
+      "duration_ms": 1517
+    },
+    {
+      "name": "Brownlow mutation after commit is detected by independent postcheck",
+      "status": "PASS",
+      "duration_ms": 1512
+    },
+    {
+      "name": "extra audit-row mutation after commit is detected",
+      "status": "PASS",
+      "duration_ms": 1528
+    },
+    {
+      "name": "pre-existing optional DDL commit is caught by in-transaction assertion; metadata rolls back",
+      "status": "PASS",
+      "duration_ms": 1154
+    }
+  ]
+}
+PRIVATE_CLUSTER_STOPPED /tmp/i316-f004-pg-UpmlC7
+I316_PG_REPORT_BASE64=ewogICJzdGF0dXMiOiAiUEFTUyIsCiAgImNhdGFsb2dfZGRsX2xpbWl0IjogIkFuIGFscmVhZHktZXhlY3V0ZWQgYnV0IHVuY29tbWl0dGVkIG9wdGlvbmFsIENSRUFURSBkb2VzIG5vdCByZXRhaW4gY2F0YWxvZyBSb3dFeGNsdXNpdmVMb2NrLiBJdCBjYW4gY29tbWl0IHdoaWxlIHJlcGFpciBob2xkcyBjYXRhbG9nIFNIQVJFIGxvY2tzLiBMaXZlIGNhdGFsb2cgbmFtZSByZXNvbHV0aW9uIG1ha2VzIHRoZSBpbi10cmFuc2FjdGlvbiBhc3NlcnRpb24gZGV0ZWN0IGl0IGFuZCByb2xsIGJhY2sgYm90aCBtZXRhZGF0YSB3cml0ZXMuIFRoaXMgY2FzZSBpcyBhZGRpdGlvbmFsIGV2aWRlbmNlIGZvciBpbmRlcGVuZGVudCByZXZpZXcsIG5vdCBhIGNsYWltIHRoYXQgY2F0YWxvZyBsb2NrcyBleGNsdWRlIGV2ZXJ5IGFscmVhZHktZXhlY3V0ZWQgRERMIGNvbW1pdC4iLAogICJlbmdpbmUiOiAicG9zdGdyZXMgKFBvc3RncmVTUUwpIDE2LjE1IChVYnVudHUgMTYuMTUtMHVidW50dTAuMjQuMDQuMSkiLAogICJpZGVudGl0eSI6IHsKICAgICJkYiI6ICJpMzE2X2YwMDRfdGVzdCIsCiAgICAiZGF0YSI6ICIvdG1wL2kzMTYtZjAwNC1wZy1VcG1sQzcvZGF0YSIsCiAgICAiY2x1c3RlciI6ICJpMzE2LWYwMDQtcHJpdmF0ZSIsCiAgICAiYWRkciI6IG51bGwsCiAgICAidmVyc2lvbiI6ICIxNi4xNSAoVWJ1bnR1IDE2LjE1LTB1YnVudHUwLjI0LjA0LjEpIgogIH0sCiAgIndvcmtfZGlyZWN0b3J5IjogIi90bXAvaTMxNi1mMDA0LXBnLVVwbWxDNyIsCiAgInNjb3BlIjogIkZyZXNoIHByaXZhdGUgVW5peC1zb2NrZXQgUG9zdGdyZVNRTCBjbHVzdGVyIGFuZCBzeW50aGV0aWMgc2hhcGVzLiBFeGFjdCBzaGFyZWQgU1FMIGV4Y2x1ZGluZyBwcm9kdWN0aW9uLW9ubHkgaWRlbnRpdHk7IHBzcWwgY2xpZW50IGRpcmVjdGl2ZXMgZXhwYW5kZWQgZm9yIGtub3duIGZpeHR1cmUgb3B0aW9uYWwgcHJlc2VuY2UuIE5vIHByb2R1Y3Rpb24gdHJhbnNwb3J0L2xpdmUtc2NoZW1hIGFjY2VwdGFuY2UuIE5vIHJlYnVpbGQgb3Igc2hhcmVkIGRhdGFiYXNlIHRvdWNoZWQuIiwKICAiY29tcGxldGVkX3V0YyI6ICIyMDI2LTEwLTI0VDEzOjA0OjM1LjIxMloiLAogICJwYXNzZWQiOiAxMCwKICAicmVzdWx0cyI6IFsKICAgIHsKICAgICAgIm5hbWUiOiAiZXhhY3QgcHJlLWxvY2sgb3JkZXJpbmcgYW5kIHVuY2hhbmdlZCBwcm90ZWN0ZWQgaW52ZW50b3J5IiwKICAgICAgInN0YXR1cyI6ICJQQVNTIiwKICAgICAgInByb3RlY3RlZF9yZWxhdGlvbnMiOiAyNywKICAgICAgInNjb3BlIjogIlN0YXRpYyBvcmRlcmluZy9pbnZlbnRvcnkgb25seS4gRG9lcyBub3Qgc2ltdWxhdGUgbG9ja3Mgb3Igc25hcHNob3RzLiIKICAgIH0sCiAgICB7CiAgICAgICJuYW1lIjogImFjdGl2ZSBCcm93bmxvdyB3cml0ZXIgY29tbWl0cyB3aGlsZSByZXBhaXIgd2FpdHM6IGZyZXNoIGd1YXJkIHJlZnVzZXM7IHplcm8gbWV0YWRhdGEgd3JpdGVzIiwKICAgICAgInN0YXR1cyI6ICJQQVNTIiwKICAgICAgImR1cmF0aW9uX21zIjogODEyCiAgICB9LAogICAgewogICAgICAibmFtZSI6ICJhY3RpdmUgcHJvdGVjdGVkIHdyaXRlciBleGNlZWRzIGFwcHJvdmVkIHR3by1zZWNvbmQgbG9jayB0aW1lb3V0OiB6ZXJvIG1ldGFkYXRhIHdyaXRlcyIsCiAgICAgICJzdGF0dXMiOiAiUEFTUyIsCiAgICAgICJkdXJhdGlvbl9tcyI6IDI0MjkKICAgIH0sCiAgICB7CiAgICAgICJuYW1lIjogIndyaXRlcnMgYW5kIGd1YXJkZWQgRERMIGFmdGVyIGFsbCBsb2NrcyBhcmUgZXhjbHVkZWQgdW50aWwgcmVwYWlyIGNvbW1pdCIsCiAgICAgICJzdGF0dXMiOiAiUEFTUyIsCiAgICAgICJkdXJhdGlvbl9tcyI6IDE0ODMzCiAgICB9LAogICAgewogICAgICAibmFtZSI6ICJhYnNlbnQgb3B0aW9uYWwgcmVsYXRpb24gY2Fubm90IGJlIGNyZWF0ZWQgYWZ0ZXIgbG9ja3MiLAogICAgICAic3RhdHVzIjogIlBBU1MiLAogICAgICAiZHVyYXRpb25fbXMiOiAxNjc1CiAgICB9LAogICAgewogICAgICAibmFtZSI6ICJsaW5rZWQtYXVkaXQgSU5TRVJUIGZhaWx1cmUgcm9sbHMgYmFjayBwcmVjZWRpbmcgbm90ZSBVUERBVEUiLAogICAgICAic3RhdHVzIjogIlBBU1MiLAogICAgICAiZHVyYXRpb25fbXMiOiA3NjgKICAgIH0sCiAgICB7CiAgICAgICJuYW1lIjogInN1Y2Nlc3NmdWwgdHdvLXdyaXRlIHJlcGFpcjsgaW5kZXBlbmRlbnQgcG9zdGNoZWNrOyBzZWNvbmQgcmVwYWlyIHJlZnVzZXMiLAogICAgICAic3RhdHVzIjogIlBBU1MiLAogICAgICAiZHVyYXRpb25fbXMiOiAxNTE3CiAgICB9LAogICAgewogICAgICAibmFtZSI6ICJCcm93bmxvdyBtdXRhdGlvbiBhZnRlciBjb21taXQgaXMgZGV0ZWN0ZWQgYnkgaW5kZXBlbmRlbnQgcG9zdGNoZWNrIiwKICAgICAgInN0YXR1cyI6ICJQQVNTIiwKICAgICAgImR1cmF0aW9uX21zIjogMTUxMgogICAgfSwKICAgIHsKICAgICAgIm5hbWUiOiAiZXh0cmEgYXVkaXQtcm93IG11dGF0aW9uIGFmdGVyIGNvbW1pdCBpcyBkZXRlY3RlZCIsCiAgICAgICJzdGF0dXMiOiAiUEFTUyIsCiAgICAgICJkdXJhdGlvbl9tcyI6IDE1MjgKICAgIH0sCiAgICB7CiAgICAgICJuYW1lIjogInByZS1leGlzdGluZyBvcHRpb25hbCBEREwgY29tbWl0IGlzIGNhdWdodCBieSBpbi10cmFuc2FjdGlvbiBhc3NlcnRpb247IG1ldGFkYXRhIHJvbGxzIGJhY2siLAogICAgICAic3RhdHVzIjogIlBBU1MiLAogICAgICAiZHVyYXRpb25fbXMiOiAxMTU0CiAgICB9CiAgXQp9Cg==
+VALIDATION_PACKAGE_RETAINED /tmp/i316-f004-package-UaeATe

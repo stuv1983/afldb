@@ -379,6 +379,70 @@ BEGIN
     GRANT USAGE ON SEQUENCE afl_api_identity_adjudications_id_seq TO afldb_import;
   END IF;
 
+  -- Migration 111 (AFLDB V2 Stage 4, curated awards): the proposal table and
+  -- its decision ledger. A status transition writes its ledger row in the
+  -- same afldb_import transaction as the status change, and an approval
+  -- writes award_winners through insertAwardWinner() in that transaction too.
+  -- award_proposals: SELECT, INSERT and a COLUMN-scoped UPDATE of the
+  -- workflow columns only, so the proposed value and its evidence are
+  -- immutable at the grant level (a correction is a new revision).
+  -- award_proposal_decisions: SELECT, INSERT and sequence USAGE only --
+  -- append-only. Neither table is registered in import_writable_tables,
+  -- whose loop above would grant UPDATE, DELETE and TRUNCATE. Neither is
+  -- app-readable: proposals hold unvetted data and must never reach the
+  -- public site. The revoke loop strips these each run; re-grant them here.
+  IF to_regclass('public.award_proposals') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON award_proposals TO afldb_import;
+    GRANT UPDATE (status, validation_result, validated_at,
+                  approved_entity_key, approved_at, updated_at)
+      ON award_proposals TO afldb_import;
+    GRANT USAGE ON SEQUENCE award_proposals_id_seq TO afldb_import;
+  END IF;
+  IF to_regclass('public.award_proposal_decisions') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON award_proposal_decisions TO afldb_import;
+    GRANT USAGE ON SEQUENCE award_proposal_decisions_id_seq TO afldb_import;
+  END IF;
+
+  -- Migration 112 (AFLDB V2 Stage 4, derived awards): the append-only ledger
+  -- of PUBLISHED derivations (today the Coleman Medal). The V2 publisher
+  -- (packages/derived/src/coleman-publication.ts) reads the current row and
+  -- inserts a new one, as afldb_import, in a single transaction. SELECT,
+  -- INSERT and sequence USAGE only: a recompute after an authorised
+  -- correction is a NEW row that supersedes the old, never an UPDATE, and no
+  -- role gets DELETE or TRUNCATE. The table is not registered in
+  -- import_writable_tables, whose loop above would grant UPDATE, DELETE and
+  -- TRUNCATE. It is not app-readable. The revoke loop strips these each run;
+  -- re-grant them here.
+  IF to_regclass('public.derived_award_results') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON derived_award_results TO afldb_import;
+    GRANT USAGE ON SEQUENCE derived_award_results_id_seq TO afldb_import;
+  END IF;
+
+  -- Migration 113 (AFLDB V2 Launch F, Brownlow eligibility): the append-only
+  -- ledger of administrator eligibility decisions. A decision is one INSERT
+  -- as afldb_import, in a single transaction; a reversal is a NEW row that
+  -- supersedes the old, never an UPDATE, and no role gets DELETE or TRUNCATE.
+  -- SELECT, INSERT and sequence USAGE only. Not registered in
+  -- import_writable_tables, whose loop above would grant UPDATE, DELETE and
+  -- TRUNCATE. Not app-readable. The revoke loop strips these each run;
+  -- re-grant them here.
+  IF to_regclass('public.brownlow_eligibility_decisions') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON brownlow_eligibility_decisions TO afldb_import;
+    GRANT USAGE ON SEQUENCE brownlow_eligibility_decisions_id_seq TO afldb_import;
+  END IF;
+
+  -- Migration 114 (AFLDB V2 Launch F, derived awards): the append-only
+  -- provenance ledger of projecting a published derivation into award_winners
+  -- (keys and actions only, not a winner store). SELECT, INSERT and sequence
+  -- USAGE only; one INSERT per projection as afldb_import, in the projection's
+  -- single transaction. Not registered in import_writable_tables (the loop
+  -- above would grant UPDATE, DELETE and TRUNCATE). Not app-readable. The
+  -- revoke loop strips these each run; re-grant them here.
+  IF to_regclass('public.derived_award_projections') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON derived_award_projections TO afldb_import;
+    GRANT USAGE ON SEQUENCE derived_award_projections_id_seq TO afldb_import;
+  END IF;
+
   -- Migration 094 (AFLDB-ISSUE-155 Phase C1): the Brownlow administration
   -- workflow. These two tables record administrative decisions -- who
   -- drafted, who finalised, who published a season and from which
@@ -508,6 +572,24 @@ DECLARE
     -- external_identities row it audits (see migration 104,
     -- AFLDB-ISSUE-235 D8). The admin history view may only read it.
     ['afl_api_identity_adjudications', 'SELECT'],                    -- 104
+    -- Read-only: the curated-award proposals and their decision ledger are
+    -- written by afldb_import alone, in the same transaction as the canonical
+    -- award_winners row an approval creates (see migration 111, AFLDB V2
+    -- Stage 4). The admin history view may only read them.
+    ['award_proposals',        'SELECT'],                            -- 111
+    ['award_proposal_decisions', 'SELECT'],                          -- 111
+    -- Read-only: the published derivation ledger is written by afldb_import
+    -- alone (see migration 112, AFLDB V2 Stage 4). The admin history view may
+    -- only read it.
+    ['derived_award_results',  'SELECT'],                            -- 112
+    -- Read-only: the Brownlow eligibility decision ledger is written by
+    -- afldb_import alone (see migration 113, AFLDB V2 Launch F). The admin
+    -- history view may only read it.
+    ['brownlow_eligibility_decisions', 'SELECT'],                    -- 113
+    -- Read-only: the derived-award projection provenance ledger is written by
+    -- afldb_import alone (see migration 114, AFLDB V2 Launch F). The admin
+    -- history view may only read it.
+    ['derived_award_projections', 'SELECT'],                         -- 114
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023

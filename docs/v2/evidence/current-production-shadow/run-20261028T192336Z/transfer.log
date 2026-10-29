@@ -1,0 +1,14 @@
+== T1 protected local directory
+== T2 copy from production (read-only scp)
+local hashes OK (6 files)
+== T3 new isolated root on streamanator
+11335237632
+afldb_prod-20261028T192336Z.dump: OK
+afldb_prod-20261028T192336Z.provenance.json: OK
+archive.toc: OK
+ledger-before.tsv: OK
+ledger-after.tsv: OK
+pg-dump.stderr: OK
+shadow-restore.sh: OK
+expected-deltas.mjs: OK
+TRANSFER PASS stamp=20261028T192336Z local=C:\Users\stuar\backups\afldb\current-shadow-20261028T192336Z isolated_root=/home/arm/afldb-v2-currentshadow-20261028T192336Z

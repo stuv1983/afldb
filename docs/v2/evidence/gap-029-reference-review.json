@@ -1,0 +1,81 @@
+{
+  "reviewedOn": "2026-10-20",
+  "matchEvents": {
+    "findingCount": 42,
+    "canonicalMatches": 16838,
+    "labelledMatches": 0,
+    "sourceSearch": "Tracked data/sources contains the two coaches CSVs, not legacy games.match_event. import_legacy_afl.py reads the label from the legacy SQLite games column. No labelled legacy snapshot or documented matching-label export found in the scoped artifacts inspected.",
+    "required": "Exact historical event matches and labels with citations or a recoverable legacy export; no date/clubs/venue-only derivation admitted."
+  },
+  "registration2026": {
+    "findingCount": 8,
+    "retainedRoster": "data/sources/afl_api/rosters/rosters-20260905/rosters_2026.json",
+    "rosterSha256": "4516fde6cde258172fbc514962b5b1968c8003c9a63530afa24e5817f28376c0",
+    "rosterCapture": "2026-09-05",
+    "affectedBoards": [
+      {
+        "board": 990,
+        "date": "2026-04-01"
+      },
+      {
+        "board": 992,
+        "date": "2026-04-03"
+      },
+      {
+        "board": 1000,
+        "date": "2026-04-11"
+      },
+      {
+        "board": 1035,
+        "date": "2026-05-16"
+      }
+    ],
+    "identities": [
+      {
+        "name": "Finnbar Maley",
+        "aflPlayerId": 8920,
+        "club": "Adelaide Crows",
+        "debutYear": "2025"
+      },
+      {
+        "name": "Jagga Smith",
+        "aflPlayerId": 9351,
+        "club": "Carlton",
+        "debutYear": "2026"
+      },
+      {
+        "name": "Malcolm Rosas",
+        "aflPlayerId": 2602,
+        "club": "Sydney Swans",
+        "debutYear": "2021"
+      },
+      {
+        "name": "Willem Duursma",
+        "aflPlayerId": 11955,
+        "club": "West Coast Eagles",
+        "debutYear": "2026"
+      }
+    ],
+    "limitation": "The existing identities for Malcolm Rosas and Finnbar Maley were verified; only Willem Duursma and Jagga Smith are missing canonical players. September roster membership is not proof of April/May participation. The documented raw 2026 match-snapshot directory has no files in this checkout. No current membership substituted for the board-date expectation.",
+    "manifestHashVerified": true
+  },
+  "siblings": {
+    "findingCount": 21,
+    "gridleyPlayerId": 3746,
+    "profile": "players/J/Jarryd_Lyons.html",
+    "relative": "Corey Lyons",
+    "relationshipEvidence": "https://www.lions.com.au/news/239732/jarryd-lyons-on-making-up-for-lost-time",
+    "relativeEvidence": "https://www.lions.com.au/players/1290/corey-lyons",
+    "findings": "Official pages read directly: relationship and 2016 Brisbane drafting confirmed; 2019 profile still describes a future senior debut in 2020, with no displayed career total. Missing displayed totals are UNKNOWN, not proof of zero. Isolated canonical database has no Corey Lyons player identity.",
+    "existingPolicy": "src/db/queries/grid-solver.ts has_brother: both sides linked to canonical players, and the brother having played a VFL/AFL match (player_career_stats.games > 0). family_siblings.py supplements require two canonical AFL Tables profiles.",
+    "required": "Evidence of a senior VFL/AFL appearance and canonical identity for Corey, or an explicit owner decision to admit listed-but-unplayed siblings. No pair inserted and no new deferral approved.",
+    "proposedOwnerDecision": "If further senior-game investigation confirms no qualifying appearance, approve an exact 21-cell Jarryd Lyons/Gridley brother semantic adjudication while retaining strict mismatches; otherwise retain the current failing gate. Do not broaden has_brother globally."
+  },
+  "earlierRepairs": {
+    "historicalBoundary": "<=2025",
+    "laterBoundary": ">=2026",
+    "independentExpectations": "club comparison counts directly by organization slugs; venue counts directly by venue/year; X1 counts linked distinct people from match_coaches, excluding pre-2026 people in the later-only population. No application query helper used as the oracle; historical constants remain independently source-defined.",
+    "identityOrdering": "SQL COLLATE C plus explicit punctuation-folded JS comparator with exact-key tie-break. Original two digests and new C digests retained. Linux collation described as inference, not directly observed.",
+    "regressions": "No test skip, tolerance or weakened pin added."
+  }
+}

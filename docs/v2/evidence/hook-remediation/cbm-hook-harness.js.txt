@@ -1,0 +1,166 @@
+// Regression harness for cbm-hook-runner.js. Harmless: every adversarial payload only
+// tries to create files by relative redirection inside a fresh canary directory, and no
+// payload contains a delete or a network command.
+//
+// Proves, for each adversarial payload and each host shell (Git Bash as Claude Code
+// uses on Windows, and cmd.exe /s /c):
+//   1. no command in the payload runs (no new, removed or changed file in the canary dir);
+//   2. the payload reaches the binary byte-for-byte (a findstr stand-in echoes it back);
+//   3. the runner exits 0 and is silent on success, and names the cause on failure;
+// and, as a negative control, that the OLD cmd.exe command DOES execute payload text
+// (so the canary check is able to see the hazard).
+//
+// Usage: node cbm-hook-harness.js [--json <out-file>]
+"use strict";
+
+const { spawnSync } = require("child_process");
+const crypto = require("crypto");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+const NODE = process.execPath;
+const RUNNER = path.resolve(__dirname, "..", "cbm-hook-runner.js");
+const BASH = process.env.HARNESS_BASH || "C:\\Program Files\\Git\\bin\\bash.exe";
+const CMD = process.env.ComSpec || "C:\\WINDOWS\\system32\\cmd.exe";
+const REAL_BIN = "C:\\Users\\stuar\\AppData\\Local\\Programs\\codebase-memory-mcp\\codebase-memory-mcp.exe";
+const FINDSTR = "C:\\WINDOWS\\system32\\findstr.exe";
+const MARK = "hook-augment"; // findstr stand-in prints every line containing this
+
+// The command strings exactly as configured in settings.json (forward slashes).
+const fwd = (p) => p.replace(/\\/g, "/");
+const NEW_COMMAND = `"${fwd(NODE)}" "${fwd(RUNNER)}" code-discovery-gate`;
+const OLD_COMMAND = `cmd.exe /d /v:off /s /c '""%USERPROFILE%\\.claude\\hooks\\cbm-code-discovery-gate.cmd""'`;
+
+const ADVERSARIAL = [
+  ["ampersand", "x & echo PWNED>amp.txt"],
+  ["double-ampersand", "x && echo PWNED>amp2.txt || echo PWNED>or2.txt"],
+  ["pipe", "x | echo PWNED>pipe.txt"],
+  ["redirect-in", "x < nul > rin.txt"],
+  ["redirect-out-supplies", "tests/site-settings.test.ts > parseSiteSettings > supplies every default"],
+  ["append", "x >> append.txt"],
+  ["stderr-redirect", "x 2> err.txt"],
+  ["caret", "x ^& echo PWNED>caret.txt ^"],
+  ["percent", "%USERPROFILE% %PATH% %% %ComSpec% & echo %USERNAME%>pct.txt"],
+  ["delayed-expansion", "!USERNAME! & echo !PATH!>bang.txt"],
+  ["parentheses", "(echo PWNED)>paren.txt"],
+  ["quote-toggle", "\" & echo PWNED>quote.txt & \""],
+  ["escaped-quote", "\\\" & echo PWNED>esc.txt"],
+  ["newline", "line1\n& echo PWNED>nl.txt\r\necho PWNED>crlf.txt"],
+  ["bash-subst", "$(echo PWNED>subst.txt) `echo PWNED>tick.txt`; echo PWNED>semi.txt"],
+  ["unicode", "em\u2014dash \u2192 arrow > uni.txt"],
+  ["long-8191-boundary", "a".repeat(8300) + " > supplies & echo PWNED>long.txt"],
+  ["recorded-shape", "FAIL  x".repeat(1500) + "\n FAIL  tests/site-settings.test.ts > parseSiteSettings > supplies every default from an empty table\n"],
+];
+
+function payloadFor(name, text) {
+  // Shapes Claude Code sends: PreToolUse Grep (tool_input) and PostToolUse Read (tool_response).
+  return [
+    { hook_event_name: "PreToolUse", tool_name: "Grep", tool_input: { pattern: `${MARK} ${text}`, path: "." } },
+    {
+      hook_event_name: "PostToolUse",
+      tool_name: "Read",
+      tool_input: { file_path: `C:\\fake\\${name}.txt` },
+      tool_response: { type: "text", file: { content: `${MARK}\n${text}\n${MARK} ${text}` } },
+    },
+  ].map((o) => JSON.stringify({ session_id: "harness", cwd: "C:\\fake", ...o }));
+}
+
+function snapshot(dir) {
+  const out = {};
+  for (const name of fs.readdirSync(dir)) {
+    const p = path.join(dir, name);
+    const st = fs.statSync(p);
+    out[name] = st.isDirectory() ? "dir" : crypto.createHash("sha256").update(fs.readFileSync(p)).digest("hex");
+  }
+  return out;
+}
+
+function diff(a, b) {
+  const changes = [];
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (!(k in a)) changes.push(`created ${k}`);
+    else if (!(k in b)) changes.push(`removed ${k}`);
+    else if (a[k] !== b[k]) changes.push(`changed ${k}`);
+  }
+  return changes;
+}
+
+function freshCanary(label) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `cbm-harness-${label}-`));
+  fs.writeFileSync(path.join(dir, "canary.txt"), "canary\n");
+  fs.writeFileSync(path.join(dir, "supplies"), "pre-existing canary named supplies\n");
+  return dir;
+}
+
+function run(host, command, payload, cwd, env) {
+  // bash: `bash -c <command>` (Claude Code on Windows with Git Bash).
+  // cmd: Node's own shell:true wrapper, i.e. `cmd.exe /d /s /c "<command>"`.
+  const opts = { cwd, input: Buffer.from(payload, "utf8"), env: { ...process.env, ...env }, timeout: 15000 };
+  const r = host === "bash" ? spawnSync(BASH, ["-c", command], opts) : spawnSync(command, { ...opts, shell: CMD });
+  return { status: r.status, stdout: (r.stdout || Buffer.alloc(0)).toString("utf8"), stderr: (r.stderr || Buffer.alloc(0)).toString("utf8") };
+}
+
+const results = [];
+let failures = 0;
+function record(entry) {
+  results.push(entry);
+  if (!entry.pass) failures += 1;
+  process.stdout.write(`${entry.pass ? "PASS" : "FAIL"} ${entry.case}${entry.detail ? ` — ${entry.detail}` : ""}\n`);
+}
+
+// 1-2. Adversarial payloads through the new command, both hosts, findstr stand-in and real binary.
+for (const host of ["bash", "cmd"]) {
+  for (const [name, text] of ADVERSARIAL) {
+    for (const [i, payload] of payloadFor(name, text).entries()) {
+      for (const bin of ["findstr", "real"]) {
+        const dir = freshCanary(`${host}-${name}`);
+        const before = snapshot(dir);
+        const r = run(host, NEW_COMMAND, payload, dir, { CBM_HOOK_BIN: bin === "findstr" ? FINDSTR : REAL_BIN });
+        const changes = diff(before, snapshot(dir));
+        const problems = [];
+        if (changes.length) problems.push(`filesystem: ${changes.join(", ")}`);
+        if (r.status !== 0) problems.push(`exit ${r.status}`);
+        if (bin === "findstr" && r.stdout.replace(/\r?\n$/, "") !== payload.split(/\r?\n/).filter((l) => l.includes(MARK)).join("\r\n")) {
+          problems.push("payload not delivered byte-for-byte");
+        }
+        if (bin === "real" && r.stderr.trim()) problems.push(`stderr: ${r.stderr.trim()}`);
+        if (/PWNED|Microsoft Windows \[Version/.test(r.stdout + r.stderr) && bin === "real") problems.push("payload text was interpreted");
+        record({ case: `${host}/${name}/${i ? "PostToolUse-Read" : "PreToolUse-Grep"}/${bin}`, pass: problems.length === 0, detail: problems.join("; "), exit: r.status, fsChanges: changes });
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  }
+}
+
+// 3. Failure modes are explicit and fail open.
+{
+  const dir = freshCanary("missing-bin");
+  const r = run("bash", NEW_COMMAND, payloadFor("x", "x")[0], dir, { CBM_HOOK_BIN: "C:\\nonexistent\\cbm.exe" });
+  record({ case: "failure/missing-binary", pass: r.status === 0 && /binary not found at C:\\nonexistent\\cbm\.exe; skipped \(fail-open/.test(r.stderr), detail: r.stderr.trim(), exit: r.status });
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+{
+  const dir = freshCanary("timeout");
+  // ping.exe (stdin ignored) outlives a 300 ms budget; argv is fixed by the runner, so it waits on "hook-augment" as a host.
+  const r = run("bash", NEW_COMMAND, payloadFor("x", "x")[0], dir, { CBM_HOOK_BIN: "C:\\WINDOWS\\system32\\timeout.exe", CBM_HOOK_TIMEOUT_MS: "300" });
+  record({ case: "failure/nonzero-or-timeout", pass: r.status === 0 && /cbm-hook\[code-discovery-gate\]: hook-augment (timed out|exited)/.test(r.stderr), detail: r.stderr.trim(), exit: r.status });
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// 4. Negative control: the OLD command executes payload text (proves the canary detects it).
+{
+  const dir = freshCanary("old-command");
+  const before = snapshot(dir);
+  const r = run("bash", OLD_COMMAND, "notacommand > supplies & echo PWNED>oldamp.txt\r\n", dir, {});
+  const changes = diff(before, snapshot(dir));
+  const hazard = changes.includes("changed supplies") && changes.includes("created oldamp.txt");
+  record({ case: "negative-control/old-command-executes-stdin", pass: hazard, detail: `observed: ${changes.join(", ") || "nothing"}`, exit: r.status, fsChanges: changes });
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+const summary = { harness: "cbm-hook-harness", ranAt: new Date().toISOString(), node: process.version, newCommand: NEW_COMMAND.replace(/stuar/g, "<user>"), cases: results.length, failures };
+process.stdout.write(`${JSON.stringify(summary)}\n`);
+const jsonIdx = process.argv.indexOf("--json");
+if (jsonIdx > 0) fs.writeFileSync(process.argv[jsonIdx + 1], JSON.stringify({ summary, results }, null, 2));
+process.exitCode = failures ? 1 : 0;

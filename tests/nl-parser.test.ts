@@ -2039,6 +2039,37 @@ describe('regression: every year in an executed question reaches the plan scope'
 });
 
 /**
+ * V2-GAP-032 (blockers R43b). Digits are outside meaningfulTokens(), so a
+ * number no extractor claimed used to cost nothing: the exploratory
+ * malformed_input form "<club> <stat> 200 40" answered the club's
+ * leaderboard at confidence 1, and the real-user range "in 1980 to 1989"
+ * answered 1980 alone.
+ */
+describe('regression: no number in a question is silently discarded (V2-GAP-032)', () => {
+  it.each([
+    ['most goals in 1980 to 1989', 1980, 1989],
+    ['who had the most kicks in 2020 to 2025', 2020, 2025],
+    ['most goals in 1989 to 1980', 1980, 1989],
+  ])('%s -> the inclusive range', async (question, seasonMin, seasonMax) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('player_season');
+    expect(p.scope.seasonMin).toBe(seasonMin);
+    expect(p.scope.seasonMax).toBe(seasonMax);
+  });
+
+  it.each([
+    ['Adelaide goals 200 40', ['200', '40']],
+    ['Richmond disposals 200 40 in 2017', ['200', '40']],
+    ['Collingwood marks 200 40 during the 2010s', ['200', '40']],
+    ['most goals in 1980 and 1989', ['1989']],
+  ])('%s -> declines, naming the stray numbers', async (question, stray) => {
+    const result = await parse(question);
+    expect(result.status).toBe('none');
+    for (const n of stray) expect(result.report.unsupportedTerms).toContain(n);
+  });
+});
+
+/**
  * A bare "most <career column>" with no player named. Found broken for
  * everything except games/goals/brownlow_votes/finals: the fallback that
  * reads a leftover career-subject word only ever hand-listed those three,
@@ -3904,6 +3935,32 @@ describe('played and also coached (AFLDB-ISSUE-152 Phase F)', () => {
       const parsed = await parse(question);
       if (parsed.status !== 'plan') return;
       expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+
+    // The played club becomes a builder parameter, so the games count would
+    // be career-wide: a player with 150 Richmond games and 60 elsewhere
+    // would qualify for "200 games for richmond".
+    it('a games count held to the played club is refused at validatePlan', async () => {
+      const p = await plan('players who played 200 games for richmond and also coached richmond');
+      expect(p.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 200 }]);
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(validatePlan(p)).toHaveProperty('error');
+    });
+
+    // The 20-character opponent window is a refusal guard and stays wide on
+    // purpose: an against-like word anywhere in it declines ("over 200 games
+    // for richmond" is a false positive, but still a decline), where the
+    // nearest-token test extractClubs uses would let "coached against arch
+    // rival carlton" bind Carlton as the coached club.
+    it('the opponent guard keeps its wide window', async () => {
+      for (const question of [
+        'players who played and also coached against arch rival carlton',
+        'players who played over 200 games for richmond and also coached richmond',
+      ]) {
+        const parsed = await parse(question);
+        expect(parsed.status, question).toBe('none');
+        expect(parsed.report.notes.join(' '), question).toContain('cannot also be scoped to an opponent');
+      }
     });
   });
 

@@ -1,0 +1,1013 @@
+{
+  "verified_at": "2026-10-25T03:48:30.796Z",
+  "package": "C:/tmp/afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z",
+  "manifest_sha256": "6d61c1c3ca35d315226efd15af8142e9f180c68e400be7e450088d1aa0e45d82",
+  "members": 167,
+  "passed": 167,
+  "findings": [],
+  "files": [
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\HASHES.FJ05-reviewed.sha256",
+      "expected_sha256": "40659f8af6cedc6771f6064043f8d3d4b50becfa5ebf763fc9a0c5ce25f9e1b8",
+      "actual_sha256": "40659f8af6cedc6771f6064043f8d3d4b50becfa5ebf763fc9a0c5ce25f9e1b8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\HASHES.pre-FJ04.sha256",
+      "expected_sha256": "665d128561c8a7534c0046fff662aca62bc26df1f9a04ea124a6426437e91d13",
+      "actual_sha256": "665d128561c8a7534c0046fff662aca62bc26df1f9a04ea124a6426437e91d13",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\HASHES.pre-FJ05.sha256",
+      "expected_sha256": "5a3f813d0cb36f02f32dff2718379d72729439569632d0743bc1d81cc4e53b34",
+      "actual_sha256": "5a3f813d0cb36f02f32dff2718379d72729439569632d0743bc1d81cc4e53b34",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\PROPOSAL_J2-FJ04.md",
+      "expected_sha256": "ae41abee418fb1cb521f2f058dca476139983ecc2a7a4306508b40d37da57c8a",
+      "actual_sha256": "ae41abee418fb1cb521f2f058dca476139983ecc2a7a4306508b40d37da57c8a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\PROPOSAL_J2-FJ05.md",
+      "expected_sha256": "0ef0eaa3a30061ca82840ee0f7c0305397aeb8d40654ec4985735e45bd532c02",
+      "actual_sha256": "0ef0eaa3a30061ca82840ee0f7c0305397aeb8d40654ec4985735e45bd532c02",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\PROPOSAL_J2.md",
+      "expected_sha256": "f54fd3f5a83ede98d040e3482f258470e06b46a03759c5244336e306049afdc7",
+      "actual_sha256": "f54fd3f5a83ede98d040e3482f258470e06b46a03759c5244336e306049afdc7",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\dryrun-streamanator\\NOT-RUN.txt",
+      "expected_sha256": "2a0ca4a3aec87e8984d8cec0cb5304aaa95b079b282846a473c449a2bda0d936",
+      "actual_sha256": "2a0ca4a3aec87e8984d8cec0cb5304aaa95b079b282846a473c449a2bda0d936",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\dryrun-streamanator\\j2-dryrun-attempt1-20261024T001117Z.tgz",
+      "expected_sha256": "178d97583beb1e51091951d7af138458469bcc029a9659f5dda8e7e4976a9c78",
+      "actual_sha256": "178d97583beb1e51091951d7af138458469bcc029a9659f5dda8e7e4976a9c78",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\dryrun-streamanator\\j2-dryrun-attempt2-20261024T025629Z.tgz",
+      "expected_sha256": "6b70a0cacadd463a3595efd332feec73310ec990318285671cdb907dd36702e1",
+      "actual_sha256": "6b70a0cacadd463a3595efd332feec73310ec990318285671cdb907dd36702e1",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\dryrun-streamanator\\j2-dryrun-attempt3-20261024T034905Z.tgz",
+      "expected_sha256": "bf2a88acdf7fa0ae6f091cff582e8cb5f7198917717316aba268811eb363c2ca",
+      "actual_sha256": "bf2a88acdf7fa0ae6f091cff582e8cb5f7198917717316aba268811eb363c2ca",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\host\\DERIVE-STAGE.sha256",
+      "expected_sha256": "cd26543d64da1e9b991deac58297bee49cd879ca93435ac08d0894b5dac65725",
+      "actual_sha256": "cd26543d64da1e9b991deac58297bee49cd879ca93435ac08d0894b5dac65725",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\host\\derive.log",
+      "expected_sha256": "7965ffa6712f27503f535f40c82d4e203207782adf222777d712a27b5ed261cc",
+      "actual_sha256": "7965ffa6712f27503f535f40c82d4e203207782adf222777d712a27b5ed261cc",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\host\\hold-probe.log",
+      "expected_sha256": "bd45c2804116e19576c8cd297f74538d84e3e3ce12e4315f25e5f05ccf5ec54b",
+      "actual_sha256": "bd45c2804116e19576c8cd297f74538d84e3e3ce12e4315f25e5f05ccf5ec54b",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\host\\prehold-baseline-2.log",
+      "expected_sha256": "bf7b04b593878da084ac3047cade2d3f07ca0a78236d89871d8206b36c5cc8c0",
+      "actual_sha256": "bf7b04b593878da084ac3047cade2d3f07ca0a78236d89871d8206b36c5cc8c0",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\host\\prehold-baseline.log",
+      "expected_sha256": "3162400d14e90d7eecdb80204ea322373b6dd3258bb6129b4324bdd5cd1021ce",
+      "actual_sha256": "3162400d14e90d7eecdb80204ea322373b6dd3258bb6129b4324bdd5cd1021ce",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\native-J2\\build-auditor.log",
+      "expected_sha256": "072cdfcee403c024e076b747a8e7a51d67ef3e6a4352f3b4350da721e8403041",
+      "actual_sha256": "072cdfcee403c024e076b747a8e7a51d67ef3e6a4352f3b4350da721e8403041",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\native-J2\\closure-derivation.json",
+      "expected_sha256": "b3dbc37d361b996de4cbe37346120c60bee001ca3dd8cd6b6e5f27abca859c93",
+      "actual_sha256": "b3dbc37d361b996de4cbe37346120c60bee001ca3dd8cd6b6e5f27abca859c93",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\native-J2\\closure-review.json",
+      "expected_sha256": "c54ec690008aeadc4a73d373ae29d1427943c87003c8d5e58bd2da1cb96304c5",
+      "actual_sha256": "c54ec690008aeadc4a73d373ae29d1427943c87003c8d5e58bd2da1cb96304c5",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\native-J2\\native-policy.txt",
+      "expected_sha256": "a8e586e0d729329eafc2773022a3aa3214cdbca9a3f1c6d77c3687cfac4599d4",
+      "actual_sha256": "a8e586e0d729329eafc2773022a3aa3214cdbca9a3f1c6d77c3687cfac4599d4",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\native-J2\\policy-compare.json",
+      "expected_sha256": "d401ecc27d2f724bfb105966421a75107fb3e0555fbe4a9dadbb6c8b5e034e28",
+      "actual_sha256": "d401ecc27d2f724bfb105966421a75107fb3e0555fbe4a9dadbb6c8b5e034e28",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\native-J2\\runtime-measure.json",
+      "expected_sha256": "8cce2bf3945d5f27915e48728cca675a53ba8381286f28bd5d097dbf40a5f4c7",
+      "actual_sha256": "8cce2bf3945d5f27915e48728cca675a53ba8381286f28bd5d097dbf40a5f4c7",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\native-J2\\runtime-record-v2.json",
+      "expected_sha256": "6c4ea3ea3fc2e6a12068c739750e64f6180c7016bd27869a652567bafec1add3",
+      "actual_sha256": "6c4ea3ea3fc2e6a12068c739750e64f6180c7016bd27869a652567bafec1add3",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\native-J2\\runtime-record-v3.json",
+      "expected_sha256": "82e25a103652a386ca51e2a49580545a1781d81921b08a48d2a5d84c00acbc65",
+      "actual_sha256": "82e25a103652a386ca51e2a49580545a1781d81921b08a48d2a5d84c00acbc65",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\pins\\BASE.sha256",
+      "expected_sha256": "639f5536034d21ab7942c450f9de559c6b0ac8ae2195f93eb4efa95f813de459",
+      "actual_sha256": "639f5536034d21ab7942c450f9de559c6b0ac8ae2195f93eb4efa95f813de459",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\pins\\BUNDLES.sha256",
+      "expected_sha256": "5d2c6fe58ab5e1046be82b11586487fe7fc2cc6d4bfb4c40831247fef622bfea",
+      "actual_sha256": "5d2c6fe58ab5e1046be82b11586487fe7fc2cc6d4bfb4c40831247fef622bfea",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\pins\\COMMIT2-prime-J2.sha256",
+      "expected_sha256": "3ab075e367f1ca605f984f9bcb132b7d87948d57af993a31887c3a412d80a8ba",
+      "actual_sha256": "3ab075e367f1ca605f984f9bcb132b7d87948d57af993a31887c3a412d80a8ba",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\pins\\j2.commit1-final.sha256",
+      "expected_sha256": "9d4b4719c5efdf502fcc161b8ffd65236079d77e5b181fe27c1d518187e4493a",
+      "actual_sha256": "9d4b4719c5efdf502fcc161b8ffd65236079d77e5b181fe27c1d518187e4493a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\pins\\transition-change-set.c2-2026-successor.J2-pinned.json",
+      "expected_sha256": "85b5f05af179c83fa0fcc4898263204a6d92e6ed99069cb8bb8384f2cb1886a1",
+      "actual_sha256": "85b5f05af179c83fa0fcc4898263204a6d92e6ed99069cb8bb8384f2cb1886a1",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\pins\\transition-change-set.c2-2026-successor.J2-unpinned.json",
+      "expected_sha256": "5a410a82389d60fe1ce77879f26459beb630af24e9b6fe79e543ad28ebfa112c",
+      "actual_sha256": "5a410a82389d60fe1ce77879f26459beb630af24e9b6fe79e543ad28ebfa112c",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\progress.log",
+      "expected_sha256": "2ac0f703f5c0db683352b6e39c8e9265c124cc457b39a462e563160d3092cc74",
+      "actual_sha256": "2ac0f703f5c0db683352b6e39c8e9265c124cc457b39a462e563160d3092cc74",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\rb-collect-20261024T034905Z.tar",
+      "expected_sha256": "a81652dae9c903f141b48ac228d51b81cfa161a8f604a456af91ec4632184a39",
+      "actual_sha256": "a81652dae9c903f141b48ac228d51b81cfa161a8f604a456af91ec4632184a39",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\rb-collect.log",
+      "expected_sha256": "da2a5f1eec1fc55ac1f3a59f9da0606f6c25ff738c47d583b06ea0e685218b5b",
+      "actual_sha256": "da2a5f1eec1fc55ac1f3a59f9da0606f6c25ff738c47d583b06ea0e685218b5b",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\rb-post.log",
+      "expected_sha256": "6f015dcd7be9858e226cac252483498755306ec170482cc86e1ddd435e8ed7a9",
+      "actual_sha256": "6f015dcd7be9858e226cac252483498755306ec170482cc86e1ddd435e8ed7a9",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\rb-shutdown.log",
+      "expected_sha256": "2482f66958442abdab98b4dea834a340a791cdeef619f6aabd1c0512fb89bc34",
+      "actual_sha256": "2482f66958442abdab98b4dea834a340a791cdeef619f6aabd1c0512fb89bc34",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\rb2-after.log",
+      "expected_sha256": "19dfd591df60039e5a4b1ee1e6a8fcb26ae802eacbefc0b8b5c93741bf46f89e",
+      "actual_sha256": "19dfd591df60039e5a4b1ee1e6a8fcb26ae802eacbefc0b8b5c93741bf46f89e",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\rb2-bootstrap.log",
+      "expected_sha256": "ec8be0ebfa6948f0203aec43dd4bc921a389d2c1aebd0d5cd0afdb2e8605fc0b",
+      "actual_sha256": "ec8be0ebfa6948f0203aec43dd4bc921a389d2c1aebd0d5cd0afdb2e8605fc0b",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\rb2-launch.log",
+      "expected_sha256": "5a0325aec6c4938c5f3bb01bfd4e7d8c0fe501b5b00fbf5da4aef1f14e9186ac",
+      "actual_sha256": "5a0325aec6c4938c5f3bb01bfd4e7d8c0fe501b5b00fbf5da4aef1f14e9186ac",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\J2-20261024T034905Z\\rb2-prepare.log",
+      "expected_sha256": "218cf5dce0da0713fb6184d9e790584a76d31b03e213c6339c9429947f447e28",
+      "actual_sha256": "218cf5dce0da0713fb6184d9e790584a76d31b03e213c6339c9429947f447e28",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\rebuild-streamanator\\NOT-RUN.txt",
+      "expected_sha256": "14683aef1e96e2f848f321118916c909cc0c4d7181f9c202b1c2b78ea20d4c00",
+      "actual_sha256": "14683aef1e96e2f848f321118916c909cc0c4d7181f9c202b1c2b78ea20d4c00",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\derive\\j2-derive.sh",
+      "expected_sha256": "6232ddfcc1fec6a1de0192761db2004c42ed84bb1634349c43d5fb7d24bcaae0",
+      "actual_sha256": "6232ddfcc1fec6a1de0192761db2004c42ed84bb1634349c43d5fb7d24bcaae0",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\derive\\j2-hold-probe-readonly.sh",
+      "expected_sha256": "2c75828c065d1c6f07ba9f2002917638ba396a45c0156ab8df6103a15c47ca87",
+      "actual_sha256": "2c75828c065d1c6f07ba9f2002917638ba396a45c0156ab8df6103a15c47ca87",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\derive\\j2-policy-compare.py",
+      "expected_sha256": "5df53fffbc5d18b7253f98d98cad3466206a026acf6920e7555ed564389b0a83",
+      "actual_sha256": "5df53fffbc5d18b7253f98d98cad3466206a026acf6920e7555ed564389b0a83",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\hold\\HOLD-STAGE.sha256",
+      "expected_sha256": "e309956b7667d744f5dd0b1ed452c87806c83cc11d352784087baa666e28f4ca",
+      "actual_sha256": "e309956b7667d744f5dd0b1ed452c87806c83cc11d352784087baa666e28f4ca",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\hold\\closure-packages.txt",
+      "expected_sha256": "de9f6ef6a0f45258632708dbc07ad29e08c00000acaeab96c15597735e70243d",
+      "actual_sha256": "de9f6ef6a0f45258632708dbc07ad29e08c00000acaeab96c15597735e70243d",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\hold\\j2-hold-apply.sh",
+      "expected_sha256": "de40408b14ec0f24c62b34aafac74f831e92deb4b8b90241b70f614addc026b8",
+      "actual_sha256": "de40408b14ec0f24c62b34aafac74f831e92deb4b8b90241b70f614addc026b8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\hold\\j2-hold-restore.sh",
+      "expected_sha256": "dee557deda0af58daef9a430375b83edb13a5a590204f2d13d73d77ceac4c74f",
+      "actual_sha256": "dee557deda0af58daef9a430375b83edb13a5a590204f2d13d73d77ceac4c74f",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\local\\compare-suites.py",
+      "expected_sha256": "a5a3374b7e709081e39382296e8b29cbb5683b89033bccab6bdeaf3d348664f8",
+      "actual_sha256": "a5a3374b7e709081e39382296e8b29cbb5683b89033bccab6bdeaf3d348664f8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\local\\dbfree-totals.py",
+      "expected_sha256": "0d43b833ddf77adbd86368683d0166b1f8b093e23bdb6b27f0661c47a2a6fe5a",
+      "actual_sha256": "0d43b833ddf77adbd86368683d0166b1f8b093e23bdb6b27f0661c47a2a6fe5a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\local\\full-suites.sh",
+      "expected_sha256": "de00f1be6dabe3f6db784c7004af9279bcecfcd6e83aa86749585b993dfef40e",
+      "actual_sha256": "de00f1be6dabe3f6db784c7004af9279bcecfcd6e83aa86749585b993dfef40e",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\local\\i-make-pinned.py",
+      "expected_sha256": "561693f41a8f94e4f138dfcba6f49d4e24954996f1ed6140e5cb736437d8b968",
+      "actual_sha256": "561693f41a8f94e4f138dfcba6f49d4e24954996f1ed6140e5cb736437d8b968",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\local\\i-prepare-local-root.sh",
+      "expected_sha256": "e944b91e6b7a1e540746639edbd635649f9fcd7b93a28f77363a18e44d3c0497",
+      "actual_sha256": "e944b91e6b7a1e540746639edbd635649f9fcd7b93a28f77363a18e44d3c0497",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\local\\lint-changed-lines.py",
+      "expected_sha256": "95fdea1c7e51d8806ecf378039c70461154030882a4e684700e478931b42d13a",
+      "actual_sha256": "95fdea1c7e51d8806ecf378039c70461154030882a4e684700e478931b42d13a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\local\\run-local-dryrun.sh",
+      "expected_sha256": "9e42282a30fd3ceef8b082a9e9b4897070f99e93bfdb9a92447418d414836973",
+      "actual_sha256": "9e42282a30fd3ceef8b082a9e9b4897070f99e93bfdb9a92447418d414836973",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\FILE_ORIGINS.json",
+      "expected_sha256": "cda37210cffb7076bc7bb8c24b9475d9871550be18be3b0cc94125f7f81fdcc8",
+      "actual_sha256": "cda37210cffb7076bc7bb8c24b9475d9871550be18be3b0cc94125f7f81fdcc8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\J2-FINAL.sha256",
+      "expected_sha256": "9d4b4719c5efdf502fcc161b8ffd65236079d77e5b181fe27c1d518187e4493a",
+      "actual_sha256": "9d4b4719c5efdf502fcc161b8ffd65236079d77e5b181fe27c1d518187e4493a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\STAGE.sha256",
+      "expected_sha256": "734c49341b78fef0cf090885c332bf3ffc0aa95a373d21cc1e77412b731432f6",
+      "actual_sha256": "734c49341b78fef0cf090885c332bf3ffc0aa95a373d21cc1e77412b731432f6",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\closure-packages.txt",
+      "expected_sha256": "de9f6ef6a0f45258632708dbc07ad29e08c00000acaeab96c15597735e70243d",
+      "actual_sha256": "de9f6ef6a0f45258632708dbc07ad29e08c00000acaeab96c15597735e70243d",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\e12-tar-dsn-members.py",
+      "expected_sha256": "026e9507e730fa89a6dd6556c101973a6622852ddf33a70a7736698411aaa031",
+      "actual_sha256": "026e9507e730fa89a6dd6556c101973a6622852ddf33a70a7736698411aaa031",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\enforcement-sampler.py",
+      "expected_sha256": "8d07f5e2104450cb99198b3111a1dfa53adc5053254982c5a76aab59e975e05a",
+      "actual_sha256": "8d07f5e2104450cb99198b3111a1dfa53adc5053254982c5a76aab59e975e05a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\iso-ord.mjs",
+      "expected_sha256": "2e7e186f37cbc4864d0cf0856051ed8d21fa667c0046b817259dc6b9066c8e98",
+      "actual_sha256": "2e7e186f37cbc4864d0cf0856051ed8d21fa667c0046b817259dc6b9066c8e98",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\j-layout-node-modules.py",
+      "expected_sha256": "ee44935f40f68d4c0c868d1ef710a579a87fc2fa94790685bb42583bafc64c68",
+      "actual_sha256": "ee44935f40f68d4c0c868d1ef710a579a87fc2fa94790685bb42583bafc64c68",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\j2-dryrun-criteria.sh",
+      "expected_sha256": "e8ff3c89af9845788700e9a301d5c1add8960185e2409ee7df860c7a4d517084",
+      "actual_sha256": "e8ff3c89af9845788700e9a301d5c1add8960185e2409ee7df860c7a4d517084",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\j2-enforcement-control.sh",
+      "expected_sha256": "1f859fe738ddd82b901b94b2c44e4e7a9aa80439196db2f5245e790c100a7b9c",
+      "actual_sha256": "1f859fe738ddd82b901b94b2c44e4e7a9aa80439196db2f5245e790c100a7b9c",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\j2-hold-check.sh",
+      "expected_sha256": "3719870fba1b91e448eebe7d109b6758309cf28bb352f8d9077f0776e26cdac8",
+      "actual_sha256": "3719870fba1b91e448eebe7d109b6758309cf28bb352f8d9077f0776e26cdac8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\j2-layout-recheck.sh",
+      "expected_sha256": "2b957d541e0deca0f9b3f7f0ab4162b0d2dd985d9fe23d4dbe8d9305cf677322",
+      "actual_sha256": "2b957d541e0deca0f9b3f7f0ab4162b0d2dd985d9fe23d4dbe8d9305cf677322",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\j2-policy-match.sh",
+      "expected_sha256": "f80bebc33f12d68f91b560d4b9e17ce74350b0cb9f8b4bd03d9acba3b6763438",
+      "actual_sha256": "f80bebc33f12d68f91b560d4b9e17ce74350b0cb9f8b4bd03d9acba3b6763438",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\j2-runtime-pins.sh",
+      "expected_sha256": "e8ceed4f51c8c2ce56e888d0c08835bd934454ed5a3436ec5ce5cbea64f084a6",
+      "actual_sha256": "e8ceed4f51c8c2ce56e888d0c08835bd934454ed5a3436ec5ce5cbea64f084a6",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\j2.conf",
+      "expected_sha256": "091fa3df787233a3696978686aba8b488968871e894db71b6c03c5d46786d8c8",
+      "actual_sha256": "091fa3df787233a3696978686aba8b488968871e894db71b6c03c5d46786d8c8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\post-inner.sh",
+      "expected_sha256": "d8847253fdc293b43243631a7f1a69e5d4fcc21488e99854194444476bec3054",
+      "actual_sha256": "d8847253fdc293b43243631a7f1a69e5d4fcc21488e99854194444476bec3054",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\post-rebuild-checks.sql",
+      "expected_sha256": "9f714da62f9e6ee767c23c335e390d4ccfc6efac13b1fc027aaac1601f682d16",
+      "actual_sha256": "9f714da62f9e6ee767c23c335e390d4ccfc6efac13b1fc027aaac1601f682d16",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb-collect.sh",
+      "expected_sha256": "a5fe650a52b9668cb628d3aaa12d1f0ba55b22854897ef8f8f4c5e7bdc34f143",
+      "actual_sha256": "a5fe650a52b9668cb628d3aaa12d1f0ba55b22854897ef8f8f4c5e7bdc34f143",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb-post.sh",
+      "expected_sha256": "5f08215897b3c5ebfe442c7120af8d2c57248c05300ddce006875bc565fb1075",
+      "actual_sha256": "5f08215897b3c5ebfe442c7120af8d2c57248c05300ddce006875bc565fb1075",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb-shutdown.sh",
+      "expected_sha256": "41f946adc0a1256e1d587181dda08ce108c6f2614e4f553ff4181fed548ef099",
+      "actual_sha256": "41f946adc0a1256e1d587181dda08ce108c6f2614e4f553ff4181fed548ef099",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb-untouched.sh",
+      "expected_sha256": "49c605551b6675e0eb44fab5afd8ecba55733837878a460fc958b31a2a32b0ab",
+      "actual_sha256": "49c605551b6675e0eb44fab5afd8ecba55733837878a460fc958b31a2a32b0ab",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb2-after.sh",
+      "expected_sha256": "449969daf1c5afdf68228cd2856f545e65204f681f33a2a92cdb5c43e8cc286a",
+      "actual_sha256": "449969daf1c5afdf68228cd2856f545e65204f681f33a2a92cdb5c43e8cc286a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb2-bootstrap.sh",
+      "expected_sha256": "e7d13015d8050ed67035d90a88a080bdb5dbbe492c63b5d79b49ddb2aa528580",
+      "actual_sha256": "e7d13015d8050ed67035d90a88a080bdb5dbbe492c63b5d79b49ddb2aa528580",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb2-launch.sh",
+      "expected_sha256": "c9ef6897803e1f4745a6daf65cd46d256efd93d6139b66cf36f4671b105dfad2",
+      "actual_sha256": "c9ef6897803e1f4745a6daf65cd46d256efd93d6139b66cf36f4671b105dfad2",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb2-prepare.sh",
+      "expected_sha256": "73266f93a191fbdd367bb6f880df8ddf3ba97992a9bc69b585ab40aa1fdfc657",
+      "actual_sha256": "73266f93a191fbdd367bb6f880df8ddf3ba97992a9bc69b585ab40aa1fdfc657",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\rb2.conf",
+      "expected_sha256": "5bfa74acb242b91e43c39ef653964c9102fda9877661583a1f19dde2708090e6",
+      "actual_sha256": "5bfa74acb242b91e43c39ef653964c9102fda9877661583a1f19dde2708090e6",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\smoke-psycopg.py",
+      "expected_sha256": "b3b80096b48581230cb5e4bd8db39c725486aa5bf2353639c86537ec6370032a",
+      "actual_sha256": "b3b80096b48581230cb5e4bd8db39c725486aa5bf2353639c86537ec6370032a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\smoke.sql",
+      "expected_sha256": "e1f3a804180d030590e37b4beaf7df8fb88e185a173e105e206c0601b053695e",
+      "actual_sha256": "e1f3a804180d030590e37b4beaf7df8fb88e185a173e105e206c0601b053695e",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\untouched.sql",
+      "expected_sha256": "27c68cfda9697443056fbc0b7e610d9076c552e1386271a1c453ddb1c1b9a08d",
+      "actual_sha256": "27c68cfda9697443056fbc0b7e610d9076c552e1386271a1c453ddb1c1b9a08d",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\rbstage2\\watchdog.sh",
+      "expected_sha256": "16260e4d83588bf0b51a6b6bc22e5e6f348b38b92e7f81098e25583f51bd717a",
+      "actual_sha256": "16260e4d83588bf0b51a6b6bc22e5e6f348b38b92e7f81098e25583f51bd717a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-collect.sh",
+      "expected_sha256": "5a0b73138b6c2203ac5c89a72cc15c3e08095668fd944b84df23c986a5ff7ca2",
+      "actual_sha256": "5a0b73138b6c2203ac5c89a72cc15c3e08095668fd944b84df23c986a5ff7ca2",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-host-probe.sh",
+      "expected_sha256": "09b189885c67e257bd5a297941537eff40a8a35eff74e27854f680861528148d",
+      "actual_sha256": "09b189885c67e257bd5a297941537eff40a8a35eff74e27854f680861528148d",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-launch-dryrun.sh",
+      "expected_sha256": "d6bc6e0df61f9c5491da754d64fe059054adff662d2e7c0b0f5797bb05c4400d",
+      "actual_sha256": "d6bc6e0df61f9c5491da754d64fe059054adff662d2e7c0b0f5797bb05c4400d",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-pregates.sh",
+      "expected_sha256": "66ba763b84115a960000d0476c645efe58a521598a159cd678723c81d0ead900",
+      "actual_sha256": "66ba763b84115a960000d0476c645efe58a521598a159cd678723c81d0ead900",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-rb-wait.sh",
+      "expected_sha256": "f802e85eafa8e8b5048da788f3b59feaced809939ecdfcdb10a0bce256f9de4c",
+      "actual_sha256": "f802e85eafa8e8b5048da788f3b59feaced809939ecdfcdb10a0bce256f9de4c",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-rebuild-finish.sh",
+      "expected_sha256": "e57aaf3267e682b9a1123b15f5d3ac79133aba8e6e14b0bf451bee193876c8ad",
+      "actual_sha256": "e57aaf3267e682b9a1123b15f5d3ac79133aba8e6e14b0bf451bee193876c8ad",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-rebuild-start.sh",
+      "expected_sha256": "85f57820a02aeadfbabe416d1141838a4aea20fe8d2876c4c41c6ae0a9ba8bb6",
+      "actual_sha256": "85f57820a02aeadfbabe416d1141838a4aea20fe8d2876c4c41c6ae0a9ba8bb6",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-restage-local.sh",
+      "expected_sha256": "e69dc7ceaf804fb963247cb29cc176018ee7edea124f2689ef8c4c6cd78f8bf1",
+      "actual_sha256": "e69dc7ceaf804fb963247cb29cc176018ee7edea124f2689ef8c4c6cd78f8bf1",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-restage.sh",
+      "expected_sha256": "0a26b631ac7112c4665fefeac857b5ac8bf6cbe51b2b9c5064dface6d23b7051",
+      "actual_sha256": "0a26b631ac7112c4665fefeac857b5ac8bf6cbe51b2b9c5064dface6d23b7051",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-run-drive-selftest.sh",
+      "expected_sha256": "7839fc52476dfec83792b6e5b02db3e85a60475758174602cb1e571cafe5a48e",
+      "actual_sha256": "7839fc52476dfec83792b6e5b02db3e85a60475758174602cb1e571cafe5a48e",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-run-listing-selftest.sh",
+      "expected_sha256": "feb21e9d67966b34035385326c5d48db272e047a198511254d92216a78f8d79a",
+      "actual_sha256": "feb21e9d67966b34035385326c5d48db272e047a198511254d92216a78f8d79a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-run-replay.sh",
+      "expected_sha256": "5f87d6533b7de4210f32f80af0b23dbdf4467f42ef390e5b8c20d9411740be37",
+      "actual_sha256": "5f87d6533b7de4210f32f80af0b23dbdf4467f42ef390e5b8c20d9411740be37",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\fj05-wait.sh",
+      "expected_sha256": "ec361b62a4cb71e6f52facefed71a191148763e9d64ee7a9ce0b0bb58af6fdc6",
+      "actual_sha256": "ec361b62a4cb71e6f52facefed71a191148763e9d64ee7a9ce0b0bb58af6fdc6",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\j2-drive-selftest.pre-FJ04.sh",
+      "expected_sha256": "1b9d5a80e3bff5c81a364fe8914090e117cc8a3e8937e0208c645076340bda74",
+      "actual_sha256": "1b9d5a80e3bff5c81a364fe8914090e117cc8a3e8937e0208c645076340bda74",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\j2-drive-selftest.sh",
+      "expected_sha256": "bf2fa85e4cdcd8f8772dc2ce5adde56196e86912af2446e9c58e6267e66cab8b",
+      "actual_sha256": "bf2fa85e4cdcd8f8772dc2ce5adde56196e86912af2446e9c58e6267e66cab8b",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\j2-listing-replay.py",
+      "expected_sha256": "33a78058e971360e2ed854de5b51c8221d0cc8cdfa4daf20839261d0480ce1d9",
+      "actual_sha256": "33a78058e971360e2ed854de5b51c8221d0cc8cdfa4daf20839261d0480ce1d9",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\j2-listing-selftest.sh",
+      "expected_sha256": "004cd52198f03161a84b8703d49c889bc3692734bbe811b2adafdd4088caae3b",
+      "actual_sha256": "004cd52198f03161a84b8703d49c889bc3692734bbe811b2adafdd4088caae3b",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\listing-run-1.log",
+      "expected_sha256": "8addfc80728dad5cbc62696e442f3a360e4accbdc2bd311bfaf1047a3254bceb",
+      "actual_sha256": "8addfc80728dad5cbc62696e442f3a360e4accbdc2bd311bfaf1047a3254bceb",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\listing-run-2.log",
+      "expected_sha256": "1eb408418f855c7fcedc47bb056805f4a70f699dbb9f10d3b3bc3629e8aebd1f",
+      "actual_sha256": "1eb408418f855c7fcedc47bb056805f4a70f699dbb9f10d3b3bc3629e8aebd1f",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\listing-run-3-uutils.log",
+      "expected_sha256": "969c209a27465ce22ee359339a3c1c36839bab34c0ba24eba5ca393336c4f2b2",
+      "actual_sha256": "969c209a27465ce22ee359339a3c1c36839bab34c0ba24eba5ca393336c4f2b2",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\run-2.log",
+      "expected_sha256": "fbd5254f34df71786eeb4d96f3af2933d8de6f106dd8f6ece124b04024a7443c",
+      "actual_sha256": "fbd5254f34df71786eeb4d96f3af2933d8de6f106dd8f6ece124b04024a7443c",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\run-3.log",
+      "expected_sha256": "58086f7c2230bbc9fcc7cb661af0af97c80a97623b084d30243d6dd9efb47c67",
+      "actual_sha256": "58086f7c2230bbc9fcc7cb661af0af97c80a97623b084d30243d6dd9efb47c67",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\selftest\\run-4.log",
+      "expected_sha256": "5785f0d5b6faf14d1112f2bb27d50cf7003d5f078efacf3e5c55b2d348ba2c60",
+      "actual_sha256": "5785f0d5b6faf14d1112f2bb27d50cf7003d5f078efacf3e5c55b2d348ba2c60",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage-preFJ04\\STAGE.sha256",
+      "expected_sha256": "575898cc067a9fa7d468c0ae10b24174c0f5485db5a5a865dfe3d7ce0a784035",
+      "actual_sha256": "575898cc067a9fa7d468c0ae10b24174c0f5485db5a5a865dfe3d7ce0a784035",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage-preFJ04\\j2-drive.sh",
+      "expected_sha256": "9ce3c6be6e2f1c9bf84bba00cd0daf764675fc7fdebfea5aa4137feb29437745",
+      "actual_sha256": "9ce3c6be6e2f1c9bf84bba00cd0daf764675fc7fdebfea5aa4137feb29437745",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage-preFJ05\\STAGE.sha256",
+      "expected_sha256": "691c27a51ffc82da95a3059a0e372fabd444fc72245302cffcd1e93673507cda",
+      "actual_sha256": "691c27a51ffc82da95a3059a0e372fabd444fc72245302cffcd1e93673507cda",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage-preFJ05\\j2-listing.sh",
+      "expected_sha256": "337dd9bf487dc2507bda9e4ac9cb968afdc1a8f6d0c1c54376c61d74081186b3",
+      "actual_sha256": "337dd9bf487dc2507bda9e4ac9cb968afdc1a8f6d0c1c54376c61d74081186b3",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\BASE.sha256",
+      "expected_sha256": "639f5536034d21ab7942c450f9de559c6b0ac8ae2195f93eb4efa95f813de459",
+      "actual_sha256": "639f5536034d21ab7942c450f9de559c6b0ac8ae2195f93eb4efa95f813de459",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\FILE_ORIGINS.json",
+      "expected_sha256": "cda37210cffb7076bc7bb8c24b9475d9871550be18be3b0cc94125f7f81fdcc8",
+      "actual_sha256": "cda37210cffb7076bc7bb8c24b9475d9871550be18be3b0cc94125f7f81fdcc8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\STAGE.sha256",
+      "expected_sha256": "e61cca16a3b50fece4e235bfd9456536464799c8f2a1af470946f08c24e5f8a8",
+      "actual_sha256": "e61cca16a3b50fece4e235bfd9456536464799c8f2a1af470946f08c24e5f8a8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\census-afldb_dev.json",
+      "expected_sha256": "7a000b93a83e846772d512eea0c25d0234d6662ede7349aca7517a86b6c963af",
+      "actual_sha256": "7a000b93a83e846772d512eea0c25d0234d6662ede7349aca7517a86b6c963af",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\census-afldb_prod.json",
+      "expected_sha256": "18b201662caa37ed0c0169e5d8f5f5a505b34f666cf5ea30a0a63a584653ffa2",
+      "actual_sha256": "18b201662caa37ed0c0169e5d8f5f5a505b34f666cf5ea30a0a63a584653ffa2",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\census-afldb_test.json",
+      "expected_sha256": "9eb203a6e521305cd043450bab0a13b2e97337498c78625b527e76fd363fbdb1",
+      "actual_sha256": "9eb203a6e521305cd043450bab0a13b2e97337498c78625b527e76fd363fbdb1",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\closure-packages.txt",
+      "expected_sha256": "de9f6ef6a0f45258632708dbc07ad29e08c00000acaeab96c15597735e70243d",
+      "actual_sha256": "de9f6ef6a0f45258632708dbc07ad29e08c00000acaeab96c15597735e70243d",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\drafts-files.tar",
+      "expected_sha256": "255601d4a2e4d77263af72db5bd2b7b0f7aab0a01860db5e00d67c37a4825bed",
+      "actual_sha256": "255601d4a2e4d77263af72db5bd2b7b0f7aab0a01860db5e00d67c37a4825bed",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\i-run-linux-enforced.sh",
+      "expected_sha256": "27d05fcba246190cce8f465c7c24f403de5abd55a019fd158cf9d0a09b040644",
+      "actual_sha256": "27d05fcba246190cce8f465c7c24f403de5abd55a019fd158cf9d0a09b040644",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j-layout-node-modules.py",
+      "expected_sha256": "ee44935f40f68d4c0c868d1ef710a579a87fc2fa94790685bb42583bafc64c68",
+      "actual_sha256": "ee44935f40f68d4c0c868d1ef710a579a87fc2fa94790685bb42583bafc64c68",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-drive.sh",
+      "expected_sha256": "c177842d0821ddb2a18f60d61556c6664e4f0cd2781e92b98a963c5edd0b47f4",
+      "actual_sha256": "c177842d0821ddb2a18f60d61556c6664e4f0cd2781e92b98a963c5edd0b47f4",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-dryrun-criteria.sh",
+      "expected_sha256": "e8ff3c89af9845788700e9a301d5c1add8960185e2409ee7df860c7a4d517084",
+      "actual_sha256": "e8ff3c89af9845788700e9a301d5c1add8960185e2409ee7df860c7a4d517084",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-enforcement-control.sh",
+      "expected_sha256": "1f859fe738ddd82b901b94b2c44e4e7a9aa80439196db2f5245e790c100a7b9c",
+      "actual_sha256": "1f859fe738ddd82b901b94b2c44e4e7a9aa80439196db2f5245e790c100a7b9c",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-hold-check.sh",
+      "expected_sha256": "3719870fba1b91e448eebe7d109b6758309cf28bb352f8d9077f0776e26cdac8",
+      "actual_sha256": "3719870fba1b91e448eebe7d109b6758309cf28bb352f8d9077f0776e26cdac8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-layout-recheck.sh",
+      "expected_sha256": "2b957d541e0deca0f9b3f7f0ab4162b0d2dd985d9fe23d4dbe8d9305cf677322",
+      "actual_sha256": "2b957d541e0deca0f9b3f7f0ab4162b0d2dd985d9fe23d4dbe8d9305cf677322",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-listing.sh",
+      "expected_sha256": "5e0187200922744a01b82a95689fed2a716fe7e40bc642161f7a7aac2ed90c39",
+      "actual_sha256": "5e0187200922744a01b82a95689fed2a716fe7e40bc642161f7a7aac2ed90c39",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-neg-input.py",
+      "expected_sha256": "bf66be96d7b7436b9420e0dd0ef324f217cec5851c1ff2286ca38823049914c7",
+      "actual_sha256": "bf66be96d7b7436b9420e0dd0ef324f217cec5851c1ff2286ca38823049914c7",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-planner-runtime-check.sh",
+      "expected_sha256": "bc6563c039e0582db696c052f47c143d9a5cc55a3a7305aef257130e2047d51c",
+      "actual_sha256": "bc6563c039e0582db696c052f47c143d9a5cc55a3a7305aef257130e2047d51c",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-policy-match.sh",
+      "expected_sha256": "f80bebc33f12d68f91b560d4b9e17ce74350b0cb9f8b4bd03d9acba3b6763438",
+      "actual_sha256": "f80bebc33f12d68f91b560d4b9e17ce74350b0cb9f8b4bd03d9acba3b6763438",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-prepare-linux.sh",
+      "expected_sha256": "5c04dbf083150da6b8c8bd6586dc04c37f93045ab4124a2dba2842786fc9218b",
+      "actual_sha256": "5c04dbf083150da6b8c8bd6586dc04c37f93045ab4124a2dba2842786fc9218b",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2-runtime-pins.sh",
+      "expected_sha256": "e8ceed4f51c8c2ce56e888d0c08835bd934454ed5a3436ec5ce5cbea64f084a6",
+      "actual_sha256": "e8ceed4f51c8c2ce56e888d0c08835bd934454ed5a3436ec5ce5cbea64f084a6",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\j2.conf",
+      "expected_sha256": "091fa3df787233a3696978686aba8b488968871e894db71b6c03c5d46786d8c8",
+      "actual_sha256": "091fa3df787233a3696978686aba8b488968871e894db71b6c03c5d46786d8c8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\scripts\\stage\\transition-change-set.c2-2026-successor.J2-pinned.json",
+      "expected_sha256": "85b5f05af179c83fa0fcc4898263204a6d92e6ed99069cb8bb8384f2cb1886a1",
+      "actual_sha256": "85b5f05af179c83fa0fcc4898263204a6d92e6ed99069cb8bb8384f2cb1886a1",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\BULK-ON-D.sha256",
+      "expected_sha256": "4220fbc1c0e94ab710bf3642ba7736beb6663c0542c8125db23a52e1bfcd4a82",
+      "actual_sha256": "4220fbc1c0e94ab710bf3642ba7736beb6663c0542c8125db23a52e1bfcd4a82",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\F-203-commit2prime-testdiff.txt",
+      "expected_sha256": "9db53774a79802d881e9e3a5026942dd0dacce1939f3dacf61e2aaf27ac0ffc6",
+      "actual_sha256": "9db53774a79802d881e9e3a5026942dd0dacce1939f3dacf61e2aaf27ac0ffc6",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\FJ05-host-probe\\probe-1\\listing.log",
+      "expected_sha256": "3d55d7e9940e09904f5506261aa363215aee6207520d4f5099d0f9bfd1792afd",
+      "actual_sha256": "3d55d7e9940e09904f5506261aa363215aee6207520d4f5099d0f9bfd1792afd",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\FJ05-host-probe\\probe-1\\native-ls",
+      "expected_sha256": "35759b07b952b212e589995edc9c7993e77075e1c4ad47d717ccd68a51bd43c5",
+      "actual_sha256": "35759b07b952b212e589995edc9c7993e77075e1c4ad47d717ccd68a51bd43c5",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\FJ05-host-probe\\probe-1\\v4-ls",
+      "expected_sha256": "c792ad0d51031c79d84e44d3f34de651f9508ea40ebffdac9c386122bbb18b93",
+      "actual_sha256": "c792ad0d51031c79d84e44d3f34de651f9508ea40ebffdac9c386122bbb18b93",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\FJ05-host-probe\\probe-2\\listing.log",
+      "expected_sha256": "3d55d7e9940e09904f5506261aa363215aee6207520d4f5099d0f9bfd1792afd",
+      "actual_sha256": "3d55d7e9940e09904f5506261aa363215aee6207520d4f5099d0f9bfd1792afd",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\FJ05-host-probe\\probe-2\\native-ls",
+      "expected_sha256": "35759b07b952b212e589995edc9c7993e77075e1c4ad47d717ccd68a51bd43c5",
+      "actual_sha256": "35759b07b952b212e589995edc9c7993e77075e1c4ad47d717ccd68a51bd43c5",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\FJ05-host-probe\\probe-2\\v4-ls",
+      "expected_sha256": "c792ad0d51031c79d84e44d3f34de651f9508ea40ebffdac9c386122bbb18b93",
+      "actual_sha256": "c792ad0d51031c79d84e44d3f34de651f9508ea40ebffdac9c386122bbb18b93",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\FJ05-host-probe\\probe-console.txt",
+      "expected_sha256": "2a16009f6d132b481fc4955dabda7c486dde46bbbc188d0bc685097dc7869378",
+      "actual_sha256": "2a16009f6d132b481fc4955dabda7c486dde46bbbc188d0bc685097dc7869378",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\FJ05-replay.log",
+      "expected_sha256": "50ed82d14ae28a579fa4eafc013016aaf30f02c22bd47f499c175e0a72c9c4cf",
+      "actual_sha256": "50ed82d14ae28a579fa4eafc013016aaf30f02c22bd47f499c175e0a72c9c4cf",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\compare-selftest-2\\log-pol-bad-rec-ok.txt",
+      "expected_sha256": "9d03673869dc6510f9ad9271edaf40bd04fa2c7561aa1c316b19b434988a96bb",
+      "actual_sha256": "9d03673869dc6510f9ad9271edaf40bd04fa2c7561aa1c316b19b434988a96bb",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\compare-selftest-2\\log-pol-nolibz-rec-ok.txt",
+      "expected_sha256": "544989379e99a725270c671e9f13d8eb86dc50bb20498a5aa02338137a92b9a0",
+      "actual_sha256": "544989379e99a725270c671e9f13d8eb86dc50bb20498a5aa02338137a92b9a0",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\compare-selftest-2\\log-pol-ok-rec-bad.txt",
+      "expected_sha256": "aec804f1ba7afe83d9ae0c8e66936331b133826a4a510f8d96487752f1923b4f",
+      "actual_sha256": "aec804f1ba7afe83d9ae0c8e66936331b133826a4a510f8d96487752f1923b4f",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\compare-selftest-2\\log-pol-ok-rec-ok.txt",
+      "expected_sha256": "b0ece8d4bcfa4df429680be18a635968335fcb190877985306fc15425b584f80",
+      "actual_sha256": "b0ece8d4bcfa4df429680be18a635968335fcb190877985306fc15425b584f80",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\compare-selftest-2\\summary.txt",
+      "expected_sha256": "45d9214368a673117a5d3cfc0574997de41fb25950dd18dc2aa64b70a5e71699",
+      "actual_sha256": "45d9214368a673117a5d3cfc0574997de41fb25950dd18dc2aa64b70a5e71699",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\dryrun-1-J2-unpinned.log",
+      "expected_sha256": "d80b4a1ad781372a378a32413c43efd74d3d7b372b9a0e8600968f35b0a15020",
+      "actual_sha256": "d80b4a1ad781372a378a32413c43efd74d3d7b372b9a0e8600968f35b0a15020",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\dryrun-2-J2-pinned.log",
+      "expected_sha256": "4ca87f3680bd96a6a70d2026747007a5ab51b9ba917d1c583f2569aa29a1f45f",
+      "actual_sha256": "4ca87f3680bd96a6a70d2026747007a5ab51b9ba917d1c583f2569aa29a1f45f",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\full-pred.status",
+      "expected_sha256": "6d02885b0b4d574ccd667a416c8ec65d3303efd28990190c4117e8bc8f338975",
+      "actual_sha256": "6d02885b0b4d574ccd667a416c8ec65d3303efd28990190c4117e8bc8f338975",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\full-pred.totals.txt",
+      "expected_sha256": "d152503bd782aeceb5a62c9aa7c17ce7c918013a509bdb07beed96543c93f715",
+      "actual_sha256": "d152503bd782aeceb5a62c9aa7c17ce7c918013a509bdb07beed96543c93f715",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\full-pred.vitest.log",
+      "expected_sha256": "e412f7258128b98949130f69dc228b3b6a501fbff2a70d0117410f9b5584a3b8",
+      "actual_sha256": "e412f7258128b98949130f69dc228b3b6a501fbff2a70d0117410f9b5584a3b8",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\full-tree.status",
+      "expected_sha256": "92357e149bb8045e159233f0dc4d07e7b7928b070d461b820377dc4236873bd0",
+      "actual_sha256": "92357e149bb8045e159233f0dc4d07e7b7928b070d461b820377dc4236873bd0",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\full-tree.totals.txt",
+      "expected_sha256": "3e979bf493b2f6228735cece155c5c098c6c14fafaa0ca339003d0b341bc9e08",
+      "actual_sha256": "3e979bf493b2f6228735cece155c5c098c6c14fafaa0ca339003d0b341bc9e08",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\full-tree.vitest.log",
+      "expected_sha256": "21b88dbe047fcb92a653bd8e041d5ae583c2b87ef793aa73ca4f69f8fef5390c",
+      "actual_sha256": "21b88dbe047fcb92a653bd8e041d5ae583c2b87ef793aa73ca4f69f8fef5390c",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\impl.diff-u0.txt",
+      "expected_sha256": "5b068b541f020de6debb17dab10af2fe6e15f64dff1efa34e2151fd2ba6ade84",
+      "actual_sha256": "5b068b541f020de6debb17dab10af2fe6e15f64dff1efa34e2151fd2ba6ade84",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\impl.lint-changed-lines.txt",
+      "expected_sha256": "f77d9960d6c1684fee28953a7c0129f92b1aa3f9cbfc4387d15dda624f208f82",
+      "actual_sha256": "f77d9960d6c1684fee28953a7c0129f92b1aa3f9cbfc4387d15dda624f208f82",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\j-2prime-testdiff.txt",
+      "expected_sha256": "424826676f04fdbc978debe50a0386256920b09583cf748de6a55e3c1b591927",
+      "actual_sha256": "424826676f04fdbc978debe50a0386256920b09583cf748de6a55e3c1b591927",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\j2-2prime-testdiff.txt",
+      "expected_sha256": "4bdcb04032e139734e19de9be6a70c45cdbca5731125d3be6678f65359f93623",
+      "actual_sha256": "4bdcb04032e139734e19de9be6a70c45cdbca5731125d3be6678f65359f93623",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\make-j2-pinned.log",
+      "expected_sha256": "90aa2f38683c605dab73d9c7abefb95a8881cb47a62f48bccfcf8914b640acaa",
+      "actual_sha256": "90aa2f38683c605dab73d9c7abefb95a8881cb47a62f48bccfcf8914b640acaa",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\post-transition.lint-changed-lines.txt",
+      "expected_sha256": "b58cc0dd1d3cf456ac5877112e3920a0acd0085b1c30455e1cc7c7a4d79e103a",
+      "actual_sha256": "b58cc0dd1d3cf456ac5877112e3920a0acd0085b1c30455e1cc7c7a4d79e103a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\prepare-1.log",
+      "expected_sha256": "c34f2bf6db8c9a126ef779d80be102de2db6c7242aa0a679ff7a2cb63fd30c97",
+      "actual_sha256": "c34f2bf6db8c9a126ef779d80be102de2db6c7242aa0a679ff7a2cb63fd30c97",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\prepare-2.log",
+      "expected_sha256": "f646cb4386d087e49a9ee28eafd7e6a0b2c036a71d2777ec57761740b68f8c8a",
+      "actual_sha256": "f646cb4386d087e49a9ee28eafd7e6a0b2c036a71d2777ec57761740b68f8c8a",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\regress-old-code-FJ01.log",
+      "expected_sha256": "7583dbfb4ae8017d2dec570d0a9e1a6a07eb1d6a6891bb539ea6f3717663caf4",
+      "actual_sha256": "7583dbfb4ae8017d2dec570d0a9e1a6a07eb1d6a6891bb539ea6f3717663caf4",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\tsc-pred.log",
+      "expected_sha256": "0a4d91c85925293ce778dbecb5c1916c778da767232cf7fa34a4b42d013d1821",
+      "actual_sha256": "0a4d91c85925293ce778dbecb5c1916c778da767232cf7fa34a4b42d013d1821",
+      "status": "PASS"
+    },
+    {
+      "path": "C:\\tmp\\afldb-c2-SUCCESSOR-PROPOSAL-J2-20261023T2346Z\\validation\\tsc-tree.log",
+      "expected_sha256": "dc92ec5082e1f96f3aa53c02a12b94e7b40e47764936ca643520e751986ccb40",
+      "actual_sha256": "dc92ec5082e1f96f3aa53c02a12b94e7b40e47764936ca643520e751986ccb40",
+      "status": "PASS"
+    }
+  ],
+  "external_material_modified": false
+}

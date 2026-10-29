@@ -63,7 +63,8 @@ export type Capability =
   | 'operations.dbHealth'
   | 'operations.appHealth'
   | 'operations.nlTelemetry'
-  | 'operations.audit.read';
+  | 'operations.audit.read'
+  | 'operations.centre.read';
 
 const ALL_STAFF: readonly CapabilityRole[] = ['contributor', 'admin', 'super_admin'];
 const ADMIN_AND_UP: readonly CapabilityRole[] = ['admin', 'super_admin'];
@@ -187,6 +188,14 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // own Brownlow drafts land in data_edits, so a full-scope read here
   // widens no boundary that exists today. The viewer has no write path.
   'operations.audit.read': ADMIN_AND_UP,
+  // The AFLDB V2 operations centre (Stage 5, plan D9, ADR 0009): READ-ONLY views of data health,
+  // sealed seasons, acquisition-run status and the shortcuts to the inspection tools. It reads
+  // nothing an Admin cannot already see (the coverage registry is a committed document, the run
+  // status is the same table /admin/current-season shows, and operations.audit.read already gives
+  // an Admin the full audit trail), so it is open to any Admin. It carries NO mutation: each
+  // operation lives behind its own existing capability (data.awards.edit for curated awards and
+  // the Coleman publication) and is shown, with its consequences, only to a viewer who holds it.
+  'operations.centre.read': ADMIN_AND_UP,
 };
 
 export function hasCapability(viewer: CapabilityViewer, capability: Capability): boolean {

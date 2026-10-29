@@ -1,0 +1,94 @@
+== attempt 2 start 2026-10-28T20:52:19Z
+attempt2.sh: OK
+inventory-compare2.mjs: OK
+schema-sections2.mjs: OK
+{
+ "counts": {
+  "s2ManifestFiles": 3722,
+  "verifiedManifestFiles": 2939,
+  "additions": 783,
+  "additionsWithSpaces": 5,
+  "missingFromS2": 0,
+  "changedVsVerified": 0,
+  "recordedDiffLines": 783,
+  "inventoryEntries": 785,
+  "tarMembers": 785,
+  "additionsMatchedToInventoryPathAndHash": 783,
+  "additionsHashMismatch": 0,
+  "additionsNotInInventory": 0,
+  "additionsChangedSinceS2": 0,
+  "additionsOnShadowPaths": 0,
+  "inventoryEntriesNotAmongAdditions": 2
+ },
+ "recordedDiffReproduced": true,
+ "tarEqualsInventory": true,
+ "explained": true,
+ "inventoryNotAdded": [
+  {
+   "path": "data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv",
+   "inVerifiedManifest": true,
+   "verifiedHashEqualsInventory": true,
+   "s2HashEqualsInventory": true
+  },
+  {
+   "path": "data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv",
+   "inVerifiedManifest": true,
+   "verifiedHashEqualsInventory": true,
+   "s2HashEqualsInventory": true
+  }
+ ]
+}
+EXIT inventory-compare.attempt2 = 0
+{
+ "sections": {
+  "archive": 1388,
+  "before": 1196,
+  "post": 1475
+ },
+ "A_restoreFidelity": {
+  "equal": 1194,
+  "onlyInArchive": 0,
+  "onlyInRestored": 0,
+  "changed": 0
+ },
+ "B_migration": {
+  "unchanged": 1193,
+  "removed": 0,
+  "changed": 1,
+  "added": 71,
+  "addedByType": {
+   "FUNCTION": 1,
+   "TABLE": 6,
+   "COMMENT": 20,
+   "SEQUENCE": 5,
+   "CONSTRAINT": 9,
+   "INDEX": 19,
+   "TRIGGER": 1,
+   "FK CONSTRAINT": 10
+  },
+  "migrationSupported": 72,
+  "unclassified": 0
+ },
+ "C_acl": {
+  "beforeAclSections": 1,
+  "archiveAclSections": 193,
+  "postAclSections": 209,
+  "preexistingEqualToArchive": 193,
+  "preexistingDiffersFromArchive": 0,
+  "preexistingAbsentFromArchive": 0,
+  "archiveOnly": 0,
+  "newObjectAclSections": 16,
+  "newObjectGrantLines": 21,
+  "newObjectGrantLinesNotInPinnedMigrations": 0
+ },
+ "newTablesFromPinnedMigrations": {
+  "public.award_proposals": "111_curated_award_proposals.sql",
+  "public.award_proposal_decisions": "111_curated_award_proposals.sql",
+  "public.derived_award_results": "112_derived_award_results.sql",
+  "public.brownlow_eligibility_decisions": "113_brownlow_eligibility_decisions.sql",
+  "public.derived_award_projections": "114_award_projections_and_curated_revisions.sql",
+  "public.brownlow_correction_receipts": "116_brownlow_correction_receipts.sql"
+ }
+}
+EXIT schema-sections.attempt2 = 0
+== attempt 2 done 2026-10-28T20:52:20Z

@@ -1,0 +1,9 @@
+{
+  "source_commit": "def676517da3955aa18db3606785463aac464188",
+  "source_tree": "01853e312132eaedacbc0e6571a384a936efd7ee",
+  "method": "git archive raw committed bytes; dependency junction to existing installation; no .env copied",
+  "source_root": ".local-release/issue316-dp-20261025/source-P",
+  "database": "DB-free only; integration suites excluded; database/libpq variables scrubbed in child",
+  "original_validation_source_root": "issues\\open\\AFLDB-ISSUE-316-dp-proposal-20261025\\source-P",
+  "relocation_reason": "Keep generated validation copy under existing tsconfig exclusion .local-release; no product/tsconfig change"
+}

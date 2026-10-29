@@ -1,0 +1,27 @@
+{
+  "node": {
+    "path": "C:/Program Files/nodejs/node.exe",
+    "sha256": "47cd67453da180a39cdf5daedb89862667b8e627e60c116607874633450cd30d"
+  },
+  "ssh": {
+    "path": "C:/WINDOWS/System32/OpenSSH/ssh.exe",
+    "sha256": "98d447730047f5df91373e852d057928a921c3d1e89938700ab656ba84b19dc8"
+  },
+  "remote_trusted_system_paths": [
+    "/bin/bash",
+    "/usr/bin/hostname",
+    "/usr/bin/id",
+    "/usr/bin/awk",
+    "/usr/bin/sed",
+    "/usr/bin/grep",
+    "/usr/bin/stat",
+    "/usr/bin/sort",
+    "/usr/bin/tr",
+    "/usr/bin/tail",
+    "/usr/bin/ps",
+    "/usr/bin/systemctl",
+    "/usr/bin/psql"
+  ],
+  "remote_credential": "Existing AFLDB_PROD_DATABASE_URL in /home/arm/projects/afldb/.env (mode 600, owner arm), read on the host by transport.sh into PGPASSWORD only. Never transferred, printed, hashed or retained by this package.",
+  "boundary": "Remote installed system binaries and PostgreSQL are trusted platform, not supplied package artifacts. No remote runtime was replaced or hashed during local construction. No sudo is used anywhere in v5."
+}

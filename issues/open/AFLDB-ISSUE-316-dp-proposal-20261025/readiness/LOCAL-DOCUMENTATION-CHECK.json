@@ -1,0 +1,28 @@
+{
+  "verified_at_utc": "2026-10-25T07:59:07.031Z",
+  "D": "2026-10-27",
+  "P": "def676517da3955aa18db3606785463aac464188",
+  "local_HEAD_before_documentation_commit": "def676517da3955aa18db3606785463aac464188",
+  "documentation_HEAD_does_not_become_P": true,
+  "approved_artifacts_unchanged": 26,
+  "accepted_source_test_structural_hashes_unchanged": 1574,
+  "reviewed_preview_map_hashes_unchanged": 4,
+  "product_or_accepted_test_changes_from_P": [],
+  "fresh_proof": "NOT RUN; await approved day-D window",
+  "production": "NO-GO",
+  "authorised_commit_scope": [
+    "CHANGELOG.md",
+    "IssuesIndex.md",
+    "issues.md",
+    "blockers.md",
+    "docs/v2/issue316-production-readiness-decision-2026-10-24.md",
+    "issues/open/AFLDB-ISSUE-316.md",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/CURRENT-VERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/FINAL-REVERIFICATION.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/LOCAL-GATE.md",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/SESSION-CHANGES.json",
+    "issues/open/AFLDB-ISSUE-316-activation-separation-20261025/STRUCTURAL-CLOSURE.json"
+  ],
+  "unrelated_codex_directory": "excluded / untouched",
+  "push": false
+}

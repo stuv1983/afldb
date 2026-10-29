@@ -1,0 +1,91 @@
+{
+  "generated": "2026-10-20",
+  "baseHEAD": "ed4c429c",
+  "decision": "D-GAP029-21",
+  "provenance": "docs/v2/owner-instruction-2026-10-20.md",
+  "database": "afldb_v2_gap029_test",
+  "port": 55433,
+  "diagnostic": false,
+  "command": "AFLDB_V2_PG_ROOT=D:/tmp/afldb-v2-pg16 AFLDB_V2_PG_PORT=55433 AFLDB_GRIDLEY_REPORT=.local-release/gap-029-adjudicated-corpus.json node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts run afldb_v2_gap029_test -- node node_modules/vitest/vitest.mjs run tests/gridley-compat.test.ts tests/integration/gridley-corpus.test.ts --reporter=json --outputFile=.local-release/gap-029-adjudicated-tests.json",
+  "totals": {
+    "tests": 1269,
+    "passed": 1266,
+    "failed": 3,
+    "skipped": 0
+  },
+  "files": [
+    {
+      "file": "gridley-compat.test.ts",
+      "passed": 59,
+      "failed": []
+    },
+    {
+      "file": "integration/gridley-corpus.test.ts",
+      "passed": 1207,
+      "failed": [
+        "Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode",
+        "Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells",
+        "Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode"
+      ]
+    }
+  ],
+  "strictFindings": 149,
+  "approvedDeferrals": 78,
+  "approvedDisagreements": 21,
+  "approvedTotal": 99,
+  "approvedDataMatches": 0,
+  "unapproved": 50,
+  "strictParityPassed": false,
+  "approvedPolicyConformancePassed": false,
+  "unexpectedFailures": 0,
+  "findingsComparison": "149 unchanged after removing structured sibling evidence and approval-neutral detail prefix; prior raw strict evidence untouched",
+  "membershipComparison": "149/149 residual membership records exactly unchanged from committed strict-before evidence",
+  "solverCellsOverFourSeconds": 0,
+  "typecheck": {
+    "command": "npm.cmd run typecheck",
+    "exitCode": 0
+  },
+  "changedFileLint": {
+    "command": "node tools/v2/lint-changes.mjs ed4c429c .local-release/gap-029-acceptance-lint.json",
+    "files": 4,
+    "errors": 0,
+    "warnings": 0,
+    "newFindings": 0
+  },
+  "credentialRotation": {
+    "ownershipGuardBeforeAuthentication": true,
+    "verifiedDatabase": "afldb_v2_gap029_test",
+    "cluster": "afldb_v2_isolated",
+    "address": "127.0.0.1",
+    "port": 55433,
+    "command": "node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts rotate-credentials (explicit root and port 55433)",
+    "credentialsRotated": 6,
+    "newLoginsPassed": 6,
+    "oldLoginsRejected28P01": 6,
+    "localSecretStorageUpdated": true,
+    "secretsDisplayed": false,
+    "connectedThrough55432": false,
+    "sharedCredentialsChanged": false,
+    "sshChanged": false,
+    "remoteLogsRead": false,
+    "incidentUncertainty": "Shared-development endpoint contact supported; successful login, SQL execution and remote cluster identity not established",
+    "sandboxFirstAttempt": "Node userInfo failed before launcher/authentication; authorized escalated retry succeeded"
+  },
+  "rawStrictEvidence": "gap-029-acceptance-strict.json",
+  "rawTestsSha256": "f9dd13680dbc71981aa1b290d98dcb5398726ffc6afa2bb1770b44dd050d1e9f",
+  "fullWorkflowRerun": false,
+  "historicalRebuildRerun": false,
+  "screenshotsRecaptured": false,
+  "rollbackRehearsalRerun": false,
+  "releasePolicyChanged": false,
+  "productionAccess": false,
+  "pushedOrDeployed": false,
+  "credentialLeakCheck": {
+    "files": 19,
+    "credentialsChecked": 6,
+    "leaks": 0,
+    "secretValuesDisplayed": false,
+    "unrelatedCodexStateRead": false
+  },
+  "implementationCommit": "5cea94e3"
+}

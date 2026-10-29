@@ -35,6 +35,7 @@
  * @see src/db/migrations/050_nl_search_fk_indexes.sql
  */
 import './guard';
+import postgres from 'postgres';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -110,14 +111,16 @@ type ForeignKey = {
   covered: boolean;
 };
 
-async function foreignKeys(): Promise<ForeignKey[]> {
-  return sql<ForeignKey[]>`
+async function foreignKeys(connection: postgres.Sql | postgres.TransactionSql = sql): Promise<ForeignKey[]> {
+  return connection<ForeignKey[]>`
     WITH fk AS (
       SELECT con.oid AS conoid,
              rel.relname AS child,
              ref.relname AS parent,
              con.conrelid,
-             con.conkey
+             con.conkey,
+             con.confrelid,
+             con.confkey
         FROM pg_constraint con
         JOIN pg_class rel   ON rel.oid = con.conrelid
         JOIN pg_class ref   ON ref.oid = con.confrelid
@@ -146,7 +149,8 @@ async function foreignKeys(): Promise<ForeignKey[]> {
               WHERE i.indrelid = f.conrelid
                 AND i.indisvalid AND i.indislive
                 -- Key columns only: an INCLUDE payload is not searchable.
-                AND i.indnkeyatts >= cardinality(f.conkey)
+                AND (
+                  (i.indnkeyatts >= cardinality(f.conkey)
                 -- The FK columns are the leading key columns, in any order:
                 -- the probe is equality on every one of them, so order
                 -- between them does not matter. indkey is an int2vector,
@@ -154,9 +158,26 @@ async function foreignKeys(): Promise<ForeignKey[]> {
                 AND (SELECT array_agg(k ORDER BY k)
                        FROM unnest((string_to_array(i.indkey::text, ' ')::smallint[])
                                    [1:cardinality(f.conkey)]) k)
-                  = (SELECT array_agg(k ORDER BY k) FROM unnest(f.conkey) k)
+                  = (SELECT array_agg(k ORDER BY k) FROM unnest(f.conkey) k))
+                  -- A leading FK column that references a globally UNIQUE parent
+                  -- column determines the entire parent tuple. An index on that
+                  -- determinant serves the complete FK probe too (e.g. result_id
+                  -- determines award_slug and season). This is not an arbitrary
+                  -- non-unique prefix exemption.
+                  OR EXISTS (
+                    SELECT 1 FROM unnest(f.conkey) WITH ORDINALITY AS k(attnum, ord)
+                    JOIN pg_index parent_index ON parent_index.indrelid = f.confrelid
+                     AND parent_index.indisunique AND parent_index.indisvalid AND parent_index.indislive
+                     AND parent_index.indpred IS NULL AND parent_index.indnkeyatts = 1
+                     AND parent_index.indkey[0] = f.confkey[k.ord::int]
+                    WHERE i.indkey[0] = k.attnum
+                  )
+                )
                 AND (i.indpred IS NULL
-                     OR pg_get_expr(i.indpred, i.indrelid) = fc.notnull_pred)
+                     OR pg_get_expr(i.indpred, i.indrelid) = fc.notnull_pred
+                     OR pg_get_expr(i.indpred, i.indrelid) =
+                       (SELECT '(' || a.attname || ' IS NOT NULL)' FROM pg_attribute a
+                         WHERE a.attrelid = f.conrelid AND a.attnum = i.indkey[0]))
            ) AS covered
       FROM fk f
       JOIN fkcols fc ON fc.conoid = f.conoid
@@ -165,6 +186,27 @@ async function foreignKeys(): Promise<ForeignKey[]> {
 }
 
 describe('foreign-key index coverage', () => {
+  it('accepts a unique parent determinant but rejects a non-unique prefix and an unrelated partial predicate', async () => {
+    const owner = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1 });
+    const rollback = new Error('rollback catalogue-only fixtures');
+    try {
+      await owner.begin(async (tx) => {
+        await tx`CREATE TABLE v2_fk_probe_parent(id int PRIMARY KEY, a int, b int, UNIQUE(id,a,b), UNIQUE(a,b))`;
+        await tx`CREATE TABLE v2_fk_probe_good(parent_id int, a int, b int, FOREIGN KEY(parent_id,a,b) REFERENCES v2_fk_probe_parent(id,a,b))`;
+        await tx`CREATE INDEX v2_fk_probe_good_idx ON v2_fk_probe_good(parent_id)`;
+        await tx`CREATE TABLE v2_fk_probe_bad(a int,b int,FOREIGN KEY(a,b) REFERENCES v2_fk_probe_parent(a,b))`;
+        await tx`CREATE INDEX v2_fk_probe_bad_idx ON v2_fk_probe_bad(a)`;
+        await tx`CREATE TABLE v2_fk_probe_partial(parent_id int,a int,b int,FOREIGN KEY(parent_id,a,b) REFERENCES v2_fk_probe_parent(id,a,b))`;
+        await tx`CREATE INDEX v2_fk_probe_partial_idx ON v2_fk_probe_partial(parent_id) WHERE parent_id>0`;
+        const rows = await foreignKeys(tx);
+        expect(rows.find((r) => r.child === 'v2_fk_probe_good')?.covered).toBe(true);
+        expect(rows.find((r) => r.child === 'v2_fk_probe_bad')?.covered).toBe(false);
+        expect(rows.find((r) => r.child === 'v2_fk_probe_partial')?.covered).toBe(false);
+        throw rollback;
+      });
+    } catch (error) { if (error !== rollback) throw error; }
+    finally { await owner.end({ timeout: 5 }); }
+  });
   it('indexes every foreign key whose parent can be deleted from', async () => {
     const fks = await foreignKeys();
 

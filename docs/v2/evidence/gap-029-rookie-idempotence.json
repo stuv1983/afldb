@@ -1,0 +1,80 @@
+{
+  "database": "afldb_v2_gap029_test",
+  "apply": true,
+  "records": [
+    {
+      "profile": "players/A/Adam_Schneider.html",
+      "eventYear": 2014,
+      "club": "St Kilda",
+      "pick": 54,
+      "evidenceStrength": "primary",
+      "action": "already present",
+      "pickId": 6942
+    },
+    {
+      "profile": "players/L/Lachie_Henderson.html",
+      "eventYear": 2019,
+      "club": "Geelong",
+      "pick": 35,
+      "evidenceStrength": "primary",
+      "action": "already present",
+      "pickId": 6943
+    },
+    {
+      "profile": "players/P/Phil_Davis.html",
+      "eventYear": 2022,
+      "club": "Greater Western Sydney",
+      "pick": 3,
+      "evidenceStrength": "primary",
+      "action": "already present",
+      "pickId": 6944
+    },
+    {
+      "profile": "players/S/Sam_Reid2.html",
+      "eventYear": 2023,
+      "club": "Sydney",
+      "pick": 11,
+      "evidenceStrength": "primary",
+      "action": "already present",
+      "pickId": 6945
+    },
+    {
+      "profile": "players/L/Lewis_Taylor.html",
+      "eventYear": 2021,
+      "club": "Sydney",
+      "pick": 10,
+      "evidenceStrength": "primary",
+      "action": "already present",
+      "pickId": 6946
+    },
+    {
+      "profile": "players/P/Paul_Seedsman.html",
+      "eventYear": 2022,
+      "club": "Adelaide",
+      "pick": 21,
+      "evidenceStrength": "primary",
+      "action": "already present",
+      "pickId": 6947
+    },
+    {
+      "profile": "players/M/Michael_Rischitelli.html",
+      "eventYear": 2018,
+      "club": "Gold Coast",
+      "pick": 2,
+      "evidenceStrength": "secondary",
+      "action": "already present",
+      "pickId": 6948
+    },
+    {
+      "profile": "players/B/Bryce_Gibbs.html",
+      "eventYear": 2020,
+      "club": "Adelaide",
+      "pick": 1,
+      "evidenceStrength": "secondary",
+      "action": "already present",
+      "pickId": 6949
+    }
+  ],
+  "source": "data/players/rookie-relisting-outcomes.csv",
+  "sourceSha256": "c24ea37cce6eb4852ec7d04ab30f82c3be354a942ba3957e4994c2137a5a4b65"
+}

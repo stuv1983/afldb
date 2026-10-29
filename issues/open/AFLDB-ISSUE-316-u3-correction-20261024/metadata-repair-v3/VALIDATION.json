@@ -1,0 +1,72 @@
+{
+  "engine": "@electric-sql/pglite 0.2.17; in-memory disposable PostgreSQL",
+  "scope": "Exact SQL includes except identity.sql, independently proven to refuse this fixture. Protected non-target relation shapes are synthetic. No production guard was changed. Transport/live production schema not tested.",
+  "completed_utc": "2026-10-24T12:59:53.621Z",
+  "passed": 16,
+  "results": [
+    {
+      "name": "production identity refuses disposable database",
+      "status": "PASS"
+    },
+    {
+      "name": "happy path: exact NULL-to-note plus one audit; protected data equal; read-only postcheck",
+      "status": "PASS"
+    },
+    {
+      "name": "non-NULL note refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "wrong full record identity refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "missing row refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "linked-audit insert PK failure rolls note update back",
+      "status": "PASS"
+    },
+    {
+      "name": "wrong actor binding refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "wrong approval hash refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "second execution refuses rather than another audit",
+      "status": "PASS"
+    },
+    {
+      "name": "authority drift refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "newline input refuses without normalization",
+      "status": "PASS"
+    },
+    {
+      "name": "preflight-to-repair canonical drift refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "postcheck detects Brownlow changes",
+      "status": "PASS"
+    },
+    {
+      "name": "postcheck detects additional audit row",
+      "status": "PASS"
+    },
+    {
+      "name": "wrong canonical count refuses before write",
+      "status": "PASS"
+    },
+    {
+      "name": "unexpected audit trigger refuses",
+      "status": "PASS"
+    }
+  ]
+}

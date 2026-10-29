@@ -1,0 +1,111 @@
+{
+  "check": "issue316-dev-stale-action",
+  "generatedAt": "2026-10-20T22:25:50.969Z",
+  "buildId": "WkKKyr7KAoFmMb5QyM4MQ",
+  "actionId": "0058d07345f6bb8d2f9a99cf05d7676825c1eed612",
+  "base": "http://127.0.0.1:3201",
+  "database": "afldb_v2_dev_candidate_build_test",
+  "phases": [
+    {
+      "name": "N1 anonymous",
+      "http": {
+        "status": 307,
+        "contentType": null,
+        "location": "/admin/login",
+        "actionRedirect": null,
+        "bodyBytes": 12,
+        "mentionsLegacyRetired": false
+      },
+      "refusal": null,
+      "auditDelta": 0,
+      "refusedRowsDelta": 0
+    },
+    {
+      "name": "N2 synthetic admin",
+      "http": {
+        "status": 200,
+        "contentType": "text/x-component",
+        "location": null,
+        "actionRedirect": "/admin;push",
+        "bodyBytes": 17059,
+        "mentionsLegacyRetired": false
+      },
+      "refusal": null,
+      "auditDelta": 0,
+      "refusedRowsDelta": 0
+    },
+    {
+      "name": "P1 synthetic super_admin",
+      "http": {
+        "status": 200,
+        "contentType": "text/x-component",
+        "location": null,
+        "actionRedirect": null,
+        "bodyBytes": 557,
+        "mentionsLegacyRetired": true
+      },
+      "refusal": {
+        "refused": true,
+        "code": "legacy_retired",
+        "surface": "admin.afltables_settle_trigger",
+        "error": "This control has been retired: it started the AFL Tables settle systemd unit on demand. Why: the AFL Tables settle is retired in V2: a V2 checkout refuses it, and the release is refused while the nightly timer can still run (cutover runbook step 4a; AFLDB-ISSUE-316 C5). V2 itself never starts or stops the timer. Use instead: the AFL API settle units, shown read-only on /admin/current-season."
+      },
+      "auditDelta": 1,
+      "refusedRowsDelta": 1,
+      "newAuditRows": [
+        {
+          "id": 278,
+          "at": "2026-10-20T22:25:54.239Z",
+          "actor_user_id": 7,
+          "actor_label": "issue316-superadmin-check@example.invalid",
+          "action": "admin.legacy_retired_refused",
+          "detail": {
+            "export": "startSettleRunAction",
+            "surface": "admin.afltables_settle_trigger"
+          },
+          "ip": "127.0.0.1/32"
+        }
+      ]
+    }
+  ],
+  "before": {
+    "audit_total": 198,
+    "audit_max_id": 276,
+    "refused_rows": 0,
+    "users": 4,
+    "sessions": 2,
+    "ledger": 117,
+    "import_batches": 56,
+    "matches": 17056
+  },
+  "synthetic": {
+    "superAdminId": 7,
+    "adminId": 8
+  },
+  "afterSetup": {
+    "audit_total": 198,
+    "audit_max_id": 276,
+    "refused_rows": 0,
+    "users": 6,
+    "sessions": 4,
+    "ledger": 117,
+    "import_batches": 56,
+    "matches": 17056
+  },
+  "after": {
+    "audit_total": 199,
+    "audit_max_id": 278,
+    "refused_rows": 1,
+    "users": 6,
+    "sessions": 4,
+    "ledger": 117,
+    "import_batches": 56,
+    "matches": 17056
+  },
+  "cleanup": {
+    "sessionsRevoked": 2,
+    "usersDisabled": 2
+  },
+  "verdict": "PASS",
+  "failures": []
+}

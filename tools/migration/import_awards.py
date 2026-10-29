@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -2595,12 +2596,41 @@ def load_person_links(lite) -> dict[int, tuple]:
     }
 
 
+def require_offline_coleman_target(pg, args) -> None:
+    """The historical bootstrap must never compete with the canonical V2 publisher."""
+    if not args.offline_historical:
+        raise RuntimeError("Coleman bootstrap is offline-only: use legacy/offline/coleman.py")
+    port_text = os.environ.get("AFLDB_V2_ISOLATED_PORT", "55432")
+    if (not re.fullmatch(r"[0-9]{4,5}", port_text)
+            or not 1024 <= int(port_text) <= 65535
+            or int(port_text) == 5432
+            or (port_text != "55432" and os.environ.get("AFLDB_V2_ISOLATED_PG") != "1")):
+        raise RuntimeError("Offline Coleman requires a valid isolated launcher port")
+    if pg.info.host not in ("127.0.0.1", "localhost", "::1") or pg.info.port != int(port_text):
+        raise RuntimeError("Offline Coleman requires the dedicated loopback cluster on the isolated launcher port")
+    with pg.cursor() as cur:
+        cur.execute("""SELECT current_database(), current_setting('cluster_name'),
+            shobj_description(oid, 'pg_database') FROM pg_database WHERE datname=current_database()""")
+        name, cluster, marker = cur.fetchone()
+        if not name.startswith("afldb_v2_") or not name.endswith("_test") or cluster != "afldb_v2_isolated" or marker != "afldb-v2-isolated-test":
+            raise RuntimeError("Offline Coleman requires a marked isolated V2 test database")
+        # Same keys as the canonical publisher, but SESSION-scoped: ImportBatch
+        # and individual historical groups commit before the Coleman write.
+        # Transaction locks here would silently expire at that boundary. The
+        # CLI owns this connection and always closes it in its finalizer.
+        cur.execute("SELECT pg_advisory_lock(hashtext('derived_award_results:coleman'), year::int) FROM seasons ORDER BY year")
+        cur.execute("SELECT count(*) FROM derived_award_results WHERE award_slug='coleman'")
+        if cur.fetchone()[0]:
+            raise RuntimeError("Coleman bootstrap refused: canonical publications exist; use the V2 publisher")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Import AFLDB awards and honours.")
     parser.add_argument("--groups", nargs="*", help="subset of groups to run")
     parser.add_argument("--list-groups", action="store_true")
     parser.add_argument("--dry-run", action="store_true",
                         help="report source counts without writing")
+    parser.add_argument("--offline-historical", action="store_true", help="explicit isolated historical Coleman bootstrap only")
     parser.add_argument(
         "--allow-link-loss", action="store_true",
         help="proceed even when a manual player-link decision cannot survive "
@@ -2623,6 +2653,7 @@ def main() -> int:
         rep.step(f"target        : {safe_dsn(dsn)}")
         pg = connect_pg(dsn)
         try:
+            require_offline_coleman_target(pg, args)
             with pg.cursor() as cur:
                 cur.execute("SELECT key, id FROM sources")
                 sources = dict(cur.fetchall())
@@ -2721,6 +2752,8 @@ def main() -> int:
     rep.step(f"target        : {safe_dsn(dsn)}")
     started = time.time()
     pg = connect_pg(dsn)
+    if COLEMAN_GROUP in selected:
+        require_offline_coleman_target(pg, args)
 
     # Declare what this run rebuilds so TRUNCATE ... CASCADE cannot
     # silently empty a table no group here repopulates.

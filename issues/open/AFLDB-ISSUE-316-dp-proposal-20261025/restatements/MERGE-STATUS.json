@@ -1,0 +1,82 @@
+[
+  {
+    "path": "docs/v2/coverage-matrix.md",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "packages/domain/src/coverage-registry.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/afl-api-cutover.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/afl-api-settle-cli-gate.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/db-promotion-check.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/db-test-rebuild.test.ts",
+    "conflicts": 1,
+    "merge_exit": 1
+  },
+  {
+    "path": "tests/first-kick-goal-source.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/fitzroy-acquisition.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/fitzroy-core-import.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/reference-data.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/season-rollover.test.ts",
+    "conflicts": 2,
+    "merge_exit": 2
+  },
+  {
+    "path": "tests/v2-admin-operations-ui.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/v2-admin-operations.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/v2-coverage-registry.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/v2-historical-manifest.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  },
+  {
+    "path": "tests/v2-season-seal.test.ts",
+    "conflicts": 0,
+    "merge_exit": 0
+  }
+]

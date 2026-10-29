@@ -1,0 +1,19 @@
+{
+  "classification": "PREPARATION ONLY; no observations",
+  "evidence_root": ".local-release/issue316-readiness-20261027/day-D-evidence",
+  "states": {
+    "opening": "NOT RUN",
+    "native": "NOT RUN",
+    "censuses": "NOT RUN",
+    "canonical_nightly": "NOT RUN",
+    "enforced_dry_run": "NOT RUN"
+  },
+  "observation_window_UTC": [
+    "2026-10-27T02:00:00Z",
+    "2026-10-27T04:00:00Z"
+  ],
+  "after_window": "Only documentation assembly may finish later, if all actual observations were completed inside the window and census freshness held at dry-run start",
+  "final_success_state": "READY FOR OWNER APPLY DECISION",
+  "production": "NO-GO",
+  "apply_authorised": false
+}

@@ -1,0 +1,23 @@
+{
+  "database": "afldb_v2_gap029_test",
+  "audits": [
+    {
+      "table_name": "players",
+      "field_group": "draft_selection",
+      "rows": 8
+    }
+  ],
+  "durableOverrides": [
+    {
+      "rows": 8
+    }
+  ],
+  "verdict": "8 audited selections; 8 durable stable-identity replay records. Repeat repair reported all 8 already present.",
+  "originalDatabasePreserved": "afldb_v2_rb_final_test",
+  "runtime": {
+    "root": "D:/tmp/afldb-v2-pg16",
+    "port": 55433,
+    "cluster": "afldb_v2_isolated",
+    "note": "55432 is owned by ssh.exe. The documented cluster was stopped; started its preserved data directory on 55433, then verified live cluster/database marker. Existing credentials worked. No reset, credential change or authentication change."
+  }
+}

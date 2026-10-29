@@ -20,7 +20,7 @@ describe('admin match mutation source contracts', () => {
       expect(mutation).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
       expect(mutation).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_round_votes/i);
     }
-    expect(playerDerived).toContain('FROM brownlow_season_votes');
+    expect(playerDerived).toContain('acceptedBrownlowRowsSql()');
     expect(playerDerived).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
   });
 
@@ -56,8 +56,14 @@ describe('admin match mutation source contracts', () => {
     };
     walk('src');
 
+    // The two reviewed, reversible one-off writers (71cd7219 legacy-ownership adoption,
+    // 4a6cacf3 round-vote match_id backfill, both 2026-10-20) joined the set after this
+    // pin was written; the set is still closed, not loosened.
     expect([...writers].sort()).toEqual([
       'src/db/queries/admin-brownlow.ts',
+      'src/db/queries/brownlow-eligibility.ts',
+      'src/db/queries/brownlow-legacy-ownership-adoption.ts',
+      'src/db/queries/brownlow-round-vote-match-backfill.ts',
       'src/lib/acquisition/canonical-apply.ts',
     ]);
   });

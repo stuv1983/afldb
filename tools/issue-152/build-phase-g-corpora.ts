@@ -103,7 +103,7 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
    * rows 1-271 of the 271-row file and §19.3's position-based statements
    * survive unchanged. The 48 Phase D rows are 272-319.
    *
-   * 242 plan = 212 + 26 + 4. 77 decline = 59 + 22 - 4.
+   * 244 plan = 212 + 26 + 6. 75 decline = 59 + 22 - 6.
    *
    * AFLDB-ISSUE-153 reclassified four rows IN PLACE -- same file, same
    * position, same id, `expected_status` decline -> plan -- because the
@@ -125,6 +125,15 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
    * would break the position-and-name pins in tests/nl-ui-corpus.test.ts
    * for no gain: the name records which boundary the row was written for,
    * and `expected_status` is what the sweep actually scores.
+   *
+   * V2-GAP-035 (owner decision, 2026-10-28) re-pinned the two rows the
+   * ISSUE-153 re-pin missed, in place and in the same way. ISSUE-153 Stage 6
+   * (D6, §11.14) shipped the family grain after that re-pin, and its locked
+   * contract claims exactly these phrasings:
+   *
+   *   rel_dec_001  C1  -- "biggest football families", combined career games;
+   *   rel_dec_002  C5  -- "families with three AFL players", a linked-members
+   *                       threshold.
    */
   current: {
     name: 'current',
@@ -139,7 +148,7 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
       `${SOURCE_DIR}/afldb-ui-questions-relationships-v1-20260909.csv`,
       `${SOURCE_DIR}/afldb-ui-questions-relationships-decline-v1-20260909.csv`,
     ],
-    expected: { rows: 319, plan: 242, decline: 77, unknown: 0 },
+    expected: { rows: 319, plan: 244, decline: 75, unknown: 0 },
   },
 
   /**
@@ -158,7 +167,7 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
    * file and every position-based statement in §19.3, §23 and §24
    * survives. The 30 Phase F rows are 320-349.
    *
-   * 258 plan = 242 + 15 + 1. 91 decline = 77 + 15 - 1.
+   * 260 plan = 244 + 15 + 1. 89 decline = 75 + 15 - 1.
    *
    * The 30 Phase F rows now contribute 16 plan / 14 decline. The
    * `coach_record` collision row -- "Richmond's coaching record", which must
@@ -196,7 +205,7 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
       `${SOURCE_DIR}/afldb-ui-questions-cross-domain-v1-20260909.csv`,
       `${SOURCE_DIR}/afldb-ui-questions-cross-domain-decline-v1-20260909.csv`,
     ],
-    expected: { rows: 349, plan: 258, decline: 91, unknown: 0 },
+    expected: { rows: 349, plan: 260, decline: 89, unknown: 0 },
   },
 
   /**
@@ -204,6 +213,14 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
    * tests/nl-ui-corpus.test.ts. Every row is scored: unlike the 12,000-row
    * corpus these two carry no `unknown` edge probes, so `pass + fail` must
    * equal the observed count and an `unscored` row is itself a defect.
+   *
+   * V2-GAP-035 (owner decision, 2026-10-28) reclassified 27 realistic rows
+   * IN PLACE, plan -> decline: every "how many career <stat> did <player>
+   * have" row in category `user_player_career`. AFLDB-ISSUE-190 (Resolved
+   * 2026-09-15) refuses a `count` over a metric-bearing `player_career` plan
+   * by design, and its optional career-total mapping was not built. The
+   * corpus predates that decision. Row count and order are unchanged, so
+   * 1,495 = 1,408 plan + 87 decline.
    */
   regression: {
     name: 'regression',
@@ -212,7 +229,7 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
       `${SOURCE_DIR}/afldb-ui-questions-1440-real-user-v3-20260822.csv`,
       `${SOURCE_DIR}/afldb-ui-questions-60-real-user-decline-v3-20260822.csv`,
     ],
-    expected: { rows: 1495, plan: 1435, decline: 60, unknown: 0 },
+    expected: { rows: 1495, plan: 1408, decline: 87, unknown: 0 },
   },
 };
 

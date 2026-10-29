@@ -1,0 +1,132 @@
+start database=afldb_v2_visual2_test baseURL=http://127.0.0.1:3912 registrySha256=1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0 history={"award_proposals":3,"award_proposal_decisions":6,"award_winners":3712,"derived_award_results":0,"derived_award_projections":0,"brownlow_season_votes":16120,"brownlow_round_votes":320861,"brownlow_eligibility_decisions":0,"data_edits":0,"data_issues":4,"data_submissions":0,"data_submission_rows":0}
+S01-awards-queue-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S01-awards-queue-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S02-coleman-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S02-coleman-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S03-brownlow-1996-tie__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=1996 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S03-brownlow-1996-tie__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=1996 h1="Brownlow reconciliation" horizontalOverflowPx=28 consoleErrors=0 checks=FAIL(overflow 28px)
+S04-brownlow-2027-refused__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=2027 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S04-brownlow-2027-refused__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=2027 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S05-brownlow-invalid-season__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=1800 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S05-brownlow-invalid-season__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=1800 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S06-brownlow-2025-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/brownlow?season=2025 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S06-brownlow-2025-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/brownlow?season=2025 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S07-proposal-1-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S07-proposal-1-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-readonly-1 expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+S08-coleman-compare-2024__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S08-coleman-compare-2024__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S09-coleman-compare-2024-admin__desktop-1280x800.png as=admin status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S09-coleman-compare-2024-admin__mobile-390x844.png as=admin status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S10-coleman-compare-2027-refused__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S10-coleman-compare-2027-refused__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S11-coleman-compare-unsettled__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+S11-coleman-compare-unsettled__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-coleman-compare expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+STEP F-submission ERROR cannot insert a non-DEFAULT value into column "id"
+STEP F-submission expected="insert one synthetic rejected legacy submission with 3 error/warning rows and 2 clean rows" expectedTables=[data_submissions,data_submission_rows] observed=[no change] match=false
+S12-submission-history__desktop-1280x800.png as=super status=404 final=/admin/submissions/0 h1="Page not found" horizontalOverflowPx=0 consoleErrors=1 checks=FAIL(text not found "This submission is read-only history."; text not found "Rows needing attention"; status 404; console ["Failed to load resource: the server responded with a status of 404 (Not Found)"])
+S12-submission-history__mobile-390x844.png as=super status=404 final=/admin/submissions/0 h1="Page not found" horizontalOverflowPx=0 consoleErrors=1 checks=FAIL(text not found "This submission is read-only history."; text not found "Rows needing attention"; status 404; console ["Failed to load resource: the server responded with a status of 404 (Not Found)"])
+S13-submission-history-admin__desktop-1280x800.png as=admin status=404 final=/admin/submissions/0 h1="Page not found" horizontalOverflowPx=0 consoleErrors=1 checks=FAIL(text not found "This submission is read-only history."; text not found "Rows needing attention"; status 404; console ["Failed to load resource: the server responded with a status of 404 (Not Found)"])
+S13-submission-history-admin__mobile-390x844.png as=admin status=404 final=/admin/submissions/0 h1="Page not found" horizontalOverflowPx=0 consoleErrors=1 checks=FAIL(text not found "This submission is read-only history."; text not found "Rows needing attention"; status 404; console ["Failed to load resource: the server responded with a status of 404 (Not Found)"])
+STEP R-submission expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+STEP F-refusals ERROR cannot insert a non-DEFAULT value into column "id"
+STEP F-refusals expected="insert 60 synthetic open canonical_apply_failed refusals and 3 open settle findings (source afl_api)" expectedTables=[data_issues] observed=[no change] match=false
+R3-refusals-populated__desktop-1280x800.png as=super status=200 final=/admin/operations/afl-api-refusals h1="AFL API settle refusals" horizontalOverflowPx=0 consoleErrors=0 checks=FAIL(text not found "60 open")
+R3-refusals-populated__mobile-390x844.png as=super status=200 final=/admin/operations/afl-api-refusals h1="AFL API settle refusals" horizontalOverflowPx=0 consoleErrors=0 checks=FAIL(text not found "60 open")
+STEP R-refusals ERROR locator.getAttribute: Timeout 30000ms exceeded.
+STEP R-refusals expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+R7-refusals-read-failed__desktop-1280x800.png as=super status=200 final=/admin/operations/afl-api-refusals h1="AFL API settle refusals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+R7-refusals-read-failed__mobile-390x844.png as=super status=200 final=/admin/operations/afl-api-refusals h1="AFL API settle refusals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+F-refusals-read-failure afldb_import SELECT restored=true
+STEP F-refusals-read-failure expected="REVOKE SELECT ON data_issues FROM afldb_import for one capture, then GRANT it back (privilege only, no row change)" expectedTables=[] observed=[no change] match=true
+U1-operations-registry-unreadable__desktop-1280x800.png as=super status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+U1-operations-registry-unreadable__mobile-390x844.png as=super status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+U2-operations-registry-unreadable-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+U2-operations-registry-unreadable-admin__mobile-390x844.png as=admin status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+U3-coleman-registry-unreadable__desktop-1280x800.png as=super status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+U3-coleman-registry-unreadable__mobile-390x844.png as=super status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+U4-approve-refused-registry-unreadable__desktop-1280x800.png as=super status=same-page final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+U4-approve-refused-registry-unreadable__mobile-390x844.png as=super status=same-page final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=13 consoleErrors=0 checks=FAIL(overflow 13px)
+F-registry-unreadable registry restored sha256 match=true
+STEP F-registry-unreadable expected="hide .next/standalone/data/reference/seasons.json (build output, not the repository); an approval attempt must be refused and write no history" expectedTables=[] observed=[no change] match=true
+A1-approve-sealed-refused__desktop-1280x800.png as=super status=same-page final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A1-approve-sealed-refused__mobile-390x844.png as=super status=same-page final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP A1-approve-sealed-no-note expected="approve validated proposal #1 (season 2026, sealed) with no note: refused season_sealed_correction_invalid, nothing written" expectedTables=[] observed=[no change] match=true
+A2-approve-sealed-correction-outcome__desktop-1280x800.png as=super status=same-page final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A2-approve-sealed-correction-outcome__mobile-390x844.png as=super status=same-page final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP A2-approve-sealed-correction expected="approve proposal #1 with a 20+ character correction note: status approved, one decision, one award_winners row" expectedTables=[award_proposals,award_proposal_decisions,award_winners] observed=[award_proposals:+0rows(changed),award_proposal_decisions:+1rows,award_winners:+1rows,data_edits:+1rows] match=false
+A3-proposal-approved-revise-panel__desktop-1280x800.png as=super status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A3-proposal-approved-revise-panel__mobile-390x844.png as=super status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A4-proposal-approved-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A4-proposal-approved-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/awards/1 h1="Award proposal #1" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-approved expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+A5-create-invalid-file-refused__desktop-1280x800.png as=super status=same-page final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A5-create-invalid-file-refused__mobile-390x844.png as=super status=same-page final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP A5-create-invalid-file expected="create from a file with one invalid row: whole file refused, nothing created" expectedTables=[] observed=[no change] match=true
+A6-create-valid-file-outcome__desktop-1280x800.png as=super status=same-page final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A6-create-valid-file-outcome__mobile-390x844.png as=super status=same-page final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP A6-create-valid-file expected="create one proposal (mark-of-the-year 2027, in progress) from a pasted file: one proposed row and its decision" expectedTables=[award_proposals,award_proposal_decisions] observed=[award_proposals:+1rows,award_proposal_decisions:+1rows] match=true
+A7-validate-outcome__desktop-1280x800.png as=super status=same-page final=/admin/operations/awards/4 h1="Award proposal #4" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A7-validate-outcome__mobile-390x844.png as=super status=same-page final=/admin/operations/awards/4 h1="Award proposal #4" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP A7-validate-own expected="validate the new proposal as its creator: status validated, one decision" expectedTables=[award_proposals,award_proposal_decisions] observed=[award_proposals:+0rows(changed),award_proposal_decisions:+1rows] match=true
+A8-self-approval-attestation__desktop-1280x800.png as=super status=200 final=/admin/operations/awards/4 h1="Award proposal #4" horizontalOverflowPx=0 consoleErrors=0 checks=FAIL(missing [data-self-approval]; missing #self-approval-attestation)
+A8-self-approval-attestation__mobile-390x844.png as=super status=200 final=/admin/operations/awards/4 h1="Award proposal #4" horizontalOverflowPx=0 consoleErrors=0 checks=FAIL(missing [data-self-approval]; missing #self-approval-attestation)
+STEP R-self-approval expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+A9-reject-short-reason-refused__desktop-1280x800.png as=super status=same-page final=/admin/operations/awards/4 h1="Award proposal #4" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+A9-reject-short-reason-refused__mobile-390x844.png as=super status=same-page final=/admin/operations/awards/4 h1="Award proposal #4" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP A9-reject-short-reason expected="reject the new proposal with a reason under 10 characters: refused, nothing written" expectedTables=[] observed=[no change] match=true
+C1-publish-unsettled-refused__desktop-1280x800.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+C1-publish-unsettled-refused__mobile-390x844.png as=super status=same-page final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP C1-publish-unsettled expected="publish 2024 without the settled attestation: refused, nothing written" expectedTables=[] observed=[no change] match=true
+STEP C2-publish-2024 ERROR locator.waitFor: Timeout 30000ms exceeded.
+STEP C2-publish-2024 expected="publish the derived 2024 Coleman result after compare: one derived_award_results row, its projection, award_winners as previewed" expectedTables=[derived_award_results,derived_award_projections,award_winners] observed=[no change] match=false
+C3-coleman-after-publish__desktop-1280x800.png as=super status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=FAIL(text not found "2024")
+C3-coleman-after-publish__mobile-390x844.png as=super status=200 final=/admin/operations/coleman h1="Coleman Medal derivation" horizontalOverflowPx=0 consoleErrors=0 checks=FAIL(text not found "2024")
+STEP R-coleman-published expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+STEP F-brownlow-missing-eligibility expected="clear eligible_rank (was 1) for the 2024 leader, player 10243: eligibility becomes missing" expectedTables=[brownlow_season_votes] observed=[brownlow_season_votes:+0rows(changed)] match=true
+B1-brownlow-2024-requires-review__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B1-brownlow-2024-requires-review__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B2-brownlow-2024-requires-review-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B2-brownlow-2024-requires-review-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-requires-review expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+B3-decision-error__desktop-1280x800.png as=super status=same-page final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B3-decision-error__mobile-390x844.png as=super status=same-page final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP B3-decision-invalid expected="submit a decision with a blank citation and a note under 20 characters: refused, nothing written" expectedTables=[] observed=[no change] match=true
+B4-decision-success__desktop-1280x800.png as=super status=same-page final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B4-decision-success__mobile-390x844.png as=super status=same-page final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP B4-decision-eligible expected="record player 10243 as eligible for 2024 (sealed: audited correction): one decision row; the medal metadata projection may update brownlow_season_votes" expectedTables=[brownlow_eligibility_decisions,brownlow_season_votes] observed=[brownlow_season_votes:+0rows(changed),brownlow_eligibility_decisions:+1rows,data_edits:+1rows] match=false
+B5-brownlow-2024-after-decision__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+B5-brownlow-2024-after-decision__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=2024 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-after-decision expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+Q1-awards-queue-empty__desktop-1280x800.png as=super status=200 final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+Q1-awards-queue-empty__mobile-390x844.png as=super status=200 final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+Q2-awards-queue-empty-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+Q2-awards-queue-empty-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/awards h1="Award proposals" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP F-empty-queue expected="move every proposal and decision into backup tables, capture the empty queue, restore them; net effect none" expectedTables=[] observed=[no change] match=true
+F-empty-queue restored award_proposals/decisions identical=true
+context super_admin blockedRequests=0
+context admin blockedRequests=0
+end history={"award_proposals":4,"award_proposal_decisions":9,"award_winners":3713,"derived_award_results":0,"derived_award_projections":0,"brownlow_season_votes":16120,"brownlow_round_votes":320861,"brownlow_eligibility_decisions":1,"data_edits":2,"data_issues":4,"data_submissions":0,"data_submission_rows":0} netChangedTables=[award_proposals:+1rows,award_proposal_decisions:+3rows,award_winners:+1rows,brownlow_eligibility_decisions:+1rows,data_edits:+2rows]
+failures=21
+  S03-brownlow-1996-tie__mobile-390x844.png: overflow 28px
+  step F-submission: ERROR cannot insert a non-DEFAULT value into column "id"
+  step F-submission: expected [data_submissions,data_submission_rows], observed []
+  S12-submission-history__desktop-1280x800.png: text not found "This submission is read-only history."; text not found "Rows needing attention"; status 404; console ["Failed to load resource: the server responded with a status of 404 (Not Found)"]
+  S12-submission-history__mobile-390x844.png: text not found "This submission is read-only history."; text not found "Rows needing attention"; status 404; console ["Failed to load resource: the server responded with a status of 404 (Not Found)"]
+  S13-submission-history-admin__desktop-1280x800.png: text not found "This submission is read-only history."; text not found "Rows needing attention"; status 404; console ["Failed to load resource: the server responded with a status of 404 (Not Found)"]
+  S13-submission-history-admin__mobile-390x844.png: text not found "This submission is read-only history."; text not found "Rows needing attention"; status 404; console ["Failed to load resource: the server responded with a status of 404 (Not Found)"]
+  step F-refusals: ERROR cannot insert a non-DEFAULT value into column "id"
+  step F-refusals: expected [data_issues], observed []
+  R3-refusals-populated__desktop-1280x800.png: text not found "60 open"
+  R3-refusals-populated__mobile-390x844.png: text not found "60 open"
+  step R-refusals: ERROR locator.getAttribute: Timeout 30000ms exceeded.
+  U4-approve-refused-registry-unreadable__mobile-390x844.png: overflow 13px
+  step A2-approve-sealed-correction: expected [award_proposals,award_proposal_decisions,award_winners], observed [award_proposals:+0rows(changed),award_proposal_decisions:+1rows,award_winners:+1rows,data_edits:+1rows]
+  A8-self-approval-attestation__desktop-1280x800.png: missing [data-self-approval]; missing #self-approval-attestation
+  A8-self-approval-attestation__mobile-390x844.png: missing [data-self-approval]; missing #self-approval-attestation
+  step C2-publish-2024: ERROR locator.waitFor: Timeout 30000ms exceeded.
+  step C2-publish-2024: expected [derived_award_results,derived_award_projections,award_winners], observed []
+  C3-coleman-after-publish__desktop-1280x800.png: text not found "2024"
+  C3-coleman-after-publish__mobile-390x844.png: text not found "2024"
+  step B4-decision-eligible: expected [brownlow_eligibility_decisions,brownlow_season_votes], observed [brownlow_season_votes:+0rows(changed),brownlow_eligibility_decisions:+1rows,data_edits:+1rows]

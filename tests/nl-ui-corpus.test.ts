@@ -13,6 +13,9 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { parseNlQuestion, type NlParseContext } from '@/search/nl/parser';
+import { validatePlan } from '@/search/nl/plan';
+
 import {
   buildSet, expectedBatches, PHASE_G_SETS, type PhaseGSetName,
 } from '../tools/issue-152/build-phase-g-corpora';
@@ -292,13 +295,17 @@ describe('readUiCorpus', () => {
     // in place: FS1, FS2, FS3 and FS6 ship, so the boundary they were
     // written to hold has moved. The file keeps its 22 rows and its order
     // -- only the scored status changed -- so the split is asserted by id
-    // rather than by "every row in this file declines".
-    const RECLASSIFIED = ['rel_dec_003', 'rel_dec_004', 'rel_dec_005', 'rel_dec_006'];
+    // rather than by "every row in this file declines". V2-GAP-035 added the
+    // two family-grain rows (C1, C5) that ISSUE-153 Stage 6 shipped after
+    // that re-pin.
+    const RECLASSIFIED = [
+      'rel_dec_001', 'rel_dec_002', 'rel_dec_003', 'rel_dec_004', 'rel_dec_005', 'rel_dec_006',
+    ];
     for (const row of declines) {
       expect(row.expectedStatus, row.id).toBe(RECLASSIFIED.includes(row.id) ? 'plan' : 'decline');
     }
-    expect(declines.filter((row) => row.expectedStatus === 'plan')).toHaveLength(4);
-    expect(declines.filter((row) => row.expectedStatus === 'decline')).toHaveLength(18);
+    expect(declines.filter((row) => row.expectedStatus === 'plan')).toHaveLength(6);
+    expect(declines.filter((row) => row.expectedStatus === 'decline')).toHaveLength(16);
     // Every Phase D row is a relationship question; none belongs in
     // another file, and none of them mentions the siren or a first kick.
     for (const row of [...plans, ...declines]) {
@@ -322,8 +329,7 @@ describe('readUiCorpus', () => {
   });
 
   it('keeps a named decline row for every boundary still NOT crossed', () => {
-    // Each of these is a class that must still decline: the family grain
-    // (D6/C1, still held by AFLDB-ISSUE-153 Stage 6), the relationship
+    // Each of these is a class that must still decline: the relationship
     // types with no witness in the data, the vague forms, pairings, an
     // ambiguous subject, and the five scopes no relationship builder
     // owns. One row each, named, so a phrasing that starts answering one
@@ -333,13 +339,14 @@ describe('readUiCorpus', () => {
     // list any more: AFLDB-ISSUE-153 Stages 2-4 shipped FS1, FS2, FS3 and
     // FS6, so their rows are now scored as plans and are pinned as such
     // below. Their category names are kept because they still record
-    // which boundary the row was written for.
+    // which boundary the row was written for. The same holds for
+    // `rel_decline_family_grain` and `rel_decline_family_size`: Stage 6
+    // shipped C1 and C5 (V2-GAP-035 re-pinned their rows).
     const rows = readUiCorpus(REL_DECLINE);
     const declineFamilies = new Set(
       rows.filter((row) => row.expectedStatus === 'decline').map((row) => row.category),
     );
     for (const family of [
-      'rel_decline_family_grain', 'rel_decline_family_size',
       'rel_decline_vague_family', 'rel_decline_vague_related',
       'rel_decline_sister', 'rel_decline_twin', 'rel_decline_cousin',
       'rel_decline_grandparent', 'rel_decline_uncle', 'rel_decline_in_law',
@@ -349,7 +356,7 @@ describe('readUiCorpus', () => {
     ]) {
       expect(declineFamilies.has(family), family).toBe(true);
     }
-    expect(declineFamilies.size).toBe(18);
+    expect(declineFamilies.size).toBe(16);
   });
 
   /**
@@ -370,6 +377,30 @@ describe('readUiCorpus', () => {
     }
   });
 
+  /**
+   * V2-GAP-035 (owner decision, 2026-10-28). The two family-grain rows the
+   * ISSUE-153 re-pin missed. Stage 6's locked D6 contract (§11.14) claims
+   * exactly these phrasings for the `family` grain, so each must parse to a
+   * plan the validator accepts -- the decision itself, not an observed
+   * rendering.
+   */
+  it('pins the two family-grain boundaries AFLDB-ISSUE-153 Stage 6 crossed as plans', async () => {
+    const byId = new Map(readUiCorpus(REL_DECLINE).map((row) => [row.id, row]));
+    for (const [id, family] of [
+      ['rel_dec_001', 'rel_decline_family_grain'],
+      ['rel_dec_002', 'rel_decline_family_size'],
+    ]) {
+      const row = byId.get(id)!;
+      expect(row.expectedStatus, id).toBe('plan');
+      expect(row.category, id).toBe(family);
+      const parsed = await parseNlQuestion(row.question, decisionCtx({}));
+      expect(parsed.status, id).toBe('plan');
+      if (parsed.status !== 'plan') continue;
+      expect(parsed.plan.grain, id).toBe('family');
+      expect(validatePlan(parsed.plan), id).not.toHaveProperty('error');
+    }
+  });
+
   it('keeps the Ben Cousins regression case as a rendered row', () => {
     // AFLDB-ISSUE-152 §22.8. PLAYER_NICKNAMES maps "cousins" -> "ben
     // cousins", so an unframed \bcousins?\b gate turned a question ABOUT
@@ -382,6 +413,64 @@ describe('readUiCorpus', () => {
     expect(cousins!.expectedStatus).toBe('plan');
     const family = readUiCorpus(REL_DECLINE).find((row) => row.category === 'rel_decline_cousin');
     expect(family!.expectedStatus).toBe('decline');
+  });
+});
+
+// --------------------------------------------- owner-decision restatements
+
+/**
+ * A parse context in which exactly the named players resolve, each to one
+ * candidate. The pins below assert what a decision does to a row's parse,
+ * so player resolution is held fixed rather than read from a database.
+ * Keys use the parser's own lookup spelling: it asks for "gary ablett jnr"
+ * when the question says "Jr" (normalisePlayerSuffixes).
+ */
+function decisionCtx(players: Record<string, number>): NlParseContext {
+  const key = (name: string) => name.toLowerCase().replace(/\b(?:jr|junior)\b/g, 'jnr');
+  const byKey = new Map(Object.entries(players).map(([name, id]) => [key(name), id]));
+  return {
+    clubs: [], venues: [], coaches: [],
+    resolvePlayer: (name: string) => {
+      const id = byKey.get(key(name));
+      return Promise.resolve(id === undefined ? [] : [{
+        ref: { id, slug: name.toLowerCase().replace(/ /g, '-'), name }, score: 1000,
+      }]);
+    },
+    resolvePlayerFamily: () => Promise.resolve([]),
+  };
+}
+
+describe('V2-GAP-035 realistic-gate restatement (AFLDB-ISSUE-190)', () => {
+  const REALISTIC = 'tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv';
+  const CAREER_COUNT = /^how many career (goals|games|kicks|handballs|disposals|marks) did (.+) have$/i;
+
+  /**
+   * AFLDB-ISSUE-190 (Resolved 2026-09-15) refuses `count` over a
+   * metric-bearing `player_career` plan, because that compiler ranks and
+   * would present the rank-one leader as a total. Its optional career-total
+   * mapping was not built, and the owner decided not to build it. So every
+   * row of this shape declines, at exactly that gate: the parse is a
+   * career plan with the stated metric and a `count`, and validation refuses
+   * it with the ISSUE-190 reason. A row that started declining anywhere else
+   * would fail here rather than pass the sweep for the wrong reason.
+   */
+  it('restates all 27 "how many career <stat> did <player> have" rows as ISSUE-190 declines', async () => {
+    const rows = readUiCorpus(REALISTIC).filter((row) => CAREER_COUNT.test(row.question));
+    expect(rows).toHaveLength(27);
+    for (const row of rows) {
+      expect(row.expectedStatus, row.id).toBe('decline');
+      expect(row.category, row.id).toBe('user_player_career');
+      const [, stat, player] = CAREER_COUNT.exec(row.question)!;
+      const parsed = await parseNlQuestion(row.question, decisionCtx({ [player.toLowerCase()]: 1 }));
+      expect(parsed.status, row.id).toBe('plan');
+      if (parsed.status !== 'plan') continue;
+      expect(parsed.plan.grain, row.id).toBe('player_career');
+      expect(parsed.plan.metric, row.id).toBe(stat.toLowerCase());
+      expect(parsed.plan.agg.kind, row.id).toBe('count');
+      expect(validatePlan(parsed.plan), row.id).toEqual({
+        error: 'This kind of question has no defined total to count; it ranks by a statistic instead.',
+      });
+    }
   });
 });
 
@@ -411,21 +500,24 @@ describe('PHASE_G_SETS (AFLDB-ISSUE-152 sweep corpora)', () => {
 
   it('the accepted Phase G P4 regression gate is still exactly 1,495', () => {
     const result = build('regression');
+    // V2-GAP-035 moved the 27 ISSUE-190 career-count rows from plan to
+    // decline in place: 1,435 + 60 became 1,408 + 87, with no row moved.
     expect({ rows: result.rows, plan: result.plan, decline: result.decline })
-      .toEqual({ rows: 1495, plan: 1435, decline: 60 });
+      .toEqual({ rows: 1495, plan: 1435 - 27, decline: 60 + 27 });
   });
 
-  it('the current Phase D set is 319 = 242 plan + 77 decline', () => {
+  it('the current Phase D set is 319 = 244 plan + 75 decline', () => {
     const result = build('current');
     expect({ rows: result.rows, plan: result.plan, decline: result.decline })
-      .toEqual({ rows: 319, plan: 242, decline: 77 });
+      .toEqual({ rows: 319, plan: 244, decline: 75 });
     // 271 + 48 rows, unchanged. AFLDB-ISSUE-152 pinned 238 + 81; the four
     // AFLDB-ISSUE-153 reclassifications (rel_dec_003/004/005/006, FS1/FS2/
-    // FS3/FS6) move four rows across the split WITHOUT moving a row, so
-    // the total and the ordering assertions below are untouched.
+    // FS3/FS6) and V2-GAP-035's two (rel_dec_001/002, C1/C5) move six rows
+    // across the split WITHOUT moving a row, so the total and the ordering
+    // assertions below are untouched.
     expect(result.rows).toBe(271 + 48);
-    expect(result.plan).toBe(212 + 26 + 4);
-    expect(result.decline).toBe(59 + 22 - 4);
+    expect(result.plan).toBe(212 + 26 + 6);
+    expect(result.decline).toBe(59 + 22 - 6);
     // nl-stress.spec.ts slices at NL_UI_BATCH (default 100), and the Phase D
     // runner refuses a corpus that does not produce this many batches.
     expect(expectedBatches(result.rows)).toBe(4);
@@ -441,16 +533,16 @@ describe('PHASE_G_SETS (AFLDB-ISSUE-152 sweep corpora)', () => {
     expect(current.slice(phaseG.length).every((row) => /^rel_/.test(row.id))).toBe(true);
   });
 
-  it('the next Phase F set is 349 = 258 plan + 91 decline', () => {
+  it('the next Phase F set is 349 = 260 plan + 89 decline', () => {
     const result = build('next');
     expect({ rows: result.rows, plan: result.plan, decline: result.decline })
-      .toEqual({ rows: 349, plan: 258, decline: 91 });
-    // 319 + 30 rows, unchanged. The plan/decline split carries the four
-    // `current` reclassifications and adds the fifth, xd_dec_014 (X3):
-    // 242 + 15 + 1 and 77 + 15 - 1.
+      .toEqual({ rows: 349, plan: 260, decline: 89 });
+    // 319 + 30 rows, unchanged. The plan/decline split carries the six
+    // `current` reclassifications and adds xd_dec_014 (X3):
+    // 244 + 15 + 1 and 75 + 15 - 1.
     expect(result.rows).toBe(319 + 30);
-    expect(result.plan).toBe(242 + 15 + 1);
-    expect(result.decline).toBe(77 + 15 - 1);
+    expect(result.plan).toBe(244 + 15 + 1);
+    expect(result.decline).toBe(75 + 15 - 1);
     expect(expectedBatches(result.rows)).toBe(4);
   });
 

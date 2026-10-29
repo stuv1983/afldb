@@ -1,0 +1,258 @@
+{
+  "state": "B",
+  "started_at": "2026-10-25T03:53:11.451Z",
+  "completed_at": "2026-10-25T03:54:32.788Z",
+  "tests": [
+    "tests/afl-api-cutover.test.ts",
+    "tests/afl-api-settle-cli-gate.test.ts",
+    "tests/db-promotion-check.test.ts",
+    "tests/db-test-rebuild.test.ts",
+    "tests/first-kick-goal-source.test.ts",
+    "tests/fitzroy-acquisition.test.ts",
+    "tests/fitzroy-core-import.test.ts",
+    "tests/reference-data.test.ts",
+    "tests/season-rollover.test.ts",
+    "tests/v2-admin-operations-ui.test.ts",
+    "tests/v2-admin-operations.test.ts",
+    "tests/v2-coverage-registry.test.ts",
+    "tests/v2-historical-manifest.test.ts",
+    "tests/v2-season-seal.test.ts"
+  ],
+  "exit_code": 1,
+  "error": null,
+  "passed": 2956,
+  "skipped": 7,
+  "failed": 32,
+  "failures": [
+    {
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process: the tsx loader runs the script in the spawned PID itself, where the tsx CLI does not",
+      "message": [
+        "AssertionError: expected 1 to be +0 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/afl-api-cutover.test.ts:2956:33\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope resolves and plans the actual contract, the adopted c2-2026-successor, without injecting an expectation",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:240:15\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state states A and B (before activation): ships an empty successor table, so no binding, however faithful, is an adopted successor",
+      "message": [
+        "ReferenceError: fabricated is not defined\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:273:14\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses the fabricated successor binding at the real preflight, before any child runs",
+      "message": [
+        "ReferenceError: fabricated is not defined\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:278:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an unsupported tuple name at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong core manifest fingerprint at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong core artefact-set fingerprint at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong witness manifest fingerprint at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong witness label at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a wrong core label at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered pair row count at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered expected row count at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered season range at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered census scope at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a mismatched source label at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a partial source at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an extra pair field at both boundaries",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at variant (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:264:33)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:298:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a preflight whose source is not the adopted binding's own",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:308:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over a wrong core manifest pin in the register",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:326:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over a wrong witness manifest pin in the contract",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:326:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over core manifest bytes that do not hash to the tuple",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:326:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over witness manifest bytes that do not hash to the tuple",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:326:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over an unsupported expectation block",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:326:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over a reopened 2026",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:326:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state is not an adopted successor over the explicit predecessor documents",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:326:40\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses an altered, copied or retargeted plan even with the adopted binding",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at adopted (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:261:60)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:330:17\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)"
+      ]
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope AFLDB-ISSUE-323 adopted-successor guard, successor state refuses a successor that claims rehearsal provenance, at resolution and at both boundaries",
+      "message": [
+        "AssertionError: expected [Function] to throw error including 'A successor profile cannot claim cand…' but got 'Unsupported ladder expectation schema…'\n    at Proxy.<anonymous> (file:///D:/dev/afldbV2/node_modules/@vitest/expect/dist/index.js:1552:16)\n    at Proxy.<anonymous> (file:///D:/dev/afldbV2/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///D:/dev/afldbV2/node_modules/chai/index.js:1700:25)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:348:10\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+      ]
+    },
+    {
+      "name": "final validation takes its expected values from the tracked register, not from this file",
+      "message": [
+        "Error: Unsupported ladder expectation schema/fingerprint tuple/row count.\n    at resolveLadderRebuildExpectation (D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tools/db/rebuild-test.ts:1253:11)\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:5691:20\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+      ]
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage db:privileges (direct run): runs its work, refusing rather than skipping",
+      "message": [
+        "AssertionError: expected 'D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSU…' to contain 'unknown privileges target \\'no-such-t…'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7096:32\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the ownership census CLI refuses before reading its evidence or launching psql",
+      "message": [
+        "AssertionError: expected 1 to be 2 // Object.is equality\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7113:28\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the reset proof CLI refuses before opening a session or launching psql",
+      "message": [
+        "AssertionError: expected 'D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSU…' to contain 'REFUSED: AFLDB_TEST_DATABASE_URL cann…'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7122:28\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    },
+    {
+      "name": "reset proof psql credential handling (AFLDB-ISSUE-313) every affected caller refuses an unusable credential before its first stage the convergence rehearsal refuses before connecting or seeding anything",
+      "message": [
+        "AssertionError: expected 'D:\\dev\\afldbV2\\issues\\open\\AFLDB-ISSU…' to contain 'REFUSED: The owner DSN cannot be used…'\n    at D:/dev/afldbV2/.local-release/issue316-dp-20261025/state-B/tests/db-test-rebuild.test.ts:7135:30\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/dev/afldbV2/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+      ]
+    }
+  ],
+  "skips": [
+    {
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process that ignores SIGTERM (POSIX): SIGKILL ends it after the grace",
+      "status": "skipped"
+    },
+    {
+      "name": "C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends runChildStep: one acquire or settle process, from spawn to a confirmed end pipes are released on every terminal path, and the monitored PID is the script's own over a real process (POSIX): SIGTERM alone ends a default process, reported by its signal",
+      "status": "skipped"
+    },
+    {
+      "name": "AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate prepare-promotion-source: the run (fake settles, no database) ISSUE-314: --record-out is checked before anything is verified, opened or written recordOutProblems refuses a dangling symbolic link, which the exclusive write also refuses",
+      "status": "skipped"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance real interpreter resolution boundary (DB-free, retained C: fixtures) refuses a dangling symlink named like the startup zip (exists() is false, lexists() is true)",
+      "status": "skipped"
+    },
+    {
+      "name": "ISSUE-316 ladder-season-scope package-provenance runtime record version 2: inert links, absent landmarks, bound executables, hard-link groups absent Python startup landmarks reviewed start-up layout landmarks (prefix, venv, build and ._pth selection) derives exactly the reviewed set for an interpreter at /usr/bin/python3.12",
+      "status": "skipped"
+    },
+    {
+      "name": "AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm run become bound node) the esbuild native-binary exception and the whole node_modules walk npm .bin link chains: every hop stays inside the checkout node_modules (F-J01) real symbolic links: an inside chain is admitted, a leave-and-return chain refuses (skipped only where file links cannot be created)",
+      "status": "skipped"
+    },
+    {
+      "name": "curated player alias reference (AFLDB-ISSUE-110 Stage 2) loads through external identity into player_name_aliases: normalised, idempotent, preserving, fail-closed (rolled back)",
+      "status": "skipped"
+    }
+  ],
+  "network_audit": {
+    "file": "validation/state-B-broader.network.jsonl",
+    "guarded_processes": 182,
+    "blocked_attempts": 29
+  },
+  "assertion_or_product_edits": false,
+  "production_contact": false,
+  "database_connection": false
+}

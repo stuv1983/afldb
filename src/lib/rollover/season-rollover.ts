@@ -50,6 +50,10 @@ import {
   AflApiOwnershipCensusError, censusTotal, describeAffected, describeScope, readCensusRecord,
   refusalMessage, rolloverCensusScope,
 } from './afl-api-ownership-census';
+import {
+  LadderSuccessorRefused, parseSuccessorLadderTuples, planSuccessorTuplesEdit, readSuccessorLadderTuplesJson,
+  type SuccessorLadderTuple,
+} from './ladder-successor';
 
 /** A refusal. Never carries a DSN, a secret or a path outside the repository. */
 export class RolloverRefused extends Error {
@@ -202,6 +206,13 @@ export const IDENTITY_SCAN_SOURCE_NOTE =
   + 'computed successor contract in a temporary directory before any tracked file is '
   + 'written. It is never an operator input.';
 
+/**
+ * AFLDB-ISSUE-136: the count of players carrying a folded renumbered AFL Tables profile. The importer
+ * prints it in its summary and an acceptance record that declares it is compared on it; older records
+ * (and validator output from before ISSUE-136) simply do not carry it.
+ */
+export const RENUMBERED_PROFILE_KEY = 'players_with_renumbered_profile';
+
 /** Summary keys copied straight through as integers. */
 const SUMMARY_INT_KEYS = [
   'matches', 'matches_with_player_rows', 'venues', 'attendance_known',
@@ -226,7 +237,9 @@ export function parseValidatorEvidence(output: string): ValidatorEvidence {
       continue;
     }
     if (section === 'none') continue;
-    const match = /^ {2}(\S+)\s{2,}(.*)$/.exec(raw);
+    // The importer prints `f"  {k:<28} {v}"`: a key of 28 characters or more (ISSUE-136's
+    // players_with_renumbered_profile is 31) is followed by ONE space, so any run separates.
+    const match = /^ {2}(\S+)\s+(.*)$/.exec(raw);
     if (!match) continue;
     (section === 'summary' ? summary : coverage).set(match[1], match[2].trim());
   }
@@ -276,6 +289,12 @@ export function parseValidatorEvidence(output: string): ValidatorEvidence {
     attendance_known: number(summary, 'attendance_known'),
     club_identities: clubIdentities,
     players: number(summary, 'players'),
+    // AFLDB-ISSUE-136: carried whenever the validator prints it, in the register's own key order.
+    // Leaving it out would silently drop the folded-renumbered-profile gate from the successor's
+    // acceptance drift check and final validation; planSeasonRollover refuses a successor that
+    // loses it while the outgoing baseline pins it.
+    ...(summary.has(RENUMBERED_PROFILE_KEY)
+      ? { [RENUMBERED_PROFILE_KEY]: number(summary, RENUMBERED_PROFILE_KEY) } : {}),
     players_with_dob: number(summary, 'players_with_dob'),
     players_with_dob_conflict: number(summary, 'players_with_dob_conflict'),
     player_match_rows: number(summary, 'player_match_rows'),
@@ -973,6 +992,10 @@ const CLUB_SEASONS_ROWS_ANCHOR =
  * requires the operator to state the number and REFUSES unless it equals the
  * witness's own row total.
  *
+ * AFLDB-ISSUE-316: a transition that adds a reviewed SUCCESSOR ladder tuple does not call this.
+ * The tuple's expected_rows is then stage 9's separate reviewed number (fingerprint-bound and
+ * re-derived from the witness manifest), and the constant keeps the predecessor's count.
+ *
  * Pure: takes source text, returns source text. Refuses on anything but
  * exactly one anchored match, so a refactor of that constant cannot be
  * silently mis-edited.
@@ -1001,6 +1024,29 @@ export function readClubSeasonsExpectedRows(source: string): number {
     refuse('tools/db/rebuild-test.ts declares no CLUB_SEASONS_EXPECTED.rows value.');
   }
   return Number(match[2]);
+}
+
+/**
+ * The club_seasons row count stage 9 gates for a state, read without executing the module. When the
+ * contract's ladder profile is a reviewed successor tuple in SUCCESSOR_LADDER_TUPLES_JSON, that tuple's
+ * expected_rows is the count (the rebuild reads it from the tuple); otherwise the profile is the
+ * predecessor line and the count is CLUB_SEASONS_EXPECTED.rows. A source without the successor table
+ * cannot select a successor.
+ */
+export function readStageNineExpectedRows(source: string, contract: Json): number {
+  const ladder = obj(obj(contract.datasets ?? {}, 'contract.datasets').ladder ?? {}, 'contract.datasets.ladder');
+  const profile = (ladder.rebuild_expectation as Json | undefined)?.profile;
+  if (typeof profile === 'string' && source.includes('export const SUCCESSOR_LADDER_TUPLES_JSON = ')) {
+    let tuples: Record<string, SuccessorLadderTuple>;
+    try {
+      tuples = parseSuccessorLadderTuples(readSuccessorLadderTuplesJson(source));
+    } catch (error) {
+      if (error instanceof LadderSuccessorRefused) refuse(error.message);
+      throw error;
+    }
+    if (Object.hasOwn(tuples, profile)) return tuples[profile].expected_rows;
+  }
+  return readClubSeasonsExpectedRows(source);
 }
 
 // ---------------------------------------------------------------------------
@@ -1258,6 +1304,132 @@ export type RolloverEvidence = SuccessorEvidence & {
 export type PlannedFile = { path: string; content: string; reformatted: boolean };
 
 /**
+ * A reviewed change-set transition (`transition-change-set.ts`), already validated against the
+ * bytes on disk. The planner stays the only author of the successor: it derives from `contractBase`
+ * instead of the current contract bytes (so contract edits the planner cannot compute land in the
+ * SAME validated change set rather than in a working tree the predecessor would fail against), and
+ * it applies `registerPatches` to the new register entry before any gate sees it.
+ */
+export type TransitionInput = {
+  contractBase?: Json;
+  registerPatches?: RegisterPatch[];
+  /**
+   * A reviewed successor ladder tuple. The plan only PROJECTS its append to `SUCCESSOR_LADDER_TUPLES_JSON` in
+   * tools/db/rebuild-test.ts (`RolloverPlan.activation`); the apply never writes it (successor activation).
+   */
+  successorLadderTuple?: SuccessorLadderTuple;
+};
+
+/** A `$comment`-only edit of the NEW register entry, pointer relative to that entry. */
+export type RegisterPatch = { pointer: string; old: unknown; new: unknown };
+
+const FORBIDDEN_POINTER_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export function parseJsonPointer(pointer: string): string[] {
+  if (typeof pointer !== 'string' || !pointer.startsWith('/') || pointer.length < 2) {
+    refuse(`${JSON.stringify(pointer)} is not a JSON pointer (it must start with '/').`);
+  }
+  const segments = pointer.slice(1).split('/').map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+  for (const segment of segments) {
+    if (segment === '' || FORBIDDEN_POINTER_SEGMENTS.has(segment)) {
+      refuse(`${JSON.stringify(pointer)} has an empty or forbidden segment.`);
+    }
+  }
+  return segments;
+}
+
+/**
+ * Apply reviewed `$comment` edits to a deep copy of the new register entry.
+ *
+ * Only comment prose may be edited here: every value a validator or the importer reads (labels,
+ * digests, measured counts, verdict, corrections) is derived from the executed gate or the
+ * reviewed acquisition, never from a patch. Each patch states the value it expects to replace, so
+ * a patch written against a different planner output refuses instead of silently landing.
+ */
+export function applyRegisterPatches(entry: Json, patches: readonly RegisterPatch[]): Json {
+  const next = JSON.parse(JSON.stringify(entry)) as Json;
+  const seen = new Set<string>();
+  for (const patch of patches) {
+    const segments = parseJsonPointer(patch.pointer);
+    if (segments[segments.length - 1] !== CORRECTIONS_COMMENT) {
+      refuse(`Register patch ${patch.pointer} does not end in /$comment. Only comment prose may be `
+        + 'patched; measured values, digests, labels, verdicts and corrections come from the '
+        + 'executed gates and reviewed inputs, never from a patch.');
+    }
+    if (seen.has(patch.pointer)) refuse(`Register patch ${patch.pointer} is given twice.`);
+    seen.add(patch.pointer);
+    const isProse = typeof patch.new === 'string'
+      || (Array.isArray(patch.new) && patch.new.length > 0
+        && patch.new.every((v) => typeof v === 'string' && v.length > 0));
+    if (!isProse) {
+      refuse(`Register patch ${patch.pointer} must replace the comment with a string or a non-empty `
+        + 'array of strings.');
+    }
+    let cursor: unknown = next;
+    for (const segment of segments.slice(0, -1)) {
+      if (typeof cursor !== 'object' || cursor === null || Array.isArray(cursor)
+          || !Object.hasOwn(cursor, segment)) {
+        refuse(`Register patch ${patch.pointer} does not resolve in the new register entry.`);
+      }
+      cursor = (cursor as Json)[segment];
+    }
+    if (typeof cursor !== 'object' || cursor === null || Array.isArray(cursor)
+        || !Object.hasOwn(cursor, CORRECTIONS_COMMENT)) {
+      refuse(`Register patch ${patch.pointer} does not resolve in the new register entry.`);
+    }
+    if (!jsonEqual((cursor as Json)[CORRECTIONS_COMMENT], patch.old)) {
+      refuse(`Register patch ${patch.pointer} expects a different current comment from the one the `
+        + 'planner derived (the reviewed text was written against another planner output). '
+        + 'Nothing is patched.');
+    }
+    if (jsonEqual(patch.old, patch.new)) {
+      refuse(`Register patch ${patch.pointer} replaces the comment with identical text.`);
+    }
+    (cursor as Json)[CORRECTIONS_COMMENT] = patch.new;
+  }
+  return next;
+}
+
+/**
+ * The successor register must keep every predecessor and older baseline exactly as it was,
+ * except that the retired baseline's status changes to the declared retirement status, and carry
+ * exactly one new entry that is the single accepted baseline.
+ */
+export function assertRegisterHistoryPreserved(
+  before: Json, after: Json, retiredLabel: string, retirementStatus: string,
+): void {
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  keys.delete('baselines');
+  for (const key of keys) {
+    if (!jsonEqual(before[key], after[key])) {
+      refuse(`The successor register changes top-level field ${JSON.stringify(key)}. The rollover `
+        + 'may only retire the outgoing baseline and append the new one.');
+    }
+  }
+  const was = arr(before.baselines, 'register.baselines');
+  const now = arr(after.baselines, 'successor register.baselines');
+  if (now.length !== was.length + 1) {
+    refuse(`The successor register carries ${now.length} baselines, but exactly ${was.length + 1} `
+      + `(the ${was.length} existing plus the new one) are allowed. No baseline may be dropped.`);
+  }
+  was.forEach((entry, index) => {
+    const old = obj(entry, `register.baselines[${index}]`);
+    const expected = old.snapshot_label === retiredLabel
+      ? { ...old, acceptance_status: retirementStatus }
+      : old;
+    if (!jsonEqual(expected, now[index])) {
+      refuse(`The successor register changed history: baseline ${String(old.snapshot_label)} `
+        + 'differs from its predecessor entry in more than the outgoing baseline\'s status.');
+    }
+  });
+  const added = obj(now[was.length], 'the new register entry');
+  if (added.acceptance_status !== 'accepted'
+      || now.filter((b) => obj(b, 'baseline').acceptance_status === 'accepted').length !== 1) {
+    refuse('The successor register must end with exactly one accepted baseline: the new entry.');
+  }
+}
+
+/**
  * The successor state that does not depend on any validator run.
  *
  * `planSeasonRollover` recomputes this from the same inputs, so the contract
@@ -1300,6 +1472,12 @@ export type RolloverPlan = {
   clubSeasonRows: { from: number; to: number };
   files: PlannedFile[];
   notes: string[];
+  /**
+   * A successor transition only: the activation edit this plan does NOT write. `inactiveContent` is the current
+   * rebuild source, left unchanged by the apply; `activeContent` is that source with exactly the reviewed tuple
+   * appended, which only the separately authorised `tools/db/successor-activation.ts` may write.
+   */
+  activation?: SuccessorActivationProjection;
   /** The bindings the remaining pre-apply gates must be checked against. */
   authority: {
     coreManifestPath: string;
@@ -1311,11 +1489,18 @@ export type RolloverPlan = {
   };
 };
 
-const REGISTER_PATH = 'data/reference/fitzroy-accepted-baselines.json';
-const SEASONS_PATH = 'data/reference/seasons.json';
-const CONTRACT_PATH = 'tools/rebuild/fitzroy/fitzroy-contract.json';
-const STAT_AVAILABILITY_PATH = 'data/reference/stat-availability.json';
-const REBUILD_PATH = 'tools/db/rebuild-test.ts';
+export type SuccessorActivationProjection = {
+  path: string;
+  tuple: SuccessorLadderTuple;
+  inactiveContent: string;
+  activeContent: string;
+};
+
+export const REGISTER_PATH = 'data/reference/fitzroy-accepted-baselines.json';
+export const SEASONS_PATH = 'data/reference/seasons.json';
+export const CONTRACT_PATH = 'tools/rebuild/fitzroy/fitzroy-contract.json';
+export const STAT_AVAILABILITY_PATH = 'data/reference/stat-availability.json';
+export const REBUILD_PATH = 'tools/db/rebuild-test.ts';
 
 /**
  * The line ending the existing document uses, so a rewrite does not silently
@@ -1370,6 +1555,7 @@ export function planSuccessorContract(input: {
   currentSources: { register: string; seasons: string; contract: string;
                     statAvailability: string; rebuild: string };
   evidence: SuccessorEvidence;
+  transition?: TransitionInput;
 }): SuccessorState {
   const { request, current, currentSources, evidence } = input;
   const notes: string[] = [];
@@ -1611,7 +1797,10 @@ export function planSuccessorContract(input: {
   notes.push(`seasons.json: season_notes for ${Y} removed and carried verbatim to `
     + `${newInProgress} (${JSON.stringify(carried)}).`);
 
-  const contractNext = JSON.parse(JSON.stringify(current.contract)) as Json;
+  // A reviewed transition derives from its own validated base contract (planner-owned fields
+  // already proven equal to the current contract); otherwise from the current bytes, as always.
+  const contractNext = JSON.parse(JSON.stringify(input.transition?.contractBase
+    ?? current.contract)) as Json;
   const fhNext = obj(contractNext.full_history, 'full_history');
   const rangeNext = obj(fhNext.season_range, 'season_range');
   rangeNext.last_season = Y;
@@ -1677,6 +1866,7 @@ export function planSeasonRollover(input: {
   currentSources: { register: string; seasons: string; contract: string;
                     statAvailability: string; rebuild: string };
   evidence: RolloverEvidence;
+  transition?: TransitionInput;
 }): RolloverPlan {
   const { request, current, currentSources, evidence } = input;
   const successor = planSuccessorContract(input);
@@ -1724,6 +1914,11 @@ export function planSeasonRollover(input: {
       + `currently accepted ${measuredNow.matches}. Adding a completed season cannot `
       + 'reduce or preserve the match count.');
   }
+  if (RENUMBERED_PROFILE_KEY in measuredNow && !(RENUMBERED_PROFILE_KEY in measured)) {
+    refuse(`The currently accepted baseline pins ${RENUMBERED_PROFILE_KEY} (AFLDB-ISSUE-136), but `
+      + 'the validator output records none, so the successor fingerprint would silently drop that '
+      + 'identity gate. Refusing to construct a weaker acceptance record.');
+  }
 
   const seasonsNext = successor.seasonsDocument;
   const contractNext = successor.contractDocument;
@@ -1742,7 +1937,7 @@ export function planSeasonRollover(input: {
   const bindingNow = obj(accepted.contract_binding ?? {}, 'accepted.contract_binding');
   const validationNow = obj(accepted.validation ?? {}, 'accepted.validation');
 
-  const newBaseline: Json = {
+  const derivedBaseline: Json = {
     snapshot_label: newLabel,
     acceptance_status: 'accepted',
     accepted_on: request.rolloverDate,
@@ -1789,17 +1984,57 @@ export function planSeasonRollover(input: {
     },
     accepted_corrections: evidence.acceptedCorrections,
   };
+  // Reviewed `$comment` replacements land here, before the register is serialised for any gate,
+  // so the bytes the gates adjudicate are the bytes that would be written.
+  const newBaseline = applyRegisterPatches(derivedBaseline, input.transition?.registerPatches ?? []);
   baselinesNext.push(newBaseline);
   registerNext.baselines = baselinesNext;
+  assertRegisterHistoryPreserved(current.register, registerNext, retiredLabel,
+    request.retirementStatus);
   notes.push(`acceptance register: accepted_corrections were REVIEWED for `
     + `${newLabel} — ${successor.corrections.entryCount} entr`
     + `${successor.corrections.entryCount === 1 ? 'y' : 'ies'} across `
     + `[${successor.corrections.categories.join(', ')}]. Nothing was inherited from `
     + `${retiredLabel}; its entries were not read.`);
 
-  const rebuildNext = planClubSeasonsConstantEdit(
-    currentSources.rebuild, current.clubSeasonsExpectedRows, witnessRows,
-  );
+  // A successor ladder tuple carries its own reviewed, fingerprint-bound row count, and stage 9
+  // reads it from there (`resolveLadderRebuildExpectation`). CLUB_SEASONS_EXPECTED.rows then stays
+  // what its declaration says it is, the superseded predecessor's 1897-Y-1 universe, so a successor
+  // transition never rewrites it: a second copy of the successor's number would gate nothing and
+  // would falsify the predecessor's. Without a tuple the ISSUE-101 constant edit is unchanged.
+  //
+  // AFLDB-ISSUE-316 (owner ruling 2026-10-25): adding the tuple to the closed table IS the successor
+  // activation, and the apply never performs it. A successor transition therefore does not write
+  // rebuild-test.ts at all; the edit is only PROJECTED here, from the same function and the same bytes,
+  // so the dry run can validate the activated state and print its pin, and the separately authorised
+  // `tools/db/successor-activation.ts` writes exactly that projection later. Refuses, as before, when the
+  // profile is already in the table: the successor must be inactive before the apply.
+  const successorTuple = input.transition?.successorLadderTuple;
+  let rebuildNext: string | undefined;
+  let activation: SuccessorActivationProjection | undefined;
+  if (successorTuple) {
+    if (successorTuple.expected_rows !== witnessRows) {
+      refuse(`The successor ladder tuple ${JSON.stringify(successorTuple.profile)} carries expected_rows `
+        + `${successorTuple.expected_rows}, but the ladder witness carries ${witnessRows} rows.`);
+    }
+    try {
+      activation = {
+        path: REBUILD_PATH, tuple: successorTuple, inactiveContent: currentSources.rebuild,
+        activeContent: planSuccessorTuplesEdit(currentSources.rebuild, successorTuple),
+      };
+    } catch (error) {
+      if (error instanceof LadderSuccessorRefused) refuse(error.message);
+      throw error;
+    }
+    notes.push(`successor activation NOT performed: ${REBUILD_PATH} is not written by this apply and its `
+      + `successor table stays as it is, so ${JSON.stringify(successorTuple.profile)} stays INACTIVE (every `
+      + 'rebuild refuses the installed profile) until a separately authorised '
+      + '`tools/db/successor-activation.ts --apply` appends exactly this tuple.');
+  } else {
+    rebuildNext = planClubSeasonsConstantEdit(
+      currentSources.rebuild, current.clubSeasonsExpectedRows, witnessRows,
+    );
+  }
 
   // --- the successor must satisfy exactly the rules the predecessor did -----
   assertCoherent({
@@ -1842,7 +2077,7 @@ export function planSeasonRollover(input: {
       reformatted: successor.contractReformatted },
     { path: STAT_AVAILABILITY_PATH, content: evidence.statAvailabilityText,
       reformatted: false },
-    { path: REBUILD_PATH, content: rebuildNext, reformatted: false },
+    ...(rebuildNext === undefined ? [] : [{ path: REBUILD_PATH, content: rebuildNext, reformatted: false }]),
   ];
   const reformatted = planned.filter((f) => f.reformatted).map((f) => f.path);
   if (reformatted.length > 0) {
@@ -1888,6 +2123,7 @@ export function planSeasonRollover(input: {
     clubSeasonRows: { from: current.clubSeasonsExpectedRows, to: witnessRows },
     files: planned,
     notes,
+    ...(activation ? { activation } : {}),
     authority: {
       coreManifestPath: evidence.coreManifestPath,
       coreSnapshotDir: evidence.coreSnapshotDir,

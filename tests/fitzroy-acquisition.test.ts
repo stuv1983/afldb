@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { predecessorJson } from "./rollover-predecessor-fixture";
 
 // AFLDB-ISSUE-093 Phase 2 — fitzRoy core acquisition contract.
 // Static/fixture validation only: no network, no R execution, no PostgreSQL.
 
 const root = path.resolve(__dirname, "..");
 const contractPath = path.join(root, "tools/rebuild/fitzroy/fitzroy-contract.json");
-const scriptPath = path.join(root, "tools/rebuild/fitzroy/acquire_core.R");
+const scriptPath = path.join(root, "legacy/offline/tools/rebuild/fitzroy/acquire_core.R");
 
 const contract = JSON.parse(readFileSync(contractPath, "utf8"));
 const seasons = JSON.parse(
@@ -269,9 +270,17 @@ describe("in-season acquisition contract (AFLDB-ISSUE-099)", () => {
       expect(baseline.contract_binding.required_datasets).toEqual(
         contract.full_history.required_datasets
       );
-      expect(baseline.contract_binding.required_range.last_season).toBe(
-        contract.full_history.season_range.last_season
-      );
+      // The accepted baseline binds the contract's current range; a retired one keeps the earlier
+      // range it was accepted over (the 2026 rollover, AFLDB-ISSUE-316 D-316-1, retired 1897-2025).
+      if (baseline.acceptance_status === "accepted") {
+        expect(baseline.contract_binding.required_range.last_season).toBe(
+          contract.full_history.season_range.last_season
+        );
+      } else {
+        expect(baseline.contract_binding.required_range.last_season).toBeLessThan(
+          contract.full_history.season_range.last_season
+        );
+      }
     }
   });
 
@@ -295,7 +304,9 @@ describe("in-season acquisition contract (AFLDB-ISSUE-099)", () => {
     expect(fh.contract_full_history_version).toBe(1);
     expect(fh.required_datasets).toEqual(["player_stats", "player_details", "results"]);
     expect(fh.season_range.first_season).toBe(1897);
-    expect(fh.season_range.last_season).toBe(2025);
+    // 2026 since the 2026 rollover (D-316-1); 2025 in the explicit predecessor. The in-season kind moved neither.
+    expect(fh.season_range.last_season).toBe(2026);
+    expect(predecessorJson("tools/rebuild/fitzroy/fitzroy-contract.json").full_history.season_range.last_season).toBe(2025);
     expect(fh.approved_source_gaps.seasons).toEqual([]);
     // No full-history gate mentions or accommodates the in-season kind.
     for (const gate of fh.completeness_gates) {

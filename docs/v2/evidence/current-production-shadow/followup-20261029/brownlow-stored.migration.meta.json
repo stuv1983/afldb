@@ -1,0 +1,30 @@
+{
+  "facts": {
+    "database": "afldb_v2_shadow_current_migration_test",
+    "user": "afldb_owner",
+    "read_only": "on",
+    "isolation": "repeatable read",
+    "ledger": 117,
+    "last_migration": "117_brownlow_provider_eligibility_unknown.sql",
+    "season_vote_rows": 16120,
+    "round_vote_rows": 330383,
+    "staged_vote_rows": 0
+  },
+  "reportSha256": "e2df67aee27df89d6723681fbd0cdda1938a4311c11fd96b7df69f1a1d5c98aa",
+  "seasons": 98,
+  "firstSeason": 1924,
+  "lastSeason": 2025,
+  "reports": 98,
+  "errors": 0,
+  "outcomes": {
+    "reconciled": 98
+  },
+  "presentation": {
+    "determined": 98
+  },
+  "basis": {
+    "stored_totals": 98
+  },
+  "findings": 0,
+  "matchVoteRecords": 0
+}

@@ -1,53 +1,51 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
-import { UploadForm } from '@/app/admin/upload/UploadForm';
 import { requireCapability } from '@/lib/auth/session';
-import { DATASETS } from '@/lib/ingest/datasets';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Upload data',
+  title: 'Upload data (retired)',
   robots: { index: false, follow: false },
 };
 
+/**
+ * RETIRED (AFLDB V2 Stage 5, V2-GAP-013, docs/v2/legacy-disposition.md L1). The CSV upload form is
+ * removed, and so is the dataset list it rendered (no ingest module is imported here). The guard
+ * stays so the notice is shown to the same staff roles the form was; the route it posted to
+ * (`./stage/route.ts`) refuses.
+ */
 export default async function UploadPage() {
   await requireCapability('acquisition.legacyIntake');
-
-  const datasets = Object.values(DATASETS).map((d) => ({
-    key: d.key,
-    title: d.title,
-    description: d.description,
-    requiredColumns: d.requiredColumns,
-  }));
 
   return (
     <>
       <div className="page-header">
         <h1>Upload data</h1>
         <p className="subtitle">
-          CSV in, staged for review. Nothing touches the statistical tables until a
-          validated file is approved and promoted.
+          CSV upload has been retired and no longer accepts files.
         </p>
       </div>
 
-      <UploadForm datasets={datasets} />
+      <p className="notice">
+        <strong>CSV upload, CSV submission review and promotion, and email intake are retired.</strong>{' '}
+        They loaded a file straight into the final statistical tables, which AFLDB V2 no longer
+        allows. Nothing a file contains can be staged here any more.
+      </p>
 
       <section className="section">
-        <h2>Accepted layouts</h2>
+        <h2>What replaces it</h2>
         <p className="section-note">
-          Each sample below shows the expected columns with a couple of placeholder rows —
-          a format template, not real data to promote as-is.
+          Curated award proposals are entered and reviewed in the operations centre:{' '}
+          <Link href="/admin/operations/awards">Award proposals →</Link>. Corrections to matches,
+          players and other facts go through the audited data editors in the admin sidebar.
         </p>
-        {datasets.map((d) => (
-          <p className="section-note" key={d.key}>
-            <strong>{d.title}</strong> — {d.description}
-            <br />
-            Required columns: <code>{d.requiredColumns.join(', ')}</code>
-            <br />
-            <a href={`/samples/${d.key.replace(/_/g, '-')}.csv`} download>Download sample CSV</a>
-          </p>
-        ))}
+        <p className="section-note">
+          Files already submitted stay readable as history on the{' '}
+          <Link href="/admin#submissions">submissions log</Link>; they can no longer be validated,
+          approved or promoted.
+        </p>
       </section>
     </>
   );

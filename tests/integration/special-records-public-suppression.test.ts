@@ -298,14 +298,21 @@ describe('/records/first-kick-goal — the public records board', () => {
   });
 
   it('reads the provenance instant from active rows only', async () => {
-    if (fx.newestImport === null) {
-      throw new Error('no unique max(imported_at) holder — the provenance fragment cannot be proved on this data');
+    // Batch rebuilds legitimately share imported_at. Make one controlled witness
+    // unique and restore its exact original instant even when an assertion fails.
+    const id = fx.earliest.id;
+    const [saved] = await sql<{ importedAt: string }[]>`
+      SELECT imported_at::text AS "importedAt" FROM player_achievements WHERE id = ${id}`;
+    try {
+      await sql`UPDATE player_achievements
+        SET imported_at = (SELECT max(imported_at) + interval '1 second' FROM player_achievements)
+        WHERE id = ${id}`;
+      const before = await getFirstKickGoalProvenance();
+      const after = await withVoid('player_achievements', id, () => getFirstKickGoalProvenance());
+      expect(after!.importedAt!.getTime()).toBeLessThan(before!.importedAt!.getTime());
+    } finally {
+      await sql`UPDATE player_achievements SET imported_at = ${saved.importedAt}::timestamptz WHERE id = ${id}`;
     }
-    const before = await getFirstKickGoalProvenance();
-    const after = await withVoid('player_achievements', fx.newestImport.id,
-      () => getFirstKickGoalProvenance());
-
-    expect(after!.importedAt!.getTime()).toBeLessThan(before!.importedAt!.getTime());
   });
 });
 

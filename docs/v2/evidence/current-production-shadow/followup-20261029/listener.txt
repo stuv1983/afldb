@@ -1,0 +1,1 @@
+listener 127.0.0.1:55467 pid 227045 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-currentshadow-20261028T192336Z/cluster/data

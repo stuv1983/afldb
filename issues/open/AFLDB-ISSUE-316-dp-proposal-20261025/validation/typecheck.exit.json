@@ -1,0 +1,8 @@
+{
+  "source_commit": "def676517da3955aa18db3606785463aac464188",
+  "started": "2026-10-25T03:26:34.022Z",
+  "ended": "2026-10-25T03:27:14.795Z",
+  "command": "npm run typecheck",
+  "exit_code": 0,
+  "signal": null
+}

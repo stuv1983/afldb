@@ -441,7 +441,8 @@ export async function runSettleCli(
   }
 }
 
-async function main(): Promise<void> {
+/** The pre-V2 entry point, kept beside `runSettleCli()` as the V1 behaviour it reproduces; V2 never calls it. */
+export async function main(): Promise<void> {
   loadEnv(DEFAULT_PROJECT_ROOT);
   const outcome = await runSettleCli(process.argv.slice(2));
 
@@ -483,9 +484,17 @@ async function main(): Promise<void> {
 const invokedDirectly = process.argv[1] !== undefined
   && relative(resolve(process.argv[1]), fileURLToPath(import.meta.url)) === '';
 
+/**
+ * AFLDB V2 Launch F (V2-GAP-011): the AFL Tables settle is retired. Run directly (`npm run
+ * settle:afltables`, the deploy unit's step 3), it refuses before loading .env or opening a
+ * connection. `runSettleCli()` stays importable for the offline promotion and rehearsal tools under
+ * tools/db/ and for the integration suite; none of them is scheduled or reachable from the app.
+ */
+export const AFLTABLES_SETTLE_RETIRED_V2 = 'AFLDB_LEGACY_RETIRED_V2: the AFL Tables settle is retired in AFLDB V2 '
+  + '(docs/v2/legacy-disposition.md). Nothing was read or written. Disable afldb-settle-afltables.timer '
+  + '(docs/v2/cutover-runbook.md); the AFL API settle is the only current-season writer.';
+
 if (invokedDirectly) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
-  });
+  console.error(AFLTABLES_SETTLE_RETIRED_V2);
+  process.exit(1);
 }

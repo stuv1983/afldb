@@ -1,9 +1,14 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { delimiter, isAbsolute, join } from 'node:path';
+import * as nativeFs from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
+import { inventoryEntries, strictJson, verifyRehearsalPackage, launchRehearsal, resolutionLaunch, assertRehearsalResolution, guardedListenerTool, pythonStartupLandmarks, nativePolicyText, assertLauncherNativeImage } from '../tools/v2/rehearsal-package.mjs';
+import { assertNativeEnforcement } from '../tools/v2/rehearsal-resolution-guard.mjs';
 
 import {
   CLUB_SEASONS_EXPECTED,
@@ -40,9 +45,12 @@ import {
   COACH_LOADER,
   afltablesClubListPin,
   afltablesCoachesPin,
-  coachChecks,
-  coachesImportArgv,
-  coachesValidateArgv,
+  coachChecks as realCoachChecks,
+  coachesImportArgv as realCoachesImportArgv,
+  coachesValidateArgv as realCoachesValidateArgv,
+  COACH_RAW_REPLAY_EXEMPT_PROFILES,
+  coachRawReplayPreflight,
+  coachRawReplayRequired,
   FATHER_SON_ADJUDICATIONS,
   FATHER_SON_CSV,
   FATHER_SON_LOADER,
@@ -80,13 +88,16 @@ import {
   HEIGHT_LOADER,
   WIKIPEDIA_HEIGHT_CSV,
   WIKIPEDIA_HEIGHT_LOADER,
+  REVIEWED_INPUT_PINS,
+  assertReviewedInputPins,
   wikipediaHeightRows,
   wikipediaHeightsValidateArgv,
   aflApiHeightsValidateArgv,
   aflApiRosterPin,
-  heightChecks,
-  heightEnrichmentPins,
-  heightsValidateArgv,
+  heightChecks as realHeightChecks,
+  heightEnrichmentPins as realHeightEnrichmentPins,
+  heightsImportArgv as realHeightsImportArgv,
+  heightsValidateArgv as realHeightsValidateArgv,
   BROWNLOW_SEASON_LOADER,
   BROWNLOW_SEASON_PREFLIGHT_FILES,
   brownlowSeasonChecks,
@@ -95,18 +106,1735 @@ import {
   brownlowSeasonValidateArgv,
   buildFinalValidationSql,
   executeRebuild,
-  finalValidationChecks,
-  finalValidationSql,
+  finalValidationChecks as realFinalValidationChecks,
+  finalValidationSql as realFinalValidationSql,
   fitzroyValidateArgv,
-  planStages,
+  planStages as realPlanStages,
+  resolveLadderRebuildExpectation,
+  completedSeasonChecks,
+  checkRebuildBinding,
+  isAdoptedSuccessorBinding,
+  SUCCESSOR_LADDER_TUPLES,
+  type LadderRebuildExpectation,
+  type RebuildBinding,
   resolveFitzroySource,
+  rehearsalChildEnv,
   resolveTarget,
-  runPreflight,
+  runPreflight as realRunPreflight,
   type Deps,
   type ResolvedTarget,
   type RunResult,
   type Stage,
 } from '../tools/db/rebuild-test';
+import { predecessorJson, predecessorText } from './rollover-predecessor-fixture';
+
+// Explicit synthetic predecessor expectation for domain regressions. The actual active
+// contract is exercised separately below, without this fixture's injected block. The documents
+// are the EXPLICIT predecessor of the 2026 rollover (tests/rollover-predecessor-fixture.ts), never
+// the tracked files, which the rollover rewrites.
+function predecessorDocuments() {
+  const read = predecessorJson;
+  const register = read('data/reference/fitzroy-accepted-baselines.json');
+  const contract = read('tools/rebuild/fitzroy/fitzroy-contract.json');
+  const seasons = read('data/reference/seasons.json');
+  const b = register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+  const w = contract.datasets.ladder.accepted_witness;
+  contract.datasets.ladder.rebuild_expectation = {
+    profile: 'predecessor-1897-2025', core_snapshot_label: b.snapshot_label,
+    core_manifest_sha256: b.acquisition.manifest_sha256, core_artefact_set_sha256: b.raw_artefacts.artefact_set_sha256,
+    witness_snapshot_label: w.snapshot_label, witness_manifest_sha256: w.manifest_sha256,
+    expected_rows: 1622, evidence_ref: 'synthetic predecessor independent pair evidence',
+  };
+  return { register, contract, seasons };
+}
+function predecessorExpectation(): LadderRebuildExpectation {
+  const d = predecessorDocuments();
+  return resolveLadderRebuildExpectation({ label: 'full-history-20260902', fullHistory: true,
+    accepted: true, acknowledgedPartial: false, selection: 'accepted-baseline' }, {
+    database: 'afldb_test', adminDsn: '', importDsn: '', importIsOwnerSubstitution: false,
+  }, d);
+}
+/** The predecessor fitzRoy contract, for every reader that would otherwise default to the tracked one. */
+const predecessorHeightContract = () => predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json') as Record<string, unknown>;
+/** Height pins default to the predecessor contract; a case that names its own reader is unchanged. */
+const heightEnrichmentPins: typeof realHeightEnrichmentPins = (read = predecessorHeightContract, label) =>
+  realHeightEnrichmentPins(read, label);
+const heightChecks: typeof realHeightChecks = (l, read = predecessorHeightContract, a) => realHeightChecks(l, read, a);
+const coachChecks: typeof realCoachChecks = (l, read = predecessorHeightContract, a) => realCoachChecks(l, read, a);
+const heightsImportArgv: typeof realHeightsImportArgv = (l, py, read = predecessorHeightContract) => realHeightsImportArgv(l, py, read);
+const heightsValidateArgv: typeof realHeightsValidateArgv = (l, py, read = predecessorHeightContract) => realHeightsValidateArgv(l, py, read);
+const coachesImportArgv: typeof realCoachesImportArgv = (l, py, read = predecessorHeightContract, raw) => realCoachesImportArgv(l, py, read, raw);
+const coachesValidateArgv: typeof realCoachesValidateArgv = (l, py, read = predecessorHeightContract, raw) => realCoachesValidateArgv(l, py, read, raw);
+const planStages: typeof realPlanStages = (t, s, o, h) =>
+  realPlanStages(t, s, o, h ?? predecessorHeightContract, undefined, predecessorDocuments());
+const finalValidationChecks: typeof realFinalValidationChecks = (r, d, h) => {
+  // Older domain-only cases intentionally use a minimal measured register; supply its
+  // explicit predecessor bounds rather than changing production fallback behavior.
+  const copy = structuredClone(r) as any;
+  const b = copy?.baselines?.find((b: any) => b.acceptance_status === 'accepted');
+  if (b?.measured) b.measured = { seasons_first: 1897, seasons_last: 2025, ...b.measured };
+  const expectation = predecessorExpectation();
+  const ladder = { ...expectation, pair: { ...expectation.pair, core_snapshot_label: b?.snapshot_label } };
+  return realFinalValidationChecks(copy, d, h ?? predecessorHeightContract, ladder);
+};
+const finalValidationSql: typeof realFinalValidationSql = (p) => realFinalValidationSql(p, predecessorExpectation(),
+  predecessorJson('data/reference/fitzroy-accepted-baselines.json'), predecessorHeightContract);
+const runPreflight: typeof realRunPreflight = (d, o, s, h, b) => realRunPreflight(d, o, s, h ?? predecessorHeightContract, b);
+/**
+ * Preflight of the PREDECESSOR rebuild. An unbound preflight takes its ladder profile (and with it the ISSUE-319
+ * coach raw-replay rule) from the tracked contract, which is the successor's since the 2026 rollover; these cases
+ * name the predecessor ladder instead. Its live re-check against the tracked documents is a no-op here, exactly
+ * as in the ISSUE-319 cases, because the tracked documents are not the predecessor's.
+ */
+type PreflightArgs = Parameters<typeof realRunPreflight>;
+const predecessorPreflight = (deps: Deps, opts: PreflightArgs[1], source: NonNullable<PreflightArgs[2]>, read?: PreflightArgs[3]) =>
+  runPreflight({ ...deps, checkBinding: () => {} }, opts, source, read,
+    Object.freeze({ source, target: target(), ladder: predecessorExpectation() }));
+
+describe('ISSUE-316 ladder-season-scope', () => {
+  const source = () => ({ label: 'full-history-20260902', accepted: true, fullHistory: true,
+    acknowledgedPartial: false, selection: 'accepted-baseline' as const });
+  const ordinary = () => ({ database: 'afldb_test', adminDsn: '', importDsn: '', importIsOwnerSubstitution: false });
+  it('resolves only the explicit reviewed predecessor tuple and keeps its census complete', () => {
+    const e = resolveLadderRebuildExpectation(source(), ordinary(), predecessorDocuments());
+    expect(e.expectedRows).toBe(1622);
+    expect(e.censusScope).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
+    expect(Object.isFrozen(e.pair)).toBe(true);
+    expect(Object.isFrozen(e.censusScope.excludedSeasons)).toBe(true);
+  });
+  // The CURRENT tracked documents: since the 2026 rollover (D-316-1) they carry the adopted successor.
+  const activeDocuments = () => {
+    const read = (p: string) => JSON.parse(readFileSync(join(process.cwd(), p), 'utf8'));
+    return { register: read('data/reference/fitzroy-accepted-baselines.json'),
+      contract: read('tools/rebuild/fitzroy/fitzroy-contract.json'), seasons: read('data/reference/seasons.json') };
+  };
+  // The explicit predecessor documents exactly as they stood, with their own (not injected) expectation.
+  const rawPredecessorDocuments = () => ({ register: predecessorJson('data/reference/fitzroy-accepted-baselines.json'),
+    contract: predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json'), seasons: predecessorJson('data/reference/seasons.json') });
+  const successorSource = () => ({ ...source(), label: 'c2-2026-final-core-v1' });
+  const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
+  const expectPinsBoundToTrackedManifests = (d: ReturnType<typeof activeDocuments>, e: LadderRebuildExpectation) => {
+    const b = d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+    const bytes = readFileSync(join(process.cwd(), b.acquisition.manifest_path));
+    expect(hash(bytes)).toBe(e.pair.core_manifest_sha256);
+    const lines = JSON.parse(bytes.toString()).files.map((f: any) => `${f.filename} ${f.sha256} ${f.row_count}`).sort();
+    expect(hash(lines.join('\n') + '\n')).toBe(e.pair.core_artefact_set_sha256);
+    expect(hash(readFileSync(join(process.cwd(), d.contract.datasets.ladder.accepted_witness.manifest))))
+      .toBe(e.pair.witness_manifest_sha256);
+    expect(d.contract.datasets.ladder.rebuild_expectation.evidence_ref).toContain('independent results/H&A');
+  };
+  it('resolves and plans the explicit predecessor contract without injecting an expectation', () => {
+    const d = rawPredecessorDocuments();
+    const e = resolveLadderRebuildExpectation(source(), ordinary(), d);
+    expect(e.pair).toMatchObject({ profile: 'predecessor-1897-2025', expected_rows: 1622,
+      first_season: 1897, last_season: 2025 });
+    expect(e.censusScope).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
+    const stages = realPlanStages(ordinary(), source(), { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: true },
+      predecessorHeightContract, undefined, d);
+    expect(stages.slice(0, 4).map((s) => s.id)).toEqual(['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate']);
+    expect(stages.at(-1)?.id).toBe('fingerprints');
+    expectPinsBoundToTrackedManifests(d, e);
+  });
+  it('state C: resolves and plans the actual contract, the adopted c2-2026-successor, without injecting an expectation', () => {
+    const d = activeDocuments();
+    const e = resolveLadderRebuildExpectation(successorSource(), ordinary());
+    expect(e).toEqual(resolveLadderRebuildExpectation(successorSource(), ordinary(), d));
+    expect(e.pair).toMatchObject({ profile: 'c2-2026-successor', core_snapshot_label: 'c2-2026-final-core-v1',
+      witness_snapshot_label: 'c2-2026-final-ladder-v1', expected_rows: 1640, first_season: 1897, last_season: 2026 });
+    expect(e.censusScope).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
+    // The predecessor source is no longer the accepted one, so it cannot resolve the active contract.
+    expect(() => resolveLadderRebuildExpectation(source(), ordinary())).toThrow(/exactly-one accepted full-history source/);
+    const stages = realPlanStages(ordinary(), successorSource(), { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: true });
+    expect(stages.slice(0, 4).map((s) => s.id)).toEqual(['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate']);
+    expect(stages.at(-1)?.id).toBe('fingerprints');
+    expectPinsBoundToTrackedManifests(d, e);
+    // The 1622 constant stays the predecessor's measurement; the successor carries its own 1640 in its tuple.
+    expect(CLUB_SEASONS_EXPECTED.rows).toBe(1622);
+  });
+  // AFLDB-ISSUE-323 (resolved): the ordinary rebuild of the ADOPTED successor, at the REAL preflight and execution
+  // boundaries over the tracked post-transition state. Exactly the binding that re-derives from the closed successor
+  // table and the tracked documents passes; every other shape still refuses as a candidate without provenance.
+  describe('AFLDB-ISSUE-323 adopted-successor guard, successor state', () => {
+    const opts = { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: false };
+    const adopted = (): RebuildBinding => {
+      const t = target(), s = successorSource();
+      return Object.freeze({ source: s, target: t, ladder: resolveLadderRebuildExpectation(s, t) });
+    };
+    const variant = (change: (b: any) => void): RebuildBinding => {
+      const b = structuredClone(adopted()) as any;
+      change(b);
+      return Object.freeze(b);
+    };
+    const stubStop = (deps: Deps): Deps => ({ ...deps, runCommand: () => { throw new Error('stub stop'); } });
+    const preflightRefusal = 'Candidate preflight requires external rehearsal provenance.';
+    const executionRefusal = 'Candidate execution requires original external provenance.';
+
+    it('state C: lets the adopted successor reach every stage of its real bound plan without rehearsal provenance', () => {
+      const b = adopted();
+      expect(Object.keys(SUCCESSOR_LADDER_TUPLES)).toEqual(['c2-2026-successor']);
+      expect(isAdoptedSuccessorBinding(b)).toBe(true);
+      const stages = realPlanStages(b.target, b.source, opts, undefined, b);
+      expect(stages.some((s) => s.argv?.includes('c2-2026-final-core-v1'))).toBe(true);
+      let preflight: unknown;
+      try { realRunPreflight(fakeDeps().deps, opts, b.source, undefined, b); } catch (error) { preflight = error; }
+      expect(String(preflight ?? '')).not.toMatch(/provenance/);
+      // Every stage of the exact plan runs (stub dependencies): no guard stops it, and nothing is mocked into a pass
+      // that the real run would refuse; the real run is the separately recorded disposable rebuild.
+      const f = fakeDeps();
+      const report = executeRebuild(stages, b.target, f.deps, { binding: b });
+      expect(report).toEqual({ executed: stages.map((s) => s.id), ok: true });
+      expect(f.commands.length).toBeGreaterThan(0);
+    });
+    it('refuses with no binding at both boundaries, before any child or stage', () => {
+      const b = adopted(), f = fakeDeps();
+      expect(() => realRunPreflight(f.deps, opts, b.source)).toThrow(preflightRefusal);
+      const unbound = realPlanStages(b.target, b.source, opts);
+      expect(() => executeRebuild(unbound, b.target, f.deps)).toThrow(executionRefusal);
+      expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+    });
+    it('refuses the rehearsal-only candidate profile and the candidate pair without provenance', () => {
+      const candidatePair = { profile: 'c2-2026-rehearsal-only', core_snapshot_label: 'c2-2026-final-core-v1',
+        core_manifest_sha256: '02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988',
+        core_artefact_set_sha256: '817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e',
+        witness_snapshot_label: 'c2-2026-final-ladder-v1',
+        witness_manifest_sha256: '65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34',
+        first_season: 1897, last_season: 2026, expected_rows: 1640 };
+      const b = variant((v) => { v.ladder.pair = candidatePair; });
+      expect(isAdoptedSuccessorBinding(b)).toBe(false);
+      const f = fakeDeps();
+      expect(() => realRunPreflight(f.deps, opts, b.source, undefined, b)).toThrow(preflightRefusal);
+      const g = adopted();
+      const stages = realPlanStages(g.target, g.source, opts, undefined, g);
+      expect(() => executeRebuild(stages, g.target, f.deps, { binding: b })).toThrow(executionRefusal);
+      expect(() => checkRebuildBinding(b, 'test')).toThrow('Missing candidate provenance.');
+      // The tracked contract naming the rehearsal-only profile is refused without provenance, whatever the binding.
+      const d = activeDocuments();
+      d.contract.datasets.ladder.rebuild_expectation.profile = 'c2-2026-rehearsal-only';
+      expect(isAdoptedSuccessorBinding(adopted(), d)).toBe(false);
+      expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+    });
+    it.each([
+      ['an unsupported tuple name', (v: any) => { v.ladder.pair.profile = 'c2-2026-successor-unreviewed'; }],
+      ['a wrong core manifest fingerprint', (v: any) => { v.ladder.pair.core_manifest_sha256 = '0'.repeat(64); }],
+      ['a wrong core artefact-set fingerprint', (v: any) => { v.ladder.pair.core_artefact_set_sha256 = '0'.repeat(64); }],
+      ['a wrong witness manifest fingerprint', (v: any) => { v.ladder.pair.witness_manifest_sha256 = '0'.repeat(64); }],
+      ['a wrong witness label', (v: any) => { v.ladder.pair.witness_snapshot_label = 'ladder-20260828'; }],
+      ['a wrong core label', (v: any) => { v.ladder.pair.core_snapshot_label = 'full-history-20260902'; }],
+      ['an altered pair row count', (v: any) => { v.ladder.pair.expected_rows = 1622; }],
+      ['an altered expected row count', (v: any) => { v.ladder.expectedRows = 1622; }],
+      ['an altered season range', (v: any) => { v.ladder.pair.last_season = 2025; v.ladder.lastSeason = 2025; }],
+      ['an altered census scope', (v: any) => { v.ladder.censusScope.excludedSeasons = []; }],
+      ['a mismatched source label', (v: any) => { v.source.label = 'full-history-20260902'; }],
+      ['a partial source', (v: any) => { v.source.acknowledgedPartial = true; }],
+      ['an extra pair field', (v: any) => { v.ladder.pair.supersedes = 'predecessor-1897-2025'; }],
+    ])('refuses %s at both boundaries', (_name, change) => {
+      const b = variant(change), f = fakeDeps();
+      expect(isAdoptedSuccessorBinding(b)).toBe(false);
+      expect(() => realRunPreflight(f.deps, opts, successorSource(), undefined, b)).toThrow(preflightRefusal);
+      // The real plan bound to the genuine binding, executed with the altered one.
+      const g = adopted();
+      const stages = realPlanStages(g.target, g.source, opts, undefined, g);
+      expect(() => executeRebuild(stages, g.target, f.deps, { binding: b })).toThrow(executionRefusal);
+      expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+    });
+    it('refuses a preflight whose source is not the adopted binding\'s own', () => {
+      const b = adopted(), f = fakeDeps();
+      expect(() => realRunPreflight(f.deps, opts, { ...b.source, selection: 'explicit-label' as any }, undefined, b))
+        .toThrow(preflightRefusal);
+      expect(() => realRunPreflight(f.deps, { ...opts, rehearsalLaunchSpec: '/spec', rehearsalLaunchSpecSha256: 'a'.repeat(64) },
+        b.source, undefined, b)).toThrow(preflightRefusal);
+      expect(f.commands).toEqual([]);
+    });
+    it.each([
+      ['a wrong core manifest pin in the register', (d: any) => { d.register.baselines.find((b: any) => b.acceptance_status === 'accepted').acquisition.manifest_sha256 = '0'.repeat(64); }],
+      ['a wrong witness manifest pin in the contract', (d: any) => { d.contract.datasets.ladder.accepted_witness.manifest_sha256 = '0'.repeat(64); }],
+      ['core manifest bytes that do not hash to the tuple', (d: any) => { d.register.baselines.find((b: any) => b.acceptance_status === 'accepted').acquisition.manifest_path = 'docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json'; }],
+      ['witness manifest bytes that do not hash to the tuple', (d: any) => { d.contract.datasets.ladder.accepted_witness.manifest = 'docs/rebuild-manifests/afltables_fitzroy_core/ladder-20260828.json'; }],
+      ['an unsupported expectation block', (d: any) => { d.contract.datasets.ladder.rebuild_expectation.expected_rows = 1641; }],
+      ['a reopened 2026', (d: any) => { d.seasons.in_progress_seasons = [2026]; }],
+      ['the explicit predecessor documents', (d: any) => { Object.assign(d, rawPredecessorDocuments()); }],
+    ])('is not an adopted successor over %s', (_name, change) => {
+      const d = activeDocuments();
+      change(d);
+      expect(isAdoptedSuccessorBinding(adopted(), d)).toBe(false);
+      expect(isAdoptedSuccessorBinding(adopted(), activeDocuments())).toBe(true);
+    });
+    it('refuses an altered, copied or retargeted plan even with the adopted binding', () => {
+      const b = adopted();
+      const plan = () => realPlanStages(b.target, b.source, opts, undefined, b);
+      const copied: Stage[] = JSON.parse(JSON.stringify(plan()));
+      expect(() => executeRebuild(copied, b.target, fakeDeps().deps, { binding: b })).toThrow(executionRefusal);
+      const altered = plan();
+      altered[0] = { ...altered[0], name: `${altered[0].name} (altered)` };
+      expect(() => executeRebuild(altered, b.target, stubStop(fakeDeps().deps), { binding: b }))
+        .toThrow('Rebuild target/plan changed or required full topology omitted.');
+      expect(() => executeRebuild(plan(), target(), stubStop(fakeDeps().deps), { binding: b }))
+        .toThrow('Rebuild target/plan changed or required full topology omitted.');
+      // A plan bound to a structurally equal but different binding object is not this binding's plan.
+      const other = adopted();
+      expect(() => executeRebuild(realPlanStages(other.target, other.source, opts, undefined, other), b.target,
+        fakeDeps().deps, { binding: b })).toThrow(executionRefusal);
+    });
+    it('refuses a successor that claims rehearsal provenance, at resolution and at both boundaries', () => {
+      const provenance = { specPath: join(tmpdir(), 'no-such-spec.json'), specSha256: 'a'.repeat(64) };
+      expect(() => resolveLadderRebuildExpectation(successorSource(), target(), undefined, provenance))
+        .toThrow('A successor profile cannot claim candidate rehearsal purpose.');
+      const b = variant((v) => { v.provenance = provenance; }), f = fakeDeps();
+      expect(isAdoptedSuccessorBinding(b)).toBe(false);
+      // A claimed provenance is held to the candidate's fixed isolated invocation, which an ordinary run is not.
+      expect(() => realRunPreflight(f.deps, opts, b.source, undefined, b))
+        .toThrow('Candidate invocation does not match the reviewed fixed full-runner options/source.');
+      const g = adopted();
+      expect(() => executeRebuild(realPlanStages(g.target, g.source, opts, undefined, g), g.target, f.deps, { binding: b }))
+        .toThrow('Rebuild target/plan changed or required full topology omitted.');
+      expect([f.commands, f.sqlRuns, f.validationRuns]).toEqual([[], [], []]);
+    });
+    it('leaves the predecessor unable to borrow the exemption: its pair is no successor tuple', () => {
+      const d = rawPredecessorDocuments();
+      const t = target();
+      const b: RebuildBinding = Object.freeze({ source: source(), target: t, ladder: resolveLadderRebuildExpectation(source(), t, d) });
+      expect(b.ladder.pair.profile).toBe('predecessor-1897-2025');
+      expect(isAdoptedSuccessorBinding(b, d)).toBe(false);
+    });
+  });
+  it('invariant: explicit predecessor plan reaches its first stage with predecessor documents', () => {
+    const s = source(), t = target(), d = rawPredecessorDocuments();
+    const binding = Object.freeze({ source: s, target: t, ladder: resolveLadderRebuildExpectation(s, t, d) });
+    expect(binding.ladder.pair.profile).toBe('predecessor-1897-2025');
+    const check: typeof checkRebuildBinding = (b, checkpoint) => checkRebuildBinding(b, checkpoint, d);
+    const stages = realPlanStages(t, s, OPTS, predecessorHeightContract, binding, d, check);
+    let preflight: unknown;
+    try { realRunPreflight({ ...fakeDeps().deps, checkBinding: check }, OPTS, s, predecessorHeightContract, binding); } catch (error) { preflight = error; }
+    expect(String(preflight ?? '')).not.toMatch(/provenance/);
+    expect(() => executeRebuild(stages, t, { ...fakeDeps().deps, checkBinding: check,
+      runCommand: () => { throw new Error('stub stop'); } }, { binding })).toThrow('stub stop');
+  });
+  it.each([undefined, null, [], {}, 'c2-2026-successor'])('refuses an absent or invalid actual-contract block: %s', (block) => {
+    const d = activeDocuments();
+    if (block === undefined) delete d.contract.datasets.ladder.rebuild_expectation;
+    else d.contract.datasets.ladder.rebuild_expectation = block;
+    expect(() => resolveLadderRebuildExpectation(successorSource(), ordinary(), d)).toThrow(/Missing explicit|Unsupported/);
+    expect(() => realPlanStages(ordinary(), successorSource(), { draftguruLabel: DEFAULT_DRAFTGURU_LABEL, planOnly: true }, undefined, undefined, d))
+      .toThrow(/Missing explicit|Unsupported/);
+  });
+  it.each([undefined, 0, -1, 1.5, '1622', NaN, Number.MAX_SAFE_INTEGER + 1, 1623, 1639, 1640, 1641])('refuses unsupported expected_rows %s', (value) => {
+    const d = predecessorDocuments();
+    d.contract.datasets.ladder.rebuild_expectation.expected_rows = value;
+    expect(() => resolveLadderRebuildExpectation(source(), ordinary(), d)).toThrow(/Unsupported/);
+  });
+  it.each(['core_manifest_sha256', 'core_artefact_set_sha256', 'witness_manifest_sha256', 'core_snapshot_label', 'witness_snapshot_label', 'profile', 'evidence_ref'])('refuses missing or changed %s', (field) => {
+    for (const value of [undefined, 'wrong']) {
+      const d = predecessorDocuments();
+      if (value === undefined) delete d.contract.datasets.ladder.rebuild_expectation[field];
+      else d.contract.datasets.ladder.rebuild_expectation[field] = value;
+      // evidence_ref is documentary, and any nonempty retained reference is syntactically valid.
+      if (field === 'evidence_ref' && value === 'wrong') continue;
+      expect(() => resolveLadderRebuildExpectation(source(), ordinary(), d)).toThrow();
+    }
+  });
+  it.each(['core-hash', 'set-hash', 'witness-hash', 'range', 'measured', 'witness-range', 'gap', 'reference'])('refuses inconsistent %s', (change) => {
+    const d = predecessorDocuments(), b = d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+    if (change === 'core-hash') b.acquisition.manifest_sha256 = '0'.repeat(64);
+    if (change === 'set-hash') b.raw_artefacts.artefact_set_sha256 = '0'.repeat(64);
+    if (change === 'witness-hash') d.contract.datasets.ladder.accepted_witness.manifest_sha256 = '0'.repeat(64);
+    if (change === 'range') b.contract_binding.required_range.last_season = 2026;
+    if (change === 'measured') b.measured.seasons_last = 2026;
+    if (change === 'witness-range') d.contract.datasets.ladder.coverage.last_season = 2026;
+    if (change === 'gap') d.contract.full_history.approved_source_gaps.seasons = [1916];
+    if (change === 'reference') d.seasons.last_season = 2024;
+    expect(() => resolveLadderRebuildExpectation(source(), ordinary(), d)).toThrow();
+  });
+  it('refuses zero/two accepted entries and acknowledged partial source', () => {
+    for (const count of [0, 2]) {
+      const d = predecessorDocuments();
+      const b = d.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+      d.register.baselines = Array.from({ length: count }, () => structuredClone(b));
+      expect(() => resolveLadderRebuildExpectation(source(), ordinary(), d)).toThrow();
+    }
+    expect(() => resolveLadderRebuildExpectation({ ...source(), acknowledgedPartial: true }, ordinary(), predecessorDocuments())).toThrow();
+  });
+  it('keeps football SQL independent of Brownlow and checks missing/unfinished years plus the decided latest GF', () => {
+    const checks = completedSeasonChecks(predecessorExpectation());
+    expect(checks[0].sql).toContain('generate_series(1897, 2025)');
+    expect(checks[0].sql).toContain("s.status <> 'complete'");
+    expect(checks[1].sql).toContain("result <> 'draw'");
+    expect(JSON.stringify(checks)).not.toMatch(/brownlow/i);
+  });
+  it('requires paired provenance options and never accepts skip/override flags', () => {
+    for (const a of [['--rehearsal-launch-spec', '/spec'], ['--rehearsal-launch-spec-sha256', 'a'.repeat(64)]]) {
+      expect(() => parseRebuildArgs(a)).toThrow(/together/);
+    }
+    expect(() => parseRebuildArgs(['--ladder-expected-rows', '1640'])).toThrow(/Unknown/);
+  });
+
+  /* eslint-disable @typescript-eslint/no-explicit-any -- the package/runtime fixtures mutate loosely typed JSON records and a fake file system */
+  describe('package-provenance', () => {
+    describe('guarded child environment', () => {
+      it('sets PATH to the bound cluster-client directory only, whatever the parent carried', () => {
+        const env = rehearsalChildEnv({ PATH: '/usr/bin:/bin', Path: 'C:\Windows', HOME: '/h', NODE_OPTIONS: '--require x', NODE_PATH: '/n', PYTHONPATH: '/p', PYTHONHOME: '/q',
+          PYTHONUSERBASE: '/u', ESBUILD_BINARY_PATH: '/e', TSX_TSCONFIG_PATH: '/t' }, { AFLDB_RESOLUTION_POLICY: '/policy', PATH: '/hijack' }, '/opt/pg/bin');
+        expect(env.PATH).toBe('/opt/pg/bin');
+        expect(Object.keys(env).filter((k) => k.toUpperCase() === 'PATH')).toEqual(['PATH']);
+        expect(env.AFLDB_RESOLUTION_POLICY).toBe('/policy');
+        expect(env.HOME).toBe('/h');
+        for (const k of ['NODE_OPTIONS', 'NODE_PATH', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONUSERBASE', 'ESBUILD_BINARY_PATH', 'TSX_TSCONFIG_PATH']) expect(env[k]).toBeUndefined();
+      });
+      it('supplies PATH even when the parent had none', () => {
+        expect(rehearsalChildEnv(undefined, {}, '/opt/pg/bin')).toEqual({ PATH: '/opt/pg/bin' });
+      });
+      it('is the only environment construction in the rehearsal spawn wrapper', () => {
+        const text = readFileSync(join(process.cwd(), 'tools/db/rebuild-test.ts'), 'utf8');
+        const body = text.slice(text.indexOf('function rehearsalSpawn('), text.indexOf('Resolve the fitzRoy source for this rebuild'));
+        expect(body).toContain('rehearsalChildEnv(options.env, enforcement.env, r.pg_bin)');
+        expect(body).not.toMatch(/\.\.\.options\.env/);
+      });
+    });
+    const digest = (b: string | Buffer) => createHash('sha256').update(b).digest('hex');
+    describe('real interpreter resolution boundary (DB-free, retained C: fixtures)', () => {
+      let base: string, loader: string, binary: string, python: string, stdlib: string[];
+      let runtimeFiles: Record<string, string>;
+      let runtimeLinkCounts: Record<string, number>; // installed files with nlink > 1 (npm hard-links tsx's esbuild binary on Linux)
+      const put = (p: string, bytes: string | Buffer) => { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, bytes); };
+      beforeAll(() => {
+        base = nativeFs.realpathSync(mkdtempSync(join(tmpdir(), 'issue316-resolution-')));
+        if (process.platform === 'win32') expect(base).toMatch(/^C:\\/i);
+        const require = createRequire(join(process.cwd(), 'package.json'));
+        loader = require.resolve('tsx');
+        const tsxRequire = createRequire(loader);
+        binary = tsxRequire.resolve(`@esbuild/${process.platform}-${process.arch}/${process.platform === 'win32' ? 'esbuild.exe' : 'bin/esbuild'}`);
+        runtimeFiles = {};
+        runtimeLinkCounts = {};
+        function bind(dir: string) {
+          for (const e of readdirSync(dir, { withFileTypes: true })) {
+            if (e.name === 'site-packages' || e.name === '__pycache__') continue;
+            const p = join(dir, e.name);
+            if (e.isDirectory()) bind(p); else if (e.isFile()) {
+              runtimeFiles[p] = digest(readFileSync(p));
+              const links = nativeFs.statSync(p).nlink;
+              if (links > 1) runtimeLinkCounts[p] = links;
+            }
+          }
+        }
+        bind(resolve(loader, '..', '..')); // actual installed tsx, esbuild and native helper
+        // Windows installs the interpreter as `python`; Debian/Ubuntu ship only `python3` (no `python`).
+        const py = spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['-I', '-S', '-c', 'import sys,json; print(json.dumps([sys.executable,sys.path]))'], { encoding: 'utf8', shell: false });
+        expect(py.status, `Required local Python unavailable: ${py.error?.message ?? py.stderr}`).toBe(0);
+        [python, stdlib] = JSON.parse(py.stdout.trim());
+        for (const p of stdlib) if (existsSync(p) && nativeFs.statSync(p).isDirectory()) bind(p);
+      });
+      function realFixture(extension = 'mjs') {
+        const root = nativeFs.realpathSync(mkdtempSync(join(base, 'case-'))), src = join(root, 'source');
+        const guard = join(src, 'tools/v2/rehearsal-resolution-guard.mjs');
+        put(guard, readFileSync(join(process.cwd(), 'tools/v2/rehearsal-resolution-guard.mjs')));
+        put(join(src, 'package.json'), '{"type":"module"}');
+        const entry = join(src, `entry.${extension}`), sentinel = join(root, 'sentinel');
+        const dependency = join(root, 'deps/node_modules/bound/index.cjs');
+        put(dependency, 'module.exports = 42;');
+        put(join(dirname(dependency), 'package.json'), '{"main":"index.cjs"}');
+        const ambient = join(root, 'node_modules/ambient/index.cjs');
+        put(ambient, `require('node:fs').writeFileSync(${JSON.stringify(sentinel)}, 'BAD'); module.exports=9;`);
+        put(join(dirname(ambient), 'package.json'), '{"main":"index.cjs"}');
+        const policy: Record<string, any> = { files: { ...runtimeFiles }, ...(Object.keys(runtimeLinkCounts).length ? { hardlink_counts: { ...runtimeLinkCounts } } : {}), node_search_roots: [join(root, 'deps')], tsx_loader: loader,
+          esbuild_binary: binary, python_stdlib: stdlib, python_dependencies: [join(root, 'pydeps')], source_root: src };
+        const bind = (p: string) => { policy.files[p] = digest(readFileSync(p)); };
+        for (const p of [guard, join(src, 'package.json'), dependency, join(dirname(dependency), 'package.json')]) bind(p);
+        const launch = () => resolutionLaunch({ spec: { source_root: src, temp_root: join(root, 'temp') }, resolution: policy } as any);
+        const run = (code: string, py = false) => {
+          put(entry, code); bind(entry);
+          const boundary = launch();
+          return spawnSync(py ? python : process.execPath, [...(py ? boundary.pythonArgs : boundary.nodeArgs), entry], {
+            cwd: src, env: { ...boundary.env, NODE_ENV: process.env.NODE_ENV, SystemRoot: process.env.SystemRoot, TEMP: join(root, 'temp'), TMP: join(root, 'temp'),
+              // These intentionally hostile inherited settings must not influence isolated Python.
+              PYTHONPATH: join(root, 'ambient-python'), PYTHONUSERBASE: join(root, 'ambient-python') },
+            encoding: 'utf8', timeout: 20_000, shell: false,
+          });
+        };
+        return { root, src, entry, sentinel, dependency, ambient, policy, bind, put, launch, run };
+      }
+      it.each(['mjs', 'cjs', 'ts'])('loads a real bound dependency through %s and the actual tsx preload', (extension) => {
+        const f = realFixture(extension);
+        const result = f.run(extension === 'cjs' ? `console.log(require('bound'));` : `import value from 'bound'; console.log(value);`);
+        expect(result.status, result.stderr).toBe(0); expect(result.stdout.trim()).toBe('42');
+      });
+      it('loads the runner-style CommonJS TypeScript path with real type transformation', () => {
+        const f = realFixture('ts');
+        f.put(join(f.src, 'package.json'), '{"type":"commonjs"}'); f.bind(join(f.src, 'package.json'));
+        const result = f.run(`const value: number = require('bound'); console.log(value);`);
+        expect(result.status, result.stderr).toBe(0); expect(result.stdout.trim()).toBe('42');
+      });
+      it('refuses ancestor imports on the runner-style CommonJS TypeScript path', () => {
+        const f = realFixture('ts');
+        f.put(join(f.src, 'package.json'), '{"type":"commonjs"}'); f.bind(join(f.src, 'package.json'));
+        const result = f.run(`const value: number = require('ambient');`);
+        expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal resolution refused');
+        expect(existsSync(f.sentinel)).toBe(false);
+      });
+      it.each(['mjs', 'cjs', 'ts'])('refuses resolvable ancestor dependency before sentinel execution via %s', (extension) => {
+        const f = realFixture(extension);
+        // Control proves this is a resolvable module, not a missing-module success.
+        const control = spawnSync(process.execPath, ['-p', `require.resolve('ambient')`], { cwd: f.src, encoding: 'utf8', shell: false });
+        expect(control.status).toBe(0); expect(control.stdout.trim()).toBe(f.ambient);
+        const result = f.run(extension === 'cjs' ? `require('ambient');` : `import 'ambient';`);
+        expect(result.status, result.stderr).not.toBe(0); expect(existsSync(f.sentinel)).toBe(false);
+        expect(result.stderr).toContain('Rehearsal resolution refused');
+      });
+      it.each(['mjs', 'cjs', 'ts'])('rejects changed bound dependency bytes at module load via %s', (extension) => {
+        const f = realFixture(extension);
+        f.put(f.dependency, `require('node:fs').writeFileSync(${JSON.stringify(f.sentinel)}, 'BAD');`);
+        const result = f.run(extension === 'cjs' ? `require('bound');` : `import 'bound';`);
+        expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal resolution refused');
+        expect(existsSync(f.sentinel)).toBe(false);
+      });
+      it('guards the TS loader graph itself before unbound loader bytes execute', () => {
+        const f = realFixture();
+        f.policy.tsx_loader = f.ambient;
+        const result = f.run(`console.log('application');`);
+        expect(result.status).not.toBe(0); expect(result.stdout).not.toContain('application'); expect(existsSync(f.sentinel)).toBe(false);
+        expect(result.stderr).toContain('Rehearsal resolution refused');
+      });
+      it('uses the real TS loader for an inventoried workspace alias and transitive import', () => {
+        const f = realFixture('ts'), config = join(f.src, 'tsconfig.json'), workspace = join(f.src, 'packages/example/src/index.ts');
+        f.put(config, JSON.stringify({ compilerOptions: { baseUrl: '.', paths: { '@afldb/example': ['packages/example/src/index.ts'] } } }));
+        f.put(workspace, `import value from 'bound'; export const result: number = value;`);
+        f.bind(config); f.bind(workspace);
+        const result = f.run(`import { result } from '@afldb/example'; console.log(result);`);
+        expect(result.status, result.stderr).toBe(0); expect(result.stdout.trim()).toBe('42');
+      });
+      it('refuses an unbound workspace alias target before its code executes', () => {
+        const f = realFixture('ts'), config = join(f.src, 'tsconfig.json');
+        f.put(config, JSON.stringify({ compilerOptions: { baseUrl: '.', paths: { '@afldb/example': [f.ambient] } } })); f.bind(config);
+        const result = f.run(`import '@afldb/example';`);
+        expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal resolution refused');
+        expect(existsSync(f.sentinel)).toBe(false);
+      });
+      it('loads inventoried Python source and a separately bound dependency in isolated mode', () => {
+        const f = realFixture('py'), dep = join(f.root, 'pydeps/bound_python.py');
+        f.put(dep, 'value = 42\n'); f.bind(dep);
+        const result = f.run('import bound_python\nprint(bound_python.value)\n', true);
+        expect(result.status, result.stderr).toBe(0); expect(result.stdout.trim()).toBe('42');
+      });
+      it.each(['ambient', 'changed'])('refuses Python %s bytes before sentinel code executes', (kind) => {
+        const f = realFixture('py'), dep = join(f.root, 'pydeps/unbound.py');
+        f.put(dep, 'value = 42\n'); if (kind === 'changed') f.bind(dep);
+        f.put(dep, `open(${JSON.stringify(f.sentinel.replaceAll('\\', '/'))}, 'w').write('BAD')\n`);
+        const result = f.run('import unbound\n', true);
+        expect(result.status, result.stderr).not.toBe(0); expect(result.stderr).toMatch(/Rehearsal Python (resolution|bytes) refused/);
+        expect(existsSync(f.sentinel)).toBe(false);
+      });
+      it('refuses a real ambient Python import even after sys.path injection', () => {
+        const f = realFixture('py'), ambient = join(f.root, 'ambient-python');
+        f.put(join(ambient, 'ambient_module.py'), `open(${JSON.stringify(f.sentinel.replaceAll('\\', '/'))}, 'w').write('BAD')\n`);
+        const inject = `import sys\nsys.path.insert(0, ${JSON.stringify(ambient.replaceAll('\\', '/'))})\n`;
+        const control = spawnSync(python, ['-I', '-S', '-c', `${inject}import importlib.util\nprint(importlib.util.find_spec('ambient_module').origin)`], { encoding: 'utf8', shell: false });
+        expect(control.status, control.stderr).toBe(0); expect(control.stdout).toContain('ambient_module.py');
+        const result = f.run(`${inject}import ambient_module\n`, true);
+        expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal Python resolution refused');
+        expect(existsSync(f.sentinel)).toBe(false);
+      });
+      // Real links need no privilege on Linux but may on Windows; when unavailable the case is skipped, never faked.
+      const linkSupport = (() => {
+        const d = mkdtempSync(join(tmpdir(), 'issue316-linkprobe-')); const out = { symlink: false, hardlink: false };
+        try { nativeFs.symlinkSync(join(d, 'absent-target'), join(d, 'symlink')); out.symlink = true; } catch { /* unsupported here */ }
+        try { writeFileSync(join(d, 'a'), 'x'); nativeFs.linkSync(join(d, 'a'), join(d, 'b')); out.hardlink = nativeFs.lstatSync(join(d, 'a')).nlink === 2; } catch { /* unsupported here */ }
+        rmSync(d, { recursive: true, force: true }); return out;
+      })();
+      // Python consults a zip on sys.path before any later import, so the guard must refuse it first.
+      const zipWithJson = (dir: string, name: string, sentinel: string) => {
+        const zip = join(dir, name);
+        const made = spawnSync(python, ['-I', '-S', '-c', 'import zipfile, sys\nz = zipfile.ZipFile(sys.argv[1], "w")\nz.writestr("json.py", sys.argv[2])\nz.close()',
+          zip, `open(${JSON.stringify(sentinel.replaceAll('\\', '/'))}, 'w').write('BAD')\n`], { encoding: 'utf8', shell: false });
+        expect(made.status, made.stderr).toBe(0);
+        return zip;
+      };
+      // JSON string syntax is valid Python string syntax, so the path is inserted exactly as the policy lists it.
+      const zipFirst = (zip: string, code: string) => `import sys\nsys.path.insert(0, ${JSON.stringify(zip)})\n${code}`;
+      // The real guard source and policy, with only the startup zip placed first on sys.path beforehand.
+      function guardedWithStartupZip(f: ReturnType<typeof realFixture>, zip: string) {
+        f.put(f.entry, 'print("application")\n'); f.bind(f.entry);
+        f.policy.python_stdlib = [zip, ...stdlib];
+        const args = f.launch().pythonArgs; // ['-I', '-S', '-B', '-c', guard, policyPath, pin]
+        return spawnSync(python, [...args.slice(0, 4), zipFirst(zip, args[4]), args[5], args[6], f.entry], {
+          cwd: f.src, encoding: 'utf8', timeout: 20_000, shell: false, env: { NODE_ENV: process.env.NODE_ENV, SystemRoot: process.env.SystemRoot } });
+      }
+      it('refuses a present startup zip before any module in it can run, where a bare interpreter would run it', () => {
+        const f = realFixture('py'), zip = zipWithJson(f.root, 'startup.zip', f.sentinel);
+        const control = spawnSync(python, ['-I', '-S', '-c', zipFirst(zip, 'import json\n')], { encoding: 'utf8', shell: false });
+        expect(control.status, control.stderr).toBe(0); expect(existsSync(f.sentinel)).toBe(true); // the zip really would execute
+        rmSync(f.sentinel);
+        const result = guardedWithStartupZip(f, zip);
+        expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal Python resolution refused');
+        expect(result.stdout).not.toContain('application'); expect(existsSync(f.sentinel)).toBe(false);
+      });
+      it.skipIf(!linkSupport.symlink)('refuses a dangling symlink named like the startup zip (exists() is false, lexists() is true)', () => {
+        const f = realFixture('py'), dangling = join(f.root, 'dangling.zip');
+        nativeFs.symlinkSync(join(f.root, 'nowhere.zip'), dangling);
+        expect(existsSync(dangling)).toBe(false);
+        const result = guardedWithStartupZip(f, dangling);
+        expect(result.status).not.toBe(0); expect(result.stderr).toContain('Rehearsal Python resolution refused');
+        expect(result.stdout).not.toContain('application');
+      });
+      it('leaves a startup path whose zip is absent, as Python lists it on Debian, working', () => {
+        const f = realFixture('py'), absent = join(f.root, 'absent.zip');
+        f.put(f.entry, 'print("application")\n'); f.bind(f.entry);
+        f.policy.python_stdlib = [absent, ...stdlib];
+        const a = f.launch().pythonArgs;
+        const result = spawnSync(python, [...a.slice(0, 4), zipFirst(absent, a[4]), a[5], a[6], f.entry],
+          { cwd: f.src, encoding: 'utf8', timeout: 20_000, shell: false, env: { NODE_ENV: process.env.NODE_ENV, SystemRoot: process.env.SystemRoot } });
+        expect(result.status, result.stderr).toBe(0); expect(result.stdout.trim()).toBe('application');
+      });
+      it('checks every startup zip with the built-in file-system module before the guard imports os or anything path-based', () => {
+        const f = realFixture('py'), guard = f.launch().pythonArgs[4];
+        const firstCheck = guard.indexOf('_fs.lstat('), firstOs = guard.indexOf('import json, os');
+        expect(firstCheck).toBeGreaterThan(-1); expect(firstCheck).toBeLessThan(firstOs);
+        // Before the zip loop the only import statement is the interpreter's own `sys`; the file-system
+        // module is chosen by builtin name, so a zip on sys.path cannot supply it.
+        const beforeCheck = guard.slice(0, firstCheck);
+        expect((beforeCheck.match(/^\s*import\s.*$/gm) ?? []).map((l) => l.trim())).toEqual(['import sys']);
+        expect(beforeCheck).toContain("__import__('nt' if 'nt' in sys.builtin_module_names else 'posix')");
+        expect(guard).not.toContain('os.path.lexists');
+      });
+      // Node: a real hard-linked module pair loads only under an exactly declared count.
+      it.skipIf(!linkSupport.hardlink)('loads a real hard-linked module only when the policy declares that exact link count', () => {
+        const f = realFixture('mjs'), a = join(f.src, 'native-a.mjs'), b = join(f.src, 'native-b.mjs');
+        f.put(a, 'export default 42;\n'); nativeFs.linkSync(a, b); f.bind(a); f.bind(b);
+        expect(nativeFs.lstatSync(a).nlink).toBe(2);
+        const policy = f.policy as any, imports = (name: string) => `import value from './${name}'; console.log(value);`;
+        const installed = { ...policy.hardlink_counts }; // real installed links (e.g. tsx's esbuild) stay declared so only the fixture's own pair varies
+        const refused = f.run(imports('native-a.mjs'));
+        expect(refused.status).not.toBe(0); expect(refused.stderr).toContain('Rehearsal resolution refused');
+        for (const counts of [{ [a]: 3, [b]: 3 }, { [b]: 2 }, { [a]: 1 }]) {
+          policy.hardlink_counts = { ...installed, ...counts }; const wrong = f.run(imports('native-a.mjs'));
+          expect(wrong.status).not.toBe(0); expect(wrong.stderr).toContain('Rehearsal resolution refused');
+        }
+        policy.hardlink_counts = { ...installed, [a]: 2, [b]: 2 };
+        for (const name of ['native-a.mjs', 'native-b.mjs']) {
+          const loaded = f.run(imports(name)); expect(loaded.status, loaded.stderr).toBe(0); expect(loaded.stdout.trim()).toBe('42');
+        }
+        // An ordinary bound module still needs nlink 1, whatever else the policy declares.
+        f.put(join(f.src, 'solo.mjs'), 'export default 7;\n'); f.bind(join(f.src, 'solo.mjs'));
+        const third = join(f.root, 'solo-extra-link.mjs'); nativeFs.linkSync(join(f.src, 'solo.mjs'), third);
+        const solo = f.run(imports('solo.mjs')); expect(solo.status).not.toBe(0); expect(solo.stderr).toContain('Rehearsal resolution refused');
+      });
+    });
+    // Entirely in memory. These bytes are synthetic; no launch/package/target exists.
+    function fixture() {
+      const base = resolve(tmpdir(), 'issue316-synthetic');
+      const pkg = join(base, 'package'), src = join(pkg, 'source');
+      const files = new Map<string, Buffer>();
+      const altered = new Map<string, string>();
+      const put = (p: string, text: string | Buffer) => files.set(p, Buffer.from(text));
+      const pair = {
+        profile: 'c2-2026-rehearsal-only', core_snapshot_label: 'c2-2026-final-core-v1',
+        core_manifest_sha256: '02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988',
+        core_artefact_set_sha256: '817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e',
+        witness_snapshot_label: 'c2-2026-final-ladder-v1', witness_manifest_sha256: '65c299072afb35f1b0ddce50c9c72728e03bcd1580d676ca63eaaafb86047c34',
+        first_season: 1897, last_season: 2026, expected_rows: 1640,
+      };
+      const target = { database: 'afldb_v2_rb_synthetic_test', host: '127.0.0.1', port: 55432,
+        cluster_name: 'afldb_v2_isolated', database_marker: 'afldb-v2-isolated-test' };
+      const binding = { schema_version: 1, purpose: 'issue316-c2-rehearsal-only', implementation_basis: 'a'.repeat(40), source_subdir: 'source', pair, target };
+      const required = ['tools/v2/rehearsal-package.mjs', 'tools/v2/rehearsal-package.d.mts', 'tools/v2/rehearsal-resolution-guard.mjs', 'tools/v2/isolated-pg.ts',
+        'tools/db/rebuild-test.ts', 'tools/db/afl-api-ownership-census.ts', 'src/lib/rollover/afl-api-ownership-census.ts',
+        'tools/db/ladder-successor.ts', 'src/lib/rollover/ladder-successor.ts',
+        'package.json', 'package-lock.json', 'tsconfig.json', 'tools/rebuild/fitzroy/fitzroy-contract.json',
+        'data/reference/fitzroy-accepted-baselines.json', 'data/reference/seasons.json', 'data/synthetic-input.csv'];
+      for (const p of required) put(join(src, p), `synthetic ${p}\n`);
+      const coreManifest = 'manifests/core.json', witnessManifest = 'manifests/witness.json';
+      put(join(src, 'data/reference/fitzroy-accepted-baselines.json'), JSON.stringify({ baselines: [{
+        acceptance_status: 'accepted', snapshot_label: pair.core_snapshot_label,
+        acquisition: { manifest_path: coreManifest, manifest_sha256: pair.core_manifest_sha256 },
+        raw_artefacts: { artefact_set_sha256: pair.core_artefact_set_sha256 },
+      }] }));
+      put(join(src, 'tools/rebuild/fitzroy/fitzroy-contract.json'), JSON.stringify({ datasets: { ladder: { accepted_witness: {
+        snapshot_label: pair.witness_snapshot_label, manifest: witnessManifest, manifest_sha256: pair.witness_manifest_sha256,
+      } } } }));
+      for (const p of [coreManifest, witnessManifest]) put(join(src, p), JSON.stringify({ working_directory: 'data', files: [{ filename: 'synthetic-input.csv' }] }));
+      put(join(pkg, 'REHEARSAL_BINDINGS.json'), JSON.stringify(binding));
+      const inventory = () => [...files.keys()].filter((p) => p.startsWith(pkg + '/') || p.startsWith(pkg + '\\'))
+        .filter((p) => p !== join(pkg, 'SHA256SUMS.txt')).map((p) => ({ p, rel: p.slice(pkg.length + 1).replaceAll('\\', '/') }))
+        .sort((a, b) => a.rel < b.rel ? -1 : 1).map(({ p, rel }) => `${digest(files.get(p)!)}  ${rel}\n`).join('');
+      put(join(pkg, 'SHA256SUMS.txt'), inventory());
+      const runtimeRoot = join(base, 'runtime');
+      const nodeRoot = dirname(process.execPath);
+      put(process.execPath, 'synthetic Node bytes');
+      const exe = (n: string) => process.platform === 'win32' ? `${n}.exe` : n;
+      for (const p of ['loader.mjs', exe('python'), `bin/${exe('psql')}`, `bin/${exe('pg_dump')}`, `bin/${exe('pg_restore')}`, 'library/dependency.js']) put(join(runtimeRoot, p), `synthetic ${p}`);
+      const listener = process.platform === 'win32' ? join(runtimeRoot, 'Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : join(runtimeRoot, 'ss');
+      put(listener, 'synthetic listener tool');
+      const runtime = { schema_version: 1, node: process.execPath, tsx_loader: join(runtimeRoot, 'loader.mjs'),
+        node_search_roots: [runtimeRoot], esbuild_binary: join(runtimeRoot, 'library/dependency.js'), python_stdlib: [runtimeRoot], python_dependencies: [],
+        python: join(runtimeRoot, exe('python')), pg_bin: join(runtimeRoot, 'bin'), listener_tool: listener, lockfile_sha256: digest(files.get(join(src, 'package-lock.json'))!),
+        roots: [nodeRoot, runtimeRoot].map((path) => ({ path, files: [...files.keys()].filter((p) => p.startsWith(path + '/') || p.startsWith(path + '\\'))
+          .map((p) => ({ path: p.slice(path.length + 1).replaceAll('\\', '/'), sha256: digest(files.get(p)!) })).sort((a, b) => a.path < b.path ? -1 : 1) })) };
+      const runtimePath = join(base, 'runtime.json'), launcher = join(base, 'launcher.mjs');
+      put(runtimePath, JSON.stringify(runtime)); put(launcher, files.get(join(src, 'tools/v2/rehearsal-package.mjs'))!);
+      const spec = { schema_version: 1, purpose: binding.purpose, implementation_basis: binding.implementation_basis, pair, target,
+        package_root: pkg, source_root: src, inventory_relative_path: 'SHA256SUMS.txt', expected_inventory_sha256: digest(inventory()),
+        runtime_record: runtimePath, runtime_record_sha256: digest(files.get(runtimePath)!), capture_root: join(base, 'capture'),
+        output_root: join(base, 'output'), temp_root: join(base, 'temp'), cluster_root: join(base, 'cluster'),
+        runner_options: ['--target', 'isolated', '--acknowledge-destroy', target.database], launcher_path: launcher,
+        launcher_sha256: digest(files.get(launcher)!), required_files: ['REHEARSAL_BINDINGS.json', ...required.map((p) => `source/${p}`)] };
+      const specPath = join(base, 'launch.json'); put(specPath, JSON.stringify(spec));
+      const request = { specPath, specSha256: digest(files.get(specPath)!), checkpoint: 'synthetic', launcherPath: launcher };
+      // Symbolic links (path -> literal link text), made directories, and per-path stat facts. Additive:
+      // nothing here is consulted unless a case registers it.
+      const links = new Map<string, string>(), extraDirs = new Set<string>();
+      const nlinks = new Map<string, number>(), modes = new Map<string, number>(), inodes = new Map<string, number>();
+      let nextInode = 1000;
+      const inodeOf = (s: string) => { if (!inodes.has(s)) inodes.set(s, nextInode++); return inodes.get(s)!; };
+      let directoryCache = new Set<string>(), directorySize = -1;
+      const directories = () => {
+        const size = files.size + links.size + extraDirs.size;
+        if (directorySize === size) return directoryCache;
+        const dirs = new Set<string>();
+        for (const p of [...files.keys(), ...links.keys(), ...extraDirs]) { let d = dirname(p); for (;;) { dirs.add(d); if (dirname(d) === d) break; d = dirname(d); } }
+        for (const p of extraDirs) dirs.add(p);
+        directorySize = size; directoryCache = dirs; return dirs;
+      };
+      const targetOf = (s: string) => isAbsolute(links.get(s)!) ? links.get(s)! : join(dirname(s), links.get(s)!);
+      const missing = () => Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+      // Every call is recorded so a case can prove which paths the verifier touched.
+      const touched: string[] = [];
+      const track = <A extends unknown[], R>(name: string, fn: (...a: A) => R) => (...a: A): R => { touched.push(`${name}:${String(a[0])}`); return fn(...a); };
+      const io = { ...nativeFs,
+        mkdirSync: (p: any) => { extraDirs.add(String(p)); },
+        writeFileSync: (p: any, b: any) => { put(String(p), b); },
+        existsSync: track('exists', (p: any) => links.has(String(p)) ? files.has(targetOf(String(p))) || directories().has(targetOf(String(p)))
+          : files.has(String(p)) || directories().has(String(p))),
+        readFileSync: track('read', (p: any) => { if (!files.has(String(p))) throw new Error('missing synthetic file'); return files.get(String(p))!; }),
+        statSync: track('stat', () => { throw new Error('unexpected stat'); }),
+        readlinkSync: track('readlink', (p: any) => { if (!links.has(String(p))) throw Object.assign(new Error('EINVAL'), { code: 'EINVAL' }); return links.get(String(p))!; }),
+        lstatSync: track('lstat', (p: any) => {
+          const s = String(p);
+          if (links.has(s)) return { isFile: () => false, isDirectory: () => false, isSymbolicLink: () => true, nlink: 1, mode: 0o120777, dev: 1, ino: inodeOf(s) };
+          if (!files.has(s) && !directories().has(s)) throw missing();
+          return { isFile: () => files.has(s) && altered.get(s) !== 'special',
+            isDirectory: () => directories().has(s), isSymbolicLink: () => altered.get(s) === 'symlink',
+            nlink: altered.get(s) === 'hardlink' ? 2 : nlinks.get(s) ?? 1, mode: modes.get(s) ?? 0o644, dev: 1, ino: inodeOf(s) };
+        }),
+        realpathSync: track('realpath', (p: any) => altered.get(String(p)) === 'redirect' ? join(base, 'redirect') : String(p)),
+        readdirSync: track('readdir', (p: any) => [...new Set([...files.keys(), ...links.keys(), ...directories()].filter((f) => dirname(f) === String(p) && f !== String(p)).map((f) => f.slice(String(p).length + 1)))]),
+      } as unknown as typeof nativeFs;
+      return { files, put, spec, request, io, pkg, src, pair, target, runtime, runtimePath, launcher, inventory, altered, specPath,
+        base, links, nlinks, modes, inodes, inodeOf, touched, extraDirs };
+    }
+    const runnerCaptureRoots: string[] = [];
+    const savedCaptureRoot = process.env.AFLDB_REBUILD_CAPTURE_ROOT;
+    afterEach(() => {
+      if (savedCaptureRoot === undefined) delete process.env.AFLDB_REBUILD_CAPTURE_ROOT; else process.env.AFLDB_REBUILD_CAPTURE_ROOT = savedCaptureRoot;
+      for (const root of runnerCaptureRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+    });
+    function runnerFixture() {
+      const f = fixture(), documents = predecessorDocuments();
+      const b = documents.register.baselines.find((b: any) => b.acceptance_status === 'accepted');
+      documents.register.baselines = [b];
+      b.snapshot_label = f.pair.core_snapshot_label; b.acquisition.manifest_sha256 = f.pair.core_manifest_sha256;
+      b.raw_artefacts.artefact_set_sha256 = f.pair.core_artefact_set_sha256;
+      b.contract_binding.required_range.last_season = b.measured.seasons_last = 2026;
+      documents.contract.full_history.season_range.last_season = 2026;
+      documents.contract.full_history.current_season_excluded.seasons = [];
+      documents.seasons.in_progress_seasons = [];
+      const l = documents.contract.datasets.ladder;
+      l.accepted_witness.snapshot_label = f.pair.witness_snapshot_label;
+      l.accepted_witness.manifest_sha256 = f.pair.witness_manifest_sha256;
+      l.coverage.last_season = 2026;
+      const { first_season: _first, last_season: _last, ...block } = f.pair;
+      l.rebuild_expectation = { ...block, evidence_ref: 'synthetic independent candidate fixture only' };
+      const src = { ...source(), label: f.pair.core_snapshot_label };
+      const t = { database: f.target.database, adminDsn: `postgres://afldb_owner:pw@127.0.0.1:55432/${f.target.database}`,
+        importDsn: `postgres://afldb_import:pw@127.0.0.1:55432/${f.target.database}`, importIsOwnerSubstitution: false, isolated: { port: 55432 } };
+      const provenance = { specPath: f.request.specPath, specSha256: f.request.specSha256 };
+      const verify: typeof verifyRehearsalPackage = (req) => verifyRehearsalPackage({ ...req, sourceRoot: f.src, cwd: f.src,
+        modulePath: join(f.src, 'tools/db/rebuild-test.ts') }, f.io);
+      const ladder = resolveLadderRebuildExpectation(src, t, documents, provenance, verify);
+      const binding: RebuildBinding = { source: src, target: t, ladder, provenance };
+      const opts = { ...OPTS, target: 'isolated', acknowledgeDestroy: t.database,
+        rehearsalLaunchSpec: provenance.specPath, rehearsalLaunchSpecSha256: provenance.specSha256 };
+      const events: string[] = [];
+      // The real capture-stage transition, modelled end to end: the stage writes the real capture
+      // file under the capture root and swaps the database comment for the rebuild marker; the
+      // reinstate stage restores the resting comment. Not a constant comment.
+      const captureRoot = mkdtempSync(join(tmpdir(), 'issue316-capture-'));
+      runnerCaptureRoots.push(captureRoot);
+      process.env.AFLDB_REBUILD_CAPTURE_ROOT = captureRoot;
+      const world = { comment: f.target.database_marker as string | null, captureDir: join(captureRoot, t.database) };
+      const captureCommand = (capturedAt = '2026-10-22T07:00:00.000Z') => {
+        const capture = buildCombinedCapture({ database: t.database, capturedAt, ledgerTablePresent: false,
+          ledgerRows: [], importerRows: [], registrations: [] });
+        const written = writePendingCapture(world.captureDir, capture);
+        world.comment = JSON.stringify({ format: CAPTURE_FORMAT, version: CAPTURE_VERSION, kind: 'set',
+          payloadSha256: capture.payloadSha256, fileSha256: written.sha256, capturedAt: capture.capturedAt });
+        return { capture, written, stdout: `    captured 0 adjudication row(s), 0 importer identity row(s) and 0 manual player registration(s) (no ledger table yet: migration 104 not applied)\n`
+          + `    file    : x/${PENDING_CAPTURE_FILE}\n    sha256  : ${written.sha256}\n    payload : ${capture.payloadSha256}\n    marker  : set\n` };
+      };
+      const check = (v: RebuildBinding, name: string) => {
+        events.push(`check:${name}`);
+        verify({ ...provenance, checkpoint: name, pair: v.ladder.pair, target: v.target });
+        const fresh = resolveLadderRebuildExpectation(v.source, v.target, documents, v.provenance, verify);
+        if (JSON.stringify(fresh) !== JSON.stringify(ladder)) throw new Error('synthetic frozen scope drift');
+      };
+      const stages = realPlanStages(t, src, opts, undefined, binding, documents, check);
+      const deps: Deps = {
+        ...fakeDeps().deps, checkBinding: check,
+        isolatedServerFacts: () => { events.push('live'); return { currentDatabase: t.database,
+          clusterName: f.target.cluster_name, databaseComment: world.comment }; },
+        runCommand: (argv) => {
+          events.push(argv.includes('capture') ? 'capture' : 'command');
+          if (argv.includes('capture')) return { status: 0, stdout: captureCommand().stdout, stderr: '' };
+          if (argv.includes('reinstate')) world.comment = f.target.database_marker;
+          return { status: 0, stdout: 'persons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+        runSql: () => { events.push('reset'); },
+        runValidation: (_dsn, sql) => { events.push(sql.includes(CENSUS_MARKER) ? 'census' : 'final'); },
+      };
+      return { ...f, documents, binding, t, source: src, opts, stages, deps, events, verify, world, captureCommand };
+    }
+    it('resolves the isolated candidate to 1640 with all 2026 included and preserves full stage order', () => {
+      const f = runnerFixture();
+      expect(f.binding.ladder.expectedRows).toBe(1640);
+      expect(f.stages[1].sql).toContain('last_season  int := 2026;');
+      expect(f.binding.ladder.censusScope.excludedSeasons).toEqual([]);
+      const result = executeRebuild(f.stages, f.t, f.deps, { binding: f.binding });
+      expect(result.ok).toBe(true);
+      expect(result.executed.slice(0, 4)).toEqual(['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate']);
+      expect(result.executed.indexOf('derived')).toBeLessThan(result.executed.indexOf('ladder-witness'));
+      expect(result.executed.at(-1)).toBe('fingerprints');
+      for (const s of f.stages) expect(f.events).toContain(`check:before:${s.id}`);
+      expect(f.events.indexOf('census')).toBeLessThan(f.events.indexOf('capture'));
+      expect(f.events.indexOf('capture')).toBeLessThan(f.events.indexOf('reset'));
+      expect(f.events.filter((e) => e === 'live')).toHaveLength(4);
+    });
+    it('plans the candidate coaches stage with the mandatory raw replay (AFLDB-ISSUE-319)', () => {
+      const f = runnerFixture();
+      const coaches = f.stages.find((s) => s.id === 'coaches')!;
+      expect(coaches.argv!.at(-1)).toBe('--require-raw-bundle');
+      expect(coaches.name).toContain('mandatory raw replay');
+      expect(f.stages.findIndex((s) => s.id === 'recreate')).toBeLessThan(f.stages.indexOf(coaches));
+    });
+    it('refuses the coherent candidate on an ordinary target even with provenance, before verification', () => {
+      const f = runnerFixture(), verify = vi.fn(f.verify);
+      const before = [...f.events];
+      expect(() => resolveLadderRebuildExpectation(f.source, ordinary(), f.documents, f.binding.provenance, verify))
+        .toThrow(/Candidate ladder requires isolated target/);
+      expect(verify).not.toHaveBeenCalled();
+      expect(f.events).toEqual(before);
+    });
+    it.each(['precheck', 'afl-api-ownership-census', 'afl-api-adjudications-capture', 'recreate', 'ladder-witness', 'fingerprints'])('refuses drift before %s without its next-stage effect', (stage) => {
+      const f = runnerFixture(); const original = f.deps.checkBinding!;
+      f.deps.checkBinding = (b, name) => {
+        if (name === `before:${stage}`) f.put(join(f.src, 'data/synthetic-input.csv'), 'drift');
+        original(b, name);
+      };
+      expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding })).toThrow();
+      if (['precheck', 'afl-api-ownership-census', 'afl-api-adjudications-capture'].includes(stage)) {
+        expect(f.events).not.toContain('capture'); expect(f.events).not.toContain('reset');
+      }
+      if (stage === 'recreate') { expect(f.events).toContain('capture'); expect(f.events).not.toContain('reset'); }
+      if (['ladder-witness', 'fingerprints'].includes(stage)) { expect(f.events).toContain('reset'); expect(f.events).not.toContain('final'); }
+    });
+    it('checks before each genuine preflight child, and catches drift made during a child', () => {
+      const f = runnerFixture(); const original = f.deps.runCommand;
+      f.deps.runCommand = (a, e) => { const r = original(a, e); f.put(join(f.src, 'tools/db/rebuild-test.ts'), 'child-time drift'); return r; };
+      expect(() => runPreflight(f.deps, f.opts, f.source, undefined, f.binding)).toThrow();
+      expect(f.events).toContain('check:preflight-entry'); expect(f.events).toContain('check:preflight-child');
+      expect(f.events).toContain('check:after-preflight-child');
+      expect(f.events.filter((e) => e === 'command')).toHaveLength(1);
+      expect(f.events).not.toContain('capture'); expect(f.events).not.toContain('reset');
+    });
+    it('cannot skip provenance, plan stages, scope SQL or the independent live target guard', () => {
+      for (const mutate of [(f: ReturnType<typeof runnerFixture>) => f.stages.splice(1, 1),
+        (f: ReturnType<typeof runnerFixture>) => f.stages.pop(),
+        (f: ReturnType<typeof runnerFixture>) => { f.stages[1].sql = 'SELECT 1'; },
+        (f: ReturnType<typeof runnerFixture>) => f.stages.reverse()]) {
+        const f = runnerFixture(); mutate(f);
+        expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding })).toThrow(/topology/);
+        expect(f.events).not.toContain('census'); expect(f.events).not.toContain('reset');
+      }
+      const f = runnerFixture();
+      expect(() => executeRebuild(f.stages, f.t, f.deps)).toThrow(/provenance/);
+      expect(() => runPreflight(f.deps, OPTS, f.source)).toThrow(/provenance/);
+      delete f.deps.isolatedServerFacts;
+      expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding })).toThrow(/live server/);
+    });
+    it.each(['validator', 'census', 'live-marker'])('package success cannot substitute for a refusing %s adapter', (kind) => {
+      const f = runnerFixture();
+      if (kind === 'validator') {
+        f.deps.runCommand = () => ({ status: 1, stdout: '', stderr: 'genuine-validator adapter refusal' });
+        expect(() => runPreflight(f.deps, f.opts, f.source, undefined, f.binding)).toThrow(/preflight failed/);
+      } else {
+        if (kind === 'census') f.deps.runValidation = () => { throw new Error('2025 (2), 2026 (1)'); };
+        if (kind === 'live-marker') f.deps.isolatedServerFacts = () => ({ currentDatabase: f.t.database, clusterName: f.target.cluster_name, databaseComment: null });
+        if (kind === 'census') expect(executeRebuild(f.stages, f.t, f.deps, { binding: f.binding }).ok).toBe(false);
+        else expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding })).toThrow();
+      }
+      expect(f.events).not.toContain('capture'); expect(f.events).not.toContain('reset');
+    });
+    it('refuses ordinary targets, unbound direct resolver calls, crossed pairs and mutable target facts', () => {
+      const f = runnerFixture();
+      expect(() => resolveLadderRebuildExpectation(f.source, ordinary(), f.documents, f.binding.provenance, f.verify)).toThrow(/isolated/);
+      expect(() => resolveLadderRebuildExpectation(f.source, f.t, f.documents)).toThrow(/provenance/);
+      f.t.isolated.port = 55433;
+      expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding })).toThrow(/target/);
+    });
+    it.each(['reference-pending', 'contract-exclusion', 'core-last', 'witness-last', 'reference-bound', 'cross-witness', 'wrong-rows'])('refuses candidate scope/pair contradiction %s', (kind) => {
+      const f = runnerFixture(), d = f.documents;
+      if (kind === 'reference-pending') d.seasons.in_progress_seasons = [2026];
+      if (kind === 'contract-exclusion') d.contract.full_history.current_season_excluded.seasons = [2026];
+      if (kind === 'core-last') d.register.baselines[0].measured.seasons_last = 2025;
+      if (kind === 'witness-last') d.contract.datasets.ladder.coverage.last_season = 2025;
+      if (kind === 'reference-bound') d.seasons.last_season = 2025;
+      if (kind === 'cross-witness') d.contract.datasets.ladder.accepted_witness.snapshot_label = 'ladder-20260828';
+      if (kind === 'wrong-rows') d.contract.datasets.ladder.rebuild_expectation.expected_rows = 1622;
+      expect(() => resolveLadderRebuildExpectation(f.source, f.t, d, f.binding.provenance, f.verify)).toThrow();
+    });
+    it('cannot change fixed runner options through a direct preflight call', () => {
+      const f = runnerFixture();
+      expect(() => runPreflight(f.deps, { ...f.opts, draftguruLabel: 'unreviewed' }, f.source, undefined, f.binding)).toThrow(/fixed full-runner options/);
+      expect(f.events).not.toContain('command');
+    });
+    it('refuses terminal drift after final validation without claiming the reset was prevented', () => {
+      const f = runnerFixture(), original = f.deps.runValidation;
+      f.deps.runValidation = (dsn, sql) => {
+        original(dsn, sql);
+        if (sql.includes(FINAL_VALIDATION_MARKER)) f.put(join(f.src, 'data/synthetic-input.csv'), 'terminal drift');
+      };
+      expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding })).toThrow();
+      expect(f.events).toContain('reset'); expect(f.events).toContain('final');
+    });
+    describe('capture-bound pending-marker recheck before recreate (ISSUE-316 attempt 1 defect)', () => {
+      type RunnerFixture = ReturnType<typeof runnerFixture>;
+      const mutateAfterBind = (f: RunnerFixture, mutate: () => void) => {
+        const original = f.deps.checkBinding!;
+        f.deps.checkBinding = (b, name) => { if (name === 'before:recreate') mutate(); original(b, name); };
+      };
+      const captureFile = (f: RunnerFixture) => join(f.world.captureDir, PENDING_CAPTURE_FILE);
+      const refusedBeforeRecreate = (f: RunnerFixture, reason: RegExp) => {
+        expect(() => executeRebuild(f.stages, f.t, f.deps, { binding: f.binding }))
+          .toThrow(new RegExp(`Live isolated-target recheck refused before recreate: .*${reason.source}`));
+        expect(f.events).toContain('capture');
+        expect(f.events).not.toContain('reset');
+      };
+
+      it('a real capture swaps the comment for the marker and the capture-bound check passes before the reset', () => {
+        const f = runnerFixture(); const seen: (string | null)[] = [];
+        const facts = f.deps.isolatedServerFacts!;
+        f.deps.isolatedServerFacts = (dsn) => { const r = facts(dsn); seen.push(r.databaseComment); return r; };
+        const logs: string[] = []; f.deps.log = (line) => { logs.push(line); };
+        const result = executeRebuild(f.stages, f.t, f.deps, { binding: f.binding });
+        expect(result.ok).toBe(true);
+        // initial and capture rechecks rest; recreate sees the pending marker; the final recheck rests again
+        expect(seen).toHaveLength(4);
+        expect(seen[0]).toBe(f.target.database_marker); expect(seen[1]).toBe(f.target.database_marker);
+        expect(seen[3]).toBe(f.target.database_marker);
+        const marker = parseRebuildMarker(seen[2]!);
+        const onDisk = readPendingCaptureWithHash(f.world.captureDir, f.t.database)!;
+        expect(marker.fileSha256).toBe(onDisk.fileSha256);
+        expect(marker.payloadSha256).toBe(onDisk.capture.payloadSha256);
+        expect(logs.some((l) => /capture bound: file sha256 [0-9a-f]{64}/.test(l))).toBe(true);
+        expect(logs.some((l) => l.includes('capture-bound rebuild marker'))).toBe(true);
+        expect(logs.join('\n')).not.toMatch(/postgres:\/\/|pw@/);
+        expect(f.events.indexOf('reset')).toBeGreaterThan(f.events.indexOf('capture'));
+      });
+
+      it.each([
+        ['wrong file digest in the marker', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ ...JSON.parse(f.world.comment!), fileSha256: 'c'.repeat(64) }); }, /the marker names a different capture file/],
+        ['wrong payload digest in the marker', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ ...JSON.parse(f.world.comment!), payloadSha256: 'd'.repeat(64) }); }, /the marker names a different capture payload/],
+        ['stale capture time in the marker', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ ...JSON.parse(f.world.comment!), capturedAt: '2026-10-21T00:00:00.000Z' }); }, /the marker names a different capture time/],
+        ['a well-formed marker of arbitrary digests', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ format: CAPTURE_FORMAT, version: CAPTURE_VERSION, capturedAt: '2026-10-22T07:00:00.000Z', payloadSha256: 'a'.repeat(64), fileSha256: 'b'.repeat(64) }); }, /the marker names a different capture file/],
+        ['arbitrary JSON', (f: RunnerFixture) => { f.world.comment = '{"ok":true}'; }, /not a valid rebuild marker/],
+        ['a foreign comment', (f: RunnerFixture) => { f.world.comment = 'something else'; }, /not a valid rebuild marker/],
+        ['a pre-v3 marker', (f: RunnerFixture) => { f.world.comment = JSON.stringify({ ...JSON.parse(f.world.comment!), version: 2 }); }, /not a valid rebuild marker/],
+        ['the resting comment (the capture marker never set)', (f: RunnerFixture) => { f.world.comment = f.target.database_marker; }, /resting isolated-test comment/],
+        ['no comment at all', (f: RunnerFixture) => { f.world.comment = null; }, /no rebuild marker/],
+        ['capture file bytes altered after the stage', (f: RunnerFixture) => { writeFileSync(captureFile(f), `${readFileSync(captureFile(f), 'utf8')}\n`); }, /bytes changed since the capture stage/],
+        ['capture payload altered', (f: RunnerFixture) => { writeFileSync(captureFile(f), readFileSync(captureFile(f), 'utf8').replace('"capturedAt": "2026-10-22T07:00:00.000Z"', '"capturedAt": "2026-10-22T07:00:00.001Z"')); }, /capture file no longer validates/],
+        ['capture file replaced by an unrelated valid capture', (f: RunnerFixture) => { writePendingCapture(f.world.captureDir, buildCombinedCapture({ database: f.t.database, capturedAt: '2026-10-20T00:00:00.000Z', ledgerTablePresent: false, ledgerRows: [], importerRows: [], registrations: [] })); }, /bytes changed since the capture stage/],
+        ['capture file taken from another database', (f: RunnerFixture) => { writeFileSync(captureFile(f), readFileSync(captureFile(f), 'utf8').replace(f.t.database, 'afldb_v2_other_test')); }, /capture file no longer validates/],
+        ['capture file removed', (f: RunnerFixture) => { rmSync(captureFile(f)); }, /capture file is missing/],
+      ])('refuses before the reset when the marker or the capture is %s', (_label, mutate, reason) => {
+        const f = runnerFixture();
+        let commentAfterMutation: string | null | undefined;
+        mutateAfterBind(f, () => { mutate(f); commentAfterMutation = f.world.comment; });
+        refusedBeforeRecreate(f, reason);
+        // nothing was cleared: the marker is exactly what the mutation left, and recovery state remains
+        expect(f.world.comment).toBe(commentAfterMutation);
+        if (!/removed/.test(_label)) expect(existsSync(captureFile(f))).toBe(true);
+        expect(f.events).not.toContain('final');
+      });
+
+      it('a wrong cluster or connected database still refuses even with the genuine marker', () => {
+        for (const [label, patch] of [['cluster', { clusterName: 'main' }], ['database', { currentDatabase: 'afldb_v2_other_test' }]] as const) {
+          const f = runnerFixture(); const original = f.deps.isolatedServerFacts!;
+          f.deps.isolatedServerFacts = (dsn) => { const r = original(dsn); return f.world.comment !== f.target.database_marker ? { ...r, ...patch } : r; };
+          refusedBeforeRecreate(f, label === 'cluster' ? /cluster_name/ : /current_database/);
+        }
+      });
+
+      it('only a binding the capture stage issued is accepted: not a boolean, a copied literal or another database', () => {
+        const f = runnerFixture();
+        const { stdout } = f.captureCommand();
+        const real = bindCompletedCapture({ dir: f.world.captureDir, database: f.t.database, absentBeforeCapture: true, captureStdout: stdout });
+        const check = (bound: unknown, database = f.t.database) =>
+          captureBoundMarkerProblems({ bound: bound as never, database, comment: f.world.comment });
+        expect(check(real)).toEqual([]);
+        expect(check(true)).toEqual(['the capture binding was not issued by a completed capture stage']);
+        expect(check({ ...real })).toEqual(['the capture binding was not issued by a completed capture stage']);
+        expect(check(structuredClone(real))).toEqual(['the capture binding was not issued by a completed capture stage']);
+        expect(check(real, 'afldb_v2_other_test')).toEqual(['the completed capture belongs to a different database']);
+        expect(() => assertIsolatedTargetLive(f.t, f.deps, { ...real })).toThrow(/not issued by a completed capture stage/);
+        expect(() => assertIsolatedTargetLive(f.t, f.deps, real)).not.toThrow();
+        expect(Object.isFrozen(real)).toBe(true);
+      });
+
+      it('refuses to bind a capture that pre-existed, is not the one reported, or is not valid', () => {
+        const f = runnerFixture();
+        const { stdout, written, capture } = f.captureCommand();
+        const bind = (patch: object = {}) => bindCompletedCapture({
+          dir: f.world.captureDir, database: f.t.database, absentBeforeCapture: true, captureStdout: stdout, ...patch });
+        expect(() => bind({ absentBeforeCapture: false })).toThrow(/already existed before the capture stage/);
+        expect(() => bind({ captureStdout: '' })).toThrow(/digests the capture stage reported/);
+        expect(() => bind({ captureStdout: stdout.replace(written.sha256, 'e'.repeat(64)) })).toThrow(/digests the capture stage reported/);
+        expect(() => bind({ captureStdout: stdout.replace(capture.payloadSha256, 'e'.repeat(64)) })).toThrow(/digests the capture stage reported/);
+        expect(() => bind({ captureStdout: `${stdout}${stdout}` })).toThrow(/digests the capture stage reported/);
+        expect(() => bind({ database: 'afldb_v2_other_test' })).toThrow(/does not validate/);
+        expect(() => bind({ dir: join(f.world.captureDir, 'missing') })).toThrow(/no regular capture file/);
+        expect(pendingCaptureAbsent(join(f.world.captureDir, 'missing'))).toBe(true);
+        expect(pendingCaptureAbsent(f.world.captureDir)).toBe(false);
+      });
+
+      it.each([
+        ['writes no capture file', (f: RunnerFixture) => { f.deps.runCommand = (argv) => ({ status: 0, stdout: argv.includes('capture') ? 'sha256  : x\n' : '', stderr: '' }); }, /no regular capture file/],
+        ['reports digests that are not the file\'s', (f: RunnerFixture) => { const o = f.deps.runCommand; f.deps.runCommand = (a, e) => { const r = o(a, e); return a.includes('capture') ? { ...r, stdout: r.stdout.replace(/sha256  : [0-9a-f]{64}/, `sha256  : ${'f'.repeat(64)}`) } : r; }; }, /digests the capture stage reported/],
+        ['finds another run\'s capture already in place', (f: RunnerFixture) => { writePendingCapture(f.world.captureDir, buildCombinedCapture({ database: f.t.database, capturedAt: '2026-10-19T00:00:00.000Z', ledgerTablePresent: false, ledgerRows: [], importerRows: [], registrations: [] })); }, /already existed before the capture stage/],
+      ])('fails the capture stage and never resets when it %s', (_label, setup, why) => {
+        const f = runnerFixture(); const logs: string[] = []; f.deps.log = (line) => { logs.push(line); };
+        setup(f);
+        const result = executeRebuild(f.stages, f.t, f.deps, { binding: f.binding });
+        expect(result.ok).toBe(false);
+        expect(result.failedStage).toBe('afl-api-adjudications-capture');
+        expect(result.executed.at(-1)).toBe('afl-api-adjudications-capture');
+        expect(f.events).not.toContain('reset');
+        expect(logs.find((l) => l.includes('exited 0 but'))).toMatch(why);
+      });
+
+      it('the ordinary and final checks still reject a pending marker, and the capture recheck still needs the resting one', () => {
+        const f = runnerFixture(); const { stdout } = f.captureCommand();
+        const real = bindCompletedCapture({ dir: f.world.captureDir, database: f.t.database, absentBeforeCapture: true, captureStdout: stdout });
+        expect(() => assertIsolatedTargetLive(f.t, f.deps)).toThrow(/database_marker/);
+        expect(() => assertIsolatedTargetLive(f.t, f.deps, real)).not.toThrow();
+        // a marker already pending when the run starts (another run's) is refused before the capture and the reset
+        const pending = runnerFixture(); pending.captureCommand();
+        expect(() => executeRebuild(pending.stages, pending.t, pending.deps, { binding: pending.binding })).toThrow(/database_marker/);
+        expect(pending.events).not.toContain('capture'); expect(pending.events).not.toContain('reset');
+        // a marker that is still pending at final validation (the reinstate stage did not restore it) is refused
+        const last = runnerFixture(); const original = last.deps.runCommand;
+        last.deps.runCommand = (argv, env) => {
+          const r = original(argv, env);
+          if (argv.includes('reinstate')) last.world.comment = JSON.stringify({ format: CAPTURE_FORMAT, version: CAPTURE_VERSION, capturedAt: 'x', payloadSha256: 'a'.repeat(64), fileSha256: 'b'.repeat(64) });
+          return r;
+        };
+        expect(() => executeRebuild(last.stages, last.t, last.deps, { binding: last.binding }))
+          .toThrow(/Live isolated-target recheck refused before fingerprints: .*database_marker/);
+        expect(last.events).toContain('reset'); expect(last.events).not.toContain('final');
+      });
+    });
+    it('verifies and deeply freezes fixed synthetic bindings and launches only the reviewed route', () => {
+      const f = fixture();
+      const v = verifyRehearsalPackage(f.request, f.io);
+      expect(v.pair.expected_rows).toBe(1640); expect(Object.isFrozen(v.spec)).toBe(true);
+      expect(() => assertRehearsalResolution(v)).toThrow(/preload missing/);
+      const spawn = vi.fn(() => ({ status: 0 }));
+      expect(launchRehearsal(f.request, spawn as any, f.io)).toBe(0);
+      expect(spawn).toHaveBeenCalledOnce();
+      const [node, args, options] = spawn.mock.calls[0] as any;
+      expect(node).toBe(process.execPath); expect(options.shell).toBe(false); expect(options.cwd).toBe(f.src);
+      expect(args).toContain(join(f.src, 'tools/v2/isolated-pg.ts')); expect(args).toContain(join(f.src, 'tools/db/rebuild-test.ts'));
+      expect(options.env.PYTHONDONTWRITEBYTECODE).toBe('1');
+      expect(args.filter((a: string) => a === '--import')).toHaveLength(2);
+      expect(args.filter((a: string) => a.endsWith('/tools/v2/rehearsal-resolution-guard.mjs'))).toHaveLength(2);
+      expect(args).not.toContain(f.runtime.tsx_loader);
+      expect(options.env.AFLDB_RESOLUTION_POLICY_SHA256).toMatch(/^[a-f0-9]{64}$/);
+      const policy = f.files.get(options.env.AFLDB_RESOLUTION_POLICY)!;
+      expect(digest(policy)).toBe(options.env.AFLDB_RESOLUTION_POLICY_SHA256);
+      expect(JSON.parse(policy.toString()).files[join(f.src, 'tools/v2/rehearsal-resolution-guard.mjs')]).toBeDefined();
+    });
+    it.each(['tools/db/rebuild-test.ts', 'tools/rebuild/fitzroy/fitzroy-contract.json', 'data/reference/seasons.json', 'data/synthetic-input.csv', '../REHEARSAL_BINDINGS.json'])('refuses initial substitution of %s before any spawn', (p) => {
+      const f = fixture(); f.put(resolve(f.src, p), 'substitution'); const spawn = vi.fn();
+      expect(() => launchRehearsal(f.request, spawn as any, f.io)).toThrow(); expect(spawn).not.toHaveBeenCalled();
+      // A replacement sums file cannot replace the external expected inventory digest.
+      f.put(join(f.pkg, 'SHA256SUMS.txt'), f.inventory());
+      expect(() => launchRehearsal(f.request, spawn as any, f.io)).toThrow(); expect(spawn).not.toHaveBeenCalled();
+    });
+    it.each(['source/tools/db/rebuild-test.ts', 'source/data/reference/seasons.json', 'source/data/synthetic-input.csv', 'REHEARSAL_BINDINGS.json'])('refuses later change/add/remove of %s against the original pins', (p) => {
+      for (const mutation of ['change', 'remove', 'add']) {
+        const f = fixture(); verifyRehearsalPackage(f.request, f.io);
+        if (mutation === 'change') f.put(join(f.pkg, p), 'changed\r\n');
+        if (mutation === 'remove') f.files.delete(join(f.pkg, p));
+        if (mutation === 'add') f.put(join(f.src, 'extra.py'), 'extra');
+        expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow();
+      }
+    });
+    it.each(['spec', 'runtime-record', 'actual-dependency', 'actual-node', 'launcher'])('refuses drift of %s and refuses terminal success', (kind) => {
+      const f = fixture();
+      const p = kind === 'spec' ? f.specPath : kind === 'runtime-record' ? f.runtimePath
+        : kind === 'actual-dependency' ? join(dirname(f.runtime.tsx_loader), 'library/dependency.js') : kind === 'actual-node' ? process.execPath : f.launcher;
+      const spawn = vi.fn(() => { f.put(p, 'drift'); return { status: 0 }; });
+      expect(() => launchRehearsal(f.request, spawn as any, f.io)).toThrow(); expect(spawn).toHaveBeenCalledOnce();
+    });
+    it.each(['../escape', '/absolute', 'C:/drive', '//unc/share', 'a\\b', 'a//b', './a', 'a/../b', 'a\u0001b'])('rejects unsafe inventory name %s', (p) => {
+      expect(() => inventoryEntries(Buffer.from(`${'a'.repeat(64)}  ${p}\n`))).toThrow();
+    });
+    it.each(['symlink', 'hardlink', 'special', 'redirect'])('rejects linked/special path components (%s)', (kind) => {
+      for (const p of [(f: ReturnType<typeof fixture>) => f.pkg, (f: ReturnType<typeof fixture>) => f.src, (f: ReturnType<typeof fixture>) => join(f.src, 'package.json')]) {
+        const f = fixture(); f.altered.set(p(f), kind);
+        if (kind === 'hardlink' || kind === 'special') f.altered.set(join(f.src, 'package.json'), kind);
+        expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow();
+      }
+    });
+    it('rejects wrong/missing pins, duplicate keys, encoding, duplicate/case collisions and missing required closure', () => {
+      const f = fixture();
+      for (const pin of ['', 'x'.repeat(64), '0'.repeat(64)]) expect(() => verifyRehearsalPackage({ ...f.request, specSha256: pin }, f.io)).toThrow();
+      for (const json of ['{"x":1,"x":2}', '{"x":1,"\\u0078":2}', '\ufeff{}', '{']) expect(() => strictJson(Buffer.from(json))).toThrow();
+      for (const text of [`${'a'.repeat(64)}  a\r\n`, `${'a'.repeat(64)}  a\n\n`, `${'a'.repeat(64)}  A\n${'a'.repeat(64)}  a\n`]) expect(() => inventoryEntries(Buffer.from(text))).toThrow();
+      f.spec.required_files = []; f.put(f.specPath, JSON.stringify(f.spec)); f.request.specSha256 = digest(f.files.get(f.specPath)!);
+      expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow(/required closure/);
+    });
+    it('does not let mutable caller pins reset trust during launcher execution', () => {
+      const f = fixture();
+      const spawn = vi.fn(() => {
+        f.spec.expected_inventory_sha256 = '0'.repeat(64);
+        f.put(f.specPath, JSON.stringify(f.spec)); f.request.specSha256 = digest(f.files.get(f.specPath)!);
+        return { status: 0 };
+      });
+      expect(() => launchRehearsal(f.request, spawn as any, f.io)).toThrow(/pinned bytes/);
+    });
+    it('hashes raw fixture bytes: a newline-only LF to CRLF change refuses', () => {
+      const f = fixture(), p = join(f.src, 'data/synthetic-input.csv');
+      f.put(p, f.files.get(p)!.toString('utf8').replaceAll('\n', '\r\n'));
+      expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow(/pinned bytes/);
+    });
+    it('preserves an original failed child result when terminal provenance also refuses', () => {
+      const f = fixture(); const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+      try {
+        expect(launchRehearsal(f.request, (() => { f.put(f.runtimePath, 'drift'); return { status: 9 }; }) as any, f.io)).toBe(9);
+        expect(stderr).toHaveBeenCalledWith(expect.stringContaining('terminal provenance refused'));
+      } finally { stderr.mockRestore(); }
+    });
+    it.each(['loader', 'source', 'purpose', 'basis', 'env', 'manifest-member', 'output-alias', 'ancestor-link'])('refuses unbound/unsafe %s before spawn', (kind) => {
+      const f = fixture();
+      if (kind === 'loader') {
+        f.runtime.tsx_loader = join(dirname(f.runtime.tsx_loader), 'unlisted-loader.mjs');
+        f.put(f.runtimePath, JSON.stringify(f.runtime)); f.spec.runtime_record_sha256 = digest(f.files.get(f.runtimePath)!);
+      }
+      if (kind === 'source') f.spec.source_root = f.pkg;
+      if (kind === 'purpose') f.spec.purpose = 'production';
+      if (kind === 'basis') f.spec.implementation_basis = 'b8ea28550a291b766bf7ad9f3b63621e9f9efa81';
+      if (kind === 'env') f.put(join(f.src, '.env'), 'synthetic=only');
+      if (kind === 'manifest-member') {
+        f.files.delete(join(f.src, 'manifests/core.json'));
+        f.put(join(f.pkg, 'SHA256SUMS.txt'), f.inventory()); f.spec.expected_inventory_sha256 = digest(f.inventory());
+      }
+      if (kind === 'output-alias') f.spec.output_root = f.spec.capture_root;
+      if (kind === 'ancestor-link') f.altered.set(dirname(f.spec.temp_root), 'redirect');
+      f.put(f.specPath, JSON.stringify(f.spec)); f.request.specSha256 = digest(f.files.get(f.specPath)!);
+      const spawn = vi.fn(); expect(() => launchRehearsal(f.request, spawn as any, f.io)).toThrow(); expect(spawn).not.toHaveBeenCalled();
+    });
+    it.each(['capture_root', 'output_root', 'temp_root', 'cluster_root'])('rejects input/write overlap for %s, even with newly reviewed synthetic spec', (key) => {
+      const f = fixture(); (f.spec as any)[key] = join(f.src, 'not-yet-created');
+      f.put(f.specPath, JSON.stringify(f.spec)); f.request.specSha256 = digest(f.files.get(f.specPath)!);
+      expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow(/overlap/);
+    });
+    it('binds actual target, pair, module, cwd and source without exposing credentials', () => {
+      const f = fixture();
+      const t = { database: f.target.database, adminDsn: `postgres://owner:SECRET@127.0.0.1:55432/${f.target.database}`,
+        importDsn: `postgres://import:SECRET@127.0.0.1:55432/${f.target.database}`, importIsOwnerSubstitution: false, isolated: { port: 55432 } };
+      verifyRehearsalPackage({ ...f.request, target: t, pair: f.pair, sourceRoot: f.src, cwd: f.src, modulePath: join(f.src, 'tools/db/rebuild-test.ts') }, f.io);
+      for (const request of [{ target: { ...t, isolated: undefined } }, { target: { ...t, database: 'afldb_prod' } },
+        { target: { ...t, importDsn: t.importDsn.replace(':55432', ':5432') } }, { pair: { ...f.pair, expected_rows: 1622 } },
+        { sourceRoot: f.src, cwd: dirname(f.src), modulePath: join(f.src, 'tools/db/rebuild-test.ts') }]) {
+        let error = ''; try { verifyRehearsalPackage({ ...f.request, ...request }, f.io); } catch (e) { error = String(e); }
+        expect(error).toContain('refused'); expect(error).not.toContain('SECRET'); expect(error).not.toContain('postgres://');
+      }
+    });
+
+    // All synthetic and in memory: these prove the verifier's rules, not Linux execution, and nothing
+    // here measures dynamic-library closure, the Node import closure, zoneinfo data or child spawns.
+    describe('runtime record version 2: inert links, absent landmarks, bound executables, hard-link groups', () => {
+      const win = process.platform === 'win32';
+      const norm = (p: string) => p.replaceAll('\\', '/');
+      const byPath = (a: { path: string }, b: { path: string }) => (a.path < b.path ? -1 : 1);
+      function v2Fixture() {
+        const f = fixture();
+        const rt = f.runtime as any;
+        const runtimeRoot = dirname(f.runtime.tsx_loader), exeDir = join(f.base, 'executables'), node = process.execPath;
+        const python = join(exeDir, 'python3.12');
+        const listener = win ? join(exeDir, 'Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : join(exeDir, 'ss');
+        const zip = join(f.base, 'python312.zip');
+        for (const p of [f.runtime.python, f.runtime.listener_tool]) f.files.delete(p);
+        f.put(python, 'synthetic python executable'); f.put(listener, 'synthetic listener executable');
+        const inRoot = (p: string) => p.startsWith(runtimeRoot + '/') || p.startsWith(runtimeRoot + '\\');
+        const rel = (p: string) => norm(p.slice(runtimeRoot.length + 1));
+        // Rebuild the record's evidence from the synthetic world as it stands.
+        const sync = () => {
+          rt.roots = [{ path: runtimeRoot, hardlinks: rt.roots?.[0]?.hardlinks ?? [],
+            files: [...f.files.keys()].filter(inRoot).map((p) => ({ path: rel(p), sha256: digest(f.files.get(p)!) })).sort(byPath),
+            links: [...f.links].filter(([p]) => inRoot(p)).map(([p, readlink]) => ({ path: rel(p), readlink })).sort(byPath) }];
+          rt.executables = [node, python, listener].map((p) => ({ path: p, sha256: digest(f.files.get(p)!) })).sort(byPath);
+        };
+        const commit = () => {
+          f.put(f.runtimePath, JSON.stringify(rt)); f.spec.runtime_record_sha256 = digest(f.files.get(f.runtimePath)!);
+          f.put(f.specPath, JSON.stringify(f.spec)); f.request.specSha256 = digest(f.files.get(f.specPath)!);
+        };
+        Object.assign(rt, { schema_version: 2, python, listener_tool: listener, python_stdlib: [zip, runtimeRoot], python_absent_landmarks: [zip, ...pythonStartupLandmarks(python)] });
+        const build = () => { sync(); commit(); };
+        build();
+        const verify = () => verifyRehearsalPackage(f.request, f.io);
+        // A hard-linked pair inside the runtime root: one inode, `nlink` names, one declared group.
+        const hardlinked = (names: string[], nlink = names.length, inode = 7777) => {
+          for (const n of names) {
+            const p = join(runtimeRoot, n);
+            f.put(p, 'synthetic hard-linked native helper'); f.nlinks.set(p, nlink); f.inodes.set(p, inode);
+          }
+        };
+        return { ...f, rt, runtimeRoot, exeDir, node, python, listener, zip, sync, commit, build, verify, hardlinked, rel };
+      }
+      type V2 = ReturnType<typeof v2Fixture>;
+      const withRecord = (v: V2, edit: (rt: any) => void, pattern?: RegExp) => {
+        edit(v.rt); v.commit();
+        if (pattern) expect(() => v.verify()).toThrow(pattern); else expect(() => v.verify()).toThrow();
+      };
+
+      it('verifies a version 2 record, binds the three executables by file and keeps version 1 exactly as it was', () => {
+        const v = v2Fixture(), bound = v.verify();
+        expect(bound.runtime.schema_version).toBe(2);
+        expect(Object.keys(bound.resolution.executables!).sort()).toEqual([v.node, v.python, v.listener].sort());
+        for (const p of [v.node, v.python, v.listener]) expect(bound.resolution.files[p]).toBeUndefined();
+        expect(bound.resolution.hardlink_counts).toEqual({});
+        // The unmodified version 1 fixture still verifies and carries none of the new policy fields.
+        const legacy = fixture(), old = verifyRehearsalPackage(legacy.request, legacy.io);
+        expect(Object.keys(old.resolution).sort()).toEqual(['esbuild_binary', 'files', 'node_search_roots', 'python_dependencies', 'python_stdlib', 'source_root', 'tsx_loader']);
+      });
+
+      describe('record versions are strict', () => {
+        it('refuses version 1 carrying any version 2 field, version 2 missing one, and an unknown version', () => {
+          const v1 = fixture();
+          for (const edit of [(r: any) => { r.executables = []; }, (r: any) => { r.python_absent_landmarks = []; },
+            (r: any) => { r.roots[0].links = []; }, (r: any) => { r.roots[0].hardlinks = []; }]) {
+            const f = fixture(), r = f.runtime as any; edit(r);
+            f.put(f.runtimePath, JSON.stringify(r)); f.spec.runtime_record_sha256 = digest(f.files.get(f.runtimePath)!);
+            f.put(f.specPath, JSON.stringify(f.spec)); f.request.specSha256 = digest(f.files.get(f.specPath)!);
+            expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow(/invalid runtime/);
+          }
+          expect(() => verifyRehearsalPackage(v1.request, v1.io)).not.toThrow();
+          for (const key of ['executables', 'python_absent_landmarks']) withRecord(v2Fixture(), (r) => { delete r[key]; }, /invalid runtime record fields/);
+          for (const key of ['links', 'hardlinks']) withRecord(v2Fixture(), (r) => { delete r.roots[0][key]; }, /invalid runtime root fields/);
+          withRecord(v2Fixture(), (r) => { r.schema_version = 4; }, /runtime schema/);
+          // Version 3 (AFLDB-ISSUE-320) requires its native closure; a version 2 body under that number refuses.
+          withRecord(v2Fixture(), (r) => { r.schema_version = 3; }, /invalid runtime record fields/);
+        });
+      });
+
+      describe('inert-link ledger', () => {
+        const alias = (v: V2) => join(v.runtimeRoot, 'library/alias.js');
+        const outside = (v: V2) => join(v.base, 'outside-target', 'sitecustomize.py');
+        it('accepts a relative same-directory link and an absolute outside-root link without ever following either', () => {
+          const v = v2Fixture();
+          v.links.set(alias(v), 'dependency.js'); v.links.set(join(v.runtimeRoot, 'library/sitecustomize.py'), norm(outside(v)));
+          v.links.set(join(v.runtimeRoot, 'library/dirlink'), '../bin');
+          v.build(); v.touched.length = 0;
+          const bound = v.verify();
+          for (const l of ['library/alias.js', 'library/sitecustomize.py', 'library/dirlink']) expect(bound.resolution.files[join(v.runtimeRoot, l)]).toBeUndefined();
+          expect(v.rt.roots[0].links.map((l: any) => l.path)).toEqual(['library/alias.js', 'library/dirlink', 'library/sitecustomize.py']);
+          const followed = ['library/alias.js', 'library/sitecustomize.py', 'library/dirlink'].map((l) => join(v.runtimeRoot, l));
+          for (const entry of v.touched) {
+            const [call, where] = [entry.slice(0, entry.indexOf(':')), entry.slice(entry.indexOf(':') + 1)];
+            if (followed.some((l) => where === l)) expect(['lstat', 'readlink']).toContain(call);
+            expect(followed.some((l) => where.startsWith(l + '/') || where.startsWith(l + '\\'))).toBe(false); // no descent
+            expect(where).not.toContain('outside-target');
+          }
+          expect(v.touched.filter((t) => t.startsWith('stat:'))).toEqual([]);
+        });
+        it.each([
+          ['an unledgered link', (v: V2) => { v.links.set(alias(v), 'dependency.js'); }],
+          ['a recorded link that is absent', (v: V2) => { v.links.set(alias(v), 'dependency.js'); v.build(); v.links.delete(alias(v)); }],
+          ['a link retargeted to an absolute path', (v: V2) => { v.links.set(alias(v), 'dependency.js'); v.build(); v.links.set(alias(v), norm(outside(v))); }],
+          ['a link retargeted to a relative path', (v: V2) => { v.links.set(alias(v), norm(outside(v))); v.build(); v.links.set(alias(v), 'dependency.js'); }],
+          ['a link replaced by a regular file', (v: V2) => { v.links.set(alias(v), 'dependency.js'); v.build(); v.links.delete(alias(v)); v.put(alias(v), 'file'); }],
+          ['a listed file replaced by a link', (v: V2) => { v.files.delete(join(v.runtimeRoot, 'library/dependency.js')); v.links.set(join(v.runtimeRoot, 'library/dependency.js'), 'x'); }],
+          ['an unledgered directory link', (v: V2) => { v.links.set(join(v.runtimeRoot, 'library/dirlink'), '../bin'); }],
+        ])('refuses %s before any package import or child spawn', (_name, change) => {
+          const v = v2Fixture(); change(v);
+          const spawn = vi.fn();
+          // The first two lines of `change` may rebuild the record; whatever the world now is, the record is stale or absent.
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(/runtime (link ledger|membership)|pinned bytes|linked/);
+          expect(spawn).not.toHaveBeenCalled();
+          expect(v.touched.filter((t) => t.startsWith('readdir:') && /dirlink/.test(t))).toEqual([]); // never descended
+        });
+        it.each([
+          ['duplicate entries', (l: any[]) => [l[0], l[0]]],
+          ['unsorted entries', (l: any[]) => [l[1], l[0]]],
+          ['a parent-directory path', (l: any[]) => [{ ...l[0], path: 'library/../x' }]],
+          ['an absolute path', (l: any[]) => [{ ...l[0], path: '/etc/x' }]],
+          ['a backslash path', (l: any[]) => [{ ...l[0], path: 'library\\x' }]],
+          ['an empty path', (l: any[]) => [{ ...l[0], path: '' }]],
+          ['an empty link text', (l: any[]) => [{ ...l[0], readlink: '' }]],
+          ['a control character in link text', (l: any[]) => [{ ...l[0], readlink: 'a\u0001b' }]],
+          ['non-ASCII link text', (l: any[]) => [{ ...l[0], readlink: 'café' }]],
+          ['over-long link text', (l: any[]) => [{ ...l[0], readlink: 'a'.repeat(4097) }]],
+          ['a case-fold collision', (l: any[]) => [l[0], { ...l[0], path: l[0].path.toUpperCase() }]],
+          ['an unknown entry field', (l: any[]) => [{ ...l[0], target: 'x' }]],
+        ])('refuses a malformed ledger: %s', (_name, mutate) => {
+          const v = v2Fixture();
+          v.links.set(alias(v), 'dependency.js'); v.links.set(join(v.runtimeRoot, 'library/b-link.js'), 'dependency.js'); v.build();
+          withRecord(v, (r) => { r.roots[0].links = mutate(r.roots[0].links); }, /invalid runtime link fields|runtime link entry|unsafe.duplicate.unsorted|malformed sums/);
+        });
+        it('refuses the same relative link in the package tree, whatever the ledger says', () => {
+          const v = v2Fixture(), spawn = vi.fn();
+          v.links.set(join(v.src, 'data/linked.csv'), 'synthetic-input.csv');
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow();
+          v.links.delete(join(v.src, 'data/linked.csv'));
+          v.links.set(join(v.pkg, 'dangling-link'), 'nowhere');
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow();
+          expect(spawn).not.toHaveBeenCalled();
+        });
+        it('refuses a link retargeted between the first verification and terminal readback', () => {
+          const v = v2Fixture();
+          v.links.set(alias(v), 'dependency.js'); v.build();
+          const spawn = vi.fn(() => { v.links.set(alias(v), 'other.js'); return { status: 0 }; });
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(/link ledger/);
+          expect(spawn).toHaveBeenCalledOnce();
+        });
+        it('refuses an import path that equals or lies beneath a ledgered link', () => {
+          const v = v2Fixture(), dep = join(v.runtimeRoot, 'library/dep');
+          v.links.set(dep, '../bin'); v.build();
+          withRecord(v, (r) => { r.python_dependencies = [dep]; }, /linked, redirected or special/);
+          const w = v2Fixture(); w.links.set(dep, '../bin'); w.build();
+          withRecord(w, (r) => { r.node_search_roots = [join(dep, 'nested')]; }, /linked, redirected or special/);
+        });
+      });
+
+      describe('absent Python startup landmarks', () => {
+        it('accepts a zip that is provably absent and that python_stdlib lists', () => {
+          const v = v2Fixture(); v.touched.length = 0;
+          expect(() => v.verify()).not.toThrow();
+          expect(v.touched).toContain(`lstat:${v.zip}`);
+        });
+        it.each([
+          ['a regular file', (v: V2) => { v.put(v.zip, 'zip'); }],
+          ['a directory', (v: V2) => { v.extraDirs.add(v.zip); }],
+          ['a valid symlink', (v: V2) => { v.put(join(v.base, 'real.zip'), 'zip'); v.links.set(v.zip, 'real.zip'); }],
+          ['a dangling symlink (existsSync is false, lstat succeeds)', (v: V2) => { v.links.set(v.zip, 'nowhere.zip'); }],
+        ])('refuses a startup zip that is %s', (_name, change) => {
+          const v = v2Fixture(); change(v);
+          expect(() => v.verify()).toThrow(/absent landmark exists|unsupported|membership|linked|package membership/);
+        });
+        it('proves a dangling link is invisible to existsSync and is therefore decided by lstat alone', () => {
+          const v = v2Fixture(); v.links.set(v.zip, 'nowhere.zip');
+          expect(v.io.existsSync(v.zip)).toBe(false);
+          expect(() => v.io.lstatSync(v.zip)).not.toThrow();
+          expect(() => v.verify()).toThrow(/Python absent landmark exists/);
+        });
+        it('refuses anything but ENOENT as proof of absence', () => {
+          const v = v2Fixture();
+          const denied = { ...v.io, lstatSync: (p: any) => { if (p === v.zip) throw Object.assign(new Error('denied'), { code: 'EACCES' }); return v.io.lstatSync(p); } } as any;
+          expect(() => verifyRehearsalPackage(v.request, denied)).toThrow(/absence unprovable/);
+        });
+        it.each([
+          ['a landmark missing from python_stdlib', (r: any) => { r.python_stdlib = [r.roots[0].path]; }, /Python absent landmark/],
+          ['a zip in python_stdlib that is not declared absent', (r: any) => { r.python_absent_landmarks = []; }, /undeclared Python zip/],
+          ['a landmark that is not a zip', (r: any) => { r.python_stdlib = [r.roots[0].path]; r.python_absent_landmarks = [r.roots[0].path]; }, /Python absent landmark/],
+          ['a relative landmark', (r: any) => { r.python_stdlib = ['python312.zip', r.roots[0].path]; r.python_absent_landmarks = ['python312.zip']; }, /Python absent landmark/],
+          ['a duplicate landmark', (r: any) => { r.python_absent_landmarks = [r.python_absent_landmarks[0], r.python_absent_landmarks[0]]; }, /Python absent landmarks/],
+        ])('refuses %s', (_name, edit, pattern) => { withRecord(v2Fixture(), edit, pattern); });
+        it('refuses a symlinked ancestor of the landmark', () => {
+          const v = v2Fixture(); v.altered.set(v.base, 'symlink');
+          expect(() => v.verify()).toThrow(/linked, redirected or special/);
+        });
+        describe('reviewed start-up layout landmarks (prefix, venv, build and ._pth selection)', () => {
+          it.skipIf(win)('derives exactly the reviewed set for an interpreter at /usr/bin/python3.12', () => {
+            expect(pythonStartupLandmarks('/usr/bin/python3.12')).toEqual([
+              '/usr/bin/pyvenv.cfg', '/usr/pyvenv.cfg', '/usr/bin/pybuilddir.txt', '/usr/bin/python3.12._pth', '/usr/bin/python3._pth',
+              '/usr/bin/Modules/Setup.local', '/usr/Modules/Setup.local', '/Modules/Setup.local']);
+          });
+          it('refuses a non-canonical or relative interpreter path', () => {
+            for (const bad of ['python3.12', './python3.12', '', undefined as any]) expect(() => pythonStartupLandmarks(bad)).toThrow(/canonical interpreter/);
+          });
+          it('proves each one absent by lstat, and every one is declared', () => {
+            const v = v2Fixture(); v.touched.length = 0; v.verify();
+            const marks = pythonStartupLandmarks(v.python);
+            expect(marks.length).toBeGreaterThanOrEqual(5);
+            for (const m of marks) { expect(v.rt.python_absent_landmarks).toContain(m); expect(v.touched).toContain(`lstat:${m}`); }
+          });
+          it.each([
+            ['pyvenv.cfg beside the interpreter', (v: V2) => join(v.exeDir, 'pyvenv.cfg')],
+            ['pyvenv.cfg in the interpreter\'s parent', (v: V2) => join(dirname(v.exeDir), 'pyvenv.cfg')],
+            ['pybuilddir.txt beside the interpreter', (v: V2) => join(v.exeDir, 'pybuilddir.txt')],
+            ['a ._pth named for the interpreter', (v: V2) => join(v.exeDir, 'python3.12._pth')],
+            ['a ._pth named for the interpreter stem', (v: V2) => join(v.exeDir, 'python3._pth')],
+            ['the build landmark in the interpreter directory', (v: V2) => join(v.exeDir, 'Modules', 'Setup.local')],
+            ['the build landmark in an ancestor', (v: V2) => join(dirname(v.exeDir), 'Modules', 'Setup.local')],
+          ])('refuses %s as a regular file, and as a dangling link', (_name, where) => {
+            const file = v2Fixture(); file.put(where(file), 'x');
+            expect(() => file.verify()).toThrow(/absent landmark exists/);
+            const link = v2Fixture(); link.links.set(where(link), 'nowhere');
+            expect(() => link.verify()).toThrow(/absent landmark exists/);
+          });
+          it('refuses when any one derived landmark is not declared', () => {
+            for (const m of pythonStartupLandmarks(v2Fixture().python)) {
+              withRecord(v2Fixture(), (r) => { r.python_absent_landmarks = r.python_absent_landmarks.filter((x: string) => x !== m); }, /undeclared Python startup landmark/);
+            }
+          });
+          it('refuses a declared landmark outside the reviewed set, even one that is genuinely absent', () => {
+            withRecord(v2Fixture(), (r) => { r.python_absent_landmarks.push(join(dirname(r.python), 'sitecustomize.py')); }, /Python absent landmark/);
+            withRecord(v2Fixture(), (r) => { r.python_absent_landmarks.push(join(r.roots[0].path, 'anything.cfg')); }, /Python absent landmark/);
+          });
+          it('refuses when the deepest existing ancestor of an absent landmark is a link, or its state is unprovable', () => {
+            const linked = v2Fixture(); linked.altered.set(linked.exeDir, 'symlink');
+            expect(() => linked.verify()).toThrow(/linked, redirected or special/);
+            const v = v2Fixture(), target = join(v.exeDir, 'Modules', 'Setup.local');
+            const denied = { ...v.io, lstatSync: (p: any) => { if (p === target) throw Object.assign(new Error('denied'), { code: 'EACCES' }); return v.io.lstatSync(p); } } as any;
+            expect(() => verifyRehearsalPackage(v.request, denied)).toThrow(/absence unprovable/);
+          });
+          it('refuses a landmark that appears after the first verification, at terminal readback', () => {
+            const v = v2Fixture(), spawn = vi.fn(() => { v.put(join(v.exeDir, 'pyvenv.cfg'), 'home = /elsewhere'); return { status: 0 }; });
+            expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(/absent landmark exists/);
+            expect(spawn).toHaveBeenCalledOnce();
+          });
+        });
+        it('refuses a zip that appears after the first verification, at terminal readback', () => {
+          const v = v2Fixture(), spawn = vi.fn(() => { v.put(v.zip, 'late zip'); return { status: 0 }; });
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(/absent landmark exists/);
+          expect(spawn).toHaveBeenCalledOnce();
+        });
+      });
+
+      describe('file-bound executables', () => {
+        it('never reads, lists or lstats the executables\' parent directory or its siblings', () => {
+          const v = v2Fixture();
+          v.put(join(v.exeDir, 'unrelated-sibling'), 'unreviewed sibling'); v.links.set(join(v.exeDir, 'sibling-link'), '/anywhere');
+          v.build(); v.touched.length = 0; v.verify();
+          expect(v.touched.filter((t) => /unrelated-sibling|sibling-link/.test(t))).toEqual([]);
+          expect(v.touched.filter((t) => t === `readdir:${v.exeDir}`)).toEqual([]);
+          for (const p of [v.node, v.python, v.listener]) expect(v.touched).toContain(`read:${p}`);
+        });
+        it.each([
+          ['python is a symlink (venv-style)', (v: V2) => { v.altered.set(v.python, 'symlink'); }, /linked, redirected or special/],
+          ['the listener is a symlink', (v: V2) => { v.altered.set(v.listener, 'symlink'); }, /linked, redirected or special/],
+          ['node is a symlink', (v: V2) => { v.altered.set(v.node, 'symlink'); }, /linked, redirected or special/],
+          ['python is hard-linked', (v: V2) => { v.nlinks.set(v.python, 2); }, /linked, redirected or special/],
+          ['the listener is a special file', (v: V2) => { v.altered.set(v.listener, 'special'); }, /linked, redirected or special/],
+          ['python has the setuid bit', (v: V2) => { v.modes.set(v.python, 0o4755); }, /executable mode/],
+          ['the listener has the setgid bit', (v: V2) => { v.modes.set(v.listener, 0o2755); }, /executable mode/],
+          ['python bytes changed', (v: V2) => { v.put(v.python, 'substituted interpreter'); }, /pinned bytes changed/],
+          ['the listener bytes changed', (v: V2) => { v.put(v.listener, 'substituted listener'); }, /pinned bytes changed/],
+          ['the parent directory is a link', (v: V2) => { v.altered.set(v.exeDir, 'symlink'); }, /linked, redirected or special/],
+        ])('refuses when %s', (_name, change, pattern) => {
+          const v = v2Fixture(), spawn = vi.fn(); change(v);
+          expect(() => launchRehearsal(v.request, spawn as any, v.io)).toThrow(pattern);
+          expect(spawn).not.toHaveBeenCalled();
+        });
+        it('refuses an executable that a tree root also owns, or whose parent is the child PATH directory', () => {
+          const v = v2Fixture();
+          withRecord(v, (r) => { r.roots.push({ path: v.exeDir, links: [], hardlinks: [],
+            files: [...v.files.keys()].filter((p) => p.startsWith(v.exeDir)).map((p) => ({ path: norm(p.slice(v.exeDir.length + 1)), sha256: digest(v.files.get(p)!) })).sort(byPath) }); });
+          withRecord(v2Fixture(), (r) => { r.pg_bin = v.exeDir; });
+        });
+        it.each([
+          ['node absent from the bound list', (r: any) => { r.executables = r.executables.filter((e: any) => e.path !== r.node); }, /runtime executables/],
+          ['an extra bound executable', (r: any) => { r.executables = [...r.executables, { path: join(dirname(r.python), 'extra'), sha256: '0'.repeat(64) }]; }, /runtime executables/],
+          ['python and the listener naming one file', (r: any) => { r.listener_tool = r.python; }, /runtime executables/],
+          ['an unknown executable field', (r: any) => { r.executables[0].mode = 755; }, /invalid runtime executable fields/],
+          ['a malformed digest', (r: any) => { r.executables[0].sha256 = 'x'; }, /invalid digest/],
+        ])('refuses %s', (_name, edit, pattern) => { withRecord(v2Fixture(), edit, pattern); });
+        it('keeps the venv interpreter, PATH-resolved names and package-tree copies out of the accepted set', () => {
+          const v = v2Fixture();
+          withRecord(v, (r) => { r.python = 'python3'; }, /runtime executables|canonical interpreter/);
+          const w = v2Fixture();
+          withRecord(w, (r) => { r.listener_tool = 'ss'; }, /runtime executables/);
+        });
+      });
+
+      describe('hard-link groups', () => {
+        const groupOf = (names: string[]) => ({ paths: [...names].sort(), nlink: names.length });
+        const pair = ['library/native-a', 'library/native-b'];
+        const withPair = (v: V2, nlink = 2) => { v.hardlinked(pair, nlink); v.build(); v.rt.roots[0].hardlinks = [groupOf(pair)]; v.commit(); };
+        it('accepts one declared group with complete membership, equal content, one inode and exact link counts', () => {
+          const v = v2Fixture(); withPair(v);
+          const bound = v.verify();
+          expect(bound.resolution.hardlink_counts).toEqual({ [join(v.runtimeRoot, pair[0])]: 2, [join(v.runtimeRoot, pair[1])]: 2 });
+          for (const p of pair) expect(bound.resolution.files[join(v.runtimeRoot, p)]).toMatch(/^[a-f0-9]{64}$/);
+        });
+        it('carries the counts into the pinned policy file the launcher writes', () => {
+          const v = v2Fixture(); withPair(v);
+          const spawn = vi.fn(() => ({ status: 0 }));
+          expect(launchRehearsal(v.request, spawn as any, v.io)).toBe(0);
+          const policy = JSON.parse(v.files.get((spawn.mock.calls[0] as any)[2].env.AFLDB_RESOLUTION_POLICY)!.toString());
+          expect(policy.hardlink_counts).toEqual({ [join(v.runtimeRoot, pair[0])]: 2, [join(v.runtimeRoot, pair[1])]: 2 });
+          expect(Object.keys(policy.executables)).toHaveLength(3);
+        });
+        it.each([
+          ['an unlisted third link (nlink above the group size)', (v: V2) => { v.nlinks.set(join(v.runtimeRoot, pair[0]), 3); v.nlinks.set(join(v.runtimeRoot, pair[1]), 3); }, /linked, redirected or special/],
+          ['nlink below the group size', (v: V2) => { v.nlinks.set(join(v.runtimeRoot, pair[1]), 1); }, /linked, redirected or special/],
+          ['differing content', (v: V2) => { v.put(join(v.runtimeRoot, pair[1]), 'different bytes'); v.sync(); v.rt.roots[0].hardlinks = [groupOf(pair)]; v.commit(); }, /hard-link group evidence/],
+          ['different inodes', (v: V2) => { v.inodes.set(join(v.runtimeRoot, pair[1]), 8888); }, /hard-link group evidence/],
+        ])('refuses a declared group with %s', (_name, change, pattern) => {
+          const v = v2Fixture(); withPair(v); change(v);
+          expect(() => v.verify()).toThrow(pattern);
+        });
+        it('refuses a lone nlink-2 file that no group declares', () => {
+          const v = v2Fixture(); v.hardlinked(['library/native-a'], 2); v.build();
+          expect(() => v.verify()).toThrow(/linked, redirected or special/);
+        });
+        it.each([
+          ['a member that is not a listed file of this root', (g: any) => { g.paths = [g.paths[0], 'library/missing']; }],
+          ['a member taken from another root', (g: any) => { g.paths = [g.paths[0], '../other-root/file']; }],
+          ['one path repeated', (g: any) => { g.paths = [g.paths[0], g.paths[0]]; }],
+          ['a single member', (g: any) => { g.paths = [g.paths[0]]; g.nlink = 1; }],
+          ['nlink not equal to the member count', (g: any) => { g.nlink = 3; }],
+          ['an unknown field', (g: any) => { g.inode = 7777; }],
+        ])('refuses a malformed group with %s', (_name, edit) => {
+          const v = v2Fixture(); withPair(v);
+          withRecord(v, (r) => edit(r.roots[0].hardlinks[0]), /runtime hard-link group|unsafe.duplicate.unsorted|hard-link group member|invalid runtime hard-link group fields/);
+        });
+        it('refuses a path claimed by two groups and groups that are not in sorted order', () => {
+          const v = v2Fixture(); v.hardlinked(pair); v.hardlinked(['library/native-c', 'library/native-d'], 2, 9999);
+          v.build();
+          withRecord(v, (r) => { r.roots[0].hardlinks = [groupOf(pair), { paths: [pair[1], 'library/native-c'], nlink: 2 }]; }, /unclaimed listed file/);
+          withRecord(v, (r) => { r.roots[0].hardlinks = [groupOf(['library/native-c', 'library/native-d']), groupOf(pair)]; }, /hard-link groups unsorted/);
+        });
+        it('refuses two groups on one inode', () => {
+          const v = v2Fixture(); v.hardlinked(pair); v.hardlinked(['library/native-c', 'library/native-d']); v.build();
+          v.rt.roots[0].hardlinks = [groupOf(pair), groupOf(['library/native-c', 'library/native-d'])]; v.commit();
+          expect(() => v.verify()).toThrow(/hard-link group evidence/);
+        });
+        it('refuses the same pair in the package tree, which keeps the exact nlink === 1 rule', () => {
+          const v = v2Fixture(); withPair(v);
+          for (const n of ['data/synthetic-input.csv', 'package.json']) { v.nlinks.set(join(v.src, n), 2); v.inodes.set(join(v.src, n), 5555); }
+          expect(() => v.verify()).toThrow(/linked, redirected or special/);
+        });
+        it('refuses a version 1 record, which has no group syntax, whose file has nlink 2', () => {
+          const f = fixture(), p = join(dirname(f.runtime.tsx_loader), 'library/dependency.js');
+          f.nlinks.set(p, 2);
+          expect(() => verifyRehearsalPackage(f.request, f.io)).toThrow(/linked, redirected or special/);
+        });
+      });
+
+      describe('launch environment and the absolute listener tool', () => {
+        it('launches with PATH reduced to the cluster client directory and the bound listener supplied absolutely', () => {
+          const v = v2Fixture(), spawn = vi.fn(() => ({ status: 0 }));
+          expect(launchRehearsal(v.request, spawn as any, v.io)).toBe(0);
+          const [, , options] = spawn.mock.calls[0] as any, env = options.env;
+          expect(env.PATH).toBe(v.rt.pg_bin);
+          for (const p of [v.node, v.python, v.listener]) expect(env.PATH.split(delimiter)).not.toContain(dirname(p));
+          expect(env.AFLDB_PYTHON).toBe(v.python);
+          expect(env.AFLDB_REHEARSAL_LISTENER_TOOL).toBe(v.listener);
+          expect(env.AFLDB_REHEARSAL_LAUNCH_SPEC).toBe(v.request.specPath);
+          expect(env.AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256).toBe(v.request.specSha256);
+          expect(options.shell).toBe(false);
+        });
+        const listenerEnv = (v: V2) => ({ AFLDB_REHEARSAL_LISTENER_TOOL: v.listener, AFLDB_REHEARSAL_LAUNCH_SPEC: v.request.specPath,
+          AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: v.request.specSha256 });
+        const anchorOf = (v: V2) => digest(JSON.stringify(v.verify().resolution));
+        const tool = (v: V2, env: Record<string, string | undefined>, anchor: unknown, execArgv: string[] = []) =>
+          guardedListenerTool(env, v.io, (r, io) => verifyRehearsalPackage(r, io), { anchor, execArgv });
+        it('leaves an ordinary process alone: no guard, no rehearsal environment, no verification', () => {
+          const v = v2Fixture(), verify = vi.fn();
+          expect(guardedListenerTool({}, v.io, verify as any, { anchor: undefined, execArgv: [] })).toBeUndefined();
+          expect(verify).not.toHaveBeenCalled();
+        });
+        it('returns the bound absolute listener only after full verification reproduces the installed policy', () => {
+          const v = v2Fixture(), verify = vi.fn((r: any, io: any) => verifyRehearsalPackage(r, io));
+          const answer = guardedListenerTool(listenerEnv(v), v.io, verify as any, { anchor: anchorOf(v), execArgv: [] });
+          expect(answer).toBe(v.listener);
+          expect(verify).toHaveBeenCalledOnce();
+          expect(verify.mock.calls[0][0]).toMatchObject({ specPath: v.request.specPath, specSha256: v.request.specSha256 });
+        });
+        it('also verifies a version 1 record, where the listener is a hashed tree member', () => {
+          const f = fixture(), bound = verifyRehearsalPackage(f.request, f.io);
+          const env = { AFLDB_REHEARSAL_LISTENER_TOOL: f.runtime.listener_tool, AFLDB_REHEARSAL_LAUNCH_SPEC: f.request.specPath, AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: f.request.specSha256 };
+          expect(guardedListenerTool(env, f.io, (r, io) => verifyRehearsalPackage(r, io), { anchor: digest(JSON.stringify(bound.resolution)), execArgv: [] })).toBe(f.runtime.listener_tool);
+        });
+        it('treats an environment variable alone, or a launcher-set value without the installed preload, as no authority', () => {
+          const v = v2Fixture(), env = listenerEnv(v);
+          expect(() => tool(v, { AFLDB_REHEARSAL_LISTENER_TOOL: v.listener }, anchorOf(v))).toThrow(/listener provenance missing/);
+          expect(() => tool(v, env, undefined)).toThrow(/resolution preload missing/);
+          expect(() => tool(v, env, 'not-a-digest')).toThrow(/resolution preload missing/);
+          expect(() => tool(v, env, '0'.repeat(64))).toThrow(/resolution policy mismatch/);
+          expect(() => tool(v, { ...env, AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: '0'.repeat(64) }, anchorOf(v))).toThrow(/pinned bytes/);
+          expect(() => tool(v, { ...env, AFLDB_REHEARSAL_LAUNCH_SPEC_SHA256: undefined }, anchorOf(v))).toThrow(/listener provenance missing/);
+          // The preload alone, with every environment value deleted, is still guarded and still refuses.
+          expect(() => tool(v, {}, anchorOf(v))).toThrow(/listener provenance missing/);
+          expect(() => tool(v, {}, undefined, ['file:///x/tools/v2/rehearsal-resolution-guard.mjs'])).toThrow(/listener provenance missing/);
+        });
+        it.each([
+          ['a bare name', (v: V2) => ({ ...listenerEnv(v), AFLDB_REHEARSAL_LISTENER_TOOL: 'ss' }), /unbound listener tool/],
+          ['another absolute file', (v: V2) => ({ ...listenerEnv(v), AFLDB_REHEARSAL_LISTENER_TOOL: v.python }), /unbound listener tool/],
+        ])('refuses %s even with valid provenance', (_name, makeEnv, pattern) => {
+          const v = v2Fixture(), anchor = anchorOf(v);
+          expect(() => tool(v, makeEnv(v), anchor)).toThrow(pattern);
+        });
+        it.each([
+          ['replaced bytes', (v: V2) => { v.put(v.listener, 'substituted listener'); }],
+          ['a symlink in its place', (v: V2) => { v.altered.set(v.listener, 'symlink'); }],
+          ['a hard link', (v: V2) => { v.nlinks.set(v.listener, 2); }],
+          ['a setuid bit', (v: V2) => { v.modes.set(v.listener, 0o4755); }],
+        ])('refuses a substituted listener executable: %s', (_name, change) => {
+          const v = v2Fixture(), env = listenerEnv(v), anchor = anchorOf(v); change(v);
+          expect(() => tool(v, env, anchor)).toThrow(/Rehearsal package refused/);
+        });
+      });
+
+      // AFLDB-ISSUE-320. Synthetic and in memory, like version 2: these prove the verifier, the policy the
+      // launcher derives and the guard self-check. The auditor's own enforcement is proven on Linux only,
+      // in the retained disposable-root experiments (tools/v2/native-audit).
+      describe('runtime record version 3: the enforced native closure', () => {
+        const ELF = Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.from(' synthetic native module')]);
+        function v3Fixture() {
+          const v = v2Fixture();
+          const nativeDir = join(v.base, 'native'), auditor = join(nativeDir, 'afldb-native-audit.so'), loader = join(nativeDir, 'ld-linux-x86-64.so.2');
+          const module = join(v.runtimeRoot, 'library/native.node');
+          v.put(auditor, 'synthetic auditor'); v.put(loader, 'synthetic loader'); v.files.set(module, ELF);
+          const closure = (extra: string[] = []) => ({ schema_version: 1, loader, auditor: { path: auditor, sha256: digest(v.files.get(auditor)!) },
+            objects: [...v.rt.executables.map((e: any) => e.path), auditor, loader, module, ...extra].sort()
+              .map((path) => ({ path, sha256: digest(v.files.get(path)!) })) });
+          const rebind = (extra: string[] = []) => { v.sync(); v.rt.schema_version = 3; v.rt.native_closure = closure(extra); v.commit(); };
+          rebind();
+          // The verifying process's own image (read only on Linux): bound objects only, from their inodes.
+          v.put('/proc/self/maps', [v.node, loader, auditor].map((p, i) => `7f${i}000-7f${i}fff r-xp 00000000 fd:01 ${v.inodeOf(p)}    ${p}`).join('\n') + '\n');
+          return { ...v, nativeDir, auditor, loader, module, rebind };
+        }
+        type V3 = ReturnType<typeof v3Fixture>;
+        const policyOf = (v: V3) => nativePolicyText(v.rt.native_closure);
+
+        it('verifies a version 3 record and derives the pinned auditor policy; version 2 carries none of it', () => {
+          const v = v3Fixture(), bound = v.verify();
+          expect(bound.runtime.schema_version).toBe(3);
+          expect(bound.resolution.native_auditor).toBe(v.auditor);
+          expect(bound.resolution.native_auditor_sha256).toBe(digest('synthetic auditor'));
+          expect(bound.resolution.native_policy_sha256).toBe(digest(policyOf(v)));
+          expect(policyOf(v).split('\n').slice(0, 2)).toEqual(['afldb-native-closure-policy 1', `auditor ${digest('synthetic auditor')} ${v.auditor}`]);
+          const v2 = v2Fixture().verify().resolution;
+          for (const key of ['native_auditor', 'native_auditor_sha256', 'native_policy_sha256']) expect(key in v2).toBe(false);
+        });
+        it('launches every guarded child with the bound auditor, the derived policy file and its pin', () => {
+          const v = v3Fixture(), spawn = vi.fn(() => ({ status: 0 }));
+          expect(launchRehearsal(v.request, spawn as any, v.io, {})).toBe(0);
+          const env = (spawn.mock.calls[0] as any)[2].env;
+          expect(env.LD_AUDIT).toBe(v.auditor);
+          expect(dirname(env.AFLDB_NATIVE_POLICY)).toBe(v.spec.temp_root);
+          expect(v.files.get(env.AFLDB_NATIVE_POLICY)!.toString()).toBe(policyOf(v));
+          expect(env.AFLDB_NATIVE_POLICY_SHA256).toBe(digest(policyOf(v)));
+          expect(env.LD_PRELOAD).toBeUndefined(); expect(env.LD_LIBRARY_PATH).toBeUndefined();
+          const policy = JSON.parse(v.files.get(env.AFLDB_RESOLUTION_POLICY)!.toString());
+          expect(policy.native_auditor).toBe(v.auditor);
+          // The same enforcement reaches every runner child through the reviewed child environment.
+          const child = rehearsalChildEnv({ LD_AUDIT: '/elsewhere.so', HOME: '/h' }, resolutionLaunch(v.verify(), v.io).env, v.rt.pg_bin);
+          expect(child.LD_AUDIT).toBe(v.auditor); expect(child.AFLDB_NATIVE_POLICY_SHA256).toBe(digest(policyOf(v)));
+          expect(resolutionLaunch(v.verify(), v.io).pythonArgs[4]).toContain("'native_auditor' in p");
+        });
+        it.each([
+          ['a version 2 record carrying a native closure', (r: any) => { r.schema_version = 2; }, /invalid runtime record fields/],
+          ['a version 3 record without one', (r: any) => { delete r.native_closure; }, /invalid runtime record fields/],
+          ['an unknown closure field', (r: any) => { r.native_closure.extra = 1; }, /invalid native closure fields/],
+          ['an unknown closure version', (r: any) => { r.native_closure.schema_version = 2; }, /native closure/],
+          ['an empty object list', (r: any) => { r.native_closure.objects = []; }, /native closure/],
+          ['unsorted objects', (r: any) => { r.native_closure.objects.reverse(); }, /native object entry/],
+          ['a repeated object', (r: any) => { r.native_closure.objects.push(r.native_closure.objects.at(-1)); }, /native object entry/],
+          ['a relative object path', (r: any) => { r.native_closure.objects[0].path = 'lib/x.so'; }, /native object entry/],
+          ['a malformed digest', (r: any) => { r.native_closure.objects[0].sha256 = 'x'; }, /native object entry/],
+          ['an unknown object field', (r: any) => { r.native_closure.objects[0].mode = 1; }, /invalid native object fields/],
+          ['an executable missing from the closure', (r: any) => { r.native_closure.objects = r.native_closure.objects.filter((o: any) => o.path !== r.python); }, /bound executable outside the native closure/],
+          ['the auditor missing from the closure', (r: any) => { r.native_closure.objects = r.native_closure.objects.filter((o: any) => o.path !== r.native_closure.auditor.path); }, /native loader\/auditor unbound/],
+          ['the loader missing from the closure', (r: any) => { r.native_closure.objects = r.native_closure.objects.filter((o: any) => o.path !== r.native_closure.loader); }, /native loader\/auditor unbound/],
+          ['an auditor digest that is not the bound object', (r: any) => { r.native_closure.auditor.sha256 = '0'.repeat(64); }, /native loader\/auditor unbound/],
+          ['an object digest that is not its bytes', (r: any) => { r.native_closure.objects[0].sha256 = '0'.repeat(64); }, /pinned bytes changed/],
+        ])('refuses %s', (_name, edit, pattern) => { withRecord(v3Fixture() as unknown as V2, edit, pattern); });
+        it('refuses an ELF member of a bound root that the closure leaves out, or binds with other bytes', () => {
+          const v = v3Fixture();
+          withRecord(v as unknown as V2, (r) => { r.native_closure.objects = r.native_closure.objects.filter((o: any) => o.path !== v.module); }, /runtime ELF file outside the native closure/);
+          withRecord(v3Fixture() as unknown as V2, (r) => { r.native_closure.objects.find((o: any) => o.path.endsWith('native.node')).sha256 = digest('other'); }, /pinned bytes changed/);
+          // A further bound object outside every root is accepted when it is listed and pinned.
+          const w = v3Fixture(), other = join(w.nativeDir, 'libextra.so.1');
+          w.put(other, 'extra'); w.rebind([other]);
+          expect(() => w.verify()).not.toThrow();
+        });
+        it.each([
+          ['substituted library bytes', (v: V3) => { v.put(v.loader, 'substituted loader'); }, /pinned bytes changed/],
+          ['changed auditor bytes', (v: V3) => { v.put(v.auditor, 'changed auditor'); }, /pinned bytes changed/],
+          ['a symlinked object', (v: V3) => { v.altered.set(v.loader, 'symlink'); }, /linked, redirected or special/],
+          ['a hard-linked object', (v: V3) => { v.nlinks.set(v.auditor, 2); }, /linked, redirected or special/],
+          ['a redirected object directory', (v: V3) => { v.altered.set(v.nativeDir, 'redirect'); }, /linked, redirected or special/],
+          ['a setuid object', (v: V3) => { v.modes.set(v.loader, 0o4755); }, /native object mode/],
+        ])('refuses before any spawn on %s', (_name, change, pattern) => {
+          const v = v3Fixture(), spawn = vi.fn(); change(v);
+          expect(() => launchRehearsal(v.request, spawn as any, v.io, {})).toThrow(pattern);
+          expect(spawn).not.toHaveBeenCalled();
+        });
+        it('refuses a writable root over a bound object and drift of an object during the run', () => {
+          const v = v3Fixture(); v.spec.capture_root = v.nativeDir; v.commit();
+          expect(() => v.verify()).toThrow(/writable root overlap/);
+          const w = v3Fixture(), spawn = vi.fn(() => { w.put(w.loader, 'drift'); return { status: 0 }; });
+          expect(() => launchRehearsal(w.request, spawn as any, w.io, {})).toThrow(/pinned bytes changed/); expect(spawn).toHaveBeenCalledOnce();
+        });
+        it.each(['LD_PRELOAD', 'LD_LIBRARY_PATH', 'LD_AUDIT', 'LD_BIND_NOT'])('the verifying launcher refuses %s in its own environment before any spawn', (key) => {
+          const v = v3Fixture(), spawn = vi.fn(() => ({ status: 0 }));
+          expect(() => launchRehearsal(v.request, spawn as any, v.io, { [key]: '/elsewhere.so', HOME: '/h' })).toThrow(/loader override in the verifying process/);
+          expect(spawn).not.toHaveBeenCalled();
+          // A version 2 record keeps its behaviour exactly.
+          const w = v2Fixture();
+          expect(() => assertLauncherNativeImage(w.verify(), { [key]: '/elsewhere.so' }, w.io, 'linux')).not.toThrow();
+        });
+
+        describe("the verifying launcher's own image (Linux /proc/self/maps)", () => {
+          const objects = ['/opt/n/ld-linux-x86-64.so.2', '/opt/n/libc.so.6', '/opt/n/node'].map((path) => ({ path, sha256: 'a'.repeat(64) }));
+          const verified = { runtime: { native_closure: { objects } } } as any;
+          const inode = new Map([['/opt/n/ld-linux-x86-64.so.2', 11], ['/opt/n/libc.so.6', 12], ['/opt/n/node', 13], ['/opt/x/libother.so', 14]]);
+          const line = (path: string, perms = 'r-xp', ino = inode.get(path) ?? 0) => `7f00-7f10 ${perms} 00000000 fd:01 ${ino}    ${path}`;
+          const good = [...objects.map((o) => line(o.path)), line('/opt/n/node', 'r--p'), '7f40-7f50 r-xp 00000000 00:00 0    [vdso]', '7f60-7f70 rwxp 00000000 00:00 0 '];
+          const io = (maps: string[]) => ({ readFileSync: () => maps.join('\n') + '\n', lstatSync: (p: string) => ({ ino: inode.get(p) ?? 99 }) }) as any;
+          it('passes when every file-backed executable mapping is a bound object from its inode (anonymous, vDSO and data mappings are not files)', () => {
+            expect(() => assertLauncherNativeImage(verified, {}, io(good), 'linux')).not.toThrow();
+            expect(() => assertLauncherNativeImage(verified, {}, io([line('/opt/x/libother.so')]), 'win32')).not.toThrow(); // no /proc there
+            expect(() => assertLauncherNativeImage(verified, {}, io([...good, line('/opt/x/libother.so', 'r--p')]), 'linux')).not.toThrow();
+          });
+          it.each([
+            ['an unbound library', [...good, line('/opt/x/libother.so')]],
+            ['a bound path mapped from another inode', [...good, line('/opt/n/libc.so.6', 'r-xp', 77)]],
+            ['a deleted (replaced) bound object', [...good, line('/opt/n/libc.so.6 (deleted)')]],
+          ])('refuses %s', (_name, maps) => {
+            expect(() => assertLauncherNativeImage(verified, {}, io(maps), 'linux')).toThrow(/verifying process maps native code outside the closure/);
+          });
+        });
+
+        describe('guard self-check: the auditor must be enforcing in the guarded process', () => {
+          const auditor = '/opt/afldb/native/afldb-native-audit.so', bytes = Buffer.from('synthetic auditor');
+          const data = { native_auditor: auditor, native_auditor_sha256: digest(bytes), native_policy_sha256: 'a'.repeat(64) };
+          const env = { LD_AUDIT: auditor, AFLDB_NATIVE_POLICY_SHA256: 'a'.repeat(64) };
+          const maps = (path = auditor, inode = 4242) => `7f00-7f10 r-xp 00000000 fd:01 ${inode}                    ${path}\n7f20-7f30 r--p 00000000 00:00 0 \n`;
+          const io = (o: { maps?: string; bytes?: Buffer; ino?: number } = {}) => ({
+            readFileSync: (p: any) => p === '/proc/self/maps' ? (o.maps ?? maps()) : o.bytes ?? bytes,
+            statSync: () => ({ ino: o.ino ?? 4242 }),
+          }) as any;
+          it('passes only when named, pinned, mapped from the bound inode and holding the bound bytes', () => {
+            expect(() => assertNativeEnforcement(data, env, io())).not.toThrow();
+            expect(() => assertNativeEnforcement({}, {}, io())).not.toThrow(); // version 1/2 policy: nothing to check
+          });
+          it.each([
+            ['LD_AUDIT absent', {}, io()],
+            ['another auditor named', { ...env, LD_AUDIT: '/tmp/other.so' }, io()],
+            ['the policy pin differs', { ...env, AFLDB_NATIVE_POLICY_SHA256: 'b'.repeat(64) }, io()],
+            ['the auditor is not mapped', env, io({ maps: maps('/tmp/other.so') })],
+            ['the mapping is another inode', env, io({ ino: 9999 })],
+            ['the auditor bytes changed', env, io({ bytes: Buffer.from('changed') })],
+          ])('refuses when %s', (_name, e, fsio) => {
+            expect(() => assertNativeEnforcement(data, e as any, fsio)).toThrow(/Rehearsal resolution refused/);
+          });
+        });
+      });
+    });
+  });
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+});
 import {
   FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE, trackedExpectedIds,
 } from '../tools/records/first-kick-goal-source';
@@ -199,7 +1927,17 @@ import {
   brownlowAflApiSeasonArtefacts,
   brownlowAflApiStageSuffix,
   brownlowSeasonPreflightFiles,
+  classifyOrdinaryCommand,
   createCliDeps,
+  assertOrdinaryStagesAdmissible,
+  ordinaryNpmScriptBodies,
+  ordinarySpawn,
+  ordinaryTsxArgv,
+  verifyOrdinaryTsxEntry,
+  ORDINARY_ESBUILD_LINKS,
+  ORDINARY_ESBUILD_SHA256,
+  ORDINARY_FORBIDDEN_ENV,
+  type OrdinaryIo,
 } from '../tools/db/rebuild-test';
 import {
   AFL_API_OWNERSHIP_COUNTS_SQL, AFL_API_OWNERSHIP_SCHEMA_SQL, AflApiOwnershipCensusError, CENSUS_MARKER,
@@ -218,7 +1956,9 @@ import {
   archivePendingCapture,
   archivedCaptureName,
   assertSequenceAboveLedger,
+  bindCompletedCapture,
   buildCombinedCapture,
+  captureBoundMarkerProblems,
   captureDirectory,
   capturePayloadSha256,
   capturedLedgerContractProblems,
@@ -230,6 +1970,8 @@ import {
   nextIdentityValue,
   observeCaptureState,
   parseCombinedCapture,
+  parseRebuildMarker,
+  pendingCaptureAbsent,
   planActorRemap,
   planLedgerReinstatement,
   readPendingCapture,
@@ -294,6 +2036,25 @@ import {
   MANUAL_REGISTRATION_REPLAY,
   REGISTRATION_CREATED_AFLTABLES_IDENTITY_SQL,
 } from '../tools/db/rebuild-test';
+import {
+  ISOLATED_REBUILD_DATABASE,
+  ISOLATED_REBUILD_SPEC,
+  ISOLATED_REBUILD_TARGET,
+  ISOLATED_SERVER_FACTS_COPY_SQL,
+  assertIsolatedTargetLive,
+  assertRebuildTargetName,
+  isIsolatedRebuildName,
+  isolatedRunPort,
+  parseIsolatedServerFacts,
+  rebuildSpecFor,
+  resolveIsolatedTarget,
+  restingDatabaseComment,
+} from '../tools/db/rebuild-test';
+import {
+  clearRebuildMarker as clearIsolatedAwareMarker,
+  setRebuildMarker as setIsolatedAwareMarker,
+} from '../tools/migration/rebuild_afl_api_adjudications';
+import { ISOLATED_CLUSTER_NAME, ISOLATED_DATABASE_MARKER, ISOLATED_SERVER_FACTS_SQL } from '@afldb/domain';
 import {
   CORRECTED_REBUILD_REPLAY,
   reinstateRegistrationsStage,
@@ -400,7 +2161,7 @@ const importerSource = readFileSync(
 const OWNER = 'postgres://afldb_owner:pw@localhost:5432/afldb_test';
 const IMPORT = 'postgres://afldb_import:pw@localhost:5432/afldb_test';
 
-const FULL_LABEL = 'full-history-2026';
+const FULL_LABEL = 'full-history-20260902';
 const fullManifest = () => ({
   full_history: true,
   completeness: 'full_history',
@@ -885,6 +2646,709 @@ describe('AFLDB-ISSUE-278 — inherited libpq routing cannot move the reset (chi
 });
 
 /*
+ * AFLDB-ISSUE-324 -- under the native LD_AUDIT closure `npx` / `npm` (env-node scripts) are unbound, so the
+ * ordinary rebuild path maps exactly `npx tsx <closed argv>` and `npm run <two scripts>` to the approved
+ * node binary + the checkout's own tsx cli.mjs, and refuses everything else BEFORE spawning. DB-free: a
+ * recording spawn proves the execution boundary; a temp checkout layout (via the OrdinaryIo seam) proves
+ * the entry-point verification, including the owner ruling that the REAL path of the executed tsx must be
+ * inside the pinned checkout (a checkout-local link to a shared install must refuse).
+ */
+describe('AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm run become bound node)', () => {
+  type Spawn = typeof import('node:child_process').spawnSync;
+  type Raw = (command: string, args: string[], options: Record<string, unknown>) => unknown;
+  type Call = { command: string; args: string[]; options: Record<string, unknown> };
+  const tmpRoots: string[] = [];
+  afterEach(() => { for (const dir of tmpRoots.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+
+  const TSX_VERSION = '4.99.99';
+  const write = (path: string, text: string) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text); };
+  const tempDir = (tag: string) => {
+    const dir = nativeFs.realpathSync(mkdtempSync(join(tmpdir(), `issue324-${tag}-`)));
+    tmpRoots.push(dir);
+    return dir;
+  };
+  const ioFor = (repoRoot: string, moduleRoot = repoRoot): OrdinaryIo => ({
+    realpathSync: (p) => nativeFs.realpathSync(p),
+    lstatSync: (p) => nativeFs.lstatSync(p),
+    readFileSync: (p, encoding) => nativeFs.readFileSync(p, encoding),
+    listDirectory: (p) => nativeFs.readdirSync(p),
+    readlinkSync: (p) => nativeFs.readlinkSync(p),
+    sha256File: (p) => createHash('sha256').update(nativeFs.readFileSync(p)).digest('hex'),
+    repoRoot,
+    moduleRoot,
+  });
+  /** A complete, honest temp checkout: real directories and regular files only. */
+  function buildLayout() {
+    const root = tempDir('checkout');
+    const tsx = join(root, 'node_modules', 'tsx');
+    write(join(root, 'package.json'), JSON.stringify({ name: 'fixture', scripts: { ...ordinaryNpmScriptBodies(), 'db:test:rebuild': 'tsx tools/db/rebuild-test.ts' } }));
+    write(join(root, 'package-lock.json'), JSON.stringify({ packages: { 'node_modules/tsx': { version: TSX_VERSION, bin: { tsx: 'dist/cli.mjs' } } } }));
+    write(join(tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: TSX_VERSION, bin: './dist/cli.mjs' }));
+    write(join(tsx, 'dist', 'cli.mjs'), '// fixture\n');
+    write(join(tsx, 'dist', 'esm', 'index.mjs'), '// fixture\n');
+    return { root, tsx, cli: join(tsx, 'dist', 'cli.mjs'), io: ioFor(root) };
+  }
+  const recorder = () => {
+    const calls: Call[] = [];
+    const spawn = ((command: string, args: string[], options: Record<string, unknown>) => {
+      calls.push({ command, args, options });
+      return { status: 0, stdout: '', stderr: '' };
+    }) as unknown as Spawn;
+    return { spawn, calls };
+  };
+  const wrap = (spawn: Spawn, io: OrdinaryIo): Raw => ordinarySpawn(spawn, io) as unknown as Raw;
+  const ENV = { PATH: '/bin', MARKER: 'passed-through-unchanged' };
+  const OPTIONS = () => ({ cwd: 'ignored', encoding: 'utf8', shell: true, env: ENV });
+  /** Creates a directory link (a junction on Windows, so no elevation is needed); a message on failure. */
+  const linkDir = (target: string, path: string): string | undefined => {
+    try { nativeFs.symlinkSync(target, path, process.platform === 'win32' ? 'junction' : 'dir'); return undefined; }
+    catch (error) { return (error as Error).message; }
+  };
+  const ORIGINAL_TSX_ARGV = ordinaryTsxArgv();
+  const CAPTURE = ORIGINAL_TSX_ARGV[0];
+
+  describe('permitted, at the execution boundary', () => {
+    it('the closed tsx table is derived from the argv builders: 5 steps + capture --recover + the two first-kick-goal argvs', () => {
+      expect(ORIGINAL_TSX_ARGV).toHaveLength(8);
+      for (const step of ['capture', 'registrations-reinstate', 'registrations-verify', 'reinstate', 'bijection'] as const) {
+        expect(ORIGINAL_TSX_ARGV).toContainEqual(aflApiAdjudicationArgv(step).slice(2));
+      }
+      expect(ORIGINAL_TSX_ARGV).toContainEqual(aflApiAdjudicationArgv('capture', true).slice(2));
+      expect(ORIGINAL_TSX_ARGV).toContainEqual(firstKickGoalArgv().slice(2));
+      expect(ORIGINAL_TSX_ARGV).toContainEqual(firstKickGoalValidateArgv().slice(2));
+      for (const argv of ORIGINAL_TSX_ARGV) expect(argv[0] === 'npx' || argv[0] === 'tsx').toBe(false);
+    });
+
+    it.each(ORIGINAL_TSX_ARGV.map((argv) => [argv.join(' '), argv] as [string, string[]]))(
+      'npx tsx %s runs as the approved node binary + the verified checkout cli.mjs', (_label, argv) => {
+        const L = buildLayout();
+        const { spawn, calls } = recorder();
+        wrap(spawn, L.io)('npx', ['tsx', ...argv], OPTIONS());
+        expect(calls).toHaveLength(1);
+        expect(calls[0].command).toBe(process.execPath);
+        expect(calls[0].args).toEqual([L.cli, ...argv]);
+        expect(calls[0].options).toMatchObject({ shell: false, cwd: L.root, encoding: 'utf8' });
+        expect(calls[0].options.env).toBe(ENV);                      // the caller's environment, untouched
+      });
+
+    it.each([
+      ['db:migrate:test', ['tools/db/migrate.ts', '--target', 'test']],
+      ['db:privileges:test', ['tools/db/privileges.ts', '--target', 'test']],
+    ] as [string, string[]][])('npm run %s runs as the approved node binary + the verified cli.mjs + its fixed argv', (name, expected) => {
+      const L = buildLayout();
+      const { spawn, calls } = recorder();
+      wrap(spawn, L.io)('npm', ['run', name], OPTIONS());
+      expect(calls).toHaveLength(1);
+      expect(calls[0].command).toBe(process.execPath);
+      expect(calls[0].args).toEqual([L.cli, ...expected]);
+      expect(calls[0].options).toMatchObject({ shell: false, cwd: L.root });
+      expect(calls[0].options.env).toBe(ENV);
+      expect(ordinaryNpmScriptBodies()[name]).toBe(`tsx ${expected.join(' ')}`);
+    });
+
+    it('psql and the planner\'s Python interpreter pass through unchanged (command, argv and the very options object)', () => {
+      const L = buildLayout();
+      const { spawn, calls } = recorder();
+      const options = OPTIONS();
+      wrap(spawn, L.io)(PSQL_BIN, ['-X', '-d', 'db'], options);
+      wrap(spawn, L.io)(resolvePython(), ['tools/migration/load_reference_data.py'], options);
+      expect(calls.map((c) => [c.command, c.args])).toEqual([
+        [PSQL_BIN, ['-X', '-d', 'db']], [resolvePython(), ['tools/migration/load_reference_data.py']],
+      ]);
+      expect(calls[0].options).toBe(options);
+      expect(calls[1].options).toBe(options);
+    });
+
+    it('every command the real predecessor plan issues is classified, and only npx/npm become node', () => {
+      for (const recover of [false, true]) {
+        const stages = planStages(target(), fitzroy(), { ...OPTS, recoverAflApiAdjudications: recover });
+        const commands = stages.filter((s) => s.argv);
+        expect(commands.length).toBeGreaterThan(10);
+        for (const stage of commands) {
+          const [command, ...args] = stage.argv!;
+          const child = classifyOrdinaryCommand(command, args);
+          expect(child.kind, stage.id).toBe(command === 'npx' || command === 'npm' ? 'node' : 'passthrough');
+        }
+      }
+    });
+  });
+
+  describe('refused before anything is spawned (nearby variants and attempted bypasses)', () => {
+    const cases: [string, string, string[]][] = [
+      ['npx tsx with an extra argument', 'npx', ['tsx', ...CAPTURE, 'extra']],
+      ['npx tsx with a missing argument', 'npx', ['tsx', ...CAPTURE.slice(0, -1)]],
+      ['npx tsx with the capture step swapped for another word', 'npx', ['tsx', CAPTURE[0], 'drop-everything']],
+      ['npx tsx with a different file', 'npx', ['tsx', 'tools/db/other.ts', 'capture']],
+      ['npx tsx with the argument order reversed', 'npx', ['tsx', ...[...CAPTURE].reverse()]],
+      ['npx tsx -e', 'npx', ['tsx', '-e', 'process.exit(0)']],
+      ['npx tsx --eval', 'npx', ['tsx', '--eval', 'process.exit(0)']],
+      ['npx tsx --import x before a permitted argv', 'npx', ['tsx', '--import', 'x', ...CAPTURE]],
+      ['npx tsx alone', 'npx', ['tsx']],
+      ['npx --yes tsx', 'npx', ['--yes', 'tsx', ...CAPTURE]],
+      ['npx -p tsx', 'npx', ['-p', 'tsx', 'tsx', ...CAPTURE]],
+      ['npx tsx@latest', 'npx', ['tsx@latest', ...CAPTURE]],
+      ['npx ts-node', 'npx', ['ts-node', ...CAPTURE]],
+      ['npx alone', 'npx', []],
+      ['npm run db:migrate:test --', 'npm', ['run', 'db:migrate:test', '--']],
+      ['npm run db:migrate:test extra', 'npm', ['run', 'db:migrate:test', 'extra']],
+      ['npm run-script db:migrate:test', 'npm', ['run-script', 'db:migrate:test']],
+      ['npm exec tsx', 'npm', ['exec', 'tsx']],
+      ['npm install', 'npm', ['install']],
+      ['npm alone', 'npm', []],
+      ['npm run alone', 'npm', ['run']],
+      ['npm run db:test:rebuild', 'npm', ['run', 'db:test:rebuild']],
+      ['npm run with a case-varied permitted name', 'npm', ['run', 'DB:MIGRATE:TEST']],
+      ['npm run with a padded permitted name', 'npm', ['run', ' db:migrate:test']],
+      ['npm run __proto__ (own-property lookup)', 'npm', ['run', '__proto__']],
+      ['npm run constructor (own-property lookup)', 'npm', ['run', 'constructor']],
+      ['npm run toString (own-property lookup)', 'npm', ['run', 'toString']],
+      ['npm run hasOwnProperty (own-property lookup)', 'npm', ['run', 'hasOwnProperty']],
+      ['node -e', 'node', ['-e', 'process.exit(0)']],
+      ['node with the tsx cli.mjs', 'node', ['node_modules/tsx/dist/cli.mjs', ...CAPTURE]],
+      ['tsx', 'tsx', [...CAPTURE]],
+      ['bash', 'bash', ['-c', 'true']],
+      ['sh', 'sh', ['-c', 'true']],
+      ['npx.cmd', 'npx.cmd', ['tsx', ...CAPTURE]],
+      ['npm.cmd', 'npm.cmd', ['run', 'db:migrate:test']],
+      ['/usr/bin/npx', '/usr/bin/npx', ['tsx', ...CAPTURE]],
+      ['NPX', 'NPX', ['tsx', ...CAPTURE]],
+      ['./node_modules/.bin/tsx', './node_modules/.bin/tsx', [...CAPTURE]],
+      ['the planner Python with -c', resolvePython(), ['-c', 'print(1)']],
+      ['the planner Python with no script', resolvePython(), []],
+    ];
+    it.each(cases)('%s', (_label, command, args) => {
+      const L = buildLayout();
+      const { spawn, calls } = recorder();
+      expect(() => wrap(spawn, L.io)(command, args, OPTIONS())).toThrow(RebuildRefused);
+      expect(calls).toHaveLength(0);                                  // refused BEFORE spawning
+      expect(() => classifyOrdinaryCommand(command, args)).toThrow(RebuildRefused);
+    });
+
+    it('non-string commands and arguments are refused, not coerced', () => {
+      expect(() => classifyOrdinaryCommand(undefined, [])).toThrow(RebuildRefused);
+      expect(() => classifyOrdinaryCommand('npx', 'tsx')).toThrow(RebuildRefused);
+      expect(() => classifyOrdinaryCommand('npx', ['tsx', 7])).toThrow(RebuildRefused);
+    });
+
+    it('the closed script table is exactly the two test scripts', () => {
+      expect(Object.keys(ordinaryNpmScriptBodies()).sort()).toEqual(['db:migrate:test', 'db:privileges:test']);
+    });
+
+    // Deliberately explicit: this must fail loudly if anyone ever adds the code-test pair to the table.
+    it('REFUSES the ordinary CLI code_test_db pair (db:migrate:code-test / db:privileges:code-test): intentionally NOT authorised (AFLDB-ISSUE-324)', () => {
+      for (const name of [REBUILD_TARGETS.code_test_db.migrateScript, REBUILD_TARGETS.code_test_db.privilegesScript]) {
+        expect(name).toMatch(/code-test$/);
+        const L = buildLayout();
+        const { spawn, calls } = recorder();
+        expect(() => wrap(spawn, L.io)('npm', ['run', name], OPTIONS())).toThrow(/Unbound package script.*code_test_db.*AFLDB-ISSUE-324/s);
+        expect(calls).toHaveLength(0);
+        expect(Object.keys(ordinaryNpmScriptBodies())).not.toContain(name);
+      }
+      expect(JSON.stringify(ordinaryNpmScriptBodies())).not.toContain('code-test');
+    });
+
+    it('a broken entry point refuses the mapped command before it spawns, but never gates psql', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: '0.0.1', bin: './dist/cli.mjs' }));
+      const { spawn, calls } = recorder();
+      expect(() => wrap(spawn, L.io)('npx', ['tsx', ...CAPTURE], OPTIONS())).toThrow(/version differs/);
+      expect(() => wrap(spawn, L.io)('npm', ['run', 'db:migrate:test'], OPTIONS())).toThrow(/version differs/);
+      expect(calls).toHaveLength(0);
+      wrap(spawn, L.io)(PSQL_BIN, ['-X'], OPTIONS());
+      expect(calls).toHaveLength(1);
+    });
+  });
+
+  describe('entry-point verification (the real path of the executed tsx stays inside the pinned checkout)', () => {
+    it('accepts a complete, honest checkout layout and returns its cli.mjs', () => {
+      const L = buildLayout();
+      expect(verifyOrdinaryTsxEntry(L.io)).toBe(L.cli);
+    });
+
+    it('refuses when the working directory is not the checkout that contains this module', () => {
+      const L = buildLayout();
+      expect(() => verifyOrdinaryTsxEntry(ioFor(L.root, tempDir('elsewhere')))).toThrow(/not the checkout that contains this module.*Nothing was run/s);
+    });
+
+    it('refuses node_modules that is a link (junction on Windows) to a directory OUTSIDE the checkout', ({ skip }) => {
+      const L = buildLayout();
+      const outside = tempDir('shared-install');
+      nativeFs.renameSync(join(L.root, 'node_modules'), join(outside, 'node_modules'));
+      const failed = linkDir(join(outside, 'node_modules'), join(L.root, 'node_modules'));
+      if (failed) skip(`directory link creation is not permitted here: ${failed}`);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/resolves outside the pinned checkout.*Nothing was run/s);
+    });
+
+    it('refuses node_modules/tsx that is a link to a directory outside the checkout', ({ skip }) => {
+      const L = buildLayout();
+      const outside = tempDir('shared-tsx');
+      nativeFs.renameSync(L.tsx, join(outside, 'tsx'));
+      const failed = linkDir(join(outside, 'tsx'), L.tsx);
+      if (failed) skip(`directory link creation is not permitted here: ${failed}`);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/resolves outside the pinned checkout/);
+    });
+
+    it('refuses node_modules/tsx/dist that is a link to a directory outside tsx', ({ skip }) => {
+      const L = buildLayout();
+      const outside = tempDir('shared-dist');
+      nativeFs.renameSync(join(L.tsx, 'dist'), join(outside, 'dist'));
+      const failed = linkDir(join(outside, 'dist'), join(L.tsx, 'dist'));
+      if (failed) skip(`directory link creation is not permitted here: ${failed}`);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/resolves outside node_modules\/tsx/);
+    });
+
+    it('refuses a link anywhere under dist, even one whose target stays inside the checkout', ({ skip }) => {
+      const L = buildLayout();
+      const failed = linkDir(join(L.tsx, 'dist', 'esm'), join(L.tsx, 'dist', 'alias'));
+      if (failed) skip(`directory link creation is not permitted here: ${failed}`);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/dist\/alias is a symbolic link or junction/);
+    });
+
+    it('checks the REAL path, not only the logical one: a lying realpath outside the checkout refuses with every lstat clean', () => {
+      const L = buildLayout();
+      const outside = tempDir('claims');
+      const lying: OrdinaryIo = { ...L.io, realpathSync: (p) => (p === L.tsx ? outside : nativeFs.realpathSync(p)) };
+      expect(() => verifyOrdinaryTsxEntry(lying)).toThrow(/node_modules\/tsx resolves outside the pinned checkout/);
+      const lyingCli: OrdinaryIo = { ...L.io, realpathSync: (p) => (p === L.cli ? join(outside, 'cli.mjs') : nativeFs.realpathSync(p)) };
+      expect(() => verifyOrdinaryTsxEntry(lyingCli)).toThrow(/cli\.mjs resolves outside node_modules\/tsx/);
+    });
+
+    it('refuses a missing cli.mjs', () => {
+      const L = buildLayout();
+      rmSync(L.cli);
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/cannot be resolved/);
+    });
+
+    it('refuses an installed tsx whose version differs from package-lock.json', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: '4.0.0', bin: './dist/cli.mjs' }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/version differs from package-lock\.json/);
+    });
+
+    it('refuses a package that is not named tsx', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'not-tsx', version: TSX_VERSION, bin: './dist/cli.mjs' }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/is not the tsx package/);
+    });
+
+    it('refuses an installed bin that is not dist/cli.mjs, and a lock bin that is not', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: TSX_VERSION, bin: { tsx: './dist/evil.mjs' } }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/bin entry is not dist\/cli\.mjs/);
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: TSX_VERSION, bin: './dist/cli.mjs' }));
+      write(join(L.root, 'package-lock.json'), JSON.stringify({ packages: { 'node_modules/tsx': { version: TSX_VERSION, bin: { tsx: 'dist/evil.mjs' } } } }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/bin entry is not dist\/cli\.mjs/);
+    });
+
+    it('refuses a lock with no node_modules/tsx entry', () => {
+      const L = buildLayout();
+      write(join(L.root, 'package-lock.json'), JSON.stringify({ packages: {} }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/no node_modules\/tsx entry/);
+      write(join(L.root, 'package-lock.json'), JSON.stringify({}));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/no node_modules\/tsx entry/);
+    });
+
+    it('refuses an altered or missing fixed npm-script body', () => {
+      const L = buildLayout();
+      const bodies = ordinaryNpmScriptBodies();
+      write(join(L.root, 'package.json'), JSON.stringify({ scripts: { ...bodies, 'db:migrate:test': 'tsx tools/db/migrate.ts --target code-test' } }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/script db:migrate:test differs from its fixed body/);
+      write(join(L.root, 'package.json'), JSON.stringify({ scripts: { 'db:migrate:test': bodies['db:migrate:test'] } }));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/script db:privileges:test differs from its fixed body/);
+      write(join(L.root, 'package.json'), JSON.stringify({}));
+      expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/differs from its fixed body/);
+    });
+
+    it('the real checkout (its WHOLE node_modules tree is walked) agrees with a direct lstat of its own node_modules chain (a linked install refuses by design)', () => {
+      const linked = ['node_modules', join('node_modules', 'tsx')].some((p) => nativeFs.lstatSync(join(process.cwd(), p)).isSymbolicLink());
+      if (linked) {
+        expect(() => verifyOrdinaryTsxEntry()).toThrow(/Ordinary tsx entry point refused/);
+      } else {
+        expect(verifyOrdinaryTsxEntry()).toBe(join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs'));
+      }
+    });
+  });
+
+  describe('admissibility before destruction (the ordinary plan, without spawning)', () => {
+    it('the real ordinary plan for the afldb_test target is admissible, including capture --recover', () => {
+      const L = buildLayout();
+      for (const recover of [false, true]) {
+        expect(() => assertOrdinaryStagesAdmissible(planStages(target(), fitzroy(), { ...OPTS, recoverAflApiAdjudications: recover }), L.io, {})).not.toThrow();
+      }
+    });
+
+    it('a --target code_test_db ordinary plan is refused before any command or SQL runs, naming the stage', () => {
+      const L = buildLayout();
+      const code = target({ database: 'code_test_db', adminDsn: 'postgres://afldb_owner:pw@localhost:5432/code_test_db',
+        importDsn: 'postgres://afldb_import:pw@localhost:5432/code_test_db' });
+      const stages = planStages(code, fitzroy(), OPTS);
+      const { deps, commands, sqlRuns, validationRuns } = fakeDeps();
+      const attempt = () => {
+        assertOrdinaryStagesAdmissible(stages, L.io, {});
+        executeRebuild(stages, code, deps);          // the order main() uses: admissibility first
+      };
+      expect(attempt).toThrow(RebuildRefused);
+      expect(attempt).toThrow(/Stage 'migrations'.*Unbound package script/s);
+      expect(attempt).toThrow(/code_test_db.*Nothing has been destroyed/s);
+      expect([commands, sqlRuns, validationRuns]).toEqual([[], [], []]);
+    });
+
+    it('a stage with any unbound command is refused and named, before anything is destroyed', () => {
+      const L = buildLayout();
+      const stages = planStages(target(), fitzroy(), OPTS);
+      for (const argv of [['bash', '-c', 'true'], ['npx', '--yes', 'tsx', ...CAPTURE], ['npm', 'run', 'db:test:rebuild']]) {
+        const bad = stages.map((s) => (s.id === 'afl-api-adjudications-capture' ? { ...s, argv } : s));
+        expect(() => assertOrdinaryStagesAdmissible(bad, L.io, {})).toThrow(/Stage 'afl-api-adjudications-capture'.*Nothing has been destroyed/s);
+      }
+    });
+
+    it('an entry-point failure is also reported as nothing destroyed', () => {
+      const L = buildLayout();
+      write(join(L.tsx, 'package.json'), JSON.stringify({ name: 'tsx', version: '0.0.1', bin: './dist/cli.mjs' }));
+      expect(() => assertOrdinaryStagesAdmissible(planStages(target(), fitzroy(), OPTS), L.io, {}))
+        .toThrow(/Ordinary tsx entry point refused.*Nothing was run.*Nothing has been destroyed/s);
+    });
+
+    it('main() builds the ordinary spawn on the non-provenance branch and checks admissibility before --plan, preflight and the destructive acknowledgement (source pin)', () => {
+      const mainBody = runnerSource.slice(runnerSource.indexOf('async function main()'));
+      expect(mainBody).toContain('createCliDeps(provenance ? rehearsalSpawn(spawnSync, binding) : ordinarySpawn(spawnSync))');
+      expect(mainBody).not.toMatch(/:\s*spawnSync\)/);
+      const admissible = mainBody.indexOf('if (!provenance) assertOrdinaryStagesAdmissible(stages);');
+      expect(admissible).toBeGreaterThan(-1);
+      expect(admissible).toBeGreaterThan(mainBody.indexOf('planStages(target, fitzroy, opts, undefined, binding)'));
+      expect(admissible).toBeLessThan(mainBody.indexOf('if (opts.planOnly)'));
+      expect(admissible).toBeLessThan(mainBody.indexOf('runPreflight('));
+      expect(admissible).toBeLessThan(mainBody.indexOf('assertDestructiveAcknowledgement(target'));
+    });
+
+    it('the ordinary block precedes rehearsalSpawn and never rebuilds an environment or uses a shell', () => {
+      const start = runnerSource.indexOf('// AFLDB-ISSUE-324 -- the ORDINARY');
+      const end = runnerSource.indexOf('function rehearsalSpawn(');
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      const block = runnerSource.slice(start, end);
+      // It may READ the environment (to refuse ORDINARY_FORBIDDEN_ENV) but never rebuilds or spreads one.
+      expect(block).not.toMatch(/\.\.\.options\.env|rehearsalChildEnv|shell: true|\.\.\.process\.env|env: \{/);
+      expect(block).toContain('shell: false');
+      expect(runnerSource.split('SUCCESSOR_LADDER_TUPLES_JSON =')).toHaveLength(2);   // anchors untouched
+      expect(runnerSource.split('export const CLUB_SEASONS_EXPECTED =')).toHaveLength(2);
+    });
+  });
+
+  /*
+   * The DISCLOSED esbuild native-binary exception (owner ruling, ISSUE-316 revision J). Links are simulated through
+   * the OrdinaryIo seam (file symlinks need elevation on Windows): `virtual` overlays link entries and absolute
+   * targets on a real, honest temp checkout.
+   */
+  describe('the esbuild native-binary exception and the whole node_modules walk', () => {
+    const ESB_VERSION = '0.28.2';
+    type Link = { rel: string; text: string; real?: string | Error };
+    type Target = { sha256: string; kind?: 'file' | 'directory' | 'link' } | Error;
+    const enoent = () => Object.assign(new Error('no such file'), { code: 'ENOENT' });
+    const fileStat = (kind: 'file' | 'directory' | 'link') => ({
+      isSymbolicLink: () => kind === 'link', isDirectory: () => kind === 'directory', isFile: () => kind === 'file',
+    });
+    /** A real checkout with tsx's two esbuild package directories and their lock entries (bin/ left empty). */
+    function esbuildLayout() {
+      const L = buildLayout();
+      const lock = { packages: { 'node_modules/tsx': { version: TSX_VERSION, bin: { tsx: 'dist/cli.mjs' } } } as Record<string, unknown> };
+      for (const { lockKey } of ORDINARY_ESBUILD_LINKS) {
+        write(join(L.root, ...lockKey.split('/'), 'package.json'), JSON.stringify({ name: lockKey.split('node_modules/').pop(), version: ESB_VERSION }));
+        mkdirSync(join(L.root, ...lockKey.split('/'), 'bin'), { recursive: true });
+        lock.packages[lockKey] = { version: ESB_VERSION };
+      }
+      write(join(L.root, 'package-lock.json'), JSON.stringify(lock));
+      return L;
+    }
+    function virtual(L: ReturnType<typeof buildLayout>, links: Link[], targets: Record<string, Target> = {}): OrdinaryIo {
+      const at = (rel: string) => join(L.root, ...rel.split('/'));
+      const byPath = new Map(links.map((link) => [at(link.rel), link]));
+      const base = L.io;
+      return {
+        ...base,
+        listDirectory: (dir) => {
+          const names = nativeFs.existsSync(dir) ? base.listDirectory(dir) : [];
+          for (const path of byPath.keys()) if (dirname(path) === dir && !names.includes(basename(path))) names.push(basename(path));
+          return names;
+        },
+        lstatSync: (path) => {
+          if (byPath.has(path)) return fileStat('link');
+          const target = targets[path];
+          if (target instanceof Error) throw target;
+          if (target) return fileStat(target.kind ?? 'file');
+          return base.lstatSync(path);
+        },
+        readlinkSync: (path) => {
+          const link = byPath.get(path);
+          if (!link) throw Object.assign(new Error('not a link'), { code: 'EINVAL' });
+          return link.text;
+        },
+        realpathSync: (path) => {
+          const link = byPath.get(path);
+          if (!link) return base.realpathSync(path);
+          const real = link.real ?? link.text;
+          if (real instanceof Error) throw real;
+          return real;
+        },
+        sha256File: (path) => {
+          const target = targets[path];
+          if (target instanceof Error) throw target;
+          return target ? target.sha256 : base.sha256File(path);
+        },
+      };
+    }
+    const exactLinks = (): Link[] => ORDINARY_ESBUILD_LINKS.map((entry) => ({ rel: entry.path, text: entry.target }));
+    const goodTargets = (): Record<string, Target> =>
+      Object.fromEntries(ORDINARY_ESBUILD_LINKS.map((entry) => [entry.target, { sha256: ORDINARY_ESBUILD_SHA256 }]));
+    const [PLATFORM, WRAPPER] = ORDINARY_ESBUILD_LINKS;
+
+    it('the closed table: exactly tsx\'s two esbuild native binaries, absolute policy-bound targets, one fixed digest', () => {
+      expect(ORDINARY_ESBUILD_LINKS.map((entry) => entry.path)).toEqual([
+        'node_modules/tsx/node_modules/@esbuild/linux-x64/bin/esbuild',
+        'node_modules/tsx/node_modules/esbuild/bin/esbuild',
+      ]);
+      const install = '/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed/';
+      for (const entry of ORDINARY_ESBUILD_LINKS) expect(entry.target).toBe(`${install}${entry.path}`);
+      expect(ORDINARY_ESBUILD_SHA256).toBe('e1698a3d5c6c0798fee4fd3b5cc816651f460c63d390a7a26ea4beb0b1884100');
+      expect(Object.isFrozen(ORDINARY_ESBUILD_LINKS) && ORDINARY_ESBUILD_LINKS.every((entry) => Object.isFrozen(entry))).toBe(true);
+      expect([...ORDINARY_FORBIDDEN_ENV]).toEqual(['ESBUILD_BINARY_PATH', 'NODE_OPTIONS', 'NODE_PATH', 'TSX_TSCONFIG_PATH']);
+    });
+
+    it('accepts the two exact links (fixed target, fixed real path, regular target, fixed sha256, lock versions)', () => {
+      const L = esbuildLayout();
+      expect(verifyOrdinaryTsxEntry(virtual(L, exactLinks(), goodTargets()))).toBe(L.cli);
+    });
+
+    it('accepts regular files at both paths: no exception is claimed (the normal install and Windows keep working)', () => {
+      const L = esbuildLayout();
+      for (const entry of ORDINARY_ESBUILD_LINKS) write(join(L.root, ...entry.path.split('/')), 'ELF fixture');
+      expect(verifyOrdinaryTsxEntry(L.io)).toBe(L.cli);
+    });
+
+    it('accepts an npm .bin link whose real file is inside the checkout node_modules', () => {
+      const L = esbuildLayout();
+      mkdirSync(join(L.root, 'node_modules', '.bin'));
+      const io = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx/dist/cli.mjs', real: L.cli }]);
+      expect(verifyOrdinaryTsxEntry(io)).toBe(L.cli);
+    });
+
+    it.each([
+      ['a relative form of the right target', (t: string) => `../../../../../..${t}`],
+      ['another absolute path', () => '/home/arm/projects/afldb/node_modules/tsx/node_modules/esbuild/bin/esbuild'],
+    ])('refuses a link whose text is %s', (_label, text) => {
+      const L = esbuildLayout();
+      const links = exactLinks().map((link, i) => (i === 0 ? { ...link, text: text(link.text), real: PLATFORM.target } : link));
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/does not link to its fixed target.*Nothing was run/s);
+    });
+
+    it('refuses the two table entries cross-wired (path A -> target B)', () => {
+      const L = esbuildLayout();
+      const links: Link[] = [{ rel: PLATFORM.path, text: WRAPPER.target }, { rel: WRAPPER.path, text: PLATFORM.target }];
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/does not link to its fixed target/);
+    });
+
+    it('refuses when the fixed target itself resolves elsewhere (a link on the target chain)', () => {
+      const L = esbuildLayout();
+      const links = exactLinks().map((link, i) => (i === 1 ? { ...link, real: '/srv/other/esbuild' } : link));
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/does not resolve to its fixed real path/);
+    });
+
+    it('refuses a missing target with its code, and a target that is not a regular file', () => {
+      const L = esbuildLayout();
+      const missing = exactLinks().map((link, i) => (i === 0 ? { ...link, real: enoent() } : link));
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, missing, goodTargets()))).toThrow(/target cannot be resolved \(ENOENT\)/);
+      const directory = { ...goodTargets(), [PLATFORM.target]: { sha256: ORDINARY_ESBUILD_SHA256, kind: 'directory' as const } };
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, exactLinks(), directory))).toThrow(/target is not a regular file/);
+    });
+
+    it('refuses a target whose bytes differ from the fixed sha256', () => {
+      const L = esbuildLayout();
+      const wrong = { ...goodTargets(), [WRAPPER.target]: { sha256: '0'.repeat(64) } };
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, exactLinks(), wrong))).toThrow(/target bytes differ from the fixed sha256.*Nothing was run/s);
+    });
+
+    it('refuses an esbuild package whose installed version differs from package-lock.json', () => {
+      const L = esbuildLayout();
+      write(join(L.root, ...WRAPPER.lockKey.split('/'), 'package.json'), JSON.stringify({ name: 'esbuild', version: '0.27.0' }));
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, exactLinks(), goodTargets()))).toThrow(/tsx\/node_modules\/esbuild version differs from package-lock\.json/);
+    });
+
+    it('keys the exception by lexical path: a non-table path linked to a table target with the right hash refuses', () => {
+      const L = esbuildLayout();
+      const links = [...exactLinks(), { rel: 'node_modules/tsx/node_modules/esbuild/bin/esbuild-copy', text: WRAPPER.target }];
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/esbuild-copy is a symbolic link or junction outside the esbuild native-binary exception/);
+    });
+
+    it('refuses an extra link anywhere else, even one resolving inside the checkout', () => {
+      const L = esbuildLayout();
+      write(join(L.root, 'node_modules', 'pg', 'lib', 'index.js'), '// fixture\n');
+      const links = [...exactLinks(), { rel: 'node_modules/pg/lib/alias.js', text: './index.js', real: join(L.root, 'node_modules', 'pg', 'lib', 'index.js') }];
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/pg\/lib\/alias\.js is a symbolic link or junction outside the esbuild native-binary exception/);
+    });
+
+    it('refuses a symlinked package directory (tsx\'s esbuild package linked to a shared install)', () => {
+      const L = esbuildLayout();
+      const pkg = WRAPPER.lockKey;
+      rmSync(join(L.root, ...pkg.split('/')), { recursive: true, force: true });
+      const links = [{ rel: pkg, text: `/home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed/${pkg}` }];
+      expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/node_modules\/tsx\/node_modules\/esbuild is a symbolic link or junction outside the esbuild native-binary exception/);
+    });
+
+    it('refuses a symlinked tsx file: package.json and dist/cli.mjs get no exception', () => {
+      const L = esbuildLayout();
+      for (const rel of ['node_modules/tsx/package.json', 'node_modules/tsx/dist/cli.mjs']) {
+        rmSync(join(L.root, ...rel.split('/')));
+        const io = virtual(L, [{ rel, text: `/home/arm/shared/${rel}` }]);
+        expect(() => verifyOrdinaryTsxEntry(io), rel).toThrow(/Ordinary tsx entry point refused.*(symbolic link|resolves outside)/s);
+        write(join(L.root, ...rel.split('/')), rel.endsWith('.json') ? JSON.stringify({ name: 'tsx', version: TSX_VERSION, bin: './dist/cli.mjs' }) : '// fixture\n');
+      }
+    });
+
+    it('refuses a .bin link resolving outside the checkout node_modules, or to a directory', () => {
+      const L = esbuildLayout();
+      mkdirSync(join(L.root, 'node_modules', '.bin'));
+      const outside = virtual(L, [{ rel: 'node_modules/.bin/esbuild', text: WRAPPER.target }], goodTargets());
+      expect(() => verifyOrdinaryTsxEntry(outside)).toThrow(/\.bin\/esbuild link chain leaves the checkout's node_modules/);
+      const dir = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx', real: L.tsx }]);
+      expect(() => verifyOrdinaryTsxEntry(dir)).toThrow(/\.bin\/tsx does not resolve to a regular file/);
+    });
+
+    /*
+     * Owner ruling set 4 (ISSUE-316 J2, finding F-J01): EVERY hop of a `.bin` chain is checked, not only the final
+     * real path. The leave-and-return cases below give a final real path INSIDE the checkout, which the earlier
+     * final-realpath-only rule admitted; they must now refuse at the first step outside node_modules.
+     */
+    describe('npm .bin link chains: every hop stays inside the checkout node_modules (F-J01)', () => {
+      const binLayout = () => {
+        const L = esbuildLayout();
+        mkdirSync(join(L.root, 'node_modules', '.bin'));
+        return L;
+      };
+      const LEAVES = /link chain leaves the checkout's node_modules.*Nothing was run/s;
+
+      it('admits an ordinary in-checkout .bin link (one relative hop)', () => {
+        const L = binLayout();
+        expect(verifyOrdinaryTsxEntry(virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx/dist/cli.mjs', real: L.cli }]))).toBe(L.cli);
+      });
+
+      it('admits a multi-hop chain entirely inside node_modules (.bin/a -> b -> ../tsx/dist/cli.mjs)', () => {
+        const L = binLayout();
+        const io = virtual(L, [
+          { rel: 'node_modules/.bin/a', text: 'b', real: L.cli },
+          { rel: 'node_modules/.bin/b', text: '../tsx/dist/cli.mjs', real: L.cli },
+        ]);
+        expect(verifyOrdinaryTsxEntry(io)).toBe(L.cli);
+      });
+
+      it('admits a nested package .bin link and an absolute hop naming a path under the real node_modules', () => {
+        const L = binLayout();
+        for (const entry of ORDINARY_ESBUILD_LINKS) write(join(L.root, ...entry.path.split('/')), 'ELF fixture');
+        mkdirSync(join(L.root, 'node_modules', 'tsx', 'node_modules', '.bin'));
+        const nested = join(L.root, ...WRAPPER.path.split('/'));
+        const io = virtual(L, [
+          { rel: 'node_modules/tsx/node_modules/.bin/esbuild', text: '../esbuild/bin/esbuild', real: nested },
+          { rel: 'node_modules/.bin/tsx', text: L.cli, real: L.cli },
+        ]);
+        expect(verifyOrdinaryTsxEntry(io)).toBe(L.cli);
+      });
+
+      it.each([
+        ['an absolute first hop outside the checkout', [{ rel: 'node_modules/.bin/tsx', text: '/srv/elsewhere/hop' }]],
+        ['a .. excursion above node_modules that comes back in', [{ rel: 'node_modules/.bin/tsx', text: '../../node_modules/tsx/dist/cli.mjs' }]],
+        ['a second hop that leaves', [
+          { rel: 'node_modules/.bin/tsx', text: 'hop' },
+          { rel: 'node_modules/.bin/hop', text: '/srv/elsewhere/cli.mjs' },
+        ]],
+      ] as [string, Link[]][])('refuses a chain that leaves and returns: %s (final real path inside)', (_label, links) => {
+        const L = binLayout();
+        const io = virtual(L, links.map((link) => ({ ...link, real: L.cli })));
+        expect(() => verifyOrdinaryTsxEntry(io)).toThrow(LEAVES);
+      });
+
+      it.each([
+        ['absolute', '/srv/elsewhere/cli.mjs'],
+        ['relative', '../../../../../../../../srv/elsewhere/cli.mjs'],
+      ])('refuses an external final target (%s link text)', (_label, text) => {
+        const L = binLayout();
+        expect(() => verifyOrdinaryTsxEntry(virtual(L, [{ rel: 'node_modules/.bin/tsx', text, real: '/srv/elsewhere/cli.mjs' }]))).toThrow(LEAVES);
+      });
+
+      it('still admits the two authorised esbuild external targets, alongside an in-checkout .bin chain', () => {
+        const L = binLayout();
+        const io = virtual(L, [...exactLinks(), { rel: 'node_modules/.bin/tsx', text: '../tsx/dist/cli.mjs', real: L.cli }], goodTargets());
+        expect(verifyOrdinaryTsxEntry(io)).toBe(L.cli);
+      });
+
+      it('refuses any other external target: a .bin chain into an esbuild exception link gets no exception', () => {
+        const L = binLayout();
+        mkdirSync(join(L.root, 'node_modules', 'tsx', 'node_modules', '.bin'));
+        const links = [...exactLinks(), { rel: 'node_modules/tsx/node_modules/.bin/esbuild', text: '../esbuild/bin/esbuild', real: WRAPPER.target }];
+        expect(() => verifyOrdinaryTsxEntry(virtual(L, links, goodTargets()))).toThrow(/tsx\/node_modules\/\.bin\/esbuild link chain leaves the checkout's node_modules/);
+      });
+
+      it('refuses a link loop, a dangling hop with its code, and a chain through a regular file', () => {
+        const L = binLayout();
+        const loop = virtual(L, [{ rel: 'node_modules/.bin/a', text: 'b', real: L.cli }, { rel: 'node_modules/.bin/b', text: 'a', real: L.cli }]);
+        expect(() => verifyOrdinaryTsxEntry(loop)).toThrow(/\.bin\/a link chain has too many links/);
+        const dangling = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../missing/cli.mjs', real: L.cli }]);
+        expect(() => verifyOrdinaryTsxEntry(dangling)).toThrow(/\.bin\/tsx link chain cannot be inspected \(ENOENT\)/);
+        const throughFile = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx/package.json/cli.mjs', real: L.cli }]);
+        expect(() => verifyOrdinaryTsxEntry(throughFile)).toThrow(/\.bin\/tsx link chain passes through a regular file/);
+      });
+
+      it('refuses when the kernel answer (realpath) disagrees with the emulated chain', () => {
+        const L = binLayout();
+        const io = virtual(L, [{ rel: 'node_modules/.bin/tsx', text: '../tsx/dist/cli.mjs', real: join(L.tsx, 'dist', 'esm', 'index.mjs') }]);
+        expect(() => verifyOrdinaryTsxEntry(io)).toThrow(/\.bin\/tsx resolution disagrees with its link chain/);
+      });
+
+      it('real symbolic links: an inside chain is admitted, a leave-and-return chain refuses (skipped only where file links cannot be created)', ({ skip }) => {
+        const L = binLayout();
+        const bin = join(L.root, 'node_modules', '.bin');
+        try {
+          nativeFs.symlinkSync('b', join(bin, 'a'), 'file');
+          nativeFs.symlinkSync(join('..', 'tsx', 'dist', 'cli.mjs'), join(bin, 'b'), 'file');
+        } catch (error) {
+          skip(`file symbolic link creation is not permitted here: ${(error as Error).message}`);
+        }
+        expect(verifyOrdinaryTsxEntry(L.io)).toBe(L.cli);
+        const outside = tempDir('bin-hop');
+        nativeFs.symlinkSync(L.cli, join(outside, 'hop'), 'file');
+        nativeFs.symlinkSync(join(outside, 'hop'), join(bin, 'c'), 'file');
+        expect(nativeFs.realpathSync(join(bin, 'c'))).toBe(L.cli);
+        expect(() => verifyOrdinaryTsxEntry(L.io)).toThrow(/\.bin\/c link chain leaves the checkout's node_modules/);
+      });
+    });
+
+    describe('no environment variable may select an executable or a module location (refused, never stripped)', () => {
+      const variants = ORDINARY_FORBIDDEN_ENV.flatMap((key) => [key, key.toLowerCase()]);
+
+      it.each(variants)('ordinarySpawn refuses %s for npx, npm, psql and Python without spawning', (key) => {
+        const L = buildLayout();
+        const { spawn, calls } = recorder();
+        const options = { ...OPTIONS(), env: { ...ENV, [key]: '/home/arm/elsewhere/esbuild' } };
+        for (const [command, args] of [
+          ['npx', ['tsx', ...CAPTURE]], ['npm', ['run', 'db:migrate:test']], [PSQL_BIN, ['-X']], [resolvePython(), ['tools/x.py']],
+        ] as [string, string[]][]) {
+          expect(() => wrap(spawn, L.io)(command, args, options), command).toThrow(/refuses an inherited .*Nothing was run/s);
+        }
+        expect(calls).toHaveLength(0);
+      });
+
+      it('assertOrdinaryStagesAdmissible refuses a forbidden key before anything is destroyed', () => {
+        const L = buildLayout();
+        const stages = planStages(target(), fitzroy(), OPTS);
+        expect(() => assertOrdinaryStagesAdmissible(stages, L.io, { ESBUILD_BINARY_PATH: '/x' }))
+          .toThrow(/ESBUILD_BINARY_PATH.*Nothing has been destroyed/s);
+        expect(() => assertOrdinaryStagesAdmissible(stages, L.io, { node_options: '--require /x.js' }))
+          .toThrow(/node_options.*Nothing has been destroyed/s);
+        expect(() => assertOrdinaryStagesAdmissible(stages, L.io, { PATH: '/bin' })).not.toThrow();
+      });
+    });
+  });
+});
+
+/*
  * AFLDB-ISSUE-278 (second pass) — an audit of the exact SQL `npm run db:test:prove-reset` sends,
  * pinned DB-free so the "no durable effects" claim in the verification procedure cannot drift
  * from the stream. Nothing here can show what PostgreSQL does with the stream; it shows what the
@@ -1262,20 +3726,26 @@ describe('fitzRoy source selection', () => {
     expect(source.selection).toBe('accepted-baseline');
   });
 
-  it('accepts exactly full-history-20260902 from the REAL tracked register', () => {
+  it('accepts exactly c2-2026-final-core-v1 from the REAL tracked register (AFLDB-ISSUE-316 D-316-1)', () => {
     const real = resolveFitzroySource({});
-    expect(real.label).toBe('full-history-20260902');
+    expect(real.label).toBe('c2-2026-final-core-v1');
     expect(real.accepted).toBe(true);
     expect(real.selection).toBe('accepted-baseline');
-    // AFLDB-ISSUE-112: full-history-20260827 is still IN the register, retired. Selection
-    // must come from acceptance_status, never from label order, date or filename.
-    expect(real.label).not.toBe('full-history-20260827');
+    // Both earlier baselines are still IN the register, retired. Selection must come from
+    // acceptance_status, never from label order, date or filename.
+    expect(['full-history-20260827', 'full-history-20260902']).not.toContain(real.label);
   });
 
-  it('refuses the retired predecessor by label on the normal path', () => {
-    // The retired baseline is historical evidence, not a selectable source.
-    expect(() => resolveFitzroySource({ fitzroyLabel: 'full-history-20260827' }))
-      .toThrow(/is not the accepted canonical baseline \('full-history-20260902'\)/);
+  it('accepted exactly full-history-20260902 from the predecessor register', () => {
+    const before = resolveFitzroySource({}, { readAcceptedRegister: () => predecessorJson('data/reference/fitzroy-accepted-baselines.json') });
+    expect(before.label).toBe('full-history-20260902');
+    expect(before.accepted).toBe(true);
+  });
+
+  it.each(['full-history-20260827', 'full-history-20260902'])('refuses the retired %s by label on the normal path', (label) => {
+    // A retired baseline is historical evidence, not a selectable source.
+    expect(() => resolveFitzroySource({ fitzroyLabel: label }))
+      .toThrow(/is not the accepted canonical baseline \('c2-2026-final-core-v1'\)/);
   });
 
   it('never selects trial-2024 on the normal path', () => {
@@ -1314,7 +3784,10 @@ describe('fitzRoy source selection', () => {
     // Assert on USE, not on prose: the header legitimately says there is no latest-label
     // fallback, so the word itself must not be the thing under test.
     const code = runnerSource.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
-    expect(code).not.toMatch(/readdirSync|globSync|\.sort\(\)\.pop\(\)|\.slice\(-1\)/);
+    // Directory enumeration now refuses ambient .env files; selection still cannot enumerate.
+    const selection = code.slice(code.indexOf('export function selectAcceptedBaseline'), code.indexOf('export const DEFAULT_VENV_PYTHON'));
+    expect(selection).not.toMatch(/readdirSync|globSync|\.sort\(\)\.pop\(\)|\.slice\(-1\)/);
+    expect(code).not.toMatch(/globSync|\.sort\(\)\.pop\(\)|\.slice\(-1\)/);
     expect(code).not.toMatch(/accepted\[accepted\.length|sort[\s\S]{0,80}accepted/);
     expect(code).not.toMatch(/extraction_date|extraction_timestamp/);
   });
@@ -1404,7 +3877,7 @@ describe('fitzRoy preflight', () => {
     expect(order.some((o) => o.startsWith('sql:'))).toBe(false);
     // and the runner sequences preflight ahead of the destructive acknowledgement itself
     expect(runnerSource).toMatch(
-      /runPreflight\(deps, opts, fitzroy\);\s*\n\s*assertDestructiveAcknowledgement/);
+      /runPreflight\(deps, opts, fitzroy, undefined, binding\);\s*\n\s*checkRebuildBinding\(binding, 'after-preflight'\);\s*\n\s*assertDestructiveAcknowledgement/);
   });
 
   it('stops before destruction when fitzRoy validation fails', () => {
@@ -1427,9 +3900,10 @@ describe('fitzRoy preflight', () => {
  * fingerprint. It never blesses: the independent validator remains the sole authority, and
  * these tests prove the binding cannot be satisfied by a hand-edited record.
  */
-describe('accepted canonical baseline', () => {
-  const REGISTER_PATH = join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json');
-  const registerText = readFileSync(REGISTER_PATH, 'utf8');
+// The register AS IT WAS ACCEPTED before the 2026 rollover: the explicit predecessor fixture. Its acceptance
+// history is retained evidence; the adopted successor is proven by the describe that follows.
+describe('accepted canonical baseline (the predecessor register, before the 2026 rollover)', () => {
+  const registerText = predecessorText('data/reference/fitzroy-accepted-baselines.json');
   const registerJson = JSON.parse(registerText);
   const accepted = registerJson.baselines
     .filter((b: any) => b.acceptance_status === 'accepted');
@@ -1573,8 +4047,7 @@ describe('accepted canonical baseline', () => {
   });
 
   it('binds acceptance to the contract and adapter versions', () => {
-    const contract = JSON.parse(readFileSync(
-      join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const contract = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
     const b = accepted[0].contract_binding;
     expect(b.contract_version).toBe(contract.contract_version);
     expect(b.contract_full_history_version)
@@ -1622,8 +4095,7 @@ describe('accepted canonical baseline', () => {
     expect(c.import_transformation[0].players_affected).toBe(4);
     // AFLDB-ISSUE-136: the four renumbered-profile continuity rules are an accepted
     // identity correction of this baseline, bound by rule id to the contract.
-    const contract = JSON.parse(readFileSync(
-      join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const contract = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
     const ruleIds = (contract.profile_url_continuity.rules as { id: string }[])
       .map((r) => r.id).sort();
     expect(c.identity_continuity[0].kind).toBe('profile_url_continuity');
@@ -1675,8 +4147,84 @@ describe('accepted canonical baseline', () => {
   });
 });
 
+/*
+ * AFLDB-ISSUE-316 D-316-1 — the register AFTER the 2026 rollover. The rollover accepted
+ * c2-2026-final-core-v1 and retired full-history-20260902 by moving its status alone: every hash,
+ * measurement and comment of both earlier entries is byte-identical to the predecessor register.
+ */
+describe('accepted canonical baseline after the 2026 rollover (AFLDB-ISSUE-316 D-316-1)', () => {
+  const registerJson = JSON.parse(readFileSync(join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+  const predecessor = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
+  const byLabel = (r: any, label: string) => r.baselines.find((b: any) => b.snapshot_label === label);
+  const accepted = registerJson.baselines.filter((b: any) => b.acceptance_status === 'accepted');
+  const manifestBytes = readFileSync(join(root, 'docs', 'rebuild-manifests', 'afltables_fitzroy_core', 'c2-2026-final-core-v1.json'));
+  const manifest = JSON.parse(manifestBytes.toString('utf8'));
+  const lfSha = (bytes: Buffer) => createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+  const setDigest = (files: any[]) => createHash('sha256')
+    .update(`${files.map((f) => `${f.filename} ${f.sha256} ${f.row_count}`).sort().join('\n')}\n`).digest('hex');
+
+  it('accepts exactly one baseline, c2-2026-final-core-v1, beside two retired ones', () => {
+    expect(registerJson.baselines.map((b: any) => [b.snapshot_label, b.acceptance_status])).toEqual([
+      ['full-history-20260827', 'retired'], ['full-history-20260902', 'retired'], ['c2-2026-final-core-v1', 'accepted'],
+    ]);
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]).toMatchObject({ accepted_on: '2026-10-27',
+      snapshot_dir: 'data/sources/afltables/fitzroy_core/c2-2026-final-core-v1' });
+    expect(registerJson.selection_policy).toEqual(predecessor.selection_policy);
+  });
+
+  it('retired full-history-20260902 by its status alone and left full-history-20260827 untouched', () => {
+    const { acceptance_status: was, ...before } = byLabel(predecessor, 'full-history-20260902');
+    const { acceptance_status: now, ...after } = byLabel(registerJson, 'full-history-20260902');
+    expect([was, now]).toEqual(['accepted', 'retired']);
+    expect(after).toEqual(before);
+    expect(byLabel(registerJson, 'full-history-20260827')).toEqual(byLabel(predecessor, 'full-history-20260827'));
+  });
+
+  it('binds the acceptance to the tracked manifest bytes and its artefact set', () => {
+    expect(accepted[0].acquisition.manifest_path).toBe('docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json');
+    expect(accepted[0].acquisition.manifest_sha256).toBe(lfSha(manifestBytes));
+    expect(accepted[0].acquisition.manifest_sha256).toBe('02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988');
+    expect(accepted[0].raw_artefacts.artefact_set_sha256).toBe(setDigest(manifest.files));
+    expect(accepted[0].raw_artefacts.artefact_set_sha256).toBe('817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e');
+    expect(accepted[0].raw_artefacts.file_count).toBe(manifest.files.length);
+    expect(accepted[0].raw_artefacts.file_count).toBe(132);
+    expect(accepted[0].raw_artefacts.total_rows).toBe(manifest.files.reduce((n: number, f: any) => n + f.row_count, 0));
+    // The manifest's self-declared verdict fields stay inert, as for every earlier acceptance.
+    expect([manifest.full_history, manifest.completeness, manifest.snapshot_label]).toEqual([false, 'unvalidated', 'c2-2026-final-core-v1']);
+  });
+
+  it('binds the completed range 1897-2026 to the tracked contract and its pinned versions', () => {
+    const contract = JSON.parse(readFileSync(join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const b = accepted[0].contract_binding;
+    expect(b.required_range).toEqual({ first_season: 1897, last_season: 2026 });
+    expect(b.contract_version).toBe(contract.contract_version);
+    expect(b.contract_full_history_version).toBe(contract.full_history.contract_full_history_version);
+    expect(b.required_datasets).toEqual(contract.full_history.required_datasets);
+    expect(accepted[0].acquisition.fitzroy_version_pinned).toBe(contract.pinned_version);
+    expect(accepted[0].acquisition.adapter_schema_version).toBe(manifest.adapter_schema_version);
+  });
+
+  it('records the validator verdict, the drift gates and the corrections by contract rule id', () => {
+    expect(accepted[0].validation).toMatchObject({ verdict: 'PASSED', database_accessed: false,
+      authority: 'tools/migration/import_fitzroy_core.py' });
+    expect(accepted[0].validation.command).toContain('--require-full-history');
+    expect(accepted[0].measured).toMatchObject({ seasons_first: 1897, seasons_last: 2026, matches: 17056,
+      players_with_renumbered_profile: 4, brownlow_round_vote_rows: 320861 });
+    const contract = JSON.parse(readFileSync(join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const ruleIds = (contract.profile_url_continuity.rules as { id: string }[]).map((r) => r.id).sort();
+    const c = accepted[0].accepted_corrections;
+    expect(c.source_data[0].rows_dropped).toBe(2);
+    // The same four ISSUE-136 players, now over the 2026 rows too: 79 rows in 2025 became 150.
+    expect([c.import_transformation[0].rows_affected, c.import_transformation[0].players_affected]).toEqual([150, 4]);
+    expect([c.identity_continuity[0].rows_affected, c.identity_continuity[0].players_affected]).toEqual([150, 4]);
+    expect([...c.identity_continuity[0].rule_ids].sort()).toEqual(ruleIds);
+    expect(ruleIds).toHaveLength(4);
+  });
+});
+
 describe('acquisition contract', () => {
-  const acquirer = readFileSync(join(root, 'tools', 'rebuild', 'fitzroy', 'acquire_core.R'),
+  const acquirer = readFileSync(join(root, 'legacy', 'offline', 'tools', 'rebuild', 'fitzroy', 'acquire_core.R'),
     'utf8');
   const contract = JSON.parse(readFileSync(
     join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
@@ -1731,7 +4279,9 @@ describe('acquisition contract', () => {
 
   it('keeps the current season and AFLW out of this snapshot', () => {
     const fh = contract.full_history;
-    expect(fh.current_season_excluded.reason).toMatch(/current-season pipeline/);
+    // The reason names the excluded in-progress season and the current-season owner that holds it.
+    expect(fh.current_season_excluded.reason).toMatch(/current-season (pipeline|path)/);
+    for (const season of fh.current_season_excluded.seasons) expect(fh.current_season_excluded.reason).toContain(String(season));
     expect(fh.aflw_excluded.reason).toMatch(/aflwstats\.com|staging_aflw/);
   });
 
@@ -1803,7 +4353,7 @@ describe('stage graph', () => {
                 'awards-honours', 'brownlow-season', 'derived', 'coleman', 'first-kick-goal']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
-      resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
+      resolvePython(), 'legacy/offline/coleman.py', '--groups', 'coleman',
     ]);
   });
 
@@ -1825,6 +4375,185 @@ describe('stage graph', () => {
       expect(heightsValidateArgv(fitzroy().label)).toEqual([...heights.argv!, '--validate-only']);
     });
 
+
+    describe('explicit shared height/coach stats inputs (ISSUE-316)', () => {
+      // In-memory configuration only: these integers are synthetic, never successor expectations.
+      const measured = { players_with_height: 101, height_without_evidence: 0, height_conflicts_open: 2 };
+      const fixturePin = heightEnrichmentPins().supplements[0];
+      const supplement = (label: string) => ({ snapshot_label: label,
+        manifest: fixturePin.manifest, manifest_sha256: fixturePin.sha256 });
+      const binding = (overrides: Record<string, unknown> = {}) => ({
+        datasets: { player_details: { height_enrichment: {
+          stats_input_mode: 'baseline_only', baseline_snapshot_label: FULL_LABEL,
+          supplements: [], measured: { ...measured }, ...overrides,
+        } } },
+      });
+      const accepted = () => {
+        const doc = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
+        doc.baselines.find((b: { acceptance_status: string }) => b.acceptance_status === 'accepted').snapshot_label = FULL_LABEL;
+        return doc;
+      };
+      const passing = () => {
+        const fake = fakeDeps();
+        const commands: string[][] = [];
+        const deps: Deps = { ...fake.deps, runCommand: (argv) => {
+          commands.push(argv);
+          return { status: 0, stderr: '', stdout: argv.includes(BROWNLOW_SEASON_LOADER)
+            ? '{"ok": true}' : 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n' };
+        } };
+        return { ...fake, deps, commands };
+      };
+
+      it.each(['baseline_only', 'supplemented_baseline'] as const)(
+        '%s uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates', (mode) => {
+          const supplements = mode === 'baseline_only' ? [] : [supplement('fixture-first'), supplement('fixture-second')];
+          const read = () => binding({ stats_input_mode: mode, supplements });
+          const pins = heightEnrichmentPins(read, FULL_LABEL);
+          expect(pins.statsInputMode).toBe(mode);
+          expect(pins.baselineSnapshotLabel).toBe(mode === 'baseline_only' ? FULL_LABEL : null);
+          const suffix = supplements.flatMap((p) => ['--supplement-label', p.snapshot_label]);
+          const h = [resolvePython(), HEIGHT_LOADER, '--label', FULL_LABEL, ...suffix];
+          const c = [resolvePython(), COACH_LOADER, '--label', afltablesCoachesPin().label,
+            '--fitzroy-label', FULL_LABEL, ...suffix];
+          expect(heightsImportArgv(FULL_LABEL, undefined, read)).toEqual(h);
+          expect(coachesImportArgv(FULL_LABEL, undefined, read)).toEqual(c);
+          expect(heightsValidateArgv(FULL_LABEL, undefined, read)).toEqual([...h, '--validate-only']);
+          expect(coachesValidateArgv(FULL_LABEL, undefined, read)).toEqual([...c, '--validate-only']);
+          const planned = planStages(target(), fitzroy(), OPTS, read);
+          expect(idsOf(planned)).toEqual(idsOf(stages));
+          const description = [FULL_LABEL, ...supplements.map((p) => p.snapshot_label)].join(' + ');
+          for (const [id, argv] of [['heights', h], ['coaches', c]] as const) {
+            const stage = planned.find((s) => s.id === id)!;
+            expect(stage.argv).toEqual(argv);
+            expect(stage.name).toContain('(' + description + ')');
+            expect(stage.name).not.toContain(' + )');
+            expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+          }
+          const run = passing();
+          predecessorPreflight(run.deps, OPTS, fitzroy(), read);
+          expect(run.commands).toContainEqual([...h, '--validate-only']);
+          expect(run.commands).toContainEqual([...c, '--validate-only']);
+          expect(run.sqlRuns).toEqual([]);
+          const height = heightChecks(FULL_LABEL, read);
+          expect(height.map((v) => [v.key, v.expected])).toEqual([
+            ['players_with_height', 101], ['height_without_evidence', 0], ['height_conflicts_open', 2],
+            ['players_with_afl_api_height_evidence', aflApiRosterPin().measured.playersWithAflApiEvidence],
+            ['players_with_wikipedia_height_evidence', wikipediaHeightRows()],
+          ]);
+          const coach = coachChecks(FULL_LABEL, read);
+          const m = afltablesCoachesPin().measured;
+          expect(coach.map((v) => [v.key, v.expected])).toEqual([
+            ['coaches', m.coaches], ['coaches_linked_to_players', m.coachesLinkedToPlayers],
+            ['coaches_unlinked', m.coachesUnlinked], ['coaches_linked_outside_unique', 0],
+            ['match_coaches', m.matchCoaches], ['matches_with_both_coaches', m.matchesWithBothCoaches],
+            ['matches_with_one_coach', m.matchesWithOneCoach], ['matches_without_coach', m.matchesWithoutCoach],
+          ]);
+          const final = finalValidationChecks(accepted(), undefined, read);
+          expect(final).toEqual(expect.arrayContaining([...height, ...coach]));
+        });
+
+      it('preserves legacy supplemented argv, order, manifest proofs and final expectations', () => {
+        const real = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
+        const explicit = structuredClone(real);
+        explicit.datasets.player_details.height_enrichment.stats_input_mode = 'supplemented_baseline';
+        const read = () => explicit;
+        expect(heightsImportArgv(FULL_LABEL, undefined, read)).toEqual(heights.argv);
+        expect(coachesImportArgv(FULL_LABEL, undefined, read)).toEqual(stages.find((s) => s.id === 'coaches')!.argv);
+        expect(heightChecks(FULL_LABEL, read)).toEqual(heightChecks());
+        expect(coachChecks(FULL_LABEL, read)).toEqual(coachChecks());
+      });
+
+      it.each([
+        { baseline_snapshot_label: undefined }, { baseline_snapshot_label: '' },
+        { baseline_snapshot_label: ' ' }, { baseline_snapshot_label: 'another-baseline' },
+        { supplements: undefined }, { supplements: [supplement('contradictory')] },
+        { stats_input_mode: undefined }, { stats_input_mode: null }, { stats_input_mode: 1 },
+        { stats_input_mode: 'unknown' }, { stats_input_mode: 'supplemented_baseline' },
+        { measured: undefined },
+      ])('refuses invalid shared bindings through every consumer: %j', (overrides) => {
+        const read = () => binding(overrides);
+        for (const call of [
+          () => heightsImportArgv(FULL_LABEL, undefined, read),
+          () => heightsValidateArgv(FULL_LABEL, undefined, read),
+          () => coachesImportArgv(FULL_LABEL, undefined, read),
+          () => coachesValidateArgv(FULL_LABEL, undefined, read),
+          () => planStages(target(), fitzroy(), OPTS, read),
+          () => heightChecks(FULL_LABEL, read), () => coachChecks(FULL_LABEL, read),
+          () => finalValidationChecks(accepted(), undefined, read),
+        ]) expect(call).toThrow(RebuildRefused);
+        const run = passing();
+        expect(() => runPreflight(run.deps, OPTS, fitzroy(), read)).toThrow(RebuildRefused);
+        expect(run.commands).toEqual([]);
+        expect(run.sqlRuns).toEqual([]);
+      });
+
+      it('refuses implicit empty supplements and baseline-only use without a selected label', () => {
+        const implicit = binding();
+        delete (implicit.datasets.player_details.height_enrichment as Record<string, unknown>).stats_input_mode;
+        expect(() => heightEnrichmentPins(() => implicit, FULL_LABEL)).toThrow(RebuildRefused);
+        const read = () => binding();
+        expect(() => heightEnrichmentPins(read)).toThrow(RebuildRefused);
+        expect(() => heightsImportArgv('different-selected-baseline', undefined, read)).toThrow(RebuildRefused);
+        expect(() => coachesImportArgv('different-selected-baseline', undefined, read)).toThrow(RebuildRefused);
+        const mismatched = accepted();
+        mismatched.baselines.find((b: { acceptance_status: string }) => b.acceptance_status === 'accepted').snapshot_label = 'different-selected-baseline';
+        expect(() => finalValidationChecks(mismatched, undefined, read)).toThrow(RebuildRefused);
+        expect(() => heightChecks(undefined, read)).toThrow(RebuildRefused);
+        expect(() => coachChecks(undefined, read)).toThrow(RebuildRefused);
+        const run = passing();
+        expect(() => runPreflight(run.deps, OPTS, undefined, read)).toThrow(RebuildRefused);
+        expect(run.commands).toEqual([]);
+      });
+
+      it.each(['players_with_height', 'height_without_evidence', 'height_conflicts_open'])(
+        'requires an explicit integer for %s in either mode', (key) => {
+          for (const mode of ['baseline_only', 'supplemented_baseline']) {
+            for (const invalid of [undefined, null, '1', 1.5, NaN, Infinity]) {
+              const read = () => binding({ stats_input_mode: mode,
+                supplements: mode === 'baseline_only' ? [] : [supplement('fixture')],
+                measured: { ...measured, [key]: invalid } });
+              expect(() => heightChecks(FULL_LABEL, read)).toThrow(/is not an integer/);
+              expect(() => coachesImportArgv(FULL_LABEL, undefined, read)).toThrow(/is not an integer/);
+            }
+          }
+        });
+
+      it.each([null, {}, { snapshot_label: 'x' }, { ...supplement('x'), manifest: 'missing-manifest.json' },
+        { ...supplement('x'), manifest_sha256: '0'.repeat(64) },
+        { ...supplement('x'), manifest_sha256: 'invalid' }])('still proves every configured supplement: %j', (pin) => {
+          const read = () => binding({ stats_input_mode: 'supplemented_baseline', supplements: [pin] });
+          expect(() => heightsImportArgv(FULL_LABEL, undefined, read)).toThrow(RebuildRefused);
+          expect(() => coachesImportArgv(FULL_LABEL, undefined, read)).toThrow(RebuildRefused);
+        });
+
+      it.each(['baseline_only', 'supplemented_baseline'])(
+        '%s stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset', (mode) => {
+          const read = () => binding({ stats_input_mode: mode,
+            supplements: mode === 'baseline_only' ? [] : [supplement('fixture-supplement')] });
+          // The loader owns artifact verification; fake its failure at the real preflight boundary.
+          const failures: Array<[string[], RegExp]> = [
+            [fitzroyValidateArgv(fitzroy()), /fitzRoy preflight failed/],
+            [heightsValidateArgv(FULL_LABEL, undefined, read), /Height preflight failed/],
+            [aflApiHeightsValidateArgv(), /AFL API roster preflight failed/],
+            [wikipediaHeightsValidateArgv(), /Wikipedia height preflight failed/],
+            [coachesValidateArgv(FULL_LABEL, undefined, read), /Coaches preflight failed/],
+          ];
+          for (const [failed, message] of failures) {
+            const run = passing();
+            const deps: Deps = { ...run.deps, runCommand: (argv, env) =>
+              JSON.stringify(argv) === JSON.stringify(failed)
+                ? { status: 1, stdout: '', stderr: 'fixture manifest/hash failure' }
+                : run.deps.runCommand(argv, env) };
+            let error: unknown;
+            try { predecessorPreflight(deps, OPTS, fitzroy(), read); } catch (e) { error = e; }
+            expect(error).toBeInstanceOf(RebuildRefused);
+            expect(String(error)).toMatch(message);
+            expect(String(error)).toContain('Nothing has been destroyed');
+            expect(run.sqlRuns).toEqual([]);
+          }
+        });
+    });
+
     it('loads the AFL API roster the contract accepts, as evidence only', () => {
       const pin = aflApiRosterPin();
       expect(aflApi.argv).toEqual([resolvePython(), AFL_API_HEIGHT_LOADER, '--label', pin.label]);
@@ -1841,6 +4570,21 @@ describe('stage graph', () => {
       expect(wikipediaHeightsValidateArgv()).toEqual([...wikipedia.argv!, '--validate-only']);
       expect(wikipediaHeightRows()).toBeGreaterThan(0);
       expect(() => wikipediaHeightRows(() => 'afltables_profile,player\n')).toThrow(/no data rows/);
+      // ISSUE-316: the Wikipedia-derived tracked artefacts are byte-pinned, not just shape-checked.
+      expect(Object.keys(REVIEWED_INPUT_PINS)).toContain(WIKIPEDIA_HEIGHT_CSV);
+      expect(() => assertReviewedInputPins()).not.toThrow();
+      const real = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
+      expect(() => assertReviewedInputPins(REVIEWED_INPUT_PINS, (p) => real(p).replace(/\n/g, '\r\n'))).not.toThrow();
+      expect(() => assertReviewedInputPins(REVIEWED_INPUT_PINS, (p) => (p === WIKIPEDIA_HEIGHT_CSV ? real(p) + 'x\n' : real(p))))
+        .toThrow(/Reviewed input pin: .*height-evidence-wikipedia\.csv sha256 .* does not match the reviewed pin/);
+      expect(() => assertReviewedInputPins(REVIEWED_INPUT_PINS, (p) => (p === WIKIPEDIA_HEIGHT_CSV ? null : real(p))))
+        .toThrow(/Reviewed input pin: .*height-evidence-wikipedia\.csv is not in this checkout/);
+      // ISSUE-316: the Python runtime is archive-hash pinned; every requirement carries exactly one sha256.
+      const requirements = readFileSync(join(process.cwd(), 'tools', 'rebuild', 'python-runtime.requirements.txt'), 'utf8')
+        .replace(/\r\n/g, '\n').replace(/\s*\\\n\s+/g, ' ').split('\n').filter((l) => l.trim() !== '' && !l.startsWith('#'));
+      expect(requirements.map((l) => l.split(' ')[0]).sort()).toEqual(
+        ['pip==26.2.1', 'psycopg-binary==3.3.4', 'psycopg==3.3.4', 'typing-extensions==4.16.0']);
+      for (const line of requirements) expect(line).toMatch(/^[a-z-]+==\d+(\.\d+)+ --hash=sha256:[0-9a-f]{64}$/);
       for (const stage of [heights, aflApi, wikipedia]) {
         expect(stage.kind).toBe('data');
         expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire/i);
@@ -1850,8 +4594,7 @@ describe('stage graph', () => {
     it('refuses a contract with no height pin, and a pin whose manifest does not hash to its binding', () => {
       expect(() => heightEnrichmentPins(() => ({ datasets: { player_details: {} } })))
         .toThrow(/records no height enrichment binding/);
-      const real = JSON.parse(readFileSync(
-        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const real = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
       const tampered = structuredClone(real);
       tampered.datasets.player_details.height_enrichment.supplements[0].manifest_sha256 = '0'.repeat(64);
       expect(() => heightEnrichmentPins(() => tampered)).toThrow(/hashes to/);
@@ -1894,8 +4637,7 @@ describe('stage graph', () => {
       expect(keys).toEqual(['players_with_height', 'height_without_evidence',
                             'height_conflicts_open', 'players_with_afl_api_height_evidence',
                             'players_with_wikipedia_height_evidence']);
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       expect(finalValidationChecks(register).map((c) => c.key)).toEqual(expect.arrayContaining(keys));
       expect(heightChecks().find((c) => c.key === 'players_with_height')!.expected).toBeGreaterThan(12000);
     });
@@ -1977,8 +4719,7 @@ describe('stage graph', () => {
       expect(byKey.club_list_birth_conflict_players.sql).toMatch(/count\(DISTINCT e\.dob\) > 1/);
       expect(byKey.dob_disagreeing_with_club_list.sql).toMatch(/p\.dob <> e\.dob/);
       for (const c of checks) expect(c.sql).not.toMatch(/'afltables_club_list'.*'wikipedia'/);
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the height gates, in stage order.
@@ -2044,11 +4785,112 @@ describe('stage graph', () => {
           return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
         },
       });
-      runPreflight(withFailing(), OPTS, fitzroy());
+      predecessorPreflight(withFailing(), OPTS, fitzroy());
       const validate = commands.filter((a) => a.includes('--validate-only'));
       expect(validate.some((a) => a.includes(COACH_LOADER) && a.includes(afltablesCoachesPin().label) && a.includes(FULL_LABEL))).toBe(true);
-      expect(() => runPreflight(withFailing(COACH_LOADER), OPTS, fitzroy()))
+      expect(() => predecessorPreflight(withFailing(COACH_LOADER), OPTS, fitzroy()))
         .toThrow(/Coaches preflight failed[\s\S]*Nothing has been destroyed/);
+      // The predecessor keeps its reviewed parsed-only behaviour: no raw replay flag.
+      expect(commands.filter((a) => a.includes(COACH_LOADER)).every((a) => !a.includes('--require-raw-bundle'))).toBe(true);
+    });
+
+    describe('mandatory raw replay outside the predecessor (AFLDB-ISSUE-319)', () => {
+      const real = () => JSON.parse(readFileSync(contractPath, 'utf8'));
+      const bundleRel = () => join('data', 'sources', 'afltables', 'coaches', afltablesCoachesPin().label,
+        afltablesCoachesPin().rawBundle!.filename);
+      // The predecessor's own resolved expectation, relabelled: only the profile decides the requirement.
+      const swapped = (profile: string): RebuildBinding => {
+        const ladder = predecessorExpectation();
+        return { source: fitzroy(), target: target(), ladder: { ...ladder, pair: { ...ladder.pair, profile } } };
+      };
+      const recording = (opts: { failCoach?: boolean; missing?: string } = {}) => {
+        const commands: string[][] = [];
+        const fake = fakeDeps();
+        const deps: Deps = {
+          ...fake.deps, checkBinding: () => {},
+          fileExists: (p) => p !== opts.missing,
+          runCommand: (a: string[]) => {
+            commands.push(a);
+            if (opts.failCoach && a.includes(COACH_LOADER)) return { status: 1, stdout: '', stderr: 'AFLDB-COACH-RAW-REPLAY REFUSED: fixture' };
+            if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+            return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+          },
+        };
+        return { deps, commands, fake };
+      };
+
+      it('exempts only the predecessor; every other or unknown profile requires the replay', () => {
+        expect(COACH_RAW_REPLAY_EXEMPT_PROFILES).toEqual(['predecessor-1897-2025']);
+        expect(Object.isFrozen(COACH_RAW_REPLAY_EXEMPT_PROFILES)).toBe(true);
+        expect(coachRawReplayRequired('predecessor-1897-2025')).toBe(false);
+        for (const p of ['c2-2026-rehearsal-only', 'c2-2026-successor', 'Predecessor-1897-2025', '', undefined, null, 1]) {
+          expect(coachRawReplayRequired(p), String(p)).toBe(true);
+        }
+      });
+
+      it('carries the flag in the stage and the derived preflight argv', () => {
+        const base = coachesImportArgv(FULL_LABEL);
+        expect(base).not.toContain('--require-raw-bundle');
+        expect(coachesImportArgv(FULL_LABEL, undefined, undefined, true)).toEqual([...base, '--require-raw-bundle']);
+        expect(coachesValidateArgv(FULL_LABEL, undefined, undefined, true)).toEqual([...base, '--require-raw-bundle', '--validate-only']);
+      });
+
+      it('reads the exact raw_bundle pin and refuses a malformed one', () => {
+        expect(afltablesCoachesPin().rawBundle).toEqual({
+          filename: 'coaches-20260905-raw.tar', sha256: '2468569067209ec3810b5bbcc45cb8d75c616f69517bac8531fbffa47c661e4a',
+          bytes: 24023040, members: 387 });
+        const without = real();
+        delete without.coaches.accepted_snapshot.raw_bundle;
+        expect(afltablesCoachesPin(() => without).rawBundle).toBeUndefined();
+        for (const mutate of [
+          (r: Record<string, unknown>) => { delete r.sha256; }, (r: Record<string, unknown>) => { r.extra = 1; },
+          (r: Record<string, unknown>) => { r.sha256 = 'A'.repeat(64); }, (r: Record<string, unknown>) => { r.filename = '../x.tar'; },
+          (r: Record<string, unknown>) => { r.filename = 'x.tar.gz'; }, (r: Record<string, unknown>) => { r.bytes = '24023040'; },
+          (r: Record<string, unknown>) => { r.members = 0; }, (r: Record<string, unknown>) => { r.bytes = 1.5; },
+        ]) {
+          const c = real(); mutate(c.coaches.accepted_snapshot.raw_bundle);
+          expect(() => afltablesCoachesPin(() => c)).toThrow(/raw_bundle is not exactly/);
+        }
+        const nulled = real(); nulled.coaches.accepted_snapshot.raw_bundle = null;
+        expect(() => afltablesCoachesPin(() => nulled)).toThrow(/raw_bundle is not exactly/);
+      });
+
+      it('requires the pin and the bundle file before any loader runs, and never for the predecessor', () => {
+        const seen: string[] = [];
+        const exists = (p: string) => { seen.push(p); return true; };
+        expect(coachRawReplayPreflight('predecessor-1897-2025', exists)).toBe(false);
+        expect(seen).toEqual([]);
+        expect(coachRawReplayPreflight('c2-2026-successor', exists)).toBe(true);
+        expect(seen).toEqual([bundleRel()]);
+        const without = real();
+        delete without.coaches.accepted_snapshot.raw_bundle;
+        expect(() => coachRawReplayPreflight('c2-2026-rehearsal-only', exists, () => without))
+          .toThrow(/profile 'c2-2026-rehearsal-only' requires the mandatory raw replay[\s\S]*no raw_bundle pin[\s\S]*Nothing has been destroyed/);
+        expect(() => coachRawReplayPreflight('c2-2026-successor', () => false))
+          .toThrow(/the mandatory raw bundle .*coaches-20260905-raw\.tar is missing[\s\S]*Nothing has been destroyed/);
+      });
+
+      it.each(['c2-2026-rehearsal-only', 'c2-2026-successor'])(
+        '%s: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure', (profile) => {
+          const ok = recording();
+          runPreflight(ok.deps, OPTS, fitzroy(), undefined, swapped(profile));
+          const coachRuns = ok.commands.filter((a) => a.includes(COACH_LOADER));
+          expect(coachRuns).toEqual([coachesValidateArgv(FULL_LABEL, undefined, undefined, true)]);
+          expect(ok.fake.sqlRuns).toEqual([]);
+          expect(ok.fake.validationRuns).toEqual([]);
+
+          const missing = recording({ missing: bundleRel() });
+          expect(() => runPreflight(missing.deps, OPTS, fitzroy(), undefined, swapped(profile)))
+            .toThrow(/mandatory raw bundle[\s\S]*Nothing has been destroyed/);
+          expect(missing.commands.some((a) => a.includes(COACH_LOADER))).toBe(false);
+          expect(missing.fake.sqlRuns).toEqual([]);
+
+          const refused = recording({ failCoach: true });
+          expect(() => runPreflight(refused.deps, OPTS, fitzroy(), undefined, swapped(profile)))
+            .toThrow(/Coaches preflight failed \(tools\/migration\/import_match_coaches\.py --validate-only --require-raw-bundle\)[\s\S]*does not replay[\s\S]*Nothing has been destroyed[\s\S]*AFLDB-COACH-RAW-REPLAY REFUSED/);
+          expect(refused.fake.sqlRuns).toEqual([]);
+          expect(refused.fake.validationRuns).toEqual([]);
+        });
     });
 
     it('gates the rebuilt coaching on the contract pin: people, proven links only, assignments, coverage shape', () => {
@@ -2065,8 +4907,7 @@ describe('stage graph', () => {
       expect(byKey.coaches_linked_to_players.sql).toMatch(/link_status_value = 'unique'/);
       expect(byKey.matches_without_coach.sql).toMatch(/LEFT JOIN match_coaches/);
       for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|name_key/); // never a name
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the birth-date gates, in stage order.
@@ -2155,8 +4996,7 @@ describe('stage graph', () => {
       expect(byKey.father_son_links_outside_trusted_status.expected).toBe(0);
       expect(byKey.player_relationships_parent_child.expected).toBe(m.selections);
       for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|_name_raw|drafted_player_name|father_name/); // never a name
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the coach gates, in stage order.
@@ -2252,8 +5092,7 @@ describe('stage graph', () => {
       expect(byKey.sibling_self_pairs.expected).toBe(0);
       expect(byKey.sibling_duplicate_pairs.expected).toBe(0);
       for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|_name_raw|person_a_name|person_b_name|family_key/); // never a name or a family
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the father–son gates, in stage order.
@@ -2350,8 +5189,7 @@ describe('stage graph', () => {
       expect(byKey.after_siren_duplicate_events.expected).toBe(0);
       expect(byKey.after_siren_rows_missing_provenance.expected).toBe(0);
       for (const c of checks) expect(c.sql).not.toMatch(/player_name|club_name_raw|opponent_name_raw/); // never a name
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the sibling gates, in stage order.
@@ -2442,8 +5280,7 @@ describe('stage graph', () => {
         expect(c.sql).toContain("s.key = 'wikipedia_first_kick_goal' AND a.achievement_type = 'first_kick_goal'");
         expect(c.sql).not.toMatch(/player_name|club_name_raw/);
       }
-      const register = JSON.parse(readFileSync(
-        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const register = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
       const all = finalValidationChecks(register).map((c) => c.key);
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       expect(all.indexOf('first_kick_goal_rows')).toBeGreaterThan(all.indexOf('after_siren_kicks'));
@@ -2559,8 +5396,7 @@ describe('stage graph', () => {
     });
 
     it('cross-checks against the label the tracked contract accepts', () => {
-      const contract = JSON.parse(readFileSync(
-        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const contract = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
       const accepted = contract.datasets.ladder.accepted_witness;
       expect(witness.argv).toContain(accepted.snapshot_label);
       expect(witness.argv).toContain('--compare');
@@ -2581,8 +5417,7 @@ describe('stage graph', () => {
       // as the core register at :425-427: .gitattributes renders these bytes LF on
       // every checkout, so the canonical LF hash is the only binding that can pass,
       // and the assertion itself must not depend on the working copy's endings.
-      const contract = JSON.parse(readFileSync(
-        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const contract = predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json');
       const accepted = contract.datasets.ladder.accepted_witness;
 
       // The validator derives the manifest as `<manifest_dir>/<label>.json`, so a
@@ -2766,7 +5601,16 @@ describe('Python interpreter resolution', () => {
     const source = readFileSync(join(root, 'tools', 'db', 'rebuild-test.ts'), 'utf8');
     expect(source).not.toMatch(/\.\.[/\\]\.\.[/\\]/);
     expect(source).not.toContain('D:\\dev\\afldb');
-    expect(source).not.toMatch(/readdirSync|process\.env\.PATH/);
+    // The rehearsal-mode .env refusal elsewhere in the file lists the checkout root, so the
+    // search ban is asserted on resolvePython's own text and behaviour, not on the whole file.
+    const start = source.indexOf('export function resolvePython(');
+    const end = source.indexOf('\n}\n', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const body = source.slice(start, end);
+    expect(body).not.toMatch(/readdirSync|readdir|existsSync|statSync|accessSync|spawn|exec|which|process\.env\.PATH|PATH/);
+    // Behaviour: no ambient search input changes the answer.
+    expect(resolvePython({ PATH: '/somewhere/else', PYTHONHOME: '/x', VIRTUAL_ENV: '/y' })).toBe(DEFAULT_VENV_PYTHON);
   });
 
   describe('with AFLDB_PYTHON set', () => {
@@ -2883,12 +5727,30 @@ describe('final validation', () => {
     expect(report.failedStage).toBe('fingerprints');
   });
 
-  it('takes its expected values from the tracked register, not from this file', () => {
+  it('invariant: takes predecessor final-check values from its explicit register fixture', () => {
+    const tracked = predecessorJson('data/reference/fitzroy-accepted-baselines.json');
+    const accepted = tracked.baselines.find((b: Record<string, unknown>) => b.acceptance_status === 'accepted');
+    const checks = finalValidationChecks(tracked);
+    for (const [key, value] of Object.entries(accepted.measured)) {
+      if (key.startsWith('$')) continue;
+      const check = checks.find((c) => c.key === key);
+      if (check) expect(check.expected).toBe(value);
+    }
+    for (const key of ['matches', 'player_match_rows', 'brownlow_round_vote_rows']) {
+      expect(checks.map((c) => c.key)).toContain(key);
+    }
+  });
+
+  it('state C: takes its expected values from the tracked register, not from this file', () => {
+    // Since the 2026 rollover (D-316-1) the tracked register, contract and ladder are the adopted successor's.
     const tracked = JSON.parse(readFileSync(
       join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
     const accepted = tracked.baselines.find((b: Record<string, unknown>) =>
       b.acceptance_status === 'accepted');
-    const checks = finalValidationChecks(tracked);
+    const ladder = resolveLadderRebuildExpectation({ label: accepted.snapshot_label, accepted: true, fullHistory: true,
+      acknowledgedPartial: false, selection: 'accepted-baseline' }, target());
+    expect(ladder.pair.profile).toBe('c2-2026-successor');
+    const checks = realFinalValidationChecks(tracked, undefined, undefined, ladder);
     for (const [key, value] of Object.entries(accepted.measured)) {
       if (key.startsWith('$')) continue;
       const check = checks.find((c) => c.key === key);
@@ -2963,11 +5825,10 @@ describe('final validation', () => {
 
     it('excludes the current season by the accepted baseline, not a hard-coded year', () => {
       expect(gate('club_seasons_after_accepted_last_season')?.sql).toContain('season > 2025');
-      // Re-pointing the register must move this gate with it.
-      const rolled = finalValidationChecks(measuredRegister({
+      // A year alone cannot authorise another fingerprint-bound expectation.
+      expect(() => finalValidationChecks(measuredRegister({
         matches: 1, seasons_last: 2026,
-      })).find((c) => c.key === 'club_seasons_after_accepted_last_season');
-      expect(rolled?.sql).toContain('season > 2026');
+      }))).toThrow(/frozen ladder\/core range/);
     });
 
     it('renders every club_seasons gate into the executed stream', () => {
@@ -3035,10 +5896,10 @@ describe('final validation', () => {
 
     it('excludes the current season by the accepted baseline, not a hard-coded year', () => {
       expect(gate('coleman_after_accepted_last_season')?.sql).toContain('season > 2025');
-      const rolled = finalValidationChecks(measuredRegister({
+      expect(() => finalValidationChecks(measuredRegister({
         matches: 1, seasons_last: 2026,
-      })).find((c) => c.key === 'coleman_after_accepted_last_season');
-      expect(rolled?.sql).toContain('season > 2026');
+      }))).toThrow(/frozen ladder\/core range/);
+      expect(colemanChecks(2026).find((c) => c.key === 'coleman_after_accepted_last_season')?.sql).toContain('season > 2026');
     });
 
     it('moves the span with the contract rather than pinning 1980 in code', () => {
@@ -3380,7 +6241,7 @@ describe('DraftGuru preflight validates the label the data stage will import', (
     // acknowledgement and executeRebuild, so no RESET can precede this refusal.
     const runner = readFileSync(join(root, 'tools', 'db', 'rebuild-test.ts'), 'utf8');
     expect(runner).toMatch(
-      /runPreflight\(deps, opts, fitzroy\);[\s\S]*assertDestructiveAcknowledgement[\s\S]*executeRebuild\(/);
+      /runPreflight\(deps, opts, fitzroy, undefined, binding\);[\s\S]*checkRebuildBinding\(binding, 'after-preflight'\);[\s\S]*assertDestructiveAcknowledgement[\s\S]*executeRebuild\(/);
   });
 });
 
@@ -7718,7 +10579,10 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
       // A `.json` spec is data, not code: it can hold no `import`/`export` statement of its own,
       // so it can never itself reach `server-only` or `@/db/*` and is resolved as a leaf.
       if (base.endsWith('.json') && existsSync(base)) return base;
-      for (const candidate of [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts')]) {
+      // An explicit source extension (the rehearsal verifier is imported as '.mjs') is a real
+      // module in the graph, never a leaf: it is read and its own imports are walked below.
+      if (/\.(?:mjs|mts|cjs|js)$/.test(base) && existsSync(base)) return base;
+      for (const candidate of [`${base}.ts`, `${base}.tsx`, `${base}.mts`, `${base}.mjs`, join(base, 'index.ts')]) {
         if (existsSync(candidate)) return candidate;
       }
       throw new Error(`unresolved import '${spec}' from ${from}`);
@@ -7748,6 +10612,13 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
       for (const [file, specs] of graph) {
         expect(specs, file).not.toContain('server-only');
         expect(specs.filter((s) => s.startsWith('@/db/')), file).toEqual([]);
+      }
+      // Not an opaque leaf: where the runner is reachable, its .mjs verifier was read and walked,
+      // and every import it makes resolved (an unresolved one throws in reachable()).
+      const verifier = [...graph.keys()].find((f) => f.endsWith(join('tools', 'v2', 'rehearsal-package.mjs')));
+      if ([...graph.keys()].some((f) => f.endsWith(join('tools', 'db', 'rebuild-test.ts')))) {
+        expect(verifier, entry).toBeDefined();
+        expect(graph.get(verifier!), entry).toContain('node:fs');
       }
     }
     // Not vacuous: the seeding fixtures module DOES reach server-only, which is why teardown must not load it.
@@ -9334,10 +12205,14 @@ describe('AFLDB-ISSUE-237 L2 — deterministic rehearsal halt (--rehearsal-stop-
 
   it('keeps the destructive acknowledgement and the capture root: both run, unconditionally, before execution', () => {
     // no branch of main() skips either when the flag is present
-    const preflight = mainSource.indexOf('\n  runPreflight(deps, opts, fitzroy);');
+    const preflight = mainSource.indexOf('\n  runPreflight(deps, opts, fitzroy, undefined, binding);');
+    const afterBinding = mainSource.indexOf("\n  checkRebuildBinding(binding, 'after-preflight');");
     const ack = mainSource.indexOf('\n  assertDestructiveAcknowledgement(target, opts.acknowledgeDestroy);');
-    const execute = mainSource.indexOf('executeRebuild(stages, target, deps, { rehearsalStopAfter: opts.rehearsalStopAfter })');
+    const execute = mainSource.indexOf('executeRebuild(stages, target, deps, { rehearsalStopAfter: opts.rehearsalStopAfter, binding })');
     expect(preflight).toBeGreaterThan(-1);
+    // the frozen provenance is re-proven after preflight and before the acknowledgement is consumed
+    expect(afterBinding).toBeGreaterThan(preflight);
+    expect(afterBinding).toBeLessThan(ack);
     expect(preflight).toBeLessThan(ack);
     expect(ack).toBeLessThan(execute);
     expect(refusal(() => assertDestructiveAcknowledgement(codeTarget(), undefined))).toMatch(/--acknowledge-destroy code_test_db/);
@@ -11553,7 +14428,8 @@ describe('AFLDB-ISSUE-233 D-233-3 — afl_api ownership census before the reset'
     const census = planStages(target(), fitzroy(), OPTS)[1];
     expect(census).toMatchObject({ kind: 'validation', run: 'validate' });
     expect(census.argv).toBeUndefined();
-    expect(census.sql).toBe(aflApiOwnershipCensusSql());
+    // The plan is the predecessor's, so its census judges the predecessor's completed scope.
+    expect(census.sql).toBe(aflApiOwnershipCensusSql(predecessorExpectation().censusScope));
   });
 
   it('is in every plan, whatever the options: there is no way to leave it out', () => {
@@ -11588,11 +14464,14 @@ describe('AFLDB-ISSUE-233 D-233-3 — afl_api ownership census before the reset'
     const scope = aflApiOwnershipCensusScope();
     expect(scope).toEqual(rebuildCensusScope(
       readJson('tools/rebuild/fitzroy/fitzroy-contract.json'), readJson('data/reference/seasons.json')));
-    expect(scope).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
+    // Since the 2026 rollover (D-316-1) 2026 is completed and 2027 is the in-progress season.
+    expect(scope).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
     const sql = aflApiOwnershipCensusSql(scope);
     expect(sql).toContain('first_season int := 1897;');
-    expect(sql).toContain('last_season  int := 2025;');
-    expect(sql).toContain('excluded     int[] := ARRAY[2026]::int[];');
+    expect(sql).toContain('last_season  int := 2026;');
+    expect(sql).toContain('excluded     int[] := ARRAY[2027]::int[];');
+    // The predecessor documents judged 1897-2025 with 2026 excluded, exactly as before.
+    expect(aflApiOwnershipCensusScope(predecessorJson)).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
   });
 
   it('never treats an in-progress season as completed, even if the documents disagree', () => {
@@ -11600,9 +14479,8 @@ describe('AFLDB-ISSUE-233 D-233-3 — afl_api ownership census before the reset'
     // the in-progress declaration still excludes it.
     const contract = { full_history: { season_range: { first_season: 1897, last_season: 2026 },
       current_season_excluded: { seasons: [] } } };
-    const scope = rebuildCensusScope(contract, { in_progress_seasons: [2026] });
-    expect(scope.excludedSeasons).toEqual([2026]);
-    expect(buildAflApiOwnershipCensusSql(scope, 'enforce')).toContain('ARRAY[2026]::int[]');
+    expect(() => rebuildCensusScope(contract, { first_season: 1897, last_season: 2026, in_progress_seasons: [2026] }))
+      .toThrow(/intersects excluded\/in-progress/);
     expect(() => aflApiOwnershipCensusScope(() => ({}))).toThrow(RebuildRefused);
   });
 
@@ -11805,5 +14683,127 @@ describe('AFLDB-ISSUE-233 D-233-2 — season-scoped AFL API Brownlow artefacts i
     const preflight = runnerSource.slice(runnerSource.indexOf('export function runPreflight('));
     expect(preflight).toContain('for (const path of brownlowSeasonPreflightFiles())');
     expect(brownlowSeasonValidateArgv()).toEqual([resolvePython(), BROWNLOW_SEASON_LOADER, '--validate-only']);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// V2 Launch F — the isolated-cluster rebuild target (`--target isolated`, tools/v2/isolated-pg.ts)
+// ---------------------------------------------------------------------------------------------
+
+describe('V2 Launch F — the isolated rebuild target', () => {
+  const PORT = '55432';
+  const RUN = { AFLDB_V2_ISOLATED_PG: '1', AFLDB_V2_ISOLATED_PORT: PORT };
+  const dsn = (db: string, host = '127.0.0.1', port = PORT, user = 'afldb_owner') => `postgresql://${user}:pw@${host}:${port}/${db}`;
+  const env = (db = ISOLATED_REBUILD_DATABASE, over: Record<string, string | undefined> = {}) => ({
+    ...RUN, AFLDB_TEST_DATABASE_URL: dsn(db), AFLDB_TEST_IMPORT_DATABASE_URL: dsn(db, '127.0.0.1', PORT, 'afldb_import'), ...over,
+  });
+  const resolveIsolated = (e: Record<string, string | undefined>, ack: string = ISOLATED_REBUILD_DATABASE, extra = {}) =>
+    resolveTarget(e, { target: ISOLATED_REBUILD_TARGET, acknowledgeDestroy: ack, ...extra });
+
+  it('resolves only the acknowledged isolated database, inside an isolated run, over loopback DSNs', () => {
+    const target = resolveIsolated(env());
+    expect(target).toMatchObject({ database: ISOLATED_REBUILD_DATABASE, importIsOwnerSubstitution: false, isolated: { port: 55432 } });
+    expect(rebuildSpecFor(target)).toBe(ISOLATED_REBUILD_SPEC);
+    expect(resolveIsolatedTarget(env(), { acknowledgeDestroy: ISOLATED_REBUILD_DATABASE })).toEqual(target);
+    expect(resolveIsolated(env('afldb_v2_rb_shadow_test'), 'afldb_v2_rb_shadow_test').database).toBe('afldb_v2_rb_shadow_test');
+  });
+
+  it('refuses outside an isolated run, without an acknowledgement, with an owner import DSN or a foreign name', () => {
+    expect(() => resolveIsolated(env(ISOLATED_REBUILD_DATABASE, { AFLDB_V2_ISOLATED_PG: undefined }))).toThrow(/only inside an isolated run/);
+    expect(() => resolveIsolated(env(ISOLATED_REBUILD_DATABASE, { AFLDB_V2_ISOLATED_PORT: '5432' }))).toThrow(/only inside an isolated run/);
+    expect(() => resolveTarget(env(), { target: ISOLATED_REBUILD_TARGET })).toThrow(/needs --acknowledge-destroy/);
+    expect(() => resolveIsolated(env(), ISOLATED_REBUILD_DATABASE, { allowOwnerImportDsn: true })).toThrow(/--allow-owner-import-dsn is refused/);
+    expect(() => resolveIsolated(env('afldb_v2_int_test'), 'afldb_v2_int_test')).toThrow(RebuildRefused);
+    expect(() => resolveIsolated(env('afldb_test'), 'afldb_test')).toThrow(/as an isolated target/);
+    expect(() => resolveIsolated(env('afldb_v2_rb_prod_test'), 'afldb_v2_rb_prod_test')).toThrow(RebuildRefused);
+  });
+
+  it('refuses DSNs that do not name the acknowledged database on the isolated loopback port', () => {
+    const db = ISOLATED_REBUILD_DATABASE;
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_DATABASE_URL: dsn('afldb_v2_rb_other_test') }))).toThrow(/not the acknowledged isolated database/);
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_DATABASE_URL: dsn(db, '10.0.0.5') }))).toThrow(/not an isolated-cluster DSN/);
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_DATABASE_URL: dsn(db, '127.0.0.1', '55433') }))).toThrow(/not an isolated-cluster DSN/);
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_IMPORT_DATABASE_URL: undefined }))).toThrow(/no restricted import credential/);
+    expect(() => resolveIsolated(env(db, { AFLDB_TEST_IMPORT_DATABASE_URL: dsn(db, 'localhost', PORT, 'afldb_import') }))).toThrow(/different servers/);
+  });
+
+  it('admits an isolated name only inside an isolated run, and never changes the allowlisted targets', () => {
+    expect(isIsolatedRebuildName(ISOLATED_REBUILD_DATABASE)).toBe(true);
+    expect(isIsolatedRebuildName('afldb_v2_int_test')).toBe(false);
+    expect(isolatedRunPort(RUN)).toBe(55432);
+    expect(isolatedRunPort({ AFLDB_V2_ISOLATED_PG: '1', AFLDB_V2_ISOLATED_PORT: '80' })).toBeNull();
+    expect(() => assertRebuildTargetName(ISOLATED_REBUILD_DATABASE, {})).toThrow(/only explicit rebuild targets/);
+    expect(() => assertRebuildTargetName(ISOLATED_REBUILD_DATABASE, RUN)).not.toThrow();
+    expect(() => assertRebuildTargetName('afldb_test', {})).not.toThrow();
+    expect(restingDatabaseComment(ISOLATED_REBUILD_DATABASE)).toBe(ISOLATED_DATABASE_MARKER);
+    expect(restingDatabaseComment('afldb_test')).toBeNull();
+  });
+
+  it('parses the live server facts strictly', () => {
+    expect(ISOLATED_SERVER_FACTS_COPY_SQL).toBe(`COPY (${ISOLATED_SERVER_FACTS_SQL}) TO STDOUT;\n`);
+    expect(parseIsolatedServerFacts(`${ISOLATED_CLUSTER_NAME}\t${ISOLATED_DATABASE_MARKER}\t${ISOLATED_REBUILD_DATABASE}\n`))
+      .toEqual({ clusterName: ISOLATED_CLUSTER_NAME, databaseComment: ISOLATED_DATABASE_MARKER, currentDatabase: ISOLATED_REBUILD_DATABASE });
+    expect(parseIsolatedServerFacts('main\t\\N\tx\n')).toEqual({ clusterName: 'main', databaseComment: null, currentDatabase: 'x' });
+    expect(() => parseIsolatedServerFacts('')).toThrow(/0 line/);
+    expect(() => parseIsolatedServerFacts('a\tb\n')).toThrow(RebuildRefused);
+  });
+
+  it('proves the live server before ANY stage: a foreign cluster, a missing marker or no check runs nothing', () => {
+    const target = resolveIsolated(env());
+    const facts = { clusterName: ISOLATED_CLUSTER_NAME, databaseComment: ISOLATED_DATABASE_MARKER, currentDatabase: ISOLATED_REBUILD_DATABASE };
+    expect(() => assertIsolatedTargetLive(target, { ...fakeDeps().deps, isolatedServerFacts: () => facts })).not.toThrow();
+    const cases: [string, Deps['isolatedServerFacts']][] = [
+      ['no live check wired', undefined],
+      ['foreign cluster', () => ({ ...facts, clusterName: 'main' })],
+      ['no marker', () => ({ ...facts, databaseComment: null })],
+      ['psql failure', () => { throw new Error('psql exited 2'); }],
+    ];
+    for (const [label, isolatedServerFacts] of cases) {
+      const run = fakeDeps();
+      const stages = planStages(target, fitzroy(), OPTS);
+      expect(() => executeRebuild(stages, target, { ...run.deps, isolatedServerFacts }), label).toThrow(RebuildRefused);
+      expect(run.commands, label).toEqual([]);
+      expect(run.sqlRuns, label).toEqual([]);
+      expect(run.validationRuns, label).toEqual([]);
+    }
+    // A hand-built target carrying an isolated name but not resolved by --target isolated.
+    const handBuilt = { ...target, isolated: undefined };
+    expect(() => assertIsolatedTargetLive(handBuilt, { ...fakeDeps().deps, isolatedServerFacts: () => facts }))
+      .toThrow(/not resolved by --target isolated/);
+  });
+
+  it('the adjudication marker treats the isolated-pg comment as the resting state and restores it', async () => {
+    const saved = { pg: process.env.AFLDB_V2_ISOLATED_PG, port: process.env.AFLDB_V2_ISOLATED_PORT };
+    Object.assign(process.env, RUN);
+    try {
+      let comment: string | null = ISOLATED_DATABASE_MARKER;
+      const statements: string[] = [];
+      const tx = Object.assign(
+        (strings: TemplateStringsArray) => {
+          const text = strings.join('?');
+          if (text.includes('current_database() AS actual')) return Promise.resolve([{ actual: ISOLATED_REBUILD_DATABASE }]);
+          if (text.includes('shobj_description')) return Promise.resolve([{ comment }]);
+          return Promise.resolve([]);
+        },
+        { unsafe: (sql: string) => { statements.push(sql); comment = sql; return Promise.resolve([]); } },
+      ) as never;
+      await setIsolatedAwareMarker(tx, ISOLATED_REBUILD_DATABASE,
+        { capturedAt: '2026-10-19T00:00:00.000Z', payloadSha256: 'a'.repeat(64), fileSha256: 'b'.repeat(64) });
+      expect(statements[0]).toMatch(/^COMMENT ON DATABASE "afldb_v2_hist_test" IS /);
+      await clearIsolatedAwareMarker(tx, ISOLATED_REBUILD_DATABASE);
+      expect(statements.at(-1)).toBe(`COMMENT ON DATABASE "${ISOLATED_REBUILD_DATABASE}" IS '${ISOLATED_DATABASE_MARKER}'`);
+    } finally {
+      if (saved.pg === undefined) delete process.env.AFLDB_V2_ISOLATED_PG; else process.env.AFLDB_V2_ISOLATED_PG = saved.pg;
+      if (saved.port === undefined) delete process.env.AFLDB_V2_ISOLATED_PORT; else process.env.AFLDB_V2_ISOLATED_PORT = saved.port;
+    }
+  });
+});
+
+describe('ISSUE-316 a pending rollover apply blocks the rebuild', () => {
+  it('refuses while the rollover journal exists and passes when it does not', async () => {
+    const { assertNoPendingRolloverApply } = await import('../tools/db/rebuild-test');
+    expect(() => assertNoPendingRolloverApply((path) => path === '.rollover-transaction.json'))
+      .toThrow(/an earlier rollover apply did not finish/);
+    expect(() => assertNoPendingRolloverApply(() => false)).not.toThrow();
   });
 });

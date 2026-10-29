@@ -8,7 +8,20 @@
     "concurrency": 1,
     "min_pacing_seconds": 1.5,
     "timeout_seconds": 20,
-    "retries": { "attempts": 3, "backoff_seconds": [2, 4, 8], "on": ["timeout", "connection error", "5xx", "429"] },
+    "retries": {
+      "attempts": 3,
+      "backoff_seconds": [
+        2,
+        4,
+        8
+      ],
+      "on": [
+        "timeout",
+        "connection error",
+        "5xx",
+        "429"
+      ]
+    },
     "robots_txt": "fetched once per run and recorded (status + sha256 when present); afltables.com returned 404 on 2026-09-05, i.e. no exclusion policy is published",
     "terminal_failure_rule": "any club page that is not HTTP 200 after the retry policy is TERMINAL: the club is never written as empty and the manifest is not written at all"
   },
@@ -23,32 +36,123 @@
     "scope_rule": "Every listed club, every run. There is no partial-club mode: a subset could not describe the population, and the loader's coverage gates assume all 21 pages.",
     "scope_key_grammar": "clubs=<count>",
     "clubs": [
-      { "label": "Adelaide", "slug": "adelaide" },
-      { "label": "Brisbane Lions", "slug": "brisbanel" },
-      { "label": "Brisbane Bears", "slug": "brisbaneb" },
-      { "label": "Carlton", "slug": "carlton" },
-      { "label": "Collingwood", "slug": "collingwood" },
-      { "label": "Essendon", "slug": "essendon" },
-      { "label": "Fitzroy", "slug": "fitzroy" },
-      { "label": "Fremantle", "slug": "fremantle" },
-      { "label": "GWS", "slug": "gws" },
-      { "label": "Geelong", "slug": "geelong" },
-      { "label": "Gold Coast", "slug": "goldcoast" },
-      { "label": "Hawthorn", "slug": "hawthorn" },
-      { "label": "Melbourne", "slug": "melbourne" },
-      { "label": "North Melbourne", "slug": "kangaroos" },
-      { "label": "Port Adelaide", "slug": "padelaide" },
-      { "label": "Richmond", "slug": "richmond" },
-      { "label": "St Kilda", "slug": "stkilda" },
-      { "label": "Sydney", "slug": "swans" },
-      { "label": "West Coast", "slug": "westcoast" },
-      { "label": "University", "slug": "university" },
-      { "label": "Western Bulldogs", "slug": "bullldogs" }
+      {
+        "label": "Adelaide",
+        "slug": "adelaide"
+      },
+      {
+        "label": "Brisbane Lions",
+        "slug": "brisbanel"
+      },
+      {
+        "label": "Brisbane Bears",
+        "slug": "brisbaneb"
+      },
+      {
+        "label": "Carlton",
+        "slug": "carlton"
+      },
+      {
+        "label": "Collingwood",
+        "slug": "collingwood"
+      },
+      {
+        "label": "Essendon",
+        "slug": "essendon"
+      },
+      {
+        "label": "Fitzroy",
+        "slug": "fitzroy"
+      },
+      {
+        "label": "Fremantle",
+        "slug": "fremantle"
+      },
+      {
+        "label": "GWS",
+        "slug": "gws"
+      },
+      {
+        "label": "Geelong",
+        "slug": "geelong"
+      },
+      {
+        "label": "Gold Coast",
+        "slug": "goldcoast"
+      },
+      {
+        "label": "Hawthorn",
+        "slug": "hawthorn"
+      },
+      {
+        "label": "Melbourne",
+        "slug": "melbourne"
+      },
+      {
+        "label": "North Melbourne",
+        "slug": "kangaroos"
+      },
+      {
+        "label": "Port Adelaide",
+        "slug": "padelaide"
+      },
+      {
+        "label": "Richmond",
+        "slug": "richmond"
+      },
+      {
+        "label": "St Kilda",
+        "slug": "stkilda"
+      },
+      {
+        "label": "Sydney",
+        "slug": "swans"
+      },
+      {
+        "label": "West Coast",
+        "slug": "westcoast"
+      },
+      {
+        "label": "University",
+        "slug": "university"
+      },
+      {
+        "label": "Western Bulldogs",
+        "slug": "bullldogs"
+      }
     ],
-    "required_header": ["Cap", "#", "Player", "DOB", "HT", "WT", "Games (W-D-L)", "Goals", "Seasons", "Debut", "Last"],
+    "required_header": [
+      "Cap",
+      "#",
+      "Player",
+      "DOB",
+      "HT",
+      "WT",
+      "Games (W-D-L)",
+      "Goals",
+      "Seasons",
+      "Debut",
+      "Last"
+    ],
     "header_rule": "The first table's header row must equal required_header exactly (order included). A changed page layout is a terminal failure, never a best-effort parse.",
     "row_rule": "A data row is a row whose Player cell carries an href; the trailing totals row has none and is not data. Every kept row must carry an href: a player row without a link is a terminal failure.",
-    "artefact_columns": ["team_label", "team_slug", "cap", "guernsey", "player_raw", "dob", "ht", "wt", "games_wdl", "goals", "seasons", "debut", "last", "profile_href", "profile_path"],
+    "artefact_columns": [
+      "team_label",
+      "team_slug",
+      "cap",
+      "guernsey",
+      "player_raw",
+      "dob",
+      "ht",
+      "wt",
+      "games_wdl",
+      "goals",
+      "seasons",
+      "debut",
+      "last",
+      "profile_href",
+      "profile_path"
+    ],
     "artefact_rule": "One CSV per club under parsed/, values kept as the page prints them (no numeric coercion, blank stays blank); the raw HTML bytes kept under raw/ with their sha256. The manifest binds both.",
     "identity_rule": "profile_path is the profile href reduced exactly as tools/migration/import_fitzroy_core.py normalise_profile_url() reduces it ('../' removed, the https://afltables.com/afl/stats/ prefix stripped, no leading slash) and is the ONLY key a loader may join on. A rendered name is never identity. A profile_path that resolves to no canonical identity is reported and refused, never matched by name.",
     "duplicate_rule": "A profile_path may appear once per club page (a player has one row per club); the same profile_path across two club pages is the same person and must carry the same DOB — a disagreement is a loader finding, never silently resolved.",
@@ -60,10 +164,10 @@
       "accepted_in": "AFLDB-ISSUE-118 §23.24",
       "evidence": "21 pages, 16,731 rows (the register's exact row count), 13,364 distinct profile paths, 0 cross-club date disagreements; on the rebuilt afldb_test 13,260 paths resolve to canonical identities, 104 do not (92 are 2026 debutants the 2025-terminal baseline lacks, 12 are profiles renumbered after 2026-09-02), 12,400 NULL dates fillable, 853 existing dates agree, 2 disagree (kept)",
       "measured": {
-        "$comment": "What the rebuild's `birth-dates` stage must reproduce on the accepted fitzRoy baseline + this snapshot; the final validation gates read these (tools/db/rebuild-test.ts birthDateChecks) and never type them. players_with_dob = 855 fitzRoy per-match dates + 12,400 filled here; dob_without_evidence must be 0 (every date carries dob_evidence_id); players_with_club_list_birth_evidence = every canonical player a page row reached (13,255 = 13,260 resolved paths less the 5 blank cells); club_list_birth_conflict_players = players reached with two different page dates (never filled; 0 in this capture); dob_disagreeing_with_club_list = players whose retained fitzRoy date differs from the page's (Roan Steele afldb 11043, Jack Hayes afldb 6330 — recorded, adjudication is a separate decision).",
-        "players_with_dob": 13255,
+        "$comment": "What the rebuild's `birth-dates` stage must reproduce on the accepted fitzRoy baseline + this snapshot; the final validation gates read these (tools/db/rebuild-test.ts birthDateChecks) and never type them. players_with_dob = 855 fitzRoy per-match dates + 12,400 filled here; dob_without_evidence must be 0 (every date carries dob_evidence_id); players_with_club_list_birth_evidence = every canonical player a page row reached (13,255 = 13,260 resolved paths less the 5 blank cells); club_list_birth_conflict_players = players reached with two different page dates (never filled; 0 in this capture); dob_disagreeing_with_club_list = players whose retained fitzRoy date differs from the page's (Roan Steele afldb 11043, Jack Hayes afldb 6330 — recorded, adjudication is a separate decision). C2 SUCCESSOR (proposed, AFLDB-ISSUE-316): 947 fitzRoy dates + 12,400 filled here = 13,347; 13,352 paths resolve (13,260 predecessor + 92 2026 debutants; the 12 profiles renumbered after 2026-09-02 stay unresolved) less the 5 blank cells; 945 existing dates agree and the same 2 disagree (Roan Steele, Jack Hayes). The predecessor values were 13255/0/13255/0/2. Reproduced by the isolated rehearsal at 5643f5c2; valid for the c2-2026-final-core-v1 pair only.",
+        "players_with_dob": 13347,
         "dob_without_evidence": 0,
-        "players_with_club_list_birth_evidence": 13255,
+        "players_with_club_list_birth_evidence": 13347,
         "club_list_birth_conflict_players": 0,
         "dob_disagreeing_with_club_list": 2
       }
@@ -180,18 +284,25 @@
       "manifest_sha256_lf": "3e78f47354ac9fe594547ad327efaa6a2f6da90c54b17072ade4443e74ba8094",
       "accepted_on": "2026-09-05",
       "accepted_in": "AFLDB-ISSUE-118 §23.28",
-      "evidence": "386 index rows, 386 pages (extraction 2026-09-05T06:36:13Z), 386 distinct names; 368 pages link a Player Stats profile, 18 do not (the coach-only people: Worrall, Fagan, Craig, Cahill, Bolton, Kinnear, McCartney, Brittain, Todd …); every one of the accepted baseline's 383 Coach strings and the supplement's 2 resolve to an index name by exact string; 4 page hrefs AFL Tables does not serve as printed are corrected by the tracked profile_link_corrections on dated evidence; on the rebuilt afldb_test the 32,452 (match, club) groups with a coach fold to 32,034 assignments on the 16,838 baseline matches (418 groups are 2026 supplement rows of a season the baseline does not hold), 364 of 386 coach pages' own Games Coached equal the canonical assignment count (the rest are the source's pre-1923/1940 gaps and 2026).",
+      "evidence": "386 index rows, 386 pages (extraction 2026-09-05T06:36:13Z), 386 distinct names; 368 pages link a Player Stats profile, 18 do not (the coach-only people: Worrall, Fagan, Craig, Cahill, Bolton, Kinnear, McCartney, Brittain, Todd …); every one of the accepted baseline's 383 Coach strings and the supplement's 2 resolve to an index name by exact string; 4 page hrefs AFL Tables does not serve as printed are corrected by the tracked profile_link_corrections on dated evidence; on the rebuilt afldb_test the 32,452 (match, club) groups with a coach fold to 32,034 assignments on the 16,838 baseline matches (418 groups are 2026 supplement rows of a season the baseline does not hold), 364 of 386 coach pages' own Games Coached equal the canonical assignment count (the rest are the source's pre-1923/1940 gaps and 2026). C2 SUCCESSOR (proposed, AFLDB-ISSUE-316; rehearsal-measured at 5643f5c2, baseline_only with no supplement): 385 Coach strings resolve to an index name; the 2026-09-05 acceptance counts above describe that earlier acceptance and are not restated. The parsed index and pages are the loaded input, and the pinned raw bundle (raw_bundle; AFLDB-ISSUE-319, owner decision 2026-10-23) must replay through the acquisition parser into exactly those bytes, in the rebuild preflight and again in the coaches stage, or the rebuild refuses; bytes only, no publisher-authenticity claim. Ten coach-page total differences remain observations, and no historical coach attribution is accepted (NM 1940 R8-R18 remain unattributed; multi-coach schema changes are deferred).",
       "measured": {
-        "$comment": "What the rebuild's `coaches` stage must reproduce on the accepted fitzRoy baseline + pinned supplement + this snapshot; the final validation gates read these (tools/db/rebuild-test.ts coachChecks) and never type them. coaches = every index page (a person exists whether or not the column names them yet); coaches_linked_to_players = pages whose Player Stats profile resolves through external_identities (link_status unique), coaches_unlinked = pages with no profile link (player_id NULL, no players row ever created); match_coaches = (match, club) assignments on canonical matches; the three match counts are the source's own coverage shape (both coaches / one / neither — gaps only before 1923 plus eleven 1940 records) and sum to the 16,838 baseline matches.",
+        "$comment": "What the rebuild's `coaches` stage must reproduce on the accepted fitzRoy baseline (baseline_only, no supplement) + this snapshot; the final validation gates read these (tools/db/rebuild-test.ts coachChecks) and never type them. coaches = every index page (a person exists whether or not the column names them yet); coaches_linked_to_players = pages whose Player Stats profile resolves through external_identities (link_status unique), coaches_unlinked = pages with no profile link (player_id NULL, no players row ever created); match_coaches = (match, club) assignments on canonical matches; the three match counts are the source's own coverage shape (both coaches / one / neither — gaps only before 1923 plus eleven 1940 records) and sum to the 17,056 baseline matches. C2 SUCCESSOR (proposed, AFLDB-ISSUE-316): match_coaches 32,470 and matches_with_both_coaches 16,035 over the c2-2026-final-core-v1 stats, persisted SQL of the isolated rehearsal at 5643f5c2. The parsed coach pages are proven against the pinned raw bundle by the mandatory raw replay (AFLDB-ISSUE-319); that proves bytes, not publisher authenticity or historical attribution; ten coach-page total differences stay observations.",
         "coaches": 386,
         "coaches_linked_to_players": 368,
         "coaches_unlinked": 18,
-        "match_coaches": 32034,
-        "matches_with_both_coaches": 15817,
+        "match_coaches": 32470,
+        "matches_with_both_coaches": 16035,
         "matches_with_one_coach": 400,
         "matches_without_coach": 621
+      },
+      "raw_bundle": {
+        "$comment": "AFLDB-ISSUE-319 (owner decision 2026-10-23: raw-to-parsed coach replay inside preflight). The recovered raw HTML of this capture as ONE uncompressed tar, gitignored like every raw artefact and placed at data/sources/afltables/coaches/<label>/<filename>: one directory entry `raw` and exactly the manifest's raw files as regular members `raw/<file>` (the space in `raw/Allan_La Fontaine.html` lives only inside the tar, never in a package path). tools/migration/import_match_coaches.py --require-raw-bundle reads it in memory, refuses any other, changed, missing, extra, duplicate, linked or nonregular member, replays the acquisition parser (tools/rebuild/afltables/coach_snapshot_parser.py) and refuses unless the rendered CSV bytes equal the manifest digests and the parsed bytes it loads. The rebuild passes that flag in preflight and in the stage for every ladder profile except predecessor-1897-2025, and refuses before anything is destroyed when this pin or the file is absent. Bytes only: no authenticity claim.",
+        "filename": "coaches-20260905-raw.tar",
+        "sha256": "2468569067209ec3810b5bbcc45cb8d75c616f69517bac8531fbffa47c661e4a",
+        "bytes": 24023040,
+        "members": 387
       }
     },
-    "accepted_snapshot_rule": "Set to {label, manifest, manifest_sha256_lf, accepted_on, accepted_in, evidence, measured} by the session that accepts a capture for the rebuild's coaches stage; the rebuild refuses a missing or mismatched pin, exactly like club_player_lists.accepted_snapshot."
+    "accepted_snapshot_rule": "Set to {label, manifest, manifest_sha256_lf, accepted_on, accepted_in, evidence, measured} by the session that accepts a capture for the rebuild's coaches stage; the rebuild refuses a missing or mismatched pin, exactly like club_player_lists.accepted_snapshot. raw_bundle {filename, sha256, bytes, members} pins the capture's raw bytes for the mandatory replay (AFLDB-ISSUE-319); a profile that requires it refuses without it."
   }
 }

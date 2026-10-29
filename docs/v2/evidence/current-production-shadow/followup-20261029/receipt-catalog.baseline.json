@@ -1,0 +1,95 @@
+{
+  "decision": "D-V2-CURRENT-SHADOW-FOLLOWUP-1",
+  "item": "4a receipt catalogue probe (read-only)",
+  "expectedDatabase": "afldb_v2_shadow_current_baseline_test",
+  "expectationsFrom": [
+    "116_brownlow_correction_receipts.sql",
+    "117_brownlow_provider_eligibility_unknown.sql"
+  ],
+  "result": {
+    "state": {
+      "db": "afldb_v2_shadow_current_baseline_test",
+      "usr": "afldb_owner",
+      "ro": "on",
+      "iso": "repeatable read",
+      "ledger": 110
+    },
+    "receiptTable": null,
+    "eligibleColumn": {
+      "type": "boolean",
+      "attnotnull": true,
+      "default": null,
+      "comment": null,
+      "rows": 0,
+      "null_rows": 0
+    },
+    "roles": [
+      {
+        "rolname": "afldb_app",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": []
+      },
+      {
+        "rolname": "afldb_auth",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": []
+      },
+      {
+        "rolname": "afldb_backup",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": [
+          "pg_read_all_data"
+        ]
+      },
+      {
+        "rolname": "afldb_import",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": []
+      },
+      {
+        "rolname": "afldb_owner",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolbypassrls": false,
+        "member_of": []
+      }
+    ]
+  },
+  "checks": [
+    {
+      "id": "117.eligible.type-boolean",
+      "ok": true,
+      "detail": "boolean"
+    },
+    {
+      "id": "117.eligible.default-none",
+      "ok": true,
+      "detail": "null"
+    },
+    {
+      "id": "110.eligible.not-null",
+      "ok": true,
+      "detail": "attnotnull true"
+    },
+    {
+      "id": "110.eligible.no-117-comment",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "id": "117.eligible.no-null-rows",
+      "ok": true,
+      "detail": "0 of 0 rows NULL"
+    }
+  ],
+  "allChecksOk": true,
+  "failed": []
+}

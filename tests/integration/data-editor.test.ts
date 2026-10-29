@@ -3094,7 +3094,7 @@ describe('AFLDB-ISSUE-267/269: the matches override replay merges every active r
    * test fails if the census and the Python preflight stop evaluating the same thing.
    */
   const censusUnderivable = async (): Promise<{ match_key: string; missing: string }[]> => {
-    const census = readFileSync(join(root, 'issues', 'open', 'AFLDB-ISSUE-267-269-override-census.sql'), 'utf8');
+    const census = readFileSync(join(root, 'issues', 'closed', 'AFLDB-ISSUE-267-269-override-census.sql'), 'utf8');
     const section = /^\\echo '== 4\..*$([\s\S]*?)^\\echo '== 5\./m.exec(census);
     expect(section, 'census section 4 not found between its == 4. and == 5. markers').not.toBeNull();
     const statement = section![1].trim().replace(/;$/, '');

@@ -1,0 +1,131 @@
+{
+  "status": "PASS",
+  "scope": "In-memory VM, stubbed runtime/transport; no actual subprocess, SSH, database or credential. Observation fixture is the retained production observation stdout (hash-checked).",
+  "passed": 31,
+  "results": [
+    {
+      "name": "ordered clean success",
+      "status": "PASS"
+    },
+    {
+      "name": "optional drift blocks U3 without retry or reversal",
+      "status": "PASS"
+    },
+    {
+      "name": "drift marker with protected failure is not verified drift",
+      "status": "PASS"
+    },
+    {
+      "name": "NO-GO refuses before any production contact",
+      "status": "PASS"
+    },
+    {
+      "name": "stopping finding refuses before any production contact",
+      "status": "PASS"
+    },
+    {
+      "name": "consumed attempt refuses before any production contact",
+      "status": "PASS"
+    },
+    {
+      "name": "wrong manifest pin refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "wrong review pin refuses",
+      "status": "PASS"
+    },
+    {
+      "name": "observation STOP consumes nothing",
+      "status": "PASS"
+    },
+    {
+      "name": "observation identity mismatch consumes nothing",
+      "status": "PASS"
+    },
+    {
+      "name": "observation SSH failure consumes nothing",
+      "status": "PASS"
+    },
+    {
+      "name": "prerequisite transport failure before write invocation consumes nothing",
+      "status": "PASS"
+    },
+    {
+      "name": "missing credential prerequisite stops before attempt consumption",
+      "status": "PASS"
+    },
+    {
+      "name": "connection/authentication failure stops before attempt consumption",
+      "status": "PASS"
+    },
+    {
+      "name": "prerequisite wrong principal stops before attempt consumption",
+      "status": "PASS"
+    },
+    {
+      "name": "prerequisite identity must be read-only afldb_owner",
+      "status": "PASS"
+    },
+    {
+      "name": "prerequisite missing preflight stops before attempt consumption",
+      "status": "PASS"
+    },
+    {
+      "name": "prerequisite host gate stop consumes nothing",
+      "status": "PASS"
+    },
+    {
+      "name": "write-session transport failure after the boundary consumes the attempt; no retry",
+      "status": "PASS"
+    },
+    {
+      "name": "write-session missing transport marker never PASS",
+      "status": "PASS"
+    },
+    {
+      "name": "write-session superuser principal never PASS",
+      "status": "PASS"
+    },
+    {
+      "name": "precommit only never PASS",
+      "status": "PASS"
+    },
+    {
+      "name": "missing postcheck never PASS",
+      "status": "PASS"
+    },
+    {
+      "name": "unordered markers never PASS",
+      "status": "PASS"
+    },
+    {
+      "name": "missing operational host gate never PASS",
+      "status": "PASS"
+    },
+    {
+      "name": "drift status with clean markers never PASS",
+      "status": "PASS"
+    },
+    {
+      "name": "nonzero write transport never PASS",
+      "status": "PASS"
+    },
+    {
+      "name": "attempt marker collision at the boundary: no write invocation",
+      "status": "PASS"
+    },
+    {
+      "name": "prerequisite mode never writes the marker or opens a write session",
+      "status": "PASS"
+    },
+    {
+      "name": "prerequisite mode failure consumes nothing",
+      "status": "PASS"
+    },
+    {
+      "name": "static composition: host gate + transport + pinned call; no sudo; principal follows identity in all three streams",
+      "status": "PASS"
+    }
+  ]
+}

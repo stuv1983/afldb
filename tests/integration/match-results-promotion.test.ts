@@ -2012,13 +2012,13 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
         /**
          * (ISSUE-265: the emulated settle takes no settle/promotion gate, as a real settle now does.)
          * The settle is the first to hold the later match B, the promotion (ascending) holds A and waits for
-         * B, then the settle's next unit asks for A. The promotion began waiting first, so its deadlock check
-         * fires first and it is the victim: the retryable refusal, nothing written, the settle unharmed.
+         * B, then the settle's next unit asks for A. The graph is forced, not the victim: PostgreSQL
+         * explicitly does not guarantee victim choice (§13.3.4). Verify both legal outcomes, atomically.
          */
         it.each([
           ['match_results'],
           ['player_match_stats'],
-        ])('%s: the promotion is the victim, gets the retryable refusal, and a retry succeeds', async (dataset) => {
+        ])('%s: an ungated deadlock aborts exactly one participant; a refused promotion is atomic and retryable', async (dataset) => {
           const [A, B] = [lockMatch[1], lockMatch[2]];
           const stats = dataset === 'player_match_stats';
           const file = await stageAndValidate(dataset, stats
@@ -2026,6 +2026,7 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
             : [lockPayload(1, { home_score: '96' }), lockPayload(2, { home_score: '96' })]);
           expect(file.summary.errors).toBe(0);
           const before = [await scoreOf(A), await scoreOf(B)];
+          const beforeRows = stats ? [await rowOf('Clear', A), await rowOf('Late', B)] : null;
 
           // A stats unit takes FOR SHARE on its match by key; a unit that writes or rekeys takes FOR UPDATE.
           const settle = await stage(
@@ -2043,26 +2044,37 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
           }
           const result = await promotion!;
           const elapsed = Date.now() - started;
-          expect(await settle.outcome).toBeNull(); // the settle survives
-          expect(result.ok).toBe(false);
-          expect(result.ok ? '' : result.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+          const settled = await settle.outcome;
           expect(elapsed).toBeLessThan(4500); // a deadlock victim after ~1s, not the 5s lock timeout
-          expect((await statusOf(file.id)).status).toBe('failed');
-          expect([await scoreOf(A), await scoreOf(B)]).toEqual(before);
-
-          expect(await promoteSubmission(file.id)).toMatchObject({ ok: true });
+          // https://www.postgresql.org/docs/16/explicit-locking.html#LOCKING-DEADLOCKS
+          if (result.ok) {
+            expect(sqlstate(settled)).toBe('40P01');
+            if (stats) {
+              expect([await rowOf('Clear', A), await rowOf('Late', B)].map((r) => r?.goals)).toEqual([4, 4]);
+            } else {
+              const rows = await owner`SELECT home_score FROM matches WHERE id IN (${A.id},${B.id}) ORDER BY id`;
+              expect(rows.map((r) => r.home_score)).toEqual([96, 96]);
+            }
+          } else {
+            expect(settled).toBeNull();
+            expect(result.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+            expect((await statusOf(file.id)).status).toBe('failed');
+            expect([await scoreOf(A), await scoreOf(B)]).toEqual(before);
+            if (stats) expect([await rowOf('Clear', A), await rowOf('Late', B)]).toEqual(beforeRows);
+            expect(await promoteSubmission(file.id)).toMatchObject({ ok: true });
+          }
         }, 60_000);
 
         /**
          * The promotion holds its matches to commit while it still writes rows. If the settle began waiting for
-         * one of those matches BEFORE the promotion reached a row the settle holds, the settle's check fires
-         * first and the SETTLE is the victim. Inside canonical-apply that costs the unit it was applying: the unit
+         * one of those matches BEFORE the promotion reached a row the settle holds, either participant can
+         * be the victim (PostgreSQL §13.3.4). If it is the settle, that costs the unit it was applying: the unit
          * rolls back to its savepoint, one `canonical_apply_failed` finding is opened, and the run continues. The
          * shared lock order does not remove this; it only orders the promotion's own acquisitions.
          * ISSUE-265: a real settle takes the shared gate first, so it cannot overlap a promotion at all and
          * this cycle cannot form. The emulation here is ungated, which is the only reason the cycle still does.
          */
-        it('characterises that an UNGATED settle can still be the deadlock victim', async () => {
+        it('an UNGATED cycle aborts exactly one participant atomically, whichever victim PostgreSQL selects', async () => {
           const [X, Y] = [lockMatch[7], lockMatch[8]];
           for (const tag of ['Clear', 'Late'] as const) {
             await owner`
@@ -2091,6 +2103,7 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
             lockRow(Y, 'FOR UPDATE'),
           );
           let promotion: Promise<Awaited<ReturnType<typeof promoteSubmission>>> | undefined;
+          const started = Date.now();
           try {
             promotion = approveAndPromote(file.id);
             await waitBlocked(slow.pid); // hook done; row 1 waits for the other writer
@@ -2101,9 +2114,18 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
             if (!promotion) { settle.go(); slow.go(); }
           }
           const [settled, promoted, slowEnded] = await Promise.all([settle.outcome, promotion!, slow.outcome]);
-          expect(sqlstate(settled)).toBe('40P01'); // the settle's unit would roll back to its savepoint
-          expect(promoted).toMatchObject({ ok: true }); // the promotion finishes once the settle is gone
+          expect(Date.now() - started).toBeLessThan(4500); // reject a lock timeout instead of a deadlock
           expect(slowEnded).toBeNull();
+          if (promoted.ok) {
+            expect(sqlstate(settled)).toBe('40P01');
+          } else {
+            expect(settled).toBeNull();
+            expect(promoted.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+            expect((await statusOf(file.id)).status).toBe('failed');
+            expect([await rowOf('Clear', X), await rowOf('Late', X), await rowOf('Added', Y)].map((r) => r?.goals))
+              .toEqual([1, 1, undefined]);
+            expect(await promoteSubmission(file.id)).toMatchObject({ ok: true });
+          }
           expect([await rowOf('Clear', X), await rowOf('Late', X), await rowOf('Added', Y)].map((r) => r?.goals))
             .toEqual([2, 2, 2]);
         }, 60_000);

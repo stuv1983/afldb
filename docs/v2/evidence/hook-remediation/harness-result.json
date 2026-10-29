@@ -1,0 +1,915 @@
+{
+  "summary": {
+    "harness": "cbm-hook-harness",
+    "ranAt": "2026-10-19T05:19:23.759Z",
+    "node": "v22.21.0",
+    "newCommand": "\"C:/Program Files/nodejs/node.exe\" \"C:/Users/<user>/.claude/hooks/cbm-hook-runner.js\" code-discovery-gate",
+    "cases": 147,
+    "failures": 0
+  },
+  "byGroup": {
+    "bash": {
+      "pass": 72,
+      "fail": 0
+    },
+    "cmd": {
+      "pass": 72,
+      "fail": 0
+    },
+    "failure": {
+      "pass": 2,
+      "fail": 0
+    },
+    "negative-control": {
+      "pass": 1,
+      "fail": 0
+    }
+  },
+  "results": [
+    {
+      "case": "bash/ampersand/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/ampersand/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/ampersand/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/ampersand/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/double-ampersand/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/double-ampersand/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/double-ampersand/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/double-ampersand/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/pipe/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/pipe/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/pipe/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/pipe/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/redirect-in/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/redirect-in/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/redirect-in/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/redirect-in/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/redirect-out-supplies/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/redirect-out-supplies/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/redirect-out-supplies/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/redirect-out-supplies/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/append/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/append/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/append/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/append/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/stderr-redirect/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/stderr-redirect/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/stderr-redirect/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/stderr-redirect/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/caret/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/caret/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/caret/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/caret/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/percent/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/percent/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/percent/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/percent/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/delayed-expansion/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/delayed-expansion/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/delayed-expansion/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/delayed-expansion/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/parentheses/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/parentheses/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/parentheses/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/parentheses/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/quote-toggle/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/quote-toggle/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/quote-toggle/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/quote-toggle/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/escaped-quote/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/escaped-quote/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/escaped-quote/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/escaped-quote/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/newline/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/newline/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/newline/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/newline/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/bash-subst/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/bash-subst/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/bash-subst/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/bash-subst/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/unicode/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/unicode/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/unicode/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/unicode/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/long-8191-boundary/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/long-8191-boundary/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/long-8191-boundary/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/long-8191-boundary/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/recorded-shape/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/recorded-shape/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/recorded-shape/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "bash/recorded-shape/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/ampersand/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/ampersand/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/ampersand/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/ampersand/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/double-ampersand/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/double-ampersand/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/double-ampersand/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/double-ampersand/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/pipe/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/pipe/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/pipe/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/pipe/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/redirect-in/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/redirect-in/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/redirect-in/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/redirect-in/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/redirect-out-supplies/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/redirect-out-supplies/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/redirect-out-supplies/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/redirect-out-supplies/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/append/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/append/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/append/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/append/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/stderr-redirect/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/stderr-redirect/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/stderr-redirect/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/stderr-redirect/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/caret/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/caret/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/caret/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/caret/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/percent/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/percent/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/percent/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/percent/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/delayed-expansion/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/delayed-expansion/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/delayed-expansion/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/delayed-expansion/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/parentheses/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/parentheses/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/parentheses/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/parentheses/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/quote-toggle/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/quote-toggle/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/quote-toggle/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/quote-toggle/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/escaped-quote/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/escaped-quote/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/escaped-quote/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/escaped-quote/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/newline/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/newline/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/newline/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/newline/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/bash-subst/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/bash-subst/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/bash-subst/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/bash-subst/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/unicode/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/unicode/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/unicode/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/unicode/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/long-8191-boundary/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/long-8191-boundary/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/long-8191-boundary/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/long-8191-boundary/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/recorded-shape/PreToolUse-Grep/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/recorded-shape/PreToolUse-Grep/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/recorded-shape/PostToolUse-Read/findstr",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "cmd/recorded-shape/PostToolUse-Read/real",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "failure/missing-binary",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "failure/nonzero-or-timeout",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": []
+    },
+    {
+      "case": "negative-control/old-command-executes-stdin",
+      "pass": true,
+      "exit": 0,
+      "fsChanges": [
+        "changed supplies",
+        "created oldamp.txt"
+      ]
+    }
+  ]
+}

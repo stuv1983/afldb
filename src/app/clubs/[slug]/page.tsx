@@ -373,7 +373,8 @@ export default async function ClubPage({
       node: (
         <section className="section">
           <p className="section-note">
-            {formatNumber(captains.length)} recorded captaincy seasons
+            {/* One row per appointment: co-captains and a re-appointment share a season. */}
+            {formatNumber(new Set(captains.map((c) => c.season)).size)} recorded captaincy seasons
             {hasLineage && ', across every era of the club'}.
           </p>
           <CollapsibleTable title="Captains">

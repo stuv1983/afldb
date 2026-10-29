@@ -1,6 +1,6 @@
 id,category,question,expected_status,tags
-rel_dec_001,rel_decline_family_grain,biggest football families,decline,"c1,d6,family-grain"
-rel_dec_002,rel_decline_family_size,families with three AFL players,decline,"c5,c6,family-grain"
+rel_dec_001,rel_decline_family_grain,biggest football families,plan,"c1,d6,family-grain"
+rel_dec_002,rel_decline_family_size,families with three AFL players,plan,"c5,c6,family-grain"
 rel_dec_003,rel_decline_fs1,players selected under the father-son rule,plan,"fs1,d8,selection"
 rel_dec_004,rel_decline_fs2,geelong father-son selections,plan,"fs2,d8,club"
 rel_dec_005,rel_decline_fs3,father-son selections in 2022,plan,"fs3,d8,season"

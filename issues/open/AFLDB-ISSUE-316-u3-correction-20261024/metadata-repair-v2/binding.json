@@ -1,0 +1,74 @@
+{
+  "issue": "AFLDB-ISSUE-316",
+  "actor": {
+    "id": 1,
+    "email": "stuart.villanti@gmail.com",
+    "role": "super_admin"
+  },
+  "approval_reference": "OWNER-RULING.md (retained 2026-10-24 owner instruction: Accept the independent review NO-GO.)",
+  "approval_sha256": "936f61e9676f66f77d06eaa7f66c02efa7e12b8ac9ecd787539a9031bfdafd55",
+  "note": "AFLDB-ISSUE-316 / U3 owner-adjudicated correction: Remove only Brayden Fiorini (player_id 2121), Essendon (club_id 6), from match 17214 (2026 round 4, 2026-03-28), canonical row 705437. Inserted by canonical application 20834, AFL API batch 32, on 2026-09-27T21:11:30.460661Z. This is the historical unused-emergency defect adjudicated under AFLDB-ISSUE-255: EMERG, 0% time on ground, all ordinary statistics zero. Retained source payload SHA-256 828744dee7dea294f7afe819508fdc8ba0d38786cf6afc356c7fb5d2af7706a5. The hash-bound J2 AFL Tables baseline omits this appearance, contains the other 23 Essendon participants, and contains Fiorini only in rounds 2 and 3. Preserve originating observations, payload/version, batch and canonical-application history; retain durable removal authority and recompute required derived statistics through the audited Match Sheet workflow. Brownlow 2026 is excluded; U4 remains Route B and the 9,522 round-vote rows remain untouched.",
+  "edit94": {
+    "id": 94,
+    "note": null,
+    "row_id": 17214,
+    "created_at": "2026-10-24T11:28:46.203865+00:00",
+    "new_values": {
+      "players": {
+        "2121": {
+          "kind": "remove"
+        }
+      },
+      "playersCount": 46,
+      "scoreUpdated": false,
+      "authorityKeys": [
+        {
+          "action": "mint",
+          "playerId": 2121,
+          "entityKey": "2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html"
+        }
+      ]
+    },
+    "old_values": {
+      "players": {
+        "2121": {
+          "goals": 0,
+          "kicks": 0,
+          "marks": 0,
+          "behinds": 0,
+          "hitouts": 0,
+          "tackles": 0,
+          "club_slug": "essendon",
+          "disposals": 0,
+          "frees_for": 0,
+          "handballs": 0,
+          "frees_against": 0,
+          "jumper_number": "8"
+        }
+      }
+    },
+    "table_name": "matches",
+    "field_group": "match_sheet",
+    "admin_user_id": 1
+  },
+  "authority93": {
+    "id": 93,
+    "is_active": true,
+    "created_at": "2026-10-24T11:28:46.203865+00:00",
+    "entity_key": "2026|4|2026-03-28|Essendon|North Melbourne|afltables:players/B/Brayden_Fiorini.html",
+    "updated_at": "2026-10-24T11:28:46.203865+00:00",
+    "entity_type": "player_match_stats",
+    "field_group": "lineup",
+    "admin_user_id": 1,
+    "override_values": {
+      "present": false
+    }
+  },
+  "audit_constraints": [
+    "CHECK (((note IS NULL) OR (length(note) <= 2000)))",
+    "CHECK ((row_id > 0))",
+    "CHECK ((table_name = ANY (ARRAY['players'::text, 'matches'::text, 'draft_picks'::text, 'award_winners'::text, 'hall_of_fame'::text, 'honour_team_members'::text, 'brownlow_vote_entry_state'::text, 'brownlow_season_authority'::text, 'coaches'::text, 'fixtures'::text, 'club_leadership'::text, 'player_achievements'::text, 'after_siren_kicks'::text])))",
+    "FOREIGN KEY (admin_user_id) REFERENCES auth_users(id)",
+    "PRIMARY KEY (id)"
+  ]
+}

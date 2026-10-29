@@ -1,0 +1,59 @@
+{
+  "verdict": "NO-GO",
+  "stopping_findings": 1,
+  "manifest_sha256": "4315cc6b205d948e35a68209cfe32323aa9bcb3abc3fd63831dd151da68f88c0",
+  "report_sha256": "3eaacf8ea63c6580730229d6e89c808fb7f7de135a3dfe2027d6f2dc6235543c",
+  "reviewer": "/root/metadata_review_v2",
+  "role": "afldb-reviewer",
+  "duty": "Independent second-pass execution-gate review",
+  "completed_utc": "2026-10-24T12:36:11.657Z",
+  "manifest_members_verified": 24,
+  "production_connection_attempted": false,
+  "production_write_attempted": false,
+  "frozen_inputs_changed": false,
+  "findings": [
+    {
+      "id": "F-004",
+      "grade": "MED",
+      "stopping": true,
+      "file": "repair.sql:5",
+      "related_locations": [
+        "repair.sql:2",
+        "repair.sql:8",
+        "repair.sql:17",
+        "identity.sql:2",
+        "identity.sql:6",
+        "locks.sql:2",
+        "assert-post.sql:28"
+      ],
+      "summary": "SERIALIZABLE snapshot precedes preservation locks; a concurrent protected commit can evade precommit gates and be detected only after metadata COMMIT."
+    }
+  ],
+  "prior_findings": [
+    {
+      "id": "F-001",
+      "grade": "HIGH",
+      "disposition": "CLOSED as originally stated; executable supplied; new F-004 still stops execution"
+    },
+    {
+      "id": "F-002",
+      "grade": "HIGH",
+      "disposition": "CLOSED; exact actor/owner/approval/review/INSERT values bound"
+    },
+    {
+      "id": "F-003",
+      "grade": "MED",
+      "disposition": "CLOSED as originally stated; repair-specific executable postcheck supplied; F-004 separately stops precommit isolation"
+    }
+  ],
+  "validation": {
+    "retained_pglite_cases": 16,
+    "independently_replayed_pglite_cases_passed": 16,
+    "validation_output_intercepted_in_memory": true,
+    "mocked_wrapper_cases_passed": 9,
+    "actual_wrapper_verify": "PACKAGE_HASHES_PASS",
+    "two_session_concurrency_reproduced": false,
+    "live_schema_or_transport_validated": false
+  },
+  "disposition": "Return to owner; no execution, modification or retry. U3 unconfirmed; U4 Route B; overall production readiness NO-GO."
+}

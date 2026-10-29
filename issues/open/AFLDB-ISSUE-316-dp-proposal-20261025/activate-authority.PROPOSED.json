@@ -1,0 +1,21 @@
+{
+  "schema": "afldb.rollover.successor_activation/1",
+  "decision": "D-316-ACT-20261027-PROPOSED",
+  "season": 2026,
+  "profile": "c2-2026-successor",
+  "rollover_date": "2026-10-27",
+  "source_commit": "def676517da3955aa18db3606785463aac464188",
+  "head_commit": "06e882277644731d665c148970b96ab214f42701",
+  "transition_change_set_sha256": "d55875cbfa686ac47511eca2e2ac7026cfadefd1fd4e7ab1b31c322f7359644b",
+  "tuple_sha256": "a78d36ee7e689b7bb5978335bff5e6bdd54f368572df5f2f01d10caf35a373aa",
+  "migrations": {
+    "count": 117,
+    "last": "117_brownlow_provider_eligibility_unknown.sql",
+    "set_sha256": "647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72"
+  },
+  "rebuild_sha256": {
+    "inactive": "320960e482699e33afb112f8a765d711bd21c6c032ce464d5f18d39d8956ccc8",
+    "active": "ab7349470d5de859e83763fb8b9b07c9d4fce1db817046dc3e8a741f65bc3338"
+  },
+  "action": "activate"
+}

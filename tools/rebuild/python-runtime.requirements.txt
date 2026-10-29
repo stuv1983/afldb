@@ -1,0 +1,28 @@
+# ISSUE-316: the Python distributions the rehearsal ran against, pinned by wheel archive SHA-256.
+#
+# Install ONLY into a new, empty virtual environment created with the interpreter recorded in the
+# runtime record (python 3.12.3, Debian/Ubuntu python3.12 3.12.3-1ubuntu0.17), never into an existing
+# environment:
+#   python3.12 -m venv <new-empty-dir>
+#   <new-empty-dir>/bin/python -m pip install --isolated --require-hashes --no-deps --only-binary=:all: -r tools/rebuild/python-runtime.requirements.txt
+#
+# Evidence for each hash (2026-10-23, disposable root, see the ISSUE-316 execution record):
+#   * the SHA-256 PyPI publishes for that exact file (pypi.org JSON, retrieved over TLS);
+#   * equals the SHA-256 of the file `pip download` fetched;
+#   * equals the SHA-256 of the wheel that was already in the DEV pip cache when the rehearsal's
+#     environment was inspected on 2026-10-22, whose members equal the installed files.
+# A hash proves these bytes are the reviewed archive. It does not prove publisher authenticity, and the
+# wheel carries vendored native libraries (psycopg_binary.libs) that the rehearsal's runtime record
+# inventories by content but does not enforce at dynamic-load time. The system libraries those
+# extensions load (libc, libssl, libz, ...) are NOT pinned here; they remain observation, not closure.
+#
+# The psycopg-binary wheel is the cp312 manylinux_2_17/manylinux2014 x86_64 build only; another
+# platform or interpreter needs its own reviewed hash, never a substituted one.
+pip==26.2.1 \
+    --hash=sha256:71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e
+psycopg==3.3.4 \
+    --hash=sha256:b6bbc25ccf05c8fad3b061d9db2ef0909a555171b84b07f29458a447253d679a
+psycopg-binary==3.3.4 \
+    --hash=sha256:e7510c37550f91a187e3660a8cc50d4b760f8c3b8b2f89ebc5698cd2c7f2c85d
+typing-extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8

@@ -1,0 +1,178 @@
+I316_OBS_HOST=afldb-prod USER=arm
+I316_OBS_SELF pid=2916037 ppid=2916036
+I316_OBS_PROC_MOUNT_OPTIONS rw,nosuid,nodev,noexec,relatime
+SYSTEMD_AFLDB MainPID=2626763
+SYSTEMD_AFLDB ExecMainStartTimestamp=Sun 2026-10-18 13:06:32 AEDT
+SYSTEMD_AFLDB LoadState=loaded
+SYSTEMD_AFLDB ActiveState=active
+SYSTEMD_AFLDB SubState=running
+I316_OBS_PS_EXIT 0
+PS 1 0 root Ss Sun Aug 16 12:14:44 2026 /usr/lib/systemd/systemd --system --deserialize=109
+PS 2 0 root S Sun Aug 16 12:14:44 2026 [kthreadd]
+PS 3 2 root S Sun Aug 16 12:14:44 2026 [pool_workqueue_release]
+PS 4 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-rcu_g]
+PS 5 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-rcu_p]
+PS 6 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-slub_]
+PS 7 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-netns]
+PS 12 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-mm_pe]
+PS 13 2 root I Sun Aug 16 12:14:44 2026 [rcu_tasks_kthread]
+PS 14 2 root I Sun Aug 16 12:14:44 2026 [rcu_tasks_rude_kthread]
+PS 15 2 root I Sun Aug 16 12:14:44 2026 [rcu_tasks_trace_kthread]
+PS 16 2 root S Sun Aug 16 12:14:44 2026 [ksoftirqd/0]
+PS 17 2 root I Sun Aug 16 12:14:44 2026 [rcu_preempt]
+PS 18 2 root S Sun Aug 16 12:14:44 2026 [migration/0]
+PS 19 2 root S Sun Aug 16 12:14:44 2026 [idle_inject/0]
+PS 20 2 root S Sun Aug 16 12:14:44 2026 [cpuhp/0]
+PS 21 2 root S Sun Aug 16 12:14:44 2026 [cpuhp/1]
+PS 22 2 root S Sun Aug 16 12:14:44 2026 [idle_inject/1]
+PS 23 2 root S Sun Aug 16 12:14:44 2026 [migration/1]
+PS 24 2 root S Sun Aug 16 12:14:44 2026 [ksoftirqd/1]
+PS 26 2 root I< Sun Aug 16 12:14:44 2026 [kworker/1:0H-events_highpri]
+PS 29 2 root S Sun Aug 16 12:14:44 2026 [kdevtmpfs]
+PS 30 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-inet_]
+PS 31 2 root S Sun Aug 16 12:14:44 2026 [kauditd]
+PS 32 2 root S Sun Aug 16 12:14:44 2026 [khungtaskd]
+PS 33 2 root S Sun Aug 16 12:14:44 2026 [oom_reaper]
+PS 35 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-write]
+PS 37 2 root S Sun Aug 16 12:14:44 2026 [kcompactd0]
+PS 38 2 root SN Sun Aug 16 12:14:44 2026 [ksmd]
+PS 40 2 root SN Sun Aug 16 12:14:44 2026 [khugepaged]
+PS 41 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-kinte]
+PS 42 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-kbloc]
+PS 43 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-blkcg]
+PS 44 2 root S Sun Aug 16 12:14:44 2026 [irq/9-acpi]
+PS 45 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-tpm_d]
+PS 46 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-ata_s]
+PS 47 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-md]
+PS 48 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-md_bi]
+PS 49 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-edac-]
+PS 50 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-devfr]
+PS 51 2 root S Sun Aug 16 12:14:44 2026 [watchdogd]
+PS 53 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-quota]
+PS 55 2 root S Sun Aug 16 12:14:44 2026 [kswapd0]
+PS 56 2 root S Sun Aug 16 12:14:44 2026 [ecryptfs-kthread]
+PS 57 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-kthro]
+PS 58 2 root I< Sun Aug 16 12:14:44 2026 [kworker/R-acpi_]
+PS 60 2 root S Sun Aug 16 12:14:45 2026 [scsi_eh_0]
+PS 61 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-scsi_]
+PS 62 2 root S Sun Aug 16 12:14:45 2026 [scsi_eh_1]
+PS 63 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-scsi_]
+PS 64 2 root S Sun Aug 16 12:14:45 2026 [scsi_eh_2]
+PS 65 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-scsi_]
+PS 68 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-mld]
+PS 69 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-ipv6_]
+PS 77 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-kstrp]
+PS 79 2 root I< Sun Aug 16 12:14:45 2026 [kworker/u7:0]
+PS 80 2 root I< Sun Aug 16 12:14:45 2026 [kworker/u8:0]
+PS 81 2 root I< Sun Aug 16 12:14:45 2026 [kworker/u9:0]
+PS 86 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-crypt]
+PS 96 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-charg]
+PS 192 2 root I< Sun Aug 16 12:14:45 2026 [kworker/R-raid5]
+PS 232 2 root S Sun Aug 16 12:14:46 2026 [jbd2/vda1-8]
+PS 233 2 root I< Sun Aug 16 12:14:46 2026 [kworker/R-ext4-]
+PS 324 2 root I< Sun Aug 16 12:14:47 2026 [kworker/R-kmpat]
+PS 325 2 root I< Sun Aug 16 12:14:47 2026 [kworker/R-kmpat]
+PS 437 2 root S Sun Aug 16 12:14:47 2026 [jbd2/vda16-8]
+PS 438 2 root I< Sun Aug 16 12:14:47 2026 [kworker/R-ext4-]
+PS 807 1 messagebus Ss Sun Aug 16 12:14:51 2026 @dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+PS 827 1 root Ss Sun Aug 16 12:14:52 2026 /usr/lib/systemd/systemd-logind
+PS 900 1 root Ss+ Sun Aug 16 12:14:52 2026 /sbin/agetty -o -p -- \u --keep-baud 115200,57600,38400,9600 - vt220
+PS 920 1 root Ssl Sun Aug 16 12:14:52 2026 /usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal
+PS 941 1 root Ss+ Sun Aug 16 12:14:52 2026 /sbin/agetty -o -p -- \u --noclear - linux
+PS 1039 1 arm Ss Sun Aug 16 12:18:46 2026 /usr/lib/systemd/systemd --user --deserialize=24
+PS 1040 1039 arm S Sun Aug 16 12:18:46 2026 (sd-pam)
+PS 6649 2 root I< Sun Aug 16 13:05:41 2026 [kworker/R-tls-s]
+PS 7797 1 caddy Ssl Sun Aug 16 13:18:12 2026 /usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
+PS 15635 1 arm Ss Sun Aug 16 18:40:44 2026 bash -c while pgrep -f deploy-prod.sh >/dev/null; do sleep 10; done; echo ===FINISHED===; tail -30 /home/arm/deploy-prod.log
+PS 460488 2 root I< Sat Aug 29 07:43:59 2026 [kworker/1:2H-kblockd]
+PS 1117825 1 root Ss Sat Sep 12 06:17:17 2026 /usr/sbin/cron -f -P
+PS 1446282 2 root I< Sun Sep 20 21:21:59 2026 [kworker/0:0H-kblockd]
+PS 1890950 2 root I< Thu Oct 1 17:59:59 2026 [kworker/0:1H]
+PS 2216094 1 do-agent Ssl Fri Oct 9 06:32:30 2026 /opt/digitalocean/bin/do-agent --syslog
+PS 2417099 2 root I Wed Oct 14 06:56:02 2026 [kworker/u4:1]
+PS 2568541 1039 arm Ss Sat Oct 17 13:34:24 2026 /usr/bin/dbus-daemon --session --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+PS 2626763 1 arm Ssl Sun Oct 18 13:06:32 2026 /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs
+PS 2626777 2626763 arm Sl Sun Oct 18 13:06:32 2026 next-server (v16.3.1)
+PS 2626778 2626763 arm Sl Sun Oct 18 13:06:32 2026 next-server (v16.3.1)
+PS 2758311 2 root I Wed Oct 21 14:17:43 2026 [kworker/u4:2-ext4-rsv-conversion]
+PS 2792502 1 root SLsl Thu Oct 22 06:43:58 2026 /sbin/multipathd -d -s
+PS 2792512 1 root S<s Thu Oct 22 06:43:58 2026 /usr/lib/systemd/systemd-journald
+PS 2792517 1 systemd-resolve Ss Thu Oct 22 06:43:58 2026 /usr/lib/systemd/systemd-resolved
+PS 2792522 1 systemd-timesync Ssl Thu Oct 22 06:43:58 2026 /usr/lib/systemd/systemd-timesyncd
+PS 2792526 1 root Ss Thu Oct 22 06:43:58 2026 /usr/lib/systemd/systemd-udevd
+PS 2792549 2 root S Thu Oct 22 06:43:58 2026 [psimon]
+PS 2792550 1 systemd-network Ss Thu Oct 22 06:43:58 2026 /usr/lib/systemd/systemd-networkd
+PS 2795453 1 root Ssl Thu Oct 22 08:05:57 2026 /opt/digitalocean/bin/droplet-agent
+PS 2795569 2 root S Thu Oct 22 08:05:58 2026 [psimon]
+PS 2910883 1 polkitd Ssl Sun Oct 25 06:09:47 2026 /usr/lib/polkit-1/polkitd --no-debug
+PS 2910890 1 root Ssl Sun Oct 25 06:09:47 2026 /usr/libexec/udisks2/udisksd
+PS 2910892 1 root Ss Sun Oct 25 06:09:47 2026 sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups
+PS 2910911 1 root Ssl Sun Oct 25 06:09:47 2026 /usr/sbin/ModemManager
+PS 2910923 1 syslog Ssl Sun Oct 25 06:09:48 2026 /usr/sbin/rsyslogd -n -iNONE
+PS 2910935 1 postgres Ss Sun Oct 25 06:09:48 2026 /usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresql/16/main -c config_file=/etc/postgresql/16/main/postgresql.conf
+PS 2910936 2910935 postgres Ss Sun Oct 25 06:09:48 2026 postgres: 16/main: checkpointer
+PS 2910937 2910935 postgres Ss Sun Oct 25 06:09:48 2026 postgres: 16/main: background writer
+PS 2910939 2910935 postgres Ss Sun Oct 25 06:09:48 2026 postgres: 16/main: walwriter
+PS 2910940 2910935 postgres Ss Sun Oct 25 06:09:48 2026 postgres: 16/main: autovacuum launcher
+PS 2910941 2910935 postgres Ss Sun Oct 25 06:09:48 2026 postgres: 16/main: logical replication launcher
+PS 2911451 1 root Ssl Sun Oct 25 06:24:00 2026 /usr/libexec/fwupd/fwupd
+PS 2912690 2910892 root Ss Sun Oct 25 07:07:57 2026 sshd: arm [priv]
+PS 2912788 2912690 arm S Sun Oct 25 07:07:58 2026 sshd: arm@notty
+PS 2913130 2 root I Sun Oct 25 07:20:00 2026 [kworker/u5:1-events_power_efficient]
+PS 2913907 2 root I Sun Oct 25 07:29:14 2026 [kworker/u6:3-events_power_efficient]
+PS 2913975 2 root I Sun Oct 25 07:29:59 2026 [kworker/1:1-events]
+PS 2914604 2910892 root Ss Sun Oct 25 07:41:49 2026 sshd: arm [priv]
+PS 2914658 2914604 arm S Sun Oct 25 07:41:50 2026 sshd: arm@notty
+PS 2915167 2 root I Sun Oct 25 07:56:15 2026 [kworker/u6:1-writeback]
+PS 2915173 2 root I Sun Oct 25 07:56:31 2026 [kworker/u5:3-events_power_efficient]
+PS 2915255 2 root I Sun Oct 25 08:00:00 2026 [kworker/1:3-cgroup_release]
+PS 2915256 2 root I Sun Oct 25 08:00:01 2026 [kworker/0:2-events]
+PS 2915318 2 root I Sun Oct 25 08:02:38 2026 [kworker/u5:0-events_power_efficient]
+PS 2915490 2 root I Sun Oct 25 08:10:00 2026 [kworker/0:3-cgroup_free]
+PS 2915643 2 root I Sun Oct 25 08:14:26 2026 [kworker/u6:0-events_unbound]
+PS 2915813 2 root I Sun Oct 25 08:21:24 2026 [kworker/u5:2-events_power_efficient]
+PS 2915901 2910935 postgres Ss Sun Oct 25 08:25:11 2026 postgres: 16/main: afldb_app afldb_prod ::1(39690) idle
+PS 2915902 2910935 postgres Ss Sun Oct 25 08:25:11 2026 postgres: 16/main: afldb_app afldb_prod ::1(39696) idle
+PS 2915938 2910892 root Ss Sun Oct 25 08:26:46 2026 sshd: arm [priv]
+PS 2915941 15635 arm S Sun Oct 25 08:26:46 2026 sleep 10
+PS 2916036 2915938 arm S Sun Oct 25 08:26:47 2026 sshd: arm@notty
+PS 2916037 2916036 arm Ss Sun Oct 25 08:26:47 2026 bash -s
+PS 2916053 2916037 arm R Sun Oct 25 08:26:47 2026 /usr/bin/ps -eww -o pid=,ppid=,user:32=,stat=,lstart=,args=
+PS_ROWS 131
+PS_MALFORMED 0
+PS_PID1_ROOT_ARGS_VISIBLE 1
+PS_FOREIGN_USER_ARGS_VISIBLE 33
+PS_POSTGRES_SERVER_ROWS 8
+PS_POSTGRES_TITLE_ROWS 7
+PS_POSTGRES_AFLDB_PROD_CLIENT_TITLES 2
+PS_AFLDB_MAINPID_VISIBLE 1
+UNSAFE_PROCESSES 0
+I316_OBS_PROCESS_GATE=PASS
+SYSTEMD_RELEVANT_JOBS_CLEAR
+SYSTEMD_RELEVANT_TRANSITIONS_CLEAR
+SYSTEMD_AFLDB_JOB_UNIT Id=afldb-settle-afltables.service
+SYSTEMD_AFLDB_JOB_UNIT LoadState=loaded
+SYSTEMD_AFLDB_JOB_UNIT ActiveState=inactive
+SYSTEMD_AFLDB_JOB_UNIT SubState=dead
+SYSTEMD_AFLDB_JOB_UNIT Id=afldb-settle-afl-api.service
+SYSTEMD_AFLDB_JOB_UNIT LoadState=not-found
+SYSTEMD_AFLDB_JOB_UNIT ActiveState=inactive
+SYSTEMD_AFLDB_JOB_UNIT SubState=dead
+SYSTEMD_AFLDB_JOB_UNIT Id=afldb-settle-afl-api-brownlow.service
+SYSTEMD_AFLDB_JOB_UNIT LoadState=not-found
+SYSTEMD_AFLDB_JOB_UNIT ActiveState=inactive
+SYSTEMD_AFLDB_JOB_UNIT SubState=dead
+SYSTEMD_AFLDB_JOB_UNIT Id=afldb-email-intake.service
+SYSTEMD_AFLDB_JOB_UNIT LoadState=not-found
+SYSTEMD_AFLDB_JOB_UNIT ActiveState=inactive
+SYSTEMD_AFLDB_JOB_UNIT SubState=dead
+SYSTEMD_AFLDB_JOB_UNITS_IDLE
+SYSTEMD_AFLDB_TIMER Mon 2026-10-26 04:31:16 AEDT      20h Sun 2026-10-25 04:31:55 AEDT 3h 54min ago afldb-settle-afltables.timer   afldb-settle-afltables.service
+I316_OBS_SERVICE_GATE=PASS
+I316_OBS_DEPLOY_MARKERS_CLEAR
+I316_OBS_DB_CONNECTION user=afldb_backup database=afldb_prod
+I316_OBS_DB_IDENTITY={"oid": "66668", "user": "afldb_backup", "database": "afldb_prod", "read_only": "on", "observed_utc": "2026-10-24T21:26:48.328Z", "system_identifier": "7674454702926115004", "server_version_num": "160015"}
+I316_OBS_DB={"superuser": false, "ddl_sessions": 0, "read_all_stats": false, "client_sessions": 2, "session_summary": [{"state": null, "usename": "afldb_app", "sessions": 2, "query_visible": false, "application_name": "postgres.js"}], "progress_cluster": 0, "progress_copy_not_to": 0, "update_process_title": "on", "prepared_transactions": 0, "progress_create_index": 0, "progress_manual_vacuum": 0, "sessions_query_redacted": 2, "autovacuum_relation_locks": 0, "schema_class_relation_locks": 0, "idle_in_transaction_sessions": 0, "tooling_application_sessions": 0, "client_sessions_all_databases": 7}
+I316_OBS_DB_GATE=PASS
+I316_OBS_DB_EXIT 0
+I316_OBS_DECISION=PASS

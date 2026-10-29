@@ -250,15 +250,29 @@ Normal test rebuild — unchanged:
 npm run db:test:rebuild -- --acknowledge-destroy afldb_test
 ```
 
-Rehearsal rebuild of `code_test_db` — the same runner, the same stage graph, nothing reduced:
+**The ordinary CLI no longer runs `--target code_test_db` (AFLDB-ISSUE-324, intentional).**
+`npm run db:test:rebuild -- --target code_test_db …` (with or without `--plan`) is now refused
+before any database contact, on every platform: the ordinary path runs only a closed table of
+`npx tsx` argument lists and the two package scripts `db:migrate:test` / `db:privileges:test`,
+mapped to the bound `node` and the checkout's own `node_modules/tsx/dist/cli.mjs`, and
+`db:migrate:code-test` / `db:privileges:code-test` are deliberately not in that table (owner
+ruling, ISSUE-316 revision J; a test pins the refusal). The dedicated `code_test_db` rehearsal
+tools (`npm run db:code-test:*-rehearsal`, which call the runner directly) are unaffected. The
+target contract below still describes how the runner itself validates a `code_test_db` binding.
 
-```bash
-npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
-```
+The ordinary path also refuses, before anything runs, when:
 
-```powershell
-npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
-```
+- the checkout's `node_modules` (or anything under it) is a symbolic link or junction to a
+  shared installation. Every package file must be physically inside the checkout. npm's own
+  `.bin/<name>` links are admitted only when every hop of the link chain stays inside the
+  checkout's real `node_modules` and the chain ends at a regular file there. A chain that
+  leaves and comes back is refused. The single exception is the two esbuild native binaries tsx execs
+  (`node_modules/tsx/node_modules/{@esbuild/linux-x64,esbuild}/bin/esbuild`). Each may be an
+  absolute symlink to its fixed, policy-bound real path in the reviewed DEV clean install, and
+  its bytes must hash to the fixed sha256 before every execution. A regular file there claims
+  no exception.
+- the environment carries `ESBUILD_BINARY_PATH`, `NODE_OPTIONS`, `NODE_PATH` or
+  `TSX_TSCONFIG_PATH`. These are refused, not stripped.
 
 Add `--plan` to print the stage graph and exit without touching anything. The core source is
 never named on the command line (it is the single accepted baseline in
@@ -331,8 +345,8 @@ stage `id` is what `--plan` prints and what a failure names.
 | 1a | `afl-api-ownership-census` | **validation** — refuse if any completed season in the rebuild scope holds a canonical match owned by source `afl_api`, naming every season and count; runs before the capture marker and the reset, with no override (AFLDB-ISSUE-233 D-233-3) | `AFLDB_TEST_DATABASE_URL` (owner; one read-only transaction) |
 | 2 | `afl-api-adjudications-capture` | **capture** the combined rebuild state — the human `afl_api` adjudication ledger (AFLDB-ISSUE-235), the importer-created `afl_api` identities (AFLDB-ISSUE-237) and the manual player registrations (AFLDB-ISSUE-245) — before anything is destroyed, then set the database marker | `AFLDB_TEST_DATABASE_URL` (owner; read-only snapshot, then the marker in its own transaction) |
 | 3 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
-| 4 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
-| 5 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
+| 4 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` only through the dedicated rehearsal tools — the ordinary CLI refuses it, AFLDB-ISSUE-324) | `AFLDB_TEST_DATABASE_URL` |
+| 5 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` only through the dedicated rehearsal tools — the ordinary CLI refuses it) | `AFLDB_TEST_DATABASE_URL` |
 | 6 | `reference` | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 7 | `fitzroy` | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 8 | `heights` | heights — AFL Tables player-details register | `AFLDB_TEST_IMPORT_DATABASE_URL` |
@@ -354,8 +368,9 @@ stage `id` is what `--plan` prints and what a failure names.
 | 24 | `brownlow-season` | Brownlow season totals — tracked artefact, plus any season-scoped AFL API artefact `data/brownlow/season-votes-afl_api-<season>.csv` for a season `stat-availability.json` marks complete (AFLDB-ISSUE-233 D-233-2) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 25 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 26 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 27 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 28 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
+| 27 | `first-kick-goal` | first-kick goal records — pinned curated extract + tracked manifest (`data/records/first-kick-goal.source.json`), via the unchanged importer under `--provenance` (AFLDB-ISSUE-249) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 28 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 29 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
 
 Stages 8–16 are the AFLDB-ISSUE-118 additions (§23.19, §23.24, §23.27, §23.29, §23.31,
 §23.33–§23.35). Every one reads a tracked, manifest-pinned artefact, contacts no network, and
@@ -1272,8 +1287,10 @@ AFL API current-season ingestion switch too, so the Brownlow chain needs that
 switch enabled as well as its own two gates; with it off the unit fails visibly
 at step 1. Automatic `revalidateSeason()` is not wired (D-232-3).
 
-**Brownlow timer policy and the count window.** The timer is permanently
-enabled once installed (AFLDB-ISSUE-232 E1). The wrapper's first check, and its
+**Brownlow timer policy and the count window.** On DEV the timer is permanently
+enabled once installed (AFLDB-ISSUE-232 E1). **On PROD, AFLDB-ISSUE-316 supersedes
+that: the Brownlow timer stays disabled and inactive until step C8 (count week),
+and installing the units (C3) never enables it.** The wrapper's first check, and its
 only early no-op, is the environment gate: when `AFLDB_AFL_API_BROWNLOW_ENABLED`
 is not `true` it exits 0 before reading `seasons.json`, the network or the
 database. Outside the count window it is left unset. The database switch is

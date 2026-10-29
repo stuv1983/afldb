@@ -21,7 +21,7 @@
  * registry/identities parse exactly as production does.
  */
 import {
-  mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -31,6 +31,16 @@ import {
   afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
+const ISOLATED_CLI_DATABASE = 'afldb_v2_cli_test';
+beforeEach(() => {
+  vi.stubEnv('AFLDB_TEST_DATABASE_URL', `postgresql://test:test@127.0.0.1:55432/${ISOLATED_CLI_DATABASE}`);
+  vi.stubEnv('AFLDB_V2_ISOLATED_PORT', '55432');
+  vi.stubEnv('AFLDB_V2_ISOLATED_PG', '1');
+});
+afterEach(() => vi.unstubAllEnvs());
+const isolatedFacts = async () => [{ cluster_name: 'afldb_v2_isolated', database_comment: 'afldb-v2-isolated-test' }];
+
+import { SealedSeasonRefusal } from '@afldb/domain';
 import { AflApiBrownlowFixtureIdentityRequiredError, BROWNLOW_ENABLE_ENV } from '@/lib/acquisition/afl-api-brownlow';
 import {
   AFL_API_FIXTURE_ACQUISITION_KIND,
@@ -41,9 +51,22 @@ import {
   readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '@/lib/acquisition/afl-api-ingestion-control';
+import {
+  AFL_API_COUNTER_KEYS,
+  aflApiSnapshotManifestSha256,
+  validateAflApiReconciliationReport,
+} from '@afldb/acquisition';
+import {
+  runSettleAflApi,
+  type AflApiSettleCounters,
+  type AflApiSettleRunResult,
+} from '@/lib/acquisition/settle-afl-api';
+import { buildSettleExceptionReport, type SettleExceptionReport } from '@/lib/acquisition/settle-report';
 import { runAflApiBrownlowSettleCli } from '../tools/current-season/settle-afl-api-brownlow';
 import { runAflApiFixturesSettleCli } from '../tools/current-season/settle-afl-api-fixtures';
-import { runAflApiSettleCli } from '../tools/current-season/settle-afl-api';
+import { parseAflApiSettleArgs, runAflApiSettleCli } from '../tools/current-season/settle-afl-api';
+import { committedUnit, makeScratchProject } from './afl-api-snapshot-fixture';
+import { predecessorText } from './rollover-predecessor-fixture';
 
 // I244-F006: only the fixture-observation RESOLVER is replaced (used solely by
 // the fixture-identity describe block at the end of this file; every other
@@ -53,6 +76,17 @@ vi.mock('@/lib/acquisition/afl-api-fixture-identity', async (importOriginal) => 
   ...(await importOriginal<typeof import('@/lib/acquisition/afl-api-fixture-identity')>()),
   resolveAflApiMatchViaFixtureObservation: vi.fn(),
 }));
+
+// V2-GAP-027: the settle itself and the post-commit exception read are spies that run the REAL
+// implementation unless a test in the `--report-out` block below supplies a SYNTHETIC result.
+vi.mock('@/lib/acquisition/settle-afl-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/acquisition/settle-afl-api')>();
+  return { ...actual, runSettleAflApi: vi.fn(actual.runSettleAflApi) };
+});
+vi.mock('@/lib/acquisition/settle-report', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/acquisition/settle-report')>();
+  return { ...actual, buildSettleExceptionReport: vi.fn(actual.buildSettleExceptionReport) };
+});
 
 const REPO_ROOT = join(__dirname, '..');
 const REFERENCE_FILES =['source-families.json', 'afl-api-identities.json', 'seasons.json'] as const;
@@ -99,6 +133,11 @@ function makeSqlStub(): { sql: postgres.Sql; touched: { value: boolean } } {
 // test, plus COPIES of the real tracked reference files so the registry and
 // identities parse exactly as production does. Nothing is ever written
 // under the real repository's own `data/` tree.
+//
+// AFLDB-ISSUE-316: these gate cases settle 2026 as the season IN PROGRESS, so
+// their seasons registry is the explicit predecessor of the 2026 rollover
+// (tests/rollover-predecessor-fixture.ts). The tracked registry, which seals
+// 2026 since D-316-1, is exercised by its own describe at the end of the file.
 // ---------------------------------------------------------------------------
 
 const scratchDirs: string[] = [];
@@ -110,12 +149,14 @@ afterEach(() => {
   else process.env.DATABASE_URL = originalControlDatabaseUrl;
 });
 
-function makeProjectRoot(prefix: string): string {
+function makeProjectRoot(prefix: string, seasons: 'predecessor' | 'tracked' = 'predecessor'): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   scratchDirs.push(root);
   mkdirSync(join(root, 'data', 'reference'), { recursive: true });
   for (const name of REFERENCE_FILES) {
-    writeFileSync(join(root, 'data', 'reference', name), readFileSync(join(REPO_ROOT, 'data', 'reference', name)));
+    writeFileSync(join(root, 'data', 'reference', name), name === 'seasons.json' && seasons === 'predecessor'
+      ? predecessorText('data/reference/seasons.json')
+      : readFileSync(join(REPO_ROOT, 'data', 'reference', name)));
   }
   return root;
 }
@@ -475,7 +516,7 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-ident
 
   /** `typedProviderIds` are the provider match ids that HAVE a typed
    * `staging.afl_api_match` row; every other id has none. */
-  function makeIdentitySql(typedProviderIds: readonly string[], databaseName = 'afldb_test') {
+  function makeIdentitySql(typedProviderIds: readonly string[], databaseName = ISOLATED_CLI_DATABASE) {
     const state = { writeBoundaryReached: false, queries: 0 };
     const fn = async (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> => {
       state.queries += 1;
@@ -496,7 +537,7 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-ident
       state.writeBoundaryReached = true;
       throw new WriteBoundaryReached('the run was allowed to start');
     };
-    return { sql: Object.assign(fn, { begin }) as unknown as postgres.Sql, state };
+    return { sql: Object.assign(fn, { begin, unsafe: isolatedFacts }) as unknown as postgres.Sql, state };
   }
 
   const REFUSED_MODES: readonly { flags: readonly string[]; mode: 'apply' | 'dry-run' }[] = [
@@ -612,7 +653,7 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-ident
 
   it('the backtest authority does not bypass the identity requirement on afldb_test', async () => {
     const { projectRoot, label } = setupVoteSnapshot(['CD_M_CORROBORATED_1']);
-    const { sql, state } = makeIdentitySql([], 'afldb_test');
+    const { sql, state } = makeIdentitySql([], ISOLATED_CLI_DATABASE);
 
     const error = await runAflApiBrownlowSettleCli(
       ['--label', label, '--apply', '--auto-apply', '--allow-completed-season-backtest'],
@@ -621,5 +662,593 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-ident
 
     expect(error).toBeInstanceOf(AflApiBrownlowFixtureIdentityRequiredError);
     expect(state.writeBoundaryReached).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// V2-GAP-006 (docs/v2/historical-baseline.md §1-§2, docs/v2/known-gaps.md) — the seal on
+// historical seasons. The season of a settle comes from its snapshot manifest. These tests use
+// the copied REAL data/reference/seasons.json (2025 sealed, 2026 open) and run with the ingestion
+// gates ENABLED, so the seal — not a switch — is what refuses. A sealed-season refusal must come
+// BEFORE any database client is touched. `--validate-only` (offline) and `--report` (read-only)
+// stay allowed. A season outside first..last (SYNTHETIC 2071 here) is not sealed.
+// ---------------------------------------------------------------------------
+
+describe('V2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs', () => {
+  const SEALED_SEASON = 2025;
+  const SYNTHETIC_OPEN_SEASON = 2071;
+  const SEAL_REFUSAL = /season 2025 is sealed historical data .*never rewrite sealed history/;
+  const originalDeploymentEnv = process.env[BROWNLOW_ENABLE_ENV];
+  const BROWNLOW_CONTROLS: AflApiIngestionControls = { currentSeasonEnabled: false, brownlowAdminEnabled: true };
+
+  beforeEach(() => {
+    process.env[BROWNLOW_ENABLE_ENV] = 'true';
+  });
+  afterEach(() => {
+    if (originalDeploymentEnv === undefined) delete process.env[BROWNLOW_ENABLE_ENV];
+    else process.env[BROWNLOW_ENABLE_ENV] = originalDeploymentEnv;
+  });
+
+  function setupMatchSnapshot(season: number): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-match-');
+    const label = 'seal-match-snapshot';
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'matches', label);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({
+      source_key: 'afl_api', acquisition_kind: 'afl_api_match_snapshot', season, files: [],
+    }));
+    return { projectRoot, label };
+  }
+
+  function setupFixturesSnapshot(season: number): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-fixtures-');
+    const label = 'seal-fixtures-snapshot';
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'fixtures', label);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({
+      source_key: 'afl_api', acquisition_kind: AFL_API_FIXTURE_ACQUISITION_KIND, season, files: [],
+    }));
+    return { projectRoot, label };
+  }
+
+  /** A zero-vote Brownlow snapshot (the "nothing published yet" state), as the earlier blocks use. */
+  function setupBrownlowSnapshot(season: number): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-brownlow-');
+    const label = 'seal-brownlow-snapshot';
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'brownlow', label);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({ source_key: 'afl_api', season, files: [] }));
+    writeFileSync(
+      join(snapshotDir, '01-brownlow-season.raw.json'),
+      JSON.stringify({ seasonId: 'CD_S2025014', status: 'COMPLETE', matchVotes: [] }),
+    );
+    writeFileSync(
+      join(snapshotDir, '02-brownlow-leaderboard.raw.json'),
+      JSON.stringify({
+        seasonId: 'CD_S2025014', status: 'COMPLETE', teamFilter: null, leaderboard: [],
+      }),
+    );
+    return { projectRoot, label };
+  }
+
+  it.each(['--dry-run', '--apply', '--apply --auto-apply'])(
+    'settle-afl-api %s refuses a sealed season before the DB path opens, with the ingestion gate ENABLED',
+    async (flags) => {
+      const { projectRoot, label } = setupMatchSnapshot(SEALED_SEASON);
+      const { sql, touched } = makeSqlStub();
+
+      const error = await runAflApiSettleCli(
+        ['--label', label, ...flags.split(' ')],
+        { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(SealedSeasonRefusal);
+      expect(error).toMatchObject({ code: 'season_sealed', season: SEALED_SEASON });
+      expect((error as Error).message).toMatch(SEAL_REFUSAL);
+      expect(touched.value).toBe(false);
+    },
+  );
+
+  it('settle-afl-api without the test-only controls refuses a sealed season before the real control preflight', async () => {
+    const { projectRoot, label } = setupMatchSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+    delete process.env.DATABASE_URL;
+
+    // Without the seal this reaches 'DATABASE_URL is not configured for the control database'.
+    await expect(runAflApiSettleCli(['--label', label, '--dry-run'], { projectRoot, sql }))
+      .rejects.toThrow(SEAL_REFUSAL);
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api --validate-only on a sealed season still succeeds offline', async () => {
+    const { projectRoot, label } = setupMatchSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    );
+
+    expect(outcome.result).toBeNull();
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api --report stays allowed for a sealed season (read-only diagnostics reach the DB path)', async () => {
+    const { projectRoot, label } = setupMatchSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', label, '--report'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  it('settle-afl-api does not seal a season outside first..last (SYNTHETIC 2071): the existing path continues', async () => {
+    const { projectRoot, label } = setupMatchSnapshot(SYNTHETIC_OPEN_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  it.each(['--dry-run', '--apply'])(
+    'settle-afl-api-fixtures %s refuses a sealed season before the DB path opens, with the ingestion gate ENABLED',
+    async (flag) => {
+      const { projectRoot, label } = setupFixturesSnapshot(SEALED_SEASON);
+      const { sql, touched } = makeSqlStub();
+
+      const error = await runAflApiFixturesSettleCli(
+        ['--label', label, flag], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(SealedSeasonRefusal);
+      expect(error).toMatchObject({ code: 'season_sealed', season: SEALED_SEASON });
+      expect((error as Error).message).toMatch(SEAL_REFUSAL);
+      expect(touched.value).toBe(false);
+    },
+  );
+
+  it('settle-afl-api-fixtures --validate-only on a sealed season still succeeds offline', async () => {
+    const { projectRoot, label } = setupFixturesSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    const outcome = await runAflApiFixturesSettleCli(
+      ['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    );
+
+    expect(outcome.counters).toBeNull();
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api-fixtures does not seal a season outside first..last (SYNTHETIC 2071)', async () => {
+    const { projectRoot, label } = setupFixturesSnapshot(SYNTHETIC_OPEN_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiFixturesSettleCli(
+      ['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  it.each(['--dry-run', '--apply', '--observe-only'])(
+    'settle-afl-api-brownlow %s refuses a sealed season before the DB path opens, with BOTH gates ENABLED',
+    async (flag) => {
+      const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
+      const { sql, touched } = makeSqlStub();
+
+      const error = await runAflApiBrownlowSettleCli(
+        ['--label', label, flag], { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS },
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(SealedSeasonRefusal);
+      expect(error).toMatchObject({ code: 'season_sealed', season: SEALED_SEASON });
+      expect((error as Error).message).toMatch(SEAL_REFUSAL);
+      expect(touched.value).toBe(false);
+    },
+  );
+
+  it('settle-afl-api-brownlow --validate-only on a sealed season still succeeds offline', async () => {
+    const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    const outcome = await runAflApiBrownlowSettleCli(
+      ['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS },
+    );
+
+    expect(outcome.result).toBeNull();
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api-brownlow does not seal a season outside first..last (SYNTHETIC 2071)', async () => {
+    const { projectRoot, label } = setupBrownlowSnapshot(SYNTHETIC_OPEN_SEASON);
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  /** Answers only `current_database()`; any other statement or `begin` is the write boundary. */
+  class BacktestWriteBoundary extends Error {}
+  function makeBacktestSql(databaseName: string): { sql: postgres.Sql; boundary: { reached: boolean } } {
+    const boundary = { reached: false };
+    const fn = async (strings: TemplateStringsArray): Promise<unknown[]> => {
+      const text = strings.join('?');
+      if (/current_database\(\)/.test(text)) return [{ name: databaseName }];
+      boundary.reached = true;
+      throw new BacktestWriteBoundary('past the backtest proof');
+    };
+    const begin = async (): Promise<never> => {
+      boundary.reached = true;
+      throw new BacktestWriteBoundary('past the backtest proof');
+    };
+    return { sql: Object.assign(fn, { begin, unsafe: isolatedFacts }) as unknown as postgres.Sql, boundary };
+  }
+
+  it('settle-afl-api-brownlow --allow-completed-season-backtest keeps the afldb_test refusal reason for a sealed season', async () => {
+    const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
+    const { sql, boundary } = makeBacktestSql('afldb_prod');
+
+    const error = await runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply', '--allow-completed-season-backtest'],
+      { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS },
+    ).catch((e: unknown) => e);
+
+    expect(error).not.toBeInstanceOf(SealedSeasonRefusal);
+    expect((error as Error).message).toMatch(/--allow-completed-season-backtest refused: connected database is 'afldb_prod'/);
+    expect(boundary.reached).toBe(false);
+  });
+
+  it('settle-afl-api-brownlow --allow-completed-season-backtest admits a sealed season ONLY after the afldb_test proof, on a logged basis', async () => {
+    const { projectRoot, label } = setupBrownlowSnapshot(SEALED_SEASON);
+    const { sql, boundary } = makeBacktestSql(ISOLATED_CLI_DATABASE);
+    const lines: string[] = [];
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply', '--allow-completed-season-backtest'],
+      { projectRoot, sql, ingestionControls: BROWNLOW_CONTROLS, log: (line) => lines.push(line) },
+    )).rejects.toThrow(BacktestWriteBoundary);
+
+    const output = lines.join('\n');
+    expect(output).toContain(`database: ${ISOLATED_CLI_DATABASE}`);
+    expect(output).toContain("SEALED SEASON 2025 admitted on basis 'test_database_backtest'");
+    expect(output).toContain('not an audited correction');
+    expect(boundary.reached).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// V2-GAP-027 — `--report-out`: the machine-readable reconciliation report.
+//
+// DATA. The snapshot is the hash-bound one built from the committed provider fixtures
+// (tests/afl-api-snapshot-fixture.ts). Every RUN RESULT and EXCEPTION REPORT below is SYNTHETIC:
+// `runSettleAflApi` and `buildSettleExceptionReport` are replaced per test, so no settle runs and
+// no database exists here. They prove the CLI's ordering and failure handling, never a settle.
+// ---------------------------------------------------------------------------
+
+describe('V2-GAP-027 — settle-afl-api --report-out', () => {
+  const NOW = '2026-10-27T01:02:03.000Z';
+  const LABEL = 'gap027-snapshot';
+  const settle = vi.mocked(runSettleAflApi);
+  const exceptionRead = vi.mocked(buildSettleExceptionReport);
+
+  beforeEach(() => {
+    settle.mockClear();
+    exceptionRead.mockClear();
+  });
+
+  function setup(): { projectRoot: string; outDir: string } {
+    const { projectRoot } = makeScratchProject(LABEL, [committedUnit()]);
+    scratchDirs.push(projectRoot);
+    // AFLDB-ISSUE-316: the snapshot settles 2026 as the season IN PROGRESS, so the registry is the explicit
+    // predecessor of the 2026 rollover (the tracked one seals 2026; see the describe at the end of the file).
+    writeFileSync(join(projectRoot, 'data', 'reference', 'seasons.json'), predecessorText('data/reference/seasons.json'));
+    const outDir = join(projectRoot, 'evidence');
+    mkdirSync(outDir);
+    return { projectRoot, outDir };
+  }
+
+  function syntheticCounters(): AflApiSettleCounters {
+    const counters: Record<string, unknown> = {};
+    for (const key of AFL_API_COUNTER_KEYS) {
+      counters[key] = key === 'recordsDeferred' || key === 'seasonFeedStatusCounts' ? {} : 0;
+    }
+    counters.snapshotMatches = 1;
+    counters.canonicalRowsInserted = 3;
+    return counters as unknown as AflApiSettleCounters;
+  }
+
+  function syntheticResult(over: Partial<AflApiSettleRunResult> = {}): AflApiSettleRunResult {
+    return {
+      applied: false, batchId: null, counters: syntheticCounters(), halt: null, rollbackReason: 'dry_run',
+      sourceCompleteness: null, absenceFindings: null, refusalEvidence: [], ...over,
+    };
+  }
+
+  const SYNTHETIC_EXCEPTIONS: SettleExceptionReport = {
+    sourceKey: 'afl_api', season: SEASON, latestBatch: null, unresolvedRecords: [],
+    candidates: { active: [], moot: [] }, applyFailures: [], disagreements: [],
+    findingsTruncated: false, deferredRecords: {},
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const readReport = (path: string): Record<string, any> => JSON.parse(readFileSync(path, 'utf8'));
+
+  it('parses --report-out and refuses it without a path, twice, or outside --dry-run / --apply', () => {
+    expect(parseAflApiSettleArgs(['--label', 'x', '--dry-run']).reportOut).toBeNull();
+    expect(parseAflApiSettleArgs(['--label', 'x', '--report-out', 'r.json', '--apply']).reportOut).toBe('r.json');
+    expect(parseAflApiSettleArgs(['--label', 'x', '--report-out', 'r.json']).reportOut).toBe('r.json'); // default dry run
+    expect(() => parseAflApiSettleArgs(['--label', 'x', '--dry-run', '--report-out'])).toThrow(/needs a file path/);
+    expect(() => parseAflApiSettleArgs(['--label', 'x', '--report-out', '--apply'])).toThrow(/needs a file path/);
+    expect(() => parseAflApiSettleArgs(['--label', 'x', '--report-out', 'a', '--report-out', 'b'])).toThrow(/given twice/);
+    for (const mode of ['--validate-only', '--report']) {
+      expect(() => parseAflApiSettleArgs(['--label', 'x', mode, '--report-out', 'r.json']))
+        .toThrow(/applies only to --dry-run or --apply/);
+    }
+  });
+
+  it.each([
+    ['an existing file (never overwritten)', 'exists', /already exists; reports are never overwritten/],
+    ['a missing parent directory', 'missing-parent', /the parent directory does not exist/],
+    ['a path inside the acquired snapshots', 'in-snapshot', /lies inside the acquired AFL API snapshots/],
+  ])('refuses %s before any connection opens or the settle runs', async (_name, kind, message) => {
+    const { projectRoot, outDir } = setup();
+    const target = kind === 'exists' ? join(outDir, 'report.json')
+      : kind === 'missing-parent' ? join(outDir, 'absent', 'report.json')
+        : join(projectRoot, 'data', 'sources', 'afl_api', 'matches', LABEL, 'report.json');
+    if (kind === 'exists') writeFileSync(target, 'operator file');
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(message);
+
+    expect(touched.value).toBe(false);
+    expect(settle).not.toHaveBeenCalled();
+    if (kind === 'exists') expect(readFileSync(target, 'utf8')).toBe('operator file');
+    else expect(existsSync(target)).toBe(false);
+  });
+
+  it('a sealed-season refusal still comes first and leaves no report file behind', async () => {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-027-sealed-');
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'matches', LABEL);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({
+      source_key: 'afl_api', acquisition_kind: 'afl_api_match_snapshot', season: 2025, files: [],
+    }));
+    const target = join(projectRoot, 'report.json');
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', LABEL, '--dry-run', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS },
+    )).rejects.toThrow(SealedSeasonRefusal);
+    expect(touched.value).toBe(false);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('releases the reserved file when the run fails before it finishes (the real settle on the stub)', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'report.json');
+    const { sql, touched } = makeSqlStub();
+
+    await expect(runAflApiSettleCli(
+      ['--label', LABEL, '--dry-run', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {} },
+    )).rejects.toThrow(SqlStubTouched);
+
+    expect(touched.value).toBe(true);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('writes a valid dry-run report bound to the snapshot manifest, the clock supplied by the caller', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'dry-run.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult());
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--dry-run', '--auto-apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => NOW },
+    );
+
+    expect(outcome.reconciliationReport).toEqual({ path: target, written: true, error: null });
+    const report = readReport(target);
+    expect(validateAflApiReconciliationReport(report)).toEqual([]);
+    expect(report.generatedAt).toBe(NOW);
+    expect(report.source).toEqual({
+      sourceKey: 'afl_api', season: SEASON, snapshotLabel: LABEL,
+      manifestSha256: aflApiSnapshotManifestSha256(join(projectRoot, 'data', 'sources', 'afl_api', 'matches', LABEL)),
+    });
+    expect(report.run).toEqual({ mode: 'dry_run', batchId: null, applied: false, halt: null, rollbackReason: 'dry_run' });
+    expect(report.counters.canonicalRowsInserted).toBe(3);
+    expect(report.exceptions).toBeNull();
+  });
+
+  it('writes an apply report carrying the committed batch and the exception report', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'apply.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult({ applied: true, batchId: '4242', rollbackReason: null }));
+    exceptionRead.mockResolvedValueOnce(SYNTHETIC_EXCEPTIONS);
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--auto-apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => NOW },
+    );
+
+    expect(outcome.report).toEqual(SYNTHETIC_EXCEPTIONS);
+    const report = readReport(target);
+    expect(validateAflApiReconciliationReport(report)).toEqual([]);
+    expect(report.run).toEqual({ mode: 'apply', batchId: '4242', applied: true, halt: null, rollbackReason: null });
+    expect(report.exceptions).toEqual(SYNTHETIC_EXCEPTIONS);
+  });
+
+  it('records a HALT as a run that committed nothing', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'halt.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult({
+      halt: { reason: 'synthetic_halt', detail: { providerMatchId: 'CD_M20260142801' } }, rollbackReason: null,
+    }));
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => NOW },
+    );
+
+    expect(outcome.result?.halt?.reason).toBe('synthetic_halt');
+    const report = readReport(target);
+    expect(validateAflApiReconciliationReport(report)).toEqual([]);
+    expect(report.run).toEqual({
+      mode: 'apply', batchId: null, applied: false,
+      halt: { reason: 'synthetic_halt', detail: { providerMatchId: 'CD_M20260142801' } }, rollbackReason: null,
+    });
+  });
+
+  it('a report that cannot be produced after a commit preserves and states the committed outcome', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'unwritable.json');
+    const { sql } = makeSqlStub();
+    const lines: string[] = [];
+    settle.mockResolvedValueOnce(syntheticResult({ applied: true, batchId: '4243', rollbackReason: null }));
+    exceptionRead.mockResolvedValueOnce(SYNTHETIC_EXCEPTIONS);
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--auto-apply', '--report-out', target],
+      {
+        projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: (line) => lines.push(line),
+        now: () => { throw new Error('synthetic clock failure'); },
+      },
+    );
+
+    expect(outcome.result).toMatchObject({ applied: true, batchId: '4243' });
+    expect(outcome.report).toEqual(SYNTHETIC_EXCEPTIONS);
+    expect(outcome.reconciliationReport).toEqual({ path: target, written: false, error: 'synthetic clock failure' });
+    expect(existsSync(target)).toBe(false);
+    const output = lines.join('\n');
+    expect(output).toContain('Applied as import batch 4243');
+    expect(output).toContain('RECONCILIATION REPORT NOT WRITTEN (synthetic clock failure)');
+    expect(output).toContain('committed import batch 4243 and that commit stands');
+  });
+
+  it('a report that fails its own validator is not written and the outcome is still returned', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'invalid.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult());
+
+    const outcome = await runAflApiSettleCli(
+      ['--label', LABEL, '--dry-run', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => 'not-an-instant' },
+    );
+
+    expect(outcome.result).toMatchObject({ applied: false, rollbackReason: 'dry_run' });
+    expect(outcome.reconciliationReport?.written).toBe(false);
+    expect(outcome.reconciliationReport?.error).toMatch(/failed its own validator \(report\.generatedAt/);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('when the post-commit exception read fails, the committed run is still recorded before the error propagates', async () => {
+    const { projectRoot, outDir } = setup();
+    const target = join(outDir, 'exceptions-failed.json');
+    const { sql } = makeSqlStub();
+    settle.mockResolvedValueOnce(syntheticResult({ applied: true, batchId: '4244', rollbackReason: null }));
+    exceptionRead.mockRejectedValueOnce(new Error('synthetic exception-read failure'));
+
+    await expect(runAflApiSettleCli(
+      ['--label', LABEL, '--apply', '--auto-apply', '--report-out', target],
+      { projectRoot, sql, ingestionControls: ENABLED_CONTROLS, log: () => {}, now: () => NOW },
+    )).rejects.toThrow('synthetic exception-read failure');
+
+    const report = readReport(target);
+    expect(validateAflApiReconciliationReport(report)).toEqual([]);
+    expect(report.run).toMatchObject({ mode: 'apply', batchId: '4244', applied: true });
+    expect(report.exceptions).toBeNull();
+  });
+});
+
+describe('AFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover', () => {
+  const originalDeploymentEnv = process.env[BROWNLOW_ENABLE_ENV];
+  const SEALED_2026 = /season 2026 is sealed historical data .*never rewrite sealed history/;
+  beforeEach(() => { process.env[BROWNLOW_ENABLE_ENV] = 'true'; });
+  afterEach(() => {
+    if (originalDeploymentEnv === undefined) delete process.env[BROWNLOW_ENABLE_ENV];
+    else process.env[BROWNLOW_ENABLE_ENV] = originalDeploymentEnv;
+  });
+
+  /** A scratch root over the TRACKED seasons registry, with one manifest (and, for Brownlow, empty vote files). */
+  function trackedSnapshot(family: 'matches' | 'fixtures' | 'brownlow', season: number): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot(`afldb-issue-316-sealed-${family}-`, 'tracked');
+    const label = `sealed-${family}-snapshot`;
+    const dir = join(projectRoot, 'data', 'sources', 'afl_api', family, label);
+    mkdirSync(dir, { recursive: true });
+    const kind = family === 'matches' ? { acquisition_kind: 'afl_api_match_snapshot' }
+      : family === 'fixtures' ? { acquisition_kind: AFL_API_FIXTURE_ACQUISITION_KIND } : {};
+    writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ source_key: 'afl_api', ...kind, season, files: [] }));
+    if (family === 'brownlow') {
+      writeFileSync(join(dir, '01-brownlow-season.raw.json'),
+        JSON.stringify({ seasonId: 'CD_S2026014', status: 'IN_PROGRESS', matchVotes: [] }));
+      writeFileSync(join(dir, '02-brownlow-leaderboard.raw.json'),
+        JSON.stringify({ seasonId: 'CD_S2026014', status: 'IN_PROGRESS', teamFilter: null, leaderboard: [] }));
+    }
+    return { projectRoot, label };
+  }
+
+  it('the tracked registry declares 2027 in progress, so 2026 is sealed', () => {
+    const registry = JSON.parse(readFileSync(join(REPO_ROOT, 'data', 'reference', 'seasons.json'), 'utf8'));
+    expect(registry.in_progress_seasons).toEqual([2027]);
+    expect(JSON.parse(predecessorText('data/reference/seasons.json')).in_progress_seasons).toEqual([2026]);
+  });
+
+  it.each(['--dry-run', '--apply'])('settle-afl-api %s refuses 2026 before the DB path opens, with ingestion ENABLED', async (flag) => {
+    const { projectRoot, label } = trackedSnapshot('matches', SEASON);
+    const { sql, touched } = makeSqlStub();
+    const error = await runAflApiSettleCli(['--label', label, flag], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SealedSeasonRefusal);
+    expect(error).toMatchObject({ code: 'season_sealed', season: 2026 });
+    expect((error as Error).message).toMatch(SEALED_2026);
+    expect(touched.value).toBe(false);
+  });
+
+  it.each(['--dry-run', '--apply'])('settle-afl-api-fixtures %s refuses 2026 before the DB path opens, with ingestion ENABLED', async (flag) => {
+    const { projectRoot, label } = trackedSnapshot('fixtures', SEASON);
+    const { sql, touched } = makeSqlStub();
+    const error = await runAflApiFixturesSettleCli(['--label', label, flag], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SealedSeasonRefusal);
+    expect(error).toMatchObject({ code: 'season_sealed', season: 2026 });
+    expect(touched.value).toBe(false);
+  });
+
+  it.each(['--dry-run', '--apply', '--observe-only'])('settle-afl-api-brownlow %s refuses 2026 before the DB path opens, with BOTH Brownlow gates on', async (flag) => {
+    const { projectRoot, label } = trackedSnapshot('brownlow', SEASON);
+    const { sql, touched } = makeSqlStub();
+    const error = await runAflApiBrownlowSettleCli(['--label', label, flag],
+      { projectRoot, sql, ingestionControls: { currentSeasonEnabled: false, brownlowAdminEnabled: true } })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SealedSeasonRefusal);
+    expect(error).toMatchObject({ code: 'season_sealed', season: 2026 });
+    expect(touched.value).toBe(false);
+  });
+
+  it('settle-afl-api --validate-only on sealed 2026 still succeeds offline', async () => {
+    const { projectRoot, label } = trackedSnapshot('matches', SEASON);
+    const { sql, touched } = makeSqlStub();
+    const outcome = await runAflApiSettleCli(['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS });
+    expect(outcome.result).toBeNull();
+    expect(touched.value).toBe(false);
+  });
+
+  it('2027, the season in progress, is not sealed: settle-afl-api continues to its DB path', async () => {
+    const { projectRoot, label } = trackedSnapshot('matches', 2027);
+    const { sql, touched } = makeSqlStub();
+    await expect(runAflApiSettleCli(['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS }))
+      .rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
   });
 });

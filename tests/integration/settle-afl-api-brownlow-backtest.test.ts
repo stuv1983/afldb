@@ -291,8 +291,8 @@ beforeAll(async () => {
   // #9's DB-connected half: proves this suite really is running against
   // afldb_test before any test below relies on the authority it grants.
   backtestAuthority = await requireAflApiBrownlowBacktestDatabase(sql);
-  if (backtestAuthority.verifiedDatabase !== 'afldb_test') {
-    throw new Error(`Expected afldb_test, got '${backtestAuthority.verifiedDatabase}'.`);
+  if (backtestAuthority.verifiedDatabase !== decodeURIComponent(new URL(process.env.AFLDB_TEST_DATABASE_URL!).pathname.slice(1))) {
+    throw new Error('Backtest authority does not match the integration target');
   }
 
   await cleanup();

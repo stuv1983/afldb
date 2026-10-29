@@ -9,6 +9,56 @@ It is not affiliated with the AFL.
 The project is currently in closed beta, gated behind an access-code/allowlist mechanism ahead
 of a public launch (see [Status](#project-status)).
 
+## AFLDB V2 (this repository: `D:\dev\afldbV2`, branch `v2/rebuild`)
+
+This checkout is the **AFLDB V2 controlled fork**: a backend strangler rebuild of the
+application described below, seeded from the verified ISSUE-316 cutover worktree at `ff100dc2`
+(see `docs/v2/baseline.md`). It has **no Git remote** and is not deployed anywhere. The execution
+contract is `docs/v2/plan.md`; progress and the resumption point are in `docs/v2/progress.md`;
+decisions are recorded as ADRs in `docs/v2/adr/`; gaps are `V2-GAP-NNN` entries in
+`docs/v2/known-gaps.md`.
+
+**Layout (ADR 0001).** The Next.js app stays at the repository root (logically `apps/web`);
+`tools/current-season/*` with the AFL API systemd units is logically `apps/worker`. New V2 code
+lives in `packages/{domain,db,acquisition,derived,admin,testing}/src/index.ts`, imported only as
+`@afldb/<module>`. Module boundaries are enforced by ESLint (`eslint.config.mjs`) and
+`tests/v2-module-boundaries.test.ts`. See `docs/v2/architecture.md` and `docs/v2/inventory.md`.
+
+**Historical baseline (Stage 2).** Seasons not in progress (today 1897-2025) are a sealed
+baseline that only audited correction workflows may change (`docs/v2/historical-baseline.md`,
+`docs/v2/provenance.md`). `tools/v2/historical-manifest.ts compare` checks two content-free
+manifests offline; its `produce` mode is read-only and has never been run
+(`docs/v2/historical-manifest-spec.md`).
+
+**Local setup with no database.** V2 is developed without any DSN: do not create a `.env` and do
+not copy one from another checkout.
+
+```bash
+npm ci
+NEXT_TELEMETRY_DISABLED=1 npx next typegen && npx tsc --noEmit --incremental false
+env -u DATABASE_URL -u AFLDB_TEST_DATABASE_URL -u AFLDB_TEST_IMPORT_DATABASE_URL npx vitest run --no-cache
+npx eslint --no-cache <changed files>
+```
+
+With no `AFLDB_TEST_DATABASE_URL`, `tests/setup.ts` strips every `*DATABASE_URL*` and libpq
+connection variable from the test process, and the database clients refuse any non-`_test`
+database inside a test process (ADR 0005), so no test can reach a real database.
+
+**Not runnable locally (by design).** The ~85 integration suites under `tests/integration/`
+(they refuse to load without a `_test` database), `npm run build` (prerendering queries the
+database; V2-GAP-002), every migrate/privileges/settle/acquire/rollover command, the systemd
+units, and anything that contacts DEV, production or the AFL API. The regression baseline and
+its pre-existing, environmental failures are recorded in `docs/v2/evidence/baseline-failures.txt`.
+
+**State (all six stages done, 2026-10-19).** V2 is implemented locally and **not deployed**:
+the AFL API pipeline contract (Stage 3), Coleman derivation, Brownlow reconciliation and curated
+awards (Stage 4), the audited operations centre at `/admin/operations` with the legacy admin
+controls refusing (Stage 5), and the shadow rehearsal tooling (Stage 6: `tools/v2/shadow-*.ts`).
+Verdicts (`docs/v2/go-no-go.md`): local development GO; an isolated shadow rehearsal GO only after
+the owner's approvals; production cutover **NO-GO**. Start with `docs/v2/final-report.md`, then
+`docs/v2/shadow-rehearsal.md`, `cutover-runbook.md`, `rollback-runbook.md`,
+`risk-register.md` and `known-gaps.md`. Every command in those runbooks is written, not executed.
+
 ## What AFLDB provides
 
 **Browsing and records**

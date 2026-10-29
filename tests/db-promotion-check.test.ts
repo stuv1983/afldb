@@ -30,6 +30,7 @@ import {
   type TableTreatment,
   DERIVED_FOOTBALL_TABLES,
   EMAIL_BEARING_TABLES,
+  EMPTY_ASSERTED_TABLES,
   ENVIRONMENTS,
   LINEAGE_IDENTITY_SQL,
   PHASES,
@@ -49,6 +50,7 @@ import {
   contractByName,
   databaseOf,
   detectLineageChange,
+  emptyAssertionSql,
   environmentNames,
   isTestFixtureEmail,
   lineageRemapProblems,
@@ -89,6 +91,7 @@ import {
   stagedReinstatementProblems,
   tablesWithTreatment,
   truncateSql,
+  truncateStatementTables,
   truncatedPublicTables,
   withDatabase,
   decodeMatchCoachKey,
@@ -276,6 +279,7 @@ import {
 } from '../src/lib/acquisition/afl-api-adjudication';
 import type { CpcResult } from '../src/lib/acquisition/afl-api-identity-correction';
 import { canonicalJson } from '../src/lib/acquisition/observations';
+import { predecessorJson } from './rollover-predecessor-fixture';
 
 const REPO = process.cwd();
 const MIGRATIONS = join(REPO, 'src', 'db', 'migrations');
@@ -609,7 +613,14 @@ describe('reinstatement order and generated SQL', () => {
 
   it('truncates every non-rebuilt contract table in one statement, without CASCADE', () => {
     const sql = truncateSql();
-    for (const name of truncatedPublicTables()) expect(sql).toContain(`"public"."${name}"`);
+    // AFLDB-ISSUE-322: the one statement names truncateStatementTables(); an empty-asserted table
+    // (brownlow_correction_receipts) is in truncatedPublicTables() but NOT in the statement.
+    const statement = sql.slice(sql.indexOf('TRUNCATE TABLE'), sql.indexOf('RESTART IDENTITY;') + 'RESTART IDENTITY;'.length);
+    for (const name of truncateStatementTables()) expect(statement).toContain(`"public"."${name}"`);
+    for (const { table } of EMPTY_ASSERTED_TABLES) {
+      expect(statement, table).not.toContain(table);
+      expect(truncatedPublicTables(), table).toContain(table);
+    }
     expect(truncatedPublicTables()).not.toContain('canonical_applications');
     expect(sql).not.toContain('canonical_applications');
     expect(sql).not.toMatch(/CASCADE/);
@@ -793,6 +804,229 @@ describe('reinstatement order and generated SQL', () => {
     expect(() => assertPromotionPlanCoherent({
       ...artifacts, reinstate: `${artifacts.reinstate}\npg_restore --schema=staging_aflw "x.dump"\n`,
     })).toThrow(/whole-schema\/TOC order/);
+  });
+
+  // AFLDB-ISSUE-322. brownlow_correction_receipts (migration 116) is reinstated production audit
+  // state whose statement trigger refuses TRUNCATE even when empty. It stays in the contract, the
+  // freeze set and the reinstate list, is left out of the one TRUNCATE statement, and the
+  // transaction instead locks it and refuses unless the candidate copy is already empty. The
+  // trigger is never bypassed, disabled or altered; rows are only ever restored into it.
+  describe('AFLDB-ISSUE-322 — brownlow_correction_receipts is reinstated, locked and asserted empty, never truncated', () => {
+    const RECEIPTS = 'brownlow_correction_receipts';
+    const QUOTED = '"public"."brownlow_correction_receipts"';
+    const { lock: LOCK, assertion: ASSERTION } = emptyAssertionSql(EMPTY_ASSERTED_TABLES[0]);
+    const refusals = (artifacts: ReturnType<typeof generatedPlanArtifacts>, environment: 'prod' | 'dev' = 'prod') =>
+      promotionPlanProblems(artifacts, environment).join('\n');
+
+    it('is classified exactly as the owner decided (reinstate, operations, production-only, equal, order 20)', () => {
+      const t = contractByName(RECEIPTS)!;
+      expect(t, 'brownlow_correction_receipts must have an explicit treatment').toBeDefined();
+      expect(t).toMatchObject({
+        schema: 'public', category: 'operations', productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+      });
+      expect(t.restoreAfter).toBeUndefined();
+      expect(t.footballRefs).toBeUndefined();
+      expect(t.historicalOnly).toBeUndefined();
+      expect(t.note).toContain('AFLDB-ISSUE-322');
+      for (const environment of ['prod', 'dev'] as const) {
+        expect(reinstatedPublicTables(environment), environment).toContain(RECEIPTS);
+        expect(effectiveTreatment(t, environment), environment).toBe('reinstate');
+        expect(effectiveCompare(t, environment), environment).toBe('equal');
+      }
+    });
+
+    it('keeps truncatedPublicTables() unchanged and drops the table only from the TRUNCATE statement list', () => {
+      expect(truncatedPublicTables()).toContain(RECEIPTS);
+      expect(truncateStatementTables()).not.toContain(RECEIPTS);
+      expect(truncatedPublicTables().filter((name) => !truncateStatementTables().includes(name))).toEqual([RECEIPTS]);
+      expect(truncateStatementTables()).toEqual(truncatedPublicTables().filter((name) => name !== RECEIPTS));
+    });
+
+    it('the empty-asserted list is closed and pinned to the migration that created table and trigger', () => {
+      expect(EMPTY_ASSERTED_TABLES.map((entry) => entry.table)).toEqual([RECEIPTS]);
+      const [entry] = EMPTY_ASSERTED_TABLES;
+      expect(entry).toMatchObject({ migration: '116', trigger: 'brownlow_receipt_immutable' });
+      const migration = readFileSync(join(MIGRATIONS, '116_brownlow_correction_receipts.sql'), 'utf8');
+      expect(migration).toContain(`CREATE TABLE ${RECEIPTS} (`);
+      expect(migration).toMatch(/CREATE TRIGGER brownlow_receipt_immutable BEFORE UPDATE OR DELETE OR TRUNCATE\s+ON brownlow_correction_receipts FOR EACH STATEMENT/);
+    });
+
+    it('cannot drift: an empty-asserted table must be a reinstated public contract table', () => {
+      expect(promotionContractProblems()).toEqual([]);
+      const missing = PROMOTION_CONTRACT.filter((t) => t.name !== RECEIPTS);
+      expect(promotionContractProblems(missing).join('\n'))
+        .toContain(`public.${RECEIPTS} is declared empty-asserted but is not a public contract table`);
+      const reset = PROMOTION_CONTRACT.map((t) => (t.name === RECEIPTS ? { ...t, treatment: 'reset' as const, compare: 'zero' as const } : t));
+      expect(promotionContractProblems(reset).join('\n'))
+        .toContain(`public.${RECEIPTS} is declared empty-asserted but is not reinstated`);
+      const twice = [...EMPTY_ASSERTED_TABLES, ...EMPTY_ASSERTED_TABLES];
+      expect(promotionContractProblems(PROMOTION_CONTRACT, REBUILT_REFERRER_FKS, twice).join('\n'))
+        .toContain(`public.${RECEIPTS} is declared empty-asserted more than once`);
+    });
+
+    it('locks the table and asserts it empty after BEGIN and before any destructive statement', () => {
+      const sql = truncateSql();
+      expect(sql).toContain(LOCK);
+      expect(sql).toContain(ASSERTION);
+      expect(LOCK).toBe(`LOCK TABLE ${QUOTED} IN ACCESS EXCLUSIVE MODE;`);
+      expect(ASSERTION).toContain(`IF EXISTS (SELECT 1 FROM ${QUOTED}) THEN`);
+      expect(ASSERTION).toContain('AFLDB-ISSUE-322');
+      expect(ASSERTION).toMatch(/is not empty;.*nothing was emptied/s);
+      const at = {
+        begin: sql.indexOf('BEGIN;'), lock: sql.indexOf(LOCK), assertion: sql.indexOf(ASSERTION),
+        drop: sql.indexOf('DROP CONSTRAINT'), truncate: sql.indexOf('TRUNCATE TABLE'), commit: sql.lastIndexOf('COMMIT;'),
+      };
+      expect(at.begin).toBeGreaterThanOrEqual(0);
+      expect(at.lock).toBeGreaterThan(at.begin);
+      expect(at.assertion).toBeGreaterThan(at.lock);
+      expect(at.drop).toBeGreaterThan(at.assertion);
+      expect(at.truncate).toBeGreaterThan(at.drop);
+      expect(at.commit).toBeGreaterThan(at.truncate);
+      // each appears exactly once: the receipts table is named only in the LOCK and the assertion
+      expect(sql.split(LOCK)).toHaveLength(2);
+      expect(sql.split(ASSERTION)).toHaveLength(2);
+      expect(sql.split(QUOTED)).toHaveLength(3);
+      const statement = sql.slice(at.truncate, sql.indexOf('RESTART IDENTITY;', at.truncate));
+      expect(statement).not.toContain(RECEIPTS);
+    });
+
+    it('never bypasses the trigger: the generated SQL has none of the forbidden constructs', () => {
+      const sql = truncateSql();
+      expect(sql).not.toMatch(/session_replication_role/i);
+      expect(sql).not.toMatch(/DISABLE\s+TRIGGER|ENABLE\s+(?:REPLICA\s+|ALWAYS\s+)?TRIGGER|DROP\s+TRIGGER/i);
+      expect(sql).not.toMatch(/ALTER\s+TABLE\s+"public"\."brownlow_correction_receipts"/);
+      expect(sql).not.toMatch(/DELETE\s+FROM/i);
+      expect(sql).not.toMatch(/\bCASCADE\b/i);
+      // the added text itself carries none of the substrings the validator refuses elsewhere
+      for (const text of [LOCK, ASSERTION]) {
+        for (const word of ['TRUNCATE TABLE', 'RESTART IDENTITY;', 'DELETE FROM', 'CASCADE', 'session_replication_role', 'DISABLE TRIGGER', 'ALTER TABLE']) {
+          expect(text, word).not.toMatch(new RegExp(word, 'i'));
+        }
+      }
+      // TRUNCATE TABLE appears only in the public statement and the staging_aflw schema block
+      expect(sql.split('TRUNCATE TABLE')).toHaveLength(3);
+      expect(sql.indexOf('TRUNCATE TABLE')).toBeGreaterThan(sql.indexOf(ASSERTION));
+    });
+
+    it('the complete generated plan validates in both environments', () => {
+      for (const environment of ['prod', 'dev'] as const) {
+        expect(promotionPlanProblems(generatedPlanArtifacts(environment), environment)).toEqual([]);
+      }
+    });
+
+    it('refuses a plan that re-adds the table to the TRUNCATE list', () => {
+      const artifacts = generatedPlanArtifacts();
+      const readded = artifacts.truncate.replace('TRUNCATE TABLE\n  ', `TRUNCATE TABLE\n  ${QUOTED},\n  `);
+      expect(readded).not.toBe(artifacts.truncate);
+      expect(refusals({ ...artifacts, truncate: readded })).toContain(`names empty-asserted ${QUOTED} in the public TRUNCATE`);
+      expect(() => assertPromotionPlanCoherent({ ...artifacts, truncate: readded })).toThrow(PromotionRefused);
+    });
+
+    it('refuses a plan missing the LOCK, missing the assertion, or carrying either twice', () => {
+      const artifacts = generatedPlanArtifacts();
+      expect(refusals({ ...artifacts, truncate: artifacts.truncate.replace(LOCK, '') }))
+        .toContain(`exactly one LOCK of empty-asserted ${QUOTED}`);
+      expect(refusals({ ...artifacts, truncate: artifacts.truncate.replace(ASSERTION, '') }))
+        .toContain(`exactly one emptiness assertion of ${QUOTED}`);
+      // function replacers throughout: the assertion contains `$$`, which String.replace would collapse
+      expect(refusals({ ...artifacts, truncate: artifacts.truncate.replace(ASSERTION, () => `${ASSERTION}\n${ASSERTION}`) }))
+        .toContain(`exactly one emptiness assertion of ${QUOTED}`);
+      expect(refusals({ ...artifacts, truncate: artifacts.truncate.replace(LOCK, `${LOCK}\n${LOCK}`) }))
+        .toContain(`exactly one LOCK of empty-asserted ${QUOTED}`);
+    });
+
+    it('refuses the assertion before the LOCK, and either one after the TRUNCATE', () => {
+      const artifacts = generatedPlanArtifacts();
+      const ordered = `empty-assertion lifecycle for ${QUOTED} is not ordered BEGIN -> LOCK -> assertion -> destructive work`;
+      const swapped = artifacts.truncate.replace(`${LOCK}\n${ASSERTION}`, () => `${ASSERTION}\n${LOCK}`);
+      expect(swapped).not.toBe(artifacts.truncate);
+      expect(refusals({ ...artifacts, truncate: swapped })).toContain(ordered);
+      const without = artifacts.truncate.replace(`${LOCK}\n${ASSERTION}`, '');
+      const late = without.replace('COMMIT;', () => `${LOCK}\n${ASSERTION}\n\nCOMMIT;`);
+      expect(refusals({ ...artifacts, truncate: late })).toContain(ordered);
+      // after the rebuilt-referrer constraint drop (destructive work) but before the TRUNCATE is also refused
+      const afterDrop = without.replace('TRUNCATE TABLE\n  ', () => `${LOCK}\n${ASSERTION}\nTRUNCATE TABLE\n  `);
+      expect(afterDrop).not.toBe(without);
+      expect(refusals({ ...artifacts, truncate: afterDrop })).toContain(ordered);
+    });
+
+    it('refuses SET session_replication_role and any DISABLE TRIGGER or ALTER TABLE on the table', () => {
+      const artifacts = generatedPlanArtifacts();
+      const bypass = 'truncate lifecycle bypasses a trigger or the session replication role';
+      const replica = artifacts.truncate.replace('BEGIN;', 'BEGIN;\nSET session_replication_role = replica;');
+      expect(refusals({ ...artifacts, truncate: replica })).toContain(bypass);
+      const disable = artifacts.truncate.replace('BEGIN;', `BEGIN;\nALTER TABLE ${QUOTED} DISABLE TRIGGER ALL;`);
+      expect(refusals({ ...artifacts, truncate: disable })).toContain(bypass);
+      expect(refusals({ ...artifacts, truncate: disable })).toContain(`truncate lifecycle alters empty-asserted ${QUOTED}`);
+      const alter = artifacts.truncate.replace('BEGIN;', `BEGIN;\nALTER TABLE ${QUOTED} ADD COLUMN extra text;`);
+      expect(refusals({ ...artifacts, truncate: alter })).toContain(`truncate lifecycle alters empty-asserted ${QUOTED}`);
+      for (const bad of [replica, disable, alter]) {
+        expect(() => assertPromotionPlanCoherent({ ...artifacts, truncate: bad })).toThrow(PromotionRefused);
+      }
+    });
+
+    it('refuses any generated file that truncates, deletes from or updates the table', () => {
+      const artifacts = generatedPlanArtifacts();
+      const phrase = `truncates, deletes from or updates empty-asserted ${QUOTED}`;
+      const mutations = [
+        `\nDELETE FROM ${QUOTED};\n`,
+        `\nUPDATE ${QUOTED} SET result = '{}'::jsonb;\n`,
+        `\nTRUNCATE ${QUOTED};\n`,
+      ];
+      for (const file of ['truncate', 'resyncIdentity', 'auditMarker', 'stage', 'promoteStaged'] as const) {
+        for (const mutation of mutations) {
+          const text = file === 'truncate'
+            ? artifacts.truncate.replace('COMMIT;', () => `${mutation}COMMIT;`)
+            : `${artifacts[file]}${mutation}`;
+          expect(refusals({ ...artifacts, [file]: text }), `${file}: ${mutation.trim()}`).toContain(`${file} ${phrase}`);
+        }
+      }
+    });
+
+    it('refuses a reinstate transcript that drops, duplicates or loosens the data-only restore', () => {
+      const artifacts = generatedPlanArtifacts();
+      const head = 'pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\';
+      const line = `           --single-transaction --exit-on-error --table=${RECEIPTS} '/backups/pre.dump'`;
+      expect(artifacts.reinstate).toContain(`${head}\n${line}\n`);
+      const exactlyOnce = `reinstate must restore empty-asserted ${QUOTED} exactly once with the plain data-only pg_restore line`;
+      expect(refusals({ ...artifacts, reinstate: artifacts.reinstate.replace(`${head}\n${line}\n`, '') })).toContain(exactlyOnce);
+      expect(refusals({ ...artifacts, reinstate: artifacts.reinstate.replace(`${head}\n${line}\n`, `${head}\n${line}\n${head}\n${line}\n`) }))
+        .toContain(exactlyOnce);
+      expect(refusals({ ...artifacts, reinstate: artifacts.reinstate.replace(line, `${line} --clean`) })).toContain(exactlyOnce);
+      expect(refusals({ ...artifacts, reinstate: artifacts.reinstate.replace(head, 'pg_restore --dbname="$CANDIDATE_DSN" --clean --data-only --no-owner --no-privileges \\') }))
+        .toContain('reinstate drops or recreates objects (--clean/--create)');
+      expect(refusals({ ...artifacts, reinstate: artifacts.reinstate.replace(line, `${line} --disable-triggers`) }))
+        .toContain('reinstate bypasses or weakens a constraint');
+    });
+
+    it('the reinstate plan restores the table data-only, once, after the empty-asserting truncate and before any resync', () => {
+      for (const environment of ['prod', 'dev'] as const) {
+        const { reinstate } = generatedPlanArtifacts(environment);
+        const restores = reinstate.split('\n').filter((line) => line.includes(`--table=${RECEIPTS}`));
+        expect(restores, environment).toEqual([
+          `           --single-transaction --exit-on-error --table=${RECEIPTS} '/backups/pre.dump'`,
+        ]);
+        const at = reinstate.indexOf(`--table=${RECEIPTS}`);
+        expect(reinstate.indexOf('-f promotion-truncate.sql')).toBeGreaterThan(0);
+        expect(at).toBeGreaterThan(reinstate.indexOf('-f promotion-truncate.sql'));
+        expect(at).toBeLessThan(reinstate.indexOf('-f promotion-resync-identity.sql'));
+        expect(reinstate).not.toMatch(/--disable-triggers|--clean|--create|session_replication_role|DISABLE\s+TRIGGER/i);
+      }
+    });
+
+    it('the rollback SQL never names the table: it is a terminate and two database renames only', () => {
+      const input = { candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod', preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump' };
+      for (const text of [rollbackSql(input), swapSql(input)]) {
+        expect(text).not.toContain(RECEIPTS);
+        const statements = text.split('\n').filter((l) => !l.startsWith('--') && !l.startsWith('\\set')).join('\n')
+          .split(';').map((s) => s.trim()).filter(Boolean);
+        expect(statements).toHaveLength(3);
+        expect(statements[0]).toMatch(/^SELECT pg_terminate_backend\(pid\)\s+FROM pg_stat_activity\s+WHERE datname IN \('[^']+', '[^']+'\)\s+AND pid <> pg_backend_pid\(\)$/);
+        expect(statements[1]).toMatch(/^ALTER DATABASE "[^"]+" RENAME TO "[^"]+"$/);
+        expect(statements[2]).toMatch(/^ALTER DATABASE "[^"]+" RENAME TO "[^"]+"$/);
+        expect(text).not.toMatch(/TRUNCATE|DELETE|UPDATE|DROP|session_replication_role|TRIGGER/i);
+      }
+    });
   });
 
   it('rejects contradictory dispositions, invalid dependencies and pre-restore FK recreation', () => {
@@ -7107,17 +7341,27 @@ describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
       expect(new Set(keys).size).toBe(keys.length);                             // no silent duplication
     });
 
-    it('a fresh F0 holds 37 tables (36 + external_identities), with a count and a digest for external_identities', async () => {
-      expect(freezeDigestTables()).toHaveLength(37);
+    // 37 -> 39 with migration 111 (AFLDB V2 Stage 4): award_proposals and award_proposal_decisions are
+    // two more reinstated contract tables, so F0 (generated from the contract) now covers 38 + external_identities.
+    // 39 -> 40 with migration 112 (derived_award_results): one more reinstated contract table, 39 + external_identities.
+    // 40 -> 42 with migrations 113 and 114 (AFLDB V2 Launch F): brownlow_eligibility_decisions and
+    // derived_award_projections are two more reinstated contract tables, 41 + external_identities.
+    // 42 -> 43 with migration 116 (AFLDB-ISSUE-322): brownlow_correction_receipts is one more reinstated
+    // contract table, 42 + external_identities. It stays in F0 although the promotion TRUNCATE statement
+    // omits it (truncatedPublicTables() is unchanged; only truncateStatementTables() drops it).
+    it('a fresh F0 holds 43 tables (42 + external_identities), with a count and a digest for external_identities', async () => {
+      expect(freezeDigestTables()).toHaveLength(43);
+      expect(freezeDigestTables().map((t) => t.key)).toContain('public.brownlow_correction_receipts');
+      expect(truncatedPublicTables()).toContain('brownlow_correction_receipts');
       const record = recordFor(baseline());
-      expect(record.tables).toHaveLength(37);
+      expect(record.tables).toHaveLength(43);
       expect(record.tables.find((t) => t.table === IDENT)).toEqual({ table: IDENT, rows: 19321, digest: DIGEST_A });
       // the record is produced by the generic frozen phase from a live read, with no second digest format
       const opts = baseOpts({ phase: 'frozen', database: 'afldb_prod', freezeManifest: join(dir, 'm.json'), freezeRecordOut: join(dir, 'r.json') });
       writeFileSync(opts.freezeManifest!, JSON.stringify(manifest));
       await runFrozenPhase(fakeQuery(frozenDb({ tables: baseline() })), opts, new Report());
       const written = parseFreezeRecord(readFileSync(opts.freezeRecordOut!, 'utf8'), 'prod');
-      expect(written.tables).toHaveLength(37);
+      expect(written.tables).toHaveLength(43);
       expect(written.tables.find((t) => t.table === IDENT)).toMatchObject({ rows: 19321, digest: DIGEST_A });
     });
 
@@ -7177,10 +7421,10 @@ describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
       expect(main.match(/gateFreezeDigest\(/g)).toHaveLength(3);                // the definition, gateFrozenTarget and the freeze-dump phase; never a candidate connection
     });
 
-    it('an old 36-table freeze record fails closed under the current contract (never synthesised, never downgraded)', async () => {
-      const old36 = new Map([...baseline()].filter(([k]) => k !== IDENT));
-      expect(old36.size).toBe(36);
-      const oldRecord = recordFor(old36);
+    it('an old 41-table freeze record fails closed under the current contract (never synthesised, never downgraded)', async () => {
+      const old41 = new Map([...baseline()].filter(([k]) => k !== IDENT));
+      expect(old41.size).toBe(42);                                              // the record minus external_identities (43 - 1, AFLDB-ISSUE-322)
+      const oldRecord = recordFor(old41);
       expect(() => parseFreezeRecord(JSON.stringify(oldRecord), 'prod')).toThrow(/different table set/);
       // even a record object that bypassed the parser is refused by the gate: external_identities is not in it
       const report = new Report();
@@ -9423,7 +9667,10 @@ describe('AFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the 
     const readJson = (p: string) => JSON.parse(readFileSync(join(REPO, p), 'utf8')) as Record<string, unknown>;
     expect(promotionOwnershipCensusScope()).toEqual(rebuildCensusScope(
       readJson('tools/rebuild/fitzroy/fitzroy-contract.json'), readJson('data/reference/seasons.json')));
-    expect(promotionOwnershipCensusScope()).toEqual(SCOPE);
+    // Since the 2026 rollover (AFLDB-ISSUE-316 D-316-1) 2026 is completed and 2027 is excluded; the explicit
+    // predecessor documents still judge 1897-2025, the scope the synthetic gate cases above use.
+    expect(promotionOwnershipCensusScope()).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
+    expect(promotionOwnershipCensusScope(predecessorJson)).toEqual(SCOPE);
     expect(() => promotionOwnershipCensusScope(() => ({}))).toThrow(PromotionRefused);
     // ONE SQL definition: the rebuild/CLI stream EXECUTEs the very text the checker runs.
     const stream = buildAflApiOwnershipCensusSql(SCOPE, 'enforce');

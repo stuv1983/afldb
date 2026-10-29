@@ -1,0 +1,34 @@
+{
+  "database": "afldb_v2_gap029_test",
+  "applied": false,
+  "reason": "Partial source coverage; not promoted as a complete event dataset",
+  "matches": [
+    {
+      "season": 1995,
+      "date": "1995-04-25",
+      "round_code": "4",
+      "home": "collingwood",
+      "away": "essendon",
+      "home_score": 111,
+      "away_score": 111,
+      "venue": "Melbourne Cricket Ground",
+      "match_event": null,
+      "proposedLabel": "Anzac Day",
+      "source": "https://www.collingwoodfc.com.au/news/256176/anzac-day-1995-2017"
+    },
+    {
+      "season": 2021,
+      "date": "2021-06-14",
+      "round_code": "13",
+      "home": "melbourne",
+      "away": "collingwood",
+      "home_score": 63,
+      "away_score": 80,
+      "venue": "Sydney Cricket Ground",
+      "match_event": null,
+      "proposedLabel": "King's Birthday",
+      "source": "https://www.afl.com.au/news/625677/big-freeze-match-moves-to-the-scg",
+      "normalization": "The existing builder uses King’s Birthday as the canonical name for the historical Queen’s Birthday series; source explicitly names the match, not just its calendar date."
+    }
+  ]
+}

@@ -304,7 +304,8 @@ Accepted order:
 7. Only if D1 proves zero canonical inserts and updates and a complete source: **D2–D4**, run the
    match service, then enable the match timer.
 8. **E**, enable the Brownlow timer permanently, with `AFLDB_AFL_API_BROWNLOW_ENABLED` still unset,
-   and prove the no-op path.
+   and prove the no-op path. **DEV only. Superseded for PROD by AFLDB-ISSUE-316** (see the note under
+   "Brownlow timer policy"): on PROD the Brownlow timer stays disabled until C8.
 
 Run as `arm` in `~/projects/afldb` unless a line says `sudo`. Every check is names, counts or
 states only; never print `.env` values.
@@ -314,6 +315,14 @@ states only; never print `.env` values.
 `AFLDB_AFL_API_BROWNLOW_ENABLED` is unset (not `true`). The wrapper checks that first and exits 0
 before reading `seasons.json`, the network or the database. Every firing is then a successful
 no-op. It is not enabled "at the next count"; E2 (leave it disabled until then) is rejected.
+
+**Superseded for PROD by AFLDB-ISSUE-316 (2026-10-19): the Brownlow timer stays disabled until C8.**
+"Permanently enabled" was the DEV decision of 2026-10-01 and was carried out on DEV. It does **not**
+authorise enabling the timer on PROD at C3 or at any step before C8. For PROD,
+`issues/open/AFLDB-ISSUE-316.md` §7 governs: C3 installs the units inert, and both AFL API timers stay
+`disabled` and `inactive` through C3, C4, C4b and C5. The Brownlow timer is enabled for the first time at
+C8 (count week), with the count-window chain below, when the owner opens the window. An operator following
+this runbook on PROD must stop after section C and must not run section E at C3.
 
 ### A. Read-only before-state
 
@@ -400,6 +409,13 @@ systemctl show afldb-settle-afl-api.service afldb-settle-afl-api-brownlow.servic
 
 Expected: repository and installed hashes pair up; both `LoadState=loaded`, `inactive`. Reload the
 panel: both rows leave "Not installed" (when `AFLDB_SETTLE_TRIGGER=systemd`).
+
+**On PROD (AFLDB-ISSUE-316 C3) the acceptance is stricter, and covers both timers and both services.** Run
+`systemctl is-enabled afldb-settle-afl-api.timer afldb-settle-afl-api-brownlow.timer` (expect `disabled`
+twice) **and** `systemctl is-active afldb-settle-afl-api.timer afldb-settle-afl-api-brownlow.timer`
+(expect `inactive` twice), and `systemctl show afldb-settle-afl-api.service afldb-settle-afl-api-brownlow.service -p LoadState,ActiveState`
+(expect `loaded` and `inactive` for each). Any other answer, in particular an enabled or active Brownlow
+timer, is a failure of C3.
 
 **C result: PASSED on DEV, 2026-10-01** (revision `6661eb66`, operator-run).
 - All four unit files are installed, and the repository and installed hashes match.
@@ -751,6 +767,9 @@ D4. Only then: `sudo systemctl enable --now afldb-settle-afl-api.timer && system
 afldb-settle-afl-api.timer --no-pager`.
 
 ### E. Brownlow unit outside the count window (E1)
+
+**DEV only. Do not run this section on PROD at C3.** AFLDB-ISSUE-316 supersedes "permanently enabled" for
+PROD: the Brownlow timer stays disabled until C8 (see "Brownlow timer policy" above).
 
 `AFLDB_AFL_API_BROWNLOW_ENABLED` stays unset. Do not run the full chain now: it would write 2026
 votes into `afldb_dev`, which needs its own decision.

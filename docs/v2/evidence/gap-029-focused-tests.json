@@ -1,0 +1,68 @@
+{
+ "generated": "2026-10-20",
+ "head": "642011c3",
+ "database": "afldb_v2_rb_final_test (guarded isolated PG16)",
+ "mode": "strict (AFLDB_GRIDLEY_DIAGNOSTIC unset)",
+ "totals": {
+  "tests": 1383,
+  "passed": 1374,
+  "failed": 2,
+  "skipped": 7
+ },
+ "files": [
+  {
+   "file": "tests/gridley-compat.test.ts",
+   "tests": 56,
+   "passed": 56,
+   "failed": 0,
+   "skipped": 0
+  },
+  {
+   "file": "tests/integration/club-comparison-route.test.ts",
+   "tests": 29,
+   "passed": 29,
+   "failed": 0,
+   "skipped": 0
+  },
+  {
+   "file": "tests/integration/gridley-corpus.test.ts",
+   "tests": 1206,
+   "passed": 1204,
+   "failed": 2,
+   "skipped": 0
+  },
+  {
+   "file": "tests/integration/home-records.test.ts",
+   "tests": 4,
+   "passed": 4,
+   "failed": 0,
+   "skipped": 0
+  },
+  {
+   "file": "tests/integration/nl-answers-cross-domain.test.ts",
+   "tests": 22,
+   "passed": 22,
+   "failed": 0,
+   "skipped": 0
+  },
+  {
+   "file": "tests/integration/release-gates.test.ts",
+   "tests": 66,
+   "passed": 59,
+   "failed": 0,
+   "skipped": 7
+  }
+ ],
+ "failures": [
+  {
+   "file": "tests/integration/gridley-corpus.test.ts",
+   "name": "Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode",
+   "message": "AssertionError: expected [ 'anzac-playedin-1', …(5) ] to deeply equal []"
+  },
+  {
+   "file": "tests/integration/gridley-corpus.test.ts",
+   "name": "Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells",
+   "message": "AssertionError: expected [ …(40) ] to deeply equal []"
+  }
+ ]
+}

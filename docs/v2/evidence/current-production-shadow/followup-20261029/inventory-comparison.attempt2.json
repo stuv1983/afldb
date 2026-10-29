@@ -1,0 +1,67 @@
+{
+  "decision": "D-V2-CURRENT-SHADOW-FOLLOWUP-1",
+  "item": "3 (attempt 2: additions derived from complete manifests; space-truncation of the recorded diff reproduced)",
+  "inputs": {
+    "diff": "/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/src-vs-c478c31b-manifest.diff",
+    "s2Manifest": "/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/src.files.sha256",
+    "inventory": "/home/arm/afldb-v2-linuxverify-20261028T0310Z/xfer/inputs.sha256",
+    "verifiedManifest": "/home/arm/afldb-v2-linuxverify-20261028T0310Z/evidence/src-c478c31b.files.sha256",
+    "currentRehash": "/home/arm/afldb-v2-currentshadow-20261028T192336Z/followup/evidence/src-rehash.sha256",
+    "tarList": "/home/arm/afldb-v2-currentshadow-20261028T192336Z/followup/evidence/inputs-tar.list"
+  },
+  "counts": {
+    "s2ManifestFiles": 3722,
+    "verifiedManifestFiles": 2939,
+    "additions": 783,
+    "additionsWithSpaces": 5,
+    "missingFromS2": 0,
+    "changedVsVerified": 0,
+    "recordedDiffLines": 783,
+    "inventoryEntries": 785,
+    "tarMembers": 785,
+    "additionsMatchedToInventoryPathAndHash": 783,
+    "additionsHashMismatch": 0,
+    "additionsNotInInventory": 0,
+    "additionsChangedSinceS2": 0,
+    "additionsOnShadowPaths": 0,
+    "inventoryEntriesNotAmongAdditions": 2
+  },
+  "recordedDiffReproduced": true,
+  "tarEqualsInventory": true,
+  "additionsWithSpaces": [
+    "data/sources/Hall of Fame/Coach inductees.csv",
+    "data/sources/Hall of Fame/Legends.csv",
+    "data/sources/Hall of Fame/Player inductees.csv",
+    "data/sources/Hall of Fame/Umpires.csv",
+    "data/sources/representative teams/VFLAFL_Team_of_the_Century.csv"
+  ],
+  "additionsByDirectory": {
+    "data/records/first-kick-goal.csv": 1,
+    "data/sources/All-Australian_team": 71,
+    "data/sources/Hall of Fame": 4,
+    "data/sources/afl_api": 16,
+    "data/sources/afltables": 311,
+    "data/sources/draftguru": 379,
+    "data/sources/representative teams": 1
+  },
+  "hashMismatch": [],
+  "notInInventory": [],
+  "rehashChanged": [],
+  "missingFromS2": [],
+  "changedVsVerified": [],
+  "inventoryNotAdded": [
+    {
+      "path": "data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv",
+      "inVerifiedManifest": true,
+      "verifiedHashEqualsInventory": true,
+      "s2HashEqualsInventory": true
+    },
+    {
+      "path": "data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv",
+      "inVerifiedManifest": true,
+      "verifiedHashEqualsInventory": true,
+      "s2HashEqualsInventory": true
+    }
+  ],
+  "explained": true
+}

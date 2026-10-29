@@ -1,0 +1,8 @@
+# Later repository metadata; not original execution evidence or a historical manifest member.
+# Retained evidence must keep its exact materialised bytes on every platform.
+* -text !eol
+# Archival patches contain nested diff context, including historical whitespace.
+# Treat them as byte data; SHA-256 and exact tree reconstruction validate them.
+activation-separation.patch -diff
+# Raw final test output is retained as byte evidence.
+FINAL-VITEST.log -diff

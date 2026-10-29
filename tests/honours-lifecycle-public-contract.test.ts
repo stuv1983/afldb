@@ -58,6 +58,42 @@ const ACTIVE = /status = 'active'/g;
 const count = (text: string, pattern: RegExp): number => (text.match(pattern) ?? []).length;
 
 /**
+ * Lifecycle predicates that belong to an HONOURS table.
+ *
+ * Since AFLDB-ISSUE-167 the special-record tables (`player_achievements`, `after_siren_kicks`)
+ * carry the same `status = 'active'` predicate, so counting every occurrence over-counts, and an
+ * extra special-record filter could mask a missing honours filter. Each predicate is attributed
+ * to a table: a qualified `x.status` to the table that `x` is bound to (the nearest preceding
+ * `FROM|JOIN <table> x`, else the nearest following one, for fragments built before their FROM);
+ * an unqualified `status` to the nearest preceding `FROM|JOIN <table>`. Only predicates
+ * attributed to an honours table are counted; the rest are returned for the second contract.
+ */
+function lifecyclePredicates(text: string): { honours: number; other: string[] } {
+  const bindings = [...text.matchAll(/(?:FROM|JOIN)\s+([a-z_][a-z0-9_.]*)(?:\s+(?:AS\s+)?([a-z_][a-z0-9_]*))?/g)]
+    .map((m) => ({ at: m.index ?? 0, table: m[1], alias: m[2] ?? null }));
+  const isHonours = (table: string) => new RegExp(`^(?:${HONOUR_TABLES})$`).test(table);
+  let honours = 0;
+  const other: string[] = [];
+  for (const m of text.matchAll(/(?:\b([a-z_][a-z0-9_]*)\.)?status = 'active'/g)) {
+    const at = m.index ?? 0;
+    const alias = m[1];
+    let table: string | undefined;
+    if (alias) {
+      const same = bindings.filter((b) => b.alias === alias);
+      table = (same.filter((b) => b.at < at).pop() ?? same.find((b) => b.at > at))?.table;
+    } else {
+      table = bindings.filter((b) => b.at < at).pop()?.table;
+    }
+    if (table && isHonours(table)) honours += 1;
+    else other.push(table ?? '(unbound)');
+  }
+  return { honours, other };
+}
+
+/** Tables other than the honours tables that legitimately carry a lifecycle `status` (ISSUE-167). */
+const OTHER_LIFECYCLE_TABLES = new Set(['player_achievements', 'after_siren_kicks']);
+
+/**
  * Every module that reads one of the three tables as a FOOTBALL FACT, and what
  * it is for. Anything scanning these tables and absent from this list is
  * either an operational reader (below) or an unaudited consumer.
@@ -88,10 +124,14 @@ describe('public read model excludes voided honours records (AFLDB-ISSUE-165 §4
     // A consumer that stopped reading these tables altogether would pass
     // vacuously, so the list is pinned as non-empty too.
     expect(scans, `${file.join('/')} no longer scans any honours table`).toBeGreaterThan(0);
+    const predicates = lifecyclePredicates(text);
     expect(
-      count(text, ACTIVE),
-      `${file.join('/')} scans ${scans} honours table(s) but carries fewer lifecycle filters`,
+      predicates.honours,
+      `${file.join('/')} scans ${scans} honours table(s) but carries a different number of honours lifecycle filters`,
     ).toBe(scans);
+    // Every lifecycle predicate is accounted for: honours, or a known special-record table.
+    expect(predicates.honours + predicates.other.length).toBe(count(text, ACTIVE));
+    expect(predicates.other.filter((t) => !OTHER_LIFECYCLE_TABLES.has(t))).toEqual([]);
   });
 
   it('names every module that scans the three tables, so the list cannot go stale', () => {

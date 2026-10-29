@@ -1,0 +1,392 @@
+import {
+  BROWNLOW_ELIGIBILITY_RULES,
+  BROWNLOW_FINDING_SEVERITIES,
+  type BrownlowEligibilityRule,
+  type BrownlowFinding,
+  type BrownlowReconciliationReport,
+} from '@afldb/derived';
+
+import type { BrownlowStagingEvidence } from '@/db/queries/brownlow-reconciliation-inputs';
+
+import { formatInstant } from '../format';
+
+/**
+ * Pure presentation of the read-only Brownlow reconciliation (AFLDB V2 Stage 5, plan D9; ADR 0007).
+ * The report is EVIDENCE: it compares staged AFL API votes with the stored authoritative totals and
+ * states a leader only when the determination is `determined`. It never states a "winner", and a
+ * player appears by stable id only.
+ */
+
+const RULE_LABELS: Record<BrownlowEligibilityRule, string> = {
+  unrecorded: 'Unrecorded (default): an ineligible vote-getter refuses the leader determination',
+  stored_eligible_rank_one: 'Stored-table rule: ineligible players excluded, highest eligible total leads',
+};
+
+const OUTCOME_LABELS = { reconciled: 'Reconciled', discrepancies: 'Discrepancies found', refused: 'Refused' } as const;
+
+/**
+ * The raw totals' `eligible` is the report's FOLDED EVIDENCE FLAG (BrownlowPlayerTotal), not an
+ * eligibility status: true only means no source marks the player ineligible. Worded as evidence so
+ * it is never read against the ADR 0014 determination, which can say "unknown (not recorded)".
+ */
+const EVIDENCE_FLAG_WORDS = {
+  true: 'not marked ineligible',
+  false: 'marked ineligible',
+  null: 'provider flag unknown',
+} as const;
+
+/** The most findings listed row by row; every finding is still counted. */
+export const FINDINGS_ROW_LIMIT = 100;
+
+export function BrownlowCaveats({ staging = null }: { staging?: BrownlowStagingEvidence | null }) {
+  const staged = staging !== null && staging.leaderboard.staged;
+  const mapped = staging !== null && staging.teamMapping.state === 'derived';
+  return (
+    <section className="section" id="brownlow-caveats" aria-labelledby="brownlow-caveats-heading">
+      <h2 id="brownlow-caveats-heading">Read this first</h2>
+      <p className="notice" data-caveat="eligibility-rule">
+        <strong>The medal uses audited eligibility evidence (ADR 0014).</strong> The diagnostic{' '}
+        reconciliation has a separate default{' '}
+        <span className="mono">unrecorded</span> rule therefore refuses to state a leader whenever an
+        ineligible player polled votes. The <span className="mono">stored_eligible_rank_one</span>{' '}
+        rule reproduces the convention measured on the stored AFL Tables table; it is applied only if
+        you choose it, and choosing it here decides nothing: the reconciliation writes nothing. The medal
+        determination on this page decides eligibility from its own evidence (ADR 0014), not from this rule.
+      </p>
+      {staged || mapped ? (
+        <p className="notice" data-caveat="leaderboard-staged">
+          <strong>{staged ? 'The API leaderboard is staged (V2-GAP-023).' : 'The API leaderboard is not staged for this season.'}</strong>{' '}
+          {staged
+            ? 'The leaderboard comparison below is made against the leaderboard the provider published.'
+            : 'The leaderboard comparison reads not supplied.'}{' '}
+          {mapped
+            ? 'Club consistency is checked through a provider-team-to-club mapping derived from the committed identities and corroborated by the fixtures (below).'
+            : 'The provider-team-to-club mapping was not derived, so club consistency is reported as unverifiable (informational); the reason is shown below.'}
+        </p>
+      ) : (
+        <p className="notice" data-caveat="leaderboard-not-staged">
+          <strong>The API leaderboard is not staged (F-WB1-005).</strong> Until the Brownlow settle
+          stages a leaderboard for the season the leaderboard comparison reads <em>not supplied</em>, and
+          until a provider team to club mapping is derived, club consistency is reported as
+          unverifiable (informational). A reconciled season is reconciled against the round votes and
+          the stored totals only.
+        </p>
+      )}
+    </section>
+  );
+}
+
+export function BrownlowSeasonPicker({
+  season, rule, seasonError,
+}: {
+  season: number | null;
+  rule: BrownlowEligibilityRule;
+  seasonError: string | null;
+}) {
+  return (
+    <section className="section" id="brownlow-picker" aria-labelledby="brownlow-picker-heading">
+      <h2 id="brownlow-picker-heading">Choose a season</h2>
+      <form method="get" action="/admin/operations/brownlow">
+        <div className="filter-grid">
+          <div>
+            <label htmlFor="brownlow-season">Season</label>
+            <input
+              id="brownlow-season"
+              name="season"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{4}"
+              maxLength={4}
+              placeholder="YYYY"
+              defaultValue={season ?? ''}
+              aria-invalid={seasonError !== null}
+            />
+            {seasonError !== null && <p className="muted" role="alert" data-field-error="season">{seasonError}</p>}
+          </div>
+          <div>
+            <label htmlFor="brownlow-rule">Eligibility rule</label>
+            <select id="brownlow-rule" name="rule" defaultValue={rule}>
+              {BROWNLOW_ELIGIBILITY_RULES.map((value) => (
+                <option key={value} value={value}>{RULE_LABELS[value]}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="filter-actions">
+          <button className="btn" type="submit">Reconcile (read-only)</button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function detailText(finding: BrownlowFinding): string {
+  const entries = Object.entries(finding.detail);
+  return entries.length === 0 ? '—' : entries.map(([key, value]) => `${key}=${value === null ? 'null' : String(value)}`).join(', ');
+}
+
+export function BrownlowStagingView({ staging }: { staging: BrownlowStagingEvidence }) {
+  const board = staging.leaderboard;
+  const mapping = staging.teamMapping;
+  return (
+    <section className="section" id="brownlow-staging" aria-labelledby="brownlow-staging-heading" data-brownlow-staging="true">
+      <h2 id="brownlow-staging-heading">Staged leaderboard and club mapping</h2>
+      <p className="section-note">
+        Evidence only, read from the observation spine and the fixtures. Nothing here is written, and the
+        club findings are never suppressed: a team the mapping cannot show consistent keeps its{' '}
+        <span className="mono">club_unverifiable</span> finding.
+      </p>
+      <dl className="audit-kv">
+        <dt>Leaderboard</dt>
+        <dd data-staging-leaderboard={board.staged ? 'staged' : 'not-staged'}>
+          {board.staged
+            ? `${board.entries} entries (status ${board.status ?? 'not recorded'}), ${board.ineligibleEntries} marked ineligible by the provider, ${board.winnerEntries} marked winner${board.unknownEligibilityEntries > 0 ? `, ${board.unknownEligibilityEntries} with unknown eligibility (absent, null or not a boolean; neither eligible nor ineligible)` : ''}`
+            : 'not staged'}
+        </dd>
+        <dt>Unresolved leaderboard players</dt>
+        <dd>{board.unresolvedPlayers}</dd>
+        <dt>Players no longer listed</dt>
+        <dd>{board.absentEntries}</dd>
+        <dt>Provider-team mapping</dt>
+        <dd data-staging-mapping={mapping.state}>
+          {mapping.state === 'derived' && `derived: ${mapping.entries.length} teams, corroborated by ${mapping.fixtureMatches} fixtures`}
+          {mapping.state === 'refused' && `refused: ${mapping.refusals.length} problem(s), no mapping applied`}
+          {mapping.state === 'not_attempted' && mapping.reason === 'no_identities_supplied' && 'not attempted: no committed identities supplied'}
+          {mapping.state === 'not_attempted' && mapping.reason === 'no_votes_staged' && 'not attempted: no API votes are staged'}
+          {mapping.state === 'not_attempted' && mapping.reason === 'identities_unavailable' && `not attempted: the committed identities could not be read (${mapping.error})`}
+        </dd>
+      </dl>
+      {mapping.state === 'derived' && (
+        <details>
+          <summary>Inspect the {mapping.entries.length} mapped teams</summary>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Provider team</th>
+                  <th scope="col">Club history name</th>
+                  <th scope="col" className="num">Club id</th>
+                  <th scope="col" className="num">Fixture slots agreeing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mapping.entries.map((entry) => (
+                  <tr key={entry.providerTeamId}>
+                    <td className="mono">{entry.providerTeamId}</td>
+                    <td>{entry.legacyClubHist}</td>
+                    <td className="num">{entry.clubId}</td>
+                    <td className="num">{entry.corroboratingSlots}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {mapping.uncorroborated.length > 0 && (
+            <p className="section-note">No fixture corroborates: {mapping.uncorroborated.join(', ')}.</p>
+          )}
+        </details>
+      )}
+      {mapping.state === 'refused' && (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Provider team</th>
+                <th scope="col">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mapping.refusals.map((refusal, index) => (
+                <tr key={`${refusal.code}-${index}`}>
+                  <td className="mono">{refusal.code}</td>
+                  <td className="mono">{refusal.providerTeamId ?? '\u2014'}</td>
+                  <td className="mono" style={{ overflowWrap: 'anywhere' }}>{refusal.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function BrownlowReportView({
+  report, staging = null,
+}: { report: BrownlowReconciliationReport; staging?: BrownlowStagingEvidence | null }) {
+  const presentation = report.awardResultPresentation;
+  const evidence = report.source.evidence;
+  const bySeverity = BROWNLOW_FINDING_SEVERITIES.map((severity) => (
+    [severity, report.findings.filter((finding) => finding.severity === severity).length] as const
+  ));
+  const shown = report.findings.slice(0, FINDINGS_ROW_LIMIT);
+  const comparisons = report.rawVotes.comparisons;
+
+  return (
+    <div data-brownlow-report={report.source.season}>
+      <section className="section" id="brownlow-outcome" aria-labelledby="brownlow-outcome-heading">
+        <h2 id="brownlow-outcome-heading">Season {report.source.season}: {OUTCOME_LABELS[report.outcome]}</h2>
+        {evidence.matchVoteRecords === 0 && (
+          <p className="notice" data-api-votes-absent="true">
+            No API match votes are staged for this season. This diagnostic cannot establish API
+            agreement. The medal determination above may use the authoritative historical season
+            totals; missing API evidence does not change those raw votes.
+          </p>
+        )}
+        <dl className="audit-kv">
+          <dt>Outcome</dt>
+          <dd><span className={report.outcome === 'reconciled' ? 'badge' : 'badge badge-warn'}>{OUTCOME_LABELS[report.outcome]}</span></dd>
+          <dt>Season state</dt>
+          <dd>{report.source.seasonState === 'complete' ? 'complete' : 'in progress'}</dd>
+          <dt>Generated</dt>
+          <dd>{formatInstant(report.generatedAt)}</dd>
+          <dt>Match vote records</dt>
+          <dd>{evidence.matchVoteRecords} across {evidence.contextMatches} context matches</dd>
+          <dt>API leaderboard</dt>
+          <dd>{evidence.leaderboardEntries === null ? 'not supplied' : `${evidence.leaderboardEntries} entries`}{report.source.leaderboardStatus === null ? '' : ` (status ${report.source.leaderboardStatus})`}</dd>
+          <dt>Stored totals</dt>
+          <dd>{evidence.storedRows === null ? 'not supplied' : `${evidence.storedRows} rows`}</dd>
+          <dt>Evidence basis</dt>
+          <dd className="mono">{report.rawVotes.basis ?? 'none'}</dd>
+        </dl>
+      </section>
+
+      <section className="section" id="brownlow-result" aria-labelledby="brownlow-result-heading">
+        <h2 id="brownlow-result-heading">Award-result presentation</h2>
+        <p className="section-note">
+          A leader is stated only when the status is <span className="mono">determined</span>. This is
+          presentation of the evidence under the chosen rule, not a recorded award.
+        </p>
+        <dl className="audit-kv">
+          <dt>Status</dt>
+          {/* V2-GAP-038: long status tokens wrap instead of widening the page at 390px. */}
+          <dd style={{ overflowWrap: 'anywhere' }}><span className="mono">{presentation.status}</span>{presentation.refusalCode === null ? '' : <> (<span className="mono">{presentation.refusalCode}</span>)</>}</dd>
+          <dt>Eligibility rule</dt>
+          <dd className="mono" style={{ overflowWrap: 'anywhere' }}>{presentation.eligibilityRule}</dd>
+          <dt>Leaders</dt>
+          <dd>
+            {presentation.leaders.length === 0
+              ? 'none stated'
+              : presentation.leaders.map((leader) => `player ${leader.playerId} (${leader.votes} votes)`).join(', ')}
+            {presentation.tie === true && ' — a tie, joint leaders'}
+          </dd>
+          <dt>Note</dt>
+          <dd>{presentation.note}</dd>
+        </dl>
+      </section>
+
+      <section className="section" id="brownlow-comparisons" aria-labelledby="brownlow-comparisons-heading">
+        <h2 id="brownlow-comparisons-heading">Comparisons</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Comparison</th>
+                <th scope="col">State</th>
+                <th scope="col" className="num">Compared</th>
+                <th scope="col" className="num">Mismatches</th>
+              </tr>
+            </thead>
+            <tbody>
+              {([
+                ['Round votes against the API leaderboard', comparisons.leaderboard],
+                ['Round votes against the stored totals', comparisons.stored],
+                ['The stored totals against themselves', comparisons.storedInternal],
+              ] as const).map(([label, summary]) => (
+                <tr key={label}>
+                  <th scope="row">{label}</th>
+                  <td className="mono">{summary.state}</td>
+                  <td className="num">{summary.compared}</td>
+                  <td className="num">{summary.mismatches}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {staging !== null && <BrownlowStagingView staging={staging} />}
+
+      <section className="section" id="brownlow-findings" aria-labelledby="brownlow-findings-heading">
+        <h2 id="brownlow-findings-heading">Findings by severity</h2>
+        <ul className="ruled-list" aria-label="Finding counts by severity">
+          {bySeverity.map(([severity, count]) => (
+            <li key={severity}><span className="mono">{severity}</span>: {count}</li>
+          ))}
+        </ul>
+        {report.findings.length === 0 ? (
+          <p className="muted">No findings.</p>
+        ) : (
+          <details>
+            <summary>Inspect {report.findings.length} diagnostic findings</summary>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Code</th>
+                    <th scope="col">Severity</th>
+                    <th scope="col">Provider match</th>
+                    <th scope="col" className="num">Player id</th>
+                    <th scope="col">Detail</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((finding, index) => (
+                    <tr key={`${finding.code}-${index}`}>
+                      <td className="mono">{finding.code}</td>
+                      <td><span className={finding.severity === 'info' ? 'badge' : 'badge badge-warn'}>{finding.severity}</span></td>
+                      <td className="mono">{finding.providerMatchId ?? '—'}</td>
+                      <td className="num">{finding.playerId ?? '—'}</td>
+                      <td className="mono" style={{ overflowWrap: 'anywhere' }}>{detailText(finding)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {report.findings.length > shown.length && (
+              <p className="section-note">Showing the first {shown.length} of {report.findings.length} findings.</p>
+            )}
+          </details>
+        )}
+      </section>
+
+      <section className="section" id="brownlow-top" aria-labelledby="brownlow-top-heading">
+        <h2 id="brownlow-top-heading">Raw vote totals</h2>
+        <p className="section-note">
+          The highest raw totals over every vote-getter, ineligible players included. These are what
+          the sources said, not an award result.
+        </p>
+        <p className="section-note" data-evidence-flag-note>
+          The last column is the reconciliation&apos;s evidence flag: whether any source marks the player
+          ineligible. It is not an eligibility status; the &quot;Medal determination&quot; section gives that.
+        </p>
+        {report.rawVotes.topVoteGetters.length === 0 ? (
+          <p className="muted">No vote totals could be formed.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" className="num">Player id</th>
+                  <th scope="col" className="num">Votes</th>
+                  <th scope="col">Ineligibility evidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.rawVotes.topVoteGetters.map((entry) => (
+                  <tr key={entry.playerId}>
+                    <td className="num">{entry.playerId}</td>
+                    <td className="num">{entry.votes}</td>
+                    <td data-evidence-flag={String(entry.eligible)}>{EVIDENCE_FLAG_WORDS[String(entry.eligible) as 'true' | 'false' | 'null']}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="section-note">{report.rawVotes.playerTotals.length} players have a total in this report.</p>
+      </section>
+    </div>
+  );
+}

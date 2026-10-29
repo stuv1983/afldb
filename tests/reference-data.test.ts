@@ -12,6 +12,8 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { rebuildCensusScope } from '../src/lib/rollover/afl-api-ownership-census';
+import { predecessorJson } from './rollover-predecessor-fixture';
 
 import { describe, expect, it } from 'vitest';
 
@@ -44,6 +46,41 @@ const statAvail = readJson('stat-availability.json');
 const venueCanonical = readJson('venue-canonical.json');
 const sourceFamiliesRaw = readJson('source-families.json');
 const aflApiIdentities = readJson('afl-api-identities.json');
+
+describe('ISSUE-316 ladder-season-scope reference fixtures', () => {
+  const contract = (last: number, excluded: number[]) => ({ full_history: {
+    season_range: { first_season: 1897, last_season: last }, current_season_excluded: { seasons: excluded },
+  } });
+  // The explicit predecessor of the 2026 rollover (2026 in progress); the tracked file is the successor's.
+  const predecessorSeasons = predecessorJson('data/reference/seasons.json');
+  it('keeps the predecessor out-of-range exclusion and active pending season unchanged', () => {
+    expect(rebuildCensusScope(contract(2025, [2026]), predecessorSeasons)).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
+    expect(predecessorSeasons.in_progress_seasons).toEqual([2026]);
+  });
+  it('included all 2026 football only in explicit synthetic completed metadata before the rollover', () => {
+    const candidate = { ...structuredClone(predecessorSeasons), in_progress_seasons: [], _rehearsal_only: 'synthetic C2 football-complete fixture' };
+    expect(rebuildCensusScope(contract(2026, []), candidate)).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [] });
+    expect(predecessorSeasons.in_progress_seasons).toEqual([2026]);
+  });
+  it('includes all 2026 football in the tracked successor state, with 2027 the excluded in-progress season (D-316-1)', () => {
+    const tracked = JSON.parse(readFileSync(join(root, 'tools/rebuild/fitzroy/fitzroy-contract.json'), 'utf8'));
+    expect(seasons.in_progress_seasons).toEqual([2027]);
+    expect(rebuildCensusScope(tracked, seasons)).toEqual({ firstSeason: 1897, lastSeason: 2026, excludedSeasons: [2027] });
+    // Sealing 2026 football accepts no Brownlow: all three 2026 Brownlow keys stay pending.
+    const pending = statAvail.coverage_ranges.filter((s: any) => /brownlow/.test(s.stat_key) && s.first_season === 2026);
+    expect(pending.map((s: any) => [s.stat_key, s.coverage])).toEqual([
+      ['brownlow_match_votes', 'pending'], ['brownlow_round_votes', 'pending'], ['brownlow_season_total', 'pending'],
+    ]);
+  });
+  it.each([[true, true], [true, false], [false, true]])('refuses either in-range incomplete declaration (%s/%s)', (referencePending, excluded) => {
+    expect(() => rebuildCensusScope(contract(2026, excluded ? [2026] : []), { ...predecessorSeasons, in_progress_seasons: referencePending ? [2026] : [] }))
+      .toThrow(/intersects/);
+  });
+  it('refuses missing reference coverage and preserves historical no-GF metadata rules', () => {
+    expect(() => rebuildCensusScope(contract(2026, []), { ...predecessorSeasons, last_season: 2025, in_progress_seasons: [] })).toThrow(/cover/);
+    expect(readFileSync(join(root, 'tools/migration/rebuild_derived.py'), 'utf8')).toContain("WHEN s.year = (SELECT season FROM latest)");
+  });
+});
 
 describe('sources dataset', () => {
   it('carries the seven registry rows with unique keys and valid kinds', () => {
@@ -432,6 +469,28 @@ describe('load_reference_data.py', () => {
         // populated-roots guard counts it rather than being blocked by it.
         'afl_api_identity_adjudications',
         'app_health_events',
+        // 111 (AFLDB V2 Stage 4, curated awards). The proposal table and its
+        // decision ledger name their award, player and club by natural identity
+        // (slug / durable player identity string), so they carry NO foreign key
+        // into awards, players, clubs or award_winners and sit outside the
+        // reference loader's FK cascade closure. Not registered import-writable:
+        // the ledger is append-only by grant and the proposal's value columns are
+        // immutable by column-scoped grant (re-granted in privileges.sql); the
+        // registry loop would restore UPDATE/DELETE/TRUNCATE on every reconcile.
+        'award_proposal_decisions',
+        'award_proposals',
+        // 116 (Brownlow correction receipts). Owner-operated, append-only by trigger, with every
+        // app/import/auth privilege revoked, so it can never be import-writable and carries no
+        // foreign key into the reference closure.
+        'brownlow_correction_receipts',
+        // 113 (AFLDB V2 Launch F, Brownlow eligibility). The append-only ledger of
+        // administrator eligibility decisions. It names its player by the durable identity
+        // string and carries NO foreign key into players or seasons (only auth_users and
+        // itself), so it sits outside the reference loader's FK cascade closure. Not
+        // registered import-writable: it is append-only by grant (SELECT, INSERT and the
+        // sequence, re-granted in privileges.sql); the registry loop would restore
+        // UPDATE/DELETE/TRUNCATE on every reconcile.
+        'brownlow_eligibility_decisions',
         // 094 (AFLDB-ISSUE-155 Phase C1). The Brownlow administration
         // workflow: a record of who drafted, finalised, voided and
         // published. Deliberately outside afldb_meta.import_writable_tables
@@ -456,6 +515,20 @@ describe('load_reference_data.py', () => {
         // the column-scoped Data Editor upsert capability, and keeps the
         // table outside afldb_meta.import_writable_tables.
         'data_overrides',
+        // 112 (AFLDB V2 Stage 4, derived awards). The append-only ledger of published
+        // derivations (today the Coleman Medal). It carries NO foreign key into awards,
+        // players, clubs, matches or award_winners (only auth_users and itself), so it
+        // sits outside the reference loader's FK cascade closure. Not registered
+        // import-writable: it is append-only by grant (SELECT, INSERT and the sequence,
+        // re-granted in privileges.sql); the registry loop would restore
+        // UPDATE/DELETE/TRUNCATE on every reconcile.
+        // 114 (AFLDB V2 Launch F, derived awards). The append-only provenance ledger of
+        // projecting a published derivation into award_winners (keys and actions only).
+        // Its only foreign keys are auth_users and derived_award_results, so it sits
+        // outside the reference loader's FK cascade closure. Not registered
+        // import-writable: append-only by grant, re-granted in privileges.sql.
+        'derived_award_projections',
+        'derived_award_results',
         // 080 (AFLDB-ISSUE-118). The external grid corpus: immutable
         // captured evidence, append-only by grant (SELECT/INSERT plus the
         // one is_current column), never registered for import write. It is

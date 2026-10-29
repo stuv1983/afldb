@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { brownlowStatusSql, acceptedBrownlowRowsSql } from './brownlow-readiness';
 
 type Tx = postgres.TransactionSql;
 
@@ -152,12 +153,7 @@ export async function recomputePlayerDerivedStats(
            brownlow_votes, brownlow_status, is_premier)
     WITH season_brownlow AS (
       SELECT s.year AS season,
-             CASE
-               WHEN EXISTS (SELECT 1 FROM brownlow_season_votes b WHERE b.season = s.year)
-                 THEN 'complete'
-               WHEN s.status = 'in_progress' THEN 'pending'
-               ELSE 'not_applicable'
-             END::coverage_status AS status
+             (${tx.unsafe(brownlowStatusSql('s.year'))})::coverage_status AS status
       FROM seasons s
       WHERE s.year = ${season}
     ),
@@ -301,7 +297,7 @@ export async function recomputePlayerDerivedStats(
       SELECT player_id,
              sum(votes) AS votes,
              count(*) FILTER (WHERE is_winner) AS medals
-      FROM brownlow_season_votes
+      FROM ${tx.unsafe(acceptedBrownlowRowsSql())} brownlow_season_votes
       WHERE player_id = ANY(${ids})
       GROUP BY player_id
     )
@@ -342,7 +338,7 @@ export async function recomputePlayerDerivedStats(
       SELECT player_id,
              sum(votes) AS votes,
              count(*) FILTER (WHERE is_winner) AS medals
-      FROM brownlow_season_votes
+      FROM ${tx.unsafe(acceptedBrownlowRowsSql())} brownlow_season_votes
       WHERE player_id = ANY(${ids})
       GROUP BY player_id
     ) b ON b.player_id = p.id
@@ -383,13 +379,7 @@ export async function recomputePlayerDerivedStats(
 export async function recomputeSeasonBrownlowStatus(tx: Tx, season: number): Promise<void> {
   await tx`
     WITH coverage AS (
-      SELECT CASE
-               WHEN EXISTS (
-                 SELECT 1 FROM brownlow_season_votes b WHERE b.season = s.year
-               ) THEN 'complete'
-               WHEN s.status = 'in_progress' THEN 'pending'
-               ELSE 'not_applicable'
-             END::coverage_status AS status
+      SELECT (${tx.unsafe(brownlowStatusSql('s.year'))})::coverage_status AS status
         FROM seasons s
        WHERE s.year = ${season}
     )
@@ -597,8 +587,10 @@ export async function recomputeSeasonMetadata(tx: Tx, season: number): Promise<v
  * above, restricted to the affected players and kept in lockstep with it
  * and with `REBUILDS["player_career_stats"]` in
  * tools/migration/rebuild_derived.py: votes are the sum over
- * brownlow_season_votes, medals the count of winning seasons, and a
- * player with no season rows at all falls to 0/0 rather than keeping a
+ * brownlow_season_votes over ACCEPTED seasons only (`acceptedBrownlowRowsSql`;
+ * AFLDB-ISSUE-316: a season whose Brownlow is still pending must not reach a
+ * career total), medals the count of winning seasons, and a
+ * player with no accepted season rows at all falls to 0/0 rather than keeping a
  * stale total. That last case is why this is an UPDATE over the supplied
  * ids rather than over the rows a join finds: the set of affected players
  * includes those whose LAST season row a re-derivation just removed.
@@ -619,10 +611,10 @@ export async function recomputeBrownlowCareerTotals(
       FROM (
         SELECT selected.player_id,
                (SELECT sum(bsv.votes)
-                  FROM brownlow_season_votes bsv
+                  FROM ${tx.unsafe(acceptedBrownlowRowsSql())} bsv
                  WHERE bsv.player_id = selected.player_id)   AS votes,
                (SELECT count(*)
-                  FROM brownlow_season_votes bsv
+                  FROM ${tx.unsafe(acceptedBrownlowRowsSql())} bsv
                  WHERE bsv.player_id = selected.player_id
                    AND bsv.is_winner)                        AS medals
           FROM player_career_stats selected

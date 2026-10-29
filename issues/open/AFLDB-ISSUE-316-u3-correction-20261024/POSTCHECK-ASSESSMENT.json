@@ -1,0 +1,35 @@
+{
+  "snapshot": "2026-10-24T11:30:11.345984",
+  "verdict": "STOP_OWNER_ADJUDICATION_REQUIRED",
+  "checks": {
+    "identity": true,
+    "target_absent": true,
+    "counts": true,
+    "no_extra_keys": true,
+    "no_missing_keys": true,
+    "no_unrelated_ids_removed": true,
+    "other_2026_pms_unchanged": true,
+    "matches_2026_unchanged": true,
+    "originating_application_unchanged": true,
+    "exact_single_removal_audit": true,
+    "durable_removal": true,
+    "expected_decision_note": false
+  },
+  "failed_conditions": [
+    "Required exact decision note is absent: data_edits 94 note is NULL."
+  ],
+  "observed_recomputation": {
+    "career_games": 125,
+    "career_rebuilt_at": "2026-10-24T22:28:46.203865+11:00",
+    "audit_created_at": "2026-10-24T22:28:46.203865+11:00",
+    "season_games": 2,
+    "club_season_games": 2
+  },
+  "not_completed": [
+    "Independent full derived-total reconciliation",
+    "Separate period-score table before/after comparison",
+    "Brownlow round-vote table before/after comparison"
+  ],
+  "retry_removal": false,
+  "additional_mutation_authorised": false
+}

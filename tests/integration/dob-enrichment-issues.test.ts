@@ -732,6 +732,62 @@ describe.skipIf(!canRun)(
         rmSync(sqliteDb, { force: true });
       }
     });
+
+    // AFLDB-ISSUE-090 D4: external_identity_conflict was written by an
+    // unconditional INSERT, so every re-run of a still-conflicting profile
+    // filed another open row. It is now refiled over the run's own
+    // profiles: one open row, withdrawn when the conflict clears, resolved
+    // history and another source's rows untouched.
+    it('test 28: an external_identity_conflict is refiled, never duplicated (D4)', async () => {
+      const url = 'players/T/issue090-d4-fixture28.html';
+      const stored = await createFixturePlayer({ dob: '1950-01-01' });
+      const legacyId = nextLegacyId();
+      const asserted = await createFixturePlayer({ legacyPlayerId: legacyId });
+      await seedIdentity(fixtureSourceId, url, stored.id);
+      const [real] = await sql<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afltables'`;
+      const [otherSource] = await sql<{ id: number }[]>`
+        INSERT INTO data_issues (entity_type, entity_id, issue_type, severity, description, details)
+        VALUES ('player', ${stored.id}, 'external_identity_conflict', 'warning', 'another source',
+                ${sql.json({ external_id: url, source_id: real.id })})
+        RETURNING id
+      `;
+      const open = () => sql<{ id: number; details: Record<string, unknown> }[]>`
+        SELECT id, details FROM data_issues
+         WHERE issue_type = 'external_identity_conflict' AND resolved_at IS NULL
+           AND details->>'external_id' = ${url} AND id <> ${otherSource.id}
+      `;
+      const sqliteDb = registerFixture([{ profileUrl: url, dobRaw: '1954-04-04', legacyId }]);
+      try {
+        expectSuccess(runRegister(sqliteDb), 'first conflicting register run');
+        expectSuccess(runRegister(sqliteDb), 'second conflicting register run');
+        const rows = await open();
+        expect(rows).toHaveLength(1);
+        expect(rows[0].details).toMatchObject({
+          external_id: url, stored_player_id: stored.id, asserted_player_id: asserted.id, source_id: fixtureSourceId,
+        });
+
+        // Resolved history is never deleted or reopened by a refile.
+        await sql`UPDATE data_issues SET resolved_at = now(), resolution = 'test 28' WHERE id = ${rows[0].id}`;
+        expectSuccess(runRegister(sqliteDb), 'register run after resolution');
+        expect(await open()).toHaveLength(1);
+        const [resolved] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM data_issues WHERE id = ${rows[0].id} AND resolved_at IS NOT NULL`;
+        expect(resolved.n).toBe(1);
+
+        // The conflict clears: its open row is withdrawn.
+        await sql`UPDATE external_identities SET player_id = ${asserted.id}
+                   WHERE source_id = ${fixtureSourceId} AND external_id = ${url}`;
+        expectSuccess(runRegister(sqliteDb), 'register run after the conflict cleared');
+        expect(await open()).toHaveLength(0);
+
+        // Another source's row is not this run's to touch.
+        const [kept] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM data_issues WHERE id = ${otherSource.id} AND resolved_at IS NULL`;
+        expect(kept.n).toBe(1);
+      } finally {
+        rmSync(sqliteDb, { force: true });
+      }
+    });
   });
 
   // ---------------------------------------------------------------------

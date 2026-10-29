@@ -18,6 +18,7 @@ import {
   parseManifestText, parseProvenance, splitPlayerName, trackedExpectedIds,
 } from '../tools/records/first-kick-goal-source';
 import type { Deps } from '../tools/db/rebuild-test';
+import { predecessorJson } from './rollover-predecessor-fixture';
 
 const EXTRACT = [
   'Player,Club,Rd.,Year',
@@ -258,6 +259,11 @@ describe('the code_test_db rehearsal tool refuses every other database (DB-free)
   });
 });
 
+// AFLDB-ISSUE-316: the plan is the REAL planner over the explicit PREDECESSOR documents (the reviewed 1897-2025
+// state, tests/rollover-predecessor-fixture.ts), so this gate keeps proving itself on an ordinary rebuild. The
+// tracked successor's ordinary rebuild passes only as the exact plan bound to an adopted-successor binding
+// (AFLDB-ISSUE-323, tests/db-test-rebuild.test.ts); this tool walks an UNBOUND plan, which is never one, so over the
+// successor's c2-2026-final-* labels it still refuses as a candidate without provenance.
 describe('the rebuild-runner rehearsal gate (DB-free): the REAL plan through the REAL executeRebuild', () => {
   const setup = async (status = 0) => {
     const rb = await import('../tools/db/rebuild-test');
@@ -267,7 +273,10 @@ describe('the rebuild-runner rehearsal gate (DB-free): the REAL plan through the
     const target = rb.resolveTarget({
       AFLDB_CODE_TEST_DATABASE_URL: dsn('code_test_db', 'owner'), AFLDB_CODE_TEST_IMPORT_DATABASE_URL: dsn('code_test_db', 'import'),
     }, opts);
-    const stages = rb.planStages(target, rb.resolveFitzroySource(opts), opts);
+    const documents = { register: predecessorJson('data/reference/fitzroy-accepted-baselines.json'),
+      contract: predecessorJson('tools/rebuild/fitzroy/fitzroy-contract.json'), seasons: predecessorJson('data/reference/seasons.json') };
+    const source = rb.resolveFitzroySource(opts, { readAcceptedRegister: () => documents.register });
+    const stages = rb.planStages(target, source, opts, () => documents.contract, undefined, documents);
     const calls = { command: [] as { argv: string[]; env: Record<string, string> }[], sql: 0, validation: 0, logs: [] as string[] };
     const real: Deps = {
       runCommand: (argv, env) => { calls.command.push({ argv, env }); return { status, stdout: 'Reconciled', stderr: '' }; },
