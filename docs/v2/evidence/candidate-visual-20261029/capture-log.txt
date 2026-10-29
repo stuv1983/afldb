@@ -1,0 +1,17 @@
+01-operations__desktop-1280x800.png as=super status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0
+08-brownlow__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0
+09-brownlow-2025__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=2025 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0
+R1-refusals__desktop-1280x800.png as=super status=200 final=/admin/operations/afl-api-refusals h1="AFL API settle refusals" horizontalOverflowPx=0 consoleErrors=0
+R2-findings__desktop-1280x800.png as=super status=200 final=/admin/operations/afl-api-refusals?section=findings h1="AFL API settle refusals" horizontalOverflowPx=0 consoleErrors=0
+context desktop-1280x800/super_admin blockedRequests=0
+02-operations-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0
+context desktop-1280x800/admin blockedRequests=0
+01-operations__mobile-390x844.png as=super status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0
+08-brownlow__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0
+09-brownlow-2025__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=2025 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0
+R1-refusals__mobile-390x844.png as=super status=200 final=/admin/operations/afl-api-refusals h1="AFL API settle refusals" horizontalOverflowPx=0 consoleErrors=0
+R2-findings__mobile-390x844.png as=super status=200 final=/admin/operations/afl-api-refusals?section=findings h1="AFL API settle refusals" horizontalOverflowPx=0 consoleErrors=0
+context mobile-390x844/super_admin blockedRequests=0
+02-operations-admin__mobile-390x844.png as=admin status=200 final=/admin/operations h1="Operations centre" horizontalOverflowPx=0 consoleErrors=0
+context mobile-390x844/admin blockedRequests=0
+database=afldb_v2_visual2_test baseURL=http://127.0.0.1:3912 history_fingerprint_unchanged=true
