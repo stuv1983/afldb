@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### Read-only production-host inspection for gate 9 (2026-10-29; production NO-GO)
+
+- D-V2-HOST-INSPECT-1, approved with three bounded amendments, revised the inspection script before running it.
+  It no longer prints process command lines, crontab lines or Caddyfile lines; each is reduced to allowlisted
+  observations. The connection count is corrected to four short read-only `afldb_backup` connections. Revised
+  SHA-256 `8bbbc56f…55f9`. Run once on `afldb-prod`: exit 10 (findings), identity, extensions and ledger
+  (110, digest `789946fe…`) matched, so there is **no release drift**. Log: `docs/v2/evidence/host-prerequisites/`.
+- Findings (`docs/v2/host-prerequisites-findings-2026-10-29.md`): the live Caddyfile is the 2026-08-16 version
+  (without the proxy-level HSTS/CSP of `3ae20fe4`); the settle unit is the 2026-09-02 version (no effect on
+  this host); the hostnames resolve through Cloudflare, so recorded client addresses are probably edge
+  addresses (inferred, not verified); there is no off-host backup route on the host; and default `backup.sh`
+  pruning would delete five existing dumps. A host change list HC-1 to HC-5 with recovery routes is prepared and
+  not approved. P1 is recommended as `beta.afldb.com` with Caddy routing unchanged. The P2 ordering is clarified:
+  no stage A/B step waits for 2027 data.
+- Prepared, not run: a production-build visual recapture (`tools/v2/candidate-visual-capture.mts`, owner
+  checklist §5). The checklist is corrected: the refusals page has dev-server captures in `gap025-visual`.
+
 ### Known release residuals recorded; owner review and host inspection prepared (2026-10-29; production NO-GO)
 
 - D-V2-RESIDUALS-1 (approved) records three residuals as **known and open** for the V2 release artifact,

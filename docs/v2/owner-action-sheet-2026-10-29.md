@@ -11,11 +11,11 @@ Choice numbers refer to [the release choices](owner-decision-release-choices-202
 | Step | Choice | Depends on | State |
 |---|---|---|---|
 | a | 1 D-V2-RESIDUALS-1 | none | **Recorded 2026-10-29**: residuals known and open, nothing waived |
-| b | 2 D-V2-VISUAL-1 | the owner's review ([checklist](owner-visual-review-2026-10-29.md)) | Pending. Four screens are stale and one page and several states have no capture |
-| c | 6a D-V2-HOST-INSPECT-1, read-only ([procedure](host-prerequisites-inspection-2026-10-29.md)) | none | Prepared, not run |
-| d | Policy decisions P1–P2 (§3) | c informs P1 | Open |
+| b | 2 D-V2-VISUAL-1 | the owner's review ([checklist](owner-visual-review-2026-10-29.md)) | Pending. Four screens are stale; the refusals page has dev-server captures only; several states have no capture. A recapture is prepared ([checklist §5](owner-visual-review-2026-10-29.md)) |
+| c | 6a D-V2-HOST-INSPECT-1, read-only ([procedure](host-prerequisites-inspection-2026-10-29.md)) | none | **DONE 2026-10-29** (with amendments): exit 10, identity and ledger 110 match, no release drift ([findings](host-prerequisites-findings-2026-10-29.md)) |
+| d | Policy decisions P1–P2 (§3) | c informs P1 | Open; recommendations in [findings §5–§6](host-prerequisites-findings-2026-10-29.md) |
 | e | 3 D-V2-PUSH-1: push, merge and lock the execution commit, then one production-configured build | a, b, d; and c, see the note below | Pending |
-| f | 6b Host change list | c, plus its own approval | Not yet prepared |
+| f | 6b Host change list | c, plus its own approval | **Prepared** (HC-1 to HC-5, each with a recovery route; [findings §4](host-prerequisites-findings-2026-10-29.md)); not approved |
 | g | 7 A-AFLT | P2 (RISK-27 and the C2 / D-316-1 position) | Pending |
 | h | 8 Window and A-BACKUP | e, f, g; a named window; a writer and admin-edit freeze; P3 | Pending |
 | i | 9 A-ROLLBACK → 10 A-REL (privileges must reach **43/43**) → 11 A-GO | h | Pending |
@@ -62,6 +62,16 @@ the release choices.
 |---|---|---|
 | **P1** | **What serves V2 at A-GO.** Either `beta.afldb.com` through the existing proxy to `127.0.0.1:3100` with Caddy unchanged, or the apex launch that `deploy/Caddyfile.production` describes ("AT LAUNCH: delete the `handle` blocks…"). No V2 record defines "traffic switch" | An apex launch changes a tracked file, so the change must be in the locked artifact. Decide after the read-only inspection |
 | **P2** | **The ISSUE-316 order (RISK-27):** release after C5, or A-AFLT after the D-316-1 final acquisition. And whether production C2 can change any tracked file of the candidate | Plan step 4 requires a pinned rebuilt artifact for any C2 change. If C2 can change the candidate, lock after C2 |
+
+> **Update 2026-10-29, after the host inspection** ([findings §5–§6](host-prerequisites-findings-2026-10-29.md)).
+> **P1, recommended:** `beta.afldb.com` with Caddy routing unchanged; the apex launch is a later, separate
+> decision. No tracked file changes. **P2, clarified from the record:** the D-316-1 final acquisition was done on
+> 2026-10-21, and the rollover is already integrated in the candidate (`c7e17da2`, `1a6de4b6`, `955d0e85`). So C2
+> changes no further tracked file and the lock need not wait for it. The route "release after C5" is the only
+> one that imports a 2027 wait and is recommended for withdrawal. The remaining constraint, A-AFLT before
+> schema and code, is plan step 5 with the RISK-27 choice. Release decision package §1 already records that
+> 2027 evidence blocks only rows 11–12. **P3:** no off-host route exists on the host; the workstation pull (HC-4)
+> needs no host change. `backup.sh` defaults would prune five existing dumps (F-4, HC-3).
 
 Needed before the window, **not** before the lock:
 

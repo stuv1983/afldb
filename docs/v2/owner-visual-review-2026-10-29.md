@@ -28,7 +28,7 @@ screens:
 
 | Change since capture | Screens it makes STALE |
 |---|---|
-| `c78e9e9b` (2026-10-28): new "AFL API settle refusals" inspection link and page (V2-GAP-025) | 01, 02; the new page has **no capture** |
+| `c78e9e9b` (2026-10-28): new "AFL API settle refusals" inspection link and page (V2-GAP-025) | 01, 02; the new page has only dev-server captures (§3 item 9) |
 | `367bfb54` (2026-10-20): staged leaderboard and provider-team mapping (V2-GAP-023). The captured "API leaderboard is not staged (F-WB1-005)… no staged table" notice is now worded per season | 08, 09, including both `local-visual` recaptures |
 | `99a1165c` (2026-10-20): Brownlow eligibility is eligible / ineligible / unknown | 08, 09 |
 | `e91fae88` (ISSUE-328): the latest settle batch is ordered numerically. This changes which data is shown, not the layout | 10 is still representative |
@@ -66,7 +66,7 @@ These must be reviewed live, recaptured, or explicitly left out by the owner. An
 
 | §6 item | Missing state |
 |---|---|
-| 9 | `/admin/operations/afl-api-refusals`: **no capture at all**. Needed: both sections populated and empty, a second page, and a failed read. It must be read-only, newest first, 50 per page, and show codes, never values |
+| 9 | `/admin/operations/afl-api-refusals`. **Correction (2026-10-29):** it is not uncaptured. [`evidence/gap025-visual/`](evidence/gap025-visual/capture-log.txt) holds 14 captures from 2026-10-27 (`c78e9e9b`): both sections empty and populated, the second page, a failed read and the right-hand columns, at both viewports. They come from `next dev`, **not a production build**. No admin page or component has changed since `c78e9e9b`. Needed: both sections populated and empty, a second page, and a failed read. It must be read-only, newest first, 50 per page, and show codes, never values |
 | 7 | `/admin/submissions/[id]`, the read-only history |
 | 1 | The overview with `data/reference/seasons.json` unreadable. Every approval must be refused (fail closed). §6 asks for this "if practical" |
 | 2 | The empty award queue |
@@ -88,3 +88,48 @@ NOT REVIEWED / OUT OF SCOPE: <screen numbers or §3 items, with reason>
 
 V2-GAP-022 closes only if every §2 row and §3 item is accepted or explicitly put out of scope by the owner.
 Otherwise it is narrowed to what remains.
+
+## 5. Recapture proposal (prepared 2026-10-29; NOT RUN, needs its own approval)
+
+The smallest run that replaces every stale capture with a production-build capture of the candidate. No build or
+environment start was performed in preparing it. Visual acceptance remains the owner's.
+
+| Item | Value |
+|---|---|
+| Environment | The isolated local cluster `afldb_v2_isolated`, root `D:\tmp\afldb-v2-pg16`, loopback **127.0.0.1:55433** (55432 is an ssh tunnel; never use it). Windows workstation, no network beyond loopback |
+| Database | New disposable **`afldb_v2_visual2_test`**, cloned with `isolated-pg.ts create-db --template afldb_v2_rollbackapp_test`. The template is the database behind the 2026-10-20 `local-visual` 08/09 recaptures (`local-rollback-10-v2-final-capture.json`). It holds synthetic staff, 3 proposals / 6 decisions and the 2025 staged Brownlow state that 09 needs. **If `list` does not show the template, stop:** no substitute database is improvised. The clone is migrated to 117 with the candidate runner. The template is not touched |
+| Build | `tools/v2/local-release.mjs build v2` inside `isolated-pg run`: `next build --webpack` then `prepare-standalone`, `NEXT_TELEMETRY_DISABLED=1`, installed `node_modules` only (no download), at the then-current `v2/rebuild` HEAD with no uncommitted application change. Expect about 1,516 prerendered pages |
+| Runtime | `local-release.mjs start v2` serves the standalone build on **127.0.0.1:3912** against the same clone |
+| Capture tool | [`tools/v2/candidate-visual-capture.mts`](../../tools/v2/candidate-visual-capture.mts) (added 2026-10-29, not yet run). It refuses an existing output directory, so `launchF-visual`, `local-visual` and `gap025-visual` cannot be overwritten. It blocks and counts external requests, fingerprints statistical and audit tables before and after, and writes a `capture-log.txt` in the launchF format |
+| Pages (12 images) | Super Admin: **01** `/admin/operations`; **08** `/admin/operations/brownlow`; **09** `/admin/operations/brownlow?season=2025`; **R1** `/admin/operations/afl-api-refusals`; **R2** `…?section=findings` (empty states, production build). Admin: **02** `/admin/operations`. Each at 1280x800 and 390x844 |
+| Output | `docs/v2/evidence/candidate-visual-<YYYYMMDD>/` |
+| Not covered | §3 items 1–5 and 7, and the refusals page's populated, second-page and failed-read states in a production build. Each needs state fixtures. Cover them by live owner review on the same running build, or by the `gap025-visual` dev-server captures for item 9 if the owner accepts those, or put them out of scope |
+
+Commands (PowerShell, repository root; `T` abbreviates the runner prefix):
+
+```powershell
+$env:AFLDB_V2_PG_ROOT = 'D:\tmp\afldb-v2-pg16'; $env:AFLDB_V2_PG_PORT = '55433'
+& D:\tmp\afldb-v2-pg16\dist\pgsql\bin\pg_ctl.exe -D D:\tmp\afldb-v2-pg16\data -l D:\tmp\afldb-v2-pg16\logs\server.log -o "-p 55433" -w start
+$T = 'node_modules/tsx/dist/cli.mjs'
+node $T tools/v2/isolated-pg.ts list                       # template present? otherwise stop
+node $T tools/v2/isolated-pg.ts create-db afldb_v2_visual2_test --template afldb_v2_rollbackapp_test
+node $T tools/v2/isolated-pg.ts run afldb_v2_visual2_test -- node $T tools/db/migrate.ts --target test
+node $T tools/v2/isolated-pg.ts run afldb_v2_visual2_test -- node tools/v2/local-release.mjs build v2
+# separate window or background:
+node $T tools/v2/isolated-pg.ts run afldb_v2_visual2_test -- node tools/v2/local-release.mjs start v2
+node $T tools/v2/isolated-pg.ts run afldb_v2_visual2_test -- node $T tools/v2/candidate-visual-capture.mts docs/v2/evidence/candidate-visual-<YYYYMMDD>
+# afterwards: stop the server (Ctrl+C), then
+& D:\tmp\afldb-v2-pg16\dist\pgsql\bin\pg_ctl.exe -D D:\tmp\afldb-v2-pg16\data -w stop
+```
+
+Approval, ready to copy:
+
+```text
+D-V2-VISUAL-RECAPTURE-1 — APPROVED as prepared in docs/v2/owner-visual-review-2026-10-29.md §5:
+start the isolated cluster afldb_v2_isolated on 127.0.0.1:55433; clone afldb_v2_rollbackapp_test to the
+disposable afldb_v2_visual2_test and migrate the clone only; one production-configured build of v2/rebuild
+HEAD <commit> with telemetry off; serve it on 127.0.0.1:3912; run tools/v2/candidate-visual-capture.mts once
+into a new docs/v2/evidence/candidate-visual-<YYYYMMDD>/; stop server and cluster; commit the captures locally.
+Not approved: any other database, any network beyond loopback, overwriting retained evidence, an agent visual
+verdict, a push or any production action. Visual acceptance stays with the owner (D-V2-VISUAL-1).
+```

@@ -1,0 +1,267 @@
+== H0 host identity (stop on any mismatch) 2026-10-29T00:14:55Z
+host=afldb-prod user=arm kernel=6.8.0-137-generic boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac uptime_s=6386411.58
+os=Ubuntu 24.04.4 LTS
+public_ip_bound=209.38.87.252
+== H1 deployed application and systemd (read-only queries) 2026-10-29T00:14:55Z
+deployed_checkout=ff100dc2b8da8523f550ef45a9eaa3ef96d9d840 build_id=vcxM_SyDxFCP0sj9n9W1t
+deployed_tracked_changes=0
+node=v22.23.2
+afldb.service MainPID=2626763
+afldb.service NRestarts=4
+afldb.service ExecMainStartTimestamp=Sun 2026-10-18 13:06:32 AEDT
+afldb.service WorkingDirectory=/home/arm/projects/afldb
+afldb.service User=arm
+afldb.service Id=afldb.service
+afldb.service LoadState=loaded
+afldb.service ActiveState=active
+afldb.service SubState=running
+afldb.service FragmentPath=/etc/systemd/system/afldb.service
+afldb.service DropInPaths=
+afldb.service UnitFileState=enabled
+file /etc/systemd/system/afldb.service sha256=a3444840e0bd5f94ea05ea4b01508e0e8209d65ae452be665c1049c6b34e149a repo_deploy_afldb.service=a3444840e0bd5f94ea05ea4b01508e0e8209d65ae452be665c1049c6b34e149a
+unit_file afldb-settle-afltables.service static  -
+unit_file afldb.service                  enabled enabled
+unit_file afldb-settle-afltables.timer   enabled enabled
+timer NEXT                         LEFT LAST                         PASSED UNIT                         ACTIVATES
+timer Fri 2026-10-30 04:44:53 AEDT  17h Thu 2026-10-29 04:37:45 AEDT 6h ago afldb-settle-afltables.timer afldb-settle-afltables.service
+timer 
+timer 1 timers listed.
+state afldb-settle-afltables.service active=inactive enabled=static
+state afldb-settle-afltables.timer active=active enabled=enabled
+state afldb-settle-afl-api.service active=inactive enabled=not-found
+state afldb-settle-afl-api.timer active=inactive enabled=not-found
+state afldb-settle-afl-api-brownlow.service active=inactive enabled=not-found
+state afldb-settle-afl-api-brownlow.timer active=inactive enabled=not-found
+state afldb-email-intake.service active=inactive enabled=not-found
+state afldb-email-intake.timer active=inactive enabled=not-found
+state afldb-backup.service active=inactive enabled=not-found
+state afldb-backup.timer active=inactive enabled=not-found
+state caddy.service active=active enabled=enabled
+state postgresql@16-main.service active=active enabled=enabled-runtime
+file /etc/systemd/system/afldb-settle-afltables.service sha256=f777395ae7cc307608124abbf2921d8cce5807e0f67baccd6ddabba259722b77 repo_deploy_afldb-settle-afltables.service=ac8d6085b75c7c60febc38b810af1841f2b6583fdbdc7fe8cbec113c5d67715b
+FINDING: /etc/systemd/system/afldb-settle-afltables.service differs from repository deploy/afldb-settle-afltables.service
+file /etc/systemd/system/afldb-settle-afltables.timer sha256=65a33089f59563745ea83660f077bfb87430b4eb66dfb05f5e0eb2c16df7409e repo_deploy_afldb-settle-afltables.timer=65a33089f59563745ea83660f077bfb87430b4eb66dfb05f5e0eb2c16df7409e
+polkit_dir 750 root:polkitd
+polkit ls: cannot open directory '/etc/polkit-1/rules.d': Permission denied
+process settle count=0
+process afl_api count=0
+process migrate count=0
+process pg_dump count=0
+process pg_restore count=0
+== H2 Caddy (configuration read only; the caddy binary is not run) 2026-10-29T00:14:56Z
+caddy_package 2.11.4
+caddy.service MainPID=7797
+caddy.service NRestarts=0
+caddy.service ExecMainStartTimestamp=Sun 2026-08-16 13:18:12 AEST
+caddy.service WorkingDirectory=
+caddy.service User=caddy
+caddy.service Id=caddy.service
+caddy.service LoadState=loaded
+caddy.service ActiveState=active
+caddy.service SubState=running
+caddy.service FragmentPath=/usr/lib/systemd/system/caddy.service
+caddy.service DropInPaths=
+caddy.service UnitFileState=enabled
+caddy_exec path=/usr/bin/caddy config=/etc/caddy/Caddyfile
+etc_caddy total 16
+etc_caddy drwxr-xr-x   2 root root 4096 Aug 16 13:18 .
+etc_caddy drwxr-xr-x 114 root root 4096 Oct 28 06:26 ..
+etc_caddy -rw-r--r--   1 root root 7807 Aug 16 18:46 Caddyfile
+file /etc/caddy/Caddyfile sha256=4f6972ec119f5d33fff4c16cbbce15c50a36b883654dcffcabdb01776d7af036 repo_deploy_Caddyfile.production=65478a2371183468e70986d763005217cd8f2e4411765ac745cdaf9411f54313
+FINDING: /etc/caddy/Caddyfile differs from repository deploy/Caddyfile.production
+caddy_diff_lines only_in_live=1 only_in_repo=3
+caddy_site repo beta.afldb.com
+caddy_proxy repo site=beta.afldb.com handle=- upstream=127.0.0.1:3100
+caddy_log_output repo site=beta.afldb.com path=/var/log/caddy/afldb-access.log
+caddy_site repo www.afldb.com
+caddy_site repo afldb.com
+caddy_handle repo site=afldb.com handle=/api/early-access*
+caddy_proxy repo site=afldb.com handle=/api/early-access* upstream=127.0.0.1:3100
+caddy_handle repo site=afldb.com handle=(all)
+caddy_root repo site=afldb.com handle=(all) path=*,/var/www/afldb-soon
+caddy_file_server repo site=afldb.com handle=(all)
+caddy_log_output repo site=afldb.com path=/var/log/caddy/afldb-apex.log
+caddy_site live beta.afldb.com
+caddy_proxy live site=beta.afldb.com handle=- upstream=127.0.0.1:3100
+caddy_log_output live site=beta.afldb.com path=/var/log/caddy/afldb-access.log
+caddy_site live www.afldb.com
+caddy_site live afldb.com
+caddy_handle live site=afldb.com handle=/api/early-access*
+caddy_proxy live site=afldb.com handle=/api/early-access* upstream=127.0.0.1:3100
+caddy_handle live site=afldb.com handle=(all)
+caddy_root live site=afldb.com handle=(all) path=*,/var/www/afldb-soon
+caddy_file_server live site=afldb.com handle=(all)
+caddy_log_output live site=afldb.com path=/var/log/caddy/afldb-apex.log
+apex_dir arm:caddy 750 2026-08-16 21:57:59.762876712 +1000
+apex_file total 60
+apex_file drwxr-x--- 3 arm  caddy 4096 Aug 16 21:57 .
+apex_file drwxr-xr-x 3 root root  4096 Aug 16 17:07 ..
+apex_file -rw-rw-r-- 1 arm  arm   9644 Aug 16 21:57 app.js
+apex_file -rw-rw-r-- 1 arm  arm    457 Aug 16 21:57 favicon.svg
+apex_file drwxr-x--- 3 arm  caddy 4096 Aug 16 20:14 img
+apex_file -rw-r--r-- 1 arm  arm   9692 Aug 16 21:57 index.html
+apex_file -rw-rw-r-- 1 arm  arm    622 Aug 16 21:57 robots.txt
+apex_file -rw-rw-r-- 1 arm  arm    721 Aug 16 21:57 sitemap.xml
+apex_file -rw-rw-r-- 1 arm  arm   9624 Aug 16 21:57 style.css
+caddy_log_file total 26636
+caddy_log_file drwxr-xr-x  2 caddy caddy      4096 Oct 21 15:04 .
+caddy_log_file drwxr-xr-x 11 root  syslog     4096 Oct 25 00:00 ..
+caddy_log_file -rw-------  1 caddy caddy    992958 Aug 19 18:34 afldb-access-2026-08-19T08-34-27.679-size.log.gz
+caddy_log_file -rw-------  1 caddy caddy   1086027 Sep  4 21:02 afldb-access-2026-09-04T11-02-31.065-size.log.gz
+caddy_log_file -rw-------  1 caddy caddy   1130156 Sep  8 07:28 afldb-access-2026-09-07T21-28-03.060-size.log.gz
+caddy_log_file -rw-------  1 caddy caddy   1121927 Sep 14 22:27 afldb-access-2026-09-14T12-27-36.536-size.log.gz
+caddy_log_file -rw-------  1 caddy caddy   1149465 Oct 16 00:18 afldb-access-2026-10-15T13-18-15.638-size.log.gz
+caddy_log_file -rw-------  1 caddy caddy  11744370 Oct 29 06:51 afldb-access.log
+caddy_log_file -rw-------  1 caddy caddy   1413311 Sep  9 23:26 afldb-apex-2026-09-09T13-26-13.354-size.log.gz
+caddy_log_file -rw-------  1 caddy caddy   1288778 Sep 28 20:33 afldb-apex-2026-09-28T10-33-21.243-size.log.gz
+caddy_log_file -rw-------  1 caddy caddy   1463479 Oct 21 15:04 afldb-apex-2026-10-21T04-04-49.343-size.log.gz
+caddy_log_file -rw-------  1 caddy caddy   5848992 Oct 29 10:22 afldb-apex.log
+== H3 TLS, DNS and listeners 2026-10-29T00:14:56Z
+listen *:443
+listen *:80
+listen 0.0.0.0:22
+listen 127.0.0.1:2019
+listen 127.0.0.1:3100
+listen 127.0.0.1:5432
+listen 127.0.0.53%lo:53
+listen 127.0.0.54:53
+listen [::1]:5432
+listen [::]:22
+dns afldb.com 104.21.25.194 172.67.134.128 
+tls afldb.com subject=CN = afldb.com
+tls afldb.com issuer=C = US, O = Let's Encrypt, CN = YE1
+tls afldb.com notBefore=Oct 15 03:49:45 2026 GMT
+tls afldb.com notAfter=Jan 13 03:49:44 2027 GMT
+tls afldb.com sha256 Fingerprint=1D:49:F7:B3:21:7E:A4:86:85:52:DA:CA:F1:9F:FE:1F:2F:14:90:AC:31:BE:21:A7:31:8D:12:3D:7B:2A:84:D5
+tls afldb.com X509v3 Subject Alternative Name: 
+tls afldb.com     DNS:afldb.com
+tls afldb.com days_remaining=76
+https afldb.com/ http=200 verify=0 redirect=
+dns www.afldb.com 104.21.25.194 172.67.134.128 
+tls www.afldb.com subject=CN = www.afldb.com
+tls www.afldb.com issuer=C = US, O = Let's Encrypt, CN = YE1
+tls www.afldb.com notBefore=Oct 14 09:09:45 2026 GMT
+tls www.afldb.com notAfter=Jan 12 09:09:44 2027 GMT
+tls www.afldb.com sha256 Fingerprint=8C:3E:85:FF:2A:FB:5C:49:9A:16:8C:FA:CD:1B:CA:54:29:64:B6:60:CC:05:B0:55:FF:8F:72:59:DA:6B:61:7C
+tls www.afldb.com X509v3 Subject Alternative Name: 
+tls www.afldb.com     DNS:www.afldb.com
+tls www.afldb.com days_remaining=75
+https www.afldb.com/ http=301 verify=0 redirect=https://afldb.com/
+dns beta.afldb.com 104.21.25.194 172.67.134.128 
+tls beta.afldb.com subject=CN = beta.afldb.com
+tls beta.afldb.com issuer=C = US, O = Let's Encrypt, CN = YE2
+tls beta.afldb.com notBefore=Oct 14 07:59:47 2026 GMT
+tls beta.afldb.com notAfter=Jan 12 07:59:46 2027 GMT
+tls beta.afldb.com sha256 Fingerprint=06:B4:17:A2:34:38:49:6D:0F:A6:FA:8F:1D:11:5A:13:A8:95:A7:B3:7B:71:77:9C:2D:D3:F4:45:FB:36:3C:94
+tls beta.afldb.com X509v3 Subject Alternative Name: 
+tls beta.afldb.com     DNS:beta.afldb.com
+tls beta.afldb.com days_remaining=75
+https beta.afldb.com/api/health http=200 verify=0 redirect=
+app_direct {"status":"ok","database":"ok","latencyMs":1} http=200
+== H4 backup and recovery routing (names, sizes and dates only; no dump is opened) 2026-10-29T00:14:56Z
+backup_dir 700 arm:arm
+backup_entry total 248328
+backup_entry drwx------ 14 arm arm     4096 2026-10-29T06:23:36 .
+backup_entry drwxrwxr-x  3 arm arm     4096 2026-08-18T23:36:53 ..
+backup_entry -rw-------  1 arm arm 21173044 2026-09-03T18:56:19 afldb_prod-20260903-185612.dump
+backup_entry -rw-------  1 arm arm 21238290 2026-09-04T11:54:20 afldb_prod-20260904-115413.dump
+backup_entry -rw-------  1 arm arm 21543086 2026-09-04T20:10:44 afldb_prod-20260904-201037.dump
+backup_entry -rw-rw-r--  1 arm arm      122 2026-09-04T20:10:44 afldb_prod-20260904-201037.dump.sha256
+backup_entry -rw-------  1 arm arm 22962432 2026-09-07T23:41:31 afldb_prod-20260907-234124.dump
+backup_entry -rw-------  1 arm arm 23021327 2026-09-08T01:04:29 afldb_prod-20260908-010422.dump
+backup_entry -rw-------  1 arm arm 23903094 2026-09-14T15:24:48 afldb_prod-20260914-152441.dump
+backup_entry -rw-------  1 arm arm 24006070 2026-09-26T21:36:19 afldb_prod-20260926-213612.dump
+backup_entry -rw-------  1 arm arm 24010174 2026-09-27T13:28:37 afldb_prod-20260927-132829.dump
+backup_entry -rw-------  1 arm arm 24031238 2026-09-27T14:32:21 afldb_prod-20260927-143214.dump
+backup_entry -rw-------  1 arm arm 24031238 2026-09-28T10:22:57 afldb_prod-20260928-102249.dump
+backup_entry -rw-rw-r--  1 arm arm 23705660 2026-09-12T13:13:56 afldb_prod-pre-admin-centre-20260912-131349.dump
+backup_entry -rw-rw-r--  1 arm arm      139 2026-09-12T13:13:56 afldb_prod-pre-admin-centre-20260912-131349.dump.sha256
+backup_entry drwx------  2 arm arm     4096 2026-10-29T06:23:47 current-shadow-20261028T192336Z
+backup_entry -rw-rw-r--  1 arm arm      122 2026-09-27T13:28:37 issue251-adoption-20260927-132829.sha256
+backup_entry -rw-rw-r--  1 arm arm     6044 2026-09-27T14:07:30 issue251-apply-20260927-132829.log
+backup_entry -rw-rw-r--  1 arm arm      332 2026-09-27T13:28:37 issue251-backup-20260927-132829.log
+backup_entry -rw-rw-r--  1 arm arm      581 2026-09-27T14:08:22 issue251-census-post-20260927-132829.txt
+backup_entry -rw-rw-r--  1 arm arm      571 2026-09-27T14:05:07 issue251-census-pre-20260927-132829-rev1dee06c0.txt
+backup_entry -rw-rw-r--  1 arm arm      571 2026-09-27T13:40:12 issue251-census-pre-20260927-132829.txt
+backup_entry -rw-rw-r--  1 arm arm     4134 2026-09-27T13:40:05 issue251-census.js
+backup_entry -rw-rw-r--  1 arm arm     6744 2026-09-27T14:08:22 issue251-census.sql
+backup_entry -rw-rw-r--  1 arm arm      535 2026-09-27T14:08:23 issue251-classify-post-20260927-132829.log
+backup_entry -rw-rw-r--  1 arm arm      535 2026-09-27T14:05:06 issue251-classify-pre-20260927-132829-rev1dee06c0.log
+backup_entry -rw-rw-r--  1 arm arm      535 2026-09-27T13:38:17 issue251-classify-pre-20260927-132829.log
+backup_entry -rw-------  1 arm arm      485 2026-09-27T13:28:58 issue251-phase4-20260927-132829.env
+backup_entry -rw-------  1 arm arm      806 2026-09-28T09:26:23 issue252-prod-dependencies-A-20260927-232620.json
+backup_entry -rwx------  1 arm arm     5986 2026-09-28T10:20:52 l5-20260928-101642-freeze-snapshot.sh
+backup_entry drwxrwxr-x  2 arm arm     4096 2026-09-08T01:00:33 promotion-20260907-234124
+backup_entry -rw-------  1 arm arm      813 2026-09-08T01:03:13 promotion-20260907-234124-issue151-interruption.txt
+backup_entry drwxrwxr-x  2 arm arm     4096 2026-09-07T23:54:21 promotion-20260907-234124-pre-issue151
+backup_entry -rw-------  1 arm arm     1409 2026-09-08T00:55:56 promotion-20260907-234124-rerun.json
+backup_entry -rw-------  1 arm arm     1409 2026-09-07T23:47:30 promotion-20260907-234124.json
+backup_entry -rw-rw-r--  1 arm arm      122 2026-09-07T23:41:31 promotion-20260907-234124.sha256
+backup_entry drwxrwxr-x  2 arm arm     4096 2026-09-08T01:09:05 promotion-20260908-010422
+backup_entry -rw-------  1 arm arm     1409 2026-09-08T01:06:20 promotion-20260908-010422.json
+backup_entry -rw-rw-r--  1 arm arm      122 2026-09-08T01:04:29 promotion-20260908-010422.sha256
+backup_entry -rw-rw-r--  1 arm arm      436 2026-09-26T21:51:10 promotion-20260926-213225-candidate-restore.log
+backup_entry -rw-------  1 arm arm     1659 2026-09-26T21:39:55 promotion-20260926-213225.json
+backup_entry -rw-rw-r--  1 arm arm      122 2026-09-26T21:36:20 promotion-20260926-213225.sha256
+backup_entry -rw-rw-r--  1 arm arm      436 2026-09-27T14:39:19 promotion-20260927-142540-candidate-restore.log
+backup_entry drwxrwxr-x  2 arm arm     4096 2026-09-27T14:32:35 promotion-20260927-142540-freeze
+backup_entry -rw-------  1 arm arm     1661 2026-09-27T14:35:38 promotion-20260927-142540.json
+backup_entry -rw-rw-r--  1 arm arm      122 2026-09-27T14:32:21 promotion-20260927-142540.sha256
+backup_entry -rw-------  1 arm arm      806 2026-09-27T20:22:51 promotion-20260927-202250-dependencies-A.json
+backup_entry -rw-------  1 arm arm     2578 2026-09-08T00:56:17 promotion-lineage-20260907-234124-rerun.sql
+backup_entry -rw-------  1 arm arm     2205 2026-09-07T23:53:38 promotion-lineage-20260907-234124.sql
+backup_entry -rw-------  1 arm arm     2578 2026-09-08T01:06:21 promotion-lineage-20260908-010422.sql
+backup_entry drwxrwxr-x  2 arm arm     4096 2026-09-26T21:23:18 promotion-prod-20260926-212317-freeze
+backup_entry drwxrwxr-x  2 arm arm     4096 2026-09-26T21:36:33 promotion-prod-20260926-213225-freeze
+backup_entry -rw-------  1 arm arm      806 2026-09-28T10:16:46 promotion-prod-20260928-101642-dependencies-A.json
+backup_entry -rw-------  1 arm arm      836 2026-09-28T10:40:36 promotion-prod-20260928-101642-dependencies-B.json
+backup_entry drwxrwxr-x  2 arm arm     4096 2026-09-28T10:23:12 promotion-prod-20260928-101642-freeze
+backup_entry drwxrwxr-x  2 arm arm     4096 2026-09-28T11:16:37 promotion-prod-20260928-101642-plan
+backup_entry -rw-rw-r--  1 arm arm     9284 2026-09-28T12:12:13 promotion-prod-20260928-101642-settle-2026-2026-09-28-1207-apply.log
+backup_entry -rw-rw-r--  1 arm arm     1831 2026-09-28T12:08:36 promotion-prod-20260928-101642-settle-2026-2026-09-28-1207-dry-run.log
+backup_entry -rw-rw-r--  1 arm arm     7633 2026-09-28T12:12:14 promotion-prod-20260928-101642-settle-2026-2026-09-28-1207-report.log
+backup_entry -rw-rw-r--  1 arm arm     9259 2026-09-28T12:17:05 promotion-prod-20260928-101642-settle-2026-2026-09-28-1216-sc3-apply.log
+backup_entry -rw-rw-r--  1 arm arm     7633 2026-09-28T12:17:06 promotion-prod-20260928-101642-settle-2026-2026-09-28-1216-sc3-report.log
+backup_entry -rw-rw-r--  1 arm arm     9259 2026-09-28T12:18:18 promotion-prod-20260928-101642-settle-2026-2026-09-28-1217-sc3-apply.log
+backup_entry -rw-rw-r--  1 arm arm     7633 2026-09-28T12:18:19 promotion-prod-20260928-101642-settle-2026-2026-09-28-1217-sc3-report.log
+backup_entry -rw-------  1 arm arm       43 2026-09-28T12:17:46 promotion-prod-20260928-101642-settle-sc3.env
+backup_entry -rw-------  1 arm arm       42 2026-09-28T12:07:16 promotion-prod-20260928-101642-settle.env
+backup_entry -rw-------  1 arm arm    18000 2026-09-28T10:20:25 promotion-prod-20260928-101642-source-proof.json
+backup_entry -rw-------  1 arm arm     1661 2026-09-28T10:46:53 promotion-prod-20260928-101642.json
+backup_entry -rw-------  1 arm arm      588 2026-09-28T11:06:52 promotion-prod-afl-api-supersede-20260928-101642.json
+backup_entry -rw-------  1 arm arm   315898 2026-09-28T11:06:52 promotion-prod-lineage-20260928-101642.sql
+backup_entry drwx------  2 arm arm     4096 2026-10-21T06:48:21 release117-20261020T194821676044Z
+backup_entry drwx------  2 arm arm     4096 2026-10-21T06:54:15 release117-20261020T194848633969Z
+backup_entry drwx------  2 arm arm     4096 2026-10-20T10:35:40 v2-rehearsal-20261019T233531867935Z
+backup_dumps_top_level=11 backup_total=329M
+disk Mounted on   1B-blocks        Used       Avail
+disk /          82086711296 20821274624 61248659456
+disk /          82086711296 20821274624 61248659456
+backup_timer Fri 2026-10-30 00:00:00 AEDT      12h Thu 2026-10-29 00:00:01 AEDT           11h ago dpkg-db-backup.timer           dpkg-db-backup.service
+crontab none_or_unreadable rc=1
+cron_d total 20
+cron_d drwxr-xr-x   2 root root 4096 Jun 15 23:45 .
+cron_d drwxr-xr-x 114 root root 4096 Oct 28 06:26 ..
+cron_d -rw-r--r--   1 root root  102 Mar 31  2024 .placeholder
+cron_d -rw-r--r--   1 root root  201 Apr  9  2024 e2scrub_all
+cron_d -rw-r--r--   1 root root  396 Jan 10  2024 sysstat
+offhost_tool rsync /usr/bin/rsync
+ssh_host_alias Host github.com-afldb-deploy
+deployed_script 776d066e9525f6a5bbb02fcb16f2b1099ce104814bb7797875f1dcdf3fa31311  /home/arm/projects/afldb/tools/maintenance/backup.sh
+deployed_script 270adda8197439220a6c6044f1e3b194c757322c1a2118bb29c46662974848c8  /home/arm/projects/afldb/tools/maintenance/restore-test.sh
+env_file 600 arm:arm
+env_keys AFLDB_APEX_DIR AFLDB_AUTH_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_BACKUP_DIR AFLDB_BASE_URL AFLDB_BETA_EPOCH AFLDB_BETA_GATE AFLDB_ENV AFLDB_IMPORT_DATABASE_URL AFLDB_MAX_FILTERS AFLDB_MAX_PAGE_SIZE AFLDB_OWNER_DATABASE_URL AFLDB_POOL_MAX AFLDB_PROD_DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_FROM AFLDB_SMTP_HOST AFLDB_SMTP_PASSWORD AFLDB_SMTP_PORT AFLDB_SMTP_SECURE AFLDB_SMTP_USER AFLDB_STATEMENT_TIMEOUT_MS AFLDB_WORKERS DATABASE_URL NODE_ENV PORT 
+== H5 database identity and backup prerequisites (afldb_backup, read-only session) 2026-10-29T00:14:56Z
+dsn_identity user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity afldb_prod	afldb_backup	66668	7674454702926115004	on	f	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+catalog database	afldb_prod	afldb_owner
+catalog database	afldb_prod_auth_recovery	afldb_owner
+catalog database	afldb_prod_candidate_20260926-213225	afldb_owner
+catalog database	afldb_prod_candidate_20260927-142540	afldb_owner
+catalog database	afldb_prod_pre_rebuild_20260907-234124	afldb_owner
+catalog database	afldb_prod_pre_rebuild_20260928-101642	afldb_owner
+catalog database	afldb_restore_test	afldb_owner
+catalog database	postgres	postgres
+ledger rows=110 last=110_match_sheet_player_match_stats_authority.sql digest=789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153
+== END findings=2 2026-10-29T00:14:57Z

@@ -1,14 +1,20 @@
 {
-# AFLDB V2 host-prerequisite inspection (release gate 9, plan step 2). READ-ONLY. Prepared 2026-10-29, NOT RUN.
+# AFLDB V2 host-prerequisite inspection (release gate 9, plan step 2). READ-ONLY. Prepared 2026-10-29.
+# Revised 2026-10-29 under the D-V2-HOST-INSPECT-1 amendments: no process command line, crontab line or
+# Caddy configuration line is printed; each is reduced to allowlisted, non-secret observations.
 # Runs only under the owner's approval D-V2-HOST-INSPECT-1
 # (docs/v2/host-prerequisites-inspection-2026-10-29.md). Streamed from Windows; nothing is copied to the host:
 #   cmd /c "ssh -o BatchMode=yes afldb bash -s < inspect-host-readonly.sh > inspect.log 2>&1"
 # It creates, edits and deletes NO file on the host: no unit, timer, polkit, Caddy, certificate, crontab, backup,
 # database or application change; no sudo; no start/stop/reload/enable/disable; the caddy binary is never run.
-# Git reads use GIT_OPTIONAL_LOCKS=0. psql runs -X, non-interactive, in a read-only session as afldb_backup.
+# Git reads use GIT_OPTIONAL_LOCKS=0. psql runs -X, non-interactive, in read-only sessions as afldb_backup.
 # The only side effects are ordinary log lines: one TLS handshake and one HTTPS GET per site, one direct
-# health GET (Caddy/app access logs), and one database connection (server log, pg_stat_activity).
-# Output goes to stdout only. Secret values are never printed; .env and crontab are reduced or redacted.
+# health GET (Caddy/app access logs), and four short read-only database connections, one per query
+# (identity, extensions, database list, ledger; server log, pg_stat_activity). The identity query runs
+# first and any mismatch stops before the other three.
+# Output goes to stdout only. Secret values are never printed: .env yields key names only; processes yield
+# identity only (pid, user, elapsed, executable name, unit); crontab yields schedules and yes/no classes;
+# Caddy yields hashes, diff line counts and allowlisted structure. Nothing relies on redacting raw text.
 set -u -o pipefail
 export LC_ALL=C GIT_OPTIONAL_LOCKS=0
 umask 077
@@ -38,7 +44,6 @@ declare -A REPO_SHA=(
   [afldb-settle-afltables.timer]=65a33089f59563745ea83660f077bfb87430b4eb66dfb05f5e0eb2c16df7409e
   [afldb-settle-afltables-trigger.rules]=3164e0d9d8f37603effcd5ef91ce2f5ba17fc340370f525251d21991b6c50b64
 )
-REDACT='s/((pass(word)?|secret|token|key|hash|basic_?auth)[^[:space:]]*[[:space:]=:]+)[^[:space:]]+/\1<redacted>/Ig; s#(postgres(ql)?://)[^[:space:]]+#\1<redacted>#Ig'
 cmp_repo() {
   local f="$1" k="$2" s
   if [ -r "$f" ]; then
@@ -50,6 +55,41 @@ cmp_repo() {
   fi
 }
 UNIT_PROPS=Id,LoadState,ActiveState,SubState,UnitFileState,FragmentPath,DropInPaths,MainPID,ExecMainStartTimestamp,NRestarts,User,WorkingDirectory
+# Presence and identity of processes whose command line matches a pattern. The command line is matched by
+# pgrep but never printed: only pid, user, elapsed seconds, executable name and systemd unit.
+proc_presence() {
+  local pids p
+  pids=$(pgrep -f -- "$2" 2>/dev/null | tr '\n' ' ')
+  echo "process $1 count=$(wc -w <<< "$pids")"
+  for p in $pids; do
+    echo "process $1 pid=$p $(ps -o user=,etimes=,comm= -p "$p" 2>/dev/null | awk '{print "user=" $1 " elapsed_s=" $2 " comm=" $3}') unit=$(sed -n 's#.*/\([^/]*\.\(service\|scope\)\)$#\1#p' "/proc/$p/cgroup" 2>/dev/null | tail -1)"
+  done
+}
+# Caddyfile structure from allowlisted tokens only: site addresses, handle matchers, proxy upstreams, root
+# paths, file_server, log output paths and imports. A token outside its allowlist prints as <other>; no
+# configuration line is printed.
+caddy_structure() {
+  awk -v SRC="$2" '
+  function keep(s, re,   n, a, i, o) { n = split(s, a, /[ \t,]+/); o = ""
+    for (i = 1; i <= n; i++) if (a[i] != "") o = o (o == "" ? "" : ",") (a[i] ~ re ? a[i] : "<other>")
+    return o == "" ? "-" : o }
+  BEGIN { HOST = "^(https?://)?[A-Za-z0-9.*-]+(:[0-9]+)?$"; UP = "^((https?|h2c)://)?(localhost|127\\.0\\.0\\.1|\\[::1\\]|[A-Za-z0-9.-]+)(:[0-9]+)?$"
+    MATCH = "^(/[A-Za-z0-9._/*-]*|@[A-Za-z0-9_-]+)$"; ROOT = "^(\\*|/[A-Za-z0-9._/-]*)$"; FILE = "^/[A-Za-z0-9._/-]+$"; NAME = "^[A-Za-z0-9._/*-]+$"
+    d = 0; site = "-"; hdl = "-" }
+  { l = $0; sub(/^[ \t]+/, "", l); if (l ~ /^#/) next; sub(/[ \t]+#.*$/, "", l); sub(/[ \t]+$/, "", l); if (l == "") next
+    c = l; gsub(/\{[^{} \t]*\}/, "", c); o = gsub(/\{/, "{", c); x = gsub(/\}/, "}", c)
+    w = l; sub(/[ \t]*\{.*$/, "", w); split(w, f, /[ \t]+/); dir = f[1]; rest = w; sub(/^[^ \t]+[ \t]*/, "", rest)
+    if (d == 0 && o > 0) {
+      site = (w == "" ? "(global)" : (w ~ /^\(/ ? "(snippet)" : keep(w, HOST))); print "caddy_site " SRC " " site
+    } else if (dir == "handle" || dir == "handle_path") {
+      m = (rest == "" ? "(all)" : keep(rest, MATCH)); if (o > x) hdl = m; print "caddy_handle " SRC " site=" site " " dir "=" m
+    } else if (dir == "reverse_proxy") { print "caddy_proxy " SRC " site=" site " handle=" hdl " upstream=" keep(rest, UP)
+    } else if (dir == "root") { print "caddy_root " SRC " site=" site " handle=" hdl " path=" keep(rest, ROOT)
+    } else if (dir == "file_server") { print "caddy_file_server " SRC " site=" site " handle=" hdl
+    } else if (dir == "output" && f[2] == "file") { print "caddy_log_output " SRC " site=" site " path=" keep(f[3], FILE)
+    } else if (dir == "import") { print "caddy_import " SRC " site=" site " name=" keep(rest, NAME) }
+    d += o - x; if (d <= 1) hdl = "-"; if (d <= 0) { d = 0; site = "-" } }' "$1"
+}
 
 step "H0 host identity (stop on any mismatch)"
 [ "$(hostname)" = afldb-prod ] || stop "unexpected host $(hostname)" 3
@@ -80,17 +120,27 @@ done
 echo "polkit_dir $(stat -c '%a %U:%G' /etc/polkit-1/rules.d 2>&1)"
 ls -la /etc/polkit-1/rules.d 2>&1 | sed 's/^/polkit /'
 [ -r /etc/polkit-1/rules.d ] && for f in /etc/polkit-1/rules.d/*afldb*; do [ -r "$f" ] && cmp_repo "$f" afldb-settle-afltables-trigger.rules; done
-pgrep -af 'settle-|afl-api-|migrate\.ts|pg_dump|pg_restore' | grep -v pgrep | sed 's/^/process /' || echo "process none (settle/migrate/dump)"
+proc_presence settle 'settle-'
+proc_presence afl_api 'afl-api-'
+proc_presence migrate 'migrate\.ts'
+proc_presence pg_dump 'pg_dump'
+proc_presence pg_restore 'pg_restore'
 
 step "H2 Caddy (configuration read only; the caddy binary is not run)"
 dpkg-query -W -f='caddy_package ${Version}\n' caddy 2>/dev/null || note "caddy is not a dpkg package (record its install route)"
-systemctl show caddy.service -p "$UNIT_PROPS",ExecStart --no-pager | sed 's/^/caddy.service /'
+systemctl show caddy.service -p "$UNIT_PROPS" --no-pager | sed 's/^/caddy.service /'
+# ExecStart is reduced to its executable path and --config path; no other argument is printed.
+CX=$(systemctl show caddy.service -p ExecStart --value 2>/dev/null)
+echo "caddy_exec path=$(sed -n 's#.*path=\(/[A-Za-z0-9._/-]*\) .*#\1#p' <<< "$CX" | head -1) config=$(sed -n 's#.*--config \(/[A-Za-z0-9._/-]*\).*#\1#p' <<< "$CX" | head -1)"
+unset CX
 ls -la /etc/caddy 2>&1 | sed 's/^/etc_caddy /'
 cmp_repo /etc/caddy/Caddyfile Caddyfile.production
 if [ -r /etc/caddy/Caddyfile ] && [ -r "$R/deploy/Caddyfile.production" ]; then
-  diff -u "$R/deploy/Caddyfile.production" /etc/caddy/Caddyfile | sed -E "$REDACT" | sed 's/^/caddy_diff /'
+  # Counts only: the differing lines themselves are never printed.
+  echo "caddy_diff_lines only_in_live=$(diff "$R/deploy/Caddyfile.production" /etc/caddy/Caddyfile | grep -c '^>') only_in_repo=$(diff "$R/deploy/Caddyfile.production" /etc/caddy/Caddyfile | grep -c '^<')"
+  caddy_structure "$R/deploy/Caddyfile.production" repo
 fi
-grep -nE '^[^#[:space:]][^{]*\{|reverse_proxy|root \*|output file|^\s*import ' /etc/caddy/Caddyfile 2>/dev/null | sed 's/^/caddy_site /'
+[ -r /etc/caddy/Caddyfile ] && caddy_structure /etc/caddy/Caddyfile live
 echo "apex_dir $(stat -c '%U:%G %a %y' /var/www/afldb-soon 2>&1)"
 ls -la /var/www/afldb-soon 2>&1 | head -40 | sed 's/^/apex_file /'
 ls -la /var/log/caddy 2>&1 | sed 's/^/caddy_log_file /'   # names and sizes only; no log is read
@@ -121,7 +171,22 @@ echo "backup_dumps_top_level=$(find "$BD" -maxdepth 1 -name '*.dump' 2>/dev/null
 df -B1 --output=target,size,used,avail /home/arm /var/lib/postgresql 2>/dev/null | sed 's/^/disk /'
 systemctl list-timers --all --no-pager --no-legend 2>/dev/null | grep -iE 'backup|dump|restore|rclone|restic|borg' | sed 's/^/backup_timer /' \
   || echo "backup_timer none"
-crontab -l 2>&1 | sed -E "$REDACT" | sed 's/^/crontab /'
+# Crontab: schedule fields (allowlisted) and yes/no classes per entry; no command text or assignment value.
+CRON=$(crontab -l 2>/dev/null); CRON_RC=$?
+if [ "$CRON_RC" -ne 0 ]; then
+  echo "crontab none_or_unreadable rc=$CRON_RC"
+else
+  printf '%s\n' "$CRON" | awk '
+    { l = $0; sub(/^[ \t]+/, "", l) }
+    l == "" || l ~ /^#/ { next }
+    l ~ /^[A-Za-z_][A-Za-z0-9_]*[ \t]*=/ { env++; next }
+    { n++; split(l, f, /[ \t]+/); ll = tolower(l)
+      if (f[1] ~ /^@[a-z]+$/) s = f[1]
+      else { s = ""; for (i = 1; i <= 5; i++) s = s (i > 1 ? " " : "") ((f[i] ~ /^[0-9*\/,-]+$/ || f[i] ~ /^[A-Za-z][A-Za-z][A-Za-z]$/) ? f[i] : "<other>") }
+      printf "crontab_entry %d schedule=\"%s\" afldb=%d backup=%d dump=%d offhost=%d\n", n, s, (ll ~ /afldb/), (ll ~ /backup/), (ll ~ /pg_dump|pg_basebackup/), (ll ~ /rclone|restic|borg|rsync|scp |aws |s3cmd|gsutil/) }
+    END { printf "crontab entries=%d env_assignments=%d\n", n, env }'
+fi
+unset CRON
 ls -la /etc/cron.d 2>&1 | sed 's/^/cron_d /'
 grep -l -i afldb /etc/crontab /etc/cron.d/* /etc/cron.daily/* /etc/cron.weekly/* 2>/dev/null | sed 's/^/cron_mentions_afldb /'
 for b in rclone restic borg rsync aws s3cmd gsutil; do command -v "$b" >/dev/null && echo "offhost_tool $b $(command -v "$b")"; done

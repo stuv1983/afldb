@@ -521,6 +521,11 @@ award results must be shown reconcilable before production; **no** — not a pro
   `c78e9e9b`) and 08/09 including the `local-visual` recaptures (V2-GAP-023 leaderboard/mapping and the
   eligibility tri-state, both 2026-10-20) are stale; `/admin/operations/afl-api-refusals` has no capture; six
   further §6 states are uncaptured. No agent verdict is recorded; the owner decides (D-V2-VISUAL-1).
+- **Correction and recapture proposal, 2026-10-29 (still OPEN).** The refusals page is not uncaptured:
+  `evidence/gap025-visual/` holds 14 `next dev` captures (2026-10-27, `c78e9e9b`; no admin code has changed
+  since), but none from a production build. A production-build recapture of 01/02/08/09 and the refusals empty
+  states is prepared and not run ([checklist §5](owner-visual-review-2026-10-29.md), new
+  `tools/v2/candidate-visual-capture.mts`).
 
 - **Technically inspected, 2026-10-19.** All 26 Launch F images opened and reviewed for
   readability/mobile/permissions/action wording/status clarity; material Brownlow wording and
