@@ -15,6 +15,28 @@ commit.
 
 ## [Unreleased]
 
+### V2 pushed; production execution package prepared (D-V2-PUSH-ROUTE-1, 2026-10-30; production NO-GO)
+
+- V2 gained `origin`: the source repository's existing URL, read without changing `D:\dev\afldb`, with the same root
+  commit verified. `origin/main` was exactly `ff100dc2`. One atomic push without force fast-forwarded it to the
+  locked commit `9ed9c9dd3e84682c43e96c46e98974b245eb54ed` and created `v2/rebuild` at `d3286d92`. The lock holds.
+  Record: `docs/v2/owner-decision-lock-2026-10-29.md` §4a.
+- O-ARTIFACT approved as the release method: a host build of exactly `9ed9c9dd` with `AFLDB_ENV=production`, with
+  `BUILD_ID` and manifest recorded before restart. The Windows build stays verification evidence only.
+- `docs/v2/production-execution-package-2026-10-30.md` is one timed session (proposed Saturday 2026-11-07,
+  09:00–14:00 AEDT) covering writer retirement and the freeze, a frozen backup with off-host copy and proven
+  restore, recovery routes, migrations 111–117 with the two staging defaults, permission verification, the host
+  build and live acceptance. The package also covers:
+  - **43/43 evidence:** the unmodified privileges suite runs only on an isolated clone of the frozen dump. Production
+    gets a read-only catalogue and effective-permission read-back
+    (`docs/v2/evidence/production-execution-20261030/permission-readback.sql`), compared line by line with that clone.
+  - **Data claims:** whole-row content comparisons from restored dumps
+    (`docs/v2/evidence/production-execution-20261030/snapshot-compare.mjs`), not the ledger.
+  - **Drift:** drift against `a4641ca0` is close to certain, because every nightly AFL Tables settle under
+    `ff100dc2` inserts an `import_batches` row. That is raised as owner choice O-DRIFT.
+  - **Status:** both new artefacts are unexecuted, and their control runs are pre-session item P-4. Nothing was run
+    against DEV, production or any database.
+
 ### Owner visual acceptance and release decisions recorded (D-V2-LOCK-1, 2026-10-29; production NO-GO)
 
 - D-V2-VISUAL-1: the owner accepted all screens and states presented for acceptance in

@@ -59,6 +59,21 @@ NOT REVIEWED / OUT OF SCOPE (owner's wording): authentic provider reconciliation
 | Branch placement | This record (and its build evidence) is committed on `v2/rebuild` only, so local `main` stays **exactly** at the locked commit. The working tree was returned to `v2/rebuild` (same tree) |
 | Lock condition | The lock assumes the remote `main` is still `ff100dc2`, so that pushing makes it a fast-forward to `9ed9c9dd`. If the remote `main` has moved, the merge must be redone, which produces a new commit and **re-opens the lock** and its build |
 
+## 4a. D-V2-PUSH-ROUTE-1 — push executed (approved and executed 2026-10-30)
+
+The owner approved O-PUSH option (a) and approved O-ARTIFACT as the release method, not as execution authority.
+The O-ARTIFACT text is recorded in the [production execution package](production-execution-package-2026-10-30.md) §0.
+
+| Item | Result |
+|---|---|
+| Source URL | `git -C D:\dev\afldb config --get remote.origin.url` was read, with no write to the source checkout: `https://github.com/stuv1983/afldb.git`. No credential is embedded |
+| Identity | V2 and the source repository share root commit `e31dc07be82b9801e9ea96d3c8d4011c3735f876`. `ff100dc2` exists in both and is the first parent of `9ed9c9dd` |
+| Remote and fetch | `git remote add origin <that URL>`; `git fetch origin`. `git ls-remote --heads origin main v2/rebuild`: `main` = `ff100dc2b8da8523f550ef45a9eaa3ef96d9d840`, no `v2/rebuild` |
+| Push | `ff100dc2` is an ancestor of `9ed9c9dd`, so this is a fast-forward. `git push --atomic origin refs/heads/v2/rebuild:refs/heads/v2/rebuild refs/heads/main:refs/heads/main` exited 0: `ff100dc2..9ed9c9dd main -> main` and `[new branch] v2/rebuild -> v2/rebuild`. No force, no protection refusal, no merge redo |
+| **Verified remote refs** | `refs/heads/main` = **`9ed9c9dd3e84682c43e96c46e98974b245eb54ed`** (= local `main`, the locked commit). `refs/heads/v2/rebuild` = **`d3286d92c5f4b8701aba20eb1c6b694c42261620`** (= local `v2/rebuild` at push time) |
+| Lock | **Holds**: the remote `main` was `ff100dc2`, as §4's lock condition requires. The records commit that follows this push is on local `v2/rebuild` only, and is not pushed |
+| Preserved | The source checkout `D:\dev\afldb` was not written: its local `main` is still `6ffb893b` with its 25 unpushed source-only commits, and its `origin/main` tracking ref is unfetched at `ff100dc2`. Untracked `.codex/` in V2 is untouched. ISSUE-327 stays parked; EXEC and frozen P/H are unchanged |
+
 ## 5. Production-configured build (executed 2026-10-29 13:06–13:08 UTC)
 
 | Item | Value |
@@ -92,6 +107,11 @@ the host build of `9ed9c9dd` needs its own recorded identity (§6, O-ARTIFACT).
 [host change list](host-prerequisites-findings-2026-10-29.md) §4. Unchanged and not waived: privileges 42/43 until
 A-REL, strict preservation and parity FAIL, staged Brownlow comparator INCOMPLETE, V2-GAP-029 open, authentic
 provider reconciliation separate (gate 7).
+
+> **Update 2026-10-30:** O-PUSH was approved as option (a) and executed (§4a). O-ARTIFACT was approved as option (a),
+> as the release method only. O-5 to O-7 and the approvals below are now consolidated, with four new choices
+> (O-DRIFT, O-ISO, O-FREEZE, O-RB), into one session package:
+> [production execution package](production-execution-package-2026-10-30.md). The text below is kept as prepared.
 
 ### 6.1 Owner choices still open, named concretely
 
