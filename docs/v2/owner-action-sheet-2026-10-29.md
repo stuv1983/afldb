@@ -53,6 +53,11 @@ Open [owner-visual-review-2026-10-29.md](owner-visual-review-2026-10-29.md):
    recapture (this needs a production build).
 4. Return the verdict block from the checklist's §4. Until you do, V2-GAP-022 stays open.
 
+   **Update (2026-10-29, D-V2-VISUAL-RECAPTURE-1):** items 1–3 are replaced by one sheet,
+   [owner-visual-review-candidate-2026-10-29.md](owner-visual-review-candidate-2026-10-29.md). It holds the production-build
+   recapture of candidate `592c6c16` and every §6 state producible with fixtures. It also records three defects
+   found (V2-GAP-036 High, 037, 038) and the states still unavailable. Return its §6 block instead.
+
 ## 3. Policy decisions needed before the artifact lock
 
 Only genuine open policy points are listed. Everything else is an execution approval already prepared in

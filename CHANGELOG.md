@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### Candidate visual recapture from a production build (2026-10-29; production NO-GO)
+
+- D-V2-VISUAL-RECAPTURE-1 (approved, expanded scope) recaptured candidate `592c6c16` from one production build
+  (1516 pages, telemetry off) served on 127.0.0.1:3912. The data came from the disposable `afldb_v2_visual2_test`
+  (cloned from `afldb_v2_rollbackapp_test`, migrated to 117) on the isolated cluster at 127.0.0.1:55433.
+  `tools/v2/candidate-visual-capture.mts` ran unchanged: 12 images, history unchanged. The new
+  `tools/v2/candidate-visual-states.mts` produced the remaining §6 states with synthetic fixtures and test actions,
+  logging each expected effect next to the observed one: two passes, 148 images, 0 external requests.
+- Defects found and recorded, the candidate unchanged: **V2-GAP-036 (High)**, the standalone bundle omits
+  `data/reference/coleman-derivation.json`, so every Coleman compare and publish is refused; V2-GAP-037, refusal
+  notices render the absolute server path; V2-GAP-038, a 28px overflow at 390px on the Brownlow page.
+- One owner review sheet: `docs/v2/owner-visual-review-candidate-2026-10-29.md`. Visual acceptance stays with the
+  owner; V2-GAP-022 remains open. Nothing was pushed, deployed or run against DEV or production.
+
 ### Read-only production-host inspection for gate 9 (2026-10-29; production NO-GO)
 
 - D-V2-HOST-INSPECT-1, approved with three bounded amendments, revised the inspection script before running it.

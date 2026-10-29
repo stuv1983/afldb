@@ -1,5 +1,9 @@
 # Owner visual review checklist — D-V2-VISUAL-1 (V2-GAP-022, gate 3)
 
+> **Superseded for screenshots (2026-10-29).** The candidate `592c6c16` was recaptured from a production build under
+> D-V2-VISUAL-RECAPTURE-1. Review from [owner-visual-review-candidate-2026-10-29.md](owner-visual-review-candidate-2026-10-29.md);
+> this page is kept as history.
+
 **Prepared 2026-10-29 for the owner's review. Nothing here is accepted.** Only the owner's own per-screen
 verdict counts. Prose approval is not evidence, and no agent verdict stands in for the owner. V2-GAP-022
 stays **OPEN** until the owner records verdicts.

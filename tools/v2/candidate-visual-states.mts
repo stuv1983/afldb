@@ -8,13 +8,18 @@
  * 127.0.0.1:3912 from the SAME disposable database. Unlike candidate-visual-capture.mts this run DELIBERATELY
  * changes the clone: every fixture and test action is a named step whose expected effect is written to the log
  * next to the observed per-table row-count/digest change, so a deliberate change is never reported as unchanged
- * data. Read-only captures between steps assert that nothing changed. Two fixtures are reverted and verified
- * (the hidden standalone season registry, the emptied award queue) and one privilege change is restored.
+ * data. Read-only captures between steps assert that nothing changed. Build-output fixtures are reverted and
+ * verified (the hidden standalone season registry; the Coleman contract copied in for the clearly labelled
+ * W-block only, V2-GAP-036) and one privilege change is restored.
+ *
+ * This is PASS 2 and expects the clone as pass 1 left it. Pass 1 (revision 20994849, output
+ * docs/v2/evidence/candidate-visual-20261029-states/) consumed proposal #1 and the 2024 Brownlow leader, and made
+ * the empty-queue captures by moving the proposals aside and restoring them byte for byte.
  * The output directory must not exist. External requests are blocked and counted. Fixture sessions are local
  * `@example.invalid` identities and are never printed.
  */
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { writeFileSync, mkdirSync, existsSync, readFileSync, renameSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync, renameSync, copyFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import postgres from 'postgres';
 import { chromium, type Page } from '@playwright/test';
@@ -56,7 +61,7 @@ function delta(before: Awaited<ReturnType<typeof fingerprint>>, after: Awaited<R
 }
 
 /** One named fixture or test action: its expected effect is logged with what actually changed. */
-async function step(id: string, expected: string, expectTables: string[], work: () => Promise<void>): Promise<void> {
+async function step(id: string, expected: string, expectTables: string[], work: () => Promise<void>, mayChange: string[] = []): Promise<void> {
   const before = await fingerprint();
   try {
     await work();
@@ -67,9 +72,9 @@ async function step(id: string, expected: string, expectTables: string[], work: 
     failures.push(`step ${id}: ERROR ${message}`);
   }
   const observed = delta(before, await fingerprint());
-  const changed = observed.map((entry) => entry.split(':')[0]).sort();
+  const changed = observed.map((entry) => entry.split(':')[0]).filter((table) => !mayChange.includes(table)).sort();
   const match = JSON.stringify(changed) === JSON.stringify([...expectTables].sort());
-  log.push(`STEP ${id} expected="${expected}" expectedTables=[${expectTables.join(',')}] observed=[${observed.join(',') || 'no change'}] match=${match}`);
+  log.push(`STEP ${id} expected="${expected}" expectedTables=[${expectTables.join(',')}]${mayChange.length ? ` mayChange=[${mayChange.join(',')}]` : ''} observed=[${observed.join(',') || 'no change'}] match=${match}`);
   if (!match) failures.push(`step ${id}: expected [${expectTables.join(',')}], observed [${observed.join(',')}]`);
 }
 
@@ -111,15 +116,26 @@ async function shoot(s: Session, name: string, viewport: typeof DESKTOP, checks:
   const finalPath = new URL(s.page.url()).pathname + new URL(s.page.url()).search;
   const h1 = await s.page.locator('h1').first().textContent().catch(() => null);
   const overflow = await s.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  // Name what overflows: elements reaching past the viewport that are not inside their own scroll box.
+  const culprits = overflow > 0 ? await s.page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    return [...document.querySelectorAll('main *')]
+      .filter((e) => e.getBoundingClientRect().right > width + 1 && !e.closest('.table-wrap'))
+      .slice(-4)
+      .map((e) => `${e.tagName.toLowerCase()}${typeof e.className === 'string' && e.className ? `.${e.className.trim().split(/\s+/).join('.')}` : ''}"${(e.textContent ?? '').trim().slice(0, 40)}"@${Math.round(e.getBoundingClientRect().right)}`);
+  }) : [];
   const body = (await s.page.locator('body').innerText()).replace(/\s+/g, ' ');
   const failed: string[] = [];
   for (const selector of checks.present ?? []) if (await s.page.locator(selector).count() === 0) failed.push(`missing ${selector}`);
   for (const selector of checks.absent ?? []) if (await s.page.locator(selector).count() > 0) failed.push(`unexpected ${selector}`);
   for (const words of checks.text ?? []) if (!body.includes(words)) failed.push(`text not found "${words}"`);
   if (status !== null && status !== (checks.status ?? 200)) failed.push(`status ${status}`);
-  if (overflow > 0) failed.push(`overflow ${overflow}px`);
+  if (overflow > 0) failed.push(`overflow ${overflow}px by ${culprits.join(' | ')}`);
   if (s.errors.length) failed.push(`console ${JSON.stringify(s.errors.slice(0, 3))}`);
   const file = `${name}__${viewport.label}.png`;
+  // Pass 1 shot action outcomes while scrolled, which drew the sticky header and sidebar mid-image.
+  await s.page.evaluate(() => window.scrollTo(0, 0));
+  await s.page.waitForTimeout(150);
   await s.page.screenshot({ path: `${outDir}/${file}`, fullPage: true });
   log.push(`${file} as=${s.role === 'super_admin' ? 'super' : 'admin'} status=${status ?? 'same-page'} final=${finalPath} h1=${JSON.stringify(h1)} horizontalOverflowPx=${overflow} consoleErrors=${s.errors.length} checks=${failed.length ? `FAIL(${failed.join('; ')})` : 'pass'}`);
   if (failed.length) failures.push(`${file}: ${failed.join('; ')}`);
@@ -151,11 +167,30 @@ async function outcome(s: Session, scope: string) {
   await s.page.locator(`${scope} [data-action-outcome]:not([data-action-outcome="idle"])`).first().waitFor();
   await s.page.waitForLoadState('networkidle');
 }
+async function compare(s: Session, season: string, settled: boolean) {
+  await open(s, '/admin/operations/coleman');
+  await s.page.fill('#compare-season', season);
+  if (settled) await s.page.check('#compare-settled');
+  await s.page.locator('#coleman-compare button[type="submit"]').click();
+  await outcome(s, '#coleman-compare');
+}
+async function decide(s: Session, proposalId: number, intent: 'validate' | 'approve' | 'reject', note: string | null) {
+  await open(s, `/admin/operations/awards/${proposalId}`);
+  if (note !== null) await s.page.fill('#decision-note', note);
+  await s.page.locator(`button[value="${intent}"]`).click();
+  await outcome(s, '');
+}
+async function createFrom(s: Session, text: string) {
+  await open(s, '/admin/operations/awards');
+  await s.page.fill('#create-text', text);
+  await s.page.locator('form:has(#create-text) button[type="submit"]').click();
+  await outcome(s, '');
+}
 const NOTE = 'SYNTHETIC visual-state check on the disposable afldb_v2_visual2_test clone (D-V2-VISUAL-RECAPTURE-1).';
 
 const browser = await chromium.launch({ headless: true });
 let registryHidden = false;
-let queueBackedUp = false;
+let contractCopied = false;
 let importRevoked = false;
 try {
   const [facts] = await sql.unsafe(ISOLATED_SERVER_FACTS_SQL);
@@ -172,42 +207,33 @@ try {
   const adm = await signIn('admin');
   const ro = (id: string, work: () => Promise<void>) => step(id, 'read-only captures: no change', [], work);
 
-  // --- 1. Read-only states over the cloned data (no fixture) ------------------------------------------------
-  await ro('R-readonly-1', async () => {
-    await capture(adm, 'S01-awards-queue-admin', '/admin/operations/awards', { absent: ['#create-file', '#create-text'], text: ['Super Admin actions'] });
-    await capture(adm, 'S02-coleman-admin', '/admin/operations/coleman', { present: ['[data-publish-unavailable]', '#compare-season'], absent: ['#publish-note'] });
-    await capture(sup, 'S03-brownlow-1996-tie', '/admin/operations/brownlow?season=1996', { present: ['[data-medal-status="determined"]'] });
-    await capture(sup, 'S04-brownlow-2027-refused', '/admin/operations/brownlow?season=2027');
-    await capture(sup, 'S05-brownlow-invalid-season', '/admin/operations/brownlow?season=1800');
-    await capture(adm, 'S06-brownlow-2025-admin', '/admin/operations/brownlow?season=2025', { present: ['[data-brownlow-determination]'] });
-    await capture(adm, 'S07-proposal-1-admin', '/admin/operations/awards/1', { present: ['[data-read-only]'], absent: ['button[value="approve"]'] });
-  });
+  // Pass 2. Pass 1 (revision 20994849) consumed proposal #1, the 2024 Brownlow leader and created proposal #4;
+  // the outcome states it captured mid-scroll are re-produced here on equivalent fresh records.
+  const DECIDE = 2; // goal-of-the-year 2026 (sealed), created by another Super Admin, status proposed
+  const BROWNLOW = 2023;
 
-  // Coleman compare is labelled read-only: the derivable, Admin and refusal comparisons must change nothing.
-  await ro('R-coleman-compare', async () => {
-    for (const [s, name, season, settled] of [[sup, 'S08-coleman-compare-2024', '2024', true], [adm, 'S09-coleman-compare-2024-admin', '2024', true],
-      [sup, 'S10-coleman-compare-2027-refused', '2027', true], [sup, 'S11-coleman-compare-unsettled', '2024', false]] as const) {
-      await open(s, '/admin/operations/coleman');
-      await s.page.fill('#compare-season', season);
-      if (settled) await s.page.check('#compare-settled');
-      await s.page.locator('#coleman-compare button[type="submit"]').click();
-      await outcome(s, '#coleman-compare');
+  // --- 1. Read-only states over the cloned data, re-captured with the scroll fix and overflow diagnostics ------
+  await ro('R-readonly', async () => {
+    await capture(sup, 'S03-brownlow-1996-tie', '/admin/operations/brownlow?season=1996', { present: ['[data-medal-status="determined"]'] });
+    for (const [s, name, season, settled] of [[sup, 'K1-coleman-compare-2024', '2024', true], [adm, 'K2-coleman-compare-2024-admin', '2024', true],
+      [sup, 'K3-coleman-compare-2027', '2027', true], [sup, 'K4-coleman-compare-unsettled', '2024', false]] as const) {
+      await compare(s, season, settled);
       await captureState(s, name);
     }
   });
 
   // --- 2. Historical submission (fixture insert) ---------------------------------------------------------------
   let submissionId = 0;
-  await step('F-submission', 'insert one synthetic rejected legacy submission with 3 error/warning rows and 2 clean rows',
+  await step('F-submission', 'insert one synthetic rejected legacy submission with 2 error, 1 warning and 2 clean rows',
     ['data_submissions', 'data_submission_rows'], async () => {
       const [uploader] = await sql`SELECT id FROM auth_users WHERE email='visual-admin@example.invalid'`;
       const [reviewer] = await sql`SELECT id FROM auth_users WHERE email='visual-super@example.invalid'`;
       const content = Buffer.from('season,round,home,away\n2019,1,SYNTHETIC,SYNTHETIC\n');
-      const [row] = await sql`INSERT INTO data_submissions (id, dataset, filename, content, content_sha256, uploaded_by, uploaded_at, status,
-          row_count, validation_report, reviewed_by, reviewed_at, error)
-        VALUES ((SELECT coalesce(max(id),0)+1 FROM data_submissions), 'match_results', 'SYNTHETIC-visual-history-2019-round-1.csv', ${content},
-          ${createHash('sha256').update(content).digest('hex')}, ${uploader.id}, '2026-08-02T03:00:00Z', 'rejected', 5,
-          ${sql.json({ ok: 2, warnings: 1, errors: 2, duplicates: 0 })}, ${reviewer.id}, '2026-08-03T03:00:00Z', NULL)
+      const [row] = await sql`INSERT INTO data_submissions (dataset, filename, content, content_sha256, uploaded_by, uploaded_at, status,
+          row_count, validation_report, reviewed_by, reviewed_at)
+        VALUES ('match_results', 'SYNTHETIC-visual-history-2019-round-1.csv', ${content}, ${createHash('sha256').update(content).digest('hex')},
+          ${uploader.id}, '2026-08-02T03:00:00Z', 'rejected', 5, ${sql.json({ ok: 2, warnings: 1, errors: 2, duplicates: 0 })},
+          ${reviewer.id}, '2026-08-03T03:00:00Z')
         RETURNING id`;
       submissionId = Number(row.id);
       const rows = [[1, 'error', ['home club SYNTHETIC is not a known club']], [2, 'error', ['score is not a whole number']],
@@ -218,17 +244,18 @@ try {
       }
     });
   await ro('R-submission', async () => {
-    const checks = { text: ['This submission is read-only history.', 'Rows needing attention'], absent: ['form button[type="submit"]:not([form])'] };
-    await capture(sup, 'S12-submission-history', `/admin/submissions/${submissionId}`, { text: checks.text });
-    await capture(adm, 'S13-submission-history-admin', `/admin/submissions/${submissionId}`, { text: checks.text });
+    if (!submissionId) throw new Error('F-submission created no row');
+    const text = ['This submission is read-only history.', 'Rows needing attention'];
+    await capture(sup, 'S12-submission-history', `/admin/submissions/${submissionId}`, { text, absent: ['main form'] });
+    await capture(adm, 'S13-submission-history-admin', `/admin/submissions/${submissionId}`, { text, absent: ['main form'] });
   });
 
   // --- 3. AFL API settle refusals in the production build ------------------------------------------------------
   await step('F-refusals', 'insert 60 synthetic open canonical_apply_failed refusals and 3 open settle findings (source afl_api)',
     ['data_issues'], async () => {
       for (let i = 1; i <= 60; i++) {
-        await sql`INSERT INTO data_issues (id, entity_type, entity_id, issue_type, severity, description, details, detected_at)
-          VALUES ((SELECT coalesce(max(id),0)+1 FROM data_issues), 'match', NULL, 'canonical_apply_failed', 'warning',
+        await sql`INSERT INTO data_issues (entity_type, issue_type, severity, description, details, detected_at)
+          VALUES ('match', 'canonical_apply_failed', 'warning',
             ${`SYNTHETIC refused canonical application ${i}: the target row disagreed with the observation.`},
             ${sql.json({ owner: 'AFLDB-ISSUE-122', source_key: 'afl_api', family: i % 2 ? 'match_results' : 'player_match_stats',
               external_record_id: `CD_M2026014${String(i).padStart(4, '0')}`, target_table: i % 2 ? 'matches' : 'player_match_stats',
@@ -237,9 +264,8 @@ try {
             ${new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString()})`;
       }
       for (const [i, owner] of [[1, 'settle-afl-api.ts'], [2, 'settle-afl-api.ts'], [3, 'settle-afl-api-brownlow.ts']] as const) {
-        await sql`INSERT INTO data_issues (id, entity_type, entity_id, issue_type, severity, description, details, detected_at)
-          VALUES ((SELECT coalesce(max(id),0)+1 FROM data_issues), 'match', NULL, 'afl_api_corroboration_mismatch', 'warning',
-            ${`SYNTHETIC settle finding ${i}.`},
+        await sql`INSERT INTO data_issues (entity_type, issue_type, severity, description, details, detected_at)
+          VALUES ('match', 'afl_api_corroboration_mismatch', 'warning', ${`SYNTHETIC settle finding ${i}.`},
             ${sql.json({ owner, source_key: 'afl_api', family: owner.includes('brownlow') ? 'brownlow_match_votes' : 'match_results',
               provider_match_id: `CD_M20260149${i}`, reason: 'corroboration_mismatch', fields: ['venue'] })},
             ${new Date(Date.UTC(2026, 9, 2, 0, i)).toISOString()})`;
@@ -249,7 +275,7 @@ try {
     await capture(sup, 'R3-refusals-populated', '/admin/operations/afl-api-refusals', { text: ['60 open'] });
     const older = await sup.page.locator('a[href*="before="]').first().getAttribute('href');
     if (!older) throw new Error('No older-page link on the populated refusals page');
-    await capture(sup, 'R4-refusals-page2', older);
+    await capture(sup, 'R4-refusals-page2', older, { text: ['60 open'] });
     await capture(sup, 'R5-findings-populated', '/admin/operations/afl-api-refusals?section=findings', { text: ['3 open'] });
     await capture(adm, 'R6-refusals-populated-admin', '/admin/operations/afl-api-refusals', { text: ['60 open'] });
   });
@@ -270,173 +296,150 @@ try {
       if (!has) throw new Error('SELECT on data_issues was not restored');
     });
 
-  // --- 4. Season registry unreadable (standalone build copy hidden, then restored) ---------------------------
-  await step('F-registry-unreadable', 'hide .next/standalone/data/reference/seasons.json (build output, not the repository); an approval attempt must be refused and write no history',
+  // --- 4. Award decisions on proposal #2, the registry refusal included (test actions) ----------------------
+  await step('A10-validate', `validate proposal #${DECIDE} as a Super Admin who did not create it: one validate decision`,
+    ['award_proposals', 'award_proposal_decisions'], async () => {
+      await decide(sup, DECIDE, 'validate', null);
+      await captureState(sup, 'A10-validate-outcome', { present: ['[data-action-outcome="ok"]'], text: ['The proposal validated'] });
+    });
+  await step('U5-registry-unreadable', `hide .next/standalone/data/reference/seasons.json (build output, not the repository); approving #${DECIDE} must be refused and write no history`,
     [], async () => {
       renameSync(REGISTRY, `${REGISTRY}.visual-hidden`);
       registryHidden = true;
       try {
-        await capture(sup, 'U1-operations-registry-unreadable', '/admin/operations', { text: ['could not be read'] });
-        await capture(adm, 'U2-operations-registry-unreadable-admin', '/admin/operations', { text: ['could not be read'] });
-        await capture(sup, 'U3-coleman-registry-unreadable', '/admin/operations/coleman', { text: ['season registry could not be read'] });
-        await open(sup, '/admin/operations/awards/1');
-        await sup.page.fill('#decision-note', NOTE);
-        await sup.page.locator('button[value="approve"]').click();
-        await outcome(sup, '');
-        await captureState(sup, 'U4-approve-refused-registry-unreadable', { present: ['[data-action-outcome="refused"]'], text: ['season_registry_unavailable'] });
+        await decide(sup, DECIDE, 'approve', NOTE);
+        await captureState(sup, 'U5-approve-refused-registry-unreadable', { present: ['[data-action-outcome="refused"]'], text: ['season_registry_unavailable'] });
       } finally {
         renameSync(`${REGISTRY}.visual-hidden`, REGISTRY);
         registryHidden = false;
       }
       const restored = sha(REGISTRY) === registrySha;
-      log.push(`F-registry-unreadable registry restored sha256 match=${restored}`);
+      log.push(`U5-registry-unreadable registry restored sha256 match=${restored}`);
       if (!restored) throw new Error('Season registry not restored byte for byte');
     });
-
-  // --- 5. Award decisions (test actions) ----------------------------------------------------------------------
-  await step('A1-approve-sealed-no-note', 'approve validated proposal #1 (season 2026, sealed) with no note: refused season_sealed_correction_invalid, nothing written',
-    [], async () => {
-      await open(sup, '/admin/operations/awards/1');
-      await sup.page.locator('button[value="approve"]').click();
-      await outcome(sup, '');
-      await captureState(sup, 'A1-approve-sealed-refused', { present: ['[data-action-outcome="refused"]'], text: ['season_sealed_correction_invalid'] });
-    });
-  await step('A2-approve-sealed-correction', 'approve proposal #1 with a 20+ character correction note: status approved, one decision, one award_winners row',
-    ['award_proposals', 'award_proposal_decisions', 'award_winners'], async () => {
-      await open(sup, '/admin/operations/awards/1');
-      await sup.page.fill('#decision-note', NOTE);
-      await sup.page.locator('button[value="approve"]').click();
-      await outcome(sup, '');
-      await captureState(sup, 'A2-approve-sealed-correction-outcome', { present: ['[data-action-outcome="ok"]'], text: ['audited correction of a sealed season'] });
+  await step('A11-approve-sealed-no-note', `approve #${DECIDE} (2026, sealed) with no note: refused season_sealed_correction_invalid, nothing written`, [], async () => {
+    await decide(sup, DECIDE, 'approve', null);
+    await captureState(sup, 'A11-approve-sealed-refused', { present: ['[data-action-outcome="refused"]'], text: ['season_sealed_correction_invalid'] });
+  });
+  await step('A12-approve-sealed-correction', `approve #${DECIDE} with a correction note: approved, one decision, one award_winners row and its data_edits audit row`,
+    ['award_proposals', 'award_proposal_decisions', 'award_winners', 'data_edits'], async () => {
+      await decide(sup, DECIDE, 'approve', NOTE);
+      await captureState(sup, 'A12-approve-sealed-correction-outcome', { present: ['[data-action-outcome="ok"]'], text: ['audited correction of a sealed season'] });
     });
   await ro('R-approved', async () => {
-    await capture(sup, 'A3-proposal-approved-revise-panel', '/admin/operations/awards/1', { text: ['Revise approved winner'] });
-    await capture(adm, 'A4-proposal-approved-admin', '/admin/operations/awards/1', { present: ['[data-read-only]'] });
+    await capture(sup, 'A13-proposal-approved-revise-panel', `/admin/operations/awards/${DECIDE}`, { text: ['Revise approved winner'] });
+    await capture(adm, 'A14-proposal-approved-admin', `/admin/operations/awards/${DECIDE}`, { present: ['[data-read-only]'], absent: ['button[value="approve"]'] });
   });
-  await step('A5-create-invalid-file', 'create from a file with one invalid row: whole file refused, nothing created', [], async () => {
-    await open(sup, '/admin/operations/awards');
-    await sup.page.fill('#create-text', JSON.stringify({ format: 'afldb-award-proposals', version: 1,
-      defaults: { source_kind: 'offline_file', citation: 'SYNTHETIC offline file', acquired_on: '2026-10-29' },
-      proposals: [{ award_slug: 'mark-of-the-year', season: 2027, player_identity: 'afltables:players/A/Aaron_Francis.html', player_name: 'Aaron Francis' },
-        { award_slug: 'not-an-award', season: 1800, player_identity: 'nonsense', player_name: '' }] }, null, 1));
-    await sup.page.locator('form:has(#create-text) button[type="submit"]').click();
-    await outcome(sup, '');
-    await captureState(sup, 'A5-create-invalid-file-refused', { present: ['[data-action-outcome="refused"]'] });
+
+  // --- 5. Create, validate and self-approval on a new 2026 proposal (test actions) ---------------------------
+  const file = (proposals: unknown[]) => JSON.stringify({ format: 'afldb-award-proposals', version: 1,
+    defaults: { source_kind: 'offline_file', citation: 'SYNTHETIC offline file (visual state check)', acquired_on: '2026-10-29' }, proposals }, null, 1);
+  await step('A15-create-invalid-file', 'create from a file with one invalid row: whole file refused, nothing created', [], async () => {
+    await createFrom(sup, file([{ award_slug: 'aflpa-mvp', season: 2026, player_identity: 'afltables:players/A/Aaron_Cadman.html', player_name: 'Aaron Cadman' },
+      { award_slug: 'not-an-award', season: 1800, player_identity: 'nonsense', player_name: '' }]));
+    await captureState(sup, 'A15-create-invalid-file-refused', { present: ['[data-action-outcome="refused"]'] });
   });
-  let createdId = 0;
-  await step('A6-create-valid-file', 'create one proposal (mark-of-the-year 2027, in progress) from a pasted file: one proposed row and its decision',
+  let ownId = 0;
+  await step('A16-create-valid-file', 'create one proposal (aflpa-mvp 2026) from a pasted file: one proposed row and its create decision',
     ['award_proposals', 'award_proposal_decisions'], async () => {
-      await open(sup, '/admin/operations/awards');
-      await sup.page.fill('#create-text', JSON.stringify({ format: 'afldb-award-proposals', version: 1,
-        defaults: { source_kind: 'offline_file', citation: 'SYNTHETIC offline file (visual state check)', acquired_on: '2026-10-29' },
-        proposals: [{ award_slug: 'mark-of-the-year', season: 2027, player_identity: 'afltables:players/A/Aaron_Francis.html', player_name: 'Aaron Francis' }] }, null, 1));
-      await sup.page.locator('form:has(#create-text) button[type="submit"]').click();
-      await outcome(sup, '');
-      await captureState(sup, 'A6-create-valid-file-outcome', { present: ['[data-action-outcome="ok"]'] });
+      await createFrom(sup, file([{ award_slug: 'aflpa-mvp', season: 2026, player_identity: 'afltables:players/A/Aaron_Cadman.html', player_name: 'Aaron Cadman' }]));
+      await captureState(sup, 'A16-create-valid-file-outcome', { present: ['[data-action-outcome="ok"]'] });
       const [row] = await sql`SELECT max(id)::int AS id FROM award_proposals WHERE created_by=${sup.userId}`;
-      createdId = row.id;
+      ownId = row.id;
     });
-  await step('A7-validate-own', `validate the new proposal as its creator: status validated, one decision`,
-    ['award_proposals', 'award_proposal_decisions'], async () => {
-      if (!createdId) throw new Error('A6 created no proposal');
-      await open(sup, `/admin/operations/awards/${createdId}`);
-      await sup.page.locator('button[value="validate"]').click();
-      await outcome(sup, '');
-      await captureState(sup, 'A7-validate-outcome', { present: ['[data-action-outcome="ok"]'] });
-    });
+  await step('A17-validate-own', 'validate the new proposal as its creator: one validate decision', ['award_proposals', 'award_proposal_decisions'], async () => {
+    if (!ownId) throw new Error('A16 created no proposal');
+    await decide(sup, ownId, 'validate', null);
+    await captureState(sup, 'A17-validate-own-outcome', { present: ['[data-action-outcome="ok"]'], text: ['The proposal validated'] });
+  });
   await ro('R-self-approval', async () => {
-    if (!createdId) throw new Error('A6 created no proposal');
-    await capture(sup, 'A8-self-approval-attestation', `/admin/operations/awards/${createdId}`, { present: ['[data-self-approval]', '#self-approval-attestation'] });
+    if (!ownId) throw new Error('A16 created no proposal');
+    await capture(sup, 'A18-self-approval-attestation', `/admin/operations/awards/${ownId}`, { present: ['[data-self-approval]', '#self-approval-attestation'] });
   });
-  await step('A9-reject-short-reason', 'reject the new proposal with a reason under 10 characters: refused, nothing written', [], async () => {
-    if (!createdId) throw new Error('A6 created no proposal');
-    await open(sup, `/admin/operations/awards/${createdId}`);
-    await sup.page.fill('#decision-note', 'too short');
-    await sup.page.locator('button[value="reject"]').click();
-    await outcome(sup, '');
-    await captureState(sup, 'A9-reject-short-reason-refused', { present: ['[data-action-outcome="refused"]'] });
+  await step('A19-self-approve-no-attestation', 'approve own proposal with a correction note but no self-approval attestation: refused, nothing written', [], async () => {
+    if (!ownId) throw new Error('A16 created no proposal');
+    await decide(sup, ownId, 'approve', NOTE);
+    await captureState(sup, 'A19-self-approve-refused', { present: ['[data-action-outcome="refused"]'] });
   });
-
-  // --- 6. Coleman publish (test actions) ----------------------------------------------------------------------
-  await step('C1-publish-unsettled', 'publish 2024 without the settled attestation: refused, nothing written', [], async () => {
-    await open(sup, '/admin/operations/coleman');
-    await sup.page.fill('#compare-season', '2024');
-    await sup.page.check('#compare-settled');
-    await sup.page.locator('#coleman-compare button[type="submit"]').click();
-    await outcome(sup, '#coleman-compare');
-    await sup.page.fill('#publish-season', '2024');
-    await sup.page.fill('#publish-note', NOTE);
-    await sup.page.locator('#coleman-publish button[type="submit"]').click();
-    await outcome(sup, '#coleman-publish');
-    await captureState(sup, 'C1-publish-unsettled-refused', { present: ['#coleman-publish [data-action-outcome="refused"]'] });
-  });
-  await step('C2-publish-2024', 'publish the derived 2024 Coleman result after compare: one derived_award_results row, its projection, award_winners as previewed',
-    ['derived_award_results', 'derived_award_projections', 'award_winners'], async () => {
-      await sup.page.check('#publish-settled');
-      await sup.page.locator('#coleman-publish button[type="submit"]').click();
-      await sup.page.locator('[data-publication-result]').waitFor();
-      await sup.page.waitForLoadState('networkidle');
-      await captureState(sup, 'C2-publish-outcome', { present: ['[data-publication-result]'] });
-    });
-  await ro('R-coleman-published', async () => {
-    await capture(sup, 'C3-coleman-after-publish', '/admin/operations/coleman', { text: ['2024'] });
+  await step('A20-reject-short-reason', 'reject own proposal with a reason under 10 characters: refused, nothing written', [], async () => {
+    if (!ownId) throw new Error('A16 created no proposal');
+    await decide(sup, ownId, 'reject', 'too short');
+    await captureState(sup, 'A20-reject-short-reason-refused', { present: ['[data-action-outcome="refused"]'] });
   });
 
-  // --- 7. Brownlow eligibility (fixture + test actions) ------------------------------------------------------
-  const [leader] = await sql`SELECT id::int, player_id::int, eligible_rank FROM brownlow_season_votes WHERE season=2024 AND vote_rank=1`;
-  await step('F-brownlow-missing-eligibility', `clear eligible_rank (was ${leader.eligible_rank}) for the 2024 leader, player ${leader.player_id}: eligibility becomes missing`,
+  // --- 6. Coleman with the contract supplied: WORKAROUND, NOT THE CANDIDATE AS BUILT --------------------------
+  // V2-GAP-036: the standalone bundle omits data/reference/coleman-derivation.json, so the candidate refuses
+  // every compare and publish (K1-K4). To show the owner the compare, preview and publish states the fix would
+  // reach, the tracked file is copied into the build output for this block only and removed afterwards.
+  const contract = resolve('.next/standalone/data/reference/coleman-derivation.json');
+  await step('W-coleman-workaround', 'copy data/reference/coleman-derivation.json into the standalone build for this block; compares write nothing; publish 2024 appends the derivation ledger and its projection (award_winners/data_edits only if the preview showed changes); copy removed afterwards',
+    ['derived_award_results', 'derived_award_projections'], async () => {
+      if (existsSync(contract)) throw new Error('The standalone bundle already holds the Coleman contract');
+      copyFileSync(resolve('data/reference/coleman-derivation.json'), contract);
+      contractCopied = true;
+      try {
+        await compare(sup, '2024', true);
+        await captureState(sup, 'W1-coleman-compare-2024-derivable', { absent: ['#coleman-compare [data-action-outcome="refused"]'] });
+        await compare(adm, '2024', true);
+        await captureState(adm, 'W2-coleman-compare-2024-admin', { present: ['[data-publish-unavailable]'] });
+        await compare(sup, '1975', true);
+        await captureState(sup, 'W3-coleman-compare-1975-refused', { present: ['#coleman-compare [data-action-outcome="refused"]'] });
+        await compare(sup, '2024', true);
+        await sup.page.fill('#publish-season', '2024');
+        await sup.page.fill('#publish-note', NOTE);
+        await sup.page.locator('#coleman-publish button[type="submit"]').click();
+        await outcome(sup, '#coleman-publish');
+        await captureState(sup, 'W4-coleman-publish-unsettled-refused', { present: ['#coleman-publish [data-action-outcome="refused"]'] });
+        await sup.page.check('#publish-settled');
+        await sup.page.locator('#coleman-publish button[type="submit"]').click();
+        await sup.page.locator('[data-publication-result]').waitFor();
+        await sup.page.waitForLoadState('networkidle');
+        await captureState(sup, 'W5-coleman-publish-outcome', { present: ['[data-publication-result]'] });
+        await capture(sup, 'W6-coleman-after-publish', '/admin/operations/coleman', { text: ['2024'] });
+        await capture(adm, 'W7-coleman-after-publish-admin', '/admin/operations/coleman', { text: ['2024'], present: ['[data-publish-unavailable]'] });
+      } finally {
+        rmSync(contract);
+        contractCopied = false;
+      }
+      log.push(`W-coleman-workaround contract copy removed=${!existsSync(contract)}`);
+    }, ['award_winners', 'data_edits']);
+
+  // --- 7. Brownlow eligibility on 2023 (fixture + test actions) ----------------------------------------------
+  const [leader] = await sql`SELECT id::int, player_id::int, eligible_rank FROM brownlow_season_votes WHERE season=${BROWNLOW} AND vote_rank=1`;
+  await step('F-brownlow-missing-eligibility', `clear eligible_rank (was ${leader.eligible_rank}) for the ${BROWNLOW} leader, player ${leader.player_id}: eligibility becomes missing`,
     ['brownlow_season_votes'], async () => {
       await sql`UPDATE brownlow_season_votes SET eligible_rank=NULL WHERE id=${leader.id} AND is_ineligible IS NOT TRUE`;
     });
-  await ro('R-requires-review', async () => {
-    await capture(sup, 'B1-brownlow-2024-requires-review', '/admin/operations/brownlow?season=2024', { present: ['[data-medal-status="requires_review"]', `[data-review-player="${leader.player_id}"] form`] });
-    await capture(adm, 'B2-brownlow-2024-requires-review-admin', '/admin/operations/brownlow?season=2024', { present: ['[data-medal-status="requires_review"]', '[data-decision-unavailable="role"]'] });
-  });
+  const brownlow = `/admin/operations/brownlow?season=${BROWNLOW}`;
   const form = `[data-review-player="${leader.player_id}"] form`;
-  await step('B3-decision-invalid', 'submit a decision with a blank citation and a note under 20 characters: refused, nothing written', [], async () => {
-    await open(sup, '/admin/operations/brownlow?season=2024');
-    await sup.page.locator(`${form} input[value="eligible"]`).check();
+  await ro('R-requires-review', async () => {
+    await capture(sup, 'B6-brownlow-2023-requires-review', brownlow, { present: ['[data-medal-status="requires_review"]', form] });
+    await capture(adm, 'B7-brownlow-2023-requires-review-admin', brownlow, { present: ['[data-medal-status="requires_review"]', '[data-decision-unavailable="role"]'] });
+  });
+  await step('B8-decision-invalid', 'submit a decision with a blank citation and a note under 20 characters: refused, nothing written', [], async () => {
+    await open(sup, brownlow);
+    await sup.page.locator(`${form} input[value="ineligible"]`).check();
     await sup.page.locator(`${form} input[name="citation"]`).fill('   ');
     await sup.page.locator(`${form} textarea[name="note"]`).fill('too short                ');
     await sup.page.locator(`${form} button[type="submit"]`).click();
     await outcome(sup, '[data-decision-workbench]');
-    await captureState(sup, 'B3-decision-error', { present: ['[data-action-outcome="refused"]'] });
+    await captureState(sup, 'B8-decision-error', { present: ['[data-action-outcome="refused"]'] });
   });
-  await step('B4-decision-eligible', `record player ${leader.player_id} as eligible for 2024 (sealed: audited correction): one decision row; the medal metadata projection may update brownlow_season_votes`,
-    ['brownlow_eligibility_decisions', 'brownlow_season_votes'], async () => {
-      await open(sup, '/admin/operations/brownlow?season=2024');
-      await sup.page.locator(`${form} input[value="eligible"]`).check();
+  await step('B9-decision-ineligible', `record player ${leader.player_id} as INELIGIBLE for ${BROWNLOW} (synthetic; sealed: audited correction): one decision, its data_edits audit row and the eligibility/medal projection into brownlow_season_votes`,
+    ['brownlow_eligibility_decisions', 'brownlow_season_votes', 'data_edits'], async () => {
+      await open(sup, brownlow);
+      await sup.page.locator(`${form} input[value="ineligible"]`).check();
       await sup.page.locator(`${form} input[name="citation"]`).fill('SYNTHETIC citation: visual state check, not a real ruling');
       await sup.page.locator(`${form} textarea[name="note"]`).fill(NOTE);
       await sup.page.locator(`${form} button[type="submit"]`).click();
       await sup.page.locator('[data-decision-result]').waitFor();
       await sup.page.waitForLoadState('networkidle');
-      await captureState(sup, 'B4-decision-success', { present: ['[data-decision-result]'] });
+      await captureState(sup, 'B9-decision-success', { present: ['[data-decision-result]'] });
     });
   await ro('R-after-decision', async () => {
-    await capture(sup, 'B5-brownlow-2024-after-decision', '/admin/operations/brownlow?season=2024', { present: ['[data-medal-status="determined"]', '[data-decision-current="true"]'] });
+    await capture(sup, 'B10-brownlow-2023-after-decision', brownlow, { present: ['[data-medal-status="determined"]', '[data-decision-current="true"]'] });
+    await capture(adm, 'B11-brownlow-2023-after-decision-admin', brownlow, { present: ['[data-decision-current="true"]'] });
   });
-
-  // --- 8. Empty award queue (all proposals moved aside, captured, restored, verified) -----------------------
-  const beforeQueue = await fingerprint();
-  await step('F-empty-queue', 'move every proposal and decision into backup tables, capture the empty queue, restore them; net effect none',
-    [], async () => {
-      await sql.begin(async (tx) => {
-        await tx.unsafe('CREATE TABLE visual_backup_award_proposals AS SELECT * FROM award_proposals');
-        await tx.unsafe('CREATE TABLE visual_backup_award_proposal_decisions AS SELECT * FROM award_proposal_decisions');
-        await tx.unsafe('DELETE FROM award_proposal_decisions');
-        await tx.unsafe('DELETE FROM award_proposals');
-      });
-      queueBackedUp = true;
-      try {
-        await capture(sup, 'Q1-awards-queue-empty', '/admin/operations/awards', { present: ['#create-text'] });
-        await capture(adm, 'Q2-awards-queue-empty-admin', '/admin/operations/awards', { absent: ['#create-text'] });
-      } finally {
-        await restoreQueue();
-      }
-    });
-  const afterQueue = await fingerprint();
-  log.push(`F-empty-queue restored award_proposals/decisions identical=${beforeQueue.award_proposals.digest === afterQueue.award_proposals.digest && beforeQueue.award_proposal_decisions.digest === afterQueue.award_proposal_decisions.digest}`);
 
   for (const s of [sup, adm]) {
     log.push(`context ${s.role} blockedRequests=${s.counter.blocked}`);
@@ -450,17 +453,8 @@ try {
 } finally {
   if (registryHidden && existsSync(`${REGISTRY}.visual-hidden`)) renameSync(`${REGISTRY}.visual-hidden`, REGISTRY);
   if (importRevoked) await sql.unsafe('GRANT SELECT ON data_issues TO afldb_import');
-  if (queueBackedUp) await restoreQueue();
+  if (contractCopied && existsSync(resolve('.next/standalone/data/reference/coleman-derivation.json'))) rmSync(resolve('.next/standalone/data/reference/coleman-derivation.json'));
   if (existsSync(outDir)) writeFileSync(`${outDir}/capture-log.txt`, `${log.join('\n')}\n`, { flag: 'wx' });
   await browser.close(); await sql.end({ timeout: 5 });
 }
 
-async function restoreQueue(): Promise<void> {
-  await sql.begin(async (tx) => {
-    await tx.unsafe('INSERT INTO award_proposals OVERRIDING SYSTEM VALUE SELECT * FROM visual_backup_award_proposals');
-    await tx.unsafe('INSERT INTO award_proposal_decisions OVERRIDING SYSTEM VALUE SELECT * FROM visual_backup_award_proposal_decisions');
-    await tx.unsafe('DROP TABLE visual_backup_award_proposals');
-    await tx.unsafe('DROP TABLE visual_backup_award_proposal_decisions');
-  });
-  queueBackedUp = false;
-}
