@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### Last † Brownlow images recaptured; consolidated release decision package (2026-10-29; production NO-GO)
+
+- New `tools/v2/candidate-visual-brownlow-recapture.mts` recaptures the seven Brownlow season images that predated the
+  raw-totals label fix (09, S06, S04, B6, B7, B8, B9). It uses the reused corrected build `XtSgl4BOQZXC2G8qIWJdV`,
+  re-verified against the tree and the served manifest, and runs on `afldb_v2_visual_leaderboard_test` only.
+  - The `requires_review` flow runs on equivalent synthetic records: the decision error and success on 2021 (a
+    synthetic INELIGIBLE ruling that persists), then Super Admin and Admin `requires_review` on 2020 with a reversible
+    fixture.
+  - One mis-specified no-winner check and one wrong column were corrected. A `--recheck` reran only the affected states:
+    0 failures, 0 external requests.
+  - `afldb_v2_visual2_test` and its template are unchanged.
+- The owner review sheet now links only corrected-candidate images, or images of components proven unchanged by
+  application diff (new §0a). The superseded images move to its diagnostic appendix.
+- New `docs/v2/release-decision-package-final-2026-10-29.md` assembles the existing release procedures into one ordered
+  view: candidate, hostname, backup and recovery, writer retirement, migrations and default privileges, installation,
+  the unresolved owner choices, and the single approval needed next. It authorises nothing. Privileges stay 42/43.
+
 ### Staged Brownlow leaderboard and provider mapping captured on the corrected candidate (2026-10-29; production NO-GO)
 
 - New `tools/v2/candidate-visual-leaderboard.mts` produces the staged API leaderboard and the derived 18-team

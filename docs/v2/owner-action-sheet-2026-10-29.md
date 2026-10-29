@@ -66,6 +66,11 @@ Open [owner-visual-review-2026-10-29.md](owner-visual-review-2026-10-29.md):
    18-team mapping and their refusals, captured from synthetic fixtures (UI evidence, not authentic reconciliation).
    Diagnostic history moved to its Appendix D, and its §4 lists the remaining gaps. Return its §6 block.
 
+   **Update (2026-10-29, final):** the seven † Brownlow images are recaptured on the corrected build (sheet §1c), and
+   every linked image is the corrected candidate or a component proven unchanged (sheet §0a). The remaining
+   choices, their order and the next approval are consolidated in
+   [release-decision-package-final-2026-10-29.md](release-decision-package-final-2026-10-29.md).
+
 ## 3. Policy decisions needed before the artifact lock
 
 Only genuine open policy points are listed. Everything else is an execution approval already prepared in

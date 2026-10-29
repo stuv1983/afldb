@@ -1,0 +1,22 @@
+start database=afldb_v2_visual_leaderboard_test cluster=afldb_v2_isolated marker="afldb-v2-isolated-test" baseURL=http://127.0.0.1:3912 buildId=XtSgl4BOQZXC2G8qIWJdV servedManifest=200 referenceSha256={"seasons.json":"1368e9b100788fd67d2f378830445df424591368536c22473b11add62be629b0","coleman-derivation.json":"93702c7199c35c157925d8e70593876903200b531c9e16d61ca5b0b141b6c633","afl-api-identities.json":"13eba653380fd2f59a83d53601402f092031636c3a9da1d955b1158d9c64f326"}
+start history={"award_proposals":5,"award_proposal_decisions":13,"award_winners":3714,"derived_award_results":2,"derived_award_projections":2,"brownlow_season_votes":16120,"brownlow_round_votes":320861,"brownlow_eligibility_decisions":3,"data_edits":5,"data_issues":67,"data_submissions":1,"data_submission_rows":5,"staging.source_records":9,"staging.source_record_versions":9,"staging.afl_api_brownlow_vote":3}
+full-run B9 record: decisions for season 2021 player 10130=1 projected is_ineligible=true
+D04-brownlow-2027-refused__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=2027 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+D04-brownlow-2027-refused__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=2027 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-recheck-2027 expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+reversible record: season=2020 leader player=8354 eligible_rank=1
+STEP F-requires-review-recheck expected="clear eligible_rank (was 1) of the 2020 leader, player 8354 (restored below)" expectedTables=[brownlow_season_votes] observed=[brownlow_season_votes:+0rows(changed)] match=true
+D-B6-brownlow-requires-review__desktop-1280x800.png as=super status=200 final=/admin/operations/brownlow?season=2020 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+D-B6-brownlow-requires-review__mobile-390x844.png as=super status=200 final=/admin/operations/brownlow?season=2020 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+D-B7-brownlow-requires-review-admin__desktop-1280x800.png as=admin status=200 final=/admin/operations/brownlow?season=2020 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+D-B7-brownlow-requires-review-admin__mobile-390x844.png as=admin status=200 final=/admin/operations/brownlow?season=2020 h1="Brownlow reconciliation" horizontalOverflowPx=0 consoleErrors=0 checks=pass
+STEP R-requires-review-recheck expected="read-only captures: no change" expectedTables=[] observed=[no change] match=true
+F-requires-review-restore brownlow_season_votes digest restored=true
+STEP F-requires-review-restore expected="restore eligible_rank 1 of player 8354: brownlow_season_votes byte-identical to before the fixture" expectedTables=[brownlow_season_votes] observed=[brownlow_season_votes:+0rows(changed)] match=true
+context super_admin blockedRequests=0
+context admin blockedRequests=0
+end seasons.json sha256 unchanged=true
+end coleman-derivation.json sha256 unchanged=true
+end afl-api-identities.json sha256 unchanged=true
+end history={"award_proposals":5,"award_proposal_decisions":13,"award_winners":3714,"derived_award_results":2,"derived_award_projections":2,"brownlow_season_votes":16120,"brownlow_round_votes":320861,"brownlow_eligibility_decisions":3,"data_edits":5,"data_issues":67,"data_submissions":1,"data_submission_rows":5,"staging.source_records":9,"staging.source_record_versions":9,"staging.afl_api_brownlow_vote":3} netChangedTables=[]
+failures=0
