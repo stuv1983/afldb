@@ -1,0 +1,24 @@
+== service 22:41:57
+MainPID=3170412 NRestarts=0 ActiveState=active SubState=running ActiveEnterTimestamp=Sat 2026-10-31 09:41:25 AEDT 
+== health
+http://127.0.0.1:3100/api/health HTTP/1.1 200 OK build= body={"status":"ok","database":"ok","latencyMs":1}
+https://beta.afldb.com/api/health HTTP/2 200  build= body={"status":"ok","database":"ok","latencyMs":2}
+== pages (follow redirects) and every referenced CSS/JS asset
+page / -> 200 https://beta.afldb.com/beta 23716 build=
+page /beta -> 200 https://beta.afldb.com/beta 23716 build=
+page /players -> 200 https://beta.afldb.com/beta?from=%2Fplayers 23794 build=
+page /matches -> 200 https://beta.afldb.com/beta?from=%2Fmatches 23794 build=
+page /seasons -> 200 https://beta.afldb.com/beta?from=%2Fseasons 23794 build=
+page /clubs -> 200 https://beta.afldb.com/beta?from=%2Fclubs 23784 build=
+page /records -> 200 https://beta.afldb.com/beta?from=%2Frecords 23794 build=
+page /search -> 200 https://beta.afldb.com/beta?from=%2Fsearch 23789 build=
+page /admin/operations -> 200 https://beta.afldb.com/admin/login 22863 build=
+distinct assets referenced: 8
+assets checked=8 bad=0
+HTTP/2 200 
+content-type: application/javascript; charset=UTF-8
+cache-control: public, max-age=31536000, immutable
+== email intake retired
+POST /api/admin/email-intake 410
+== journal since start (errors)
+error_lines=0

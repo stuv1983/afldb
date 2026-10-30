@@ -1,0 +1,1 @@
+﻿FREEZE LIFTED 2026-10-31 10:20:45 AEDT (2026-10-30T23:20:45Z) by the operator session under D-V2-PROD-EXEC-1 Stage 14. Procedural admin-edit freeze declared 2026-10-31 08:17 AEDT is lifted. Legacy writers stay retired (hs-retired-close.log PASS 10:19:53). No new writer or provider integration enabled.

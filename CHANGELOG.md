@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### V2 released to production (D-V2-PROD-EXEC-1, 2026-10-31)
+
+- Production runs V2 at `9ed9c9dd3e84682c43e96c46e98974b245eb54ed` (`BUILD_ID` `QNEHXAtU53TzUjj0Mb7mv`) behind the
+  unchanged `beta.afldb.com` route. Migrations 111–117, `privileges.sql` and both staging defaults are applied (ledger
+  117). Gates: D ATTRIBUTED_ONLY with owner GO; R REPRODUCED; 43/43 on an isolated clone (no test on production); V2
+  IDENTICAL; V3 LEDGER_TIMING_ONLY; M sealed scope identical.
+- The AFL Tables settle timer is retired; email intake answers 410. No AFL API writer, provider or curated operation was
+  enabled. Caddy, `.env` and DNS are unchanged.
+- Verified frozen and post-schema backups are kept on the host, on the workstation and as an O-5 second copy on
+  `streamanator:/mnt/backup/backup(2026-10-31)/` (new reviewed adapter `second-copy.ps1`, controls 43/43). They are
+  retained until at least 2026-11-30.
+- Incident: the first host build ran out of memory after `next build` had removed the serving bundle, and live assets
+  failed until one controlled rebuild. The deployment defect is AFLDB-ISSUE-329. Admin live acceptance was accepted by
+  the owner. Record: [execution record](docs/v2/production-execution-record-2026-10-31.md).
+
 ### Production execution preparation P-1 to P-7 completed (D-V2-PROD-EXEC-1, 2026-10-30; production NO-GO)
 
 - The session scripts exist and are pinned by SHA-256 (`docs/v2/evidence/production-execution-20261030/`):

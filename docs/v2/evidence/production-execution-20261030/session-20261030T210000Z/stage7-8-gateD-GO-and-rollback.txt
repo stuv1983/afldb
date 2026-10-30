@@ -1,0 +1,19 @@
+﻿Gate D GO (owner), 2026-10-31 08:43 AEDT, after reading the D/R/T report:
+  rehearse.result PASS-PENDING-OWNER-GO; D ATTRIBUTED_ONLY (settle-bookkeeping, runtime-telemetry; 0 stops); R REPRODUCED; T 43/43 (isolated clone);
+  ledger 117 digest 647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72; frozen archive 599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb.
+  Owner answer: GO.
+
+Stage 8 A-ROLLBACK named (package section 6, O-RB a), 2026-10-31 08:43 AEDT:
+  Frozen dump: afldb-prod:/home/arm/backups/afldb/release-v2-20261030T210000Z/afldb_prod-20261031-082655.dump
+    sha256 599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb, 29781936 bytes, 1549 TOC objects, restore proven (Stage 5, 9/9 parity).
+  Copies: C:\Users\stuar\backups\afldb\release-v2-20261030T210000Z\ (TRANSFER PASS);
+          streamanator:/mnt/backup/backup(2026-10-31)/release-v2-20261030T210000Z/frozen/ (SECONDCOPY PASS, sums e4f67f71...).
+  Routes: stop at stages 0-8 -> keep A-AFLT, checkout may stay at 9ed9c9dd (old standalone serves);
+          migration failure -> stop, keep log, no retry/ledger edit;
+          privileges/default/V2 DIFFERENT -> stop before A-GO, fix forward under new approval;
+          V3 DIFFERENT -> stop before A-GO;
+          build failure -> stop, previous build serves;
+          post-restart failure -> code rollback (rollback runbook 4.1): git checkout ff100dc2, npm ci, npm run build, owner sudo systemctl restart afldb, gate R4; schema stays forward; O-RB: 7x unknown-applied-migration is the recorded expected exception;
+          V2 table removal -> owner decision only, rollback runbook 5, never 116, no NOT NULL on 117;
+          data loss/corruption -> host restore only from the frozen dump above, under A-ROLLBACK.
+  PREV: checkout ff100dc2b8da8523f550ef45a9eaa3ef96d9d840, build vcxM_SyDxFCP0sj9n9W1t.

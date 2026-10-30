@@ -1,0 +1,22 @@
+== 3.0 before: HEAD=ff100dc2b8da8523f550ef45a9eaa3ef96d9d840 branch=main standalone_build=vcxM_SyDxFCP0sj9n9W1t
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-09-02-1958.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-09-03-0553.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-09-03-2230.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-09-08-0128.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-09-08-0141.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-04-0431.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-05-0435.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-06-0443.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-07-0440.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-08-0433.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-09-0431.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-10-0439.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-11-0437.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-12-0438.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-13-0435.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-14-0444.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-15-0433.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-16-0442.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-17-0443.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-18-0438.json
+STOP: checkout is not clean before the fast-forward

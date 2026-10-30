@@ -1,0 +1,3 @@
+﻿== P1 the two read-only SQL files and the artifact manifest tool -> afldb:/home/arm/backups/afldb/release-v2-20261030T210000Z/pinned (init created it)
+copied; verify on the host with: host-session.sh pinned 20261030T210000Z
+TRANSFER PASS mode=PushPinned permission-readback.sql=1e7a4f625069cba913194a6aff736236be52eae4d16892e45087564abcc62e43 arel-readback.sql=c195fab894420ca951562eb55290b6d984623e73de32e41b347fd34331a3e5c9 artifact-manifest.mjs=ea37a7e70087185c88815be39cb952e94bde2be624d6b848c6a2ca2324055b10

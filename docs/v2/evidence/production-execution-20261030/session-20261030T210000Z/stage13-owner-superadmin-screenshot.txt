@@ -1,0 +1,1 @@
+﻿Stage 13 Super Admin evidence: the owner supplied a live Operations centre screenshot showing a Super Admin session (2026-10-31). Retained by the owner; it is Super Admin evidence only and does not establish the Admin-role check, which is acceptance-admin-20261031-run2 (visible role Admin).

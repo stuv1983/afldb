@@ -1,5 +1,7 @@
 # V2 production execution package — D-V2-PROD-EXEC-1 (prepared 2026-10-30)
 
+**Executed 2026-10-31 under D-V2-PROD-EXEC-1: see the [execution record](production-execution-record-2026-10-31.md). Its §4 shows that the §6 "Build fails" assumption (the previous build still serves) is false for an in-place build (AFLDB-ISSUE-329).** Text below is as approved.
+
 **Production: NO-GO. This package authorises nothing.** It combines the prepared release steps into **one
 owner-triggered execution session**:
 - A-AFLT, the freeze and A-BACKUP (choices 7–8, HC-2 to HC-5);

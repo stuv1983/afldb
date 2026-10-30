@@ -1,0 +1,27 @@
+== D-V2-PROD-EXEC-1 host session stage=backup stamp=20261030T210000Z 2026-10-30T21:26:55Z
+host=afldb-prod user=arm boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac checkout=9ed9c9dd3e84682c43e96c46e98974b245eb54ed build=vcxM_SyDxFCP0sj9n9W1t
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=110 last=110_match_sheet_player_match_stats_authority.sql digest=789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153
+no settle/migrate/dump/restore process
+timer afldb-settle-afltables.timer enabled=disabled active=inactive
+timer afldb-settle-afl-api.timer enabled=not-found active=inactive
+timer afldb-settle-afl-api-brownlow.timer enabled=not-found active=inactive
+timer afldb-email-intake.timer enabled=not-found active=inactive
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+==> Backing up afldb_prod to /home/arm/backups/afldb/release-v2-20261030T210000Z/afldb_prod-20261031-082655.dump
+    wrote 29M in 9s
+    archive readable, 1549 objects
+    a dump is not proven until restored: tools/maintenance/restore-test.sh
+==> Pruning backups older than the newest 999
+==> Done. 1 backup(s) of afldb_prod retained in /home/arm/backups/afldb/release-v2-20261030T210000Z
+series_count before=11 after=11; new dumps in /home/arm/backups/afldb/release-v2-20261030T210000Z: [afldb_prod-20261031-082655.dump]
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb  afldb_prod-20261031-082655.dump
+ce5075cfd61846ec7f039ba473082e02be8c202771ab8d57ab80abd14eda26c9  afldb_prod-20261031-082655.release.json
+9a593ab4a6e36f1bc916bfcb57a1acf0adca484d2cb10470973568b0e375b4d0  frozen.toc
+789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153  frozen.ledger-before.tsv
+789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153  frozen.ledger-after.tsv
+6d78d0813f830daa56e0c8718dc6a979c5e0001fa7d68dab65b33e5fe4669cff  frozen.backup.log
+RESULT PASS stage=backup label=frozen archive=afldb_prod-20261031-082655.dump sha256=599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb bytes=29781936 toc=1549 staged_brownlow=none

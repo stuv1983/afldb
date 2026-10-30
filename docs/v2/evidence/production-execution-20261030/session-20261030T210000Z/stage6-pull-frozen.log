@@ -1,0 +1,4 @@
+﻿== T1 protected local directory C:\Users\stuar\backups\afldb\release-v2-20261030T210000Z
+== T2 copy frozen set from production (read-only scp)
+local hashes OK (6 files)
+TRANSFER PASS mode=Pull label=frozen archive_sha256=599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb local=C:\Users\stuar\backups\afldb\release-v2-20261030T210000Z

@@ -1,0 +1,49 @@
+﻿== setup: /home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31) (mode 700) and synthetic sets in C:\Users\stuar\AppData\Local\Temp\claude\D--dev-afldbV2\4f98f407-19d4-48e4-bdc2-e5b9fdfe5b69\scratchpad\o5-run4\local
+ok
+root filesystem uuid=420faf38-96e4-4e5b-81f1-b35e5efb8948
+PASS A1 Check frozen on a fresh destination :: SECONDCOPY CHECK PASS label=frozen attempt=1 dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000001Z/frozen
+PASS A2 Copy frozen :: SECONDCOPY PASS label=frozen attempt=1 archive_sha256=cb0115a9611ebbb745e15b3dbe875c494d3d82329ce6d83ff1acae384694dc5d sums_sha256=1180e0a39d691f1431bcbfce37d7a2f9652cfa7612bbadc0e87631e3bb5b2d8f dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000001Z/frozen
+PASS A2m modes: child and label 700, record and files 600 :: 600 frozen.VERIFIED
+PASS A2v frozen.VERIFIED names the verified SUMS hash :: 
+PASS A3 Verify frozen :: SECONDCOPY VERIFY PASS label=frozen attempt=1 sums_sha256=1180e0a39d691f1431bcbfce37d7a2f9652cfa7612bbadc0e87631e3bb5b2d8f dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000001Z/frozen
+PASS A4 second frozen Copy refused, destination unchanged ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS A5 Copy postschema into the existing child :: SECONDCOPY PASS label=postschema attempt=1 archive_sha256=c537b6e41aa5b7f197e3b2e2035a7a723c27d67cdbf1a4dba6981befc2d3db55 sums_sha256=1e94f25a4cb2bb68cd43ffaded9bf91c3798f974815e4e808a320f68acb2f9a2 dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000001Z/postschema
+PASS A6 second postschema Copy refused, destination unchanged ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS A7 postschema without a frozen child refused ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS P1 after a failed attempt, attempt 1 again is refused ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS P2 postschema refused without frozen.VERIFIED ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS P3 attempt 2 copies into frozen-a2 :: SECONDCOPY PASS label=frozen attempt=2 archive_sha256=a82706e2934662d93a8ac0f2accbe0d30cf39c84c313c6e63601e7376695cb2b sums_sha256=9da1853570d2ff7be63e088d3ca4464b637f811002bd7bc4f3d0e54e024a8d2f dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000004Z/frozen-a2
+PASS P4 the failed attempt is unchanged :: 
+PASS P5 Verify attempt 2 :: SECONDCOPY VERIFY PASS label=frozen attempt=2 sums_sha256=9da1853570d2ff7be63e088d3ca4464b637f811002bd7bc4f3d0e54e024a8d2f dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000004Z/frozen-a2
+PASS P6 attempt 3 refused once frozen is verified ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS P7 postschema after the verified attempt 2 :: SECONDCOPY PASS label=postschema attempt=1 archive_sha256=2d6e2385d4dd96d610f1f6db58cd0aa7a3ac982ee506710c809648ba6bdfc923 sums_sha256=2e6cc96cdd27d9ace671f0da25e76c2421b1c68d25a1e0d235e1199d1634abc9 dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000004Z/postschema
+PASS P8 attempt 4 rejected :: 
+PASS F1 local file differs from its manifest: STOP, nothing created ::     + FullyQualifiedErrorId : STOP: local hash mismatch for frozen.restore.txt
+PASS F2 ArchiveSha differs from the dump: STOP, nothing created ::     + FullyQualifiedErrorId : STOP: the set must hold exactly one dump with hash -ArchiveSha
+PASS F3 missing local set: STOP ::     + FullyQualifiedErrorId : STOP: C:\Users\stuar\AppData\Local\Temp\claude\D--dev-afldbV2\4f98f407-19d4-48e4-bdc2-e5 
+PASS F4 remote content changed: STOP ::     + FullyQualifiedErrorId : STOP: remote verification failed (exit 1)
+PASS F4r restored: Verify passes again :: SECONDCOPY VERIFY PASS label=frozen attempt=1 sums_sha256=1180e0a39d691f1431bcbfce37d7a2f9652cfa7612bbadc0e87631e3bb5b2d8f dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000001Z/frozen
+PASS F5 extra remote file: STOP ::     + FullyQualifiedErrorId : STOP: remote verification failed (exit 1)
+PASS F6 missing remote file: STOP ::     + FullyQualifiedErrorId : STOP: remote verification failed (exit 1)
+PASS F7 remote file mode 644: STOP ::     + FullyQualifiedErrorId : STOP: remote verification failed (exit 1)
+PASS F7r restored: Verify passes again :: SECONDCOPY VERIFY PASS label=frozen attempt=1 sums_sha256=1180e0a39d691f1431bcbfce37d7a2f9652cfa7612bbadc0e87631e3bb5b2d8f dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000001Z/frozen
+PASS F7s remote SUMS changed: STOP ::     + FullyQualifiedErrorId : STOP: remote verification failed (exit 1)
+PASS F7sr restored: Verify passes again :: SECONDCOPY VERIFY PASS label=frozen attempt=1 sums_sha256=1180e0a39d691f1431bcbfce37d7a2f9652cfa7612bbadc0e87631e3bb5b2d8f dest=/home/arm/afldb-v2-prodexec-20261030T020000Z/o5-test-20261030T204032Z/backup(2026-10-31)/release-v2-20261031T000001Z/frozen
+PASS F7u Verify on a filesystem with another UUID: STOP ::     + FullyQualifiedErrorId : STOP: remote verification failed (exit 1)
+PASS F7t Copy on a filesystem of another type: STOP ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS F7m Verify with the destination off the named mount: STOP ::     + FullyQualifiedErrorId : STOP: remote verification failed (exit 1)
+PASS F8 missing destination: STOP, not created ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS F9 destination mode 755: STOP, nothing created ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS F10 destination is a symlink: STOP ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS F11 destination not on the named mount: STOP ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS F12 named mount is not a mountpoint: STOP ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS F13 capacity below set plus reserve: STOP ::     + FullyQualifiedErrorId : STOP: destination check or mkdir failed (exit 1)
+PASS F14 path with a space rejected, nothing created :: 
+PASS F15 path with a quote rejected, nothing created :: 
+PASS F16 path with .. rejected ::     + FullyQualifiedErrorId : STOP: -DestRoot must be a normalised absolute path
+PASS F17 no refused control created a release child :: 
+PASS R1 Check on /mnt/backup/backup(2026-10-31) (read-only) :: SECONDCOPY CHECK PASS label=frozen attempt=1 dest=/mnt/backup/backup(2026-10-31)/release-v2-20261031T000003Z/frozen
+  remote: DEST /mnt/backup/backup(2026-10-31) mount=/mnt/backup source=/dev/sdg1 fstype=ext4 uuid=4bc4fb8d-b3eb-466a-b5f4-42806ec83d3c owner=arm:700
+PASS R2 real destination still empty :: 
+second-copy.ps1 sha256=768e46a3f76e47ed473747f695c417abe6900eea3b09e9d6b7685eb5aa1e8118
+CONTROLS PASS 43/43

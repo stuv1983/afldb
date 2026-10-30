@@ -1,0 +1,16 @@
+﻿Stage 1 (A-AFLT, HC-2), owner-run sudo on afldb-prod, pasted by the owner 2026-10-31 08:17 AEDT.
+Polkit: /etc/polkit-1/rules.d is empty (dir mtime Apr 10 2026); the AFL Tables rule is ABSENT. No kept copy, no hash (none invented).
+Owner decision: the Stage 3 legacy-writers gate is met by the owner running the reviewed read-only preflight with sudo (arm cannot list rules.d, root:polkitd 750).
+
+arm@afldb-prod:~/projects/afldb$ sudo ls -la /etc/polkit-1/rules.d
+sudo systemctl disable --now afldb-settle-afltables.timer
+systemctl is-enabled afldb-settle-afltables.timer
+systemctl is-active afldb-settle-afltables.timer afldb-settle-afltables.service
+systemctl list-unit-files 'afldb-email-intake*' 'afldb-settle-afl-api*' --no-legend
+total 8
+drwxr-x--- 2 root polkitd 4096 Apr 10  2026 .
+drwxr-xr-x 3 root root    4096 Jun 15 23:45 ..
+Removed "/etc/systemd/system/timers.target.wants/afldb-settle-afltables.timer".
+disabled
+inactive
+inactive

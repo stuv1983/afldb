@@ -1,5 +1,15 @@
 # AFLDB Waiting and Blocker Register
 
+> **V2 released to production (2026-10-31, D-V2-PROD-EXEC-1; latest):** `9ed9c9dd`, `BUILD_ID`
+> `QNEHXAtU53TzUjj0Mb7mv`, ledger 117, behind `beta.afldb.com`. The AFL Tables timer is retired, no new writer or
+> provider is enabled, and the freeze was lifted at 10:20:45 AEDT.
+> - New blocker: **AFLDB-ISSUE-329**. An in-place build destroys the serving bundle, and this also affects the code
+>   rollback route.
+> - Rows below that wait on "the V2 release" (for example R8, R58, R60) are **not** re-graded or closed by this note.
+>   Each needs its own owner review.
+> - The AFL API production activation and the apex launch remain NO-GO.
+> - [Record](docs/v2/production-execution-record-2026-10-31.md).
+
 > **Linux verification of the integrated V2 code (2026-10-28, latest; the R37 counts below still stand, as no row
 > moved):** [record](docs/v2/linux-verification-2026-10-28.md). On streamanator, against disposable clones of the
 > approved test baseline (not a rebuild): the full workflow at `c3dea709` gives 14,860 / 3 / 63 plus Coleman 28/28, and

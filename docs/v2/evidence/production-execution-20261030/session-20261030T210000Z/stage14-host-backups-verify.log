@@ -1,0 +1,44 @@
+host frozen.SHA256SUMS OK (6 files)
+host postschema.SHA256SUMS OK (6 files)
+host restore-test.SHA256SUMS OK (1 files)
+host checkout-settle-manifests OK (61 files)
+total 61688
+drwx------  4 arm arm     4096 Oct 31 09:43 .
+drwx------ 15 arm arm     4096 Oct 31 08:00 ..
+-rw-------  1 arm arm   438402 Oct 31 08:44 P.permissions.txt
+-rw-------  1 arm arm 29781936 Oct 31 08:27 afldb_prod-20261031-082655.dump
+-rw-------  1 arm arm    17131 Oct 31 08:27 afldb_prod-20261031-082655.release.json
+-rw-------  1 arm arm 29833028 Oct 31 08:44 afldb_prod-20261031-084435.dump
+-rw-------  1 arm arm    18215 Oct 31 08:44 afldb_prod-20261031-084435.release.json
+-rw-------  1 arm arm      607 Oct 31 08:44 arel.SHA256SUMS
+-rw-------  1 arm arm       25 Oct 31 08:44 arel.default-app.log
+-rw-------  1 arm arm       25 Oct 31 08:44 arel.default-import.log
+-rw-------  1 arm arm      591 Oct 31 08:44 arel.migrate.log
+-rw-------  1 arm arm      743 Oct 31 08:44 arel.privileges.log
+-rw-------  1 arm arm      325 Oct 31 08:44 arel.readback.txt
+-rw-------  1 arm arm     5053 Oct 31 08:44 arel.status-after.txt
+-rw-------  1 arm arm     5053 Oct 31 08:44 arel.status-before.txt
+-rw-rw-r--  1 arm arm        2 Oct 31 08:52 build.attempt1-oom.exit
+-rw-rw-r--  1 arm arm     1939 Oct 31 08:52 build.attempt1-oom.log
+-rw-rw-r--  1 arm arm        2 Oct 31 09:39 build.attempt2.exit
+-rw-rw-r--  1 arm arm     7905 Oct 31 09:39 build.attempt2.log
+-rw-rw-r--  1 arm arm     3779 Oct 31 09:39 build.attempt2.mem.log
+-rw-rw-r--  1 arm arm      110 Oct 31 09:40 build.identity.txt
+drwx------  2 arm arm     4096 Oct 31 08:21 checkout-settle-manifests
+-rw-------  1 arm arm      546 Oct 31 08:27 frozen.SHA256SUMS
+-rw-------  1 arm arm      389 Oct 31 08:27 frozen.backup.log
+-rw-------  1 arm arm    10518 Oct 31 08:27 frozen.ledger-after.tsv
+-rw-------  1 arm arm    10518 Oct 31 08:26 frozen.ledger-before.tsv
+-rw-------  1 arm arm   114849 Oct 31 08:27 frozen.toc
+-rw-------  1 arm arm   528196 Oct 31 09:43 manifest-after.json
+-rw-------  1 arm arm   528196 Oct 31 08:27 manifest-before.json
+-rw-------  1 arm arm      496 Oct 31 09:43 manifest-compare.json
+drwx------  2 arm arm     4096 Oct 31 08:28 pinned
+-rw-------  1 arm arm      562 Oct 31 08:44 postschema.SHA256SUMS
+-rw-------  1 arm arm      389 Oct 31 08:44 postschema.backup.log
+-rw-------  1 arm arm    11248 Oct 31 08:44 postschema.ledger-after.tsv
+-rw-------  1 arm arm    11248 Oct 31 08:44 postschema.ledger-before.tsv
+-rw-------  1 arm arm   122856 Oct 31 08:44 postschema.toc
+-rw-------  1 arm arm      136 Oct 31 08:44 readback.SHA256SUMS
+-rw-------  1 arm arm      135 Oct 31 08:28 restore-test.SHA256SUMS
+-rw-------  1 arm arm    19519 Oct 31 08:28 restore-test.log

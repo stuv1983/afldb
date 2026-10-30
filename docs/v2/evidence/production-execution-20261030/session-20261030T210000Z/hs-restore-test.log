@@ -1,0 +1,238 @@
+== D-V2-PROD-EXEC-1 host session stage=restore-test stamp=20261030T210000Z 2026-10-30T21:28:04Z
+host=afldb-prod user=arm boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac checkout=9ed9c9dd3e84682c43e96c46e98974b245eb54ed build=vcxM_SyDxFCP0sj9n9W1t
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=110 last=110_match_sheet_player_match_stats_authority.sql digest=789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153
+afldb_prod-20261031-082655.dump: OK
+==> Restoring afldb_prod-20261031-082655.dump into afldb_restore_test
+    clearing afldb_restore_test
+NOTICE:  drop cascades to 38 other objects
+DETAIL:  drop cascades to constraint brownlow_round_votes_source_id_fkey on table brownlow_round_votes
+drop cascades to constraint source_payloads_source_id_fkey on table staging.source_payloads
+drop cascades to constraint match_period_scores_source_id_fkey on table match_period_scores
+drop cascades to constraint draft_picks_source_id_fkey on table draft_picks
+drop cascades to constraint player_birth_evidence_source_id_fkey on table player_birth_evidence
+drop cascades to constraint external_identities_source_id_fkey on table external_identities
+drop cascades to constraint match_coaches_source_id_fkey on table match_coaches
+drop cascades to constraint player_height_evidence_source_id_fkey on table player_height_evidence
+drop cascades to constraint brownlow_season_votes_source_id_fkey on table brownlow_season_votes
+drop cascades to constraint player_name_aliases_source_id_fkey on table player_name_aliases
+drop cascades to constraint draft_persons_source_id_fkey on table draft_persons
+drop cascades to constraint award_winners_source_id_fkey on table award_winners
+drop cascades to constraint captaincies_source_id_fkey on table captaincies
+drop cascades to constraint award_nominations_source_id_fkey on table award_nominations
+drop cascades to constraint player_relationships_source_id_fkey on table player_relationships
+drop cascades to constraint club_seasons_source_id_fkey on table club_seasons
+drop cascades to constraint coaches_source_id_fkey on table coaches
+drop cascades to constraint afltables_match_attendance_source_id_fkey on table staging.afltables_match
+drop cascades to constraint canonical_applications_source_id_fkey on table canonical_applications
+drop cascades to constraint hall_of_fame_source_id_fkey on table hall_of_fame
+drop cascades to constraint player_achievements_source_id_fkey on table player_achievements
+drop cascades to constraint promotion_candidates_source_id_fkey on table promotion_candidates
+drop cascades to constraint after_siren_kicks_source_id_fkey on table after_siren_kicks
+drop cascades to constraint father_son_selections_source_id_fkey on table father_son_selections
+drop cascades to constraint import_batches_source_id_fkey on table import_batches
+drop cascades to constraint honour_team_members_source_id_fkey on table honour_team_members
+drop cascades to constraint matches_attendance_source_id_fkey on table matches
+drop cascades to constraint matches_source_id_fkey on table matches
+drop cascades to constraint venue_aliases_source_id_fkey on table venue_aliases
+drop cascades to constraint club_aliases_source_id_fkey on table club_aliases
+drop cascades to constraint external_grid_sources_ingest_source_id_fkey on table external_grid_sources
+drop cascades to constraint player_match_period_stats_source_id_fkey on table player_match_period_stats
+drop cascades to constraint external_current_matches_source_id_fkey on table staging.external_current_matches
+drop cascades to constraint fixtures_source_id_fkey on table fixtures
+drop cascades to constraint season_list_members_source_id_fkey on table season_list_members
+drop cascades to constraint club_leadership_source_id_fkey on table club_leadership
+drop cascades to constraint afl_api_match_attendance_source_id_fkey on table staging.afl_api_match
+drop cascades to constraint player_match_stats_source_id_fkey on table player_match_stats
+NOTICE:  drop cascades to 5 other objects
+DETAIL:  drop cascades to constraint afltables_match_venue_id_fkey on table staging.afltables_match
+drop cascades to constraint matches_venue_id_fkey on table matches
+drop cascades to constraint venue_aliases_venue_id_fkey on table venue_aliases
+drop cascades to constraint fixtures_venue_id_fkey on table fixtures
+drop cascades to constraint afl_api_match_venue_id_fkey on table staging.afl_api_match
+NOTICE:  drop cascades to 22 other objects
+DETAIL:  drop cascades to constraint site_media_uploaded_by_fkey on table site_media
+drop cascades to constraint auth_audit_log_actor_user_id_fkey on table auth_audit_log
+drop cascades to constraint data_overrides_admin_user_id_fkey on table data_overrides
+drop cascades to constraint data_edits_admin_user_id_fkey on table data_edits
+drop cascades to constraint site_settings_updated_by_fkey on table site_settings
+drop cascades to constraint auth_sessions_user_id_fkey on table auth_sessions
+drop cascades to constraint admin_invites_invited_by_fkey on table admin_invites
+drop cascades to constraint beta_access_codes_created_by_fkey on table beta_access_codes
+drop cascades to constraint beta_allowed_emails_added_by_fkey on table beta_allowed_emails
+drop cascades to constraint beta_join_requests_reviewed_by_fkey on table beta_join_requests
+drop cascades to constraint brownlow_vote_entry_state_created_by_fkey on table brownlow_vote_entry_state
+drop cascades to constraint brownlow_vote_entry_state_finalised_by_fkey on table brownlow_vote_entry_state
+drop cascades to constraint brownlow_vote_entry_state_updated_by_fkey on table brownlow_vote_entry_state
+drop cascades to constraint data_submissions_reviewed_by_fkey on table data_submissions
+drop cascades to constraint data_submissions_uploaded_by_fkey on table data_submissions
+drop cascades to constraint nl_search_review_reviewed_by_fkey on table nl_search_review
+drop cascades to constraint player_link_resolutions_admin_user_id_fkey on table player_link_resolutions
+drop cascades to constraint player_link_suggestions_resolved_by_fkey on table player_link_suggestions
+drop cascades to constraint promotion_decisions_admin_user_id_fkey on table promotion_decisions
+drop cascades to constraint brownlow_season_authority_published_by_fkey on table brownlow_season_authority
+drop cascades to constraint brownlow_season_authority_updated_by_fkey on table brownlow_season_authority
+drop cascades to constraint afl_api_identity_adjudications_admin_user_id_fkey on table afl_api_identity_adjudications
+NOTICE:  drop cascades to constraint external_grids_source_id_fkey on table external_grids
+NOTICE:  drop cascades to 11 other objects
+DETAIL:  drop cascades to view aflw.clubs
+drop cascades to view aflw.matches
+drop cascades to view aflw.club_totals
+drop cascades to view aflw.fixtures
+drop cascades to view aflw.player_match_stats
+drop cascades to view aflw.player_careers
+drop cascades to view aflw.player_seasons
+drop cascades to view aflw.players
+drop cascades to view aflw.scoring_events
+drop cascades to view aflw.ladders
+drop cascades to view aflw.seasons
+NOTICE:  drop cascades to constraint matches_match_key_fkey on table staging_aflw.matches
+NOTICE:  drop cascades to 40 other objects
+DETAIL:  drop cascades to function afldb_season_list_clubs(smallint)
+drop cascades to constraint player_season_stats_primary_club_id_fkey on table player_season_stats
+drop cascades to constraint match_period_scores_club_id_fkey on table match_period_scores
+drop cascades to constraint player_season_stats_club_id_fkey on table player_club_season_stats
+drop cascades to constraint draft_picks_club_id_fkey on table draft_picks
+drop cascades to constraint match_coaches_club_id_fkey on table match_coaches
+drop cascades to constraint afltables_player_match_club_id_fkey on table staging.afltables_player_match
+drop cascades to constraint brownlow_season_votes_club_id_fkey on table brownlow_season_votes
+drop cascades to constraint player_clubs_club_id_fkey on table player_clubs
+drop cascades to constraint award_winners_club_id_fkey on table award_winners
+drop cascades to constraint captaincies_club_id_fkey on table captaincies
+drop cascades to constraint award_nominations_club_id_fkey on table award_nominations
+drop cascades to constraint award_nominations_opponent_club_id_fkey on table award_nominations
+drop cascades to constraint afltables_match_away_club_id_fkey on table staging.afltables_match
+drop cascades to constraint afltables_match_home_club_id_fkey on table staging.afltables_match
+drop cascades to constraint matches_away_club_id_fkey on table matches
+drop cascades to constraint matches_home_club_id_fkey on table matches
+drop cascades to constraint matches_winner_club_id_fkey on table matches
+drop cascades to constraint afltables_match_winner_club_id_fkey on table staging.afltables_match
+drop cascades to constraint player_achievements_club_id_fkey on table player_achievements
+drop cascades to constraint after_siren_kicks_club_id_fkey on table after_siren_kicks
+drop cascades to constraint after_siren_kicks_opponent_club_id_fkey on table after_siren_kicks
+drop cascades to constraint father_son_selections_club_id_fkey on table father_son_selections
+drop cascades to constraint awards_club_id_fkey on table awards
+drop cascades to constraint club_aliases_club_id_fkey on table club_aliases
+drop cascades to constraint player_match_stats_club_id_fkey on table player_match_stats
+drop cascades to constraint player_match_period_stats_club_id_fkey on table player_match_period_stats
+drop cascades to constraint external_current_matches_away_club_id_fkey on table staging.external_current_matches
+drop cascades to constraint external_current_matches_home_club_id_fkey on table staging.external_current_matches
+drop cascades to constraint team_seasons_club_id_fkey on table staging.team_seasons
+drop cascades to constraint afl_api_lineup_club_id_fkey on table staging.afl_api_lineup
+drop cascades to constraint season_list_members_club_id_fkey on table season_list_members
+drop cascades to constraint fixtures_away_club_id_fkey on table fixtures
+drop cascades to constraint fixtures_home_club_id_fkey on table fixtures
+drop cascades to constraint club_leadership_club_id_fkey on table club_leadership
+drop cascades to constraint afl_api_match_away_club_id_fkey on table staging.afl_api_match
+drop cascades to constraint afl_api_player_match_club_id_fkey on table staging.afl_api_player_match
+drop cascades to constraint afl_api_match_home_club_id_fkey on table staging.afl_api_match
+drop cascades to constraint afl_api_match_winner_club_id_fkey on table staging.afl_api_match
+drop cascades to constraint afl_api_brownlow_vote_club_id_fkey on table staging.afl_api_brownlow_vote
+NOTICE:  drop cascades to constraint nl_search_review_search_log_id_fkey on table nl_search_review
+NOTICE:  drop cascades to constraint promotion_decisions_candidate_id_fkey on table promotion_decisions
+NOTICE:  drop cascades to 34 other objects
+DETAIL:  drop cascades to constraint brownlow_round_votes_import_batch_id_fkey on table brownlow_round_votes
+drop cascades to constraint match_period_scores_import_batch_id_fkey on table match_period_scores
+drop cascades to constraint source_records_last_batch_id_fkey on table staging.source_records
+drop cascades to constraint source_record_versions_closed_by_batch_id_fkey on table staging.source_record_versions
+drop cascades to constraint source_record_versions_opened_by_batch_id_fkey on table staging.source_record_versions
+drop cascades to constraint draft_picks_import_batch_id_fkey on table draft_picks
+drop cascades to constraint player_birth_evidence_batch_id_fkey on table player_birth_evidence
+drop cascades to constraint match_coaches_import_batch_id_fkey on table match_coaches
+drop cascades to constraint player_height_evidence_batch_id_fkey on table player_height_evidence
+drop cascades to constraint afltables_player_match_projected_by_batch_id_fkey on table staging.afltables_player_match
+drop cascades to constraint brownlow_season_votes_import_batch_id_fkey on table brownlow_season_votes
+drop cascades to constraint import_rejections_import_batch_id_fkey on table import_rejections
+drop cascades to constraint award_winners_import_batch_id_fkey on table award_winners
+drop cascades to constraint captaincies_import_batch_id_fkey on table captaincies
+drop cascades to constraint award_nominations_import_batch_id_fkey on table award_nominations
+drop cascades to constraint player_relationships_import_batch_id_fkey on table player_relationships
+drop cascades to constraint coaches_import_batch_id_fkey on table coaches
+drop cascades to constraint afltables_match_projected_by_batch_id_fkey on table staging.afltables_match
+drop cascades to constraint hall_of_fame_import_batch_id_fkey on table hall_of_fame
+drop cascades to constraint player_achievements_import_batch_id_fkey on table player_achievements
+drop cascades to constraint after_siren_kicks_import_batch_id_fkey on table after_siren_kicks
+drop cascades to constraint honour_team_members_import_batch_id_fkey on table honour_team_members
+drop cascades to constraint player_match_stats_import_batch_id_fkey on table player_match_stats
+drop cascades to constraint matches_import_batch_id_fkey on table matches
+drop cascades to constraint data_submissions_import_batch_id_fkey on table data_submissions
+drop cascades to constraint external_grids_import_batch_id_fkey on table external_grids
+drop cascades to constraint player_match_period_stats_import_batch_id_fkey on table player_match_period_stats
+drop cascades to constraint afl_api_lineup_projected_by_batch_id_fkey on table staging.afl_api_lineup
+drop cascades to constraint season_list_members_import_batch_id_fkey on table season_list_members
+drop cascades to constraint fixtures_import_batch_id_fkey on table fixtures
+drop cascades to constraint club_leadership_import_batch_id_fkey on table club_leadership
+drop cascades to constraint afl_api_player_match_projected_by_batch_id_fkey on table staging.afl_api_player_match
+drop cascades to constraint afl_api_match_projected_by_batch_id_fkey on table staging.afl_api_match
+drop cascades to constraint afl_api_brownlow_vote_projected_by_batch_id_fkey on table staging.afl_api_brownlow_vote
+NOTICE:  drop cascades to 3 other objects
+DETAIL:  drop cascades to view aflw.venues
+drop cascades to constraint player_match_stats_match_key_fkey on table staging_aflw.player_match_stats
+drop cascades to constraint scoring_events_match_key_fkey on table staging_aflw.scoring_events
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to constraint club_organization_relations_from_organization_id_fkey on table club_organization_relations
+drop cascades to constraint club_organization_relations_to_organization_id_fkey on table club_organization_relations
+NOTICE:  drop cascades to constraint external_grid_axes_grid_id_fkey on table external_grid_axes
+NOTICE:  drop cascades to constraint draft_picks_draft_person_id_fkey on table draft_picks
+NOTICE:  drop cascades to constraint stat_availability_stat_key_fkey on table stat_availability
+NOTICE:  drop cascades to constraint source_record_versions_source_id_family_payload_hash_fkey on table staging.source_record_versions
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to constraint source_records_source_id_family_external_record_id_current_fkey on table staging.source_records
+drop cascades to constraint afl_api_brownlow_vote_source_id_family_external_record_id__fkey on table staging.afl_api_brownlow_vote
+NOTICE:  drop cascades to 19 other objects
+DETAIL:  drop cascades to constraint player_season_stats_player_id_fkey1 on table player_season_stats
+drop cascades to constraint player_season_stats_player_id_fkey on table player_club_season_stats
+drop cascades to constraint player_career_stats_player_id_fkey on table player_career_stats
+drop cascades to constraint player_birth_evidence_player_id_fkey on table player_birth_evidence
+drop cascades to constraint draft_picks_player_id_fkey on table draft_picks
+drop cascades to constraint external_identities_player_id_fkey on table external_identities
+drop cascades to constraint player_height_evidence_player_id_fkey on table player_height_evidence
+drop cascades to constraint brownlow_season_votes_player_id_fkey on table brownlow_season_votes
+drop cascades to constraint award_winners_player_id_fkey on table award_winners
+drop cascades to constraint award_nominations_player_id_fkey on table award_nominations
+drop cascades to constraint coaches_player_id_fkey on table coaches
+drop cascades to constraint honour_team_members_player_id_fkey on table honour_team_members
+drop cascades to constraint brownlow_vote_entry_state_one_player_id_fkey on table brownlow_vote_entry_state
+drop cascades to constraint brownlow_vote_entry_state_three_player_id_fkey on table brownlow_vote_entry_state
+drop cascades to constraint brownlow_vote_entry_state_two_player_id_fkey on table brownlow_vote_entry_state
+drop cascades to constraint player_link_resolutions_player_id_fkey on table player_link_resolutions
+drop cascades to constraint player_match_period_stats_player_id_fkey on table player_match_period_stats
+drop cascades to constraint player_match_stats_player_id_fkey on table player_match_stats
+drop cascades to constraint afl_api_brownlow_vote_player_id_fkey on table staging.afl_api_brownlow_vote
+NOTICE:  drop cascades to constraint match_coaches_coach_id_fkey on table match_coaches
+NOTICE:  drop cascades to 7 other objects
+DETAIL:  drop cascades to constraint match_period_scores_match_id_fkey on table match_period_scores
+drop cascades to constraint match_coaches_match_id_fkey on table match_coaches
+drop cascades to constraint player_match_stats_match_id_fkey on table player_match_stats
+drop cascades to constraint brownlow_vote_entry_state_match_id_fkey on table brownlow_vote_entry_state
+drop cascades to constraint player_match_period_stats_match_id_fkey on table player_match_period_stats
+drop cascades to constraint external_current_matches_local_match_id_fkey on table staging.external_current_matches
+drop cascades to constraint afl_api_brownlow_vote_match_id_fkey on table staging.afl_api_brownlow_vote
+NOTICE:  drop cascades to constraint award_nominations_award_id_fkey on table award_nominations
+NOTICE:  drop cascades to 7 other objects
+DETAIL:  drop cascades to constraint brownlow_season_votes_season_fkey on table brownlow_season_votes
+drop cascades to constraint award_nominations_season_fkey on table award_nominations
+drop cascades to constraint stat_availability_season_fkey on table stat_availability
+drop cascades to constraint brownlow_vote_entry_state_season_fkey on table brownlow_vote_entry_state
+drop cascades to constraint external_current_matches_season_fkey on table staging.external_current_matches
+drop cascades to constraint team_seasons_season_fkey on table staging.team_seasons
+drop cascades to constraint afl_api_brownlow_vote_season_fkey on table staging.afl_api_brownlow_vote
+NOTICE:  drop cascades to constraint scoring_events_season_key_fkey on table staging_aflw.scoring_events
+NOTICE:  drop cascades to constraint data_submission_rows_submission_id_fkey on table data_submission_rows
+    pg_restore exited 1; only extension-owner errors were reported
+    restored in 12s
+==> Parity checks against the restored database
+    PASS  player_match_stats rows                695499
+    PASS  players rows                           13365
+    PASS  matches rows                           17056
+    PASS  clubs rows                             24
+    PASS  career games total                     695499
+    PASS  career goals total                     413607
+    PASS  Brownlow votes total                   79113
+    PASS  unrecorded disposals                   248996
+    PASS  stat_availability rows                 3120
+    recorded restored dump sha256 599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb
+==> Restore verified: the backup is proven.
+RESULT PASS stage=restore-test dump=afldb_prod-20261031-082655.dump

@@ -1,0 +1,17 @@
+{
+  "started": "2026-10-30T23:04:28.267Z",
+  "base": "https://beta.afldb.com",
+  "checks": [
+    {
+      "id": "run",
+      "ok": false,
+      "detail": {
+        "error": "TimeoutError: page.reload: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for navigation until \"networkidle\"\u001b[22m\n\u001b[2m    - navigated to \"https://beta.afldb.com/admin/operations\"\u001b[22m\n"
+      }
+    }
+  ],
+  "screenshots": [],
+  "role": "Admin",
+  "finished": "2026-10-30T23:14:49.207Z",
+  "verdict": "FAIL"
+}

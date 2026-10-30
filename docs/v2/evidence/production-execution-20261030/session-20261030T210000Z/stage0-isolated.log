@@ -1,0 +1,8 @@
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/archive/afldb_prod-20261028T192336Z.dump: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/archive/afldb_prod-20261028T192336Z.provenance.json: OK
+manifest: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/before.preservation.json: OK
+/home/arm/afldb-v2-currentshadow-20261028T192336Z/evidence/before.manifest.json: OK
+archive_bytes=29781203 node_modules=658075445
+free=12755357696 port55491_listeners=0
+new root absent: OK

@@ -1,0 +1,1 @@
+﻿Stage 13 owner-run legacy-writers preflight (owner sudo, as reported by the owner in the session on 2026-10-31): RESULT PASS, exit=0. The owner ran it after the service start at 09:41:25 AEDT; not repeated by the operator session (no state change). The full console text was not supplied to the operator session; the owner's report is the record.

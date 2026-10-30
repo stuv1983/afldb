@@ -1,0 +1,10 @@
+/ final=https://beta.afldb.com/beta http=200 bytes=23716
+/players final=https://beta.afldb.com/beta?from=%2Fplayers http=200 bytes=23794
+/matches final=https://beta.afldb.com/beta?from=%2Fmatches http=200 bytes=23794
+asset 500 /_next/static/css/cb39c2e05a6b8ca6.css
+asset 500 /_next/static/chunks/webpack-88f152eb20ce9379.js
+asset 500 /_next/static/chunks/4bd1b696-93bf506b236d6248.js
+asset 500 /_next/static/chunks/3794-e3f7d5d730533d7c.js
+total 24
+drwxrwxr-x 6 arm arm 4096 Oct 31 08:50 .
+drwxrwxr-x 7 arm arm 4096 Oct 31 08:52 ..

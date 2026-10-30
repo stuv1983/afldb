@@ -1,0 +1,10 @@
+== D-V2-PROD-EXEC-1 host session stage=identity stamp=20261030T210000Z 2026-10-30T21:00:21Z
+host=afldb-prod user=arm boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac checkout=ff100dc2b8da8523f550ef45a9eaa3ef96d9d840 build=vcxM_SyDxFCP0sj9n9W1t
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=110 last=110_match_sheet_player_match_stats_authority.sql digest=789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=localhost port=5432 database=afldb_prod
+owner_identity afldb_prod afldb_owner 66668 7674454702926115004
+no settle/migrate/dump/restore process
+RESULT PASS stage=identity ledger=110

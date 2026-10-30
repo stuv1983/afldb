@@ -1,0 +1,6 @@
+[2026-10-30T23:04:29.319Z] READY: the browser shows the sign-in page. Sign in with an Admin account (not Super Admin). Waiting up to 20 minutes.
+[2026-10-30T23:14:19.189Z] visible role: Admin
+[2026-10-30T23:14:49.207Z] FAIL run {"error":"TimeoutError: page.reload: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for navigation until \"networkidle\"\u001b[22m\n\u001b[2m    - navigated to \"https://beta.afldb.com/admin/operations\"\u001b[22m\n"}
+[2026-10-30T23:14:49.208Z] VERDICT FAIL (0/1)
+
+[exited with code 0]

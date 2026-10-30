@@ -1,0 +1,15 @@
+1 checkout HEAD=9ed9c9dd3e84682c43e96c46e98974b245eb54ed porcelain=0
+2 now: {"files":13022,"symlinks":0,"bytes":811707318,"manifest_sha256":"c35ac0321f4a41396ff96be9e446a3aab5f02d5fd1ecdd22b0f72b8855175a74"}
+2 recorded=b8a0c6d33b9fd623185b2b2e08fd9b041b973602db82e93eefae520b4b556a29 now=c35ac0321f4a41396ff96be9e446a3aab5f02d5fd1ecdd22b0f72b8855175a74
+2 standalone matches: NO
+1369a1370,1376
+> 0ec15675266844d9fa77d837e981977f2d64bdbd5bb16547f6be6eaa07600fff  .next/server/app/matches/11692.html
+> e0692be14397e3ef53ee455fd4269da7fb779a4555c003e31c85077f3d5ac671  .next/server/app/matches/11692.meta
+> a42090fd8a0e09eaa7087fb7b8e561f5e24bbf7a4d023e21bcda5e07ae38a9d0  .next/server/app/matches/11692.rsc
+> a42090fd8a0e09eaa7087fb7b8e561f5e24bbf7a4d023e21bcda5e07ae38a9d0  .next/server/app/matches/11692.segments/_full.segment.rsc
+3 http://127.0.0.1:3100 new=200 old=404 header_x_afldb_build=0
+3 https://beta.afldb.com new=200 old=404 header_x_afldb_build=0
+4 MainPID=3170412 cmd=/home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs  cwd=/home/arm/projects/afldb started=Sat Oct 31 09:41:24 2026
+4 worker pid=3170420 cmd=next-server (v16.3.1)                                                                              cwd=/home/arm/projects/afldb/.next/standalone started=Sat Oct 31 09:41:24 2026
+4 worker pid=3170421 cmd=next-server (v16.3.1)                                                                              cwd=/home/arm/projects/afldb/.next/standalone started=Sat Oct 31 09:41:24 2026
+4 BUILD_ID file QNEHXAtU53TzUjj0Mb7mv written 2026-10-31 09:39:35.670169804 +1100; no other standalone bundle exists: 2 BUILD_ID file(s)
