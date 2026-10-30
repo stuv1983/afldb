@@ -1,0 +1,87 @@
+{
+  "format": "afldb.v2.snapshot-compare.1",
+  "mode": "preservation",
+  "inputs": {
+    "a": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/reference/before.preservation.json",
+      "sha256": "d861bec8ba24e6db14bd38bea9f2bc20b3dd433e5336efce076c764c3c1651a3"
+    },
+    "b": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/D11.preservation.json",
+      "sha256": "fba5a04a176e9285a755a351f0e9f1db1dac0ae5eae6af8baf3d9e609bbdb3ff"
+    }
+  },
+  "scopeA": {
+    "backupSha256": "a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc",
+    "queryContractSha256": "f0bc0b9a95c52e25f37b65ea688ccc0e90417ecc45ced7b6fdfb880008e6ae4f",
+    "seal": 2025,
+    "phase": "migration"
+  },
+  "scopeB": {
+    "backupSha256": "a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc",
+    "queryContractSha256": "f0bc0b9a95c52e25f37b65ea688ccc0e90417ecc45ced7b6fdfb880008e6ae4f",
+    "seal": 2025,
+    "phase": "migration"
+  },
+  "tablesCompared": 99,
+  "queriesCompared": 6,
+  "findings": [
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.import_batches",
+      "rowsA": 64,
+      "rowsB": 65,
+      "rowDigestsOnlyInA": 0,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.import_rejections",
+      "rowsA": 681,
+      "rowsB": 682,
+      "rowDigestsOnlyInA": 0,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "staging.afltables_match",
+      "rowsA": 218,
+      "rowsB": 218,
+      "rowDigestsOnlyInA": 50,
+      "rowDigestsOnlyInB": 50
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "staging.afltables_player_match",
+      "rowsA": 10028,
+      "rowsB": 10028,
+      "rowDigestsOnlyInA": 50,
+      "rowDigestsOnlyInB": 50
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "staging.source_payloads",
+      "rowsA": 30245,
+      "rowsB": 30246,
+      "rowDigestsOnlyInA": 0,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "staging.source_record_versions",
+      "rowsA": 30245,
+      "rowsB": 30246,
+      "rowDigestsOnlyInA": 1,
+      "rowDigestsOnlyInB": 2
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "staging.source_records",
+      "rowsA": 20663,
+      "rowsB": 20663,
+      "rowDigestsOnlyInA": 52,
+      "rowDigestsOnlyInB": 52
+    }
+  ],
+  "verdict": "DIFFERENT"
+}

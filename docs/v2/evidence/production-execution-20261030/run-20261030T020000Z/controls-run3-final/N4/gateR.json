@@ -1,0 +1,7 @@
+{
+  "format": "afldb.v2.gate-r.1",
+  "fresh": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence",
+  "accepted": "/home/arm/afldb-v2-prodexec-20261030T020000Z/pinned/accepted",
+  "verdict": "REPRODUCED",
+  "differences": []
+}

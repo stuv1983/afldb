@@ -20,8 +20,9 @@ Sources, all unchanged by this package:
 - [lock record](owner-decision-lock-2026-10-29.md);
 - `docs/deployment.md` §3 and §11.
 
-Prepared without production, DEV or isolated-host access. The only actions taken were the D-V2-PUSH-ROUTE-1 push
-(§0) and local commits.
+Prepared without production or DEV access. The 2026-10-30 preparation (§4.1) used only streamanator, in a new
+private root with its own loopback-only isolated cluster, and restored only the approved `a4641ca0` archive copy
+into disposable `_test` databases. The other actions were the D-V2-PUSH-ROUTE-1 push (§0) and local commits.
 
 ## 0. Where the release stands (2026-10-30)
 
@@ -71,6 +72,12 @@ either: any later login reintroduces drift. **O-DRIFT** (§3) is therefore a gen
 keeps the rule's purpose: a fresh migration rehearsal on the exact bytes that will be migrated, plus a stop on any
 change that could matter. It runs that rehearsal inside the session, on the frozen dump itself.
 
+Two further facts, found in preparation, apply the same reasoning to gate V3. First, O-FREEZE (a) stops the owner's
+edits but not the public site: visitors' NL searches (`nl_search_log`), health events and beta sign-ins keep writing
+between the frozen and the post-schema dump. Second, the window's own migrate run writes the seven new ledger rows
+with production `applied_at` and `duration_ms`, which can never equal the rehearsal's. A literal `IDENTICAL` V3
+would therefore always stop. §3.1 states the proposed rule for both gates.
+
 ### 2.2 The 43/43 requirement: isolated test evidence and production read-back, kept apart
 
 `tests/integration/privileges.test.ts` is catalogue-only: it asks the catalogue `has_*_privilege` questions and
@@ -89,16 +96,21 @@ timestamps or the database name:
 - the two `afldb_meta` registries, ledger names and checksums, and user triggers (`S|`);
 - the **effective** privileges of `afldb_app`, `afldb_auth` and `afldb_import` (`E|`). This is the first comparison
   of production effective permissions that the release requires;
-- cluster role attributes and memberships (`C|`);
+- cluster role attributes and memberships of every `afldb_*` role (`C|`), except `afldb_v2_super`, the isolated
+  cluster's own bootstrap superuser, which production does not have;
 - the suite's two role-level assertions evaluated on that cluster's own values (`A|`).
 
 **Gate V2 (43/43):**
 - T reports 43 passed, 0 failed, 0 skipped.
 - The comparison is `IDENTICAL`. `S|` and `E|` must be byte-identical, and every `A|` line on both sides must end in
   `ok`.
-- A `REVIEW` verdict (cluster role facts differ, for example `afldb_backup`'s `pg_read_all_data` membership, which
-  the isolated cluster lacks) lists each difference. The owner resolves it in the session. Because `E|` is identical
-  by then, a `C|` difference cannot change any answer of the 43 assertions. It is still never passed automatically.
+- A `REVIEW` verdict (cluster role facts differ, for example an attribute or a membership of an `afldb_*` role
+  that only production has) lists each difference. The owner resolves it in the session. Because `E|` is identical
+  by then, a `C|` difference cannot change any answer of the 43 assertions, but clone equivalence is then **not**
+  claimed. It is never passed automatically.
+- Every assertion's inputs are mapped to compared facts in
+  [`permission-assertion-map.md`](evidence/production-execution-20261030/permission-assertion-map.md). The suite is
+  catalogue-only and writes nothing; it still never runs on production.
 - Any `DIFFERENT` verdict stops before A-GO.
 
 Reporting wording is fixed: "privileges suite **43/43 on the isolated clone of the frozen production dump**;
@@ -114,7 +126,7 @@ dumps restored on the isolated host:
 |---|---|---|---|
 | **D (drift)** | Clone A of the frozen dump (accepted shadow restore method) vs the accepted `a4641ca0` "before" set | `snapshot-compare.mjs preservation`: per table, definition digest and rows as a multiset of whole-row digests; every contract query. Plus `historical-manifest.ts compare` (sealed scope) | What changed in the data between the accepted shadow and the freeze, table by table |
 | **R (re-rehearsal)** | Clone A after the A-REL sequence vs clone A before | The accepted shadow procedure, unchanged: `shadow-parity.ts compare`, `release-gates.ts`, classifier `expected-deltas.mjs`. Their finding codes per table are compared with the committed `a4641ca0` run outputs | That 111–117 on the frozen bytes reproduce the accepted result: only the expected 116/117 deltas, the same strict findings, no new finding |
-| **V3 (after-state)** | A post-A-REL production dump (restored as clone C) vs clone A's rehearsed after-state | `snapshot-compare.mjs preservation`: same archive base, so any difference is a production write or a migration that behaved differently from the rehearsal | That production after A-REL holds exactly the rehearsed content, and that no write happened under the freeze |
+| **V3 (after-state)** | A post-A-REL production dump (restored as clone C) vs clone AM, the rehearsed after-state | `snapshot-compare.mjs preservation` and `historical-manifest.ts compare`, then `drift-gate.mjs after` (§3.1): same archive base, so any difference is a production write or a migration that behaved differently from the rehearsal | That production after A-REL holds exactly the rehearsed content apart from attributed visitor/auth activity and ledger timing, and that no canonical write happened under the freeze |
 | **M (sealed history)** | Production before vs after the window (cutover step 8) | `historical-manifest.ts produce --read-only-source --i-understand-this-reads-a-non-test-database`, then `compare` | `sealed-scope-identical` |
 
 A changed ledger digest is reported as a ledger finding only. It is never offered as evidence about rows.
@@ -123,20 +135,74 @@ A changed ledger digest is reported as a ledger finding only. It is never offere
 
 | # | Choice | Options | Recommendation |
 |---|---|---|---|
-| **O-DRIFT** *(new)* | What gate D does with drift since `a4641ca0` | **(a)** Literal rule: any difference stops. Expect the stop: the session ends after a verified frozen backup, with A-AFLT done, and a re-baseline session follows. **(b)** Measured and re-rehearsed: continue only if **all** of these hold: (1) no `DEFINITION_CHANGED`, `TABLE_ONLY_IN_*` or `QUERY_CHANGED` (public projections unchanged); (2) the sealed scope is `sealed-scope-identical`; (3) no `ROWS_CHANGED` in a table that 111–117 create or alter (`staging.afl_api_brownlow_vote`, the 115-indexed adjudication table, or any new table); (4) every remaining `ROWS_CHANGED` table is named and attributed to its writer (expected: `import_batches` and `staging.source_record_versions` from the settle, and `auth_sessions`/`auth_audit_log` from logins); (5) gate R reproduces the accepted classification. Otherwise stop. The owner gives GO in the session on the recorded outputs. **(c)** Recapture after A-AFLT and re-bind the acceptance before the window: two extra owner steps, and still fragile against logins | **(b)**. It is the rule's intent: a fresh migration rehearsal, on the exact frozen bytes, with a stop on any canonical, public or schema change. The approved archive-bound acceptance tool is **not** re-bound or edited. Gate R's comparison is recorded as the evidence instead |
+| **O-DRIFT** *(new; PROPOSED, not approved by this preparation)* | What gates D and V3 do with differences | **(a)** Literal rule: any difference stops. Expect the stop at gate D: the session ends after a verified frozen backup, with A-AFLT done, and a re-baseline session follows. **(b)** The evidence rule in §3.1, implemented by `drift-gate.mjs` and proven by the controls in §4.1. **(c)** Recapture after A-AFLT and re-bind the acceptance before the window: two extra owner steps, and still fragile against logins and visitors | **(b)**. It is the rule's intent: a fresh migration rehearsal on the exact frozen bytes, a stop on any canonical, public-query, schema or migration-sensitive change, and every other changed row attributed to its writer from both restored databases. The approved archive-bound acceptance tool is **not** re-bound or edited; gate R's comparison with the committed `a4641ca0` outputs is the evidence instead |
 | **O-ISO** *(new)* | Where clones A, B and C run | **(a)** `streamanator`: a new root and a new isolated cluster on an unused loopback port, no shared database, exactly as the accepted shadow (`shadow-restore.sh`, `transfer.ps1`). Linux, the same host as the 42/43 run. It needs a narrow authority to use that host (not DEV's database or app) and a disk check. **(b)** The workstation isolated cluster: no DEV host, but Windows, and less comparable with the accepted runs | **(a)**, with the Stage 0 disk check (two clones, a third after A-REL, and the dumps) |
 | **O-FREEZE** *(new)* | How admin edits are frozen | **(a)** Procedural: the owner signs in to nothing and edits nothing from Stage 2 until Stage 13. Gate V3 then proves mechanically that no write occurred between the frozen dump and the post-schema dump. **(b)** Enforced with the ISSUE-250 promotion freeze (`tools/db/promotion-freeze.ts`). That revokes CONNECT, needs `postgres` and takes the site offline: an outage tool built for promotion | **(a)**. Four auth users, beta-gated, and V3 makes it verifiable |
 | **O-RB** *(new; demanded by rollback runbook §4.2)* | `PREV` with 111–117 applied makes the preflight report 7× `unknown-applied-migration` | **(a)** Pre-record that as the expected exception for a code rollback. **(b)** Reverse the schema first (§5): data-losing, and forbidden for 116 | **(a)** |
 | O-5 | Retention of the frozen and post-schema dumps, and any second copy | — | Keep the host release directory and the workstation copy until 30 days after A-GO with no rollback. Then delete under D-V2-EVIDENCE-RETENTION-1, never automatically. Add a second hash-verified copy on a separate medium the owner controls: the workstation is otherwise the only off-host copy |
 | O-6 | HC-1: install the repository Caddyfile | take / decline | **Decline for this session.** It keeps the window to one failure domain. Its HSTS cannot be withdrawn by a revert, and F-1 affects only proxy-generated responses. Record F-1 as a known residual, and schedule HC-1 on its own approval |
-| O-7 | The session | — | **Saturday 2026-11-07, 09:00–14:00 AEDT (22:00Z 11-06 to 03:00Z 11-07), 5 h**: 4 h planned plus 1 h contingency. Off-season weekend morning; no match data is expected. It is a new window: no earlier authority is reused, including the expired 2026-10-27 day-D window. Cut-offs are in §5 |
+| O-7 | When the session runs | — | **Owner-triggered, no calendar date.** The owner names the start time T0 in the approval (§8). The session is 4 h 45 min from T0 (3 h 35 min of stages, 25 min slack, 45 min code-rollback allowance), measured and budgeted in §5. Cut-offs are relative to T0. The only start constraint: T0 must not fall in 04:15–05:30 AEDT, the AFL Tables timer's observed run window (04:37 and 04:44), because Stage 0 stops on a running settle before A-AFLT retires it. No earlier authority is reused, including the expired 2026-10-27 day-D window |
+
+### 3.1 O-DRIFT (b) as proposed: the evidence rule
+
+Gate D compares clone A of the frozen dump with the `a4641ca0` "before" set; gate V3 compares clone C of the
+post-A-REL dump with clone AM, the rehearsed after-state. Both run `snapshot-compare.mjs preservation`,
+`historical-manifest.ts compare` and then `drift-gate.mjs`, which re-reads every changed row by primary key from
+both restored databases. A table name alone never attributes anything.
+
+**Always STOP** (both gates):
+1. `DEFINITION_CHANGED`, `TABLE_ONLY_IN_*`, a scope mismatch (the comparator refuses: exit 2), or a sealed scope
+   that is not `sealed-scope-identical`.
+2. `QUERY_CHANGED` on any public query, with one exception: `audit_history`, only when its contract text is exactly
+   `SELECT * FROM public.auth_audit_log` and that table's change is itself attributed in the same run.
+3. Any row change in a migration-sensitive table: the ledger (gate D), `staging.afl_api_brownlow_vote`,
+   `public.afl_api_identity_adjudications`, or any table that 111–117 create.
+4. A changed table without a primary key, a catalogue shape that differs between the two databases, or a comparator
+   report the row re-derivation cannot reproduce.
+5. Any changed row that does not match its writer's rule below, and any insert dated before the reference time (gate D:
+   the `a4641ca0` capture start; gate V3: the frozen dump's start, which is its snapshot).
+
+**Writer rules** (the only rows that may differ):
+
+| Writer class | Table | Gate D | Gate V3 |
+|---|---|---|---|
+| settle bookkeeping | `public.import_batches` | inserts only (time `started_at`), each with `tool = 'settle-afltables.ts'`, `target_table = 'staging.source_record_versions'` and notes matching `AFLDB-ISSUE-099 settle; snapshot=…; season=YYYY; mode=apply` | none (A-AFLT retired the writer): STOP |
+| settle bookkeeping | `staging.source_records` | insert (time `first_seen_at`, `last_batch_id` attributed); update of `scope_key`, `last_seen_at`, `last_batch_id`, `absent_since`, `current_version_seq`, `current_payload_hash` where each row is either a head refresh (new `last_batch_id` attributed, `last_seen_at` after the reference) or an absence mark (only `absent_since` changes, after the reference) | none: STOP |
+| settle bookkeeping | `staging.source_record_versions` | insert (time `observed_from`, `opened_by_batch_id` attributed); update of `observed_to`/`closed_by_batch_id` only on an open version, closed by an attributed batch after the reference | none: STOP |
+| settle bookkeeping | `staging.source_payloads` | insert (time `first_stored_at`; content-addressed, no batch column: each new payload must be referenced by a `source_record_versions` row opened by an attributed batch) | none: STOP |
+| settle bookkeeping | `staging.afltables_match`, `staging.afltables_player_match` | insert (time `projected_at`, `projected_by_batch_id` attributed); update of any non-key column, each row re-stamped with an attributed `projected_by_batch_id` and `projected_at` after the reference (every present record is re-projected on every run, `ON CONFLICT … DO UPDATE`) | none: STOP |
+| settle bookkeeping | `public.import_rejections` | insert (time `rejected_at`, `import_batch_id` attributed) | none: STOP |
+| settle candidates | `public.promotion_candidates` | insert (time `created_at`, `created_by_batch_id` attributed); refresh of a **pending** row re-stamped by an attributed batch (the `ON CONFLICT … WHERE status = 'pending'` columns only) | none: STOP |
+| auth activity | `auth_sessions` | insert, delete, update of `expires_at`/`revoked_at` | same |
+| auth activity | `auth_audit_log` | insert | same |
+| auth activity | `auth_users` | update of `totp_last_step`, `password_hash`, `password_changed_at`, `must_change_password` | update of `totp_last_step` only |
+| auth activity | `beta_login_tokens` | insert, delete, update of `used_at` | same |
+| runtime telemetry | `app_health_events`, `nl_search_log`, `nl_search_feedback` | insert | same |
+| migration ledger timing | `afldb_meta.schema_migrations` | none: STOP | only `applied_at`/`duration_ms` may differ; names, checksums and row set identical |
+
+The settle rows are the `ff100dc2` writer's footprint, read from its code (`settle-afltables.ts:1845-1966, 2028,
+2740-2810, 2827-2871, 3528, 3588-3613`, `observation-store.ts:104-224`): an idempotent nightly run inserts one batch and head-refreshes
+every enumerated record, so updates are part of the rule (controls D10, D11). A batch reference never makes a canonical
+row bookkeeping: 38 tables reference `import_batches`, canonical ones included, and only the tables named above may be
+bound that way (control D7).
+
+**Verdicts.** `NO_DIFFERENCE` (exit 0). `LEDGER_TIMING_ONLY` (V3 only, exit 0): the window's own migrate run
+stamped production times, nothing else differs; no owner decision is needed, because names and checksums are
+identical. `ATTRIBUTED_ONLY` (exit 3): continue only on the owner's GO in the session, on the recorded report,
+which lists each class, row counts, time ranges and, for settle, the signatures (never a secret column).
+`STOP` (exit 1) and invalid input (exit 2) end that gate.
+
+**Why V3 needs the rule too.** O-FREEZE (a) stops the owner's edits, not the public site: visitors' NL searches and
+health events, and beta sign-ins, keep writing while the previous code serves. A literal "IDENTICAL" V3 would also
+always stop on the seven new ledger rows' production `applied_at`. Both are now explicit.
+
+**Preparation is not approval.** The rule is implemented, controlled (§4.1) and pinned so that the owner can choose
+it. Choosing (a) or (c) needs no code change: (a) treats any non-zero gate exit as STOP.
 
 ## 4. Pre-session preparation (no production access; no owner decision)
 
 The session runs only reviewed bytes pinned by SHA-256 in the approval, following the established pattern
-(host-inspection script hashes, `transfer.ps1` hash pins). None of the items below exists yet, apart from the two
-artefacts in this commit, whose control runs are also pending. **Recommended: one fresh session**, because of the
-context ceiling.
+(host-inspection script hashes, `transfer.ps1` hash pins). P-1 to P-6 are complete and P-7 was run after P-6 closed, as recorded in §4.1.
 
 | # | Item | Derived from | Control before pinning |
 |---|---|---|---|
@@ -144,8 +210,41 @@ context ceiling.
 | P-2 | Transfer script: host → workstation (HC-4, SHA-256 both ends) → isolated host | `transfer.ps1` | Hash and parameter checks as in the original |
 | P-3 | Isolated script: clones A, B and C on a new cluster. Source = `git archive 9ed9c9dd`, replacing `shadow-restore.sh`'s `c478c31b` tree. Clone A uses the accepted restore and capture options. Clone B keeps ACLs and owners: every role the dump names must exist first, and any `pg_restore` error stops. Gates D, R, T and V3, with the finding-code comparison against the committed `a4641ca0` outputs scripted | `shadow-restore.sh`, `followup.sh` F8–F9 | Synthetic controls, including negatives: a changed row → `ROWS_CHANGED`; a widened grant → `E|` difference; a missing staging default → suite 42/43 **and** an `S|` difference |
 | P-4 | Controls for the two artefacts in this commit: `permission-readback.sql` on a disposable isolated `_test` database; `snapshot-compare.mjs` on synthetic snapshot pairs (identical, row change, definition change, query change, scope mismatch → exit 2) | — | Outputs retained beside the artefacts |
-| P-5 | Copies, not in the `9ed9c9dd` checkout, for transfer to the host with pinned hashes: `permission-readback.sql`, `evidence/lock-build-20261029/artifact-manifest.mjs` | — | SHA-256 recorded in the approval |
+| P-5 | Copies, not in the `9ed9c9dd` checkout, for transfer to the host with pinned hashes: `permission-readback.sql`, `lib/arel-readback.sql`, `evidence/lock-build-20261029/artifact-manifest.mjs` (bound by `host-session.sh`'s embedded `PIN_*` values, and listed in `PINNED.SHA256`) | — | SHA-256 recorded in the approval |
 | P-6 | Independent review of P-1 to P-5 and of this package. A finding of HIGH or above returns here | — | Review record |
+| P-7 | After P-6 closes: `transfer-session.ps1 -Mode PinnedHash` on the reviewed tree. It assembles the pinned rehearsal set (every file P-3 reads: `isolated-rehearsal.sh`, `drift-gate.mjs`, `gate-r.mjs`, `snapshot-compare.mjs`, `permission-readback.sql`, `lib/*`, `expected-deltas.mjs`, `artifact-manifest.mjs`, the three accepted `a4641ca0` outputs) and `git archive 9ed9c9dd`, and prints the `PINNED.SHA256` and `src-9ed9c9dd.tar` hashes | — | Both hashes recorded in the approval (§8) |
+
+### 4.1 Preparation run results (2026-10-30, streamanator only; no production or DEV access)
+
+Final root `/home/arm/afldb-v2-prodexec-20261030T020000Z`: its own isolated cluster on 127.0.0.1:55491, fresh
+credentials, disposable `_test` restores of the approved `a4641ca0` archive. Retained evidence:
+[`run-20261030T020000Z/`](evidence/production-execution-20261030/run-20261030T020000Z/README.md). Review record:
+[`review-P6-2026-10-30.md`](evidence/production-execution-20261030/review-P6-2026-10-30.md).
+
+| Item | Result |
+|---|---|
+| Pinned set (P-7, `PinnedHash` on the reviewed tree, unchanged after the run) | `PINNED.SHA256` `38e7fbb4c948211796be4f7e9ea8de1e92be53cc2c82982e723952f9660e1842`; `src-9ed9c9dd.tar` `ab10691fb2e9facb9b28bdb65b04c2ee823813f41ee48c193f0abe94dd7b6ad5` |
+| Rehearsal (P-3) | `PASS` in 553 s: gate D `NO_DIFFERENCE`, gate R `REPRODUCED`, gate T privileges 43/43, ledger-117 digest `647c3fb3…`. Restore of two clones 99 s, before capture 168 s, A-REL 21 s |
+| Controls (P-3/P-4, `rehearsal-controls.sh` `7989eeca…`) | **`PASS 112/112` in one run** (04:36–05:20Z): D 23 (incl. D10 settle replay: seven tables attributed; D11 unbound refresh stops on `source_records` and both projections; gate 152 s), T 11, V 11, N 8, RB 13 (PREV `ff100dc2` on the 117 schema: runner accepts the ledger, build 229 s, health 200, 18 route checks, Brownlow writer suite, privileges), H 46 (`host-session.sh` `0fe897f8…` in library mode, including A-REL end to end in 9 s and its failure, no-retry and privileges-failure negatives; no password in any log) |
+| End-to-end chain (P-2, `e2e-chain.ps1`) | E1–E3: post-schema Pull and PushIso `TRANSFER PASS`; `isolated-rehearsal.sh after` (gate V3) `PASS`, V3 `NO_DIFFERENCE`, 195 s. E4 stopped on a P-2 defect (below); after the fix, rerun of E4: PullIso `rehearse:PASS,after:PASS`, GateV2 `IDENTICAL` |
+| Review (P-6) | Independent review plus four re-reviews: findings F-001 to F-018; every HIGH and MED closed; the P-2 `timings.txt` fix accepted in Re-review 4. F-011 (rerun evidence) is met by this run. Open LOW, no work gate: F-016 wording (fixed by this section), F-017 (H2b/H6b assert the exit code without a reason string), F-018 (an aborted controls run leaves `env.good` with isolated-cluster credentials; run 2's copy was redacted) |
+| Approval pins (§8) | `host-session.sh` (P-1) `0fe897f856c039a33a3c178c57af789c58001681b50eea75316e8e27597b2067`; `transfer-session.ps1` (P-2) `0ee343bac81c7864a27e14c4237d80e8c3eb5f7f38ebf4ccfa1bdd3b47c0adb8`; `PINNED.SHA256` and `src-9ed9c9dd.tar` as above. Inside the pinned set: `permission-readback.sql` `1e7a4f62…`, `arel-readback.sql` `c195fab8…`, `snapshot-compare.mjs` `5542958b…`, `artifact-manifest.mjs` `ea37a7e7…`, `drift-gate.mjs` `ce80f864…`, `isolated-rehearsal.sh` `30c72d98…` |
+
+**Failed and superseded attempts (kept, not counted):** rehearsal roots `20261029T210000Z` and `20261029T220000Z`
+(controls with harness defects; `220000Z` also ENOSPC at the PREV build), `20261030T011000Z` and `20261030T013000Z`
+(PASS on pinned sets superseded by the F-001 and F-014 fixes; used as D10/D11 trial beds). On the final root:
+controls run 1 (stopped by the 3 GiB disk watchdog at RB4, because `room()` rounded `df -B1G` up; all controls up
+to RB4 passed) and controls run 2 (D, T, V, N and RB passed; every H control failed with exit 5 because the harness
+read the database OID with the wrong root; fixed and proven by an H-only trial, 46/46). E2E attempt 1 found the P-2
+defect: `after` appends to `timings.txt`, which the rehearse manifest had sealed, so Stage 11's PullIso would always
+stop; `transfer-session.ps1` now verifies that file only against the after manifest once `after` has run.
+
+**Disk.** The host started at 4.7 GiB free. Cleanup of this preparation's own reproducible intermediates and
+superseded evidence (compressed and verified, not deleted), and two owner-authorised lists of other disposable
+build outputs and stopped clusters (per-file SHA-256 listings in
+`/home/arm/afldb-v2-prodexec-20261029T220000Z/cleanup-external-20261030/`), raised it to 11.9 GiB. Budget: peak
+use about 3 GiB, an external swing of about 3 GiB from media containers on the same filesystem, and a 3 GiB
+watchdog reserve. The final controls run's lowest free space was 9,047 MiB.
 
 ## 5. The execution session (D-V2-PROD-EXEC-1)
 
@@ -158,27 +257,33 @@ context ceiling.
 **Rules:**
 - Every stage writes its evidence before the next begins.
 - A failed gate stops at that stage, and recovery follows §6.
-- Times are AEDT on 2026-11-07.
+- Times are relative to **T0**, the start the owner names in the approval (O-7). The duration of each stage is its
+  budget; "measured" marks a duration taken from the 2026-10-30 preparation run on streamanator, "est." an
+  operation that preparation could not run (production host only).
 
-| Time | Stage | Steps | Gate (stop unless it holds) |
+**Scripts per stage** (all pinned, §8): host stages run `host-session.sh <stage> <STAMP> …` streamed over
+`ssh afldb bash -s`; transfers run `transfer-session.ps1 -Mode …`; the isolated stages run
+`isolated-rehearsal.sh rehearse|after` on streamanator, started by the line PushIso prints.
+
+| Start | Stage | Steps | Gate (stop unless it holds) |
 |---|---|---|---|
-| 09:00 (10′) | **0 Go check** | Local `HEAD`/`main`/`origin/main` = `9ed9c9dd`; pinned script hashes; `ssh -G afldb` identity. Isolated host read-only: the `a4641ca0` before-set present with its recorded hashes; disk budget. Host read-only identity (P-1 block) | Every identity matches §0–§1. Ledger is exactly 110 with digest `789946fe…`. No settle, migrate or dump process running |
-| 09:10 (15′) | **1 Writer retirement (A-AFLT, HC-2)**, owner `sudo` | `sudo ls -la /etc/polkit-1/rules.d`; `sudo sha256sum` of the `*afldb*` rule, compared with `deploy/afldb-settle-afltables-trigger.rules` `3164e0d9…`; `sudo install -d -m 700 /root/afldb-v2-retired`; `sudo cp -p` of the rule into it (the kept copy); `sudo systemctl disable --now afldb-settle-afltables.timer`; `sudo mv` the rule into `/root/afldb-v2-retired/`. The email-intake timer is absent (H1): recheck, and disable it only if present | Timer `disabled`/`inactive`; `afldb-settle-afltables.service` `inactive`; no settle process; rule absent from `rules.d`; the kept copy's hash recorded |
-| 09:25 (5′) | **2 Freeze** (O-FREEZE) | Freeze declared. Cutover step 2 scheduler loop recorded. Read-only: active sessions per role from `pg_stat_activity` (counts only) | No writer unit active. AFL API units absent, as before |
-| 09:30 (15′) | **3 Reviewed checkout** | `git fetch origin`; `git merge --ff-only 9ed9c9dd…`; `git rev-parse HEAD`; `git status --porcelain` empty; `npm ci`. The serving `.next/standalone` is untouched. Then `npm run preflight -- --mode deploy …` (cutover step 1) and `npx tsx tools/v2/cutover-preflight.ts legacy-writers` | HEAD = `9ed9c9dd…`. The preflight's only migration findings are `pending-migration` for exactly 111–117. `legacy-writers` exits 0 (PASS) |
-| 09:45 (10′) | **4 Frozen backup (HC-3)** and sealed manifest **before** | `backup.sh --dir ~/backups/afldb/release-v2-<STAMP> --keep 999`; SHA-256; the existing series count before and after. `historical-manifest.ts produce` (read-only, `afldb_backup`) | Count unchanged (11); `pg_restore --list` passes; SHA recorded; manifest written |
-| 09:55 (10′) | **5 Proven restore (HC-5)** | `restore-test.sh <frozen dump>` into the disposable `afldb_restore_test` | Exit 0, every parity check equal |
-| 10:05 (10′) | **6 Off-host copy (HC-4, O-5)** | Pull to `C:\Users\stuar\backups\afldb\release-v2-<STAMP>\`; SHA-256 equal on both ends; the second copy (O-5); transfer to the isolated host (O-ISO) | SHA-256 equal everywhere |
-| 10:15 (30′) | **7 Isolated rehearsal on the frozen bytes** | **Clone A:** accepted restore; before captures; **gate D**; the A-REL sequence; after captures; **gate R**. **Clone B:** ACL-kept restore; the A-REL sequence; suite (**T**); `B.permissions.txt` | Gate D per O-DRIFT; gate R as in §2.3; T = 43/43 |
-| 10:45 (5′) | **Gate D GO (owner)** | The owner reads the D/R/T summary and answers GO or STOP | GO. A STOP ends the session here (§6, row 1) |
-| 10:50 (5′) | **8 A-ROLLBACK named** | Record the routes in §6 against the frozen dump's path and SHA, with O-RB | Recorded |
-| 10:55 (20′) | **9 A-REL** | Re-verify identity, and the ledger at exactly 110. `node --import tsx tools/db/migrate.ts --target prod --status`, then `--target prod` (`AFLDB_PROD_DATABASE_URL` from `.env`, never argv). Then `psql -X -w -v ON_ERROR_STOP=1 -d afldb_prod -f tools/maintenance/privileges.sql` as `afldb_owner` (`PGPASSWORD` from the environment only). Then the two defaults (§1). Read back after each write | Ledger 117: the 7 new names, checksums equal to clone A's; 0 pending. The new tables and the 115 index exist; `staging.afl_api_brownlow_vote.eligible` is nullable; the 116 trigger is enabled. The two `staging` default-ACL rows exist |
-| 11:15 (10′) | **10 Gate V2: permissions** | `permission-readback.sql` on `afldb_prod` as `afldb_backup` → `P.permissions.txt`; `snapshot-compare.mjs permissions` against B | `IDENTICAL`, or `REVIEW` resolved by the owner (§2.2). T 43/43 already holds |
-| 11:25 (30′) | **11 Gate V3: after-state** | Post-schema dump into the same release directory (`--keep 999`); SHA-256; pull and copy as in Stage 6; restore as clone C; preservation capture; `snapshot-compare.mjs preservation` against clone A's after snapshot | `IDENTICAL`. Any difference stops before code, with the previous code still serving |
-| 11:55 (35′) | **12 A-GO (O-ARTIFACT a)** | `npm run build 2>&1 \| tee build.log` with `AFLDB_ENV=production` from the host `.env`, and the log must contain "AFLDB_ENV=production detected". Record `.next/BUILD_ID` = `.next/standalone/.next/BUILD_ID`, and the `artifact-manifest.mjs` manifest SHA-256 (P-5). Then owner `sudo systemctl restart afldb` | Build exit 0 and both identities recorded **before** restart. `/api/health` returns HTTP 200 `{"status":"ok","database":"ok"}` through `beta.afldb.com` and on `127.0.0.1:3100`. The `x-afldb-build` header equals the recorded `BUILD_ID` |
-| 12:30 (20′) | **13 Live acceptance and after-checks** | Signed in as Admin: `/admin/operations` renders. The owner saves a screenshot to the evidence; otherwise the result is `VISUAL: UNVERIFIED`, never prose. Key public pages return 200. `POST /api/admin/email-intake` → 410. Sealed manifest **after** + `compare` (gate M). Scheduler loop: AFL Tables `disabled`/`inactive`, AFL API absent as before. `legacy-writers` PASS. No new writer or provider integration enabled | All hold; M = `sealed-scope-identical` |
-| 12:50 (10′) | **14 Close** | Lift the admin-edit freeze (writers stay retired). Write the window record (cutover step 11) | — |
-| 13:00–14:00 | Contingency | — | **Cut-offs:** Stage 9 must start by **11:45**, or the session stops before any schema change. Stage 12 must start by **13:00**, or it stops after V3 with the previous code serving the new schema. That rest state is safe: `PREV` never reads the new tables. A-GO then needs its own short approval. **Hard end 14:00** |
+| T0 (10′) | **0 Go check** | Local `HEAD`/`main`/`origin/main` = `9ed9c9dd`; pinned script hashes; `transfer-session.ps1 -Mode PinnedHash` prints exactly the approval's `PINNED.SHA256` and `src-9ed9c9dd.tar` hashes; `ssh -G afldb` identity. Isolated host read-only: the `a4641ca0` before-set present with its recorded hashes; disk budget. Host: `host-session.sh identity <STAMP> 110`, `writers`, `init` | Every identity matches §0–§1. Ledger is exactly 110 with digest `789946fe…`. No settle, migrate or dump process running |
+| T0+0:10 (15′, owner-paced) | **1 Writer retirement (A-AFLT, HC-2)**, owner `sudo` | `sudo ls -la /etc/polkit-1/rules.d`; `sudo sha256sum` of the `*afldb*` rule, compared with `deploy/afldb-settle-afltables-trigger.rules` `3164e0d9…`; `sudo install -d -m 700 /root/afldb-v2-retired`; `sudo cp -p` of the rule into it (the kept copy); `sudo systemctl disable --now afldb-settle-afltables.timer`; `sudo mv` the rule into `/root/afldb-v2-retired/`. The email-intake timer is absent (H1): recheck, and disable it only if present | Timer `disabled`/`inactive`; `afldb-settle-afltables.service` `inactive`; no settle process; rule absent from `rules.d`; the kept copy's hash recorded |
+| T0+0:25 (5′) | **2 Freeze** (O-FREEZE) | Freeze declared. Cutover step 2 scheduler loop recorded. Read-only: active sessions per role from `pg_stat_activity` (counts only). `host-session.sh retired <STAMP>` | No writer unit active. No afldb writer timer enabled or active (AFL Tables retired by Stage 1; AFL API and email-intake units absent, as the accepted capture recorded). `backup` and `arel` repeat this check |
+| T0+0:30 (15′, est.: `npm ci`) | **3 Reviewed checkout** | `git fetch origin`; `git merge --ff-only 9ed9c9dd…`; `git rev-parse HEAD`; `git status --porcelain` empty; `npm ci`. The serving `.next/standalone` is untouched. Then `npm run preflight -- --mode deploy …` (cutover step 1) and `npx tsx tools/v2/cutover-preflight.ts legacy-writers` | HEAD = `9ed9c9dd…`. The preflight's only migration findings are `pending-migration` for exactly 111–117. `legacy-writers` exits 0 (PASS) |
+| T0+0:45 (10′; the accepted capture dumped in 10 s) | **4 Frozen backup (HC-3)** and sealed manifest **before** | `host-session.sh backup <STAMP> frozen` (HC-3 `backup.sh --dir ~/backups/afldb/release-v2-<STAMP> --keep 999`, series count, `pg_restore --list`, ledger before = after, sidecar, `frozen.SHA256SUMS`); `host-session.sh manifest <STAMP> before` | `RESULT PASS` line; series count unchanged; SHA recorded; manifest written |
+| T0+0:55 (10′, est.) | **5 Proven restore (HC-5)** | `host-session.sh restore-test <STAMP>` (`restore-test.sh <frozen dump>` into the disposable `afldb_restore_test`) | Exit 0, every parity check equal |
+| T0+1:05 (10′; measured under 1 min for a 30 MB set) | **6 Off-host copy (HC-4, O-5)** | `transfer-session.ps1 -Mode Pull -Label frozen -ArchiveSha <RESULT sha> -SecondCopy <medium>` (to `C:\Users\stuar\backups\afldb\release-v2-<STAMP>\`); `-Mode PushPinned`, then `host-session.sh pinned`; `-Mode PushIso -Label frozen -ArchiveSha <RESULT sha> -PinnedSha <approval PINNED.SHA256> -SrcTarSha <approval tar>` (a new isolated root; the pinned set re-verified there) | `TRANSFER PASS` lines; SHA-256 equal everywhere |
+| T0+1:15 (15′; measured 9 min 37 s) | **7 Isolated rehearsal on the frozen bytes** | **Clone A:** accepted restore; before captures; **gate D**; the A-REL sequence; after captures; **gate R**. **Clone B:** ACL-kept restore; the A-REL sequence; suite (**T**); `B.permissions.txt` | `rehearse.result` = `PASS`, or `PASS-PENDING-OWNER-GO` (gate D `ATTRIBUTED_ONLY`, §3.1); gate R `REPRODUCED`; T = 43/43. Then `transfer-session.ps1 -Mode PullIso -ArchiveSha <frozen sha>`: it pulls only a finished run (`rehearse.done`), verifies every file against the run's own evidence manifest, and hands over the 117 digest only for a `PASS*` summary that names this archive |
+| T0+1:30 (5′) | **Gate D GO (owner)** | The owner reads the D/R/T summary and answers GO or STOP | GO. A STOP ends the session here (§6, row 1) |
+| T0+1:35 (5′) | **8 A-ROLLBACK named** | Record the routes in §6 against the frozen dump's path and SHA, with O-RB | Recorded |
+| T0+1:40 (15′; the stage measured 9 s end to end on a clone (`host-session.sh arel`, control H12; 16 s in the H trial; the rehearsal's own A-REL 21 s)) | **9 A-REL** | `host-session.sh arel <STAMP> <AM.ledger.digest> <frozen sha>`: re-verifies identity as `afldb_backup` and `afldb_owner`, ledger exactly 110, no writer process or timer, the clean reviewed checkout, the pinned files, and that the rehearsed archive is this directory's frozen dump with its restore proof. `AFLDB_PROD_DATABASE_URL` is not kept in the host `.env` (`docs/deployment.md`): the identity-checked `AFLDB_OWNER_DATABASE_URL` is handed to the migrate child's environment only, never argv, and migrate's own target line must name it. `migrate.ts --target prod --status` (pending exactly 111–117; not strictly read-only: it first runs the runner's `CREATE SCHEMA/TABLE IF NOT EXISTS` bootstrap as `afldb_owner`, a no-op on this target), then `--target prod`; ledger = the rehearsed 117 digest; `privileges.sql` and the two defaults (§1) as `afldb_owner` (`PGPASSWORD` in the child only); `arel-readback.sql` as `afldb_backup`. One attempt only: once migrate has reached the database, a second `arel` in the same directory refuses; an attempt refused before connecting is set aside and may rerun | Ledger 117: the 7 new names, checksums equal to clone A's; 0 pending. The new tables and the 115 index exist; `staging.afl_api_brownlow_vote.eligible` is nullable; the 116 trigger is enabled. The two `staging` default-ACL rows exist. `arel-readback.sql` 12/12 `ok` |
+| T0+1:55 (10′) | **10 Gate V2: permissions** | `host-session.sh readback <STAMP> <digest>` (read only; `I|transaction_read_only|on` required) → `P.permissions.txt`; `transfer-session.ps1 -Mode GateV2` (`snapshot-compare.mjs permissions`, B vs P; it prints `TRANSFER PASS … IDENTICAL` or `TRANSFER REVIEW …`, never PASS for REVIEW) | `IDENTICAL`, or `REVIEW` resolved by the owner (§2.2, [assertion map](evidence/production-execution-20261030/permission-assertion-map.md)). T 43/43 already holds |
+| T0+2:05 (25′; `after` measured 195 s on a clone; backup and transfer at production size not measured) | **11 Gate V3: after-state** | `host-session.sh backup <STAMP> postschema <digest>`; `transfer-session.ps1 -Mode Pull -Label postschema`, then `-Mode PushIso -Label postschema`; `isolated-rehearsal.sh after` (clone C; ledger equal to AM's; preservation and manifest compare against AM; `drift-gate.mjs after`); `-Mode PullIso -ArchiveSha <frozen sha>` | `after.result` = `PASS` (V3 `NO_DIFFERENCE` or `LEDGER_TIMING_ONLY`), or `PASS-PENDING-OWNER-GO` (only attributed visitor or auth activity, owner GO). Anything else stops before code, with the previous code still serving |
+| T0+2:30 (35′, est.: host build) | **12 A-GO (O-ARTIFACT a)** | `npm run build 2>&1 \| tee build.log` with `AFLDB_ENV=production` from the host `.env`, and the log must contain "AFLDB_ENV=production detected". Record `.next/BUILD_ID` = `.next/standalone/.next/BUILD_ID`, and the `artifact-manifest.mjs` manifest SHA-256 (P-5). Then owner `sudo systemctl restart afldb` | Build exit 0 and both identities recorded **before** restart. `/api/health` returns HTTP 200 `{"status":"ok","database":"ok"}` through `beta.afldb.com` and on `127.0.0.1:3100`. The `x-afldb-build` header equals the recorded `BUILD_ID` |
+| T0+3:05 (20′) | **13 Live acceptance and after-checks** | Signed in as Admin: `/admin/operations` renders. The owner saves a screenshot to the evidence; otherwise the result is `VISUAL: UNVERIFIED`, never prose. Key public pages return 200. `POST /api/admin/email-intake` → 410. Sealed manifest **after** + `compare` (gate M). Scheduler loop: AFL Tables `disabled`/`inactive`, AFL API absent as before. `legacy-writers` PASS. No new writer or provider integration enabled | All hold; M = `sealed-scope-identical` |
+| T0+3:25 (10′) | **14 Close** | Lift the admin-edit freeze (writers stay retired). Write the window record (cutover step 11) | — |
+| T0+3:35 – T0+4:45 | Contingency and recovery allowance | 25 min slack, plus 45 min reserved for a code rollback (rollback runbook §4.1: checkout `ff100dc2`, `npm ci`, build, restart, gate R4) | **Cut-offs:** Stage 9 must start by **T0+2:05**, or the session stops before any schema change. Stage 12 must start by **T0+2:55**, or it stops after V3 with the previous code serving the new schema; that rest state is safe (§6, rollback validation) and A-GO then needs its own short approval. **Hard end T0+4:45** |
 
 ## 6. Recovery routes (A-ROLLBACK; plan step 11 limits)
 
@@ -205,10 +310,12 @@ production, no ledger or checksum edit, no deletion of an existing dump, databas
 
 ```text
 D-V2-PROD-EXEC-1 — APPROVED as prepared in docs/v2/production-execution-package-2026-10-30.md at commit [package
-commit], running only the pinned bytes: [P-1 sha256] [P-2 sha256] [P-3 sha256] [permission-readback.sql sha256]
-[snapshot-compare.mjs sha256] [artifact-manifest.mjs sha256].
+commit], running only the pinned bytes: host-session.sh (P-1) [sha256]; transfer-session.ps1 (P-2) [sha256];
+PINNED.SHA256 (P-3 set, P-7) [sha256], which enumerates permission-readback.sql, arel-readback.sql,
+snapshot-compare.mjs, artifact-manifest.mjs, drift-gate.mjs, gate-r.mjs and every other pinned file;
+src-9ed9c9dd.tar (P-7) [sha256].
 
-Session: Saturday 2026-11-07, 09:00–14:00 AEDT; cut-offs and hard end as §5.
+Session: T0 = [date and time AEDT], not within 04:15–05:30 AEDT; 4 h 45 min from T0, cut-offs and hard end as §5.
 Choices: O-DRIFT [b]; O-ISO [a streamanator, new root and isolated cluster only]; O-FREEZE [a]; O-RB [a];
 O-5 [retain until 30 days after A-GO; second copy: <medium>]; O-6 HC-1 [decline].
 

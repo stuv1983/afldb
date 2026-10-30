@@ -15,6 +15,27 @@ commit.
 
 ## [Unreleased]
 
+### Production execution preparation P-1 to P-7 completed (D-V2-PROD-EXEC-1, 2026-10-30; production NO-GO)
+
+- The session scripts exist and are pinned by SHA-256 (`docs/v2/evidence/production-execution-20261030/`):
+  `host-session.sh` (P-1: identity, writers, release directory, frozen and post-schema backups via HC-3
+  `backup.sh`, restore proof, sealed manifests, A-REL, read-back), `transfer-session.ps1` (P-2),
+  `isolated-rehearsal.sh` with `drift-gate.mjs`, `gate-r.mjs` and `lib/` (P-3), and the tightened
+  `permission-readback.sql`/`snapshot-compare.mjs` plus `permission-assertion-map.md` (P-4/P-5).
+- Preparation ran only on streamanator, in a new private root with its own loopback-only isolated cluster and fresh
+  credentials, on disposable `_test` restores of the approved `a4641ca0` archive: rehearsal PASS (gate D
+  `NO_DIFFERENCE`, gate R `REPRODUCED`, privileges 43/43), 112/112 positive and negative controls in one run
+  (including the previous-release rollback checks on the 117 schema and A-REL end to end), the end-to-end transfer
+  and V2/V3 chain (V3 `NO_DIFFERENCE`, V2 `IDENTICAL`). No production or DEV access. Results and failed attempts:
+  package §4.1.
+- The independent review's HIGH findings were fixed before the final run: gate D now attributes every table the
+  nightly settle writes, including head refreshes, absence marks and the projections it re-stamps on every run
+  (controls D10/D11). Also fixed: refusal exit codes, the isolated cluster's own superuser in the permission
+  read-back, a failed gate V3 result in the transfer pull, and the transfer pull after gate V3 (`timings.txt`).
+- O-DRIFT (b) is now a precise, evidence-based proposed rule (package §3.1) for both gate D and gate V3; it awaits the
+  owner's choice. The fixed 2026-11-07 date is replaced by an owner-triggered session of 4 h 45 min with
+  T0-relative cut-offs (package §5). The rollback runbook §4 now covers 111–117.
+
 ### V2 pushed; production execution package prepared (D-V2-PUSH-ROUTE-1, 2026-10-30; production NO-GO)
 
 - V2 gained `origin`: the source repository's existing URL, read without changing `D:\dev\afldb`, with the same root

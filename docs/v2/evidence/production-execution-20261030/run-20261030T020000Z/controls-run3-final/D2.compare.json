@@ -1,0 +1,39 @@
+{
+  "format": "afldb.v2.snapshot-compare.1",
+  "mode": "preservation",
+  "inputs": {
+    "a": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/reference/before.preservation.json",
+      "sha256": "d861bec8ba24e6db14bd38bea9f2bc20b3dd433e5336efce076c764c3c1651a3"
+    },
+    "b": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/D2.preservation.json",
+      "sha256": "daacab7b6b5142332d2e51273088050bf62a93990dbc29a925dcf0d229bf4623"
+    }
+  },
+  "scopeA": {
+    "backupSha256": "a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc",
+    "queryContractSha256": "f0bc0b9a95c52e25f37b65ea688ccc0e90417ecc45ced7b6fdfb880008e6ae4f",
+    "seal": 2025,
+    "phase": "migration"
+  },
+  "scopeB": {
+    "backupSha256": "a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc",
+    "queryContractSha256": "f0bc0b9a95c52e25f37b65ea688ccc0e90417ecc45ced7b6fdfb880008e6ae4f",
+    "seal": 2025,
+    "phase": "migration"
+  },
+  "tablesCompared": 99,
+  "queriesCompared": 6,
+  "findings": [
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.players",
+      "rowsA": 13365,
+      "rowsB": 13365,
+      "rowDigestsOnlyInA": 1,
+      "rowDigestsOnlyInB": 1
+    }
+  ],
+  "verdict": "DIFFERENT"
+}

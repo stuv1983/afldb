@@ -1,0 +1,47 @@
+{
+  "format": "afldb.v2.snapshot-compare.1",
+  "mode": "permissions",
+  "inputs": {
+    "a": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/B.permissions.txt",
+      "sha256": "ef4d4b59115c47a135631c1f82c17d8c04786f2f2d3d92c6997e3cea9066b7bb"
+    },
+    "b": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/T4.permissions.txt",
+      "sha256": "6ca083244116668e4e469bf88cf2a7b3b7987cb734ee446c295f1b590ad369bf"
+    }
+  },
+  "storedAndEffectiveLines": {
+    "a": 5329,
+    "b": 5329
+  },
+  "stored": {
+    "onlyInA": [],
+    "onlyInB": []
+  },
+  "assertionFailures": [
+    {
+      "side": "B",
+      "line": "A|afldb_app-unprivileged|super=f|bypassrls=f|createdb=f|createrole=f|FAIL"
+    }
+  ],
+  "cluster": {
+    "onlyInA": [],
+    "onlyInB": []
+  },
+  "identity": {
+    "a": [
+      "I|database|afldb_v2_shadow_permw_test",
+      "I|server_version_num|160015",
+      "I|session_user|afldb_backup",
+      "I|transaction_read_only|on"
+    ],
+    "b": [
+      "I|database|afldb_v2_shadow_permw_test",
+      "I|server_version_num|160015",
+      "I|session_user|afldb_backup",
+      "I|transaction_read_only|on"
+    ]
+  },
+  "verdict": "DIFFERENT"
+}

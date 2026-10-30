@@ -1,0 +1,3283 @@
+{
+  "format": "afldb.v2.coverage-registry-export",
+  "formatVersion": 1,
+  "producedAt": "2026-10-30T01:48:57Z",
+  "registryProblems": [],
+  "cells": [
+    {
+      "season": 1897,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1897,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1897,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1897,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1897,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1898,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1898,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1898,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1898,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1898,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1899,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1899,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1899,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1899,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1899,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1900,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1900,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1900,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1900,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1900,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1901,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1901,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1901,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1901,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1901,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1902,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1902,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1902,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1902,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1902,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1903,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1903,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1903,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1903,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1903,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1904,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1904,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1904,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1904,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1904,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1905,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1905,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1905,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1905,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1905,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1906,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1906,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1906,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1906,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1906,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1907,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1907,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1907,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1907,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1907,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1908,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1908,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1908,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1908,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1908,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1909,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1909,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1909,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1909,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1909,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1910,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1910,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1910,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1910,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1910,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1911,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1911,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1911,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1911,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1911,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1912,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1912,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1912,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1912,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1912,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1913,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1913,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1913,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1913,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1913,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1914,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1914,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1914,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1914,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1914,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1915,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1915,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1915,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1915,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1915,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1916,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1916,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1916,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1916,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1916,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1917,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1917,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1917,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1917,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1917,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1918,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1918,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1918,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1918,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1918,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1919,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1919,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1919,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1919,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1919,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1920,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1920,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1920,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1920,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1920,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1921,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1921,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1921,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1921,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1921,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1922,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1922,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1922,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1922,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1922,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1923,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1923,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1923,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1923,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1923,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1924,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1924,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1924,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1924,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1924,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1925,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1925,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1925,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1925,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1925,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1926,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1926,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1926,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1926,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1926,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1927,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1927,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1927,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1927,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1927,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1928,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1928,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1928,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1928,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1928,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1929,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1929,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1929,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1929,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1929,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1930,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1930,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1930,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1930,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1930,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1931,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1931,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1931,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1931,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1931,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1932,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1932,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1932,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1932,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1932,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1933,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1933,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1933,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1933,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1933,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1934,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1934,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1934,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1934,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1934,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1935,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1935,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1935,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1935,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1935,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1936,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1936,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1936,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1936,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1936,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1937,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1937,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1937,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1937,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1937,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1938,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1938,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1938,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1938,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1938,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1939,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1939,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1939,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1939,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1939,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1940,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1940,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1940,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1940,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1940,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1941,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1941,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1941,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1941,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1941,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1942,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1942,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1942,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1942,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1942,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1943,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1943,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1943,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1943,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1943,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1944,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1944,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1944,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1944,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1944,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1945,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 1945,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1945,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1945,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1945,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1946,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1946,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1946,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1946,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1946,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1947,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1947,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1947,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1947,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1947,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1948,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1948,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1948,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1948,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1948,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1949,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1949,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1949,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1949,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1949,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1950,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1950,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1950,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1950,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1950,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1951,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1951,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1951,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1951,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1951,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1952,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1952,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1952,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1952,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1952,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1953,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1953,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1953,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1953,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1953,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1954,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1954,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1954,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1954,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1954,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1955,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1955,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1955,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1955,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1955,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1956,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1956,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1956,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1956,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1956,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1957,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1957,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1957,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1957,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1957,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1958,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1958,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1958,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1958,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1958,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1959,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1959,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1959,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1959,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1959,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1960,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1960,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1960,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1960,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1960,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1961,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1961,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1961,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1961,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1961,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1962,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1962,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1962,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1962,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1962,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1963,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1963,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1963,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1963,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1963,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1964,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1964,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1964,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1964,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1964,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1965,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1965,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1965,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1965,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1965,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1966,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1966,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1966,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1966,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1966,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1967,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1967,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1967,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1967,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1967,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1968,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1968,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1968,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1968,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1968,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1969,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1969,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1969,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1969,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1969,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1970,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1970,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1970,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1970,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1970,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1971,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1971,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1971,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1971,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1971,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1972,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1972,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1972,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1972,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1972,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1973,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1973,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1973,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1973,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1973,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1974,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1974,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1974,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1974,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1974,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1975,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1975,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1975,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1975,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1975,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1976,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1976,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1976,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1976,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1976,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1977,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1977,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1977,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1977,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1977,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1978,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1978,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1978,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1978,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1978,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1979,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1979,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1979,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1979,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1979,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1980,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1980,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1980,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1980,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1980,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1981,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1981,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1981,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1981,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1981,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1982,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1982,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1982,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1982,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1982,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1983,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1983,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1983,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1983,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1983,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1984,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1984,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1984,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1984,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1984,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1985,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1985,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1985,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1985,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1985,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1986,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1986,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1986,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1986,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1986,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1987,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1987,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1987,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1987,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1987,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1988,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1988,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1988,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1988,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1988,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1989,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1989,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1989,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1989,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1989,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1990,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1990,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1990,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1990,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1990,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1991,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1991,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1991,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1991,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1991,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1992,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1992,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1992,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1992,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1992,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1993,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1993,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1993,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1993,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1993,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1994,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1994,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1994,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1994,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1994,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1995,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1995,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1995,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1995,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1995,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1996,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1996,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1996,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1996,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1996,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1997,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1997,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1997,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1997,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1997,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1998,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1998,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1998,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1998,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1998,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1999,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1999,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1999,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1999,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 1999,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2000,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2000,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2000,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2000,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2000,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2001,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2001,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2001,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2001,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2001,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2002,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2002,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2002,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2002,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2002,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2003,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2003,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2003,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2003,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2003,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2004,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2004,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2004,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2004,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2004,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2005,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2005,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2005,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2005,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2005,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2006,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2006,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2006,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2006,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2006,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2007,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2007,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2007,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2007,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2007,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2008,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2008,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2008,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2008,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2008,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2009,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2009,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2009,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2009,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2009,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2010,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2010,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2010,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2010,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2010,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2011,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2011,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2011,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2011,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2011,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2012,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2012,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2012,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2012,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2012,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2013,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2013,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2013,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2013,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2013,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2014,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2014,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2014,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2014,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2014,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2015,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2015,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2015,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2015,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2015,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2016,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2016,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2016,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2016,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2016,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2017,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2017,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2017,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2017,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2017,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2018,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2018,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2018,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2018,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2018,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2019,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2019,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2019,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2019,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2019,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2020,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2020,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2020,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2020,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2020,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2021,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2021,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2021,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2021,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2021,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2022,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2022,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2022,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2022,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2022,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2023,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2023,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2023,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2023,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2023,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2024,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2024,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2024,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2024,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2024,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2025,
+      "family": "brownlow",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2025,
+      "family": "fixtures",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2025,
+      "family": "match_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2025,
+      "family": "player_stats",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2025,
+      "family": "results",
+      "status": "historical_baseline"
+    },
+    {
+      "season": 2026,
+      "family": "brownlow",
+      "status": "api_partial"
+    },
+    {
+      "season": 2026,
+      "family": "fixtures",
+      "status": "api_partial"
+    },
+    {
+      "season": 2026,
+      "family": "match_stats",
+      "status": "api_partial"
+    },
+    {
+      "season": 2026,
+      "family": "player_stats",
+      "status": "api_partial"
+    },
+    {
+      "season": 2026,
+      "family": "results",
+      "status": "api_verified"
+    },
+    {
+      "season": 2027,
+      "family": "brownlow",
+      "status": "unsupported"
+    },
+    {
+      "season": 2027,
+      "family": "fixtures",
+      "status": "unsupported"
+    },
+    {
+      "season": 2027,
+      "family": "match_stats",
+      "status": "unsupported"
+    },
+    {
+      "season": 2027,
+      "family": "player_stats",
+      "status": "unsupported"
+    },
+    {
+      "season": 2027,
+      "family": "results",
+      "status": "unsupported"
+    }
+  ]
+}

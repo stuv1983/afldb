@@ -1,0 +1,15 @@
+{
+  "format": "afldb.v2.rehearsal-summary.1",
+  "mode": "after",
+  "result": "PASS",
+  "gates": {
+    "archiveSha256": "7008a15a5fc27acbd83a111064e47af48772aa3b4b5065e00aa86ed85b573a78",
+    "V3": {
+      "verdict": "NO_DIFFERENCE",
+      "classes": [],
+      "stops": []
+    }
+  },
+  "missing": [],
+  "failures": []
+}

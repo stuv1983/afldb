@@ -1,0 +1,83 @@
+{
+  "format": "afldb.v2.snapshot-compare.1",
+  "mode": "preservation",
+  "inputs": {
+    "a": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/reference/before.preservation.json",
+      "sha256": "d861bec8ba24e6db14bd38bea9f2bc20b3dd433e5336efce076c764c3c1651a3"
+    },
+    "b": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/D1.preservation.json",
+      "sha256": "1b58b091fc2c9b5d6913c2077bca77b2bb69651fa09a697cff6f7f3786312ef0"
+    }
+  },
+  "scopeA": {
+    "backupSha256": "a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc",
+    "queryContractSha256": "f0bc0b9a95c52e25f37b65ea688ccc0e90417ecc45ced7b6fdfb880008e6ae4f",
+    "seal": 2025,
+    "phase": "migration"
+  },
+  "scopeB": {
+    "backupSha256": "a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc",
+    "queryContractSha256": "f0bc0b9a95c52e25f37b65ea688ccc0e90417ecc45ced7b6fdfb880008e6ae4f",
+    "seal": 2025,
+    "phase": "migration"
+  },
+  "tablesCompared": 99,
+  "queriesCompared": 6,
+  "findings": [
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.app_health_events",
+      "rowsA": 17,
+      "rowsB": 18,
+      "rowDigestsOnlyInA": 0,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.auth_audit_log",
+      "rowsA": 203,
+      "rowsB": 204,
+      "rowDigestsOnlyInA": 0,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.auth_sessions",
+      "rowsA": 5,
+      "rowsB": 6,
+      "rowDigestsOnlyInA": 0,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.auth_users",
+      "rowsA": 4,
+      "rowsB": 4,
+      "rowDigestsOnlyInA": 1,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.import_batches",
+      "rowsA": 64,
+      "rowsB": 65,
+      "rowDigestsOnlyInA": 0,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "ROWS_CHANGED",
+      "table": "public.nl_search_log",
+      "rowsA": 52,
+      "rowsB": 53,
+      "rowDigestsOnlyInA": 0,
+      "rowDigestsOnlyInB": 1
+    },
+    {
+      "kind": "QUERY_CHANGED",
+      "query": "audit_history"
+    }
+  ],
+  "verdict": "DIFFERENT"
+}

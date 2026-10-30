@@ -1,0 +1,120 @@
+{
+  "format": "afldb.v2.drift-gate.1",
+  "mode": "drift",
+  "compare": "/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/D1.compare.json",
+  "compareVerdict": "DIFFERENT",
+  "manifestExit": 0,
+  "referenceDatabase": "afldb_v2_shadow_pxref_test",
+  "referenceTime": "2026-10-28T19:23:36.899Z",
+  "verdict": "ATTRIBUTED_ONLY",
+  "stops": [],
+  "tables": [
+    {
+      "table": "public.import_batches",
+      "cls": "settle-bookkeeping",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 0,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "started_at",
+          "earliest": "2026-10-30T04:37:42.718Z",
+          "latest": "2026-10-30T04:37:42.718Z"
+        },
+        "signatures": [
+          "settle-afltables.ts | staging.source_record_versions | AFLDB-ISSUE-099 settle; snapshot=settle-2026-2026-10-30-0444; season=2026; mode=apply"
+        ]
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "public.app_health_events",
+      "cls": "runtime-telemetry",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 0,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "at",
+          "earliest": "2026-10-30T04:37:42.767Z",
+          "latest": "2026-10-30T04:37:42.767Z"
+        }
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "public.auth_audit_log",
+      "cls": "auth-activity",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 0,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "at",
+          "earliest": "2026-10-30T04:37:42.747Z",
+          "latest": "2026-10-30T04:37:42.747Z"
+        }
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "public.auth_sessions",
+      "cls": "auth-activity",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 0,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "created_at",
+          "earliest": "2026-10-30T04:37:42.804Z",
+          "latest": "2026-10-30T04:37:42.804Z"
+        }
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "public.auth_users",
+      "cls": "auth-activity",
+      "inserted": 0,
+      "deleted": 0,
+      "updated": 1,
+      "evidence": {
+        "updatedColumns": [
+          "totp_last_step"
+        ]
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "public.nl_search_log",
+      "cls": "runtime-telemetry",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 0,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "at",
+          "earliest": "2026-10-30T04:37:42.788Z",
+          "latest": "2026-10-30T04:37:42.788Z"
+        }
+      },
+      "verdict": "ATTRIBUTED"
+    }
+  ],
+  "queries": [
+    {
+      "query": "audit_history",
+      "sources": [
+        "public.auth_audit_log"
+      ],
+      "contractTextPinned": true,
+      "explainedByAttributedRows": true
+    }
+  ],
+  "classes": [
+    "auth-activity",
+    "runtime-telemetry",
+    "settle-bookkeeping"
+  ],
+  "rule": "O-DRIFT (b) as proposed: stop on any definition, scope, public-query, sealed-scope or migration-sensitive change; every remaining row change is re-derived from both databases and bound to a writer signature. NOT an owner approval."
+}

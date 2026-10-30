@@ -1,0 +1,1302 @@
+{
+  "format": "afldb.v2.coleman-comparison-report",
+  "formatVersion": 1,
+  "generatedAt": "2026-10-30T01:44:24.811Z",
+  "seasons": [
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 107,
+          "key": "coleman:1980:players/M/Michael_Roach.html",
+          "playerId": "9577",
+          "profilePath": "players/M/Michael_Roach.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "0f6f4ffc0c09cf330c57e62193d2b76655cdac3196702587501da69ab26ab4bc",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1980,
+      "stored": [
+        {
+          "playerId": "9577",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1980:players/M/Michael_Roach.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 86,
+          "key": "coleman:1981:players/M/Michael_Roach.html",
+          "playerId": "9577",
+          "profilePath": "players/M/Michael_Roach.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "f7b2b8b146b0dcf90e2ec05c8b9219b11dd96f43eb17475200e6bf78dfda039f",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1981,
+      "stored": [
+        {
+          "playerId": "9577",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1981:players/M/Michael_Roach.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 94,
+          "key": "coleman:1982:players/M/Malcolm_Blight.html",
+          "playerId": "9001",
+          "profilePath": "players/M/Malcolm_Blight.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "1c1503190ed2a44d832bc3ca26f7c4454f5028a6dc898fbdaf63ae3b6cf50976",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1982,
+      "stored": [
+        {
+          "playerId": "9001",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1982:players/M/Malcolm_Blight.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 106,
+          "key": "coleman:1983:players/B/Bernie_Quinlan.html",
+          "playerId": "1177",
+          "profilePath": "players/B/Bernie_Quinlan.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "343b8acd71a3634348265778c3a9108b8424de7e1612221bc766154593a9839e",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1983,
+      "stored": [
+        {
+          "playerId": "1177",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1983:players/B/Bernie_Quinlan.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 102,
+          "key": "coleman:1984:players/B/Bernie_Quinlan.html",
+          "playerId": "1177",
+          "profilePath": "players/B/Bernie_Quinlan.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "26a6ffb93b3a88c7428a6b12d213c0581f0dadbab088792dda041ccc7ac0c0f3",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1984,
+      "stored": [
+        {
+          "playerId": "1177",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1984:players/B/Bernie_Quinlan.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 93,
+          "key": "coleman:1985:players/S/Simon_Beasley.html",
+          "playerId": "11864",
+          "profilePath": "players/S/Simon_Beasley.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "141a30f54c77c81a5305ba698a0625ad849020b16125a3323a0f7dd0ecd31396",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1985,
+      "stored": [
+        {
+          "playerId": "11864",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1985:players/S/Simon_Beasley.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 100,
+          "key": "coleman:1986:players/B/Brian_Taylor.html",
+          "playerId": "2319",
+          "profilePath": "players/B/Brian_Taylor.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "ff3bccccd9ce2e33fc62237aff49fa734a952100d203b8163a906dec1bd67f41",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1986,
+      "stored": [
+        {
+          "playerId": "2319",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1986:players/B/Brian_Taylor.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 117,
+          "key": "coleman:1987:players/T/Tony_Lockett.html",
+          "playerId": "12780",
+          "profilePath": "players/T/Tony_Lockett.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "dd0c609e23d9bf63981a5db14b75acc8f55d2772f58bc1c46a61a31a157cacc2",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1987,
+      "stored": [
+        {
+          "playerId": "12780",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1987:players/T/Tony_Lockett.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 124,
+          "key": "coleman:1988:players/J/Jason_Dunstall.html",
+          "playerId": "6837",
+          "profilePath": "players/J/Jason_Dunstall.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "e4e27604226b95d2f8d2eb48b12bdeeb7694ea7eb5bbddd255a8d865fbdd07f8",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1988,
+      "stored": [
+        {
+          "playerId": "6837",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1988:players/J/Jason_Dunstall.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 128,
+          "key": "coleman:1989:players/J/Jason_Dunstall.html",
+          "playerId": "6837",
+          "profilePath": "players/J/Jason_Dunstall.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "9e5527bf86cb552095d1b06bf545f3a7626742bacc4c955c03e70faf0275ec35",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1989,
+      "stored": [
+        {
+          "playerId": "6837",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1989:players/J/Jason_Dunstall.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 98,
+          "key": "coleman:1990:players/J/John_Longmire.html",
+          "playerId": "7619",
+          "profilePath": "players/J/John_Longmire.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "8fd7fd60c5da829f720383c6aedb9db3c7c244683ccf08239274826a31402645",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1990,
+      "stored": [
+        {
+          "playerId": "7619",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1990:players/J/John_Longmire.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 118,
+          "key": "coleman:1991:players/T/Tony_Lockett.html",
+          "playerId": "12780",
+          "profilePath": "players/T/Tony_Lockett.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "cc6d75b21690d2377a2078d2f06276c7c8e325340b7644bd2fad08a3183f6a58",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1991,
+      "stored": [
+        {
+          "playerId": "12780",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1991:players/T/Tony_Lockett.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 139,
+          "key": "coleman:1992:players/J/Jason_Dunstall.html",
+          "playerId": "6837",
+          "profilePath": "players/J/Jason_Dunstall.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "0073bff171548844960f8ef8feb0093a9393a9d57354e0f3cafbdb0ce2438d4b",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1992,
+      "stored": [
+        {
+          "playerId": "6837",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1992:players/J/Jason_Dunstall.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 124,
+          "key": "coleman:1993:players/G/Gary_Ablett0.html",
+          "playerId": "4700",
+          "profilePath": "players/G/Gary_Ablett0.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "d7e1803cb04b2fefdc6447830b80ded426045642b774183579e778e9a84cc4eb",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1993,
+      "stored": [
+        {
+          "playerId": "4700",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1993:players/G/Gary_Ablett0.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 113,
+          "key": "coleman:1994:players/G/Gary_Ablett0.html",
+          "playerId": "4700",
+          "profilePath": "players/G/Gary_Ablett0.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "a8ebc24ddee8c3a90b954325e6a55bbd61125898046c866ddb1dde0bf3b9e736",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1994,
+      "stored": [
+        {
+          "playerId": "4700",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1994:players/G/Gary_Ablett0.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 118,
+          "key": "coleman:1995:players/G/Gary_Ablett0.html",
+          "playerId": "4700",
+          "profilePath": "players/G/Gary_Ablett0.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "37cdef804f322669958d367425a272526e70f92a8b1c626c44513743210480f8",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1995,
+      "stored": [
+        {
+          "playerId": "4700",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1995:players/G/Gary_Ablett0.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 114,
+          "key": "coleman:1996:players/T/Tony_Lockett.html",
+          "playerId": "12780",
+          "profilePath": "players/T/Tony_Lockett.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "975fa4803edf0f434b78627ee986910e267b3a767c67f1a07f3f0c1e48e0df76",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1996,
+      "stored": [
+        {
+          "playerId": "12780",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1996:players/T/Tony_Lockett.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 81,
+          "key": "coleman:1997:players/T/Tony_Modra.html",
+          "playerId": "12786",
+          "profilePath": "players/T/Tony_Modra.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "941774b177d24caf71b08ef6295104ed959c7388d8c09aac8a0d48c6889fb17c",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1997,
+      "stored": [
+        {
+          "playerId": "12786",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1997:players/T/Tony_Modra.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 107,
+          "key": "coleman:1998:players/T/Tony_Lockett.html",
+          "playerId": "12780",
+          "profilePath": "players/T/Tony_Lockett.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "f467483b93a36dc4884781a6763d78dd372790f0e42bb29aa3d5463c6f2a4efd",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1998,
+      "stored": [
+        {
+          "playerId": "12780",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1998:players/T/Tony_Lockett.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 88,
+          "key": "coleman:1999:players/S/Scott_Cummings.html",
+          "playerId": "11706",
+          "profilePath": "players/S/Scott_Cummings.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "bfafa360e78f931c31b28410340dd9c289a1ae6171d040e7e8e40c7a4eec27a9",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 1999,
+      "stored": [
+        {
+          "playerId": "11706",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:1999:players/S/Scott_Cummings.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 94,
+          "key": "coleman:2000:players/M/Matthew_Lloyd0.html",
+          "playerId": "9295",
+          "profilePath": "players/M/Matthew_Lloyd0.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "321a892f53636859cf2a5ffdcea8abb7b9eb09f6c6b5b4986993acda27cc6bd6",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2000,
+      "stored": [
+        {
+          "playerId": "9295",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2000:players/M/Matthew_Lloyd0.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 96,
+          "key": "coleman:2001:players/M/Matthew_Lloyd0.html",
+          "playerId": "9295",
+          "profilePath": "players/M/Matthew_Lloyd0.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "92d404aa56bed575e6f418f4c94440ce014ad4ff3df5eefe15084b1c09d4d089",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2001,
+      "stored": [
+        {
+          "playerId": "9295",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2001:players/M/Matthew_Lloyd0.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 75,
+          "key": "coleman:2002:players/D/David_Neitz.html",
+          "playerId": "3548",
+          "profilePath": "players/D/David_Neitz.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "cf15a793890b23717de960df0b69867a3e77655df4ae9431cd1e6c9256c787e3",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2002,
+      "stored": [
+        {
+          "playerId": "3548",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2002:players/D/David_Neitz.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 87,
+          "key": "coleman:2003:players/M/Matthew_Lloyd0.html",
+          "playerId": "9295",
+          "profilePath": "players/M/Matthew_Lloyd0.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "fe0e77d40cc8bf3b0322f8a20a357fd591727ecbe92082c3af316c5c096d8cab",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2003,
+      "stored": [
+        {
+          "playerId": "9295",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2003:players/M/Matthew_Lloyd0.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 90,
+          "key": "coleman:2004:players/F/Fraser_Gehrig.html",
+          "playerId": "4509",
+          "profilePath": "players/F/Fraser_Gehrig.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "f0584d22ef144bed01cfdec94007b070f6801882e78ddd8d2590d3428ae5a546",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2004,
+      "stored": [
+        {
+          "playerId": "4509",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2004:players/F/Fraser_Gehrig.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 74,
+          "key": "coleman:2005:players/F/Fraser_Gehrig.html",
+          "playerId": "4509",
+          "profilePath": "players/F/Fraser_Gehrig.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "a1066804e528c8617bf5056adb6f5a529dc1d34f6bf146165797d752f1a8c3e1",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2005,
+      "stored": [
+        {
+          "playerId": "4509",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2005:players/F/Fraser_Gehrig.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 84,
+          "key": "coleman:2006:players/B/Brendan_Fevola.html",
+          "playerId": "2131",
+          "profilePath": "players/B/Brendan_Fevola.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "55176ad3071b2fa174546d3a7bea4aa02817b8819d826df6f2f95a9ea4c508a3",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2006,
+      "stored": [
+        {
+          "playerId": "2131",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2006:players/B/Brendan_Fevola.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 77,
+          "key": "coleman:2007:players/J/Jonathan_Brown.html",
+          "playerId": "7805",
+          "profilePath": "players/J/Jonathan_Brown.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "6430b257cbe52f21433c4311810c3286ba6c24c622a6b1a016863fcb483edac0",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2007,
+      "stored": [
+        {
+          "playerId": "7805",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2007:players/J/Jonathan_Brown.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 102,
+          "key": "coleman:2008:players/L/Lance_Franklin.html",
+          "playerId": "8384",
+          "profilePath": "players/L/Lance_Franklin.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "b4815329ab1fb070033b04cc1937874c6832ce954c420ee3ab133d7bcdc9e9bb",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2008,
+      "stored": [
+        {
+          "playerId": "8384",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2008:players/L/Lance_Franklin.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 86,
+          "key": "coleman:2009:players/B/Brendan_Fevola.html",
+          "playerId": "2131",
+          "profilePath": "players/B/Brendan_Fevola.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "4f62a42eaab301ab1c57db68a51ca50d66f4a2cb3f294935310b660e93f6fedb",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2009,
+      "stored": [
+        {
+          "playerId": "2131",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2009:players/B/Brendan_Fevola.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 78,
+          "key": "coleman:2010:players/J/Jack_Riewoldt.html",
+          "playerId": "6510",
+          "profilePath": "players/J/Jack_Riewoldt.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "a687a0e4beb187c3f82849f85d363d0c72d9c444ff21d8f37be67361552027d6",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2010,
+      "stored": [
+        {
+          "playerId": "6510",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2010:players/J/Jack_Riewoldt.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 71,
+          "key": "coleman:2011:players/L/Lance_Franklin.html",
+          "playerId": "8384",
+          "profilePath": "players/L/Lance_Franklin.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "37bf0e37df966eadc9c832e36b4eec1c73fba719c74402215d047d906e54c60f",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2011,
+      "stored": [
+        {
+          "playerId": "8384",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2011:players/L/Lance_Franklin.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 65,
+          "key": "coleman:2012:players/J/Jack_Riewoldt.html",
+          "playerId": "6510",
+          "profilePath": "players/J/Jack_Riewoldt.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "2886015eb548742046daa47080ec6151d30918fb473332ceee5248e1ebf465df",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2012,
+      "stored": [
+        {
+          "playerId": "6510",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2012:players/J/Jack_Riewoldt.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 68,
+          "key": "coleman:2013:players/J/Jarryd_Roughead.html",
+          "playerId": "6820",
+          "profilePath": "players/J/Jarryd_Roughead.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "297a76614b66e01d4395953b1547156f02e73e85dca1ae85c432ec06a8f125ba",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2013,
+      "stored": [
+        {
+          "playerId": "6820",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2013:players/J/Jarryd_Roughead.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 67,
+          "key": "coleman:2014:players/L/Lance_Franklin.html",
+          "playerId": "8384",
+          "profilePath": "players/L/Lance_Franklin.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "189d65ca74d57eaa59178138682c9614aa1946bb97cdf8a56bec4cfe8cd681e8",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2014,
+      "stored": [
+        {
+          "playerId": "8384",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2014:players/L/Lance_Franklin.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 75,
+          "key": "coleman:2015:players/J/Josh_Kennedy0.html",
+          "playerId": "7881",
+          "profilePath": "players/J/Josh_Kennedy0.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "666267ae39c77cb1fcb6d340cbd14e43d962a35c5de00b7c1167fcf47a2777cc",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2015,
+      "stored": [
+        {
+          "playerId": "7881",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2015:players/J/Josh_Kennedy0.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 80,
+          "key": "coleman:2016:players/J/Josh_Kennedy0.html",
+          "playerId": "7881",
+          "profilePath": "players/J/Josh_Kennedy0.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "47960c0203abdaf1a86c465089ab3ca38e29da9c6a836ae2c744577776c2e5e6",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2016,
+      "stored": [
+        {
+          "playerId": "7881",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2016:players/J/Josh_Kennedy0.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 69,
+          "key": "coleman:2017:players/L/Lance_Franklin.html",
+          "playerId": "8384",
+          "profilePath": "players/L/Lance_Franklin.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "394ce3e7374448cf26b4c421b14c02ca57e55d34a123c613e097d62b5a77a83f",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2017,
+      "stored": [
+        {
+          "playerId": "8384",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2017:players/L/Lance_Franklin.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 65,
+          "key": "coleman:2018:players/J/Jack_Riewoldt.html",
+          "playerId": "6510",
+          "profilePath": "players/J/Jack_Riewoldt.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "86dbb7415a7a50d5fc093b4301d4cfd781effa5a9688c661aade65beb125ef4d",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2018,
+      "stored": [
+        {
+          "playerId": "6510",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2018:players/J/Jack_Riewoldt.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 67,
+          "key": "coleman:2019:players/J/Jeremy_Cameron.html",
+          "playerId": "6930",
+          "profilePath": "players/J/Jeremy_Cameron.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "ce294ce0d3ca5a456f414778c0dea09bb1d58086c6b7f297c807779333491b63",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2019,
+      "stored": [
+        {
+          "playerId": "6930",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2019:players/J/Jeremy_Cameron.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 42,
+          "key": "coleman:2020:players/T/Tom_Hawkins.html",
+          "playerId": "12562",
+          "profilePath": "players/T/Tom_Hawkins.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "11b07633511c04f4611ae351d87c19cb058d20e8ef958f4b5b328d83143e77c6",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2020,
+      "stored": [
+        {
+          "playerId": "12562",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2020:players/T/Tom_Hawkins.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 58,
+          "key": "coleman:2021:players/H/Harry_McKay.html",
+          "playerId": "5660",
+          "profilePath": "players/H/Harry_McKay.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "57b3f8b64474989286d4e2dc2843ecd2734e09e7518e6a46a5c817fb18118811",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2021,
+      "stored": [
+        {
+          "playerId": "5660",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2021:players/H/Harry_McKay.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 64,
+          "key": "coleman:2022:players/C/Charlie_Curnow.html",
+          "playerId": "2619",
+          "profilePath": "players/C/Charlie_Curnow.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "c919bd2cd5251fc051fce9aacdc9f308638a29fa48cba18e79d9555de7e8c40e",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2022,
+      "stored": [
+        {
+          "playerId": "2619",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2022:players/C/Charlie_Curnow.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 78,
+          "key": "coleman:2023:players/C/Charlie_Curnow.html",
+          "playerId": "2619",
+          "profilePath": "players/C/Charlie_Curnow.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "63ed14744869197d1605b6154baec2cf72a8987e068e24de712768ecdc73a2e8",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2023,
+      "stored": [
+        {
+          "playerId": "2619",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2023:players/C/Charlie_Curnow.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 69,
+          "key": "coleman:2024:players/J/Jesse_Hogan.html",
+          "playerId": "6950",
+          "profilePath": "players/J/Jesse_Hogan.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "89f6921fcd3152c36c466503667a0c6a3901b3ea3be2a59d42d8fbfa28bc1586",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2024,
+      "stored": [
+        {
+          "playerId": "6950",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2024:players/J/Jesse_Hogan.html",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "category": "agree",
+      "derivationVersion": "v2.coleman.1",
+      "derivedWinners": [
+        {
+          "goals": 83,
+          "key": "coleman:2025:players/J/Jeremy_Cameron.html",
+          "playerId": "6930",
+          "profilePath": "players/J/Jeremy_Cameron.html"
+        }
+      ],
+      "duplicates": [],
+      "extra": [],
+      "ignored": [],
+      "inputChecksum": "adb017f04fea004719c5448c1a78f9c6d52cc41624640a4f1d59552997907c4d",
+      "methodVersion": 1,
+      "missing": [],
+      "refusal": null,
+      "season": 2025,
+      "stored": [
+        {
+          "playerId": "6930",
+          "sourceKey": "afltables",
+          "sourceRecordId": "coleman:2025:players/J/Jeremy_Cameron.html",
+          "status": "active"
+        }
+      ]
+    }
+  ],
+  "storedSeasonsWithoutOutcome": [],
+  "summary": {
+    "agree": 46,
+    "disagree": 0,
+    "notDerivable": 0,
+    "seasons": 46
+  }
+}

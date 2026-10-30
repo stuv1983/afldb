@@ -1,0 +1,15 @@
+{
+  "format": "afldb.v2.drift-gate.1",
+  "mode": "after",
+  "compare": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/gateV3.compare.json",
+  "compareVerdict": "IDENTICAL",
+  "manifestExit": 0,
+  "referenceDatabase": "afldb_v2_shadow_pxfrozenmig_test",
+  "referenceTime": "2026-10-28T19:23:36.899Z",
+  "verdict": "NO_DIFFERENCE",
+  "stops": [],
+  "tables": [],
+  "queries": [],
+  "classes": [],
+  "rule": "O-DRIFT (b) as proposed: stop on any definition, scope, public-query, sealed-scope or migration-sensitive change; every remaining row change is re-derived from both databases and bound to a writer signature. NOT an owner approval."
+}

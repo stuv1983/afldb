@@ -1,0 +1,25 @@
+{
+  "format": "afldb.v2.historical-baseline-comparison",
+  "formatVersion": 1,
+  "before": {
+    "producedAt": "2026-10-28T19:48:53.910Z",
+    "database": "afldb_v2_shadow_current_migration_test"
+  },
+  "after": {
+    "producedAt": "2026-10-30T04:58:32.193Z",
+    "database": "afldb_v2_shadow_pxctl_test"
+  },
+  "comparedSealed": {
+    "from": 1897,
+    "through": 2026,
+    "open": []
+  },
+  "verdict": "sealed-scope-identical",
+  "counts": {
+    "violation": 0,
+    "unverified": 0,
+    "review": 0,
+    "info": 0
+  },
+  "findings": []
+}

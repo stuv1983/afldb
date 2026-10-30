@@ -1,0 +1,44 @@
+{
+  "policy": "v2.migration-separation.1",
+  "backendFunctional": "PASS",
+  "migrationCompatibility": "FAIL",
+  "migrationCompatibilityBasis": "NOT_ESTABLISHED",
+  "stagedBrownlowComparator": "INCOMPLETE",
+  "brownlowAlternative": {
+    "decision": "D-V2-BROWNLOW-ALT-1",
+    "status": "NOT_APPLIED",
+    "reasons": [
+      "No Brownlow alternative attestation supplied"
+    ],
+    "scope": {
+      "archiveSha256": "a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04",
+      "migrationScope": {
+        "from": 110,
+        "to": 115
+      },
+      "seasons": 98
+    },
+    "notEstablished": "authentic AFL API vote, identity or leaderboard reconciliation"
+  },
+  "brownlowOperationalReconciliation": "OUTSTANDING: authentic provenance/checksum-verified completed-season API vote, identity and leaderboard reconciliation is still required before Brownlow operational/publication readiness",
+  "gridleyEvidence": "Retained 2026-10-20 at 12abe77f; not rerun by this offline report",
+  "strictGridley": {
+    "result": "FAIL",
+    "findings": 149
+  },
+  "adjudicationConformance": {
+    "result": "FAIL",
+    "approved": 99,
+    "unapproved": 50
+  },
+  "productionOperational": "INCOMPLETE",
+  "backendAcceptance": "FAIL",
+  "productionDecision": "NO-GO",
+  "preservation": {
+    "result": "FAIL",
+    "findings": [
+      "staging.afl_api_brownlow_vote: DEFINITION_OR_RELATIONSHIP_CHANGED",
+      "public.brownlow_correction_receipts: UNAPPROVED_TABLE_ADDED"
+    ]
+  }
+}

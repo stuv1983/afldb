@@ -1,0 +1,30 @@
+== isolated rehearse start host=streamanator stamp=20261030T020140Z 2026-10-30T05:12:46Z
+== I1 pinned bytes and transferred archive 2026-10-30T05:12:46Z
+EXIT pinned-manifest-sha = 0
+accepted/expected-deltas.json: OK
+accepted/migration.parity.json: OK
+accepted/release-gates.json: OK
+arel-readback.sql: OK
+artifact-manifest.mjs: OK
+drift-gate.mjs: OK
+expected-deltas.mjs: OK
+gate-r.mjs: OK
+isolated-rehearsal.sh: OK
+ledger-check.mjs: OK
+ledger-tsv.mjs: OK
+permission-readback.sql: OK
+psql-owner.mjs: OK
+rehearsal-summary.mjs: OK
+restore-accepted.mjs: OK
+schema-dump.mjs: OK
+snapshot-compare.mjs: OK
+src-9ed9c9dd.tar: OK
+staged-seasons.mjs: OK
+EXIT pinned-files = 0
+EXIT self-listed = 0
+afldb_prod-20261028T192336Z.dump: FAILED
+afldb_prod-20261028T192336Z.release.json: OK
+sha256sum: WARNING: 1 computed checksum did NOT match
+EXIT xfer-sums = 1
+STOP: xfer-sums failed (exit 1); evidence retained
+rehearse result: FAIL exit=9 stage=I1 pinned bytes and transferred archive

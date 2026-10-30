@@ -72,6 +72,8 @@ function multisetDiff(a, b) {
 function validPreservation(s) {
   return s && s.format === 'afldb.v2.preservation.1' && s.scope && typeof s.tables === 'object'
     && s.tables !== null && typeof s.queries === 'object' && s.queries !== null
+    // An empty capture is never evidence of equality.
+    && Object.keys(s.tables).length > 0 && Object.keys(s.queries).length > 0
     && Object.values(s.tables).every((t) => t && typeof t.definition === 'string' && Array.isArray(t.rows));
 }
 
@@ -138,9 +140,14 @@ function comparePermissions(aIn, bIn) {
     ...aa.filter((l) => !l.endsWith('|ok')).map((l) => ({ side: 'A', line: l })),
     ...ab.filter((l) => !l.endsWith('|ok')).map((l) => ({ side: 'B', line: l })),
   ];
+  // Every cluster-evaluated assertion must be present on both sides; a missing one is never an ok. The
+  // 'postgres' membership line exists only where that role does (the isolated cluster has none).
+  const REQUIRED_A = ['A|role-exists|afldb_app|', 'A|role-exists|afldb_auth|', 'A|role-exists|afldb_import|',
+    'A|afldb_app-unprivileged|', 'A|afldb_app-not-member-of|afldb_owner|', 'A|afldb_app-not-member-of|afldb_import|',
+    'A|afldb_app-not-member-of|afldb_auth|', 'A|afldb_backup-cannot-execute-telemetry-clear|'];
   for (const [side, as] of [['A', aa], ['B', ab]]) {
-    if (!as.some((l) => l.startsWith('A|afldb_app-unprivileged|'))) {
-      assertionFailures.push({ side, line: 'A|afldb_app-unprivileged missing' });
+    for (const p of REQUIRED_A) {
+      if (as.filter((l) => l.startsWith(p)).length !== 1) assertionFailures.push({ side, line: `${p} missing or repeated` });
     }
   }
   const stored = { onlyInA: setDiff(sa, sb), onlyInB: setDiff(sb, sa) };

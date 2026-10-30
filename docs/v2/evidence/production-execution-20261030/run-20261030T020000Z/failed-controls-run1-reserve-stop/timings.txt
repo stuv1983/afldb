@@ -1,0 +1,2 @@
+d10_gate_seconds=135
+rb_build_seconds=240

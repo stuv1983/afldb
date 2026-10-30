@@ -21,7 +21,8 @@
 -- OUTPUT: one fact per line, "<section>|<fields>", the whole output sorted COLLATE "C".
 --   I|  identity, informational, never compared
 --   S|  database-local stored facts (owners, ACLs, column ACLs, default ACLs, routine security
---       attributes and bodies, registries, ledger names/checksums, triggers)  -> must be identical
+--       attributes and bodies, registries, ledger names/checksums, triggers, sequence
+--       dependencies, ordered column lists)  -> must be identical
 --   E|  effective privileges of afldb_app, afldb_auth, afldb_import (granted only) -> must be identical
 --   C|  cluster-level role attributes, memberships, database privileges -> recorded, differences listed
 --   A|  the suite's two role-level assertions on THIS cluster's values -> every line must end "|ok"
@@ -60,6 +61,7 @@ rel AS (
 ),
 fn AS (
   SELECT p.oid, n.nspname, p.proname, p.prokind, p.proowner, p.prosecdef, p.proconfig,
+         p.provolatile, p.pronargs,
          p.prosrc, p.proacl, pg_get_function_identity_arguments(p.oid) AS args
     FROM pg_proc p JOIN nsp n ON n.oid = p.pronamespace
    WHERE NOT EXISTS (SELECT 1 FROM ext_member e
@@ -110,8 +112,9 @@ facts(k) AS (
 
   -- S4: routines: owner, kind, SECURITY DEFINER, pinned settings, body digest, then ACL
   UNION ALL
-  SELECT format('S|routine|%s.%s(%s)|kind=%s|owner=%s|secdef=%s|config=%s|src_md5=%s',
+  SELECT format('S|routine|%s.%s(%s)|kind=%s|owner=%s|secdef=%s|vol=%s|nargs=%s|config=%s|src_md5=%s',
            f.nspname, f.proname, f.args, f.prokind, pg_get_userbyid(f.proowner), f.prosecdef,
+           f.provolatile, f.pronargs,
            coalesce(array_to_string(f.proconfig, ','), ''), md5(coalesce(f.prosrc, '')))
     FROM fn f
   UNION ALL
@@ -130,9 +133,11 @@ facts(k) AS (
            CASE WHEN d.defaclnamespace = 0 THEN '*'
                 ELSE (SELECT nspname FROM pg_namespace WHERE oid = d.defaclnamespace) END,
            d.defaclobjtype,
-           CASE x.grantee WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid(x.grantee) END,
-           pg_get_userbyid(x.grantor), x.privilege_type, x.is_grantable)
-    FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) x
+           CASE WHEN x.grantee IS NULL THEN 'acl=empty' WHEN x.grantee = 0 THEN 'PUBLIC'
+                ELSE pg_get_userbyid(x.grantee) END,
+           coalesce(pg_get_userbyid(x.grantor), 'acl=empty'), coalesce(x.privilege_type, 'acl=empty'),
+           coalesce(x.is_grantable::text, 'acl=empty'))
+    FROM pg_default_acl d LEFT JOIN LATERAL aclexplode(d.defaclacl) x ON true
 
   -- S6: the fail-closed registries the suite reads (names only; added_at differs by design)
   UNION ALL SELECT format('S|registry|app_readable|%s', t.name) FROM afldb_meta.app_readable_tables t
@@ -149,6 +154,30 @@ facts(k) AS (
     JOIN pg_trigger tg ON tg.tgrelid = r.oid AND NOT tg.tgisinternal
     JOIN pg_proc fp ON fp.oid = tg.tgfoid
     JOIN pg_namespace fnn ON fnn.oid = fp.pronamespace
+
+  -- S9: sequence-to-table dependencies, the catalogue input of afldb_meta.owned_sequences()
+  --     (migration 045), which six of the suite's assertions call
+  UNION ALL
+  SELECT format('S|sequence-dep|%s.%s|table=%s.%s|deptype=%s', r.nspname, r.relname,
+           tn.nspname, t.relname, d.deptype)
+    FROM rel r
+    JOIN pg_depend d ON d.objid = r.oid AND d.classid = 'pg_class'::regclass
+                    AND d.refclassid = 'pg_class'::regclass
+    JOIN pg_class t ON t.oid = d.refobjid
+    JOIN pg_namespace tn ON tn.oid = t.relnamespace
+   WHERE r.relkind = 'S'
+
+  -- S10: ordered column lists. The suite enumerates pg_attribute in attnum order
+  --      (data_overrides, award_proposals) and reads information_schema.columns
+  --      (data_issues.issue_key). pos is the rank among live columns, NOT attnum: a restore
+  --      renumbers past dropped columns, so attnum legitimately differs from production.
+  UNION ALL
+  SELECT format('S|column|%s.%s|pos=%s|%s|%s', r.nspname, r.relname,
+           row_number() OVER (PARTITION BY r.oid ORDER BY a.attnum), a.attname,
+           format_type(a.atttypid, a.atttypmod))
+    FROM rel r
+    JOIN pg_attribute a ON a.attrelid = r.oid AND a.attnum > 0 AND NOT a.attisdropped
+   WHERE r.relkind <> 'S'
 
   -- E1: table-level privileges of the tested roles (granted only)
   UNION ALL
@@ -195,20 +224,22 @@ facts(k) AS (
     FROM tested_present t CROSS JOIN fn f
    WHERE has_function_privilege(t.role, f.oid, 'EXECUTE')
 
-  -- C1: role attributes of every afldb_* role (cluster-level)
+  -- C1: role attributes of every afldb_* role (cluster-level), except afldb_v2_super: the isolated
+  -- cluster's own bootstrap superuser (tools/v2/isolated-pg.ts), which no production cluster has
   UNION ALL
   SELECT format('C|role|%s|super=%s|inherit=%s|createrole=%s|createdb=%s|login=%s|replication=%s|bypassrls=%s',
            r.rolname, r.rolsuper, r.rolinherit, r.rolcreaterole, r.rolcreatedb, r.rolcanlogin,
            r.rolreplication, r.rolbypassrls)
-    FROM pg_roles r WHERE r.rolname LIKE 'afldb\_%'
+    FROM pg_roles r WHERE r.rolname LIKE 'afldb\_%' AND r.rolname <> 'afldb_v2_super'
 
-  -- C2: memberships touching an afldb_* role (PostgreSQL 16 options included)
+  -- C2: memberships touching an afldb_* role (PostgreSQL 16 options included), same exclusion
   UNION ALL
   SELECT format('C|membership|member=%s|of=%s|admin=%s|inherit=%s|set=%s',
            pg_get_userbyid(m.member), pg_get_userbyid(m.roleid), m.admin_option,
            m.inherit_option, m.set_option)
     FROM pg_auth_members m
-   WHERE pg_get_userbyid(m.member) LIKE 'afldb\_%' OR pg_get_userbyid(m.roleid) LIKE 'afldb\_%'
+   WHERE (pg_get_userbyid(m.member) LIKE 'afldb\_%' OR pg_get_userbyid(m.roleid) LIKE 'afldb\_%')
+     AND 'afldb_v2_super' NOT IN (pg_get_userbyid(m.member), pg_get_userbyid(m.roleid))
 
   -- C3: database-level privileges of the tested roles on the current database
   UNION ALL
@@ -237,6 +268,18 @@ facts(k) AS (
     FROM pg_roles w
    WHERE w.rolname IN ('afldb_owner', 'afldb_import', 'afldb_auth', 'postgres')
      AND EXISTS (SELECT 1 FROM pg_roles r WHERE r.rolname = 'afldb_app')
+
+  -- A3: privileges.test.ts 'may be executed by afldb_auth and by no other application role'
+  --     asserts afldb_backup's EXECUTE only where the role exists. afldb_backup is not one of
+  --     the E| roles, so its answer is evaluated here on this cluster's own values.
+  UNION ALL
+  SELECT format('A|afldb_backup-cannot-execute-telemetry-clear|present=%s|%s',
+           EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_backup'),
+           CASE WHEN NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_backup') THEN 'ok'
+                WHEN to_regprocedure('public.nl_search_telemetry_clear()') IS NULL THEN 'FAIL'
+                WHEN has_function_privilege('afldb_backup',
+                       to_regprocedure('public.nl_search_telemetry_clear()'), 'EXECUTE') THEN 'FAIL'
+                ELSE 'ok' END)
 )
 SELECT k FROM facts ORDER BY k COLLATE "C";
 

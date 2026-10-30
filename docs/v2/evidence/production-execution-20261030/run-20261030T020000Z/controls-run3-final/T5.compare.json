@@ -1,0 +1,95 @@
+{
+  "format": "afldb.v2.snapshot-compare.1",
+  "mode": "permissions",
+  "inputs": {
+    "a": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/B.permissions.txt",
+      "sha256": "ef4d4b59115c47a135631c1f82c17d8c04786f2f2d3d92c6997e3cea9066b7bb"
+    },
+    "b": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/T5.permissions.txt",
+      "sha256": "a6a06a5a153b5f2ed5dc5ae56a96d5c8e7d22e0716eb287b62f869f17226bfac"
+    }
+  },
+  "storedAndEffectiveLines": {
+    "a": 5329,
+    "b": 5340
+  },
+  "stored": {
+    "onlyInA": [
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_owner|grantee=afldb_import|grantor=afldb_owner|priv=SELECT|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_owner|grantee=afldb_import|grantor=afldb_owner|priv=UPDATE|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_owner|grantee=afldb_import|grantor=afldb_owner|priv=USAGE|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=SELECT|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=UPDATE|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=USAGE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_app|grantor=afldb_owner|priv=SELECT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_auth|grantor=afldb_owner|priv=SELECT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_import|grantor=afldb_owner|priv=DELETE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_import|grantor=afldb_owner|priv=INSERT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_import|grantor=afldb_owner|priv=SELECT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_import|grantor=afldb_owner|priv=TRUNCATE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_import|grantor=afldb_owner|priv=UPDATE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=DELETE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=INSERT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=REFERENCES|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=SELECT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=TRIGGER|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=TRUNCATE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_owner|grantee=afldb_owner|grantor=afldb_owner|priv=UPDATE|grantable=f"
+    ],
+    "onlyInB": [
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=SELECT|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=UPDATE|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=USAGE|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_auth|grantee=afldb_import|grantor=afldb_auth|priv=SELECT|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_auth|grantee=afldb_import|grantor=afldb_auth|priv=UPDATE|grantable=f",
+      "S|relation|public.players_id_seq|kind=S|owner=afldb_auth|grantee=afldb_import|grantor=afldb_auth|priv=USAGE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_app|grantor=afldb_auth|priv=SELECT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=DELETE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=INSERT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=REFERENCES|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=SELECT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=TRIGGER|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=TRUNCATE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_auth|grantor=afldb_auth|priv=UPDATE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_import|grantor=afldb_auth|priv=DELETE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_import|grantor=afldb_auth|priv=INSERT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_import|grantor=afldb_auth|priv=SELECT|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_import|grantor=afldb_auth|priv=TRUNCATE|grantable=f",
+      "S|relation|public.players|kind=r|owner=afldb_auth|grantee=afldb_import|grantor=afldb_auth|priv=UPDATE|grantable=f",
+      "E|any-column|afldb_auth|public.players|INSERT",
+      "E|any-column|afldb_auth|public.players|REFERENCES",
+      "E|any-column|afldb_auth|public.players|UPDATE",
+      "E|sequence|afldb_auth|public.players_id_seq|SELECT",
+      "E|sequence|afldb_auth|public.players_id_seq|UPDATE",
+      "E|sequence|afldb_auth|public.players_id_seq|USAGE",
+      "E|table|afldb_auth|public.players|DELETE",
+      "E|table|afldb_auth|public.players|INSERT",
+      "E|table|afldb_auth|public.players|REFERENCES",
+      "E|table|afldb_auth|public.players|TRIGGER",
+      "E|table|afldb_auth|public.players|TRUNCATE",
+      "E|table|afldb_auth|public.players|UPDATE"
+    ]
+  },
+  "assertionFailures": [],
+  "cluster": {
+    "onlyInA": [],
+    "onlyInB": []
+  },
+  "identity": {
+    "a": [
+      "I|database|afldb_v2_shadow_permw_test",
+      "I|server_version_num|160015",
+      "I|session_user|afldb_backup",
+      "I|transaction_read_only|on"
+    ],
+    "b": [
+      "I|database|afldb_v2_shadow_pxctl_test",
+      "I|server_version_num|160015",
+      "I|session_user|afldb_backup",
+      "I|transaction_read_only|on"
+    ]
+  },
+  "verdict": "DIFFERENT"
+}

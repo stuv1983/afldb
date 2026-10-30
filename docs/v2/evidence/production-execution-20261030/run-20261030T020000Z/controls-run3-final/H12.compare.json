@@ -1,0 +1,42 @@
+{
+  "format": "afldb.v2.snapshot-compare.1",
+  "mode": "permissions",
+  "inputs": {
+    "a": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/B.permissions.txt",
+      "sha256": "ef4d4b59115c47a135631c1f82c17d8c04786f2f2d3d92c6997e3cea9066b7bb"
+    },
+    "b": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/H12.permissions.txt",
+      "sha256": "7ad89856290c73ed841913ba44f66f30adda2e5c2d6b731bcf2dda19fbd44f45"
+    }
+  },
+  "storedAndEffectiveLines": {
+    "a": 5329,
+    "b": 5329
+  },
+  "stored": {
+    "onlyInA": [],
+    "onlyInB": []
+  },
+  "assertionFailures": [],
+  "cluster": {
+    "onlyInA": [],
+    "onlyInB": []
+  },
+  "identity": {
+    "a": [
+      "I|database|afldb_v2_shadow_permw_test",
+      "I|server_version_num|160015",
+      "I|session_user|afldb_backup",
+      "I|transaction_read_only|on"
+    ],
+    "b": [
+      "I|database|afldb_v2_shadow_hsctlarel_test",
+      "I|server_version_num|160015",
+      "I|session_user|afldb_backup",
+      "I|transaction_read_only|on"
+    ]
+  },
+  "verdict": "IDENTICAL"
+}
