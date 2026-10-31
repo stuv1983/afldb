@@ -15,7 +15,7 @@ import { reconcileCareerTotals } from '@/db/queries/db-health';
 import { searchAdminMatches } from '@/db/queries/match-admin';
 import { runMatchSearch } from '@/db/queries/match-search';
 import { getSeasonMatches } from '@/db/queries/matches';
-import { getPlayerMatches } from '@/db/queries/players';
+import { getPlayerMatches, listPlayers } from '@/db/queries/players';
 import { getSeasonRoundLadder } from '@/db/queries/rounds';
 import { searchRounds } from '@/db/queries/search';
 import { formatRound, formatRoundShort } from '@/lib/format';
@@ -518,6 +518,41 @@ describe('query performance', () => {
     `;
     expect(Date.now() - started).toBeLessThan(200);
   });
+});
+
+/**
+ * AFLDB-ISSUE-330 — a listed player with no career row (an ISSUE-108 shell, yet to debut) has
+ * NULL career columns. Sorted descending, the /players index must not rank that player above
+ * every recorded value. The shell is seeded here so the case holds on any populated database.
+ */
+describe('AFLDB-ISSUE-330 player index places career-less players last', () => {
+  const slug = 'zz-issue330-shell';
+  let shellId: number;
+
+  beforeAll(async () => {
+    await sql`DELETE FROM players WHERE slug = ${slug}`;
+    const [row] = await sql<{ id: number }[]>`
+      INSERT INTO players (display_name, sort_name, search_name, slug)
+      VALUES ('Aaron Issue330', 'Issue330, Aaron', 'aaron issue330', ${slug})
+      RETURNING id::int AS id
+    `;
+    shellId = row.id;
+  });
+
+  afterAll(async () => {
+    await sql`DELETE FROM players WHERE slug = ${slug}`;
+  });
+
+  for (const sort of ['games', 'goals', 'finals', 'brownlow_votes', 'premierships'] as const) {
+    it(`sort=${sort} desc: page 1 descends and omits the career-less player`, async () => {
+      const { rows } = await listPlayers({ sort, dir: 'desc', limit: 50, offset: 0 });
+      const key = sort === 'brownlow_votes' ? 'brownlowVotes' : sort;
+      const values = rows.map((r) => Number(r[key]));
+      expect(rows.map((r) => Number(r.id))).not.toContain(shellId);
+      expect(values).toEqual([...values].sort((a, b) => b - a));
+      expect(values[0]).toBeGreaterThan(0);
+    });
+  }
 });
 
 /**

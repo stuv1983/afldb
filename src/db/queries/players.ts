@@ -105,9 +105,12 @@ export async function listPlayers(options: PlayerListFilters & {
     const nulls = dir === 'asc' ? sql`NULLS LAST` : sql`NULLS LAST`;
     orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir} ${nulls}, p.sort_name ASC`;
   } else if (sort === 'premierships') {
-    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir}, c.games ${sqlDir}, p.sort_name ASC`;
+    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir} NULLS LAST, c.games ${sqlDir} NULLS LAST, p.sort_name ASC`;
   } else {
-    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir}, p.sort_name ASC`;
+    // A player with no career row (a listed player yet to debut, AFLDB-ISSUE-108) has NULL
+    // career columns. PostgreSQL sorts NULL first under DESC, which put them above the leader
+    // (AFLDB-ISSUE-330); they belong after every recorded value in either direction.
+    orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir} NULLS LAST, p.sort_name ASC`;
   }
 
   const conditions = ranges ? rangeConditions(ranges, PLAYER_FILTER_COLUMNS) : [];
