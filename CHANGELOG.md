@@ -82,6 +82,12 @@ commit.
 - **Still open (V2-GAP-006 stays open).** Database-level enforcement (not implemented); direct-library, legacy and
   ISSUE-316 writers; deployment and production verification. Record: `docs/v2/gap006-release-readiness-2026-11-01.md`.
 
+### V2-GAP-006: Brownlow production-correction suite 8/8 on retained authentic inputs; note-exposure scope corrected (2026-11-01, local only, not deployed)
+
+- **`v2-brownlow-production-correction` is 8/8 (0 failed, 0 skipped)** on the final candidate (HEAD `23eb5fa9`), a new full run distinct from the earlier 4/8. The authentic inputs (dump, `fixture-root.tar`, `acquisition-014218.tar`) were copied read-only from the DEV host under an owner authorisation and verified against the host `SHA256SUMS` and by local recomputation; the restored template reproduced every recorded identity figure. Limitation: the old records kept only hash prefixes, so this is consistency with the record, not a proven historical full-hash match. Run on a fresh clone of the template on the guarded recovery cluster (migrations 116 and 117 and privileges applied). No real Brownlow was recorded, backfilled, adopted or published.
+- **Note-exposure gate corrected.** The proposed pre-deployment production count is withdrawn: the first design never reached DEV or PRODUCTION. A read-only local census of the disposable `afldb_v2_gap006*_test` clones found 2 synthetic list entries (and their 2 override payloads) in `gap006b` whose record note equals the audit note, written by the first-design review journey; the corrected-design clone shows none. No remediation required; matching text alone does not establish exposure.
+- **Still open.** ISSUE-331 (unexplained disappearance and frozen-store drift); V2-GAP-006 (database-level enforcement, other writers, deployment). Evidence: `docs/v2/evidence/gap006-brownlow-cases-20261101/`; record: `docs/v2/gap006-release-readiness-2026-11-01.md`.
+
 ### V2-GAP-006: the correction justification is no longer copied into a record note; environment recovery and final verification (2026-11-01, local only, not deployed)
 
 - **Behaviour change (review F-003 corrected).** The human correction justification stays in the private audit row
@@ -99,8 +105,7 @@ commit.
   `admin-club-leadership`, `sealed-editor-guard`, `draft-linkage`, `v2-brownlow-eligibility`, `admin-brownlow`: 6 files,
   210 passed (includes sealed-season tests that a long record note alone is refused and that both notes are stored
   apart). Unit `v2-season-seal`, `admin-club-leadership-actions`, `admin-season-list-actions`: 94 passed. `tsc --noEmit`
-  clean. `v2-brownlow-production-correction`: 4/8 (cases 2 to 5 need authentic inputs that are not recoverable locally,
-  ISSUE-331). One independent read-only review of the final diff found no HIGH/MED production defect.
+  clean. `v2-brownlow-production-correction`: 4/8 at that time (cases 2 to 5 lacked the authentic inputs; later run 8/8, see the entry above). One independent read-only review of the final diff found no HIGH/MED production defect.
 - **Visual.** `tools/v2/gap006-note-separation-visual.mts`: private correction text appears nowhere on the admin list,
   leadership panel, the club's public page or mobile; 0 page errors, 0 external requests, no overflow at 390px. Sealed
   screenshots are labelled `SYNTHETIC-REGISTRY`. Evidence: `docs/v2/evidence/gap006-note-separation-visual-20261101/`
@@ -109,7 +114,7 @@ commit.
   `D:\tmp\afldb-v2-pg16` while in use; recovered by cold backup and a verified vendor 16.14 distribution on a separate
   recovery copy. Details and identities: `docs/v2/gap006-release-readiness-2026-11-01.md`.
 - **Still open (V2-GAP-006 stays open).** Database-level enforcement; direct-library, legacy and ISSUE-316 writers;
-  deployment; the Brownlow production-correction cases 2 to 5.
+  deployment.
 
 ### V2-GAP-005 and V2-GAP-010 closed as accepted decisions; V2-GAP-006 traced and held (2026-10-31)
 

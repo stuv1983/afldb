@@ -1,0 +1,59 @@
+# Note-exposure census (READ-ONLY; counts only), 2026-11-01
+# Cluster: guarded recovery copy, 127.0.0.1:55432 (afldb_v2_isolated). Databases: the disposable afldb_v2_gap006*_test clones where the editors ran.
+# afldb_v2_gap006e_test and afldb_v2_gap006h_test were dropped earlier and cannot be censused. Query: census.sql (default_transaction_read_only=on).
+== afldb_v2_gap006_test
+sl_rows_with_note=0
+sl_note_equals_audit=0
+cl_rows_with_note=0
+cl_note_equals_audit=0
+ov_rows_with_note=0
+ov_note_equals_audit=0
+audit_rows_editor_families=0
+== afldb_v2_gap006b_test
+sl_rows_with_note=2
+sl_note_equals_audit=2
+cl_rows_with_note=0
+cl_note_equals_audit=0
+ov_rows_with_note=2
+ov_note_equals_audit=2
+audit_rows_editor_families=4
+== afldb_v2_gap006c_test
+sl_rows_with_note=0
+sl_note_equals_audit=0
+cl_rows_with_note=0
+cl_note_equals_audit=0
+ov_rows_with_note=0
+ov_note_equals_audit=0
+audit_rows_editor_families=0
+== afldb_v2_gap006d_test
+sl_rows_with_note=0
+sl_note_equals_audit=0
+cl_rows_with_note=0
+cl_note_equals_audit=0
+ov_rows_with_note=0
+ov_note_equals_audit=0
+audit_rows_editor_families=0
+== afldb_v2_gap006f_test
+sl_rows_with_note=0
+sl_note_equals_audit=0
+cl_rows_with_note=0
+cl_note_equals_audit=0
+ov_rows_with_note=0
+ov_note_equals_audit=0
+audit_rows_editor_families=0
+== afldb_v2_gap006g_test
+sl_rows_with_note=2
+sl_note_equals_audit=0
+cl_rows_with_note=1
+cl_note_equals_audit=0
+ov_rows_with_note=3
+ov_note_equals_audit=0
+audit_rows_editor_families=4
+== afldb_v2_gap006i_test
+sl_rows_with_note=0
+sl_note_equals_audit=0
+cl_rows_with_note=0
+cl_note_equals_audit=0
+ov_rows_with_note=0
+ov_note_equals_audit=0
+audit_rows_editor_families=0

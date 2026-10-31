@@ -1,0 +1,19 @@
+# Retained Brownlow artifacts: identity and transfer record (2026-11-01). No credentials, rows or archive contents.
+source host      : streamanator (10.0.40.100), user arm, Ubuntu 24.04.5 LTS, kernel 6.8.0-147-generic (matches docs/v2/linux-verification-2026-10-28.md section 1)
+access           : ssh with the dev key (NOT the production alias 'afldb'); read-only ls, cat, stat, sha256sum and scp of the listed files only
+source directory : /home/arm/afldb-v2-brownlowverify-20261028/xfer (dump, tars, SHA256SUMS, template-identity.txt, export.log) and .../evidence (manifests)
+
+## Full sha256 (host SHA256SUMS written at export 2026-10-28 14:44 +1100 == host recomputation 2026-11-01 == local recomputation after scp)
+3ed1b46b16673ea1dcff0fdfba253243fd10d1cf54029523a45b91de453aa3b1 *acquisition-014218.tar
+5be45eab11549a206f3a8c444f0e4481c807e4f30f3145c851d9e7847623ba4b *afldb_v2_rb_brownlow2025_test.dump
+23cc8b76bbab21897aa9fcbd41573bd77166ad82ce53d3e36dbfc3130f37ce23 *fixture-root.tar
+
+## Sizes
+acquisition-014218.tar
+afldb_v2_rb_brownlow2025_test.dump
+fixture-root.tar
+
+## Archive path validation before extraction
+fixture-root.tar: 483 members (258 files, 225 dirs), 0 absolute, 0 '..', 0 backslash/drive, 0 links
+acquisition-014218.tar: 4 members (3 files, 1 dir), 0 absolute, 0 '..', 0 backslash/drive, 0 links
+template.toc sha256 cad80b541eb9b36fdd16363816a257acee5217584566e39abe938c885f722d0e (1,640 entries; retained locally, not committed)
