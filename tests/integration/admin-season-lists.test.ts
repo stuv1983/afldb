@@ -30,7 +30,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { sql } from '@/db/client';
 import {
@@ -50,6 +50,11 @@ import {
   seasonListEntityKey,
   transferSeasonListMember,
 } from '@/db/queries/admin-season-lists';
+import { clearFixtureSeasonOpen, setFixtureSeasonOpen } from './sealed-registry-fixture';
+
+// V2-GAP-006: the real registry applies unless a test seals the fixture season through the seam (setFixtureSeasonOpen).
+vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) =>
+  (await import('./sealed-registry-fixture')).withFixtureSeasonOpen(await importOriginal()));
 
 /*
  * TEST DATABASE SAFETY. tests/setup.ts redirects DATABASE_URL to afldb_test and
@@ -112,6 +117,7 @@ let createdThrowawayAdmin = false;
 let maxYear = 0;
 let seasonA = 0;
 let seasonB = 0;
+const CORRECTION = 'Private correction justification: verified against the club list published that week.';
 let clubA = { id: 0, slug: '', name: '', organizationId: 0 };
 let clubB = { id: 0, slug: '', name: '', organizationId: 0 };
 
@@ -174,8 +180,8 @@ async function clearFixtureAudits(): Promise<void> {
 }
 
 async function auditRows(playerId: number, fieldGroup: string) {
-  return admin<{ newValues: Record<string, unknown>; oldValues: Record<string, unknown> }[]>`
-    SELECT new_values AS "newValues", old_values AS "oldValues"
+  return admin<{ newValues: Record<string, unknown>; oldValues: Record<string, unknown>; note: string | null }[]>`
+    SELECT new_values AS "newValues", old_values AS "oldValues", note
       FROM data_edits
      WHERE table_name = 'players' AND row_id = ${playerId} AND field_group = ${fieldGroup}
      ORDER BY id`;
@@ -368,7 +374,8 @@ describe('add (§12.1)', () => {
   it('writes the canonical row, the durable override and the audit row together', async () => {
     const result = await addSeasonListMember({
       season: seasonA, clubSlug: clubA.slug, playerId: aflPlayerId, adminUserId: actorId,
-      note: 'listed for the fixture season',
+      memberNote: 'listed for the fixture season',
+      note: CORRECTION,
     });
     expect(result.ok, JSON.stringify(result)).toBe(true);
     if (!result.ok) return;
@@ -384,6 +391,12 @@ describe('add (§12.1)', () => {
     expect(row.origin).toBe('added');
     expect(row.sourceKey).toBe('manual_admin_edit');
     expect(row.copiedFromSeason).toBeNull();
+
+    // V2-GAP-006 review F-003: the entry keeps its OWN note; the correction justification is the audit row's alone.
+    const [entry] = await sql<{ note: string | null }[]>`SELECT note FROM season_list_members WHERE id = ${result.membershipId}`;
+    expect(entry.note).toBe('listed for the fixture season');
+    const addAudit = await auditRows(aflPlayerId, 'season_list_added');
+    expect(addAudit.at(-1)!.note).toBe(CORRECTION);
 
     const overrides = await readSeasonListOverrides(result.entityKey);
     expect(overrides).toHaveLength(1);
@@ -583,15 +596,26 @@ describe('transfer within a season (§13)', () => {
   it('moves the membership atomically, keeping I-1 and pairing the two audits', async () => {
     const rows = await readClubSeasonList(seasonA, clubA.slug);
     const target = rows.find((r) => r.playerId === aflPlayerId)!;
+    const [source] = await sql<{ note: string | null }[]>`SELECT note FROM season_list_members WHERE id = ${target.membershipId}`;
 
     const result = await transferSeasonListMember({
       membershipId: target.membershipId,
       toClubSlug: clubB.slug,
       expectedUpdatedAt: target.updatedAt,
       adminUserId: actorId,
+      note: CORRECTION,
     });
     expect(result.ok, JSON.stringify(result)).toBe(true);
     if (!result.ok) return;
+
+    // The moved entry keeps its OWN note and never inherits the correction justification; both audit rows carry it.
+    const [movedNote] = await sql<{ note: string | null }[]>`SELECT note FROM season_list_members WHERE id = ${result.membershipId}`;
+    expect(movedNote.note).toBe(source.note);
+    expect(movedNote.note).not.toBe(CORRECTION);
+    const [movedOverride] = await readSeasonListOverrides(result.toEntityKey);
+    expect(JSON.stringify(movedOverride.overrideValues)).not.toContain('Private correction');
+    expect((await auditRows(aflPlayerId, 'season_list_removed')).at(-1)!.note).toBe(CORRECTION);
+    expect((await auditRows(aflPlayerId, 'season_list_added')).at(-1)!.note).toBe(CORRECTION);
 
     const [moved] = await sql<{ clubSlug: string; origin: string }[]>`
       SELECT c.slug AS "clubSlug", m.origin FROM season_list_members m
@@ -675,7 +699,7 @@ describe('the transaction contract (§18)', () => {
     const before = await membershipCount(seasonA);
     const result = await addSeasonListMember({
       season: seasonA, clubSlug: clubA.slug, playerId: player, adminUserId: actorId,
-      note: 'AFLDB-ISSUE-161-OVERRIDE-FORCE-FAIL',
+      memberNote: 'AFLDB-ISSUE-161-OVERRIDE-FORCE-FAIL',
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('failed');
@@ -782,10 +806,14 @@ describe('copy forward (§11a)', () => {
     expect(await membershipCount(seasonB)).toBe(0);
 
     const done = await copySeasonListsForward({
-      season: seasonB, clubs: 'all', dryRun: false, adminUserId: actorId,
+      season: seasonB, clubs: 'all', dryRun: false, adminUserId: actorId, note: CORRECTION,
     });
     expect(done.ok, JSON.stringify(done)).toBe(true);
     if (!done.ok) return;
+    // Copy-forward has no per-entry note: the correction justification is never stamped onto the copied entries.
+    const [stamped] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM season_list_members WHERE season = ${seasonB} AND note IS NOT NULL`;
+    expect(stamped.n).toBe(0);
     expect(done.copied).toBe(sourceCount);
     expect(await membershipCount(seasonB)).toBe(sourceCount);
 
@@ -980,5 +1008,52 @@ describe('replay and rebuild (§19)', () => {
     await admin`
       DELETE FROM data_overrides
        WHERE entity_type = 'season_list_members' AND entity_key LIKE 'not-a-real-club|%'`;
+  });
+});
+
+describe('the seal judges the correction note only, never the entry own note (V2-GAP-006 review F-003)', () => {
+  const OWN_NOTE = 'An entry note that is comfortably longer than twenty characters.';
+
+  it('refuses a sealed-season add that carries only a long entry note, and writes nothing', async () => {
+    const player = await createIdentifiedPlayer('Sealed Own Note');
+    setFixtureSeasonOpen(seasonA + 1); // seasonA and earlier are sealed for the seal; nothing is open
+    try {
+      const members = await membershipCount(seasonA);
+      const edits = (await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM data_edits`)[0].n;
+      for (const note of [undefined, null, '', 'too short']) {
+        const result = await addSeasonListMember({
+          season: seasonA, clubSlug: clubA.slug, playerId: player, adminUserId: actorId,
+          memberNote: OWN_NOTE, note: note as string | undefined,
+        });
+        expect(result.ok, JSON.stringify(result)).toBe(false);
+        if (!result.ok) { expect(result.reason).toBe('validation'); expect(result.error).toMatch(/sealed|correction note/i); }
+      }
+      expect(await membershipCount(seasonA)).toBe(members);
+      expect((await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM data_edits`)[0].n).toBe(edits);
+      expect((await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM season_list_members WHERE player_id = ${player}`)[0].n).toBe(0);
+    } finally {
+      clearFixtureSeasonOpen();
+    }
+  });
+
+  it('accepts a sealed-season add with a valid correction note and keeps the two notes apart', async () => {
+    const player = await createIdentifiedPlayer('Sealed Both Notes');
+    setFixtureSeasonOpen(seasonA + 1);
+    try {
+      const result = await addSeasonListMember({
+        season: seasonA, clubSlug: clubA.slug, playerId: player, adminUserId: actorId,
+        memberNote: OWN_NOTE, note: CORRECTION,
+      });
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+      if (!result.ok) return;
+      const [entry] = await sql<{ note: string | null }[]>`SELECT note FROM season_list_members WHERE id = ${result.membershipId}`;
+      expect(entry.note).toBe(OWN_NOTE);
+      expect((await auditRows(player, 'season_list_added')).at(-1)!.note).toBe(CORRECTION);
+      const [override] = await readSeasonListOverrides(result.entityKey);
+      expect(JSON.stringify(override.overrideValues)).toContain(OWN_NOTE);
+      expect(JSON.stringify(override.overrideValues)).not.toContain('Private correction');
+    } finally {
+      clearFixtureSeasonOpen();
+    }
   });
 });

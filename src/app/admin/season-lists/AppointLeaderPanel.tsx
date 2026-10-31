@@ -43,6 +43,9 @@ export function AppointLeaderPanel({
   const [role, setRole] = useState<LeadershipRole>('captain');
   const [playerId, setPlayerId] = useState('');
   const [startedOn, setStartedOn] = useState('');
+  // The appointment's own note and the correction note are different fields: the correction note is the private
+  // justification kept on the audit row and is never stored as the appointment's note.
+  const [appointmentNote, setAppointmentNote] = useState('');
   const [note, setNote] = useState('');
   /** What the last submit actually asked for, so a refusal cannot outlive it. */
   const [submitted, setSubmitted] = useState<{ role: LeadershipRole; playerId: string } | null>(null);
@@ -56,6 +59,7 @@ export function AppointLeaderPanel({
     formData.set('playerId', playerId);
     formData.set('role', role);
     if (startedOn) formData.set('startedOn', startedOn);
+    if (appointmentNote.trim()) formData.set('appointmentNote', appointmentNote.trim());
     if (note) formData.set('note', note);
     if (confirmCoCaptaincy) formData.set('confirmCoCaptaincy', '1');
     appoint.submit(formData, event.currentTarget);
@@ -112,7 +116,19 @@ export function AppointLeaderPanel({
           />
         </label>
 
-        <CorrectionNoteField value={note} onChange={setNote} disabled={appoint.isPending} label="Note (kept on the appointment and on the audit row)" id="leadership-appoint-note" />
+        <label style={{ display: 'grid', gap: '0.2rem' }}>
+          Note on the appointment (optional)
+          <input
+            type="text" value={appointmentNote} onChange={(event) => setAppointmentNote(event.target.value)}
+            disabled={appoint.isPending} maxLength={2000} aria-label="Appointment note"
+          />
+        </label>
+
+        <CorrectionNoteField
+          value={note} onChange={setNote} disabled={appoint.isPending}
+          label="Correction note (private audit record only; not stored on the appointment)"
+          id="leadership-appoint-note"
+        />
 
         {appoint.state.error && <p className="notice" role="alert">{appoint.state.error}</p>}
         {appoint.state.ok && appoint.state.message && (

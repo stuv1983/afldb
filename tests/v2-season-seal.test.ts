@@ -591,14 +591,40 @@ describe('the action layer never truncates the correction note (V2-GAP-006 E1, n
     expect(storedNoteText(` ${'z'.repeat(2500)} `)).toBe('z'.repeat(2000));
   });
 
-  it('the records that keep the note as their own text store the capped copy, never the raw one', () => {
-    const q = (file: string) => readFileSync(join(__dirname, '..', 'src', 'db', 'queries', file), 'utf8');
+  it('the records that keep a note of their own store the capped copy of THEIR OWN note; the correction note reaches only the audit row', () => {
+    const q = (file: string) => readFileSync(join(__dirname, '..', 'src', 'db', 'queries', file), 'utf8').replaceAll('\r\n', '\n');
+    // V2-GAP-006 review F-003: the correction justification is never the appointment's or the list entry's own note.
     const leadership = q('admin-club-leadership.ts');
     expect(leadership).toContain("'active', ${input.startedOn}::date, ${storedNoteText(input.note)},");
     expect(leadership).toContain('note: storedNoteText(input.note),');
+    const fn = (source: string, name: string): string => {
+      const start = source.indexOf(`async function ${name}(`);
+      const end = source.indexOf('\n}\n', start);
+      return start < 0 || end < 0 ? '' : source.slice(start, end);
+    };
+    const appointment = fn(leadership, 'insertAppointment');
+    expect(appointment).toContain('note: input.correctionNote,');
+    expect(appointment).not.toContain('note: input.note,\n    seal');
+    expect(leadership).toContain("note: (input.appointmentNote ?? '').trim() || null,");
+    expect(leadership).toContain("correctionNote: (input.note ?? '').trim() || null,");
+    expect(leadership).toContain('note: appointmentNote,\n          correctionNote: note,');
     const lists = q('admin-season-lists.ts');
-    expect(lists).toContain('${storedNoteText(input.note)})');
-    expect(lists).toContain('note: storedNoteText(input.note),');
+    expect(lists).toContain('${storedNoteText(input.memberNote)})');
+    expect(lists).toContain('note: storedNoteText(input.memberNote),');
+    const membership = fn(lists, 'insertMembership');
+    expect(membership).toContain('note: input.correctionNote,');
+    expect(membership).not.toContain('storedNoteText(input.note)');
+    // A removal's durable tombstone carries no note either.
+    const removal = fn(lists, 'deleteMembership');
+    expect(removal.slice(0, removal.indexOf('recordDataEdit'))).not.toContain('note: input.note');
+  });
+
+  it('the actions read the record note and the correction note from separate fields', () => {
+    const read = (file: string) => readFileSync(join(ADMIN_DIR, file), 'utf8');
+    const lists = read('season-lists/actions.ts');
+    expect(lists).toContain("memberNote: optionalText(formData.get('memberNote'), 2000),");
+    const leadership = read('season-lists/leadership-actions.ts');
+    expect(leadership.split("appointmentNote: optionalText(formData.get('appointmentNote'), 2000),").length - 1).toBe(3);
   });
 
   it('the Brownlow eligibility publication seals the HUMAN note, never its generated default', () => {

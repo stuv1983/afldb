@@ -49,6 +49,14 @@ import { getAward, getAwardWinners, getAwardSeason, getAwardSeasons, getAwardLea
 import { compileAxis } from '@/db/queries/grid-solver';
 import type { GridAxisState } from '@/search/grid-solver-spec';
 import { audit, type AdminUser } from '@/lib/auth/session';
+import { SealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
+
+import { clearFixtureSeasonOpen, setFixtureSeasonOpen } from './sealed-registry-fixture';
+
+// V2-GAP-006: the season seal reads the REAL registry (1897-2026 sealed, 2027 open), so this suite's synthetic seasons
+// are open for the seal. A test that needs one sealed declares it through the fixture seam (setFixtureSeasonOpen).
+vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) =>
+  (await import('./sealed-registry-fixture')).withFixtureSeasonOpen(await importOriginal()));
 
 vi.mock('@/lib/auth/session', () => ({
   audit: vi.fn(async () => undefined),
@@ -612,10 +620,29 @@ describe('ties among eligible leaders (season 2086)', () => {
     const before = await rawVoteFingerprint();
     await owner`UPDATE brownlow_season_votes SET eligible_rank=NULL
       WHERE season=${SEASONS.tie} AND player_id=${playerIds.c1}`;
-    const result = await importSql.begin((tx) => publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
-      season: SEASONS.tie, registry: REGISTRY, actorId: superAdmin.id, note: NOTE,
-    }));
-    expect(result.determination.status).toBe('requires_review');
+
+    // V2-GAP-006 review F-001, against real PostgreSQL: on a sealed season the publication audit is judged on the
+    // HUMAN note only. The server's generated default text (comfortably over 20 characters) must never satisfy the
+    // seal, so a publication carrying no human note is refused and the whole transaction rolls back.
+    setFixtureSeasonOpen(SEASONS.tie + 1); // every season up to and including 2086 is sealed for the seal; nothing is open
+    try {
+      const stateBefore = await owner`SELECT to_jsonb(b) AS row FROM brownlow_season_votes b WHERE season=${SEASONS.tie} ORDER BY player_id`;
+      const editsBefore = (await owner`SELECT count(*)::int AS n FROM data_edits WHERE field_group = 'eligibility_publication'`)[0].n as number;
+      for (const humanNote of [undefined, null, 'too short']) {
+        await expect(importSql.begin((tx) => publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
+          season: SEASONS.tie, registry: REGISTRY, actorId: superAdmin.id,
+          note: 'Authorised completed-season publication', sealNote: humanNote,
+        }))).rejects.toBeInstanceOf(SealedEditorRefusal);
+        expect(await owner`SELECT to_jsonb(b) AS row FROM brownlow_season_votes b WHERE season=${SEASONS.tie} ORDER BY player_id`).toEqual(stateBefore);
+        expect((await owner`SELECT count(*)::int AS n FROM data_edits WHERE field_group = 'eligibility_publication'`)[0].n).toBe(editsBefore);
+      }
+
+      const result = await importSql.begin((tx) => publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
+        season: SEASONS.tie, registry: REGISTRY, actorId: superAdmin.id, note: NOTE,
+      }));
+      expect(result.determination.status).toBe('requires_review');
+      expect((await owner`SELECT count(*)::int AS n FROM data_edits WHERE field_group = 'eligibility_publication'`)[0].n).toBe(editsBefore + 1);
+    } finally { clearFixtureSeasonOpen(); }
     const winnerAxes: GridAxisState[] = [
       { builder: 'brownlow_finish_exact', params: { place: '1' } },
       { builder: 'brownlow_top_finish', params: { place: '1' } },

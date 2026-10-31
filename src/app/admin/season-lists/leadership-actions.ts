@@ -83,6 +83,8 @@ export async function appointLeaderAction(
     role: roleRaw,
     adminUserId: admin.id,
     startedOn: optionalText(formData.get('startedOn'), 10),
+    // The appointment's own note keeps its original rule; the correction note is a separate, audit-only field.
+    appointmentNote: optionalText(formData.get('appointmentNote'), 2000),
     note: parseCorrectionNote(formData.get('note')),
     // Strict '1' -- never a truthy coercion. An absent, empty or
     // accidentally-repeated field must never read as confirmed (L-3).
@@ -133,6 +135,7 @@ export async function replaceLeaderAction(
     newPlayerId,
     adminUserId: admin.id,
     effectiveOn: optionalText(formData.get('effectiveOn'), 10),
+    appointmentNote: optionalText(formData.get('appointmentNote'), 2000),
     note: parseCorrectionNote(formData.get('note')),
   });
 

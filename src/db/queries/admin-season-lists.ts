@@ -480,7 +480,13 @@ async function insertMembership(tx: Tx, input: {
   adminUserId: number;
   copiedFromSeason?: number | null;
   candidateSource?: string | null;
-  note?: string | null;
+  /** The membership's OWN note (`season_list_members.note`, the override payload). Never the correction note. */
+  memberNote?: string | null;
+  /**
+   * The human correction justification (V2-GAP-006): written ONLY to the private audit row, where the season seal
+   * judges it. It is never copied into `season_list_members.note` or the override payload.
+   */
+  correctionNote?: string | null;
   auditExtra?: Record<string, unknown>;
 }): Promise<{ membershipId: number; entityKey: string }> {
   const entityKey = seasonListEntityKey({
@@ -493,7 +499,7 @@ async function insertMembership(tx: Tx, input: {
     origin: input.origin,
     copiedFromSeason: input.copiedFromSeason,
     candidateSource: input.candidateSource,
-    note: storedNoteText(input.note),
+    note: storedNoteText(input.memberNote),
   });
 
   const [inserted] = await tx<{ id: number }[]>`
@@ -501,7 +507,7 @@ async function insertMembership(tx: Tx, input: {
           (season, club_id, player_id, source_id, origin, copied_from_season, note)
     VALUES (${input.season}::smallint, ${input.club.id}, ${input.player.id}, ${input.sourceId},
             ${input.origin}, ${input.copiedFromSeason ?? null}::smallint,
-            ${storedNoteText(input.note)})
+            ${storedNoteText(input.memberNote)})
     ON CONFLICT (season, player_id) DO NOTHING
     RETURNING id::int AS id
   `;
@@ -536,7 +542,7 @@ async function insertMembership(tx: Tx, input: {
     oldValues: {},
     newValues: { ...payload, entity_key: entityKey, ...(input.auditExtra ?? {}) },
     adminUserId: input.adminUserId,
-    note: input.note,
+    note: input.correctionNote,
     seal: { kind: 'seasons', seasons: [input.season] },
   });
 
@@ -553,6 +559,7 @@ async function deleteMembership(tx: Tx, input: {
   row: MembershipRow;
   playerIdentity: string;
   adminUserId: number;
+  /** The human correction justification: the audit row only. A removal has no record note. */
   note?: string | null;
   auditExtra?: Record<string, unknown>;
 }): Promise<{ entityKey: string }> {
@@ -572,7 +579,7 @@ async function deleteMembership(tx: Tx, input: {
               playerIdentity: input.playerIdentity,
               origin: input.row.origin,
               copiedFromSeason: input.row.copiedFromSeason,
-              note: input.note,
+              // No `note`: the correction justification stays in the audit row, not in the durable record.
             }) as unknown as postgres.JSONValue)},
             ${input.adminUserId}, false, now())
     ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE
@@ -615,6 +622,9 @@ export type AddSeasonListMemberInput = {
   clubSlug: string;
   playerId: number;
   adminUserId: number;
+  /** The membership's own optional note (stored on the list entry, validated at 2000 characters). */
+  memberNote?: string | null;
+  /** The human correction justification: audit row only, judged by the season seal (never stored on the entry). */
   note?: string | null;
   /**
    * Where the admin was LOOKING when they chose this player —
@@ -642,7 +652,8 @@ export async function addSeasonListMember(
           sourceId: pre.sourceId,
           adminUserId: input.adminUserId,
           candidateSource: input.candidateSource,
-          note: input.note,
+          memberNote: input.memberNote,
+          correctionNote: input.note,
         });
         return { ok: true as const, ...written };
       }) as SeasonListMutationResult<{ membershipId: number; entityKey: string }>;
@@ -703,6 +714,7 @@ export type AddSeasonListMembersInput = {
   clubSlug: string;
   playerIds: readonly number[];
   adminUserId: number;
+  /** The human correction justification: audit rows only. A batch add has no per-entry note. */
   note?: string | null;
   candidateSource?: string | null;
 };
@@ -746,7 +758,7 @@ export async function addSeasonListMembers(
             sourceId: pre.sourceId,
             adminUserId: input.adminUserId,
             candidateSource: input.candidateSource,
-            note: input.note,
+            correctionNote: input.note,
             auditExtra: { batch_id: batchId },
           });
           entityKeys.push(written.entityKey);
@@ -872,7 +884,9 @@ export async function transferSeasonListMember(
           origin: 'transferred',
           sourceId,
           adminUserId: input.adminUserId,
-          note: input.note,
+          // The moved entry keeps its OWN note; the correction note is audit-only and is never copied onto it.
+          memberNote: row.note,
+          correctionNote: input.note,
           auditExtra: { transfer_id: transferId, transferred_from: row.clubSlug },
         });
 
@@ -1101,7 +1115,8 @@ export async function copySeasonListsForward(
             sourceId,
             adminUserId: input.adminUserId,
             copiedFromSeason: fromSeason,
-            note: input.note,
+            // Copy-forward has no per-entry note; the correction note is audit-only.
+            correctionNote: input.note,
             auditExtra: { batch_id: batchId },
           });
         }

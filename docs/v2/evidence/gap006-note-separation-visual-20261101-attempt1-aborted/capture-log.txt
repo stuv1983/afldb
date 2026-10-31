@@ -1,0 +1,8 @@
+fixtures: entry player=15653 lead player=15654; list club=adelaide
+SYNTHETIC-REGISTRY in effect: 2027 sealed (the build copy of seasons.json only)
+OK   SYNTHETIC-REGISTRY, entry note only: the add is refused (the entry note never satisfies the seal); nothing written
+OK   the typed entry note is still in the form after the refusal
+OK   both notes: the entry stores ONLY its own note
+OK   both notes: the audit row stores ONLY the correction note, bound to the actor
+FAIL the durable override carries the entry note and never the correction text
+build copy of seasons.json restored from its backup

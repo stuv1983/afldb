@@ -720,7 +720,10 @@ async function insertAppointment(tx: Tx, input: {
   player: PlayerSubject;
   role: LeadershipRole;
   startedOn: string | null;
+  /** The appointment's OWN note (`club_leadership.note`, the override payload). Never the correction note. */
   note: string | null;
+  /** The human correction justification: audit row only, judged by the season seal. */
+  correctionNote: string | null;
   sourceId: number;
   adminUserId: number;
   replacesAppointmentKey?: string | null;
@@ -770,7 +773,7 @@ async function insertAppointment(tx: Tx, input: {
     oldValues: {},
     newValues: { ...payload, ...(input.auditExtra ?? {}) },
     adminUserId: input.adminUserId,
-    note: input.note,
+    note: input.correctionNote,
     seal: { kind: 'row' },
   });
 
@@ -786,6 +789,9 @@ export type AppointLeaderInput = {
   role: LeadershipRole;
   adminUserId: number;
   startedOn?: string | null;
+  /** The appointment's own optional note (stored on `club_leadership.note`). Never the correction note. */
+  appointmentNote?: string | null;
+  /** The human correction justification: audit row only, and the only text the season seal judges. */
   note?: string | null;
   /**
    * L-3. Required when a captain is already active at this club-season and the
@@ -850,7 +856,8 @@ export async function appointLeader(
           player: subject.player,
           role: input.role,
           startedOn: dates.startedOn,
-          note: (input.note ?? '').trim() || null,
+          note: (input.appointmentNote ?? '').trim() || null,
+          correctionNote: (input.note ?? '').trim() || null,
           sourceId,
           adminUserId: input.adminUserId,
         });
@@ -1184,6 +1191,9 @@ export type ReplaceLeaderInput = {
   adminUserId: number;
   /** The changeover date, when it is known. Ends one row and starts the other. */
   effectiveOn?: string | null;
+  /** The incoming appointment's own optional note (stored on `club_leadership.note`). Never the correction note. */
+  appointmentNote?: string | null;
+  /** The human correction justification: audit rows only, and the only text the season seal judges. */
   note?: string | null;
 };
 
@@ -1274,6 +1284,7 @@ export async function replaceLeader(
         const sourceId = await manualSourceId(tx);
         const paths = await clubPublicPaths(tx, row.clubId);
         const note = (input.note ?? '').trim() || null;
+        const appointmentNote = (input.appointmentNote ?? '').trim() || null;
 
         // Everything above refused before a write. From here, any refusal throws.
         await tx`
@@ -1288,7 +1299,8 @@ export async function replaceLeader(
           player: incoming.player,
           role: row.role,
           startedOn: effectiveOn,
-          note,
+          note: appointmentNote,
+          correctionNote: note,
           sourceId,
           adminUserId: input.adminUserId,
           replacesAppointmentKey: row.appointmentKey,

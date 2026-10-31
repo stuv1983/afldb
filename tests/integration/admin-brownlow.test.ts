@@ -29,7 +29,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { sql } from '@/db/client';
 import {
@@ -58,6 +58,12 @@ import {
   seedBrownlowSeason,
   type BrownlowFixture,
 } from './brownlow-fixture';
+import { clearFixtureSeasonOpen, setFixtureSeasonOpen } from './sealed-registry-fixture';
+
+// V2-GAP-006: the season seal reads the REAL registry (1897-2026 sealed, 2027 open), so this suite's synthetic seasons
+// are open for the seal. A test that needs one sealed declares it through the fixture seam (setFixtureSeasonOpen).
+vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) =>
+  (await import('./sealed-registry-fixture')).withFixtureSeasonOpen(await importOriginal()));
 
 // The four transactions open their own short-lived connection from
 // AFLDB_IMPORT_DATABASE_URL, read at call time; point it at the test database.
@@ -1311,6 +1317,36 @@ describe('publication', () => {
     if (result.ok) throw new Error('unreachable');
     expect(result.code).toBe('invalid');
     expect(result.message).toContain('polled no votes');
+  });
+
+  it('refuses a publication without the administrator note: the generated default never satisfies the season seal (V2-GAP-006 review F-001)', async () => {
+    const overview = await getBrownlowSeasonOverview(main.season);
+    const publishEdits = async () => (await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_edits
+       WHERE table_name = 'brownlow_season_authority' AND row_id = ${main.season}
+         AND field_group IN ('publish', 'eligibility_publication')`)[0].n;
+    const editsBefore = await publishEdits();
+    // The fixture season is synthetic (beyond the real registry, so open for the seal). Seal it for this test only.
+    setFixtureSeasonOpen(main.season + 1);
+    try {
+      for (const note of [undefined, null, 'too short']) {
+        const result = await publishBrownlowSeason({
+          season: main.season, ineligiblePlayerIds: [], expectedRevision: overview!.revision, actorId, note,
+        });
+        expect(result.ok, JSON.stringify(result)).toBe(false);
+        if (result.ok) throw new Error('unreachable');
+        expect(result.code).toBe('invalid');
+        expect(result.message).toMatch(/note/i);
+        // The refusal rolled the whole publication back: revision, status and audit are exactly as they were.
+        const after = await getBrownlowSeasonOverview(main.season);
+        expect(after!.revision).toBe(overview!.revision);
+        expect(after!.status).toBe(overview!.status);
+        expect(after!.publishedRevision).toBe(overview!.publishedRevision);
+        expect(await publishEdits()).toBe(editsBefore);
+      }
+    } finally {
+      clearFixtureSeasonOpen();
+    }
   });
 
   it('publishes: manual rows, measured ranks and winners, derived totals in step', async () => {

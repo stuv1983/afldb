@@ -1,0 +1,20 @@
+fixtures: entry player=15655 lead player=15656; list club=adelaide
+SYNTHETIC-REGISTRY in effect: 2027 sealed (the build copy of seasons.json only)
+OK   SYNTHETIC-REGISTRY, entry note only: the add is refused (the entry note never satisfies the seal); nothing written
+OK   the typed entry note is still in the form after the refusal
+OK   both notes: the entry stores ONLY its own note
+OK   both notes: the audit row stores ONLY the correction note, bound to the actor
+OK   the durable override carries the entry note and never the correction text
+OK   the rendered admin list page never shows the correction text
+OK   appointee added to the synthetic list (correction note only: the entry stores no note)
+OK   a correction note alone leaves the entry note empty
+OK   SYNTHETIC-REGISTRY, appointment note only: refused, nothing written
+OK   appointment: the row stores ONLY its own note
+OK   appointment: the audit row stores ONLY the correction note
+OK   the leadership panel renders the appointment's own note
+OK   the leadership panel and list page never show the correction text
+OK   the club's public page (HTTP 200) never shows the correction text
+OK   mobile 390px: no horizontal overflow (0px) and no correction text
+pageErrors=0 blockedExternalRequests desktop=0 mobile=0
+database=afldb_v2_gap006g_test baseURL=http://127.0.0.1:3912
+build copy of seasons.json restored from its backup

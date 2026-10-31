@@ -30,9 +30,10 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { sql } from '@/db/client';
+import { clearFixtureSeasonOpen, setFixtureSeasonOpen } from './sealed-registry-fixture';
 import {
   FIRST_LEADERSHIP_SEASON,
   appointLeader,
@@ -56,6 +57,10 @@ import {
 } from '@/db/queries/admin-season-lists';
 import { getClubCaptains, getPlayerHonours } from '@/db/queries/awards';
 import { getClubCurrentLeadership } from '@/db/queries/club-leadership';
+
+// V2-GAP-006: the real registry applies unless a test seals the fixture season through the seam (setFixtureSeasonOpen).
+vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) =>
+  (await import('./sealed-registry-fixture')).withFixtureSeasonOpen(await importOriginal()));
 
 /*
  * TEST DATABASE SAFETY. tests/setup.ts redirects DATABASE_URL to afldb_test and
@@ -189,9 +194,9 @@ async function appointmentRow(appointmentKey: string) {
 
 async function auditRows(appointmentId: number) {
   return admin<{
-    fieldGroup: string; newValues: Record<string, unknown>; oldValues: Record<string, unknown>;
+    fieldGroup: string; newValues: Record<string, unknown>; oldValues: Record<string, unknown>; note: string | null;
   }[]>`
-    SELECT field_group AS "fieldGroup", new_values AS "newValues", old_values AS "oldValues"
+    SELECT field_group AS "fieldGroup", new_values AS "newValues", old_values AS "oldValues", note
       FROM data_edits
      WHERE table_name = 'club_leadership' AND row_id = ${appointmentId}
      ORDER BY id`;
@@ -500,7 +505,7 @@ describe('appointment write invariants (§9, §11)', () => {
     await resetAppointments();
     const result = await appointLeader({
       season: seasonA, clubSlug: clubA.slug, playerId: captainId, role: 'captain',
-      startedOn: `${seasonA}-02-14`, note: 'announced at the season launch', adminUserId: actorId,
+      startedOn: `${seasonA}-02-14`, appointmentNote: 'announced at the season launch', adminUserId: actorId,
     });
     expect(result.ok, JSON.stringify(result)).toBe(true);
     if (!result.ok) return;
@@ -920,6 +925,108 @@ describe('mid-season replacement (§12)', () => {
   });
 });
 
+describe('the correction note is not the appointment own note (V2-GAP-006, review F-003)', () => {
+  const CORRECTION = 'Private correction justification: verified against the club media release of the day.';
+
+  it('appoint keeps the appointment note on the row and the correction note on the audit row only', async () => {
+    await resetAppointments();
+    const result = await appointLeader({
+      season: seasonA, clubSlug: clubA.slug, playerId: captainId, role: 'captain',
+      appointmentNote: 'announced at the season launch', note: CORRECTION, adminUserId: actorId,
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const row = await appointmentRow(result.appointmentKey);
+    expect(row!.note).toBe('announced at the season launch');
+    const [override] = await readLeadershipOverrides(result.appointmentKey);
+    expect(override.overrideValues).toMatchObject({ note: 'announced at the season launch' });
+    expect(JSON.stringify(override.overrideValues)).not.toContain('Private correction');
+    const audits = await auditRows(row!.id);
+    expect(audits).toHaveLength(1);
+    expect(audits[0].note).toBe(CORRECTION);
+  });
+
+  it('appoint with only a correction note stores no appointment note', async () => {
+    await resetAppointments();
+    const result = await appointLeader({
+      season: seasonA, clubSlug: clubA.slug, playerId: captainId, role: 'captain',
+      note: CORRECTION, adminUserId: actorId,
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    expect((await appointmentRow(result.appointmentKey))!.note).toBeNull();
+    const [override] = await readLeadershipOverrides(result.appointmentKey);
+    expect(override.overrideValues).not.toHaveProperty('note');
+  });
+
+  it('replace keeps the incoming appointment note on the new row and the correction note on both audit rows only', async () => {
+    await resetAppointments();
+    const appointed = await appointLeader({
+      season: seasonA, clubSlug: clubA.slug, playerId: captainId, role: 'captain', adminUserId: actorId,
+    });
+    if (!appointed.ok) throw new Error('setup failed');
+    const replaced = await replaceLeader({
+      appointmentKey: appointed.appointmentKey,
+      expectedUpdatedAt: await currentUpdatedAt(appointed.appointmentKey),
+      newPlayerId: successorId, effectiveOn: `${seasonA}-06-20`,
+      appointmentNote: 'took over mid-season', note: CORRECTION, adminUserId: actorId,
+    });
+    expect(replaced.ok, JSON.stringify(replaced)).toBe(true);
+    if (!replaced.ok) return;
+    const incoming = await appointmentRow(replaced.appointmentKey);
+    expect(incoming!.note).toBe('took over mid-season');
+    const outgoing = await appointmentRow(appointed.appointmentKey);
+    expect(outgoing!.note).toBeNull();
+    expect((await auditRows(incoming!.id)).at(-1)!.note).toBe(CORRECTION);
+    expect((await auditRows(outgoing!.id)).at(-1)!.note).toBe(CORRECTION);
+    const [incomingOverride] = await readLeadershipOverrides(replaced.appointmentKey);
+    expect(JSON.stringify(incomingOverride.overrideValues)).not.toContain('Private correction');
+  });
+});
+
+describe('the seal judges the correction note only, never the appointment own note (V2-GAP-006 review F-003)', () => {
+  const CORRECTION = 'Private correction justification: verified against the club media release of the day.';
+  const OWN_NOTE = 'An appointment note that is comfortably longer than twenty characters.';
+
+  it('refuses a sealed-season appointment that carries only a long appointment note, and writes nothing', async () => {
+    await resetAppointments();
+    setFixtureSeasonOpen(seasonA + 1); // seasonA and earlier are sealed for the seal; nothing is open
+    try {
+      const edits = (await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM data_edits`)[0].n;
+      for (const note of [undefined, null, '', 'too short']) {
+        const result = await appointLeader({
+          season: seasonA, clubSlug: clubA.slug, playerId: captainId, role: 'captain',
+          appointmentNote: OWN_NOTE, note: note as string | undefined, adminUserId: actorId,
+        });
+        expect(result.ok, JSON.stringify(result)).toBe(false);
+        if (!result.ok) expect(result.reason).toBe('validation');
+      }
+      expect((await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM data_edits`)[0].n).toBe(edits);
+      expect((await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM club_leadership WHERE player_id = ${captainId} AND season = ${seasonA}`)[0].n).toBe(0);
+    } finally {
+      clearFixtureSeasonOpen();
+    }
+  });
+
+  it('accepts a sealed-season appointment with a valid correction note and keeps the two notes apart', async () => {
+    await resetAppointments();
+    setFixtureSeasonOpen(seasonA + 1);
+    try {
+      const result = await appointLeader({
+        season: seasonA, clubSlug: clubA.slug, playerId: captainId, role: 'captain',
+        appointmentNote: OWN_NOTE, note: CORRECTION, adminUserId: actorId,
+      });
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+      if (!result.ok) return;
+      const row = await appointmentRow(result.appointmentKey);
+      expect(row!.note).toBe(OWN_NOTE);
+      expect((await auditRows(row!.id)).at(-1)!.note).toBe(CORRECTION);
+    } finally {
+      clearFixtureSeasonOpen();
+    }
+  });
+});
+
 describe('the transaction contract (§13)', () => {
   it('rolls the canonical row back when the audit write fails', async () => {
     await resetAppointments();
@@ -941,7 +1048,7 @@ describe('the transaction contract (§13)', () => {
     await resetAppointments();
     const result = await appointLeader({
       season: seasonA, clubSlug: clubA.slug, playerId: captainId, role: 'captain',
-      note: OVERRIDE_FAIL_NOTE, adminUserId: actorId,
+      appointmentNote: OVERRIDE_FAIL_NOTE, adminUserId: actorId,
     });
     expect(result.ok).toBe(false);
     const [{ n }] = await sql<{ n: number }[]>`
@@ -1145,7 +1252,7 @@ describe('durability: the real replay (§19)', () => {
 
     const active = await appointLeader({
       season: seasonA, clubSlug: clubA.slug, playerId: captainId, role: 'captain',
-      startedOn: `${seasonA}-02-01`, note: 'season launch', adminUserId: actorId,
+      startedOn: `${seasonA}-02-01`, appointmentNote: 'season launch', adminUserId: actorId,
     });
     const ended = await appointLeader({
       season: seasonA, clubSlug: clubA.slug, playerId: viceOneId, role: 'vice_captain',

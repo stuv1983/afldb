@@ -58,6 +58,9 @@ export async function addSeasonListMemberAction(
     clubSlug,
     playerId,
     adminUserId: admin.id,
+    // The entry's own note keeps its original rule (optional, at most 2000 characters). The correction note is a
+    // separate field: audit row only, and the only text the season seal judges.
+    memberNote: optionalText(formData.get('memberNote'), 2000),
     note: parseCorrectionNote(formData.get('note')),
     candidateSource: optionalText(formData.get('candidateSource'), 60),
   });

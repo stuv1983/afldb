@@ -30,6 +30,9 @@ export function AddPlayerPanel({
 }) {
   const add = useSeasonListActionSubmit(addSeasonListMemberAction, {});
   const [selected, setSelected] = useState<{ id: number; label: string } | null>(initialSelected);
+  // The list entry's own note and the correction note are different fields: the correction note is the private
+  // justification kept on the audit row and is never stored as the entry's note.
+  const [memberNote, setMemberNote] = useState('');
   const [note, setNote] = useState('');
 
   const handleAdd = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -38,6 +41,7 @@ export function AddPlayerPanel({
     formData.set('season', String(season));
     formData.set('clubSlug', clubSlug);
     formData.set('playerId', String(selected.id));
+    if (memberNote.trim()) formData.set('memberNote', memberNote.trim());
     if (note.trim()) formData.set('note', note.trim());
     add.submit(formData, event.currentTarget);
   };
@@ -53,7 +57,18 @@ export function AddPlayerPanel({
       </p>
       <div style={{ display: 'grid', gap: '0.6rem', maxWidth: '26rem' }}>
         <PlayerPicker label="Search players…" onSelect={setSelected} initialSelected={selected} />
-        <CorrectionNoteField value={note} onChange={setNote} disabled={add.isPending} label="Note (recorded on the audit row)" />
+        <label style={{ display: 'grid', gap: '0.2rem' }}>
+          Note on the list entry (optional)
+          <input
+            type="text" value={memberNote} onChange={(event) => setMemberNote(event.target.value)}
+            disabled={add.isPending} maxLength={2000} aria-label="List entry note"
+          />
+        </label>
+        <CorrectionNoteField
+          value={note} onChange={setNote} disabled={add.isPending}
+          label="Correction note (private audit record only; not stored on the entry)"
+          id="season-list-add-correction-note"
+        />
         {add.state.error && <p className="notice" role="alert">{add.state.error}</p>}
         {add.state.ok && add.state.message && <p className="notice" role="status">{add.state.message}</p>}
         <div>

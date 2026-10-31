@@ -66,6 +66,8 @@ export function LeadershipActions({
   const [mode, setMode] = useState<'none' | 'replace' | 'end' | 'correct' | 'void'>('none');
   const [newPlayerId, setNewPlayerId] = useState('');
   const [effectiveOn, setEffectiveOn] = useState('');
+  // The incoming appointment's own note, and (separately) the private correction note for the audit rows.
+  const [replaceAppointmentNote, setReplaceAppointmentNote] = useState('');
   const [replaceNote, setReplaceNote] = useState('');
   const [endDate, setEndDate] = useState('');
   const [endReason, setEndReason] = useState('');
@@ -97,6 +99,7 @@ export function LeadershipActions({
     formData.set('expectedUpdatedAt', expectedUpdatedAt);
     formData.set('newPlayerId', newPlayerId);
     if (effectiveOn) formData.set('effectiveOn', effectiveOn);
+    if (replaceAppointmentNote.trim()) formData.set('appointmentNote', replaceAppointmentNote.trim());
     if (replaceNote) formData.set('note', replaceNote);
     replace.submit(formData, event.currentTarget);
   };
@@ -182,11 +185,22 @@ export function LeadershipActions({
             aria-label="Changeover date"
           />
         </label>
+        <label style={{ display: 'grid', gap: '0.2rem' }}>
+          Note on the new appointment (optional)
+          <input
+            type="text"
+            value={replaceAppointmentNote}
+            onChange={(event) => setReplaceAppointmentNote(event.target.value)}
+            disabled={anyPending}
+            maxLength={2000}
+            aria-label="Replacement note"
+          />
+        </label>
         <CorrectionNoteField
           value={replaceNote}
           onChange={setReplaceNote}
           disabled={anyPending}
-          label="Note (kept on the new appointment and on the audit row)"
+          label="Correction note (private audit record only; not stored on the new appointment)"
           id="leadership-replace-note"
         />
         {replace.state.error && <p className="notice" role="alert">{replace.state.error}</p>}
