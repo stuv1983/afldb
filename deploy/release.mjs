@@ -31,7 +31,7 @@
  * releases/, and promote/rollback only ever replace a symlink by rename(2).
  * Nothing here restarts the service, deletes a release, touches the database
  * or writes to the checkout. Linux only; Node built-ins only, so it runs
- * before any `npm ci`. Design and proof: issues/open/AFLDB-ISSUE-329.md.
+ * before any `npm ci`. Design and proof: issues/closed/AFLDB-ISSUE-329.md.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, createHmac, randomBytes } from 'node:crypto';

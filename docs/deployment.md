@@ -180,6 +180,7 @@ node $R build --checkout ~/projects/afldb --revision <40-hex> --afldb-env produc
 node $R promote <rev12>-<BUILD_ID>            # refuses unless the service runs `current`
 sudo systemctl restart afldb                   # owner
 node $R status --expect <rev12>-<BUILD_ID>     # the identity gate
+bash deploy/post-install-check.sh <rev12>-<BUILD_ID>   # origin, public assets, journal
 # if the gate fails: switch back to the retained release (no build), restart, gate again
 node $R rollback && sudo systemctl restart afldb && node $R status --expect <previous id>
 ```
@@ -228,6 +229,13 @@ node $R rollback && sudo systemctl restart afldb && node $R status --expect <pre
   `status --expect` is recorded in `events.log`. The supervisor also logs
   `[afldb] serving build <BUILD_ID> release <id> revision <sha>` at every start. `x-afldb-build`
   remains a tracing-only header.
+- **Post-install check.** `deploy/post-install-check.sh <id> [<previous BUILD_ID>]` runs
+  `status --expect`, then checks health and the current BUILD_ID on loopback and the public
+  endpoint, every CSS/JS asset of the key pages against the release's own bytes, and the journal.
+  The previous BUILD_ID (default: the `previous` release's) must answer 404 at the origin: on
+  loopback and through a cache-busted public request. A plain public 200 for it with
+  `cf-cache-status: HIT` is an old Cloudflare copy of an immutable asset: it prints `CACHE`, not
+  `FAIL`. Any other 200 fails.
 - **Sessions.** Run `build` inside `tmux` (or `systemd-run --user`): a dropped SSH session sends
   `SIGHUP`, which stops the build safely but wastes it.
 - **Retention.** Nothing is deleted automatically. A release is about 0.8 GB. `rollback --to <id>`

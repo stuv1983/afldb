@@ -38,7 +38,7 @@ import {
  * switches only a validated release into service. The first block is pure
  * and runs anywhere; the second drives the real tool on Linux, against a
  * fixture repository, through every way a build can end, while a server keeps
- * serving from `current`. Design: issues/open/AFLDB-ISSUE-329.md.
+ * serving from `current`. Design: issues/closed/AFLDB-ISSUE-329.md.
  */
 
 const REPO = join(__dirname, '..');
@@ -670,5 +670,167 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-330 maintenance — the maintained post-install checker (deploy/post-install-check.sh).
+ *
+ * At ISSUE-329 B2 the frozen package's checker failed on the public previous-BUILD_ID 404 because
+ * Cloudflare answered that immutable asset from cache (HIT) while the origin answered 404. The
+ * maintained checker proves the previous build absent at the origin (loopback and a cache-busted
+ * public request), reports an old public cache HIT separately, and still fails on genuine origin,
+ * identity and asset errors. Each case runs the real script against stub curl, systemctl,
+ * journalctl and node.
+ */
+const checkerBash = (() => {
+  const r = spawnSync('bash', ['-c', 'command -v awk sha256sum >/dev/null && stat -c %s /dev/null >/dev/null'], { encoding: 'utf8' });
+  return r.status === 0;
+})();
+
+describe.runIf(checkerBash)('AFLDB-ISSUE-330 — post-install check: origin absence, cache HIT, genuine failures', () => {
+  const fwd = (p: string) => p.replace(/\\/g, '/');
+  const ID = 'bbbbbbbbbbbb-NEWBUILD';
+  const LOCAL = 'http://local.test';
+  const PUBLIC = 'https://public.test';
+  const OLD = '/_next/static/OLDBUILD/_buildManifest.js';
+  let dir: string;
+  let stubs: string;
+  let rel: string;
+
+  beforeAll(() => {
+    dir = fwd(mkdtempSync(join(tmpdir(), 'afldb-pic-')));
+    stubs = `${dir}/bin`;
+    mkdirSync(stubs);
+    const stub = (name: string, body: string) => writeFileSync(`${stubs}/${name}`, `#!/bin/bash\n${body}\n`, { mode: 0o755 });
+    // Answers from $STUB_ROUTES lines "<METHOD> <url> <code> <content-type> <cf-cache-status|-> <body|->".
+    stub('curl', [
+      'out=; fmt=; hdr=; method=GET; url=',
+      'while [ $# -gt 0 ]; do',
+      '  case $1 in -o) out=$2; shift;; -w) fmt=$2; shift;; -D) hdr=$2; shift;; -X) method=$2; shift;; -m) shift;; -*) ;; *) url=$1;; esac; shift',
+      'done',
+      'key=$(sed -E "s/afldb-origin-check=[0-9]+/afldb-origin-check=N/" <<< "$url")',
+      'line=$(awk -v m="$method" -v u="$key" \'$1 == m && $2 == u { print; exit }\' "$STUB_ROUTES")',
+      'read -r _ _ code type cf body <<< "${line:-x x 404 text/html - -}"',
+      'if [ -n "$hdr" ]; then { printf "HTTP/1.1 %s\\r\\ncontent-type: %s\\r\\n" "$code" "$type"; [ "$cf" = - ] || printf "cf-cache-status: %s\\r\\n" "$cf"; printf "\\r\\n"; } > "$hdr"; fi',
+      'if [ -n "$out" ]; then if [ "$body" = - ]; then : > "$out"; else cat "$body" > "$out"; fi',
+      'elif [ "$body" != - ]; then cat "$body"; fi',
+      'w=${fmt//"%{http_code}"/$code}; w=${w//"%{content_type}"/$type}; printf "%s" "${w//"%{url_effective}"/$url}"',
+    ].join('\n'));
+    stub('systemctl', 'case $4 in ActiveState) echo active;; Result) echo success;; ActiveEnterTimestamp) echo "Sat 2026-10-31 18:02:55 AEDT";; MemoryCurrent) echo 154140672;; NRestarts) echo 0;; esac');
+    stub('journalctl', 'cat "$STUB_JOURNAL"');
+    stub('node', 'echo "release: STATUS stub"; exit "${STUB_STATUS_EXIT:-0}"');
+
+    rel = `${dir}/root/releases/${ID}/.next/standalone/.next`;
+    mkdirSync(`${rel}/static/chunks`, { recursive: true });
+    mkdirSync(`${rel}/static/css`, { recursive: true });
+    mkdirSync(`${dir}/root/previous/.next/standalone/.next`, { recursive: true });
+    writeFileSync(`${rel}/BUILD_ID`, 'NEWBUILD');
+    writeFileSync(`${dir}/root/previous/.next/standalone/.next/BUILD_ID`, 'OLDBUILD');
+    writeFileSync(`${rel}/static/chunks/app.js`, `/* app */${'a'.repeat(200)}`);
+    writeFileSync(`${rel}/static/css/site.css`, `/* css */${'c'.repeat(200)}`);
+    writeFileSync(`${dir}/wrong.js`, `/* old */${'b'.repeat(200)}`);
+    writeFileSync(`${dir}/health.json`, '{"status":"ok","database":"ok","latencyMs":1}');
+    writeFileSync(`${dir}/health-bad.json`, '{"status":"degraded","database":"error"}');
+    writeFileSync(`${dir}/manifest.js`, 'self.__BUILD_MANIFEST={}');
+    writeFileSync(`${dir}/page.html`, '<link href="/_next/static/css/site.css"><script src="/_next/static/chunks/app.js"></script>');
+    writeFileSync(`${dir}/journal`, `[afldb] primary 1 started\n[afldb] serving build NEWBUILD release ${ID} revision ${'b'.repeat(40)}\n`);
+  });
+
+  afterAll(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  const baseRoutes = (): Record<string, string> => ({
+    [`GET ${LOCAL}/api/health`]: `200 application/json - ${dir}/health.json`,
+    [`GET ${PUBLIC}/api/health`]: `200 application/json DYNAMIC ${dir}/health.json`,
+    [`GET ${LOCAL}/_next/static/NEWBUILD/_buildManifest.js`]: `200 application/javascript - ${dir}/manifest.js`,
+    [`GET ${PUBLIC}/_next/static/NEWBUILD/_buildManifest.js`]: `200 application/javascript HIT ${dir}/manifest.js`,
+    [`GET ${LOCAL}${OLD}`]: '404 text/html - -',
+    [`GET ${PUBLIC}${OLD}?afldb-origin-check=N`]: '404 text/html BYPASS -',
+    [`GET ${PUBLIC}${OLD}`]: '404 text/html MISS -',
+    [`GET ${PUBLIC}/`]: `200 text/html DYNAMIC ${dir}/page.html`,
+    [`GET ${PUBLIC}/players`]: `200 text/html DYNAMIC ${dir}/page.html`,
+    [`GET ${PUBLIC}/_next/static/chunks/app.js`]: `200 application/javascript HIT ${rel}/static/chunks/app.js`,
+    [`GET ${PUBLIC}/_next/static/css/site.css`]: `200 text/css HIT ${rel}/static/css/site.css`,
+    [`POST ${PUBLIC}/api/admin/email-intake`]: '410 application/json DYNAMIC -',
+  });
+
+  const check = (over: Record<string, string> = {}, env: Record<string, string> = {}) => {
+    const routes = { ...baseRoutes(), ...over };
+    const file = `${dir}/routes-${Math.random().toString(36).slice(2)}`;
+    writeFileSync(file, Object.entries(routes).map(([k, v]) => `${k} ${v}\n`).join(''));
+    const r = spawnSync('bash', [fwd(join(REPO, 'deploy', 'post-install-check.sh')), ID], {
+      encoding: 'utf8',
+      env: {
+        ...process.env, PATH: `${stubs}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`,
+        STUB_ROUTES: file, STUB_JOURNAL: `${dir}/journal`, CHECKOUT: dir, ROOT: `${dir}/root`,
+        NODE: `${stubs}/node`, LOCAL, PUBLIC, PAGES: '/ /players', ...env,
+      },
+    });
+    return { status: r.status, out: r.stdout + r.stderr };
+  };
+
+  it('passes when the previous build is 404 everywhere, deriving it from the retained previous release', () => {
+    const { status, out } = check();
+    expect(out).toContain('previous OLDBUILD');
+    expect(out).toContain('ok    origin (loopback) previous OLDBUILD 404');
+    expect(out).toContain('ok    origin (public, cache-busted) previous OLDBUILD 404, cf-cache-status BYPASS');
+    expect(out).toContain('ok    public previous OLDBUILD 404');
+    expect(out).not.toMatch(/FAIL|CACHE/);
+    expect(out).toContain(`POST-INSTALL CHECK PASS ${ID}\n`);
+    expect(status).toBe(0);
+  });
+
+  it('reports an old Cloudflare cache HIT of the previous build separately and still passes', () => {
+    const { status, out } = check({ [`GET ${PUBLIC}${OLD}`]: `200 application/javascript HIT ${dir}/manifest.js` });
+    expect(out).toContain('CACHE public previous OLDBUILD 200 from an old Cloudflare cache HIT');
+    expect(out).not.toContain('FAIL');
+    expect(out).toContain(`POST-INSTALL CHECK PASS ${ID} (1 old Cloudflare cache HIT(s) reported above, origin 404)`);
+    expect(status).toBe(0);
+  });
+
+  it('fails when the origin still serves the previous build on loopback', () => {
+    const { status, out } = check({ [`GET ${LOCAL}${OLD}`]: `200 application/javascript - ${dir}/manifest.js` });
+    expect(out).toContain('FAIL  origin (loopback) serves previous OLDBUILD: 200');
+    expect(out).toContain('POST-INSTALL CHECK FAIL (1)');
+    expect(status).toBe(1);
+  });
+
+  it('fails when the cache-busted public request reaches an origin serving the previous build, even beside a cache HIT', () => {
+    const { status, out } = check({
+      [`GET ${PUBLIC}${OLD}?afldb-origin-check=N`]: `200 application/javascript MISS ${dir}/manifest.js`,
+      [`GET ${PUBLIC}${OLD}`]: `200 application/javascript HIT ${dir}/manifest.js`,
+    });
+    expect(out).toContain('FAIL  origin (public, cache-busted) serves previous OLDBUILD: 200, cf-cache-status MISS');
+    expect(out).toContain('CACHE public previous OLDBUILD');
+    expect(out).toContain('POST-INSTALL CHECK FAIL (1)');
+    expect(status).toBe(1);
+  });
+
+  it('fails a public 200 for the previous build that is not a cache HIT', () => {
+    const { status, out } = check({ [`GET ${PUBLIC}${OLD}`]: `200 application/javascript MISS ${dir}/manifest.js` });
+    expect(out).toContain('FAIL  public previous OLDBUILD answered 200, cf-cache-status MISS (not a cache HIT)');
+    expect(out).not.toContain('CACHE');
+    expect(status).toBe(1);
+  });
+
+  it('fails when status --expect fails (identity)', () => {
+    const { status, out } = check({}, { STUB_STATUS_EXIT: '1' });
+    expect(out).toContain(`FAIL  status --expect ${ID}`);
+    expect(status).toBe(1);
+  });
+
+  it('fails when the public health check reports a database error', () => {
+    const { status, out } = check({ [`GET ${PUBLIC}/api/health`]: `200 application/json DYNAMIC ${dir}/health-bad.json` });
+    expect(out).toContain(`FAIL  ${PUBLIC}/api/health`);
+    expect(status).toBe(1);
+  });
+
+  it('fails a public asset whose bytes are not the release\'s, and one that is missing', () => {
+    const wrong = check({ [`GET ${PUBLIC}/_next/static/chunks/app.js`]: `200 application/javascript HIT ${dir}/wrong.js` });
+    expect(wrong.out).toContain(`FAIL  only 1 of 2 served assets match ${ID}'s files`);
+    expect(wrong.status).toBe(1);
+    const missing = check({ [`GET ${PUBLIC}/_next/static/css/site.css`]: '404 text/html - -' });
+    expect(missing.out).toContain('FAIL  2 assets, 1 bad');
+    expect(missing.status).toBe(1);
   });
 });

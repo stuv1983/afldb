@@ -78,9 +78,21 @@ only the variable named by `--dsn-env`.
 
 ### 4.1 Redeploy the previous release
 
-Use the current production release procedure with the previously deployed commit (`PREV`, recorded
-at the start of the window) as the target: check out `PREV`, `npm ci`, `npm run build`, restart,
-then the health and build-identity checks that procedure requires. Migrations 111-117 can stay in
+Production uses the release route (`docs/deployment.md` §3a, §11; AFLDB-ISSUE-329, installed
+2026-10-31). `PREV` is the retained release that `previous` names, recorded at the start of the
+window as its release id `<rev12>-<BUILD_ID>`. Switch back to it without rebuilding, as arm from the
+serving checkout with the unit's pinned Node:
+
+```bash
+node deploy/release.mjs rollback                # or: rollback --to <PREV release id>
+sudo systemctl restart afldb                     # owner
+node deploy/release.mjs status --expect <PREV release id>
+bash deploy/post-install-check.sh <PREV release id>
+```
+
+Never check out, `npm ci` or `npm run build` in the serving checkout to roll back: that deletes the
+live bundle first (AFLDB-ISSUE-329). The frozen 2026-10-30 execution package keeps its in-place text
+as the record of what was approved then. Migrations 111-117 can stay in
 place: `PREV` never reads or writes the six new tables, and the tables hold no row that `PREV` needs
 (validated for 111-117 on 2026-10-30, §4.5).
 
@@ -104,7 +116,13 @@ automatically.
 
 ### 4.4 Verification gate R4
 
-`PREV`'s health and build-identity checks pass; `systemctl is-enabled afldb-email-intake.timer`
+`node deploy/release.mjs status --expect <PREV release id>` prints `STATUS PASS` and appends
+`status-pass` to `events.log`: the service process runs in `PREV`'s release directory, `PREV`'s
+`_buildManifest.js` answers 200, the release rolled back from answers 404, and `/api/health` is
+`ok`/`ok`. This replaces the earlier `x-afldb-build` header gate, which production does not emit
+(`AFLDB_TRACE_REQUESTS` is off). `deploy/post-install-check.sh` then passes; a public `CACHE` line
+for the release rolled back from is an old Cloudflare cache HIT and is not a failure, because the
+same script proves that build absent at the origin. `systemctl is-enabled afldb-email-intake.timer`
 prints what the owner decided; the AFL Tables and AFL API timers are in the state they had before
 the window (V2 never changes them; ISSUE-316 owns them).
 
