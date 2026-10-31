@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-015 closed: Coleman derived against stored winners on the production archive (2026-10-31)
+
+- Records only; no capture, test, build, database access, publication or deployment. On production archive
+  `a4641ca0…`, winners derived from match goal facts agree with the stored winners in **46 of 46 seasons
+  (1980-2025): 0 disagree, 0 not derivable**, before and after migrations 111-117 (shadow log, and the retained
+  season-level reports of the 2026-10-30 rehearsal, `486bc1f5…` / `0e4775dc…`). There was no disagreement row
+  to review. The parity `coleman` check (46 compared, 0 findings) is a separate, preservation-only result.
+- Limits: an internal consistency check (both sides are AFL Tables-lineage data in one database); no tie in range,
+  so tie handling is covered by synthetic tests only; nothing was published. Brownlow (V2-GAP-016) is unchanged.
+- Gap register recounted from the table rows: 38 total / 27 closed / 11 open. `known-gaps.md`, `go-no-go.md`
+  (criterion 8), RISK-11 and `shadow-rehearsal.md` §10 updated. ISSUE-316 stays open; ISSUE-327 stays parked.
+
 ### V2-GAP-026 closed on rehearsal evidence; no production rollback exercised (2026-10-31)
 
 - Records only; nothing was run, built, pushed or deployed. The gap's written criteria are met by rehearsals:

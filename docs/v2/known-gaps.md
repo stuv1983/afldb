@@ -19,9 +19,10 @@ application rollback. The historical Launch F counts below are retained as histo
 **Gap 026 was CLOSED on rehearsal evidence on 2026-10-31** (entry below): the criteria are met by rehearsals on
 production-derived data. **No rollback has been exercised on production**; the retained release is an available
 target, not an exercised one.
-Current register: **38 total / 26 closed / 12 open**, counted from the table rows on 2026-10-31. The 2026-10-31
+**Gap 015 was CLOSED on retained evidence on 2026-10-31** (entry below).
+Current register: **38 total / 27 closed / 11 open**, counted from the table rows on 2026-10-31. The 2026-10-31
 production execution (D-V2-PROD-EXEC-1) had already closed 007 and 013 (table 25 / 13); the sentence below still read
-23 / 15 and was not updated then. Closing 026 makes 26 / 12.
+23 / 15 and was not updated then. Closing 026 made 26 / 12, and closing 015 makes 27 / 11.
 Earlier recount: **38 / 23 / 15**, counted from the table rows on 2026-10-30 after the owner's
 D-V2-VISUAL-1 verdict (D-V2-LOCK-1, 2026-10-29) closed 022. Before it: 38 / 22 / 16, after the
 release-hardening fix closed 036, 037 and 038 locally. The candidate visual recapture (D-V2-VISUAL-RECAPTURE-1)
@@ -64,7 +65,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-012 | Medium | legacy runtime | no | **CLOSED (Launch F)**: helpers moved to `settle-shared.ts`, both edges removed from the ratchet, settle integration suites pass on isolated PG16 | none |
 | V2-GAP-013 | High | legacy runtime | **cutover** | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: in the approved window, `afldb-email-intake.service` and `.timer` were `not-found` and inactive at every writer check (initial, freeze and close), so step 4 had nothing to disable; live `POST /api/admin/email-intake` answered 410 at Stage 13. The three changed integration suites ran in the full Linux default workflow on 2026-10-28, whose only failures were `gridley-corpus` (V2-GAP-029) | none |
 | V2-GAP-014 | Low | legacy quarantine | no | **CLOSED locally**: acquisition implementations quarantined, refusing old entry points; deterministic rebuild retained and verified | no live retirement authorised |
-| V2-GAP-015 | Medium | Coleman | reconciliation | open, narrowed (Launch F): 46/46 seasons (1980-2025) agree on the locally rebuilt history; production data not compared | approve the shadow Coleman capture on the production dump (§4/§8) |
+| V2-GAP-015 | Medium | Coleman | reconciliation | **CLOSED on retained evidence (2026-10-31)**: winners derived from match goal facts on production archive `a4641ca0…` agree with the stored winners in 46/46 seasons (1980-2025), 0 disagree, 0 not derivable; unchanged after migrations 111-117. No publication occurred | none |
 | V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed: atomic audited public publication implemented; 98/98 local seasons agree, none unresolved; archive-scoped migration evidence accepted (D-V2-BROWNLOW-ALT-1: stored-only, identical 98-season before/after; D-V2-BROWNLOW-ALT-3 for current-production archive `a4641ca0…`, 2026-10-29, migration evidence only, privileges 42/43 not waived) and an **authentic 2025 API snapshot reconciles** (207/207 matches, 188 players, 621 votes, totals, ranks and winner; [record](brownlow-authentic-reconciliation-2026-10-20.md)) **except 12 players the provider marks ineligible whom the stored table holds eligible (policy/rulings approved under D-V2-BROWNLOW-ELIGIBILITY-1; the tri-state runtime is implemented locally and isolated-verified ([record](brownlow-eligibility-implementation-2026-10-20.md)); production recording and rollout pending; exact citations preserved: [ruling](brownlow-eligibility-ruling-2026-10-20.md))** | review the local runtime commit and **new migration 117**; separately approve schema installation (116 + 117), exact production recording and reconciliation acceptance ([checklist](release-requirements-checklist-2026-10-20.md) item 1) |
 | V2-GAP-017 | Medium | Stage 4-5 SQL | no | **CLOSED (Launch F)**: 111-114 applied, privileges run, `privileges` and awards integration suites pass, operations pages rendered (isolated PG16) | none |
 | V2-GAP-018 | Low | curated awards | no | **CLOSED (Launch F)**: `reviseApprovedProposal` (ADR 0008), PostgreSQL-tested | none |
@@ -411,6 +412,38 @@ award results must be shown reconcilable before production; **no** — not a pro
   isolated `afldb_test` to prove it still completes.
 
 ## V2-GAP-015 — The Coleman derivation has run on synthetic inputs only
+
+- **CLOSED on retained evidence, 2026-10-31.** A records change: no capture, test, build or database access was
+  made to close it. The written close condition was to derive the sealed seasons' winners from goal facts on an
+  isolated copy, run the comparison report, and review every `disagree` and `not_derivable` row before any
+  publication. All three are met on production data.
+  - **Derivation against stored winners.** `shadow-award-reports.ts coleman` (read only, repeatable read, rolled
+    back) derives each season's winner from `matches` and `player_match_stats` goals
+    (`loadColemanDerivationInput`) and compares it with the `award_winners` rows (`loadStoredColemanWinners`), two
+    separate loaders. Result on the restored production archive `a4641ca0…` (writers-active snapshot, ledger 110):
+    **seasons 46, agree 46, disagree 0, not derivable 0**, before and after migrations 111-117
+    (`shadow.log` lines 98 and 144 of `evidence/current-production-shadow/run-20261028T192336Z/`; report
+    hashes `94da1e1b…` and `0f69eb93…` in its `evidence-sha256.txt`; the two report files stayed on the host).
+  - **Season-level detail, retained.** The same archive was re-derived on 2026-10-30 in the P-3 rehearsal on a
+    separate isolated cluster (`afldb_v2_shadow_pxfrozen_test`): `rehearsal-evidence/before.coleman.json`
+    (`486bc1f5…`) and `postmig.coleman.json` (`0e4775dc…`) under
+    `evidence/production-execution-20261030/run-20261030T020000Z/`. Re-read for this record: 46 seasons 1980-2025,
+    each `agree`, `derivationVersion` `v2.coleman.1`, one derived winner equal to the one active stored winner
+    (player id and source record), `missing`, `extra`, `duplicates` and `refusal` all empty, no stored season
+    without an outcome. The two files are identical apart from `generatedAt`.
+  - **Disposition of every disagree / not_derivable season.** There are none. The review required by the close
+    condition has nothing to review; no row was waived, accepted or deferred.
+  - **Preservation is a separate result.** The parity `coleman` check
+    (`migration.parity.json`: 46 before, 46 after, 46 compared, 0 failures, 0 findings) shows only that the reports
+    did not change across the migrations. It would have said the same of a report full of disagreements (those would
+    appear as `info` findings, and there were none). The derivation result above is what shows the stored winners
+    are the derived ones.
+  - **Limits.** Derived and stored winners both come from AFL Tables-lineage data in the same database, so this is
+    an internal consistency check, not an independent external check. Seasons 1980-2025 only (the 2026 season is in
+    progress). The snapshot is writers-active, with a ledger identical before and after. No season in range has a tie,
+    so tie handling is covered by synthetic tests only. Nothing was published: `derived_award_results` has 0 rows
+    in the archive after migration, and publication remains a separate, audited operation. Brownlow is V2-GAP-016.
+- Earlier text, kept as history:
 
 - **Launch F (2026-10-19).** `shadow-award-reports.ts coleman` on the locally rebuilt history (1980-2025) reports agree 46, disagree 0, not derivable 0. Comparing production data still needs the shadow rehearsal.
 - **What.** `deriveColeman` and the comparison report (`@afldb/derived`, ADR 0006) are tested on
