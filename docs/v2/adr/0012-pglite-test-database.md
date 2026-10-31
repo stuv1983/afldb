@@ -45,4 +45,6 @@ New V2 migrations and transactional services get executed proofs on PostgreSQL 1
 (constraints, foreign keys, rollback). Those proofs do not cover the production roles, grants,
 `afldb_meta` registry functions, extensions (`pg_trgm`, `unaccent`) or the interaction with the
 existing 110-migration schema; V2-GAP-009 (transactional preservation of the AFL API settle on
-PostgreSQL) stays open because PGlite is deliberately not extended to that schema (R-017).
+PostgreSQL) stayed open at the time because PGlite is deliberately not extended to that schema (R-017). It was
+closed on 2026-10-31 by running the settle suites on guarded isolated PostgreSQL instead (`known-gaps.md`), not by
+extending PGlite; this ADR's decision is unchanged.

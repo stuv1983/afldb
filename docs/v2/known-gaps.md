@@ -20,9 +20,12 @@ application rollback. The historical Launch F counts below are retained as histo
 production-derived data. **No rollback has been exercised on production**; the retained release is an available
 target, not an exercised one.
 **Gap 015 was CLOSED on retained evidence on 2026-10-31** (entry below).
-Current register: **38 total / 27 closed / 11 open**, counted from the table rows on 2026-10-31. The 2026-10-31
+**Gap 009 was CLOSED on retained evidence on 2026-10-31** (entry below): its written criterion is met by the local
+and Linux runs on guarded isolated PostgreSQL. **No settle suite has been replayed on a production-dump clone**; that
+is recorded as a stated limit, not waived (entry below).
+Current register: **38 total / 28 closed / 10 open**, counted from the table rows on 2026-10-31. The 2026-10-31
 production execution (D-V2-PROD-EXEC-1) had already closed 007 and 013 (table 25 / 13); the sentence below still read
-23 / 15 and was not updated then. Closing 026 made 26 / 12, and closing 015 makes 27 / 11.
+23 / 15 and was not updated then. Closing 026 made 26 / 12, closing 015 made 27 / 11, and closing 009 makes 28 / 10.
 Earlier recount: **38 / 23 / 15**, counted from the table rows on 2026-10-30 after the owner's
 D-V2-VISUAL-1 verdict (D-V2-LOCK-1, 2026-10-29) closed 022. Before it: 38 / 22 / 16, after the
 release-hardening fix closed 036, 037 and 038 locally. The candidate visual recapture (D-V2-VISUAL-RECAPTURE-1)
@@ -59,7 +62,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open | decide on database-level seal enforcement |
 | V2-GAP-007 | Medium | historical baseline | rehearsal | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: the owner-authorised read-only production runs produced the real-baseline manifest before (`4060c929…`, ledger 110) and after (`ba1d5c64…`, ledger 117) the release; both are 32 tables and 1,380 buckets, kept outside the repository in the host release directory; gate M sealed scope identical. Isolated repeat runs were already identical (Launch F) | none |
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
-| V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed: the two formerly name-pinned files pass locally and on Linux (2026-10-28: backtest 6/6, state-b 1/1, under the guarded isolated target); strict isolated proofs replace the name pin | production-dump replay under the same guarded target contract |
+| V2-GAP-009 | Medium | AFL API promotion | rehearsal | **CLOSED on retained evidence (2026-10-31)**: all seven AFL API integration files executed on guarded isolated PostgreSQL, **124/124 passed, 0 skipped** locally (`local-supported-tests-delivered.json`, 73 + 21 + 16 + 6 + 4 + 3 + 1), including the transaction-rollback and preservation cases; the Linux run (PG 16.15, 2026-10-28) records them passing with no failure or refusal. Stated limit: **not replayed on a production-dump clone** | none (production-dump replay is a recorded limit, RISK-03) |
 | V2-GAP-010 | Medium | AFL API coverage | no (coverage is not claimed) | open: 2012-2025 API coverage has no committed evidence | decide which seasons to evidence |
 | V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains. **2026-10-31 (D-V2-PROD-EXEC-1):** A-AFLT executed. The timer is disabled and inactive, the polkit rule was recorded absent, and `legacy-writers` passed (owner sudo) at Stages 3 and 13. Its close condition, the ISSUE-316 sequence, is not met | the owner's ISSUE-316 sequence (C2, the C4b PASS, C5) |
 | V2-GAP-012 | Medium | legacy runtime | no | **CLOSED (Launch F)**: helpers moved to `settle-shared.ts`, both edges removed from the ratchet, settle integration suites pass on isolated PG16 | none |
@@ -259,6 +262,59 @@ award results must be shown reconcilable before production; **no** — not a pro
   fixture pipeline is **no-go**.
 
 ## V2-GAP-009 — Transactional preservation of promoted data is not executed on PostgreSQL
+
+- **CLOSED on retained evidence, 2026-10-31.** A records change: no test, capture, build, host or database access
+  was made to close it. The written close condition was to run the AFL API integration suites against an isolated
+  `afldb_test` and record the result. Re-read for this record:
+  - **All seven files executed, assertion by assertion.** `local-supported-tests-delivered.json` (sha256
+    `f4e0e011…`; the same seven files pass identically in `local-supported-tests-complete.json`, `1dfe215d…`):
+    `settle-afl-api` 73, `-brownlow` 21, `-fixtures` 16, `-brownlow-backtest` 6, `-issue276` 4,
+    `-brownlow-reschedule` 3, `-state-b` 1 = **124 assertions, 124 passed, 0 failed, 0 skipped, 0 pending** (counted
+    from the per-assertion results, not the file totals). The `-state-b` case has a loud `ctx.skip()` when migration
+    110 is absent (State A); it reports **passed**, so it executed its body. 2026-10-20 reported the same 124/124
+    (the `final-local-regression-2026-10-20.json` file retains only the 73 of the main file).
+  - **Transaction rollback and preservation are asserted against real rows, not plans.** All passed:
+    `I244-F008` finalisation failure rolls the whole run back (no batch, no canonical, spine, ledger or observation
+    row; mirrored in `-brownlow`); `I244-F004` require-complete-source refuses before commit; the dry-run cases leave
+    no batch row; `APPLY-TIME RECHECK` refuses inside the savepoint with no match, period or player row; `I3`
+    atomicity (an audit INSERT refused by its CHECK leaves zero rows on both sides); the `I15` replay stops write
+    nothing; `P-M point 2` and `OD-5 reinstate` run inside one transaction that is always rolled back and compare the
+    database state before and after; state-B shows a Match Sheet correction surviving a re-settle with ownership
+    unchanged. The plan-level proof in `tests/v2-acquisition-replay.test.ts` (a failed unit is never planned) is a
+    separate, additional layer and is **not** counted as database proof.
+  - **Guarded isolated target.** Every one of the seven files imports `tests/integration/guard.ts`: the DSN must be
+    set and name a `_test` database, and under `tools/v2/isolated-pg.ts` (`AFLDB_V2_ISOLATED_PG=1`) it must be
+    loopback on the isolated port with the marked isolated cluster and database. The two formerly name-pinned files
+    now prove the same facts strictly (`requireAflApiBrownlowBacktestDatabase` demands the isolated runner, DSN,
+    live `current_database()`, cluster name and marker; the state-B fixture uses the guard). Those two files could
+    not have passed outside the guarded isolated runner; the name pin is replaced, not bypassed.
+  - **Supported Linux run (2026-10-28), distinct from the local run.** `linux-verification-2026-10-28.md` §§1-2:
+    streamanator, Ubuntu 24.04, PostgreSQL 16.15, Node 22.23.2, a disposable copy of the approved test baseline on
+    the guarded isolated cluster (`127.0.0.1:55461`, marker `afldb-v2-isolated-test`), not a production dump and
+    not a rebuild. The full workflow ran (303 files; S1F `c3dea709`: 14,860 passed / 3 failed / 63 skipped), and the
+    seven settle files are in neither the failure nor the refusal list. Its §2 records `settle-afl-api` **74/74**
+    (the 73 plus the V2-GAP-027 case added since), `-state-b` 1/1 and `-brownlow-backtest` 6/6; the other four files
+    are covered by the no-failure statement and are not enumerated per file. **The repository JSON
+    (`linux-verification-2026-10-28.json`, sha256 `079e7aff…`) retains only the failed and refused files and the
+    aggregate counts, so the per-file Linux counts rest on that document and the host's 134-file evidence
+    (`evidence-sha256.txt` `32114d7f…`), which is not in the repository.** The binding local evidence for the
+    124 is the per-assertion file above.
+  - **The remaining production-dump wording, reconciled.** The 2026-10-20 follow-up and the 2026-10-28 table row
+    carried "production-dump replay under the same guarded target contract" as the remainder. That was never in the
+    entry's written close condition, and `shadow-rehearsal.md` §7 itself names a rebuilt `afldb_test`, not a
+    production dump, as the authoritative integration run. It is **not** executed and is **not** claimed:
+    none of the seven files has been run on a production-dump clone. (The one settle suite found on a
+    production-derived clone is the previous release's own `settle-afl-api-brownlow` on the 117 schema, control
+    `RB6` of the 2026-10-30 rehearsal: a rollback control run from the previous release's tree, not this gap's proof.) What it would add is real-data and production-role fidelity for the settle
+    writers, which is the general limit already carried by RISK-03 and the production-dump release acceptance, not a
+    separate untested transactional property: rollback and preservation are properties of the transaction and the
+    schema the isolated target carries (migrations 001-117 with the application roles and grants); production
+    grants are the subject of the privileges suite and the release-acceptance records, not of this gap, and this
+    record does not re-verify them. This is a recorded limit. If the owner wants the settle suites replayed on a production-dump clone, that is a separate,
+    owner-approved rehearsal (S-A1, S-A5), and this gap would be reopened only if it found a difference.
+  - **Not claimed.** This closes V2-GAP-009 only. It is not an overall-green claim: V2-GAP-029 (the three Gridley
+    strict gates) and the other open gaps are unchanged.
+- Earlier text, kept as history:
 
 - **Current local follow-up (2026-10-20):** all seven AFL API integration files pass locally:
   backtest 6, Brownlow reschedule 3, Brownlow 21, fixtures 16, issue276 4, state-B 1, main 73

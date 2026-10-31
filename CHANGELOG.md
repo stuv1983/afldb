@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-009 closed: AFL API settle suites executed on guarded isolated PostgreSQL (2026-10-31)
+
+- Records only; no test, capture, build, host or database access, writer activation, deployment or push. The gap's
+  written criterion (run the AFL API integration suites against an isolated test database and record the result)
+  is met by retained evidence: all seven files, **124 assertions, 124 passed, 0 failed, 0 skipped**
+  (`local-supported-tests-delivered.json`, counted per assertion), including the transaction-rollback and
+  preservation cases (finalisation-failure rollback, require-complete refusal, apply-time recheck, atomicity, replay
+  stops, always-rolled-back reinstate, state-B ownership). Every file runs under the integration guard; the two
+  formerly name-pinned files now prove the isolated target strictly. The 2026-10-28 Linux run (PostgreSQL 16.15)
+  records the settle files passing with no failure or refusal; its repository JSON keeps only failed files, so
+  per-file Linux counts rest on its document and host evidence.
+- Limit, not waived: the settle suites have **not** been replayed on a production-dump clone. That is recorded
+  against RISK-03 and the owner's release acceptance; it was never in the gap's written close condition.
+- Gap register recounted from the table rows: 38 total / 28 closed / 10 open. V2-GAP-029 (the three Gridley strict
+  gates) stays open and no overall-green claim is made. `known-gaps.md`, `go-no-go.md` (criterion 4), RISK-03 and
+  ADR 0012 updated. ISSUE-316 stays open; ISSUE-327 stays parked.
+
 ### V2-GAP-015 closed: Coleman derived against stored winners on the production archive (2026-10-31)
 
 - Records only; no capture, test, build, database access, publication or deployment. On production archive
