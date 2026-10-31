@@ -1,0 +1,27 @@
+== identity: HEAD 23eb5fa9fdb1816b2ea1c0acac2d29b0c0dc58ab test blob 0083f4213f25c327e19ebab1b8fbd9dfe9a63fed node v22.21.0 2026-10-31T19:41:15Z
+b44b6d95c474cd6c10b607ca700f95453892afc9587b8d63f640db2e23854136 *tests/integration/v2-brownlow-production-correction.test.ts
+drop-db: afldb_v2_brownlow_policy_final_test dropped
+create-db: afldb_v2_brownlow_policy_final_test created from afldb_v2_rb_brownlow2025_test and marked
+ISOLATED TARGET OK: afldb_v2_brownlow_policy_final_test
+  PENDING  116_brownlow_correction_receipts.sql
+  PENDING  117_brownlow_provider_eligibility_unknown.sql
+
+2 pending.
+  117 migration file(s), 115 already applied
+  applying 116_brownlow_correction_receipts.sql ... ok (12 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (1 ms)
+psql:tools/maintenance/privileges.sql:899: NOTICE:  afldb_backup: pg_read_all_data needs a superuser; unchanged
+DO
+== run suite 2026-10-31T19:41:32Z
+vitest exit 0
+== summary 2026-10-31T19:58:10Z
+total 8 passed 8 failed 0 skipped 0 success true
+  PASSED: plans read-only, refuses a wrong live target and pre-apply row drift (67938 ms)
+  PASSED: rolls a failed backfill back, then applies/replays/reverses preserving all vote values and provenance (144412 ms)
+  PASSED: adopts exactly 621 positives, preserves 8901 zero rows, replays and reverses; refuses subsequent-write reversal (190933 ms)
+  PASSED: refuses premature issue resolution and unapproved or ambiguous eligibility (46050 ms)
+  PASSED: records and replays an authentic observe-only snapshot in the outer transaction (89823 ms)
+  PASSED: rolls all eligibility decisions/publication back on partial failure, then records an approved subset through the audited service (86687 ms)
+  PASSED: resolves only a genuinely healed ownership issue, atomically with its receipt and with replay (206724 ms)
+  PASSED: requires a fresh restored baseline and re-proves live identity before a historical-only correction (162814 ms)
+== done 2026-10-31T19:58:10Z

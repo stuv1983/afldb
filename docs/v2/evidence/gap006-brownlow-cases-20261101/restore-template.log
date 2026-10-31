@@ -1,0 +1,14 @@
+== hash re-check 2026-10-31T19:37:58Z
+afldb_v2_rb_brownlow2025_test.dump: OK
+acquisition-014218.tar: OK
+fixture-root.tar: OK
+template-identity.txt: OK
+== create template database (guarded) 2026-10-31T19:37:58Z
+create-db: afldb_v2_rb_brownlow2025_test created and marked
+toc entries 1640; excluded 4
+pg_restore exit 0
+analyze exit 0
+identity query exit 0
+restored template identity == exported template identity
+ISOLATED TARGET OK: afldb_v2_rb_brownlow2025_test
+== done 2026-10-31T19:38:17Z
