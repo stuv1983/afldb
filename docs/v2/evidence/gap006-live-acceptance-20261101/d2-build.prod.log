@@ -1,0 +1,8 @@
+release: admission: MemAvailable 2943 MB of 3915 MB, swap 0 MB, free disk 53.6 GB
+release: workspace /home/arm/afldb-releases/builds/20261031T233005Z-fd48ace0c2cb-85430f
+release: npm ci: 16 s, min MemAvailable 2035 MB, peak RSS 916 MB
+release: build: 225 s, min MemAvailable 1391 MB, peak RSS 1720 MB
+release: candidate fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/cb39c2e05a6b8ca6.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200"} (beta claim)
+release: RELEASE READY fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy (12995 files, manifest 2f011e790d79…) at /home/arm/afldb-releases/releases/fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+release: next: node deploy/release.mjs promote fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy

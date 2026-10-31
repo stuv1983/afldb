@@ -1,0 +1,30 @@
+[2026-10-31T23:51:53.349Z] READY: the browser shows the sign-in page. Sign in as the super admin. Waiting up to 15 minutes.
+[2026-10-31T23:57:24.380Z] visible role: Super Admin
+[2026-10-31T23:57:24.381Z] PASS role-super-admin {"role":"Super Admin"}
+[2026-10-31T23:57:28.625Z] PASS 1440x900 award-winner-new status-200 {"status":200,"url":"https://beta.afldb.com/admin/awards/winners/new"}
+[2026-10-31T23:57:28.625Z] PASS 1440x900 award-winner-new correction-note-control {"count":1,"first":{"label":"Administrative note (kept with the audit entry)","name":"adminNote","maxLength":"2000","hint":"Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.","associated":true}}
+[2026-10-31T23:57:28.626Z] PASS 1440x900 award-winner-new no-overflow {"scrollWidth":1425,"innerWidth":1440}
+[2026-10-31T23:57:28.626Z] PASS 1440x900 award-winner-new static-and-console {"staticSeen":12,"badStatic":[],"consoleErrors":[]}
+[2026-10-31T23:57:32.923Z] PASS 1440x900 draft-new-pick status-200 {"status":200,"url":"https://beta.afldb.com/admin/draft/new"}
+[2026-10-31T23:57:32.923Z] PASS 1440x900 draft-new-pick correction-note-control {"count":1,"first":{"label":"Admin note (recorded on the audit row)","name":"note","maxLength":"2000","hint":"Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.","associated":true}}
+[2026-10-31T23:57:32.924Z] PASS 1440x900 draft-new-pick no-overflow {"scrollWidth":1425,"innerWidth":1440}
+[2026-10-31T23:57:32.924Z] PASS 1440x900 draft-new-pick static-and-console {"staticSeen":11,"badStatic":[],"consoleErrors":[]}
+[2026-10-31T23:57:37.237Z] PASS 1440x900 first-kick-goal-new status-200 {"status":200,"url":"https://beta.afldb.com/admin/records/first-kick-goal/new"}
+[2026-10-31T23:57:37.237Z] PASS 1440x900 first-kick-goal-new correction-note-control {"count":1,"first":{"label":"Administrative note (kept with the audit entry)","name":"adminNote","maxLength":"2000","hint":"Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.","associated":true}}
+[2026-10-31T23:57:37.238Z] PASS 1440x900 first-kick-goal-new no-overflow {"scrollWidth":1425,"innerWidth":1440}
+[2026-10-31T23:57:37.238Z] PASS 1440x900 first-kick-goal-new static-and-console {"staticSeen":12,"badStatic":[],"consoleErrors":[]}
+[2026-10-31T23:57:40.523Z] INFO season-lists: status 200 correction-note controls 0 (screenshot only; not a pass/fail gate)
+[2026-10-31T23:57:44.147Z] INFO player-links: status 200 correction-note controls 0 (screenshot only; not a pass/fail gate)
+[2026-10-31T23:57:48.755Z] PASS 390x844 award-winner-new status-200 {"status":200,"url":"https://beta.afldb.com/admin/awards/winners/new"}
+[2026-10-31T23:57:48.756Z] PASS 390x844 award-winner-new correction-note-control {"count":1,"first":{"label":"Administrative note (kept with the audit entry)","name":"adminNote","maxLength":"2000","hint":"Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.","associated":true}}
+[2026-10-31T23:57:48.757Z] PASS 390x844 award-winner-new no-overflow {"scrollWidth":375,"innerWidth":390}
+[2026-10-31T23:57:48.757Z] PASS 390x844 award-winner-new static-and-console {"staticSeen":12,"badStatic":[],"consoleErrors":[]}
+[2026-10-31T23:57:52.990Z] PASS 390x844 draft-new-pick status-200 {"status":200,"url":"https://beta.afldb.com/admin/draft/new"}
+[2026-10-31T23:57:52.990Z] PASS 390x844 draft-new-pick correction-note-control {"count":1,"first":{"label":"Admin note (recorded on the audit row)","name":"note","maxLength":"2000","hint":"Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.","associated":true}}
+[2026-10-31T23:57:52.991Z] PASS 390x844 draft-new-pick no-overflow {"scrollWidth":375,"innerWidth":390}
+[2026-10-31T23:57:52.991Z] PASS 390x844 draft-new-pick static-and-console {"staticSeen":11,"badStatic":[],"consoleErrors":[]}
+[2026-10-31T23:57:57.189Z] PASS 390x844 first-kick-goal-new status-200 {"status":200,"url":"https://beta.afldb.com/admin/records/first-kick-goal/new"}
+[2026-10-31T23:57:57.189Z] PASS 390x844 first-kick-goal-new correction-note-control {"count":1,"first":{"label":"Administrative note (kept with the audit entry)","name":"adminNote","maxLength":"2000","hint":"Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.","associated":true}}
+[2026-10-31T23:57:57.190Z] PASS 390x844 first-kick-goal-new no-overflow {"scrollWidth":375,"innerWidth":390}
+[2026-10-31T23:57:57.190Z] PASS 390x844 first-kick-goal-new static-and-console {"staticSeen":12,"badStatic":[],"consoleErrors":[]}
+[2026-10-31T23:57:57.258Z] VERDICT PASS (25/25)
