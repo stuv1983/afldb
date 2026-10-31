@@ -8,6 +8,10 @@ classification and baseline-112 examples below. No approved local production bac
 Prior local mechanics are retained evidence; no production-data rehearsal has occurred.
 The old full-suite/rebuild/visual examples are outside this task's execution authority.
 
+**Update, 2026-10-31:** the rehearsal has run, as executions of the reviewed packages above rather than of this
+document's command blocks. §10 holds the record and V2-GAP-026 is closed on it. The status text that follows is
+the original Stage 6 wording, kept as history.
+
 Status: written in Stage 6 (Launch E, 2026-10-19). **Every command in this document is NOT
 EXECUTED.** V2 has no database, host or network access (plan §1). The tools it names exist, are
 committed, and are unit-tested on committed synthetic inputs, fakes and in-memory PGlite only
@@ -305,19 +309,26 @@ On the shadow copy, in this order, recording each gate:
 3. **Roll forward again** with the V2 checkout (§5) to prove the ledger rows were removed correctly
    (111/112 apply again cleanly).
 
-## 10. Rehearsal record (fill in; nothing below has happened)
+## 10. Rehearsal record (filled in 2026-10-31; closes V2-GAP-026)
+
+Filled from retained evidence only; nothing was run to complete it. The rehearsal was executed as two reviewed
+packages, not as this document's command blocks. The S-A1..S-A5 labels were superseded by named owner decisions,
+listed below. S-A5 (rebuilding `afldb_test`) was not used by either run. Production was read, never rehearsed on.
 
 | Item | Value |
 |---|---|
-| V2 commit, `PREV` commit, rehearsal host, operator, date | — |
-| approvals S-A1..S-A5 (reference each) | — |
-| dump file name and sha256 | — |
-| gate results §3, §5, §6, §7a, §9 | — |
-| `npm run build` exit code, duration | — |
-| unit suite counts on Linux; integration suite counts | — |
-| parity verdict and `parity.json` sha256; every FAIL with the owner's reconciliation | — |
-| visual verdict per screen (or VISUAL: UNVERIFIED) | — |
-| Coleman disagreements reviewed; Brownlow outcomes reviewed | — |
+| V2 commit, `PREV` commit, rehearsal host, operator, date | **Run 1 (current-production shadow):** shadow source `c478c31b2ad84719907e0372d1b94230d3a4c508`, session HEAD `b144ee9a` on `v2/rebuild`; `PREV` `ff100dc2`; isolated cluster `127.0.0.1:55467` on streamanator; Claude Code session under owner approval, 2026-10-28T19:23Z capture and 19:45–20:00Z shadow. **Run 2 (window rehearsal):** reviewed commit `9ed9c9dd3e84682c43e96c46e98974b245eb54ed`; isolated cluster `127.0.0.1:55491` on streamanator; preparation controls 2026-10-30, in-window rehearsal 2026-10-31 (611 s); owner sudo steps by the owner |
+| approvals (reference each) | D-V2-CURRENT-SHADOW-CAPTURE-1 (the restore and the isolated databases, standing in for S-A1, S-A2, S-A3). D-V2-CURRENT-SHADOW-FOLLOWUP-1 and D-V2-CURRENT-ACCEPTANCE-RUN-1 (bounded follow-up and the acceptance run). D-V2-CURRENT-REHEARSAL-1, D-V2-CURRENT-SCHEMA-1, D-V2-BROWNLOW-ALT-3 (owner acceptance, 2026-10-29, [text](owner-decision-current-rehearsal-2026-10-29.md) §1). D-V2-PROD-EXEC-1 (window; O-ISO streamanator, O-RB a; Gate D owner GO 2026-10-31 08:43 AEDT). The build and run of S-A4 were not rehearsed here: the application was built and served through the later production route |
+| dump file name and sha256 | Run 1: `afldb_prod-20261028T192336Z.dump`, `a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc`, 29,781,203 bytes, 1,549 TOC entries; sidecar `72f00046…`; shadow evidence manifest `ea197fcf40c1b27108bebb1cc9b0a6523e8d79804952f77610f5f4606ac8ac75` (writers-active snapshot; **not** a rollback baseline). Run 2: frozen `afldb_prod-20261031-082655.dump`, `599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb`, 29,781,936 bytes; post-schema `afldb_prod-20261031-084435.dump`, `3f5b5339…` |
+| gate results §3, §5, §6, §7a, §9 | §3 restore: ledger 110/110 equals the sidecar (Run 1 S4); frozen restore proven 9/9 on the host (Run 2 Stage 5). §5: pending exactly 111–117, applied 7, privileges OK, 0 pending (Run 1 S5); A-REL 111–117, read-back 12/12, ledger 117 digest equal to the rehearsal's, Gate V2 IDENTICAL (production, Run 2). §6 and §7a: see the next three rows. **§9 (rollback):** code rollback on the 117 schema, production-derived clone, controls RB1–RB7 PASS, within 112/112 (`evidence/production-execution-20261030/run-20261030T020000Z/controls-run3-final/`); release-route rollback F6 and R8 ([ISSUE-329](../../issues/closed/AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md) §2); database reversal 111–115 and recovery on a populated synthetic copy, 2026-10-20 ([record](rollback-populated-rehearsal-2026-10-20.md)); the §5.1 re-forward is the Run 2 A-REL sequence. Schema reversal at 116/117 is not rehearsed and not offered (see `rollback-runbook.md` §5) |
+| `npm run build` exit code, duration | Not rehearsed on the shadow copies. Production, first host build: attempt 1 died of JavaScript heap exhaustion in the type-check phase (in place, which destroyed the serving bundle); attempt 2 exit 0 with a 3,072 MB heap, `BUILD_ID` `QNEHXAtU53TzUjj0Mb7mv` ([record](production-execution-record-2026-10-31.md) §4). Through the release route: `next build` 234 s, `RELEASE READY` (ISSUE-329 B1) and 227 s (ISSUE-330 D2) |
+| unit suite counts on Linux; integration suite counts | Linux, `c3dea709`: 14,860 passed / 3 failed / 63 skipped, the 3 being the listed `gridley-corpus` cases (V2-GAP-029) ([verification](linux-verification-2026-10-28.md)). On `a4641ca0`: units 508/508, eligibility integration 47/47, privileges integration 42/43 (absent staging defaults, not waived). Run 2 T: privileges 43/43 on an isolated clone after the A-REL sequence, no test on production |
+| parity verdict and `parity.json` sha256; every FAIL with the owner's reconciliation | `v2.parity.1` on `a4641ca0…`: **FAIL**, 3 pass / 1 fail / 1 incomplete. Passing: `historical_manifest`, `coleman`, `coverage`. Failing: `table_row_counts`, only `UNEXPECTED_TABLE_ADDED public.brownlow_correction_receipts` (0 rows, migration 116). Incomplete: `brownlow` (`INPUT_MISSING`; production has no staged seasons). **Reconciled in writing by the owner, 2026-10-29:** the 116 table by D-V2-CURRENT-SCHEMA-1 (owner-only ACL, PUBLIC EXECUTE on the mutation guard disclosed, 117's nullable `eligible`); the incomplete Brownlow check by D-V2-BROWNLOW-ALT-3 as alternative migration evidence, not API reconciliation. The strict verdict itself is unchanged and stays FAIL; the acceptance run gives `migrationCompatibility` PASS ([report](evidence/current-rehearsal-acceptance-2026-10-29.json)). Report files are under `evidence/current-production-shadow/run-20261028T192336Z/` (`COMMITTED-SHA256SUMS`); `parity.json`'s own hash is in that manifest and was not recomputed for this record. On the real release, Gate M: sealed scope identical (manifest after `ba1d5c64…`) |
+| visual verdict per screen (or VISUAL: UNVERIFIED) | Not part of these two runs. The owner accepted all presented screens and states on the corrected candidate (D-V2-VISUAL-1, 2026-10-29; synthetic UI evidence). Production Admin live acceptance 2026-10-31: 10/12, the two failures being the harness's own assertions, accepted by the owner |
+| Coleman disagreements reviewed; Brownlow outcomes reviewed | Coleman: 46 of 46 seasons compared with 0 findings between before and after in the shadow; the pass is a comparison of before to after, not a reconciliation of award winners against an independent source (V2-GAP-015 stays open). Brownlow: production holds no staged seasons, the comparator is INCOMPLETE and was accepted only as alternative migration evidence; authentic API reconciliation is not established (V2-GAP-016 stays open, `brownlowOperationalReconciliation` OUTSTANDING) |
+
+**Not shown by this record:** a rollback exercised on production; the Caddy and TLS path of a rollback; schema
+reversal at ledger 116 or 117; Brownlow or Coleman correctness on authentic production reconciliation.
 
 ## 11. Teardown
 

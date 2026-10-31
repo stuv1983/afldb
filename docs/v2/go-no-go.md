@@ -8,7 +8,10 @@
 - Deployment defect: AFLDB-ISSUE-329, resolved 2026-10-31. Production now serves `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`
   (revision `61a95f73`, `BUILD_ID` `JYIBkYn8ynPgYMn1e5nK-`), built through the release route.
 - [Execution record](production-execution-record-2026-10-31.md). The verdicts below predate the release and are kept
-  as history.
+  as history, except where a row is marked with a 2026-10-31 update.
+- **Rollback (V2-GAP-026), 2026-10-31: closed on rehearsal evidence, not exercised on production.** See
+  `shadow-rehearsal.md` §10 and `rollback-runbook.md` §7. Production has moved forward only; the retained `previous`
+  release is an available target. An optional production drill is described there and is the owner's call.
 
 **Current decision package, 2026-10-28:** [release decision package](release-decision-package-2026-10-28.md).
 It separates stages A (inert V2 installation), B (schema/data acceptance), C (source retirement and
@@ -160,7 +163,7 @@ deployed.**
 | Decision | Verdict | Why |
 |---|---|---|
 | Continue local development | **GO** | Launch F is committed, and the local gates hold at its close. tsc is 0. The full suite (run once, no DSN) has 98 failing lines, none of them a code regression: 92 are baseline lines; 4 are new integration files that need a DSN, like the other integration files; 1 is a frozen DraftGuru sample that is environmental (`final-report.md` §3); 1 was a real regression, fixed and re-verified. Repo-wide ESLint is 235 errors / 131 warnings, under the 253/132 ceiling, with no new finding. The isolated PG16 cluster gives every developer-run integration suite a real database without touching a shared one |
-| Run the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`) | **GO, conditional** on the owner's approvals S-A1..S-A5 (§4.1). It touches no production system: it restores a dump into `afldb_v2_shadow_test` on a rehearsal host | Launch F ran the mechanics end to end on isolated PG16 with locally rebuilt data, and both passed: the guard, the captures, 111-114 with privileges, and parity (PASS 5/5) for one; the database reversal and re-forward (schemas identical) for the other. What remains is exactly what needs real data or a host: the production-dump parity, the backup and the application rollback (V2-GAP-026) |
+| Run the isolated shadow rehearsal (`docs/v2/shadow-rehearsal.md`) | **GO, conditional** on the owner's approvals S-A1..S-A5 (§4.1). It touches no production system: it restores a dump into `afldb_v2_shadow_test` on a rehearsal host | Launch F ran the mechanics end to end on isolated PG16 with locally rebuilt data, and both passed: the guard, the captures, 111-114 with privileges, and parity (PASS 5/5) for one; the database reversal and re-forward (schemas identical) for the other. What remains is exactly what needs real data or a host: the production-dump parity, the backup and the application rollback (V2-GAP-026). *(Update 2026-10-31: all three have since run, as rehearsals on production archives; V2-GAP-026 is closed and `shadow-rehearsal.md` §10 is filled in.)* |
 | Production cutover (V2 release and the AFL API cutover) | **NO-GO** | Production-only blockers remain: V2-GAP-008: ISSUE-229 B2 is uncaptured, because no 2027 season exists yet; V2-GAP-011 and V2-GAP-013: the legacy timers are still enabled on the host. The preflight refuses the release until they are disabled under A-AFLT/A-REL; The real-data rehearsal and the application rollback have not run; Award results are not shown reconcilable on production data (V2-GAP-015/016); The ISSUE-316 production gates are unsatisfied, and D-316-13 has not been approved after a deployed C4 (§3) |
 
 V2 is **implemented and verified locally on isolated PostgreSQL 16, and not shadow-ready in the
@@ -185,7 +188,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | 12 | Admin operations are narrow, permissioned and audited | **met**, isolated PG16 | capability guards and audit rows (Stage 5); `privileges.test.ts` and the awards suites pass on PG16; pages rendered for Admin and Super Admin |
 | 13 | Tests, type checking and linting pass | **NOT GREEN: see final assertion-level evidence** | `local-release-review.md` records the complete workflow and residual test identities. Typecheck and production build pass. Changed-file lint has 0 new findings but inherited errors remain. **Re-measured at `461f4372` (2026-10-29, D-V2-RESIDUALS-1): 508 errors / 136 warnings / 0 fatal**; 0 new findings in `src/`/`packages/`, all 279 since 2026-10-20 in tests, tools and retained issue evidence ([record](release-residuals-2026-10-29.md)). Recorded as a known, open residual, not a pass. No failure-line-count comparison is accepted as a pass. |
 | 14 | Production access is not needed to run the test suite | **met** | ADR 0005: the test setup strips DSNs and refuses any non-`_test` database |
-| 15 | Migration, comparison, rollback and cutover instructions are complete | **met**; application rollback and populated-ledger DB reversal/recovery rehearsed on an isolated copy (not a production dump) | `cutover-runbook.md` (now with step 4a and 111-114), `rollback-runbook.md` §5 (111-114) and §7 record; V2-GAP-026 |
+| 15 | Migration, comparison, rollback and cutover instructions are complete | **met**; (2026-10-31) application rollback rehearsed on the 117 schema with production-derived data and through the release route; backup and restore proven on the production dump; database reversal rehearsed through 115 only. **No rollback has been exercised on production** (V2-GAP-026 closed on rehearsal evidence) | `cutover-runbook.md` (now with step 4a and 111-114), `rollback-runbook.md` §5 (111-114) and §7 record; V2-GAP-026 |
 | 16 | No secrets are committed | **met** | no `.env*` beyond `.env.example`; DSNs in tests are synthetic placeholders; closure scans at every stage |
 | 17 | No production action has occurred | **met** | (Update 2026-10-30: V2 now has `origin`, and `main`/`v2/rebuild` were pushed under D-V2-PUSH-ROUTE-1. A Git push is not a production action.) Originally: V2 has no remote; no production or shared database, ssh, deploy or service command was run in any launch. Launch F's only network use was one read-only GET of the public AFL API compSeasons list |
 
@@ -202,7 +205,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | Admin actions can bypass validation, permissions or auditing | no (code, tests, isolated PG16) | Stage 5 closure; V2-GAP-017 closed |
 | Runtime still depends on legacy ingestion | **yes on the host, blocks**: the code refuses, but the timers remain enabled until the release window | V2-GAP-011, 013; cutover runbook step 4a |
 | Shadow comparison thresholds are undefined | no: policy `v2.parity.1` | `shadow-rehearsal.md` §8 |
-| Rollback is untested or unclear | **host and production-dump rollback untested: blocks** (application rollback and populated-ledger reversal/recovery rehearsed on an isolated copy, 2026-10-20) | `rollback-runbook.md` §7, V2-GAP-026 |
+| Rollback is untested or unclear | **no longer blocks V2 (2026-10-31)**: rehearsed on production-derived data and through the release route, backup and restore proven on the production dump; V2-GAP-026 closed. Stated limits: never exercised on production, no retained pre-V2 release, reversal not rehearsed at ledger 116/117, Caddy/TLS path not rehearsed. The ISSUE-316 writer-activation rollback is separate and still blocks that cutover | `rollback-runbook.md` §7, V2-GAP-026 |
 | ISSUE-316 production gates remain unsatisfied | **yes, blocks** | `issues/open/AFLDB-ISSUE-316.md` §7-§8 |
 | D-316-13 not separately approved after the required C4 result | **yes, blocks** | ISSUE-316 §7 C4b |
 

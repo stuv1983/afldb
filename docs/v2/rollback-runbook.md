@@ -1,8 +1,9 @@
 # AFLDB V2 — backup and rollback runbook
 
-Status: production steps **NOT EXECUTED**. Local database reversal was demonstrated at Launch F;
-application rollback was demonstrated on this workstation in the local-release follow-up
-(`local-release-review.md`). No host/service or production step was executed. Every production step needs
+Status (2026-10-31): **rehearsed, not exercised on production** (V2-GAP-026 closed on that basis; §7). Production has
+only moved forward, so no production rollback has run. Its available targets are the retained releases that
+`node deploy/release.mjs status` lists and the verified frozen and post-schema dumps; an available target is not an
+exercised rollback. The backup of §2 was executed for the 2026-10-31 window. Every production step needs
 the owner's explicit approval for that window (`docs/v2/go-no-go.md` §4), and the ISSUE-316 gates
 (`issues/open/AFLDB-ISSUE-316.md` §7-§8) are separate owner decisions that this rebuild neither
 grants nor satisfies.
@@ -70,7 +71,7 @@ only the variable named by `--dsn-env`.
 |---|---|
 | Migration 111 or 112 fails | Nothing to roll back: each migration runs in its own transaction (`tools/db/migrate.ts:287-299`) and a failure rolls it back and records nothing. Stop the window; keep the previous code running |
 | `privileges.sql` fails | The previous code does not use the new tables, so production behaviour is unchanged. Stop; fix forward or run §5 |
-| Build fails | The previous build is still the one being served (the build runs before the restart). Stop; nothing to roll back in the database |
+| Build fails | Through the release route (`deploy/release.mjs build`, ISSUE-329) nothing is published and the serving release is untouched; stop. An in-place `npm run build` in the serving checkout is **not** safe: it clears `.next` first, and on 2026-10-31 it destroyed the serving assets. Nothing to roll back in the database |
 | The new code fails health checks, or an operations-centre page errors | §4 (code rollback). The migrations may stay |
 | A V2 table must be removed (owner decision) | §4, then §5 |
 
@@ -94,7 +95,13 @@ Never check out, `npm ci` or `npm run build` in the serving checkout to roll bac
 live bundle first (AFLDB-ISSUE-329). The frozen 2026-10-30 execution package keeps its in-place text
 as the record of what was approved then. Migrations 111-117 can stay in
 place: `PREV` never reads or writes the six new tables, and the tables hold no row that `PREV` needs
-(validated for 111-117 on 2026-10-30, §4.5).
+(validated for 111-117 with the previous code `ff100dc2` on a production-derived clone on 2026-10-30; §7, controls
+RB1-RB7).
+
+The retained `previous` release is a V2 build, so rolling back to it crosses no schema boundary. A pre-V2 release
+(`ff100dc2`) is **not retained** on the host (its bundle was destroyed in the 2026-10-31 incident); returning to it
+would need a fresh route build of that revision, which no record shows, and the RB controls prove only that its
+code runs on the 117 schema.
 
 ### 4.2 Expected preflight finding with the migrations left in place
 
@@ -134,6 +141,11 @@ are NOT removed: they are ordinary `award_winners` rows with their own `data_ove
 `data_edits` audit rows (migration 111 ROLLBACK block, lines 101-104), but the link from each
 winner back to its proposal, evidence and decision chain is lost once the ledger is dropped.
 `award_winners` is untouched by dropping `derived_award_results` (migration 112, lines 93-94).
+
+**Limit at ledger 116 and 117.** This reversal was rehearsed through 115 only (Launch F and the populated rehearsal,
+both before 116 and 117 existed). It has not been rehearsed with 116 and 117 applied, and 116 (append-only
+receipts) is never reversed. Do not run it on production at ledger 117 without a fresh rehearsal on a clone of the
+production-derived state. The supported recovery from data loss is §6, restoration from the verified frozen dump.
 
 Run only after §4 (the previous code is live, so nothing can write the V2 ledgers between export
 and drop), only with the owner's approval, as the production owner role, from a shell whose DSN
@@ -249,3 +261,24 @@ This is a rehearsal on a synthetic populated copy, not on a production dump. §2
 backup), §4 on a host and §6 remain unrehearsed, and any V2 write between export and drop is lost.
 **The demonstrated rollback route remains the application rollback with the additive schema
 retained**; the database reversal is a last resort needing the owner's approval.
+
+**Update, 2026-10-31 (V2-GAP-026 closed on rehearsal evidence; full record `shadow-rehearsal.md` §10).** Where the
+paragraphs above call a step unrehearsed, this supersedes them as follows.
+
+| Step | State | Evidence |
+|---|---|---|
+| §2 backup | **Executed for real** in the 2026-10-31 window: frozen dump `599e32a1…`, restore proven 9/9 on the host, off-host copies verified on the workstation and streamanator, re-verified at Stage 14 | `production-execution-record-2026-10-31.md` §2, §5 |
+| §4 code rollback, previous code on the 117 schema | **Rehearsed** on streamanator against a clone of the production-derived after-state: ledger accepted, exactly 111-117 unknown-applied, health 200, 18 route and permission checks, Brownlow writer suite, `privileges.sql` completes (RB1-RB7, controls 112/112, 2026-10-30). The build there ran in a private worktree, so it could not show the in-place flaw above | `evidence/production-execution-20261030/run-20261030T020000Z/controls-run3-final/` |
+| §4.1 release-route rollback | **Rehearsed** on a stand-in systemd 255 unit and in the package dress rehearsal (F6, R8), and in the 25/25 route suite (L8): no build, `npm` or Git; `status --expect` PASS. Not run on the production unit, not through Caddy or TLS (the dress rehearsal used a loopback `PUBLIC`) | `issues/closed/AFLDB-ISSUE-329.md` §8-§8a; `issues/closed/AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md` §2 |
+| §5 reversal | Rehearsed through 115 only; see the limit at ledger 116 and 117 in §5 | above |
+| §6 full restore | The restore procedure is proven into a scratch database (host and isolated); a restore over production has not been run and should not be | Stage 5, Stage 7 |
+
+**Exercised versus available.** No production rollback has run. Production has moved forward only (V2 adoption,
+ISSUE-329 first route build, ISSUE-330), and ISSUE-330's rollback branch D5 was "not used". Current targets:
+`61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` (the `previous` release, one recorded `status-pass`) and
+`9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv`. An optional drill, with the owner's approval for a window, is
+`node deploy/release.mjs rollback`, an owner restart, `status --expect <PREV id>`, `bash deploy/post-install-check.sh <PREV id>`,
+then return with `node deploy/release.mjs rollback --to <current id>` (a mistaken rollback is reversed the same way, INSTALLATION.md) and run the same checks again. Pace the two restarts 30 s apart
+(ISSUE-329 O2). It is not a close condition for V2-GAP-026.
+
+The AFL API writer activation (ISSUE-316) has its own rollback and roll-forward rules and is not covered here.

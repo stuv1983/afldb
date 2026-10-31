@@ -125,7 +125,7 @@ isolated PostgreSQL. It is not shadow-tested on production data and not cut over
 independent verifier (`docs/v2/progress.md`). Production cutover is **NO-GO** (`go-no-go.md`):
 three structural cutover blockers are open (V2-GAP-008 AFL API fixtures, 011 the AFL Tables
 nightly settle, 013 the email-intake timer), the isolated shadow rehearsal has never run
-(V2-GAP-026), award results are not yet shown reconcilable (V2-GAP-015/016), and ISSUE-316's
+(V2-GAP-026; closed 2026-10-31, and this sentence is the Launch F state), award results are not yet shown reconcilable (V2-GAP-015/016), and ISSUE-316's
 production gates, including D-316-13, are unsatisfied.
 
 | Item | Value |
@@ -236,7 +236,7 @@ Full table with the owner action per gap: `docs/v2/known-gaps.md`. Production bl
 4. RISK-04 the production build has never run (V2-GAP-002).
 5. RISK-05 the workstation hook hazard in the source worktree (V2-GAP-004).
 6. RISK-06 the email-intake timer keeps polling until the release window (V2-GAP-013).
-7. RISK-07 rollback is untested (V2-GAP-026).
+7. RISK-07 rollback is untested (V2-GAP-026). *(Update 2026-10-31: rehearsed, not exercised on production; V2-GAP-026 is closed. See `shadow-rehearsal.md` §10.)*
 
 ## 7. Verdicts and approvals
 

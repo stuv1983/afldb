@@ -16,7 +16,13 @@ and 021 and 028 are closed locally; 016 has its publication and 98-season eviden
 open for production-dump/owner release acceptance. Gap 022 is closed by the owner's visual acceptance
 (D-V2-VISUAL-1, 2026-10-29). Gap 026 now requires the host/production-data rehearsal, not local
 application rollback. The historical Launch F counts below are retained as history.
-Current register: **38 total / 23 closed / 15 open**, counted from the table rows on 2026-10-30 after the owner's
+**Gap 026 was CLOSED on rehearsal evidence on 2026-10-31** (entry below): the criteria are met by rehearsals on
+production-derived data. **No rollback has been exercised on production**; the retained release is an available
+target, not an exercised one.
+Current register: **38 total / 26 closed / 12 open**, counted from the table rows on 2026-10-31. The 2026-10-31
+production execution (D-V2-PROD-EXEC-1) had already closed 007 and 013 (table 25 / 13); the sentence below still read
+23 / 15 and was not updated then. Closing 026 makes 26 / 12.
+Earlier recount: **38 / 23 / 15**, counted from the table rows on 2026-10-30 after the owner's
 D-V2-VISUAL-1 verdict (D-V2-LOCK-1, 2026-10-29) closed 022. Before it: 38 / 22 / 16, after the
 release-hardening fix closed 036, 037 and 038 locally. The candidate visual recapture (D-V2-VISUAL-RECAPTURE-1)
 had opened them earlier that day (38 / 19 / 19; before it, 35 / 19 / 16). It includes the
@@ -69,7 +75,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-023 | Low | Brownlow | no | **CLOSED in code, verified on a disposable clone of the authentic 2025 data (2026-10-20)**: the settle stages the API leaderboard on the observation spine and the reconciliation derives the 18-team provider-team-to-club mapping from the committed identities, corroborated by the fixtures; the operations centre shows both. Production staging still needs one operator-run settle with this code (owner action; nothing was run against production) | none for migration; the stage runs when the operator next settles a Brownlow snapshot |
 | V2-GAP-024 | Medium | curated awards | no | **CLOSED (Launch F)**: approval returns the revalidation paths and the page posts them (ADR 0008), PostgreSQL-tested | none |
 | V2-GAP-025 | Low | admin UI | no | **CLOSED locally (2026-10-27)**: read-only `/admin/operations/afl-api-refusals` linked from the overview; real-PostgreSQL test 2/2 as `afldb_import` on a disposable isolated `_test` database; page rendered signed in at 1280x800 and 390x844 (populated, empty, second page, failed read). Not deployed | optional owner eyeball of `docs/v2/evidence/gap025-visual/` |
-| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | open, narrowed: previous/V2/previous/V2 passes on a populated copy (2026-10-20); populated-ledger DB reversal and archive recovery restore everything exactly on a synthetic copy | approve host backup/rollback and production-dump rehearsal |
+| V2-GAP-026 | High | shadow rehearsal and rollback | rehearsal | **CLOSED on rehearsal evidence (2026-10-31)**: shadow rehearsal on production archives (`a4641ca0…`; frozen window dump `599e32a1…`), parity FAIL/INCOMPLETE reconciled by written owner decisions, application rollback rehearsed on the 117 schema with production-derived data (112/112 controls) and through the release route (F6, R8), restore proven 9/9. **Not exercised on production**; see the entry | none for this gap. Optional, owner's call: a production rollback drill (entry, "Remaining") |
 | V2-GAP-027 | Low | AFL API reconciliation report | no | **CLOSED locally (2026-10-27)**: `settle-afl-api.ts --report-out` writes the report (destination checked before any connection, never overwritten, outcome preserved on a write failure); opt-in parity policy `v2.parity.2` compares it, `v2.parity.1` unchanged; real-PostgreSQL dry-run and apply 1/1 on a disposable isolated `_test` copy. Not deployed | decide whether a rehearsal adopts `v2.parity.2` |
 | V2-GAP-028 | Low | integration tests | no | **CLOSED locally**: original four files 200/200, including teardown, on fresh isolated rebuild; literal-name dependencies removed with live identity proofs; Linux 200/200 (2026-10-28) | none |
 | V2-GAP-029 | Medium | strict historical baseline verification | data quality | OPEN: 149 strict; 99 approved; 50 unapproved; both Gridley gates fail. D-V2-MIGRATION-SEPARATION permits separate backend acceptance only with preservation/compatibility evidence; **now PASS, scoped** to archive `a583fc7d…ed11b04` and 110 → 115 via D-V2-BROWNLOW-ALT-1 (Gridley findings unchanged and not waived); **Linux 2026-10-28 reproduces the accepted strict set key for key (149/99/50)** after the eight-selection rookie replay; separation also approved for current-production archive `a4641ca0…` 110 → 117 (D-V2-CURRENT-REHEARSAL-1, 2026-10-29; [record](owner-decision-current-rehearsal-2026-10-29.md); measured run PASS 2026-10-29, D-V2-CURRENT-ACCEPTANCE-RUN-1). Gridley findings unchanged and not waived; recorded as a known, open release residual by D-V2-RESIDUALS-1 (2026-10-29, [record](release-residuals-2026-10-29.md)) |  approved local production backup and Linux rehearsal required: production-shadow-commands.md; source requests unchanged; shared-development incident uncertainty preserved |
@@ -750,6 +756,43 @@ award results must be shown reconcilable before production; **no** — not a pro
     indicator overlay part of some captures; neither belongs to this page.
 
 ## V2-GAP-026 — The shadow rehearsal, the parity and capture tools on real data, and both rollback paths have never run
+
+- **CLOSED on rehearsal evidence, 2026-10-31.** Every close condition below is met by a rehearsal. The complete
+  record is `shadow-rehearsal.md` §10. No rollback has been exercised on production, and this closure does not claim
+  one. Nothing was run to close it; this is a records change over retained evidence.
+
+  | Close condition | Evidence | Result |
+  |---|---|---|
+  | An operator runs the rehearsal under the owner's approvals | Production archive `a4641ca0…` captured read-only and rehearsed on streamanator (D-V2-CURRENT-SHADOW-CAPTURE-1: `shadow.result` SUCCEEDED, 111–117 applied, privileges, captures; [report](current-production-shadow-2026-10-29.md)). The frozen window dump `599e32a1…` rehearsed in isolation (D-V2-PROD-EXEC-1 Stage 7: D `ATTRIBUTED_ONLY`, R `REPRODUCED`, T 43/43 on a clone, 611 s; [record](production-execution-record-2026-10-31.md) §2) | met |
+  | Parity is PASS, or every FAIL is reconciled by the owner | Strict `v2.parity.1` on `a4641ca0…` was FAIL, 3 pass / 1 fail / 1 incomplete. The one failure was `UNEXPECTED_TABLE_ADDED` for the empty 116 receipt table; the incomplete check was Brownlow, because production has no staged seasons. Both are accepted in writing by D-V2-CURRENT-SCHEMA-1 and D-V2-BROWNLOW-ALT-3 ([owner decision](owner-decision-current-rehearsal-2026-10-29.md)), run to `migrationCompatibility` PASS ([report](evidence/current-rehearsal-acceptance-2026-10-29.json)). Historical manifest, Coleman and coverage passed in the shadow. After the real release, Gate M: sealed scope identical on production | met, by owner reconciliation (the strict verdict stays FAIL) |
+  | Application rollback rehearsed | (a) Previous `ff100dc2` built and served against the **117 schema on a clone of the production-derived after-state**: runner accepts the ledger, exactly 111–117 unknown-applied, health 200, 18 route and permission checks, Brownlow writer suite, 0 null-eligible rows, `privileges.sql` completes; controls PASS 112/112 (2026-10-30, `evidence/production-execution-20261030/run-20261030T020000Z/controls-run3-final/`). (b) The release route's `rollback` (no build, no `npm`, no Git): fixture and real-Next suite 25/25 (L8), systemd 255 stand-in F6 and package dress rehearsal R8, status PASS ([ISSUE-329](../../issues/closed/AFLDB-ISSUE-329.md) §8–§8a, [package](../../issues/closed/AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md) §2). (c) Earlier: local previous/V2/previous/V2 (2026-10-19) and the populated copy 18/24/18/24 (2026-10-20) | met, on isolated hosts |
+  | Database recovery rehearsed | Frozen backup `afldb_prod-20261031-082655.dump` (`599e32a1…`, 1,549 TOC entries) restored on the host into a scratch database: PASS 9/9 parity (Stage 5). Copies verified on the host, the workstation and streamanator (Stages 6, 11, 14). Populated-ledger reversal of 111–115 and archive recovery restored every row, id, reference, sequence and public result exactly (2026-10-20, synthetic identities) | met; see the 116/117 limit below |
+  | The §10 record is filled in | `shadow-rehearsal.md` §10 | met |
+
+  **Exercised versus available (stated so that deployment is not mistaken for rollback proof).**
+  - *Exercised on production:* nothing. Production has moved forward only: V2 adoption and promotion (ISSUE-329 A2–B2),
+    then ISSUE-330 (D3). Both ran `promote`, restart and `status`. ISSUE-330 D5 (rollback on failed gate) was "not
+    used". The window's named A-ROLLBACK route (in-place `git checkout`, `npm ci`, `npm run build`) was never run; the
+    first host build destroyed the serving bundle instead (ISSUE-329 incident), and that route was withdrawn.
+  - *Available on production:* retained releases `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` (the `previous` target, one
+    recorded `status-pass`) and `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv`; the frozen and post-schema dumps with verified
+    off-host copies (retention not before 2026-11-30). A target that exists is not a rollback that has run.
+  - *Not available:* a retained pre-V2 (`ff100dc2`) release. Its bundle was destroyed in the incident, so a pre-V2
+    rollback would need a fresh route build of that revision, which no record shows. Case (a) shows only that its
+    code runs on the 117 schema.
+  - *Schema reversal at 116/117.* `rollback-runbook.md` §5 was rehearsed through 115 only. At ledger 117 it is
+    unrehearsed, and 116 (append-only receipts) is never reversed. The supported recovery from data loss is
+    restoration from the frozen dump, and the runbook now says so.
+  - *Not covered by this closure:* the Caddy and TLS path (E4 used a loopback `PUBLIC`), the ISSUE-316 writer
+    activation (its own rollback and roll-forward rules, ISSUE-316 §7), and any V2 write between a ledger export and a
+    drop (lost by design).
+
+  **Remaining (optional, owner's call, not a close condition).** A production rollback drill would turn "available"
+  into "exercised": `node deploy/release.mjs rollback`, an owner restart, `status --expect`, `deploy/post-install-check.sh`,
+  then `rollback --to <current id>` to return, with the same checks. It costs two restarts of about 5 s each, paced 30 s apart (ISSUE-329 O1, O2), and needs the
+  owner's approval for the window. The commands are the ones in `rollback-runbook.md` §4.1 and its §7 update.
+
+  Earlier narrative, retained as history:
 
 - **Local application rollback demonstrated, 2026-10-19.** Archived previous compatible app
   `ff100dc2` (no new worktree), V2, previous retaining additive schema, then V2: all start and

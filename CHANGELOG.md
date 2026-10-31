@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-026 closed on rehearsal evidence; no production rollback exercised (2026-10-31)
+
+- Records only; nothing was run, built, pushed or deployed. The gap's written criteria are met by rehearsals:
+  the shadow rehearsal on production archives (`a4641ca0…` and the frozen window dump `599e32a1…`), a parity
+  verdict that stays FAIL under `v2.parity.1` but is reconciled by written owner decisions, the previous code
+  served on the 117 schema with production-derived data (controls 112/112), the release-route rollback
+  (F6, R8) and the frozen dump's restore (9/9). The record is `docs/v2/shadow-rehearsal.md` §10.
+- Stated limits: **no rollback has been exercised on production** (an available `previous` release is not an
+  exercised rollback); no pre-V2 release is retained; schema reversal is rehearsed through 115 only and
+  `rollback-runbook.md` §5 now forbids it at ledger 116/117 without a fresh rehearsal; Caddy and TLS were not
+  rehearsed. An optional production drill is described in the runbook §7 update.
+- `known-gaps.md`, `go-no-go.md`, `risk-register.md` (RISK-07), `final-report.md` and the rollback runbook
+  updated. The runbook's in-place "build fails" row (false for an in-place build) and a dangling `§4.5`
+  reference were corrected. Gap register recounted from the table rows: 38 total / 26 closed / 12 open (the
+  previous 23 / 15 had not been updated when 007 and 013 closed on 2026-10-31).
+- ISSUE-316 stays open; the writer activation and AFL API cutover remain NO-GO. ISSUE-327 stays parked.
+
 ### Release route installed on production; first route build served (AFLDB-ISSUE-329 resolved, 2026-10-31)
 
 - Installed under owner-approved package Parts A and B: `origin/main` fast-forwarded to

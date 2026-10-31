@@ -453,7 +453,7 @@ in `shadow-rehearsal.md` §2; C6-005 and C6-006 (INFO) need nothing.
 
 1. Review `v2/rebuild` (`git log ff100dc2..v2/rebuild`) starting with `docs/v2/final-report.md`.
 2. Decide the rehearsal approvals S-A1..S-A5 (`docs/v2/go-no-go.md` §4.1); an operator then runs
-   `docs/v2/shadow-rehearsal.md` and fills in its §10 record.
+   `docs/v2/shadow-rehearsal.md` and fills in its §10 record. *(Update 2026-10-31: done as the production-archive rehearsals and the 2026-10-31 window; §10 is filled in and V2-GAP-026 is closed, with no rollback exercised on production.)*
 3. Decide V2-GAP-016 (Brownlow eligibility) and V2-GAP-024 (award-page revalidation); fix or disable
    the user-level hook (V2-GAP-004).
 4. Production stays **NO-GO** until `go-no-go.md` §3 has no blocking line; the ISSUE-316 sequence
