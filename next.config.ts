@@ -79,12 +79,26 @@ const cpus = Number.isSafeInteger(buildWorkers) && buildWorkers > 0
   ? buildWorkers
   : undefined;
 
+/**
+ * Type-check placement (AFLDB-ISSUE-329).
+ *
+ * The type-check is the build's memory peak: on the 4 GB production host it
+ * ran out of heap (2026-10-31), and measured on Linux it needs about 1 GB more
+ * than the rest of the build. `deploy/release.mjs build --typecheck off-host`
+ * sets AFLDB_BUILD_TYPECHECK=off-host to skip only that phase, and refuses
+ * unless the operator records where this exact revision passed
+ * `npm run typecheck`. Unset, `next build` type-checks as it always has.
+ */
+const typecheckOffHost = process.env.AFLDB_BUILD_TYPECHECK === 'off-host';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
 
   ...(cpus === undefined ? {} : { experimental: { cpus } }),
+
+  ...(typecheckOffHost ? { typescript: { ignoreBuildErrors: true } } : {}),
 
   // Standalone output keeps the systemd deployment self-contained.
   output: 'standalone',

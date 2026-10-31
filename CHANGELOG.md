@@ -15,6 +15,34 @@ commit.
 
 ## [Unreleased]
 
+### Non-destructive production build, promotion and rollback (AFLDB-ISSUE-329, 2026-10-31; not installed)
+
+- New `deploy/release.mjs`. It builds a revision in a workspace outside the serving checkout
+  (`git archive`, `npm ci`, `npm run build`), then validates the candidate:
+  - BUILD_ID agreement, byte-identical assets, no `.env` file, no escaping symlink, the transport
+    flag;
+  - a boot smoke with the service's environment that renders `/`;
+  - a file manifest.
+  Only then is the candidate published as an immutable release. `promote` and `rollback` switch
+  `current`/`previous` symlinks by rename. Rollback reuses the retained release and never rebuilds.
+  `status` proves build identity without request tracing: the service process's release, its own
+  `_buildManifest.js` 200, the previous one's 404, and health ok/ok. `adopt` registers today's
+  in-place bundle once.
+- New production-only drop-in `deploy/afldb.service.d/release-route.conf`: the service starts from
+  `current`, and only `releases/` is writable. DEV is unchanged.
+- Memory: the build's process group runs with `oom_score_adj` 1000, an admission check and a 0.5 s
+  `MemAvailable` guard that kills only the build. Measured on Linux: about 2.8 GB with the build's
+  type-check, about 1.7 GB without it. `next.config.ts` skips that phase only for
+  `AFLDB_BUILD_TYPECHECK=off-host`, which the tool sets only with recorded type-check evidence.
+- `deploy/server-cluster.mjs` logs `serving build <BUILD_ID> release <id> revision <sha>` at every
+  start.
+- `tsconfig.json` excludes `docs/v2/evidence`. A retained session script imports an absolute
+  Windows path, which failed a clean Linux type-check of the current branch. That failure was found
+  by the route's first real build.
+- Release tracking reconciled to the 2026-10-31 window: V2-GAP-007 and V2-GAP-013 closed; checklist
+  rows 5 and 9 closed; blocker R60 ended; V2-GAP-011 updated and still open (the ISSUE-316
+  sequence). R6, R8 and R58 stay open: their production checks are not in the window's evidence.
+
 ### V2 released to production (D-V2-PROD-EXEC-1, 2026-10-31)
 
 - Production runs V2 at `9ed9c9dd3e84682c43e96c46e98974b245eb54ed` (`BUILD_ID` `QNEHXAtU53TzUjj0Mb7mv`) behind the
