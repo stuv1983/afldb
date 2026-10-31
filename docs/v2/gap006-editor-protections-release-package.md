@@ -18,6 +18,15 @@ fetched remote to the exact approved `R`, and fast-forwards to that pinned `R` (
 "expected value" comment into an enforced assertion; (4) separates Claude's permitted work from the owner's
 sudo, restart, push and sign-in steps (section 4.1).
 
+**Revision 3 (2026-11-01, P6 corrected; documentation and a SQL block only; `C` and its validation unchanged).** At T0
+of revision 2 the owner ran P6 on production: `afldb_import` held `SELECT`, `INSERT` and sequence `USAGE` with no
+`UPDATE`/`DELETE`/`TRUNCATE`, `afldb_app` held nothing, the ledger was 117, and the assertion exited 3. Production was
+correct and the assertion was wrong: revision 2 required `SELECT`+`INSERT` for `afldb_app`, but a trace of `C` shows no
+`data_edits` path uses `afldb_app` (every audit INSERT is on `afldb_import`, every audit read on `afldb_auth`; section
+4.6). P6 now asserts exactly the per-role needs, reports `afldb_app` separately and never gates on it. Nothing was granted
+or changed on production; the run stopped at P-B. Revision 2's W0, P-A and J1 results are superseded and are repeated for
+revision 3.
+
 ## 1. Candidate and outgoing state
 
 | | |
@@ -138,7 +147,7 @@ failure is a STOP (section 7.1); do not adjust an expected value.
 |---|---|---|
 | W0 workstation static checks | **Claude** | local read-only Git, plus `git ls-remote origin` (read-only) |
 | P-A production read-only checks | **Claude** over SSH as `arm`, or the owner | no sudo; `status` and `verify` only read |
-| P-B production database checks (P6, P7) | **Owner only** | `sudo -u postgres psql`, read-only transaction |
+| P-B production database checks (P6, P7), machine **afldb-prod** | **Owner only** | `sudo -u postgres psql`, read-only transaction |
 | D0 push | **Owner only** | push to `origin/main` |
 | D1 fetch + fast-forward, D2 build, D3a promote, D3c checks | **Claude** over SSH as `arm`, or the owner | no sudo |
 | D3b / recovery restart | **Owner only** | `sudo systemctl restart afldb` |
@@ -238,60 +247,118 @@ crontab -l 2>/dev/null | grep -i afldb || echo "no afldb cron entries"       # J
 **J1 is the only judgement item.** Cron entries cannot be compared with the window mechanically: read them, and none may
 fire within 100 minutes of `T0`. The nightly watcher and the AFL Tables settle have fixed early-morning times.
 
-### 4.6 P-B: database checks P6 and P7 (owner only; read-only; fail closed)
+### 4.6 P-B: database checks P6 and P7 (owner only; machine: **afldb-prod**; read-only; fail closed)
 
-The production database is `afldb_prod` (`docs/production-cutover.md`). A connection error means the name is wrong or
-the access is missing: that is a STOP, never a prompt to guess another name.
+**Machine: `afldb-prod`**, the production droplet (SSH alias `afldb`, 209.38.87.252), logged in as the owner's user with
+`sudo`. The production database is `afldb_prod` (`docs/production-cutover.md`). A connection error means the name is
+wrong or the access is missing: that is a STOP, never a prompt to guess another name.
+
+**Which role does what (traced in the final candidate `C`, `git show C:<file>`).** Every `INSERT INTO data_edits` is
+`recordDataEdit` (`src/db/queries/audit-log.ts`), which takes a postgres.js transaction and ends `RETURNING id`. Every
+caller opens that transaction on **`AFLDB_IMPORT_DATABASE_URL`, role `afldb_import`**: the `withImportConnection` helpers
+in the awards, club-leadership, coaches, draft, fixtures, season-list and special-record editors, and the direct
+`postgres(importUrl)` in match-admin, match-sheet, players, awards-admin, data-edits and admin-brownlow; the Brownlow
+eligibility and Coleman publications reach `recordDataEdit` through the import-role executors
+(`withAwardProposalExecutor`, and `admin-brownlow`'s import connection). **Every audit read** uses
+**`authSql`, role `afldb_auth`**: `audit-reader.ts` (the audit page, the per-entity history, `RecordHistory`) and
+`readDraftPickRevision` (the draft editor's compare-and-swap). **No `data_edits` path uses `afldb_app`.** Its source
+comments say so: `afldb_auth` is "the only application role granted SELECT" on `data_edits`, and `afldb_app` is not
+registered in `afldb_meta.app_readable_tables`. Only the audit INSERT with `RETURNING` is new in `C` (the
+running release inserted without it), which is what newly needs `SELECT` for `afldb_import`; the readers are unchanged.
+
+| Role | Needs on `public.data_edits` | Asserted by P6 |
+|---|---|---|
+| `afldb_import` | `SELECT` (for `RETURNING id`) and `INSERT`; `USAGE` on `data_edits_id_seq`; **no** `UPDATE`, `DELETE`, `TRUNCATE` (append-only) | **yes, all** |
+| `afldb_auth` | `SELECT` (audit reads); **no** `UPDATE`, `DELETE`, `TRUNCATE`. `INSERT` is not used through this role and is not asserted | **yes** |
+| `afldb_app` | nothing: no editor, audit-write or audit-read path uses it | **no. Reported separately, never gated, never to be granted to satisfy this package** |
+
+Revision 1 asserted `SELECT` and `INSERT` for `afldb_app` as well. That was wrong: it asked for a grant no code path uses,
+and on production `afldb_app` correctly holds none, so the assertion failed (exit 3) on a healthy system.
 
 ```bash
+# MACHINE: afldb-prod   (the production droplet; run as your sudo user)
 sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d afldb_prod <<'SQL'
 BEGIN READ ONLY;
-SELECT r.rolname,
-       has_table_privilege(r.rolname, 'public.data_edits', 'SELECT')   AS sel,
-       has_table_privilege(r.rolname, 'public.data_edits', 'INSERT')   AS ins,
-       has_table_privilege(r.rolname, 'public.data_edits', 'UPDATE')   AS upd,
-       has_table_privilege(r.rolname, 'public.data_edits', 'DELETE')   AS del,
-       has_table_privilege(r.rolname, 'public.data_edits', 'TRUNCATE') AS trunc,
-       has_sequence_privilege(r.rolname, 'public.data_edits_id_seq', 'USAGE') AS seq
-  FROM pg_roles r WHERE r.rolname IN ('afldb_app', 'afldb_import') ORDER BY 1;
+SELECT v.role,
+       r.rolname IS NOT NULL AS present,
+       CASE WHEN r.rolname IS NULL THEN NULL ELSE has_table_privilege(r.rolname, 'public.data_edits', 'SELECT')   END AS sel,
+       CASE WHEN r.rolname IS NULL THEN NULL ELSE has_table_privilege(r.rolname, 'public.data_edits', 'INSERT')   END AS ins,
+       CASE WHEN r.rolname IS NULL THEN NULL ELSE has_table_privilege(r.rolname, 'public.data_edits', 'UPDATE')   END AS upd,
+       CASE WHEN r.rolname IS NULL THEN NULL ELSE has_table_privilege(r.rolname, 'public.data_edits', 'DELETE')   END AS del,
+       CASE WHEN r.rolname IS NULL THEN NULL ELSE has_table_privilege(r.rolname, 'public.data_edits', 'TRUNCATE') END AS trunc,
+       CASE WHEN r.rolname IS NULL THEN NULL ELSE has_sequence_privilege(r.rolname, 'public.data_edits_id_seq', 'USAGE') END AS seq,
+       v.note
+  FROM (VALUES ('afldb_import', 'ASSERTED: audit INSERT ... RETURNING in every editor transaction'),
+               ('afldb_auth',   'ASSERTED: every audit read (audit pages, entity history, draft revision)'),
+               ('afldb_app',    'REPORTED ONLY: no data_edits path uses it')) AS v(role, note)
+  LEFT JOIN pg_roles r ON r.rolname = v.role
+ ORDER BY v.role;
 SELECT count(*) AS migrations, max(name) AS latest FROM afldb_meta.schema_migrations;
 DO $$
-DECLARE roles int; good int;
+DECLARE
+  imp CONSTANT text := 'afldb_import';
+  aut CONSTANT text := 'afldb_auth';
+  app CONSTANT text := 'afldb_app';
+  tbl CONSTANT text := 'public.data_edits';
+  seq CONSTANT text := 'public.data_edits_id_seq';
 BEGIN
-  SELECT count(*),
-         count(*) FILTER (WHERE has_table_privilege(rolname, 'public.data_edits', 'SELECT')
-                            AND has_table_privilege(rolname, 'public.data_edits', 'INSERT')
-                            AND NOT has_table_privilege(rolname, 'public.data_edits', 'UPDATE')
-                            AND NOT has_table_privilege(rolname, 'public.data_edits', 'DELETE')
-                            AND NOT has_table_privilege(rolname, 'public.data_edits', 'TRUNCATE'))
-    INTO roles, good FROM pg_roles WHERE rolname IN ('afldb_app', 'afldb_import');
-  IF roles <> 2 OR good <> 2 THEN
-    RAISE EXCEPTION 'P6 FAIL: % of 2 roles found, % hold SELECT+INSERT without UPDATE/DELETE/TRUNCATE on data_edits', roles, good;
+  IF to_regclass(tbl) IS NULL THEN
+    RAISE EXCEPTION 'P6 FAIL: public.data_edits does not exist';
   END IF;
-  IF NOT has_sequence_privilege('afldb_import', 'public.data_edits_id_seq', 'USAGE') THEN
-    RAISE EXCEPTION 'P6 FAIL: afldb_import lacks USAGE on data_edits_id_seq';
+  -- afldb_import: writes the audit row and reads it back (RETURNING), append-only.
+  IF to_regrole(imp) IS NULL THEN RAISE EXCEPTION 'P6 FAIL: role afldb_import does not exist'; END IF;
+  IF NOT has_table_privilege(imp, tbl, 'SELECT') THEN RAISE EXCEPTION 'P6 FAIL: afldb_import lacks SELECT on data_edits'; END IF;
+  IF NOT has_table_privilege(imp, tbl, 'INSERT') THEN RAISE EXCEPTION 'P6 FAIL: afldb_import lacks INSERT on data_edits'; END IF;
+  IF NOT has_sequence_privilege(imp, seq, 'USAGE') THEN RAISE EXCEPTION 'P6 FAIL: afldb_import lacks USAGE on data_edits_id_seq'; END IF;
+  IF has_table_privilege(imp, tbl, 'UPDATE') OR has_table_privilege(imp, tbl, 'DELETE') OR has_table_privilege(imp, tbl, 'TRUNCATE') THEN
+    RAISE EXCEPTION 'P6 FAIL: afldb_import holds UPDATE, DELETE or TRUNCATE on data_edits (it must stay append-only)';
   END IF;
+  -- afldb_auth: reads the audit trail, append-only.
+  IF to_regrole(aut) IS NULL THEN RAISE EXCEPTION 'P6 FAIL: role afldb_auth does not exist'; END IF;
+  IF NOT has_table_privilege(aut, tbl, 'SELECT') THEN RAISE EXCEPTION 'P6 FAIL: afldb_auth lacks SELECT on data_edits'; END IF;
+  IF has_table_privilege(aut, tbl, 'UPDATE') OR has_table_privilege(aut, tbl, 'DELETE') OR has_table_privilege(aut, tbl, 'TRUNCATE') THEN
+    RAISE EXCEPTION 'P6 FAIL: afldb_auth holds UPDATE, DELETE or TRUNCATE on data_edits (it must stay append-only)';
+  END IF;
+  -- P7: the migration ledger.
   IF (SELECT count(*) FROM afldb_meta.schema_migrations) <> 117
      OR (SELECT max(name) FROM afldb_meta.schema_migrations) <> '117_brownlow_provider_eligibility_unknown.sql' THEN
     RAISE EXCEPTION 'P7 FAIL: the migration ledger is not 117 rows ending 117_brownlow_provider_eligibility_unknown.sql';
+  END IF;
+  -- afldb_app is reported, never asserted.
+  IF to_regrole(app) IS NULL THEN
+    RAISE NOTICE 'afldb_app (informational, not asserted): role absent';
+  ELSE
+    RAISE NOTICE 'afldb_app (informational, not asserted): select=% insert=% update=% delete=% truncate=%',
+      has_table_privilege(app, tbl, 'SELECT'), has_table_privilege(app, tbl, 'INSERT'),
+      has_table_privilege(app, tbl, 'UPDATE'), has_table_privilege(app, tbl, 'DELETE'), has_table_privilege(app, tbl, 'TRUNCATE');
   END IF;
   RAISE NOTICE 'P6 PASS, P7 PASS';
 END $$;
 ROLLBACK;
 SQL
-echo "P6/P7 psql exit status: $?   (must be 0 and the output must contain: P6 PASS, P7 PASS)"
+echo "P6/P7 psql exit status: $?"
 ```
 
-This SQL was written for this package and **has not been executed against any database** (production is untouched
-until approval). It cannot change anything (`BEGIN READ ONLY … ROLLBACK`) and fails closed: a syntax error or a failed
-assertion exits non-zero, which is a STOP.
+**Expected on production** (the state you reported):
+- three role rows: `afldb_import` `present=t sel=t ins=t upd=f del=f trunc=f seq=t`; `afldb_auth` `present=t sel=t upd=f del=f trunc=f`
+  (`ins` is whatever it is and is not asserted); `afldb_app` `present=t sel=f ins=f upd=f del=f trunc=f` (reported only);
+- one ledger row: `migrations 117` and `latest 117_brownlow_provider_eligibility_unknown.sql`;
+- `NOTICE:  afldb_app (informational, not asserted): select=f insert=f update=f delete=f truncate=f`;
+- `NOTICE:  P6 PASS, P7 PASS`, and `P6/P7 psql exit status: 0`.
 
-**Why P6 is a hard gate.** Every audited editor mutation runs as one transaction on the **import** connection
-(`AFLDB_IMPORT_DATABASE_URL`, role `afldb_import`). The new code writes the audit row with `INSERT ... RETURNING id`, and
-PostgreSQL requires `SELECT` on the returned column. Migration 066 gave `afldb_import` `INSERT` only; migration 108 and
-`tools/maintenance/privileges.sql` add `SELECT`. If the grant were absent on production, **every editor write would fail
-closed** ("permission denied for table data_edits"). Production is at ledger 117 so 108 should be applied, but privileges
-can be reset by a privileges run, so the live grant is verified rather than the ledger.
+Any `ERROR: P6 FAIL…` or `P7 FAIL…`, or a non-zero exit, is a STOP. **No grant is authorised.** If `afldb_auth` is the
+role that fails, the audit pages and the draft editor were already broken under the running release; that is a finding to
+report, not something this package repairs.
+
+This SQL cannot change anything (`BEGIN READ ONLY … ROLLBACK`). It was verified on a throwaway PostgreSQL 16 cluster
+(`docs/v2/evidence/gap006-release-package-20261101/p6-p7-verification.txt`); it has still not been run on production.
+
+**Why P6 is a hard gate.** Every audited editor mutation runs as one transaction on the **import** connection. The new
+code writes the audit row with `INSERT ... RETURNING id`, and PostgreSQL requires `SELECT` on the returned column.
+Migration 066 gave `afldb_import` `INSERT` only; migration 108 and `tools/maintenance/privileges.sql` add `SELECT`. If the
+grant were absent on production, **every editor write would fail closed** ("permission denied for table data_edits").
+Production is at ledger 117 so 108 should be applied, but privileges can be reset by a privileges run, so the live
+grant is verified rather than the ledger.
 
 **If any P6 or P7 assertion fails, this is a STOP at the go/no-go. No grant is authorised by this package.** Closing a
 missing privilege would be a database change needing its own owner-approved package; do not improvise one.
@@ -432,7 +499,7 @@ end:** if D4 is not complete and passing by then, recover.
 
 | Condition | Action |
 |---|---|
-| W0, P-A or P-B fails (including `afldb_import` lacking `SELECT` on `data_edits`, a different running release, a dirty checkout, a lock, a timer, backup or resource shortfall, or J1 not clear) | **STOP before D0.** Nothing changed. Re-plan; do not adjust the expected values. **No grant is authorised** |
+| W0, P-A or P-B fails (including `afldb_import` lacking `SELECT`/`INSERT`/sequence `USAGE`, or holding `UPDATE`/`DELETE`/`TRUNCATE`, on `data_edits`, or `afldb_auth` lacking `SELECT` there, a different running release, a dirty checkout, a lock, a timer, backup or resource shortfall, or J1 not clear) | **STOP before D0.** Nothing changed. Re-plan; do not adjust the expected values. **No grant is authorised** |
 | `git push` rejected, or `origin/main` is not `63c945ae…` before it | STOP; do not force |
 | D1: fetched remote is not `R`, non-fast-forward, `C` absent, or the production static check fails | STOP; the checkout is untouched (the fast-forward is the last step and only follows a pass) |
 | Build `REFUSED`, guard abort, admission shortfall, or over budget | STOP; `current`/`previous` untouched; no swap, no service stop, no lowered threshold |
@@ -587,26 +654,29 @@ Execution begins only when the owner sends an approval in this shape, with `<R>`
 fixes no calendar window.
 
 ```text
-I approve execution of the GAP-006 editor-protections release package, revision 2, at R=<R>
+I approve execution of the GAP-006 editor-protections release package, revision 3, at R=<R>
 (docs/v2/gap006-editor-protections-release-package.md), building revision
 C=fd48ace0c2cb70296d723603aa397b5bd7a21a0d, outgoing release
-OLD_ID=ad245d602f6f-m0M8pf121326vNSo2B759. T0 is when I say "go".
+OLD_ID=ad245d602f6f-m0M8pf121326vNSo2B759. T0 starts when I send this approval.
 
-Claude may: run W0 on the workstation; run, as arm over SSH without sudo, P-A, D1, D2, D3a, D3c and the recovery
-blocks R2/R3/R5 exactly as written; run the read-only state probe at any time; stop at the first failed check.
-I will do: P6/P7 (sudo -u postgres, read-only), the D0 push of exactly R, every `sudo systemctl restart afldb`,
-and the D4 sign-in and visual acceptance.
+Claude may: run W0 on the workstation; run, as arm over SSH without sudo, P-A, D1, D2, D3a and D3c exactly as
+written; run the read-only state probe; run the applicable R2/R3/R5 recovery blocks exactly as packaged; launch the
+packaged read-only headed browser acceptance runner (I enter credentials and inspect the screenshots). Proceed
+automatically between authorised steps; pause only for my required actions or a failed gate; label each owner
+command with its machine and expected result.
+I will do: P6/P7 on machine afldb-prod (sudo -u postgres, read-only), the D0 fast-forward push of exactly R from the
+workstation, every production service restart, and the Super Admin sign-in and visual acceptance.
 
-Claude must not: use sudo, restart the unit, push, grant any privilege, run an unqualified `rollback`, roll back or
-restart a release the probe shows as OLD_SERVING, build anything other than C, delete any release, backup or frozen
-material, or continue past a failed check. Missing afldb_import privileges are a STOP; no grant is authorised.
-V2-GAP-006 and ISSUE-331 stay open with their limitations.
+Claude must not: use sudo, restart the unit, push, grant any privilege (afldb_app included), change a schema, run an
+unqualified rollback, roll back or restart a release the probe shows as OLD_SERVING, build anything other than C,
+delete any retained material, or continue past a failed check. A failed P6/P7 is a STOP; no grant is authorised.
+V2-GAP-006 and ISSUE-331 stay open with their limitations. Commit scoped outcome records locally; no push beyond R.
 ```
 
 Remaining owner actions, in order:
 
 1. Read this package and `docs/v2/gap006-release-readiness-2026-11-01.md`; decide whether to proceed and when `T0` is.
-2. Send the approval above. At `T0`: W0 and P-A run; **you** run P-B (P6/P7) and read J1.
+2. Send the approval above. At `T0`: W0, P-A and J1 run (Claude); **you** run P-B (P6/P7, machine afldb-prod).
 3. D0: the push block (owner).
 4. D1, D2, D3a (Claude, or you), then **you** run `sudo systemctl restart afldb` (D3b), then D3c.
 5. D4: sign in as Super Admin and run the acceptance script; look at the screenshots.
@@ -616,3 +686,31 @@ Remaining owner actions, in order:
 Not authorised and not done by this package: any grant or database change, a build other than `C`, deleting a retained
 release, backup or frozen store, writer activation, provider acquisition, or any real Brownlow recording, backfill,
 adoption or publication.
+
+## 11. Execution record
+
+### 11.1 Revision 2 attempt, 2026-11-01 (stopped at P-B; nothing deployed, nothing granted)
+
+| Step | Result |
+|---|---|
+| T0 | the owner's approval of revision 2 at `R=41a9787c0cc9fb0e0bcef65f5cd5dc4b759cf2f7`, about 2026-10-31T22:42Z (09:42 AEDT 2026-11-01) |
+| W0 (workstation) | **PASS**: HEAD `R`; clean apart from untracked `.codex/`; static delta check PASS; classifier self-test PASS; `origin/main` `63c945ae…` |
+| P-A (production, `arm`, read-only) | **PASS**: checkout `65c02ecc…` clean; no locks; `current` `ad245d602f6f-m0M8pf121326vNSo2B759`, `previous` `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`; `status` PASS (process 3190377 in `OLD_ID`, health ok/ok); `verify OLD_ID` PASS (12,995 files); MemAvailable 2,970 MB; free disk about 56 GB; `.env` import-URL count 1. The one write: a transient `/home/arm/gap006-pa.sh`, copied and removed |
+| J1 | **resolved**: `arm` has no crontab; nothing in `/etc/cron.*` or `/var/spool/cron` mentions afldb, settle or watcher (some paths unreadable); the 18 systemd timers are OS housekeeping, none afldb |
+| P6/P7 (owner, `afldb-prod`) | **P6 FAILED, exit 3.** `afldb_import`: `SELECT`, `INSERT`, sequence `USAGE`, no `UPDATE`/`DELETE`/`TRUNCATE`. `afldb_app`: none of these. Ledger: 117 migrations as expected |
+| Outcome | **STOP before D0.** No push, no fetch, no build, no promotion, no restart; `current` still `OLD_ID`, serving. No grant, no schema change |
+
+### 11.2 Cause and correction (revision 3)
+
+The assertion was wrong, not production. The role trace in section 4.6 shows every `recordDataEdit` INSERT (with the
+new `RETURNING id`) on `afldb_import` and every audit read on `afldb_auth`; no path uses `afldb_app`, which is
+deliberately not registered as a reader of `data_edits`. Revision 2's reading of the failing production state was
+therefore correct and safe: `afldb_import` has what `C` needs and stays append-only. Revision 3 asserts exactly that
+(plus `afldb_auth` `SELECT` and append-only), reports `afldb_app` separately and never gates on it. Verification:
+`p6-p7-verify.sh` and `p6-p7-verification.txt` in `docs/v2/evidence/gap006-release-package-20261101/` (19 scenarios on a
+throwaway PostgreSQL 16.15 cluster, including the production-observed state, which passes, and revision 2's block against
+it, which reproduces the exit 3). `C` and its validation are unchanged.
+
+### 11.3 Revision 3 attempt
+
+Not started. Starts at a new owner approval carrying revision 3's `R`.

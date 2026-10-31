@@ -1,0 +1,53 @@
+# P6/P7 SQL verification (isolated; revision 3 of the GAP-006 release package)
+# Run 2026-11-01 on streamanator (PostgreSQL 16.15), throwaway socket-only cluster in /dev/shm, removed afterwards.
+# Inputs: the exact SQL printed in section 4.6 and, for the last check, revision 2's block (commit 41a9787c).
+# Command: bash p6-p7-verify.sh p6-p7.sql p6-rev2.sql   (harness: p6-p7-verify.sh in this directory)
+
+throwaway cluster: postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) socket-only at /dev/shm/gap006-p6-cxiMVq, listen_addresses empty
+== passing states
+  ok    A  production as reported (import S+I+seq, auth S+I, app none) -> exit 0, found: P6 PASS, P7 PASS
+  ok    A reports afldb_app separately: select=f insert=f update=f delete=f truncate=f
+---- scenario A full output (what the owner should see, apart from timing) ----
+  | BEGIN
+  |      role     | present | sel | ins | upd | del | trunc | seq |                                   note                                   
+  | --------------+---------+-----+-----+-----+-----+-------+-----+--------------------------------------------------------------------------
+  |  afldb_app    | t       | f   | f   | f   | f   | f     | f   | REPORTED ONLY: no data_edits path uses it
+  |  afldb_auth   | t       | t   | t   | f   | f   | f     | f   | ASSERTED: every audit read (audit pages, entity history, draft revision)
+  |  afldb_import | t       | t   | t   | f   | f   | f     | t   | ASSERTED: audit INSERT ... RETURNING in every editor transaction
+  | (3 rows)
+  | 
+  |  migrations |                    latest                     
+  | ------------+-----------------------------------------------
+  |         117 | 117_brownlow_provider_eligibility_unknown.sql
+  | (1 row)
+  | 
+  | psql:/dev/shm/p6-new.sql:56: NOTICE:  afldb_app (informational, not asserted): select=f insert=f update=f delete=f truncate=f
+  | psql:/dev/shm/p6-new.sql:56: NOTICE:  P6 PASS, P7 PASS
+  | DO
+  | ROLLBACK
+---- end ----
+  ok    B  auth has SELECT only (INSERT not asserted) -> exit 0, found: P6 PASS, P7 PASS
+  ok    C  app also holds SELECT+INSERT (reported, never gated) -> exit 0, found: afldb_app (informational, not asserted): select=t insert=t update=f delete=f truncate=f
+  ok    D  afldb_app role absent (reported) -> exit 0, found: afldb_app (informational, not asserted): role absent
+  ok    E  PUBLIC SELECT (inherited by app, reported) -> exit 0, found: afldb_app (informational, not asserted): select=t
+== failing states (each must exit 3 with its own message)
+  ok    F  import lacks SELECT -> exit 3, found: afldb_import lacks SELECT
+  ok    G  import lacks INSERT -> exit 3, found: afldb_import lacks INSERT
+  ok    H  import lacks sequence USAGE -> exit 3, found: afldb_import lacks USAGE on data_edits_id_seq
+  ok    I  import holds UPDATE -> exit 3, found: afldb_import holds UPDATE, DELETE or TRUNCATE
+  ok    J  import holds DELETE -> exit 3, found: afldb_import holds UPDATE, DELETE or TRUNCATE
+  ok    K  import holds TRUNCATE -> exit 3, found: afldb_import holds UPDATE, DELETE or TRUNCATE
+  ok    L  PUBLIC UPDATE reaches import -> exit 3, found: afldb_import holds UPDATE, DELETE or TRUNCATE
+  ok    M  auth lacks SELECT -> exit 3, found: afldb_auth lacks SELECT
+  ok    N  auth holds DELETE -> exit 3, found: afldb_auth holds UPDATE, DELETE or TRUNCATE
+  ok    O  ledger has 116 rows -> exit 3, found: P7 FAIL
+  ok    P  ledger latest is not 117_brownlow... -> exit 3, found: P7 FAIL
+  ok    Q  afldb_auth role absent -> exit 3, found: role afldb_auth does not exist
+  ok    R  afldb_import role absent -> exit 3, found: role afldb_import does not exist
+  ok    S  public.data_edits missing (the report query already fails closed) -> exit 3, found: relation "public.data_edits" does not exist
+== the block changes nothing
+  ok    ACLs, ledger and roles identical before and after (42f9c0b7c6281544bebde513e0122781 117 18)
+  ok    the file opens BEGIN READ ONLY and ends ROLLBACK
+== revision 2 block against the production-observed state (reproduces the owner's failure)
+  ok    revision 2: exit 3 -> P6 FAIL: 2 of 2 roles found, 1 hold SELECT+INSERT without UPDATE/DELETE/TRUNCATE on data_edits
+P6/P7 VERIFICATION PASS
