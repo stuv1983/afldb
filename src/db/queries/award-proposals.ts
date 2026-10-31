@@ -92,6 +92,7 @@ export const awardWinnerPromotionPort: AwardPromotionPort = {
         note: request.note,
         adminUserId: request.adminUserId,
         adminNote: request.adminNote,
+        sealWorkflow: 'curated_award_approval',
         confirmDuplicate: request.confirmDuplicate,
         auditExtra: {
           curated_proposal_id: request.proposalId,

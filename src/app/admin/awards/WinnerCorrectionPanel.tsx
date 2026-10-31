@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRef, useState } from 'react';
 
 import { correctAwardWinnerAction } from '@/app/admin/awards/actions';
@@ -121,13 +122,7 @@ export function WinnerCorrectionPanel({
           />
         </label>
 
-        <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
-          Administrative note (kept with the audit entry)
-          <input
-            type="text" maxLength={2000} value={adminNote}
-            onChange={(e) => setAdminNote(e.target.value)}
-          />
-        </label>
+        <CorrectionNoteField name="adminNote" value={adminNote} onChange={setAdminNote} label="Administrative note (kept with the audit entry)" />
 
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button

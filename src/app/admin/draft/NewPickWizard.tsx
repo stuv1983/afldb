@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import Link from 'next/link';
 import { useRef, useState, useTransition } from 'react';
 
@@ -174,10 +175,7 @@ export function NewPickWizard({
             Detail / biography
             <textarea name="detail" maxLength={2000} rows={3} disabled={isPending} />
           </label>
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-            Admin note (recorded on the audit row)
-            <input type="text" name="note" maxLength={2000} disabled={isPending} />
-          </label>
+          <CorrectionNoteField label="Admin note (recorded on the audit row)" disabled={isPending} />
         </form>
       </section>
 

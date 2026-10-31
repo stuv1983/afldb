@@ -4,6 +4,7 @@ import postgres from 'postgres';
 
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
+import { enforceSealedEditorWrite, isSealedEditorRefusal, type SealScope } from '@/lib/seasons/sealed-editor-guard';
 import {
   assessOneSource,
   fetchSourceEvidence,
@@ -423,6 +424,11 @@ async function recordLinkedResolution(tx: Tx, input: {
   adminUserId: number;
   note?: string | null;
   /**
+   * The HUMAN-written note the season seal evaluates when `note` was filled in by the server
+   * (createPlayerAndResolveLink stores a generated sentence). Defaults to `note`.
+   */
+  sealNote?: string | null;
+  /**
    * How the link was decided (migration 067). The score is always the
    * one the server recomputed a moment earlier in this transaction,
    * never a number the browser sent.
@@ -431,7 +437,7 @@ async function recordLinkedResolution(tx: Tx, input: {
   matchScore?: number | null;
   algorithmVersion?: string | null;
 }): Promise<void> {
-  await tx`
+  const rows = await tx<{ id: string }[]>`
     INSERT INTO player_link_resolutions
           (target_table, target_id, action, player_id, previous_status,
            admin_user_id, note, match_method, match_score, algorithm_version)
@@ -440,7 +446,54 @@ async function recordLinkedResolution(tx: Tx, input: {
             ${(input.note ?? '').trim().slice(0, 2000) || null},
             ${input.matchMethod ?? 'manual'},
             ${input.matchScore ?? null}, ${input.algorithmVersion ?? null})
+    RETURNING id
   `;
+  // V2-GAP-006 (D-V2-GAP006-EDITORS E1): the link rewrote `player_id` on a season-bearing fact row
+  // (award winners, nominations, captaincies, special records, draft picks), so the season seal
+  // applies in this same transaction, under the existing `identity_adjudication` workflow. A refusal
+  // throws and rolls back the link, the resolution row and any player created with it.
+  // Honours rows (hall_of_fame, honour_team_members) are reference tables and not sealed.
+  await enforceSealedEditorWrite(tx, {
+    tableName: input.targetTable,
+    rowId: input.targetId,
+    scope: await linkTargetScope(tx, input.targetTable, input.targetId),
+    actorUserId: input.adminUserId,
+    note: 'sealNote' in input ? input.sealNote : input.note,
+    workflow: 'identity_adjudication',
+    evidenceRef: `player_link_resolutions:${String(rows[0]!.id)}`,
+  });
+}
+
+/** The seasons a link write touched: the target row's own, and for a draft person every pick's. */
+/** The season of a single-row lookup; a row that is not found is an unknown season (fail closed). */
+function seasonScope(rows: { season: number | null }[]): SealScope {
+  return { kind: 'seasons', seasons: [rows[0]?.season ?? null] };
+}
+
+async function linkTargetScope(tx: Tx, targetTable: LinkTargetTable, targetId: number): Promise<SealScope> {
+  switch (targetTable) {
+    case 'hall_of_fame':
+    case 'honour_team_members':
+      return { kind: 'reference' };
+    case 'draft_picks': {
+      const years = await tx<{ draftYear: number | null }[]>`
+        SELECT DISTINCT p.draft_year AS "draftYear"
+          FROM draft_picks p
+         WHERE p.id = ${targetId}
+            OR p.draft_person_id = (SELECT draft_person_id FROM draft_picks WHERE id = ${targetId})
+      `;
+      return { kind: 'seasons', seasons: years.length > 0 ? years.map((r) => r.draftYear) : [null] };
+    }
+    // One static statement per table: the table name is never interpolated into SQL.
+    case 'award_winners':
+      return seasonScope(await tx<{ season: number | null }[]>`SELECT season FROM award_winners WHERE id = ${targetId}`);
+    case 'award_nominations':
+      return seasonScope(await tx<{ season: number | null }[]>`SELECT season FROM award_nominations WHERE id = ${targetId}`);
+    case 'captaincies':
+      return seasonScope(await tx<{ season: number | null }[]>`SELECT season FROM captaincies WHERE id = ${targetId}`);
+    case 'player_achievements':
+      return seasonScope(await tx<{ season: number | null }[]>`SELECT season FROM player_achievements WHERE id = ${targetId}`);
+  }
 }
 
 /**
@@ -506,6 +559,7 @@ export async function resolveLink(input: {
   try {
     return await importSql.begin((tx) => resolveLockedLink(tx, input));
   } catch (error) {
+    if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The link could not be applied: ${message}` };
   } finally {
@@ -565,6 +619,8 @@ export async function createPlayerAndResolveLink(input: {
         adminUserId: input.adminUserId,
         note: input.note?.trim()
           || `Created player ${player.displayName} and linked to ${input.targetTable} #${input.targetId}`,
+        // The generated sentence above is not a human note; the seal evaluates only what was typed.
+        sealNote: input.note,
       });
       return { ok: true as const, player };
     });
@@ -580,6 +636,7 @@ export async function createPlayerAndResolveLink(input: {
     }
     return result;
   } catch (error) {
+    if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The player and link could not be created: ${message}` };
   } finally {
@@ -789,6 +846,7 @@ export async function resolveLinkFromSuggestion(input: {
     };
     return { ok: false, error: messages[outcome.error] ?? 'The suggestion could not be approved.' };
   } catch (error) {
+    if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The link could not be applied: ${message}` };
   } finally {

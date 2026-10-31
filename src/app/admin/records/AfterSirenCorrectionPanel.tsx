@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef } from 'react';
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
+import { useRef, useState } from 'react';
 
 import {
   asText, correctionFormData, useCorrectionDraft,
@@ -47,6 +48,7 @@ const SIREN_LABELS: Record<string, string> = {
  */
 export function AfterSirenCorrectionPanel({ row }: { row: AfterSirenAdminRow }) {
   const submitRef = useRef<HTMLButtonElement>(null);
+  const [adminNote, setAdminNote] = useState('');
   const correct = useSpecialRecordsActionSubmit(correctAfterSirenKickAction);
   const draft = useCorrectionDraft({
     playerNameRaw: asText(row.playerNameRaw),
@@ -96,6 +98,7 @@ export function AfterSirenCorrectionPanel({ row }: { row: AfterSirenAdminRow }) 
       expectedUpdatedAt: row.updatedAt,
       values: draft.values,
       changed: draft.changed,
+      adminNote,
     }), submitRef.current);
   };
 
@@ -309,6 +312,8 @@ export function AfterSirenCorrectionPanel({ row }: { row: AfterSirenAdminRow }) 
           them, and after-siren player linkage is deliberately out of scope (D-2). A record with no
           player shows as unlinked rather than being silently guessed at.
         </p>
+
+        <CorrectionNoteField name="adminNote" value={adminNote} onChange={setAdminNote} label="Administrative note (kept with the audit entry)" disabled={correct.isPending} />
 
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
           <button

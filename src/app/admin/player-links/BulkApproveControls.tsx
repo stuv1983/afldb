@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect } from 'react';
 
@@ -50,7 +51,7 @@ export function BulkApproveControls({
   }
 
   return (
-    <form action={formAction} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+    <form action={formAction} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
       <input
         type="hidden"
         name="targets"
@@ -61,6 +62,7 @@ export function BulkApproveControls({
         name="playerIds"
         value={targets.map((t) => t.suggestPlayerId ?? '').join(',')}
       />
+      <CorrectionNoteField name="note" label="Verification note (applies to every approval in this batch)" id="bulk-approve-note" />
       <button type="submit" className="btn btn-primary" disabled={pending}>
         {pending
           ? 'Approving…'

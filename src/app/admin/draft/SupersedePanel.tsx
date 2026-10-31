@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useState } from 'react';
 
 import { supersedeManualPickBySourceRowAction } from '@/app/admin/draft/actions';
@@ -21,12 +22,14 @@ export function SupersedePanel({
   sourcePlayerNameRaw: string;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [note, setNote] = useState('');
   const supersede = useDraftActionSubmit(supersedeManualPickBySourceRowAction);
 
   const handleSupersede = (event: React.MouseEvent<HTMLButtonElement>) => {
     const formData = new FormData();
     formData.set('manualPickId', String(manualPickId));
     formData.set('sourcePickId', String(sourcePickId));
+    formData.set('note', note);
     supersede.submit(formData, event.currentTarget);
   };
 
@@ -45,6 +48,7 @@ export function SupersedePanel({
         </button>
       ) : (
         <div style={{ display: 'grid', gap: '0.5rem', maxWidth: '26rem' }}>
+          <CorrectionNoteField value={note} onChange={setNote} disabled={supersede.isPending} />
           {supersede.state.error && <p className="notice" role="alert">{supersede.state.error}</p>}
           {supersede.state.ok && supersede.state.message && <p className="notice" role="status">{supersede.state.message}</p>}
           <div style={{ display: 'flex', gap: '0.6rem' }}>

@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -289,10 +290,14 @@ export function ReplacePanel({
             <HonourTeamFields prefix="new:" existingTeams={existingTeams ?? []} />
           )}
 
-          <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
-            Administrative note (kept with both audit entries)
-            <input type="text" name="adminNote" maxLength={2000} />
-          </label>
+          {domain === 'winners' ? (
+            <CorrectionNoteField name="adminNote" label="Administrative note (kept with both audit entries)" />
+          ) : (
+            <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
+              Administrative note (kept with both audit entries)
+              <input type="text" name="adminNote" maxLength={2000} />
+            </label>
+          )}
 
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button ref={previewRef} type="submit" className="btn btn-primary">

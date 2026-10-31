@@ -204,6 +204,10 @@ describe('AFLDB-ISSUE-167 Stage 5 — public special-record reads are filtered',
       const literal = expand(raw, consts);
       const refs = referencesIn(literal);
       if (refs.length === 0) continue;
+      // V2-GAP-006: the admin season-seal lookup of ONE row the editor has already locked, by id. It
+      // reads a season, never a record, so the public active filter does not apply (a void row can
+      // still be re-linked, and must resolve to ITS season rather than fail closed as unknown).
+      if (/^\s*SELECT season FROM \w+ WHERE id = \$\{targetId\}\s*$/.test(literal)) { checked += refs.length; continue; }
 
       // Per alias, so filtering four of five identically-aliased CTEs fails.
       const byAlias = new Map<string, number>();

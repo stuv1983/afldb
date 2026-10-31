@@ -180,6 +180,8 @@ export async function endAppointmentAction(
     adminUserId: admin.id,
     endedOn: optionalText(formData.get('endedOn'), 10),
     reason: optionalText(formData.get('reason'), 500),
+    // V2-GAP-006: the correction note the server requires for a sealed season.
+    note: optionalText(formData.get('note'), 2000),
   });
 
   if (!result.ok) {
@@ -215,6 +217,7 @@ export async function reinstateAppointmentAction(
     expectedUpdatedAt,
     adminUserId: admin.id,
     confirmCoCaptaincy: formData.get('confirmCoCaptaincy') === '1',
+    note: optionalText(formData.get('note'), 2000), // V2-GAP-006
   });
 
   if (!result.ok) {
@@ -252,6 +255,7 @@ export async function correctAppointmentAction(
     startedOn: optionalText(formData.get('startedOn'), 10),
     endedOn: optionalText(formData.get('endedOn'), 10),
     appointmentNote: optionalText(formData.get('appointmentNote'), 2000),
+    note: optionalText(formData.get('note'), 2000), // V2-GAP-006: the audit note, distinct from the appointment's own note
   });
 
   if (!result.ok) {
@@ -287,6 +291,7 @@ export async function voidAppointmentAction(
 
   const result = await voidAppointmentQuery({
     appointmentKey, expectedUpdatedAt, adminUserId: admin.id, reason,
+    note: optionalText(formData.get('note'), 2000), // V2-GAP-006
   });
 
   if (!result.ok) {

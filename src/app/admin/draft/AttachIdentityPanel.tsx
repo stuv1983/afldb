@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRef } from 'react';
 
 import { attachAflTablesIdentityAction } from '@/app/admin/draft/actions';
@@ -47,6 +48,8 @@ export function AttachIdentityPanel({ playerId, displayName }: { playerId: numbe
         </label>
         {attach.state.error && <p className="notice" role="alert">{attach.state.error}</p>}
         {attach.state.ok && attach.state.message && <p className="notice" role="status">{attach.state.message}</p>}
+        <CorrectionNoteField disabled={attach.isPending} />
+
         <div>
           <button type="button" className="btn btn-primary" onClick={handleAttach} disabled={attach.isPending}>
             {attach.isPending ? 'Attaching…' : 'Attach identity'}

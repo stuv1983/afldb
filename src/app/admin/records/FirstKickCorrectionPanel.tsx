@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef } from 'react';
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
+import { useRef, useState } from 'react';
 
 import {
   asText, correctionFormData, useCorrectionDraft,
@@ -36,6 +37,7 @@ import type { FirstKickGoalAdminRow } from '@/db/queries/admin-special-records';
  */
 export function FirstKickCorrectionPanel({ row }: { row: FirstKickGoalAdminRow }) {
   const submitRef = useRef<HTMLButtonElement>(null);
+  const [adminNote, setAdminNote] = useState('');
   const correct = useSpecialRecordsActionSubmit(correctFirstKickGoalAction);
   const draft = useCorrectionDraft({
     playerNameRaw: asText(row.playerNameRaw),
@@ -64,6 +66,7 @@ export function FirstKickCorrectionPanel({ row }: { row: FirstKickGoalAdminRow }
       expectedUpdatedAt: row.updatedAt,
       values: draft.values,
       changed: draft.changed,
+      adminNote,
     }), submitRef.current);
   };
 
@@ -192,6 +195,8 @@ export function FirstKickCorrectionPanel({ row }: { row: FirstKickGoalAdminRow }
           move the match link — the import resolves the match from the source&apos;s own season and
           round, and a link changed here would not survive a rebuild.
         </p>
+
+        <CorrectionNoteField name="adminNote" value={adminNote} onChange={setAdminNote} label="Administrative note (kept with the audit entry)" disabled={correct.isPending} />
 
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
           <button

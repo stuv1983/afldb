@@ -223,6 +223,7 @@ export async function copySeasonListsForwardAction(
 
   const result = await copySeasonListsForwardQuery({
     season, clubs, dryRun, adminUserId: admin.id,
+    note: optionalText(formData.get('note'), 2000), // V2-GAP-006
   });
 
   if (!result.ok) {

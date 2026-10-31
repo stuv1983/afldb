@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 
@@ -85,13 +86,12 @@ export function DeleteMatchButton({
 
       <form action={formAction} style={{ display: 'grid', gap: '0.5rem' }}>
         <input type="hidden" name="matchId" value={matchId} />
-        <input
-          type="text"
+        <CorrectionNoteField
           name="reason"
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Reason for deletion (optional, e.g. test match)"
-          style={{ fontSize: '0.8rem' }}
+          onChange={setReason}
+          label="Reason for deletion (audit entry; required for a sealed season)"
+          id={`delete-match-reason-${matchId}`}
         />
 
         <div style={{ display: 'flex', gap: '0.5rem' }}>

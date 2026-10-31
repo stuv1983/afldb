@@ -14,12 +14,19 @@ evidence. Nothing in section 3 is executed.
 
 ## 2. D-V2-GAP006-EDITORS — the exact decision the trace produced
 
+> **DECIDED 2026-10-31: E1 approved for local implementation, and implemented locally the same day (not deployed).**
+> See `known-gaps.md` V2-GAP-006 for what is covered and what remains. The workflow mapping the owner chose is `data_editor`
+> for the audited manual editors, with `brownlow_authority` and `identity_adjudication` retained where they already apply,
+> and no new workflow id. One detail of the package below changed with the owner's decision: the evidence reference is the
+> same-transaction `data_edits` row, so the audit row is inserted first and the guard runs on it inside the same
+> transaction (a refusal still rolls back the canonical write, the audit row and every sibling write).
+
 ### 2.1 What the trace found
 
 The seal contract is `evaluateSeasonWrite` (`packages/domain/src/season-seal.ts`). A write to a sealed season is refused
 unless it carries an **audited correction**: a workflow id from a **closed list of eight**, the acting user, a **note of
 20-2000 characters** (owner decision OD-4) and a **non-empty evidence reference**. An unknown or undated season is
-treated as sealed. The sealed range is read from `data/reference/seasons.json` (today 1897-2025) through
+treated as sealed. The sealed range is read from `data/reference/seasons.json` (1897-2026 today, 2027 open) through
 `src/lib/seasons/sealed-seasons.ts`, which fails closed.
 
 Already covered: the three AFL API settle CLIs, the Coleman publisher (`derived_award_publication`), curated award

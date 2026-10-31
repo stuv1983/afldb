@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import {
   clearPlayerClubMatchReferences,
   matchBusyRefusal,
@@ -122,6 +123,11 @@ export type CreateMatchInput = {
   attendance?: number | null;
   matchEvent?: string | null;
   notes?: string | null;
+  /**
+   * V2-GAP-006: the administrator's correction note for the audit row. Required (20-2000 characters) when
+   * the match is in a sealed season; `notes` is the match's own public text and is never taken as it.
+   */
+  note?: string | null;
   homeQuarters?: Record<number, QuarterScoreInput> | null; // periods 1..4
   awayQuarters?: Record<number, QuarterScoreInput> | null; // periods 1..4
   adminUserId: number;
@@ -365,7 +371,10 @@ export async function createMatch(input: CreateMatchInput): Promise<{
           awayScore,
         },
         adminUserId: input.adminUserId,
-        note: input.notes?.trim() || 'Created match via Data Editor',
+        note: input.note?.trim() || input.notes?.trim() || 'Created match via Data Editor',
+        // The stored default is not a human note; the seal evaluates only what the admin typed.
+        sealNote: input.note,
+        seal: { kind: 'row' },
       });
 
       return matchRow;
@@ -673,6 +682,9 @@ export async function deleteMatch(input: {
         newValues: {},
         adminUserId: input.adminUserId,
         note: input.reason?.trim() || 'Deleted match via Data Editor',
+        // The stored default is not a human note; the seal evaluates only what the admin typed.
+        sealNote: input.reason,
+        seal: { kind: 'seasons', seasons: [match.season] },
       });
 
       return {
@@ -719,6 +731,8 @@ export async function deleteMatch(input: {
     // refusal instead.
     const busy = matchBusyRefusal(error);
     if (busy) return { ok: false, error: busy };
+    // The season seal (V2-GAP-006): the transaction rolled back whole; the action does not catch.
+    if (isSealedEditorRefusal(error)) return { ok: false, error: error.message };
     if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23503') {
       return {
         ok: false,

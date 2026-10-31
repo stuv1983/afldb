@@ -449,6 +449,13 @@ preamble over-claimed for the Stage 2 manifest producer) fixed in the closure co
 placeholders in this table) filled; C6-004 (INFO, the guard ignores DSN query parameters) documented
 in `shadow-rehearsal.md` §2; C6-005 and C6-006 (INFO) need nothing.
 
+## 2026-10-31: V2-GAP-006 editors (D-V2-GAP006-EDITORS, E1) implemented locally
+
+The season seal now covers every audited admin editor mutation (55 audit call sites plus player-link resolutions); see
+`known-gaps.md` V2-GAP-006 and the `CHANGELOG.md` Unreleased entry for scope, validation and visual evidence. Local
+only: nothing pushed or deployed; database-level enforcement not implemented; gap 006 remains open (register count
+unchanged: 38 / 31 / 7).
+
 ## Next action for the owner
 
 1. Review `v2/rebuild` (`git log ff100dc2..v2/rebuild`) starting with `docs/v2/final-report.md`.

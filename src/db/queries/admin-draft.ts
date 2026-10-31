@@ -7,6 +7,7 @@ import 'server-only';
 import postgres from 'postgres';
 
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import {
@@ -278,6 +279,8 @@ class RollbackRefusal extends Error {
 function rolledBackRefusal(
   error: unknown,
 ): { ok: false; error: string; reason: DraftRefusalReason } | null {
+  // The season seal (V2-GAP-006): the transaction rolled back whole; say so in its own words.
+  if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
   return error instanceof RollbackRefusal ? refuse(error.reason, error.detail) : null;
 }
 
@@ -792,6 +795,7 @@ export async function saveSourcePickFields(
           newValues: values,
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'row', previousSeasons: [pick.draftYear] },
         });
 
         const changed: Record<string, { from: FieldValue; to: FieldValue }> = {};
@@ -853,6 +857,9 @@ export async function retireSourcePickOverride(input: {
           newValues: {},
           adminUserId: input.adminUserId,
           note: `${(input.note ?? '').trim()}${input.note ? ' — ' : ''}override retired`,
+          // The stored note carries a fixed suffix; the seal evaluates only what the admin typed.
+          sealNote: input.note,
+          seal: { kind: 'row' },
         });
         return { ok: true as const };
       });
@@ -1024,6 +1031,7 @@ export async function createManualPick(
           newValues: { ...payload, pick_token: token },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'seasons', seasons: [input.draftYear] },
         });
         return { ok: true as const, pickId, pickToken: token, playerSlug: player.slug, playerId: player.id };
       });
@@ -1118,6 +1126,7 @@ export async function createPlayerAndDraftPick(
           newValues: { display_name: player.displayName, player_token: playerToken },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'reference' },
         });
         await recordDataEdit(tx, {
           tableName: 'players',
@@ -1127,6 +1136,7 @@ export async function createPlayerAndDraftPick(
           newValues: { ...payload, pick_token: pickToken },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'seasons', seasons: [input.draftYear] },
         });
         return {
           ok: true as const,
@@ -1247,6 +1257,7 @@ export async function saveManualPick(
             newValues: { moved_to_player_id: player.id },
             adminUserId: input.adminUserId,
             note: input.note,
+            seal: { kind: 'seasons', seasons: [pick.draftYear, input.draftYear] },
           });
         }
         await recordDataEdit(tx, {
@@ -1260,6 +1271,7 @@ export async function saveManualPick(
           newValues: { ...payload, pick_token: token },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'seasons', seasons: [pick.draftYear, input.draftYear] },
         });
         return { ok: true as const, relinked };
       });
@@ -1388,6 +1400,7 @@ export async function adoptLegacyPick(
             newValues: { ...identityPayload, player_token: playerToken },
             adminUserId: input.adminUserId,
             note: input.note,
+            seal: { kind: 'reference' },
           });
           playerIdentity = manualEntityKey(playerToken);
           mintedPlayerIdentity = true;
@@ -1440,6 +1453,7 @@ export async function adoptLegacyPick(
           newValues: { ...payload, pick_token: pickToken, adopted_from_pick_id: pick.id },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'seasons', seasons: [pick.draftYear] },
         });
         return {
           ok: true as const,
@@ -1579,6 +1593,7 @@ export async function attachAflTablesIdentityInTransaction(
     newValues: { afltables_profile_path: path, player_token: token },
     adminUserId: input.adminUserId,
     note: input.note,
+    seal: { kind: 'reference' },
   });
   return { ok: true as const };
 }
@@ -1647,6 +1662,7 @@ export async function retireManualPick(input: {
           newValues: {},
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'seasons', seasons: [pick.draftYear] },
         });
         return { ok: true as const, playerId: pick.playerId };
       });
@@ -1719,6 +1735,7 @@ export async function supersedeManualPickBySourceRow(input: {
           newValues: { superseded_by_pick_id: source.id },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'seasons', seasons: [manual.draftYear, source.draftYear] },
         });
         return { ok: true as const, playerId: manual.playerId };
       });

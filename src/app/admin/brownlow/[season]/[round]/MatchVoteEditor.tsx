@@ -323,9 +323,9 @@ export function MatchVoteEditor({
           })}
         </div>
 
-        {canFinalise && (
+        {(canFinalise || (model.status !== 'final' && model.status !== 'void')) && (
           <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', maxWidth: '30rem' }}>
-            Reason <span className="muted">(required to correct, void, or finalise a voided match)</span>
+            Reason <span className="muted">(required to correct, void, or finalise a voided match; for a sealed, completed season every save needs a reason of at least 20 characters saying what is being corrected and the evidence)</span>
             <input
               type="text"
               name="reason"

@@ -5,11 +5,12 @@
  * rollover, AFLDB-ISSUE-316 D-316-1; the explicit predecessor sealed 2025 but not 2026).
  * No database, no network.
  */
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import type postgres from 'postgres';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
   ADJUDICATION_NOTE_MAX_LENGTH,
@@ -28,7 +29,28 @@ import {
   type SeasonRegistry,
 } from '@afldb/domain';
 
+import {
+  CORRECTION_NOTE_FIELD_MAX,
+  CORRECTION_NOTE_FIELD_MIN,
+} from '@/components/admin/CorrectionNoteField';
+import {
+  REFERENCE_AUDIT_TABLES,
+  SealedEditorRefusal,
+  enforceSealedEditorWrite,
+  resolveSealScopeSeasons,
+  workflowForAuditTable,
+  type SealScope,
+} from '@/lib/seasons/sealed-editor-guard';
+import { SeasonRegistryError, loadSealedSeasons } from '@/lib/seasons/sealed-seasons';
+
 import { isSettleSeasonSealed, refuseSealedSeasonForSettle } from '../tools/current-season/settle-season-seal';
+
+// V2-GAP-006 editor guard: the registry loader is wrapped so one test can make it fail; by default
+// it is the real implementation reading the real data/reference/seasons.json.
+vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/seasons/sealed-seasons')>();
+  return { ...actual, loadSealedSeasons: vi.fn(actual.loadSealedSeasons) };
+});
 
 const REAL_REGISTRY = JSON.parse(
   readFileSync(join(__dirname, '..', 'data', 'reference', 'seasons.json'), 'utf8'),
@@ -232,5 +254,254 @@ describe('assertSeasonWritable / SealedSeasonRefusal', () => {
     });
     expect(assertSeasonWritable({ season: 2025, sealed: SEALED, correction: correction() }).basis)
       .toBe('audited_correction');
+  });
+});
+
+
+// ---------------------------------------------------------------------------------------------
+// V2-GAP-006, owner decision D-V2-GAP006-EDITORS (Option E1): the season seal for the audited
+// admin editors. A sealed-season mutation needs a 20-2000 character human note; an open season
+// needs none; an unknown season fails closed; an unreadable registry refuses. No database here -
+// the PostgreSQL behaviour (rollback, audit binding, per-editor mutations) is in
+// tests/integration/sealed-editor-guard.test.ts.
+// ---------------------------------------------------------------------------------------------
+
+const REAL_SEALED = sealedSeasonsFrom(REAL_REGISTRY);
+const SEALED_YEAR = 2019;
+const OPEN_YEAR = REAL_SEALED.through + 1; // the in-progress season of the real registry
+const EDITOR_NOTE = 'Corrected against the printed AFL Record scoreboard.';
+
+/** A transaction stand-in: row-season lookups answer from `seasons` ("table:id" -> season); nothing else is touched. */
+function fakeTx(seasons: Record<string, number | null> = {}) {
+  const queries: string[] = [];
+  const tagged = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+    queries.push(strings.join('?'));
+    const season = seasons[`matches:${String(values[0])}`];
+    return season === undefined ? [] : [{ season }];
+  };
+  const unsafe = async (query: string, params: unknown[]) => {
+    queries.push(query);
+    const table = /FROM (\w+) WHERE/.exec(query)?.[1] ?? '';
+    const season = seasons[`${table}:${String(params[0])}`];
+    return season === undefined ? [] : [{ season }];
+  };
+  return { tx: Object.assign(tagged, { unsafe }) as unknown as postgres.TransactionSql, queries };
+}
+
+async function enforce(opts: {
+  tableName?: string; rowId?: number; scope: SealScope; note?: string | null;
+  seasons?: Record<string, number | null>; workflow?: Parameters<typeof enforceSealedEditorWrite>[1]['workflow'];
+}) {
+  const { tx } = fakeTx(opts.seasons);
+  return enforceSealedEditorWrite(tx, {
+    tableName: opts.tableName ?? 'matches',
+    rowId: opts.rowId ?? 1,
+    scope: opts.scope,
+    actorUserId: 7,
+    note: opts.note ?? null,
+    workflow: opts.workflow,
+    evidenceRef: 'data_edits:99',
+  });
+}
+
+describe('the editor guard: sealed seasons need a human note (V2-GAP-006 E1)', () => {
+  it('mirrors the domain note limits in the form field copy', () => {
+    expect(CORRECTION_NOTE_FIELD_MIN).toBe(CORRECTION_NOTE_MIN_LENGTH);
+    expect(CORRECTION_NOTE_FIELD_MAX).toBe(CORRECTION_NOTE_MAX_LENGTH);
+  });
+
+  it('reads the real registry: sealed through the last season not in progress, the in-progress season open', () => {
+    expect(isSealedSeason(REAL_SEALED, SEALED_YEAR)).toBe(true);
+    expect(isSealedSeason(REAL_SEALED, OPEN_YEAR)).toBe(false);
+  });
+
+  it('refuses a missing note on a sealed season, naming the rule and that nothing changed', async () => {
+    for (const note of [null, undefined, '', '   \n ']) {
+      const failure = await enforce({ scope: { kind: 'seasons', seasons: [SEALED_YEAR] }, note })
+        .then(() => null, (error: unknown) => error);
+      expect(failure).toBeInstanceOf(SealedEditorRefusal);
+      expect(failure).toMatchObject({ code: 'correction_invalid', seasons: [SEALED_YEAR] });
+      expect((failure as Error).message).toContain(`${SEALED_YEAR} is sealed historical data`);
+      expect((failure as Error).message).toContain('20-2000 characters');
+      expect((failure as Error).message).toContain('No note was entered');
+      expect((failure as Error).message).toContain('Nothing was changed');
+    }
+  });
+
+  it('refuses a short note (trimmed) and an excessive note, but not the boundaries', async () => {
+    const scope: SealScope = { kind: 'seasons', seasons: [SEALED_YEAR] };
+    await expect(enforce({ scope, note: 'too short' })).rejects.toMatchObject({ code: 'correction_invalid' });
+    await expect(enforce({ scope, note: `   ${'x'.repeat(19)}   ` })).rejects.toThrow(/shorter than 20/);
+    await expect(enforce({ scope, note: 'x'.repeat(2001) })).rejects.toThrow(/longer than 2000/);
+    await expect(enforce({ scope, note: 'x'.repeat(20) })).resolves.toMatchObject({ basis: 'audited_correction' });
+    await expect(enforce({ scope, note: 'x'.repeat(2000) })).resolves.toMatchObject({ basis: 'audited_correction' });
+  });
+
+  it('accepts a valid sealed correction and binds workflow, actor, trimmed note and the real audit row', async () => {
+    const receipt = await enforce({ scope: { kind: 'seasons', seasons: [SEALED_YEAR] }, note: `  ${EDITOR_NOTE}  ` });
+    expect(receipt).toEqual({
+      basis: 'audited_correction',
+      seasons: [SEALED_YEAR],
+      sealedSeasons: [SEALED_YEAR],
+      workflow: 'data_editor',
+      actorUserId: 7,
+      note: EDITOR_NOTE,
+      evidenceRef: 'data_edits:99',
+    });
+  });
+
+  it('leaves an open season unchanged: no note needed, nothing recorded', async () => {
+    const scope: SealScope = { kind: 'seasons', seasons: [OPEN_YEAR] };
+    await expect(enforce({ scope })).resolves.toEqual({ basis: 'open_season', seasons: [OPEN_YEAR] });
+    await expect(enforce({ scope, note: 'x' })).resolves.toMatchObject({ basis: 'open_season' });
+    // A season beyond the registry (the synthetic fixture seasons 2079+) is not sealed either.
+    await expect(enforce({ scope: { kind: 'seasons', seasons: [2079] } })).resolves.toMatchObject({ basis: 'open_season' });
+  });
+
+  it('fails closed on an unknown or undated season, and on a row that cannot be found', async () => {
+    await expect(enforce({ scope: { kind: 'seasons', seasons: [null] } })).rejects.toMatchObject({ code: 'correction_invalid' });
+    await expect(enforce({ scope: { kind: 'seasons', seasons: [Number.NaN] } })).rejects.toBeInstanceOf(SealedEditorRefusal);
+    await expect(enforce({ scope: { kind: 'seasons', seasons: [2019.5] } })).rejects.toBeInstanceOf(SealedEditorRefusal);
+    // The audited row does not exist (or has a NULL season): unknown, so sealed.
+    await expect(enforce({ scope: { kind: 'row' }, seasons: {} })).rejects.toBeInstanceOf(SealedEditorRefusal);
+    await expect(enforce({ scope: { kind: 'row' }, seasons: { 'matches:1': null } }))
+      .rejects.toMatchObject({ code: 'correction_invalid' });
+    // With a valid note the unknown season is an audited correction, recorded as unknown.
+    await expect(enforce({ scope: { kind: 'row' }, seasons: { 'matches:1': null }, note: EDITOR_NOTE }))
+      .resolves.toMatchObject({ basis: 'audited_correction', sealedSeasons: [null] });
+  });
+
+  it('resolves the season from the audited row, and guards BOTH the old and the new season of a move', async () => {
+    const scope = (previousSeasons?: number[]): SealScope => ({ kind: 'row', previousSeasons });
+    // Row now in an open season, previously sealed: the old season is guarded.
+    await expect(enforce({ scope: scope([SEALED_YEAR]), seasons: { 'matches:1': OPEN_YEAR } }))
+      .rejects.toMatchObject({ code: 'correction_invalid', seasons: [SEALED_YEAR] });
+    // Row now sealed, previously open: the new season is guarded.
+    await expect(enforce({ scope: scope([OPEN_YEAR]), seasons: { 'matches:1': SEALED_YEAR } }))
+      .rejects.toMatchObject({ seasons: [SEALED_YEAR] });
+    // Both open: no note.
+    await expect(enforce({ scope: scope([OPEN_YEAR]), seasons: { 'matches:1': OPEN_YEAR } }))
+      .resolves.toMatchObject({ basis: 'open_season' });
+    // Both sealed, valid note: one correction covering both.
+    await expect(enforce({ scope: scope([2001]), seasons: { 'matches:1': SEALED_YEAR }, note: EDITOR_NOTE }))
+      .resolves.toMatchObject({ basis: 'audited_correction', sealedSeasons: [2001, SEALED_YEAR] });
+  });
+
+  it('guards every season of a multi-season mutation, and only the sealed ones need the note', async () => {
+    const mixed: SealScope = { kind: 'seasons', seasons: [OPEN_YEAR, SEALED_YEAR, SEALED_YEAR, 2001] };
+    await expect(enforce({ scope: mixed })).rejects.toMatchObject({ seasons: [SEALED_YEAR, 2001] });
+    await expect(enforce({ scope: mixed, note: EDITOR_NOTE })).resolves.toMatchObject({
+      basis: 'audited_correction', seasons: [OPEN_YEAR, SEALED_YEAR, 2001], sealedSeasons: [SEALED_YEAR, 2001],
+    });
+    await expect(enforce({ scope: { kind: 'seasons', seasons: [OPEN_YEAR, OPEN_YEAR + 1] } }))
+      .resolves.toMatchObject({ basis: 'open_season' });
+  });
+
+  it('refuses every sealed-scope write when the registry cannot be read, and never for a reference table', async () => {
+    const mocked = vi.mocked(loadSealedSeasons);
+    mocked.mockImplementation(() => { throw new SeasonRegistryError('seasons.json is unreadable'); });
+    try {
+      await expect(enforce({ scope: { kind: 'seasons', seasons: [OPEN_YEAR] }, note: EDITOR_NOTE }))
+        .rejects.toMatchObject({ name: 'SealedEditorRefusal', code: 'season_registry_unavailable' });
+      await expect(enforce({ scope: { kind: 'row' }, seasons: { 'matches:1': OPEN_YEAR } }))
+        .rejects.toMatchObject({ code: 'season_registry_unavailable' });
+      // A reference-table mutation has no season, so the registry is not consulted.
+      await expect(enforce({ tableName: 'players', scope: { kind: 'reference' } }))
+        .resolves.toEqual({ basis: 'not_applicable', seasons: [] });
+    } finally {
+      const actual = await vi.importActual<typeof import('@/lib/seasons/sealed-seasons')>('@/lib/seasons/sealed-seasons');
+      mocked.mockReset();
+      mocked.mockImplementation(actual.loadSealedSeasons);
+    }
+  });
+
+  it("allows { kind: 'reference' } only for the reference audit tables, never as a way past a season-bearing one", async () => {
+    for (const table of REFERENCE_AUDIT_TABLES) {
+      await expect(enforce({ tableName: table, scope: { kind: 'reference' } })).resolves.toMatchObject({ basis: 'not_applicable' });
+    }
+    for (const table of ['matches', 'draft_picks', 'award_winners', 'club_leadership', 'brownlow_season_authority']) {
+      await expect(enforce({ tableName: table, scope: { kind: 'reference' } })).rejects.toThrow(/not a reference audit table/);
+    }
+    // And a reference table cannot resolve a season from its row: it must declare the seasons.
+    await expect(resolveSealScopeSeasons(fakeTx().tx, 'players', 1, { kind: 'row' })).rejects.toThrow(/no season column/);
+  });
+
+  it('derives the workflow from the audited table on the server, from the closed list, adding none', async () => {
+    expect(workflowForAuditTable('brownlow_vote_entry_state')).toBe('brownlow_authority');
+    expect(workflowForAuditTable('brownlow_season_authority')).toBe('brownlow_authority');
+    for (const table of ['matches', 'draft_picks', 'award_winners', 'club_leadership', 'player_achievements', 'after_siren_kicks', 'players']) {
+      expect(workflowForAuditTable(table)).toBe('data_editor');
+    }
+    expect(AUDITED_CORRECTION_WORKFLOWS).toHaveLength(8); // the closed list gained no id
+    const brownlow = await enforce({
+      tableName: 'brownlow_season_authority', rowId: SEALED_YEAR, scope: { kind: 'row' }, note: EDITOR_NOTE,
+    });
+    expect(brownlow).toMatchObject({ basis: 'audited_correction', workflow: 'brownlow_authority', seasons: [SEALED_YEAR] });
+    // A server-side caller already under another audited workflow can name it (never a client).
+    const link = await enforce({
+      scope: { kind: 'seasons', seasons: [SEALED_YEAR] }, note: EDITOR_NOTE, workflow: 'identity_adjudication',
+    });
+    expect(link).toMatchObject({ workflow: 'identity_adjudication' });
+    await expect(enforce({
+      scope: { kind: 'seasons', seasons: [SEALED_YEAR] }, note: EDITOR_NOTE,
+      workflow: 'settle' as never,
+    })).rejects.toThrow(/closed audited-correction list/);
+  });
+
+  it('resolves the Brownlow vote-entry row through its match and the authority row as the season itself', async () => {
+    const { tx } = fakeTx({ 'matches:55': SEALED_YEAR });
+    await expect(resolveSealScopeSeasons(tx, 'brownlow_vote_entry_state', 55, { kind: 'row' })).resolves.toEqual([SEALED_YEAR]);
+    await expect(resolveSealScopeSeasons(tx, 'brownlow_season_authority', 2005, { kind: 'row' })).resolves.toEqual([2005]);
+    await expect(resolveSealScopeSeasons(tx, 'brownlow_vote_entry_state', 56, { kind: 'row' })).resolves.toEqual([null]);
+  });
+});
+
+describe('every audited editor mutation declares its seasons (V2-GAP-006 E1 inventory)', () => {
+  const QUERY_DIR = join(__dirname, '..', 'src', 'db', 'queries');
+  const files = readdirSync(QUERY_DIR).filter((f) => f.endsWith('.ts') && f !== 'audit-log.ts');
+
+  /** Every `recordDataEdit(` call expression in the source, with its argument block. */
+  function callBlocks(source: string): string[] {
+    const blocks: string[] = [];
+    const re = /await recordDataEdit\(/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(source)) !== null) {
+      // The call ends at the first line that closes the argument object at the call's own indent.
+      const lineStart = source.lastIndexOf('\n', match.index) + 1;
+      const indent = /^\s*/.exec(source.slice(lineStart))![0];
+      const end = source.indexOf(`\n${indent}});`, match.index);
+      blocks.push(source.slice(match.index, end + 1));
+    }
+    return blocks;
+  }
+
+  it('passes a seal scope at every call site, in every query module', () => {
+    let total = 0;
+    for (const file of files) {
+      const source = readFileSync(join(QUERY_DIR, file), 'utf8');
+      for (const block of callBlocks(source)) {
+        total += 1;
+        expect(block, `${file}: ${block.slice(0, 80)}`).toMatch(/\bseal:\s*(\{ kind: '|(input|entity)\.table)/);
+      }
+    }
+    expect(total).toBe(55); // the inventory at 2026-10-31; a new call site must be declared AND raise this
+  });
+
+  it("never passes { kind: 'reference' } for a table the manifest treats as season-bearing", () => {
+    for (const file of files) {
+      const source = readFileSync(join(QUERY_DIR, file), 'utf8');
+      for (const block of callBlocks(source)) {
+        if (!/seal:\s*\{ kind: 'reference' \}/.test(block)) continue;
+        const table = /tableName:\s*'(\w+)'/.exec(block)?.[1];
+        // `entity.table`/`input.table` dynamic sites are declared per case, so only literals are checked here.
+        if (table !== undefined) expect(REFERENCE_AUDIT_TABLES as readonly string[], `${file}: ${table}`).toContain(table);
+      }
+    }
+  });
+
+  it('keeps the player-link resolution on the identity_adjudication workflow', () => {
+    const source = readFileSync(join(QUERY_DIR, 'player-links.ts'), 'utf8');
+    expect(source).toContain("workflow: 'identity_adjudication'");
+    expect(source).toContain('enforceSealedEditorWrite');
   });
 });

@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -16,12 +17,14 @@ import { useDraftActionSubmit } from '@/app/admin/draft/submit-helper';
 export function RetirePanel({ pickId, expectedRevision }: { pickId: number; expectedRevision: string }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+  const [note, setNote] = useState('');
   const retire = useDraftActionSubmit(retireManualPickAction);
 
   const handleRetire = (event: React.MouseEvent<HTMLButtonElement>) => {
     const formData = new FormData();
     formData.set('pickId', String(pickId));
     formData.set('confirmRetire', '1');
+    formData.set('note', note);
     formData.set('expectedRevision', expectedRevision);
     retire.submit(formData, event.currentTarget);
   };
@@ -59,6 +62,7 @@ export function RetirePanel({ pickId, expectedRevision }: { pickId: number; expe
           <p role="alert" className="notice">
             This cannot be undone from this page. The selection will be permanently deleted.
           </p>
+          <CorrectionNoteField value={note} onChange={setNote} disabled={retire.isPending} />
           {retire.state.error && <p className="notice" role="alert">{retire.state.error}</p>}
           <div style={{ display: 'flex', gap: '0.6rem' }}>
             <button type="button" className="btn btn-primary" onClick={handleRetire} disabled={retire.isPending}>

@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
@@ -67,6 +68,8 @@ export function SpecialRecordCreatePanel({ family }: { family: RecordFamilySlug 
           replay rebuilds it from carries the source spelling rather than a club id. Every public
           page already falls back to that spelling.
         </p>
+
+        <CorrectionNoteField name="adminNote" label="Administrative note (kept with the audit entry)" disabled={create.isPending} />
 
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
           <button

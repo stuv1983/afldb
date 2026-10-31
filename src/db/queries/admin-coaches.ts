@@ -7,6 +7,7 @@ import 'server-only';
 import postgres from 'postgres';
 
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { sql } from '@/db/client';
 
 /**
@@ -485,11 +486,13 @@ export async function createCoach(input: CreateCoachInput): Promise<CreateCoachR
           newValues: overrideValues,
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'reference' },
         });
         return row.id;
       });
       return { ok: true, coachId };
     } catch (error) {
+      if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: `The coach could not be created: ${message}` };
     }
@@ -570,10 +573,12 @@ export async function saveCoachMetadata(input: SaveCoachMetadataInput): Promise<
         await recordDataEdit(tx, {
           tableName: 'coaches', rowId: input.coachId, fieldGroup: 'identity',
           oldValues, newValues: values, adminUserId: input.adminUserId, note: input.note,
+          seal: { kind: 'reference' },
         });
       });
       return { ok: true };
     } catch (error) {
+      if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: `The edit could not be applied: ${message}` };
     }
@@ -643,10 +648,12 @@ export async function linkCoachToPlayer(input: {
           tableName: 'coaches', rowId: input.coachId, fieldGroup: 'linkage',
           oldValues: { player_id_identity: null }, newValues: { player_id_identity: profilePath },
           adminUserId: input.adminUserId, note: input.note,
+          seal: { kind: 'reference' },
         });
       });
       return { ok: true };
     } catch (error) {
+      if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: message };
     }
@@ -688,10 +695,12 @@ export async function unlinkCoach(input: {
           tableName: 'coaches', rowId: input.coachId, fieldGroup: 'linkage',
           oldValues: { player_id_identity: coach.afltablesProfilePath }, newValues: { player_id_identity: null },
           adminUserId: input.adminUserId, note: input.note,
+          seal: { kind: 'reference' },
         });
       });
       return { ok: true };
     } catch (error) {
+      if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: message };
     }
@@ -766,11 +775,13 @@ export async function setCoachAssignment(input: {
             oldValues: { club: club.slug, coach: existing?.coachPath ?? null, source: existing?.sourceKey ?? null },
             newValues: { club: club.slug, coach: coach.afltablesCoachPath, source: 'manual_admin_edit' },
             adminUserId: input.adminUserId, note: input.note,
+            seal: { kind: 'row' },
           });
         }
       });
       return { ok: true };
     } catch (error) {
+      if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: message };
     }
@@ -815,10 +826,12 @@ export async function clearCoachAssignment(input: {
           oldValues: { club: club.slug, coach: existing.overrideValues.coach_identity ?? null, source: 'manual_admin_edit' },
           newValues: { club: club.slug, coach: existing.overrideValues.coach_identity ?? null, source: 'manual_admin_edit', retired: true },
           adminUserId: input.adminUserId, note: input.note,
+          seal: { kind: 'row' },
         });
       });
       return { ok: true };
     } catch (error) {
+      if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: message };
     }
@@ -860,10 +873,12 @@ export async function retireCoachOverride(input: {
           tableName: 'coaches', rowId: input.coachId, fieldGroup: input.fieldGroup,
           oldValues: existing.overrideValues, newValues: { ...existing.overrideValues, retired: true },
           adminUserId: input.adminUserId, note: input.note,
+          seal: { kind: 'reference' },
         });
       });
       return { ok: true };
     } catch (error) {
+      if (isSealedEditorRefusal(error)) return { ok: false, error: error.message }; // V2-GAP-006 season seal
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: message };
     }

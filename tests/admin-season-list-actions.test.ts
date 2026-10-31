@@ -99,6 +99,7 @@ function defaultDb(overrides: Record<string, unknown[]> = {}): Responder {
     if (flat.includes('FROM season_list_members m')) return [];
     if (flat.includes('FROM sources WHERE key')) return [{ id: 3 }];
     if (flat.includes('INSERT INTO season_list_members')) return [{ id: 500 }];
+    if (flat.includes('INSERT INTO data_edits')) return [{ id: 9001 }]; // RETURNING id (V2-GAP-006)
     return [];
   };
 }

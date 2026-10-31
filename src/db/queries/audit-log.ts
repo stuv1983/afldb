@@ -2,6 +2,14 @@ import 'server-only';
 
 import type postgres from 'postgres';
 
+import type { AuditedCorrectionWorkflow } from '@afldb/domain';
+
+import {
+  enforceSealedEditorWrite,
+  type SealReceipt,
+  type SealScope,
+} from '@/lib/seasons/sealed-editor-guard';
+
 /**
  * Required mutation audit (AFLDB-ISSUE-027, migration 066).
  *
@@ -105,13 +113,47 @@ export type DataEditAuditInput = {
   newValues: Record<string, unknown>;
   adminUserId: number;
   note?: string | null;
+  /**
+   * The HUMAN-written note the season seal evaluates, when `note` is not exactly what the admin
+   * typed (a few editors append a fixed suffix to the stored note). Defaults to `note`. A fixed
+   * suffix must never count toward the 20-character minimum.
+   */
+  sealNote?: string | null;
+  /**
+   * Server-internal only: a caller that already runs under a more specific audited workflow
+   * (the Coleman publisher, curated award approval) names it so the receipt records that one.
+   * It must come from server code, never from a form or a request. Default: derived from
+   * `tableName` (see `workflowForAuditTable`).
+   */
+  sealWorkflow?: AuditedCorrectionWorkflow;
+  /**
+   * REQUIRED (V2-GAP-006, D-V2-GAP006-EDITORS E1): which seasons this mutation writes, so the
+   * season seal can be applied inside this same transaction. See `SealScope`. There is no
+   * default: a new editor mutation cannot be added without declaring its seasons.
+   */
+  seal: SealScope;
 };
 
+export type DataEditReceipt = {
+  /** The id of the `data_edits` row just written (int8, so a string at runtime). */
+  readonly id: string;
+  readonly seal: SealReceipt;
+};
+
+/**
+ * Writes the required audit row and applies the season seal in the SAME transaction.
+ *
+ * The seal runs AFTER the audit INSERT so that the correction's evidence reference names the real
+ * row (`data_edits:<id>`, read back by RETURNING, never predicted). A refusal THROWS
+ * `SealedEditorRefusal`, which aborts the transaction: the canonical write that preceded this
+ * call, the audit row and every sibling write roll back together. A write wholly inside an open
+ * season is unchanged and needs no note.
+ */
 export async function recordDataEdit(
   tx: postgres.TransactionSql,
   input: DataEditAuditInput,
-): Promise<void> {
-  await tx`
+): Promise<DataEditReceipt> {
+  const rows = await tx<{ id: string }[]>`
     INSERT INTO data_edits
           (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
     VALUES (${input.tableName}, ${input.rowId}, ${input.fieldGroup},
@@ -119,5 +161,18 @@ export async function recordDataEdit(
             ${tx.json(input.newValues as postgres.JSONValue)},
             ${input.adminUserId},
             ${(input.note ?? '').trim().slice(0, 2000) || null})
+    RETURNING id
   `;
+  const id = String(rows[0]!.id);
+  const seal = await enforceSealedEditorWrite(tx, {
+    tableName: input.tableName,
+    rowId: input.rowId,
+    scope: input.seal,
+    actorUserId: input.adminUserId,
+    // `sealNote` present (even as undefined) means `note` is not the human's text: evaluate only that.
+    note: 'sealNote' in input ? input.sealNote : input.note,
+    evidenceRef: `data_edits:${id}`,
+    workflow: input.sealWorkflow,
+  });
+  return { id, seal };
 }

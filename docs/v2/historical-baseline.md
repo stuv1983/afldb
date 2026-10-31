@@ -15,7 +15,7 @@ this repository; the repository holds only its definition, its verification tool
 authorised run produces one, a content-free manifest of it.
 
 - **Sealed seasons**: every season from `first_season` to the last season not listed in
-  `in_progress_seasons` in `data/reference/seasons.json`. Today: **1897-2025**. 2026 is open.
+  `in_progress_seasons` in `data/reference/seasons.json`. Today: **1897-2026** (the registry after the 2026 rollover; 2027 is in progress and open). This section's earlier text said 1897-2025.
   The rollover (`tools/db/rollover-season.ts`) seals a season by writing `in_progress_seasons:
   [Y + 1]`.
 - **Covered tables**: the fact and reference tables listed in
@@ -55,6 +55,22 @@ sealed season in every writing mode before opening a database client (except the
 constraint or trigger stops other writers (V2-GAP-006, narrowed); for them the manifest
 comparison remains the control. Settle is never a correction workflow: the refusal points at the
 audited workflows in the table above.
+
+**The audited admin editors (V2-GAP-006, owner decision D-V2-GAP006-EDITORS, Option E1; implemented locally
+2026-10-31, not deployed).** Every mutation the editors make goes through `recordDataEdit`
+(`src/db/queries/audit-log.ts`), which inserts the `data_edits` row and then asks
+`enforceSealedEditorWrite` (`src/lib/seasons/sealed-editor-guard.ts`) to decide the write against the season registry
+inside the same transaction. A write that touches a sealed season, or a season that cannot be determined (fail
+closed), is refused unless it carries a **human-written note of 20-2000 characters** (after trim). The refusal rolls the
+whole transaction back: the canonical row, the audit row and every sibling write. An open season is unchanged and needs
+no note. The workflow is derived on the server from the audited table (`data_editor`; `brownlow_authority` for the
+Brownlow tables; `identity_adjudication` for a player-link resolution; `curated_award_approval` and
+`derived_award_publication` where those paths call the shared writers) and the actor is the authenticated
+administrator. The evidence reference is `data_edits:<id>` of the row just written in the same transaction (or
+`player_link_resolutions:<id>`), never a predicted or invented id. A note the editor generates or defaults (for example
+"Created match via Data Editor") never satisfies the rule. A record that moves season is checked for the old season
+and the new. Season-less reference tables (players, coaches, hall of fame, honour teams, fixtures) are declared
+explicitly and are not season-sealed. The closed list of workflows gained no id.
 
 ## 3. Out of scope, and why
 

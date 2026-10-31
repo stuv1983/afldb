@@ -1,5 +1,7 @@
 'use client';
 
+import { keepFormOnSubmit } from '@/components/admin/keep-form-on-submit';
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
@@ -115,7 +117,7 @@ export function CreateMatchForm({
         </div>
       )}
 
-      <form action={formAction} style={{ display: 'grid', gap: '1rem' }}>
+      <form onSubmit={keepFormOnSubmit(formAction)} style={{ display: 'grid', gap: '1rem' }}>
         {/* Row 1: Season, Round Type, Round # */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', gap: '0.75rem' }}>
           <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
@@ -390,6 +392,11 @@ export function CreateMatchForm({
             style={{ fontSize: '0.9rem', resize: 'vertical' }}
           />
         </label>
+
+        <CorrectionNoteField
+          name="note"
+          label="Correction note (audit entry; required for a sealed season)"
+        />
 
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
           <button type="submit" disabled={isPending}>

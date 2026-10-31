@@ -6,6 +6,7 @@ import postgres from 'postgres';
 
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { resolvePlayerIdentity } from '@/db/queries/player-identity';
 
 /**
@@ -284,6 +285,8 @@ class RollbackRefusal extends Error {
 
 /** The refusal a `RollbackRefusal` carried, or null for a genuine failure. */
 function rolledBackRefusal(error: unknown): SeasonListRefusal | null {
+  // The season seal (V2-GAP-006): the transaction rolled back whole; say so in its own words.
+  if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
   return error instanceof RollbackRefusal
     ? refuse(error.reason, error.detail, error.subjects)
     : null;
@@ -533,6 +536,7 @@ async function insertMembership(tx: Tx, input: {
     newValues: { ...payload, entity_key: entityKey, ...(input.auditExtra ?? {}) },
     adminUserId: input.adminUserId,
     note: input.note,
+    seal: { kind: 'seasons', seasons: [input.season] },
   });
 
   return { membershipId: inserted.id, entityKey };
@@ -597,6 +601,7 @@ async function deleteMembership(tx: Tx, input: {
     },
     adminUserId: input.adminUserId,
     note: input.note,
+    seal: { kind: 'seasons', seasons: [input.row.season] },
   });
 
   return { entityKey };

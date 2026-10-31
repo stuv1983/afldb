@@ -437,6 +437,7 @@ export async function createMatchAction(
       attendance,
       matchEvent,
       notes,
+      note: String(formData.get('note') ?? '').trim() || null, // V2-GAP-006 correction note
       homeQuarters,
       awayQuarters,
       adminUserId: admin.id,
@@ -484,7 +485,9 @@ export async function deleteMatchAction(
     return { error: 'Invalid match ID.' };
   }
 
-  const reason = String(formData.get('reason') ?? '').trim() || 'Deleted match via Data Editor';
+  // The raw reason: deleteMatch supplies its own default for the stored audit note, but a default must
+  // never satisfy the sealed-season correction-note rule (V2-GAP-006), so it is not applied here.
+  const reason = String(formData.get('reason') ?? '').trim() || undefined;
 
   const result = await deleteMatch({
     matchId,

@@ -4,8 +4,11 @@ import { randomUUID } from 'node:crypto';
 
 import postgres from 'postgres';
 
+import type { AuditedCorrectionWorkflow } from '@afldb/domain';
+
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { MANUAL_SOURCE_KEY, resolvePlayerIdentity } from '@/db/queries/player-identity';
 import {
   awardPath, awardSeasonPath, clubPath, honourTeamPath, playerPath, seasonPath,
@@ -293,6 +296,8 @@ class RollbackRefusal extends Error {
 }
 
 function rolledBackRefusal(error: unknown): HonourRefusal | null {
+  // The season seal (V2-GAP-006): the transaction rolled back whole; say so in its own words.
+  if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
   return error instanceof RollbackRefusal
     ? refuse(error.reason, error.detail, error.subjects)
     : null;
@@ -1023,6 +1028,7 @@ async function runHonourEditInTx<TRow>(tx: Tx, input: HonourEditSpec<TRow>): Pro
     newValues: { ...row.auditIdentity, ...applied.newValues },
     adminUserId: input.adminUserId,
     note: input.note,
+    seal: input.table === 'award_winners' ? { kind: 'row' } : { kind: 'reference' },
   });
 
   return {
@@ -1457,6 +1463,8 @@ type CreatedWinner = { rowId: number; entityKey: string; sourceRecordId: string 
 export async function insertAwardWinner(tx: Tx, input: CreateAwardWinnerInput & {
   replacesKey?: string | null;
   auditExtra?: Record<string, unknown>;
+  /** Server-internal: the audited workflow the caller already runs under (curated approval). */
+  sealWorkflow?: AuditedCorrectionWorkflow;
 }): Promise<CreatedWinner> {
   const [award] = await tx<{
     id: number; slug: string; name: string; category: string;
@@ -1628,6 +1636,8 @@ export async function insertAwardWinner(tx: Tx, input: CreateAwardWinnerInput & 
     },
     adminUserId: input.adminUserId,
     note: input.adminNote,
+    sealWorkflow: input.sealWorkflow,
+    seal: { kind: 'row' },
   });
 
   await recomputeAwardSpan(tx, input.awardId);
@@ -1786,6 +1796,7 @@ export async function replaceAwardWinnerInTx(
     },
     adminUserId: input.adminUserId,
     note: input.note,
+    seal: { kind: 'row' },
   });
 
   await recomputeAwardSpan(tx, row.row.awardId);
@@ -2328,6 +2339,7 @@ async function insertHallOfFame(tx: Tx, input: CreateHallOfFameInput & {
     },
     adminUserId: input.adminUserId,
     note: input.adminNote,
+    seal: { kind: 'reference' },
   });
 
   return { rowId: inserted.id, entityKey };
@@ -2450,6 +2462,7 @@ export async function replaceHallOfFameInductee(
           },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'reference' },
         });
 
         const createdRow = await readHallOfFameInTx(tx as Tx, created.rowId);
@@ -2881,6 +2894,7 @@ async function insertHonourTeamMember(tx: Tx, input: CreateHonourTeamMemberInput
     },
     adminUserId: input.adminUserId,
     note: input.adminNote,
+    seal: { kind: 'reference' },
   });
 
   return { rowId: inserted.id, entityKey };
@@ -2990,6 +3004,7 @@ export async function replaceHonourTeamMember(
           },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'reference' },
         });
 
         const createdRow = await readHonourTeamMemberInTx(tx as Tx, created.rowId);

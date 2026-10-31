@@ -15,6 +15,36 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-006: season seal on the audited admin editors, Option E1 (2026-10-31, local only, not deployed)
+
+- **Behaviour.** Every audited editor mutation now goes through one guard (`src/lib/seasons/sealed-editor-guard.ts`,
+  called by `recordDataEdit`, plus the player-link resolution). A change touching a sealed season (registry: 1897-2026;
+  2027 open), or an unknown season, is refused unless it carries a human-written note of 20-2000 characters; open seasons
+  are unchanged. A refusal rolls back the canonical write, the `data_edits` row and every sibling write. The evidence
+  reference is the real same-transaction row. Generated or default notes never count. A record that changes season is
+  checked for the old and new season. No workflow id was added (`data_editor`, `brownlow_authority`,
+  `identity_adjudication`, plus the existing curated-award and Coleman ids where those paths reach the shared writers).
+- **Scope.** All 55 `recordDataEdit` call sites (a static inventory test pins the count and requires each to declare its
+  seal scope) and player-link resolutions. Season-less reference tables (players, coaches, Hall of Fame, honour teams,
+  fixtures) are declared explicitly. `deleteMatch` no longer lets the action's default reason satisfy the rule.
+- **UI.** A shared `CorrectionNoteField` on the data editor, create/delete match, match sheet, awards winners, draft,
+  coach assignments, season lists and leadership, special records, player links and Brownlow editor/publish; a refused
+  data-editor save no longer wipes the typed edit (`keep-form-on-submit.ts`).
+- **Validation (local; disposable PostgreSQL 16, `afldb_v2_gap006_test`).** `tsc` clean; unit directory 204 files passed
+  (11,502 tests); 21 editor/related integration files passed (545 tests, 2 skipped), including the new
+  `tests/integration/sealed-editor-guard.test.ts` (16 tests: missing/short/excessive notes, boundaries, valid corrections
+  and audit binding, open season unchanged, unknown season fails closed, registry unavailable, direct transaction
+  rollback, old/new season, Brownlow workflow, coaches/awards/draft refusals). Not run: `v2-brownlow-production-correction`
+  and `v2-coleman-publication` integration (they require dedicated databases this workstation did not have).
+- **Visual evidence.** Headed Chromium against a local production build on the same disposable database, sealed 1990
+  match and 2025 coach season: refusal shown, database and audit unchanged, typed edit kept, valid note saved and bound
+  to the actor (`tools/v2/gap006-editor-visual.mts`; screenshots reviewed, desktop 1280x800 and mobile 390x844, no
+  horizontal overflow). Season-lists and player-links notes: VISUAL: UNVERIFIED (no 2027 club identity or open review
+  target in that database).
+- **Not done / still open (gap 006 stays open).** Database-level enforcement (no constraint or trigger); direct-library,
+  legacy and ISSUE-316 writers; deployment and production verification. Known limitation: the action layer's
+  `optionalText(..., 2000)` silently truncates a crafted over-length note.
+
 ### V2-GAP-005 and V2-GAP-010 closed as accepted decisions; V2-GAP-006 traced and held (2026-10-31)
 
 - Records only; no code, test, database, host, provider or Brownlow operation. Owner decisions D-V2-GAP005 and

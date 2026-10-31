@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRef, useState, useTransition } from 'react';
 
 import { searchPlayersForDraftAction, saveManualPickAction } from '@/app/admin/draft/actions';
@@ -183,6 +184,8 @@ export function ManualPickPanel({
         )}
         {!save.state.needsConfirmation && save.state.error && <p className="notice" role="alert">{save.state.error}</p>}
         {save.state.ok && save.state.message && <p className="notice" role="status">{save.state.message}</p>}
+
+        <CorrectionNoteField disabled={save.isPending} />
 
         <div>
           <button

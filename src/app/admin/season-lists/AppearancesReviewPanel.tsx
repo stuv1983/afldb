@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useState } from 'react';
 
 import { addSeasonListMemberAction, addSeasonListMembersAction } from '@/app/admin/season-lists/actions';
@@ -39,6 +40,7 @@ export function AppearancesReviewPanel({
   const single = useSeasonListActionSubmit(addSeasonListMemberAction, {});
   const batch = useSeasonListActionSubmit(addSeasonListMembersAction, {});
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [note, setNote] = useState('');
   const isPending = single.isPending || batch.isPending;
 
   const toggle = (playerId: number) => setSelected((current) => {
@@ -53,6 +55,7 @@ export function AppearancesReviewPanel({
     formData.set('clubSlug', clubSlug);
     formData.set('playerId', String(candidate.playerId));
     formData.set('candidateSource', candidate.candidateSource);
+    if (note) formData.set('note', note);
     single.submit(formData, event.currentTarget);
   };
 
@@ -63,6 +66,7 @@ export function AppearancesReviewPanel({
     formData.set('clubSlug', clubSlug);
     for (const playerId of selected) formData.append('playerIds', String(playerId));
     formData.set('candidateSource', `appearances:${season - 1}`);
+    if (note) formData.set('note', note);
     batch.submit(formData, event.currentTarget);
   };
 
@@ -74,6 +78,7 @@ export function AppearancesReviewPanel({
         This is participation evidence, never a list: nothing below is added to {season} until you
         choose a player explicitly. {season - 1} appearances are never written as membership.
       </p>
+      <CorrectionNoteField value={note} onChange={setNote} disabled={isPending} />
       {single.state.error && <p className="notice" role="alert">{single.state.error}</p>}
       {batch.state.error && <p className="notice" role="alert">{batch.state.error}</p>}
       {single.state.ok && single.state.message && <p className="notice" role="status">{single.state.message}</p>}

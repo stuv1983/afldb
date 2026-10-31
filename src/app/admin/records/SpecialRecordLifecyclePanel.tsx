@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRef, useState } from 'react';
 
 import {
@@ -52,6 +53,7 @@ export function SpecialRecordLifecyclePanel({
   const noun = FAMILY_NOUNS[family];
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState('');
+  const [adminNote, setAdminNote] = useState('');
   const suppressButtonRef = useRef<HTMLButtonElement>(null);
   const reinstateButtonRef = useRef<HTMLButtonElement>(null);
   const suppressIt = useSpecialRecordsActionSubmit(SUPPRESS_ACTIONS[family]);
@@ -61,6 +63,7 @@ export function SpecialRecordLifecyclePanel({
     const data = new FormData();
     data.set('rowId', String(rowId));
     data.set('expectedUpdatedAt', expectedUpdatedAt);
+    if (adminNote) data.set('adminNote', adminNote);
     return data;
   };
 
@@ -74,6 +77,7 @@ export function SpecialRecordLifecyclePanel({
           and its audit trail survive, and so a rebuild can re-assert it.
         </p>
         {statusReason && <p className="muted">Reason given: {statusReason}</p>}
+        <CorrectionNoteField name="adminNote" value={adminNote} onChange={setAdminNote} disabled={reinstate.isPending} />
         {reinstate.state.error && <p className="notice" role="alert">{reinstate.state.error}</p>}
         {reinstate.state.ok && <p className="notice" role="status">{reinstate.state.message}</p>}
         {reinstate.state.warning && <p className="notice" role="alert">{reinstate.state.warning}</p>}
@@ -119,6 +123,7 @@ export function SpecialRecordLifecyclePanel({
               placeholder="e.g. duplicate of fkg-042; the source misread the round"
             />
           </label>
+          <CorrectionNoteField name="adminNote" value={adminNote} onChange={setAdminNote} disabled={suppressIt.isPending} />
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button
               ref={suppressButtonRef}

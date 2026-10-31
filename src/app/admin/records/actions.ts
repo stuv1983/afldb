@@ -333,7 +333,9 @@ export async function createFirstKickGoalAction(
   const facts = firstKickFacts(formData);
   if (!facts.ok) return { error: facts.error };
 
-  const result = await createFirstKickQuery({ ...facts.value, adminUserId: admin.id });
+  // V2-GAP-006: the administrator's note (the server requires it for a sealed season; optional otherwise).
+  const adminNote = optionalText(formData.get('adminNote'), 2000) ?? undefined;
+  const result = await createFirstKickQuery({ ...facts.value, adminUserId: admin.id, adminNote });
   return settle(result, {
     action: 'create_first_kick_goal',
     auditAction: 'special_records.first_kick_created',
@@ -604,7 +606,9 @@ export async function createAfterSirenKickAction(
   const facts = afterSirenFacts(formData);
   if (!facts.ok) return { error: facts.error };
 
-  const result = await createAfterSirenQuery({ ...facts.value, adminUserId: admin.id });
+  // V2-GAP-006: the administrator's note (the server requires it for a sealed season; optional otherwise).
+  const adminNote = optionalText(formData.get('adminNote'), 2000) ?? undefined;
+  const result = await createAfterSirenQuery({ ...facts.value, adminUserId: admin.id, adminNote });
   return settle(result, {
     action: 'create_after_siren',
     auditAction: 'special_records.after_siren_created',

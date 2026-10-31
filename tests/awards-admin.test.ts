@@ -125,10 +125,14 @@ describe('awards admin mutation contracts', () => {
       }
       if (text.includes('INSERT INTO data_edits')) {
         if (auditUnavailable) throw new Error('audit unavailable');
-        return [];
+        return [{ id: 9001 }]; // RETURNING id (V2-GAP-006 evidence reference)
       }
       throw new Error(`Unexpected test query: ${text}`);
-    }), { json: txJson });
+    }), {
+      json: txJson,
+      // The season-seal row lookup (V2-GAP-006): a season beyond the registry, so the editor is open-season.
+      unsafe: vi.fn(async () => [{ season: 2099 }]),
+    });
 
     importSql = {
       begin: vi.fn(async (callback: (sql: typeof tx) => Promise<unknown>) => callback(tx)),

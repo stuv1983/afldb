@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -79,10 +80,7 @@ export function AwardWinnerForm({ awards, clubs }: { awards: AwardSummary[]; clu
           </label>
         )}
 
-        <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
-          Administrative note (kept with the audit entry)
-          <input type="text" name="adminNote" maxLength={2000} />
-        </label>
+        <CorrectionNoteField name="adminNote" label="Administrative note (kept with the audit entry)" />
 
         <div>
           <button ref={submitRef} type="submit" className="btn btn-primary" disabled={create.isPending}>

@@ -12,6 +12,7 @@ import {
   type ListSeasonBounds,
 } from '@/db/queries/admin-season-lists';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { FIRST_LEADERSHIP_SEASON } from '@/db/queries/club-leadership';
 import { resolvePlayerIdentity } from '@/db/queries/player-identity';
 
@@ -320,6 +321,8 @@ class RollbackRefusal extends Error {
 
 /** The refusal a `RollbackRefusal` carried, or null for a genuine failure. */
 function rolledBackRefusal(error: unknown): LeadershipRefusal | null {
+  // The season seal (V2-GAP-006): the transaction rolled back whole; say so in its own words.
+  if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
   return error instanceof RollbackRefusal
     ? refuse(error.reason, error.detail, error.subjects)
     : null;
@@ -767,6 +770,7 @@ async function insertAppointment(tx: Tx, input: {
     newValues: { ...payload, ...(input.auditExtra ?? {}) },
     adminUserId: input.adminUserId,
     note: input.note,
+    seal: { kind: 'row' },
   });
 
   return { appointmentId: inserted.id, appointmentKey };
@@ -976,6 +980,7 @@ async function editAppointment(input: LeadershipEditBase & {
           },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'row' },
         });
 
         return { ok: true as const, appointmentKey: row.appointmentKey, revalidatePaths: paths };
@@ -1326,6 +1331,7 @@ export async function replaceLeader(
           },
           adminUserId: input.adminUserId,
           note,
+          seal: { kind: 'row' },
         });
 
         return {

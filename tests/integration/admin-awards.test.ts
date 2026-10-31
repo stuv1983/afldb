@@ -19,6 +19,12 @@
  */
 import './guard';
 
+// V2-GAP-006: this suite's fixture season is the season after the newest one on the test database,
+// which the real registry has sealed; declare it open (see tests/integration/sealed-registry-fixture.ts).
+vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) =>
+  (await import('./sealed-registry-fixture')).withFixtureSeasonOpen(await importOriginal()));
+
+
 import { createImportRoleParityHarness } from './import-role-parity';
 
 import { spawnSync } from 'node:child_process';
@@ -26,9 +32,10 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { sql } from '@/db/client';
+import { setFixtureSeasonOpen } from './sealed-registry-fixture';
 import {
   BROWNLOW_AWARD_SLUG,
   awardWinnerEntityKey,
@@ -218,6 +225,8 @@ function runAwardReload(scopeAwardId: number, rows: unknown[][]) {
 let actorId = 0;
 let createdThrowawayAdmin = false;
 let season = 0;
+/** A valid correction note for the few fixtures that deliberately write a sealed season (V2-GAP-006). */
+const SEALED_FIXTURE_NOTE = 'Integration fixture: deliberate write to a sealed season.';
 let wikipediaSourceId = 0;
 const createdPlayerIds = new Set<number>();
 let linkedPlayerId = 0;
@@ -384,6 +393,7 @@ beforeAll(async () => {
 
   const [bound] = await sql<{ year: number }[]>`SELECT max(year)::int AS year FROM seasons`;
   season = bound.year;
+  setFixtureSeasonOpen(season);
 
   const [existingAdmin] = await sql<{ id: number }[]>`SELECT id FROM auth_users ORDER BY id LIMIT 1`;
   if (existingAdmin) {
@@ -764,6 +774,7 @@ describe('award_winners — correction, void, reinstate, replace', () => {
       expectedUpdatedAt: targetBefore!.updatedAt,
       adminUserId: actorId,
       reason: 'entered against the wrong season',
+      note: SEALED_FIXTURE_NOTE, // the void is in the sealed wrong season (V2-GAP-006)
       replacement: { awardId, season, playerId: linkedPlayerId },
     });
     expect(refused.ok).toBe(false);
@@ -789,6 +800,7 @@ describe('award_winners — correction, void, reinstate, replace', () => {
       expectedUpdatedAt: targetBefore!.updatedAt,
       adminUserId: actorId,
       reason: 'entered against the wrong season',
+      note: SEALED_FIXTURE_NOTE, // the void is in the sealed wrong season (V2-GAP-006)
       replacement: { awardId, season, playerId: linkedPlayerId, confirmDuplicate: true },
     });
     expect(confirmed.ok, JSON.stringify(confirmed)).toBe(true);
@@ -975,6 +987,7 @@ describe('create-path refusals on the live module (§18.6 residue)', () => {
     // season decide it, and the answer is the historical row, not the modern one.
     const created = await createAwardWinner({
       awardId: award.id, season: lineage.year, playerId: linkedPlayerId, adminUserId: actorId,
+      adminNote: SEALED_FIXTURE_NOTE, // a historical (sealed) season: V2-GAP-006
     });
     expect(created.ok, JSON.stringify(created)).toBe(true);
     if (!created.ok) return;

@@ -250,6 +250,7 @@ export async function createAwardWinner(input: CreateAwardWinnerInput): Promise<
         },
         adminUserId: input.adminUserId,
         note: input.note,
+        seal: { kind: 'row' },
       });
 
       return row;
@@ -331,6 +332,7 @@ export async function createHallOfFameInductee(
         newValues: { name: input.name, year: input.inductedYear, playerId: input.playerId },
         adminUserId: input.adminUserId,
         note: input.notes,
+        seal: { kind: 'reference' },
       });
 
       return row;
@@ -465,6 +467,7 @@ export async function createHonourTeamMember(
         newValues: { teamName: input.teamName, playerName: input.playerNameRaw, playerId: input.playerId },
         adminUserId: input.adminUserId,
         note: input.note,
+        seal: { kind: 'reference' },
       });
 
       return row;

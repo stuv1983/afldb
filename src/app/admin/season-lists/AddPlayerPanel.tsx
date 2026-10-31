@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -52,16 +53,7 @@ export function AddPlayerPanel({
       </p>
       <div style={{ display: 'grid', gap: '0.6rem', maxWidth: '26rem' }}>
         <PlayerPicker label="Search players…" onSelect={setSelected} initialSelected={selected} />
-        <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-          Note (optional, recorded on the audit row)
-          <input
-            type="text"
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            maxLength={2000}
-            disabled={add.isPending}
-          />
-        </label>
+        <CorrectionNoteField value={note} onChange={setNote} disabled={add.isPending} label="Note (recorded on the audit row)" />
         {add.state.error && <p className="notice" role="alert">{add.state.error}</p>}
         {add.state.ok && add.state.message && <p className="notice" role="status">{add.state.message}</p>}
         <div>

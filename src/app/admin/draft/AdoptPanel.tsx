@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRef, useState } from 'react';
 
 import { adoptLegacyPickAction } from '@/app/admin/draft/actions';
@@ -70,6 +71,8 @@ export function AdoptPanel({
         )}
         {!adopt.state.needsConfirmation && adopt.state.error && <p className="notice" role="alert">{adopt.state.error}</p>}
         {adopt.state.ok && adopt.state.message && <p className="notice" role="status">{adopt.state.message}</p>}
+
+        <CorrectionNoteField disabled={adopt.isPending} />
 
         <div>
           <button

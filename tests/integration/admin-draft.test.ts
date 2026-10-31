@@ -21,14 +21,21 @@
  */
 import './guard';
 
+// V2-GAP-006: this suite's fixture season is the season after the newest one on the test database,
+// which the real registry has sealed; declare it open (see tests/integration/sealed-registry-fixture.ts).
+vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) =>
+  (await import('./sealed-registry-fixture')).withFixtureSeasonOpen(await importOriginal()));
+
+
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { sql } from '@/db/client';
+import { setFixtureSeasonOpen } from './sealed-registry-fixture';
 import {
   adoptLegacyPick,
   attachAflTablesIdentity,
@@ -181,6 +188,7 @@ beforeAll(async () => {
     clubs = active;
     break;
   }
+  setFixtureSeasonOpen(fixtureYear);
   expect(fixtureYear, 'need an empty draft year with active club identities').toBeGreaterThan(0);
   expect(clubs.length).toBe(2);
   clubId = clubs[0].id;

@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRef, useState } from 'react';
 
 import { retireSourcePickOverrideAction, saveSourcePickFieldsAction } from '@/app/admin/draft/actions';
@@ -51,6 +52,7 @@ export function SourceFieldsPanel({
 
   // J-5 `null_pick_number` (AFLDB-ISSUE-287): the box appears only after the action asks.
   const [confirmed, setConfirmed] = useState(false);
+  const [note, setNote] = useState('');
 
   const isPending = playerInfo.isPending || measurements.isPending || notes.isPending
     || selectionFacts.isPending || retire.isPending;
@@ -65,6 +67,7 @@ export function SourceFieldsPanel({
     const formData = new FormData(formRef.current);
     formData.set('pickId', String(pickId));
     formData.set('groupKey', groupKey);
+    formData.set('note', note);
     formData.set('expectedRevision', expectedRevision);
     if (sourceFieldsConfirmed(groupKey, selectionFacts.state.needsConfirmation, confirmed)) {
       formData.set('confirmed', '1');
@@ -78,6 +81,7 @@ export function SourceFieldsPanel({
     const formData = new FormData();
     formData.set('pickId', String(pickId));
     formData.set('groupKey', groupKey);
+    formData.set('note', note);
     retire.submit(formData, event.currentTarget);
   };
 
@@ -89,6 +93,12 @@ export function SourceFieldsPanel({
         immediately and survives the next reload. A field you leave unchanged keeps tracking the
         source across reloads.
       </p>
+      <CorrectionNoteField
+        value={note}
+        onChange={setNote}
+        label="Correction note (applies to every save and retire on this page)"
+        disabled={isPending}
+      />
 
       <form
         ref={playerInfoRef}

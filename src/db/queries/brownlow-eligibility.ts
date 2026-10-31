@@ -407,6 +407,7 @@ export async function publishBrownlowEligibilityInTransaction(
         decisionIds: evidence.decisions.filter((d) => d.current).map((d) => d.id), basis: determination.basis,
         ranksWithheld: true, unresolvedPlayerIds },
       adminUserId: request.actorId, note: request.note,
+      seal: { kind: 'row' },
     });
     return { determination, changed: true, publication: { state: 'partial', unresolvedPlayerIds } };
   }
@@ -475,6 +476,7 @@ export async function publishBrownlowEligibilityInTransaction(
         })),
         votesTotal: stored.reduce((n, r) => n + r.votes, 0) },
       adminUserId: request.actorId, note: request.note,
+      seal: { kind: 'row' },
     });
   }
   return { determination, changed, publication: { state: changed ? 'published' : 'unchanged', unresolvedPlayerIds: [] } };

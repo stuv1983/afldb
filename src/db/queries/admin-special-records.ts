@@ -6,6 +6,7 @@ import postgres from 'postgres';
 
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { resolvePlayerIdentity } from '@/db/queries/player-identity';
 import { clubPath, matchPath, playerPath } from '@/lib/format';
 import {
@@ -592,6 +593,8 @@ class RollbackRefusal extends Error {
 }
 
 function rolledBackRefusal(error: unknown): SpecialRecordRefusal | null {
+  // The season seal (V2-GAP-006): the transaction rolled back whole; say so in its own words.
+  if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
   return error instanceof RollbackRefusal
     ? refuse(error.reason, error.detail, error.subjects)
     : null;
@@ -941,6 +944,7 @@ async function runSpecialRecordEdit<TRow>(input: SpecialRecordEditBase & {
           newValues: { ...row.auditIdentity, ...applied.newValues },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'row' },
         });
 
         return {
@@ -1464,6 +1468,12 @@ export type CreateFirstKickGoalInput = {
   /** Selected by database id, never by name (Phase E §12). */
   matchId?: number | null;
   adminUserId: number;
+  /**
+   * V2-GAP-006: the administrator's own note. Optional, and when absent the row's `notes` is still the
+   * audit note (unchanged). A change in a SEALED season requires it (20-2000 characters); it then
+   * becomes the audit note in place of the row's `notes`.
+   */
+  adminNote?: string | null;
 };
 
 type CreatedSpecialRecord = { rowId: number; entityKey: string; sourceRecordId: string };
@@ -1471,12 +1481,7 @@ type CreatedSpecialRecord = { rowId: number; entityKey: string; sourceRecordId: 
 async function insertFirstKickGoal(tx: Tx, input: CreateFirstKickGoalInput & {
   replacesKey?: string | null;
   auditExtra?: Record<string, unknown>;
-  /**
-   * ISSUE-283: the replace panel's administrative note for the created half.
-   * Absent (a plain create, which deliberately has no admin-note field) keeps
-   * the row's own `notes` as the audit note.
-   */
-  adminNote?: string | null;
+  /** ISSUE-283 / V2-GAP-006: see {@link CreateFirstKickGoalInput.adminNote}; absent keeps the row's `notes` as the audit note. */
 }): Promise<CreatedSpecialRecord> {
   let playerNameRaw = input.playerNameRaw?.trim() || '';
   if (input.playerId) {
@@ -1559,6 +1564,10 @@ async function insertFirstKickGoal(tx: Tx, input: CreateFirstKickGoalInput & {
     },
     adminUserId: input.adminUserId,
     note: input.adminNote === undefined ? input.notes : input.adminNote,
+    // The record's own public `notes` may stand in for the audit note, but they are not the
+    // administrator's correction note: the seal evaluates only `adminNote`.
+    sealNote: input.adminNote ?? null,
+    seal: { kind: 'row' },
   });
 
   return { rowId: inserted.id, entityKey, sourceRecordId };
@@ -1689,6 +1698,7 @@ export async function replaceFirstKickGoal(
           },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'row' },
         });
 
         const createdRow = await readFirstKickGoalInTx(tx as Tx, created.rowId);
@@ -2029,6 +2039,8 @@ export type CreateAfterSirenKickInput = {
   /** Selected by database id, never by name (Phase E §12). */
   matchId?: number | null;
   adminUserId: number;
+  /** ISSUE-283 / V2-GAP-006: see {@link CreateFirstKickGoalInput.adminNote}. */
+  adminNote?: string | null;
 };
 
 function validateAfterSirenCreate(input: CreateAfterSirenKickInput): string | null {
@@ -2057,8 +2069,6 @@ function validateAfterSirenCreate(input: CreateAfterSirenKickInput): string | nu
 async function insertAfterSirenKick(tx: Tx, input: CreateAfterSirenKickInput & {
   replacesKey?: string | null;
   auditExtra?: Record<string, unknown>;
-  /** ISSUE-283: see `insertFirstKickGoal`. */
-  adminNote?: string | null;
 }): Promise<CreatedSpecialRecord> {
   let playerNameRaw = input.playerNameRaw?.trim() || '';
   if (input.playerId) {
@@ -2144,6 +2154,10 @@ async function insertAfterSirenKick(tx: Tx, input: CreateAfterSirenKickInput & {
     },
     adminUserId: input.adminUserId,
     note: input.adminNote === undefined ? input.notes : input.adminNote,
+    // The record's own public `notes` may stand in for the audit note, but they are not the
+    // administrator's correction note: the seal evaluates only `adminNote`.
+    sealNote: input.adminNote ?? null,
+    seal: { kind: 'row' },
   });
 
   return { rowId: inserted.id, entityKey, sourceRecordId };
@@ -2252,6 +2266,7 @@ export async function replaceAfterSirenKick(
           },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'row' },
         });
 
         const createdRow = await readAfterSirenKickInTx(tx as Tx, created.rowId);

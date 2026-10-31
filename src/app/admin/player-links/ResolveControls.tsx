@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 
@@ -330,13 +331,7 @@ export function ResolveControls({
             <form action={approveAction} style={{ display: 'grid', gap: '0.4rem' }}>
               <input type="hidden" name="targets" value={targetsRaw} />
               <input type="hidden" name="playerId" value={match.playerId} />
-              <input
-                type="text"
-                name="note"
-                maxLength={2000}
-                placeholder="Verification note (optional)"
-                style={{ fontSize: '0.85rem', width: '100%' }}
-              />
+              <CorrectionNoteField name="note" label="Verification note" id={`approve-note-${targetsRaw}`} rows={1} />
               <button type="submit" className="btn btn-primary" disabled={approvePending}>
                 {approvePending ? 'Approving…' : `Approve match: ${match.playerName}`}
               </button>
@@ -417,16 +412,7 @@ export function ResolveControls({
             <PlayerPicker label="Find AFLDB player" onSelect={setPicked} />
           </div>
           <div>
-            <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.8rem' }}>
-              Verification note (optional)
-              <input
-                type="text"
-                name="note"
-                maxLength={2000}
-                placeholder="e.g. Sourced from club debut records"
-                style={{ fontSize: '0.85rem', width: '100%' }}
-              />
-            </label>
+            <CorrectionNoteField name="note" label="Verification note (e.g. sourced from club debut records)" id={`link-note-${targetsRaw}`} />
           </div>
           <button type="submit" disabled={linkPending || !picked}>
             {linkPending ? 'Linking…' : 'Link player'}

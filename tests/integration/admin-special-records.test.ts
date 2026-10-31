@@ -29,8 +29,17 @@
  */
 import './guard';
 
+// V2-GAP-006: this suite's rows are synthetic and sit in season 1897, a sealed season. Its subject is
+// the lifecycle and the (optional) note semantics, so it declares 1897 open; the sealed behaviour is
+// proved with the real registry in tests/integration/sealed-editor-guard.test.ts.
+vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) =>
+  (await import('./sealed-registry-fixture')).withFixtureSeasonOpen(await importOriginal()));
+
+
 import postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { setFixtureSeasonsOpen } from './sealed-registry-fixture';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   correctAfterSirenKick, correctFirstKickGoal, createAfterSirenKick, createFirstKickGoal,
@@ -60,6 +69,8 @@ let activeAchievementId: number;
 let voidAchievementId: number;
 let activeKickId: number;
 let voidKickId: number;
+
+setFixtureSeasonsOpen([1897]);
 
 beforeAll(async () => {
   const [source] = await admin<{ id: number }[]>`
@@ -775,6 +786,20 @@ describe('Stage 6 — suppress, reinstate, and the history neither erases', () =
 });
 
 describe('Stage 6 — manual creation, and the replay that must rebuild it', () => {
+  it('refuses a sealed-season creation without a note, and writes nothing (V2-GAP-006)', async () => {
+    const before = await owner`SELECT (SELECT count(*)::int FROM player_achievements) AS rows, (SELECT count(*)::int FROM data_edits) AS audits`;
+    for (const adminNote of [undefined, '', 'too short', 'x'.repeat(2001)]) {
+      const refused = await createFirstKickGoal({
+        playerId: s6PlayerId, clubNameRaw: S6, season: s6MatchSeason, roundRaw: `${S6}-R-sealed`, notes: `${S6} public text, long enough to be mistaken for a note`,
+        consecutiveGoalKicks: 2, matchId: s6MatchId, adminUserId: actorId, adminNote,
+      });
+      expect(refused.ok).toBe(false);
+      if (!refused.ok) expect(refused.error).toContain('sealed historical data');
+    }
+    const after = await owner`SELECT (SELECT count(*)::int FROM player_achievements) AS rows, (SELECT count(*)::int FROM data_edits) AS audits`;
+    expect(after[0]).toEqual(before[0]);
+  });
+
   it('creates a first-kick record whose durable payload the TS adapter re-creates', async () => {
     const created = await createFirstKickGoal({
       playerId: s6PlayerId,
@@ -785,6 +810,7 @@ describe('Stage 6 — manual creation, and the replay that must rebuild it', () 
       consecutiveGoalKicks: 2,
       matchId: s6MatchId,
       adminUserId: actorId,
+      adminNote: 'Integration fixture: deliberate write to a sealed season.', // V2-GAP-006
     });
     expect(created.ok, created.ok ? '' : created.error).toBe(true);
     if (!created.ok) return;

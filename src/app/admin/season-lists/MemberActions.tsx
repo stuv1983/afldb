@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useState } from 'react';
 
 import { removeSeasonListMemberAction, transferSeasonListMemberAction } from '@/app/admin/season-lists/actions';
@@ -40,6 +41,7 @@ export function MemberActions({
   const transfer = useSeasonListActionSubmit(transferSeasonListMemberAction, {});
   const [mode, setMode] = useState<'none' | 'remove' | 'transfer'>('none');
   const [toClub, setToClub] = useState('');
+  const [note, setNote] = useState('');
   const isPending = remove.isPending || transfer.isPending;
 
   if (remove.state.ok) {
@@ -54,6 +56,7 @@ export function MemberActions({
     formData.set('membershipId', String(membershipId));
     formData.set('expectedUpdatedAt', expectedUpdatedAt);
     formData.set('confirmRemove', '1');
+    if (note) formData.set('note', note);
     remove.submit(formData, event.currentTarget);
   };
 
@@ -63,6 +66,7 @@ export function MemberActions({
     formData.set('membershipId', String(membershipId));
     formData.set('expectedUpdatedAt', expectedUpdatedAt);
     formData.set('toClubSlug', toClub);
+    if (note) formData.set('note', note);
     transfer.submit(formData, event.currentTarget);
   };
 
@@ -73,6 +77,7 @@ export function MemberActions({
           Remove {playerName} from the {season} list? This cannot be undone from this page.
           {leadershipWarning}
         </p>
+        <CorrectionNoteField value={note} onChange={setNote} disabled={isPending} id={`member-remove-note-${membershipId}`} />
         {remove.state.error && <p className="notice" role="alert">{remove.state.error}</p>}
         <div style={{ display: 'flex', gap: '0.4rem' }}>
           <button type="button" className="btn btn-primary" onClick={handleRemove} disabled={isPending}>
@@ -98,6 +103,7 @@ export function MemberActions({
             {destinations.map((club) => <option key={club.slug} value={club.slug}>{club.name}</option>)}
           </select>
         </label>
+        <CorrectionNoteField value={note} onChange={setNote} disabled={isPending} id={`member-transfer-note-${membershipId}`} />
         {transfer.state.error && <p className="notice" role="alert">{transfer.state.error}</p>}
         <div style={{ display: 'flex', gap: '0.4rem' }}>
           <button type="button" className="btn btn-primary" onClick={handleTransfer} disabled={isPending || !toClub}>

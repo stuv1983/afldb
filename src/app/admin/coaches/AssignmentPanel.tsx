@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { clearCoachAssignmentAction, setCoachAssignmentAction } from '@/app/admin/coaches/actions';
 import { useCoachActionSubmit } from '@/app/admin/coaches/submit-helper';
 import type { ClubSeasonMatchRow } from '@/db/queries/admin-coaches';
@@ -28,6 +29,7 @@ export function AssignmentPanel({
   rows: ClubSeasonMatchRow[];
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [note, setNote] = useState('');
   const setAssignment = useCoachActionSubmit(setCoachAssignmentAction);
   const clearAssignment = useCoachActionSubmit(clearCoachAssignmentAction);
   const isPending = setAssignment.isPending || clearAssignment.isPending;
@@ -44,6 +46,7 @@ export function AssignmentPanel({
     const formData = new FormData();
     formData.set('coachId', String(coachId));
     formData.set('assignments', pairs);
+    formData.set('note', note);
     setAssignment.submit(formData, event.currentTarget);
   };
 
@@ -51,6 +54,7 @@ export function AssignmentPanel({
     const formData = new FormData();
     formData.set('matchId', String(matchId));
     formData.set('clubId', String(clubId));
+    formData.set('note', note);
     clearAssignment.submit(formData, event.currentTarget);
   };
 
@@ -82,6 +86,7 @@ export function AssignmentPanel({
           <p className="muted">No matches for that club and season.</p>
         ) : (
           <>
+            <CorrectionNoteField value={note} onChange={setNote} label="Correction note (applies to Set, Clear override and Apply)" />
             <div className="table-wrap">
               <table>
                 <thead>

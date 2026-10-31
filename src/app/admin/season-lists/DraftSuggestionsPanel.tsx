@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { addSeasonListMemberAction } from '@/app/admin/season-lists/actions';
 import { useSeasonListActionSubmit } from '@/app/admin/season-lists/submit-helper';
 
@@ -29,6 +32,7 @@ export function DraftSuggestionsPanel({
   candidates: Candidate[];
 }) {
   const add = useSeasonListActionSubmit(addSeasonListMemberAction, {});
+  const [note, setNote] = useState('');
 
   const handleAdd = (event: React.MouseEvent<HTMLButtonElement>, candidate: Candidate) => {
     const formData = new FormData();
@@ -36,6 +40,7 @@ export function DraftSuggestionsPanel({
     formData.set('clubSlug', clubSlug);
     formData.set('playerId', String(candidate.playerId));
     formData.set('candidateSource', `draft:${candidate.draftPickId}`);
+    if (note) formData.set('note', note);
     add.submit(formData, event.currentTarget);
   };
 
@@ -46,6 +51,7 @@ export function DraftSuggestionsPanel({
         Selections by this club in {season - 1} or {season} whose player is not on the {season}
         list. Adding here is the same explicit, audited decision as anywhere else on this page.
       </p>
+      <CorrectionNoteField value={note} onChange={setNote} disabled={add.isPending} />
       {add.state.error && <p className="notice" role="alert">{add.state.error}</p>}
       {add.state.ok && add.state.message && <p className="notice" role="status">{add.state.message}</p>}
       <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.2rem' }}>

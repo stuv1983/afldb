@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useActionState, useMemo, useState, type ChangeEvent } from 'react';
 
 import { publishSeasonAction, type BrownlowActionState } from '@/app/admin/brownlow/actions';
@@ -139,10 +140,9 @@ export function PublishPanel({
         {[...ineligible].map((id) => (
           <input key={id} type="hidden" name="ineligible" value={id} />
         ))}
-        <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', maxWidth: '30rem', marginBottom: '0.6rem' }}>
-          Note (optional)
-          <input type="text" name="note" maxLength={500} placeholder="e.g. Published after the official count" />
-        </label>
+        <div style={{ marginBottom: '0.6rem' }}>
+          <CorrectionNoteField name="note" label="Note (e.g. published after the official count)" />
+        </div>
 
         {!canPublish ? (
           <>

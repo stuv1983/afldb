@@ -67,7 +67,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-003 | Medium | environment | rehearsal | **CLOSED locally (2026-10-28, Linux)**: full default workflow on streamanator at `c3dea709` 14,860 passed / 3 failed / 63 skipped plus Coleman 28/28; the only failures are listed `gridley-corpus` (V2-GAP-029); three Linux regressions were fixed first. Not run: 11 Brownlow dedicated-clone tests, 45 opt-in tests ([Linux verification](linux-verification-2026-10-28.md)). A second pass (§9 there) ran the eligible opt-in suites: receipts 7/7, import lock 1/1, populated lifecycle 17/17, oracle reports pass. The Brownlow clones, Phase B, populated-pending and external-grids remain blocked, with their reasons recorded | none |
 | V2-GAP-004 | Low | source worktree hygiene | no | **CLOSED (2026-10-31, re-verified; fix made 2026-10-19)**: the user-level hook runs through a no-shell Node runner, not `cmd.exe`; harness 147/147 and a live Read probe created no file; the stray `supplies` was deleted 2026-10-19 under its four proved conditions. User-level, outside the repository; re-run the harness after any `codebase-memory-mcp` update | none |
 | V2-GAP-005 | Low | historical baseline scope | no | **CLOSED (2026-10-31, owner decision D-V2-GAP005 Option A): accepted scope boundary.** AFLW stays outside the V2 AFL/VFL historical manifest; the manifest specification is unchanged (spec version 1); AFLW data, loader and backups are untouched | none |
-| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher, curated award approval and Brownlow eligibility decisions. **2026-10-31: Option B (admin editors) approved, traced, blocked by a policy conflict; nothing implemented.** The audited editors are not covered; database-level enforcement deferred (not implemented) | decide D-V2-GAP006-EDITORS (E1/E2/E3, [sheet](owner-decisions-remaining-2026-10-31.md) §2) |
+| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4 and **the editors, 2026-10-31**): enforced at the AFL API settle CLIs, the Coleman publisher, curated award approval, Brownlow eligibility decisions and, **new and local only (not deployed)**, every audited admin editor mutation (owner decision D-V2-GAP006-EDITORS, E1). Still unmet: database-level enforcement (**not implemented**), direct-library and legacy writers (011, ISSUE-316) and deployment | deploy the editor guard (PROD gates, not run); decide database-level enforcement; legacy writers via 011 / ISSUE-316 |
 | V2-GAP-007 | Medium | historical baseline | rehearsal | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: the owner-authorised read-only production runs produced the real-baseline manifest before (`4060c929…`, ledger 110) and after (`ba1d5c64…`, ledger 117) the release; both are 32 tables and 1,380 buckets, kept outside the repository in the host release directory; gate M sealed scope identical. Isolated repeat runs were already identical (Launch F) | none |
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
 | V2-GAP-009 | Medium | AFL API promotion | rehearsal | **CLOSED on retained evidence (2026-10-31)**: all seven AFL API integration files executed on guarded isolated PostgreSQL, **124/124 passed, 0 skipped** locally (`local-supported-tests-delivered.json`, 73 + 21 + 16 + 6 + 4 + 3 + 1), including the transaction-rollback and preservation cases; the Linux run (PG 16.15, 2026-10-28) records them passing with no failure or refusal. Stated limit: **not replayed on a production-dump clone** | none (production-dump replay is a recorded limit, RISK-03) |
@@ -239,7 +239,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 - **Close.** An owner decision on database-level enforcement (an additive migration under plan
   D4), Stage 5 for the admin editors, and the ISSUE-316 cutover plus Stage 5 for the legacy
   writers.
-- **2026-10-31: owner approved Option B (application-level seal for the appropriate admin mutation paths; triggers
+- **2026-10-31 (superseded by the entry that follows it): owner approved Option B (application-level seal for the appropriate admin mutation paths; triggers
   stay deferred). The trace found a policy conflict, so nothing was implemented and no code changed.**
   - *Contract.* `evaluateSeasonWrite` refuses a sealed-season write unless it carries an audited correction: a workflow
     id from a closed list of eight, the actor, a note of 20-2000 characters (OD-4) and a non-empty evidence reference.
@@ -253,6 +253,44 @@ award results must be shown reconcilable before production; **no** — not a pro
   - *Decision prepared:* D-V2-GAP006-EDITORS with options E1-E3, a per-editor inventory and the smallest execution
     package ([sheet](owner-decisions-remaining-2026-10-31.md) §2). **Gap 006 stays open**: the editors, the legacy
     writers (011, ISSUE-316) and database-level enforcement (**not implemented**) remain unmet.
+- **2026-10-31, later: owner decision D-V2-GAP006-EDITORS, Option E1, approved and IMPLEMENTED LOCALLY (not pushed, not
+  deployed, no host, production database or Brownlow operation).**
+  - *Rule.* A mutation by an audited editor that touches a sealed season (1897-2026 in the registry today, 2027 open), or
+    a season that cannot be determined, is refused unless it carries a human-written note of 20-2000 characters. Open
+    seasons are unchanged. A refusal rolls the whole transaction back (canonical row, `data_edits` row, sibling writes).
+    The evidence reference is the real same-transaction row (`data_edits:<id>`, or `player_link_resolutions:<id>`), never
+    predicted. Filler is never accepted: a stored default or generated note ("Created match via Data Editor", the
+    generated link sentence, a record's own public `notes`) does not count as the human note.
+  - *Workflow mapping (no new workflow id).* `data_editor` for the audited manual editors, `brownlow_authority` for the
+    Brownlow authority and vote-entry tables, `identity_adjudication` for player-link resolutions, the existing
+    `curated_award_approval` and `derived_award_publication` where those paths reach the shared writers. The actor is
+    the authenticated administrator and the workflow is derived from the audited table on the server; neither is read
+    from the client. The editor's own action/entity identity stays in the existing `data_edits` audit metadata.
+  - *Covered.* All 55 `recordDataEdit` call sites (pinned by a static inventory test, so a new call that omits its seal
+    scope fails the build and the test) plus the player-link resolution: data editor (`saveEdit`), match admin
+    (create, delete), match sheet (save, return to source), awards (winners: create, correct, void/reinstate, replace,
+    curated approval, Coleman publication; Hall of Fame and honour teams audited as reference), coaches (match
+    assignments and clears audited as `matches`; coach identity as reference), draft (create, save, source fields,
+    adopt, retire, supersede, identity attach; old and new year both checked when a pick moves), club leadership,
+    season lists (add, remove, transfer, copy forward), special records (first kick goal, after the siren: create,
+    correct, replace, suppress, reinstate), Brownlow vote entry and publication, Brownlow eligibility decisions, and
+    player-link resolutions on `draft_picks`, `award_winners`, `award_nominations`, `captaincies` and
+    `player_achievements`. *Declared reference, not season-sealed* (the manifest treats them as reference or schedule):
+    `players`, `coaches`, `hall_of_fame`, `honour_team_members`, `fixtures`. `confirmLockedUnlinked` writes no canonical
+    row. A season-bearing table cannot be declared reference (a programming error is thrown).
+  - *UI.* One shared `CorrectionNoteField` (20-2000 characters, rule stated, never browser-`required` because the season
+    is not known to the form) now carries the note on the editors above; refusals surface in each form's own error
+    state; the data-editor forms no longer wipe a refused edit.
+  - *Validation (local, disposable PostgreSQL 16 on 127.0.0.1:55432, `afldb_v2_gap006_test` cloned from
+    `afldb_v2_rb_final_test`).* See `CHANGELOG.md` (Unreleased) for the run counts. Visual evidence is listed there.
+  - *Still unmet, so the gap stays open.* (1) **Database-level enforcement is not implemented** (no constraint or
+    trigger): any writer that bypasses these editors (direct library calls, legacy loaders, the AFL Tables settle,
+    ISSUE-316 tooling, ad hoc SQL) is not stopped by this. (2) The editors are protected **locally only**; nothing is
+    deployed. Production needs the usual release path, and `afldb_import` must hold `SELECT` on `data_edits` (migration
+    108 and `privileges.sql` already grant it; verify on the target). (3) Known limitation: the action layer's
+    `optionalText(..., 2000)` silently truncates a crafted over-length note before the guard sees it (the textarea
+    enforces `maxLength`, and direct callers are refused at the boundary). (4) The pre-existing legacy `awards-admin.ts`
+    helpers are not wired to a route and are only guarded where they call `recordDataEdit`.
 
 ## V2-GAP-007 — No manifest of the real baseline exists yet
 

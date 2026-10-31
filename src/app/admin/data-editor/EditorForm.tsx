@@ -1,5 +1,7 @@
 'use client';
 
+import { keepFormOnSubmit } from '@/components/admin/keep-form-on-submit';
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import Link from 'next/link';
 import { useActionState } from 'react';
 
@@ -31,7 +33,7 @@ function GroupForm({
 
   return (
     <form
-      action={formAction}
+      onSubmit={keepFormOnSubmit(formAction)}
       style={{
         border: '1px solid var(--rule, rgba(128,128,128,0.3))',
         borderRadius: '6px',
@@ -80,13 +82,7 @@ function GroupForm({
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-        <input
-          type="text"
-          name="note"
-          maxLength={2000}
-          placeholder="Source / how this was verified (optional)"
-          style={{ fontSize: '0.85rem', flexGrow: 1, maxWidth: '30rem' }}
-        />
+        <CorrectionNoteField name="note" label="Source / how this was verified" id={`editor-note-${entityKey}-${group.key}`} />
         <button type="submit" disabled={pending}>Save</button>
       </div>
 

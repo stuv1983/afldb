@@ -1048,6 +1048,7 @@ async function insertFixture(tx: Tx, input: {
     },
     adminUserId: input.adminUserId,
     note: input.row.notes,
+    seal: { kind: 'reference' },
   });
 
   return { fixtureId: inserted.id, fixtureKey };
@@ -1527,6 +1528,7 @@ async function editFixture(input: FixtureEditBase & {
           },
           adminUserId: input.adminUserId,
           note: input.note,
+          seal: { kind: 'reference' },
         });
 
         return { ok: true as const, fixtureKey: row.fixtureKey };

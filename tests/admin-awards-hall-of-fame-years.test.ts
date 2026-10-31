@@ -68,6 +68,7 @@ function installFakeTransaction(locked: HallOfFameRow | null) {
       const text = strings.join('?');
       queries.push({ text, values });
       if (text.includes('SELECT id FROM sources')) return [{ id: 57 }];
+      if (text.includes('INSERT INTO data_edits')) return [{ id: 9001 }];
       if (text.includes('FOR UPDATE')) return locked ? [{ id: locked.id }] : [];
       if (text.includes('INSERT INTO hall_of_fame')) return [{ id: 201 }];
       return [];

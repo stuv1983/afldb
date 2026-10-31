@@ -395,6 +395,10 @@ async function project(tx: SqlExecutor, request: ColemanProjectionRequest): Prom
       },
       adminUserId: publishedBy,
       note: audit.note,
+      // Already decided by the Coleman publisher's own seal (derived_award_publication); the
+      // editor seal re-checks the same note and records the same workflow.
+      sealWorkflow: audit.workflow,
+      seal: { kind: 'row' },
     });
     actions.push({ entityKey: row.entityKey, action: row.action, awardWinnerId });
     changed.push({ ...row, awardWinnerId });

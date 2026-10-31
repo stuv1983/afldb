@@ -5,6 +5,7 @@ import { postgresTransactionExecutor } from '@afldb/db';
 
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { publishBrownlowEligibilityInTransaction } from '@/db/queries/brownlow-eligibility';
 import {
   recomputeBrownlowCareerTotals,
@@ -1175,6 +1176,7 @@ async function runMatchMutation(
             },
             adminUserId: input.actorId,
             note: reason,
+            seal: { kind: 'row' },
           });
         } else {
           await tx`
@@ -1218,6 +1220,7 @@ async function runMatchMutation(
         },
         adminUserId: input.actorId,
         note: reason ?? input.note ?? null,
+        seal: { kind: 'row' },
       });
 
       return {
@@ -1228,6 +1231,8 @@ async function runMatchMutation(
     return { ok: true, value: result };
   } catch (error) {
     if (error instanceof BrownlowRefusalError) return error.refusal;
+    // The season seal (V2-GAP-006): the transaction rolled back whole.
+    if (isSealedEditorRefusal(error)) return brownlowRefusal('invalid', error.message);
     return databaseRefusal(error, `Brownlow ${action} on match #${input.matchId}`);
   } finally {
     await importSql.end({ timeout: 5 });
@@ -1428,6 +1433,7 @@ export async function publishBrownlowSeason(input: {
         },
         adminUserId: input.actorId,
         note: input.note ?? null,
+        seal: { kind: 'row' },
       });
 
       return {
@@ -1442,6 +1448,7 @@ export async function publishBrownlowSeason(input: {
     return { ok: true, value: result };
   } catch (error) {
     if (error instanceof BrownlowRefusalError) return error.refusal;
+    if (isSealedEditorRefusal(error)) return brownlowRefusal('invalid', error.message); // V2-GAP-006 season seal
     return databaseRefusal(error, `Brownlow publish of ${input.season}`);
   } finally {
     await importSql.end({ timeout: 5 });

@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useState } from 'react';
 
 import { copySeasonListsForwardAction } from '@/app/admin/season-lists/actions';
@@ -34,6 +35,7 @@ export function CopyForwardPanel({
    * mutation's safety control, and it is the one bulk write in the feature).
    */
   const [previewedKey, setPreviewedKey] = useState<string | null>(null);
+  const [note, setNote] = useState('');
   const selectionKey = [...selected].sort().join(',');
 
   const toggle = (slug: string) => setSelected((current) => {
@@ -47,6 +49,7 @@ export function CopyForwardPanel({
     formData.set('season', String(season));
     formData.set('dryRun', dryRun ? '1' : '0');
     for (const slug of selected) formData.append('clubs', slug);
+    if (note) formData.set('note', note);
     return formData;
   };
 
@@ -82,6 +85,7 @@ export function CopyForwardPanel({
         organisation. Refused before anything is written if any selected club already holds{' '}
         {season} rows, or has no {season} identity.
       </p>
+      <CorrectionNoteField value={note} onChange={setNote} disabled={copy.isPending} />
       <div className="table-wrap">
         <table>
           <thead>

@@ -1,5 +1,7 @@
 'use client';
 
+import { keepFormOnSubmit } from '@/components/admin/keep-form-on-submit';
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import Link from 'next/link';
 import { useActionState, useMemo, useState } from 'react';
 
@@ -816,7 +818,7 @@ export function MatchSheetEditor({
       </div>
 
       {/* Main Save Form */}
-      <form action={formAction} style={{ display: 'grid', gap: '1rem' }}>
+      <form onSubmit={keepFormOnSubmit(formAction)} style={{ display: 'grid', gap: '1rem' }}>
         <input type="hidden" name="matchId" value={match.id} />
         <input type="hidden" name="payload" value={payloadString} />
         <input type="hidden" name="staleToken" value={staleToken} />
@@ -839,16 +841,7 @@ export function MatchSheetEditor({
             Use Match Details to edit the official team score.
           </p>
 
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-            Verification / Audit note (optional)
-            <input
-              type="text"
-              name="note"
-              maxLength={2000}
-              placeholder="e.g. Sourced from official AFL match report"
-              style={{ maxWidth: '36rem', fontSize: '0.85rem' }}
-            />
-          </label>
+          <CorrectionNoteField name="note" label="Verification / audit note (e.g. sourced from the official AFL match report)" />
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginTop: '0.5rem' }}>
             <button type="submit" disabled={isPending} style={{ padding: '0.6rem 1.25rem', fontSize: '0.95rem' }}>

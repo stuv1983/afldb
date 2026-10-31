@@ -105,7 +105,15 @@ function fakeTransaction(respond: QueryResponder): {
     if (typeof first === 'string') return { identifier: first };
     const text = compact(first);
     seen.push({ text, values });
-    return Promise.resolve(respond(text, values));
+    const answered = respond(text, values);
+    // `INSERT ... RETURNING id` on the audit/resolution rows (V2-GAP-006 evidence reference).
+    // The season-seal lookups (V2-GAP-006): a season beyond the registry, so these flows stay open-season.
+    if (answered.length === 0 && text.startsWith('SELECT season FROM')) return Promise.resolve([{ season: 2099 }]);
+    if (answered.length === 0 && text.startsWith('SELECT DISTINCT p.draft_year')) return Promise.resolve([{ draftYear: 2099 }]);
+    if (answered.length === 0 && (text.startsWith('INSERT INTO data_edits') || text.startsWith('INSERT INTO player_link_resolutions'))) {
+      return Promise.resolve([{ id: 9001 }]);
+    }
+    return Promise.resolve(answered);
   }) as any;
   // postgres.js transactions expose the full Sql surface, including .json.
   tx.json = (value: unknown) => ({ json: value });

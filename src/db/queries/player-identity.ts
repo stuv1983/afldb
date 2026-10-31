@@ -243,6 +243,7 @@ export async function syncManualIdentityNameRecord(
     newValues: patch,
     adminUserId: input.adminUserId,
     note: input.note,
+    seal: { kind: 'reference' },
   });
   return 'synced';
 }
@@ -434,5 +435,6 @@ export async function applyManualIdentityRecordSync(
     newValues: plan.patch,
     adminUserId: input.adminUserId,
     note: input.note,
+    seal: { kind: 'reference' },
   });
 }

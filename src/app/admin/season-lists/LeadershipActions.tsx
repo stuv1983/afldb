@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useState } from 'react';
 
 import {
@@ -75,6 +76,8 @@ export function LeadershipActions({
   const [correctEndedOn, setCorrectEndedOn] = useState(endedOn ?? '');
   const [correctNote, setCorrectNote] = useState(note ?? '');
   const [voidReason, setVoidReason] = useState('');
+  // V2-GAP-006: the audit/correction note for end, correct, void and reinstate (replace uses its own note).
+  const [auditNote, setAuditNote] = useState('');
 
   const anyPending = replace.isPending || end.isPending || reinstate.isPending
     || correct.isPending || voidAction.isPending;
@@ -105,6 +108,7 @@ export function LeadershipActions({
     if (endDate) formData.set('endedOn', endDate);
     if (endReason) formData.set('reason', endReason);
     formData.set('confirmEnd', '1');
+    if (auditNote) formData.set('note', auditNote);
     end.submit(formData, event.currentTarget);
   };
 
@@ -113,6 +117,7 @@ export function LeadershipActions({
     formData.set('appointmentKey', appointmentKey);
     formData.set('expectedUpdatedAt', expectedUpdatedAt);
     if (confirmCoCaptaincy) formData.set('confirmCoCaptaincy', '1');
+    if (auditNote) formData.set('note', auditNote);
     reinstate.submit(formData, event.currentTarget);
   };
 
@@ -123,6 +128,7 @@ export function LeadershipActions({
     if (correctStartedOn) formData.set('startedOn', correctStartedOn);
     if (status !== 'active' && correctEndedOn) formData.set('endedOn', correctEndedOn);
     if (correctNote) formData.set('appointmentNote', correctNote);
+    if (auditNote) formData.set('note', auditNote);
     correct.submit(formData, event.currentTarget);
   };
 
@@ -132,6 +138,7 @@ export function LeadershipActions({
     formData.set('expectedUpdatedAt', expectedUpdatedAt);
     formData.set('reason', voidReason);
     formData.set('confirmVoid', '1');
+    if (auditNote) formData.set('note', auditNote);
     voidAction.submit(formData, event.currentTarget);
   };
 
@@ -175,17 +182,13 @@ export function LeadershipActions({
             aria-label="Changeover date"
           />
         </label>
-        <label style={{ display: 'grid', gap: '0.2rem' }}>
-          Note (optional)
-          <input
-            type="text"
-            value={replaceNote}
-            onChange={(event) => setReplaceNote(event.target.value)}
-            disabled={anyPending}
-            maxLength={2000}
-            aria-label="Replacement note"
-          />
-        </label>
+        <CorrectionNoteField
+          value={replaceNote}
+          onChange={setReplaceNote}
+          disabled={anyPending}
+          label="Note (kept on the new appointment and on the audit row)"
+          id="leadership-replace-note"
+        />
         {replace.state.error && <p className="notice" role="alert">{replace.state.error}</p>}
         <div style={{ display: 'flex', gap: '0.6rem' }}>
           <button
@@ -214,6 +217,7 @@ export function LeadershipActions({
           Reason (optional)
           <input type="text" value={endReason} onChange={(event) => setEndReason(event.target.value)} disabled={anyPending} maxLength={500} aria-label="Reason the appointment ended" />
         </label>
+        <CorrectionNoteField value={auditNote} onChange={setAuditNote} disabled={anyPending} id="leadership-audit-note" />
         {end.state.error && <p className="notice" role="alert">{end.state.error}</p>}
         <div style={{ display: 'flex', gap: '0.6rem' }}>
           <button type="button" className="btn btn-primary" onClick={submitEnd} disabled={anyPending}>
@@ -248,6 +252,7 @@ export function LeadershipActions({
           Note
           <input type="text" value={correctNote} onChange={(event) => setCorrectNote(event.target.value)} disabled={anyPending} maxLength={2000} aria-label="Correct note" />
         </label>
+        <CorrectionNoteField value={auditNote} onChange={setAuditNote} disabled={anyPending} id="leadership-audit-note" />
         {correct.state.error && <p className="notice" role="alert">{correct.state.error}</p>}
         <div style={{ display: 'flex', gap: '0.6rem' }}>
           <button type="button" className="btn btn-primary" onClick={submitCorrect} disabled={anyPending}>
@@ -273,6 +278,7 @@ export function LeadershipActions({
           Reason
           <input type="text" value={voidReason} onChange={(event) => setVoidReason(event.target.value)} required minLength={1} maxLength={500} disabled={anyPending} aria-label="Reason for voiding" />
         </label>
+        <CorrectionNoteField value={auditNote} onChange={setAuditNote} disabled={anyPending} id="leadership-audit-note" />
         {voidAction.state.error && <p className="notice" role="alert">{voidAction.state.error}</p>}
         <div style={{ display: 'flex', gap: '0.6rem' }}>
           <button type="button" className="btn btn-danger" onClick={submitVoid} disabled={anyPending || !voidReason.trim()}>
@@ -292,6 +298,11 @@ export function LeadershipActions({
   // captain (L-3 applies again -- reinstating is a new "holds it now" claim).
   return (
     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+      {status === 'ended' && (
+        <div style={{ flexBasis: '100%' }}>
+          <CorrectionNoteField value={auditNote} onChange={setAuditNote} disabled={anyPending} id="leadership-reinstate-note" label="Correction note (for Reinstate, Correct or Void)" />
+        </div>
+      )}
       {status === 'active' && (
         <>
           <button type="button" className="btn btn-secondary" onClick={() => setMode('replace')}>Replace…</button>

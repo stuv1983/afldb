@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRef, useState } from 'react';
 
 import {
@@ -53,6 +54,7 @@ export function LifecyclePanel({
   const noun = DOMAIN_NOUNS[domain];
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState('');
+  const [adminNote, setAdminNote] = useState('');
   const voidButtonRef = useRef<HTMLButtonElement>(null);
   const reinstateButtonRef = useRef<HTMLButtonElement>(null);
   const voidIt = useAwardsActionSubmit(VOID_ACTIONS[domain]);
@@ -62,6 +64,7 @@ export function LifecyclePanel({
     const data = new FormData();
     data.set('rowId', String(rowId));
     data.set('expectedUpdatedAt', expectedUpdatedAt);
+    if (adminNote) data.set('adminNote', adminNote);
     return data;
   };
 
@@ -75,6 +78,7 @@ export function LifecyclePanel({
           trail survive.
         </p>
         {statusReason && <p className="muted">Reason given: {statusReason}</p>}
+        {domain === 'winners' && <CorrectionNoteField name="adminNote" value={adminNote} onChange={setAdminNote} disabled={reinstate.isPending} />}
         {reinstate.state.error && <p className="notice" role="alert">{reinstate.state.error}</p>}
         {reinstate.state.ok && <p className="notice" role="status">{reinstate.state.message}</p>}
         {reinstate.state.warning && <p className="notice" role="alert">{reinstate.state.warning}</p>}
@@ -119,6 +123,7 @@ export function LifecyclePanel({
               placeholder="e.g. duplicate of entry #1234; recorded against the wrong season"
             />
           </label>
+          {domain === 'winners' && <CorrectionNoteField name="adminNote" value={adminNote} onChange={setAdminNote} disabled={voidIt.isPending} />}
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button
               ref={voidButtonRef}

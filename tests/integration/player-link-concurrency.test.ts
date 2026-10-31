@@ -7,6 +7,10 @@ import {
 } from '@/db/queries/afl-api-player-links';
 import { resolveLockedLink, confirmLockedUnlinked } from '@/db/queries/player-links';
 
+// The fixture draft picks sit in season 2000, which the season registry seals (V2-GAP-006): resolving
+// them needs a human correction note of 20-2000 characters.
+const SEALED_FIXTURE_NOTE = 'Concurrency fixture: link a synthetic 2000 draft pick (V2-GAP-006 sealed-season note).';
+
 import {
   cleanupS6Fixtures,
   insertS6BrownlowVote,
@@ -181,6 +185,7 @@ describe('player-link concurrency integration (AFLDB-ISSUE-082)', () => {
           targetId: pickA,
           playerId,
           adminUserId,
+          note: SEALED_FIXTURE_NOTE,
         });
 
         t1Done = true;
@@ -233,6 +238,7 @@ describe('player-link concurrency integration (AFLDB-ISSUE-082)', () => {
             targetId: pickB,
             playerId,
             adminUserId,
+            note: SEALED_FIXTURE_NOTE,
           });
         });
 

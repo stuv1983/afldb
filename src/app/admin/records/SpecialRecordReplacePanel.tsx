@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -171,10 +172,7 @@ export function SpecialRecordReplacePanel({
             ? <FirstKickFields prefix="replacement_" />
             : <AfterSirenFields prefix="replacement_" />}
 
-          <label style={{ display: 'grid', gap: '0.25rem', fontSize: '0.85rem' }}>
-            Administrative note (kept with both audit entries)
-            <input type="text" name="adminNote" maxLength={2000} />
-          </label>
+          <CorrectionNoteField name="adminNote" label="Administrative note (kept with both audit entries)" />
 
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button type="submit" className="btn btn-primary">Preview the replacement…</button>

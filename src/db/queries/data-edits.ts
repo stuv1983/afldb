@@ -3,6 +3,7 @@ import 'server-only';
 import postgres from 'postgres';
 
 import { recordDataEdit, type DataEditTableName } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { sql } from '@/db/client';
 import {
   recomputeClubSeasons,
@@ -297,6 +298,7 @@ export async function saveEdit(input: {
         newValues: values,
         adminUserId: input.adminUserId,
         note: input.note,
+        seal: entity.table === 'matches' ? { kind: 'row' } : { kind: 'reference' },
       });
       return before;
     }) as Record<string, FieldValue> | null;
@@ -311,6 +313,8 @@ export async function saveEdit(input: {
     }
     // A refusal this module decided inside the transaction (AFLDB-ISSUE-277): its own message, not the generic wrapper.
     if (error instanceof EditRefusal) return { ok: false, error: error.message };
+    // The season seal (V2-GAP-006): the transaction rolled back whole; say so in its own words.
+    if (isSealedEditorRefusal(error)) return { ok: false, error: error.message };
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, error: `The edit could not be applied: ${message}` };
   } finally {

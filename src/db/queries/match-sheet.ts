@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import postgres from 'postgres';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
 import { recomputePlayerDerivedStats } from '@/db/queries/player-derived';
 import {
   PLAYER_MATCH_STATS_ENTITY,
@@ -347,6 +348,7 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
         }),
         adminUserId: input.adminUserId,
         note: input.note,
+        seal: { kind: 'row' },
       });
 
       return { playerCount: players.length, scoreUpdated: false };
@@ -359,6 +361,7 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
     };
   } catch (err) {
     if (err instanceof MatchSheetRefusal) return { ok: false, error: err.message };
+    if (isSealedEditorRefusal(err)) return { ok: false, error: err.message }; // V2-GAP-006 season seal
     // 55P03 lock timeout or 40P01 deadlock victim: the whole transaction rolled
     // back; classification only, never a retry or a partial save (F-S4-01/F-S4-02).
     const retryable = matchSheetRetryableRefusal(err);
@@ -681,6 +684,7 @@ export async function returnMatchSheetToSource(
         }),
         adminUserId: input.adminUserId,
         note: input.note,
+        seal: { kind: 'row' },
       });
 
       return { withdrawnKeys: [entry.entityKey], rowDeleted, rowKept };
@@ -688,6 +692,7 @@ export async function returnMatchSheetToSource(
     return { ok: true, ...result };
   } catch (err) {
     if (err instanceof MatchSheetRefusal) return { ok: false, error: err.message };
+    if (isSealedEditorRefusal(err)) return { ok: false, error: err.message }; // V2-GAP-006 season seal
     const retryable = matchSheetRetryableRefusal(err);
     if (retryable) return { ok: false, error: retryable };
     const msg = err instanceof Error ? err.message : String(err);

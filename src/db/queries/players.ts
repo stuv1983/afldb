@@ -491,6 +491,7 @@ export async function createPlayer(
         newValues: { displayName: player.displayName },
         adminUserId: audit.adminUserId,
         note: audit.note,
+        seal: { kind: 'reference' },
       });
       return player;
     });

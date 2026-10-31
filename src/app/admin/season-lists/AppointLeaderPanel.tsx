@@ -1,5 +1,6 @@
 'use client';
 
+import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
 import { useState } from 'react';
 
 import { appointLeaderAction } from '@/app/admin/season-lists/leadership-actions';
@@ -111,13 +112,7 @@ export function AppointLeaderPanel({
           />
         </label>
 
-        <label style={{ display: 'grid', gap: '0.2rem' }}>
-          Note (optional)
-          <input
-            type="text" value={note} onChange={(event) => setNote(event.target.value)}
-            disabled={appoint.isPending} maxLength={2000} aria-label="Appointment note"
-          />
-        </label>
+        <CorrectionNoteField value={note} onChange={setNote} disabled={appoint.isPending} label="Note (kept on the appointment and on the audit row)" id="leadership-appoint-note" />
 
         {appoint.state.error && <p className="notice" role="alert">{appoint.state.error}</p>}
         {appoint.state.ok && appoint.state.message && (
