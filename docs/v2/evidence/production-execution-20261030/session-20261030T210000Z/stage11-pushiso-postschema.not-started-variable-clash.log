@@ -1,0 +1,11 @@
+﻿powershell : The argument '3f5b5339cee312950c308b494ca98ff29a2f1620d9f60a4d062fbaf37b624730\transfer-session.ps1' to 
+the -File parameter does not exist. Provide the path to an existing '.ps1' file as an argument to the -File parameter.
+At line:4 char:1
++ powershell -NoProfile -File "$p\transfer-session.ps1" -Mode PushIso - ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (The argument '3...File parameter.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+

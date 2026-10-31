@@ -1,0 +1,19 @@
+== D-V2-PROD-EXEC-1 host session stage=manifest stamp=20261030T210000Z 2026-10-30T22:42:46Z
+host=afldb-prod user=arm boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac checkout=9ed9c9dd3e84682c43e96c46e98974b245eb54ed build=QNEHXAtU53TzUjj0Mb7mv
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=117 last=117_brownlow_provider_eligibility_unknown.sql digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+AFLDB V2 historical baseline manifest — READ ONLY (session + transaction), rolled back
+  target   : database 'afldb_prod' from AFLDB_V2_RELEASE_READONLY_URL (NON-TEST source, read-only flags given)
+  sealed   : 1897-2026
+  written  : /home/arm/backups/afldb/release-v2-20261030T210000Z/manifest-after.json (32 tables, 1380 buckets; counts and digests only)
+ba1d5c649ae95e8aa47dcd635061a414572b5c6dd39385d5f8446570f41ae87d  /home/arm/backups/afldb/release-v2-20261030T210000Z/manifest-after.json
+AFLDB V2 historical baseline comparison — offline, no database contact
+before : afldb_prod at 2026-10-30T21:27:56.806Z
+after  : afldb_prod at 2026-10-30T22:43:40.188Z
+sealed : 1897-2026
+counts : 0 violation, 0 unverified, 0 review, 0 info
+verdict: sealed-scope-identical
+gate M compare exit=0
+RESULT PASS stage=manifest which=after

@@ -1,0 +1,13 @@
+== pre-checks 2026-10-30T22:33:52Z
+afldb.service=inactive
+postgresql: active localhost:5432 - accepting connections
+HEAD=9ed9c9dd3e84682c43e96c46e98974b245eb54ed clean; env AFLDB_ENV=production lines: 1
+               total        used        free      shared  buff/cache   available
+Mem:            3915         837        2491         146        1024        3078
+Swap:              0           0           0
+MemAvailable_kB=3152268
+== preserve the failed attempt's logs
+ccaecc41e70c0eebefafa533377c74449b6f3591dec4e9de6661efde61a1be04  /home/arm/backups/afldb/release-v2-20261030T210000Z/build.attempt1-oom.log
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  /home/arm/backups/afldb/release-v2-20261030T210000Z/build.attempt1-oom.exit
+== start attempt 2 (detached): NODE_OPTIONS=--max-old-space-size=3072 AFLDB_BUILD_WORKERS=1 AFLDB_ENV=production
+build pid=3168656 pgid=3168656 started 22:33:53

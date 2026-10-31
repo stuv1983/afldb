@@ -1,0 +1,20 @@
+ls: cannot access '.next/standalone': No such file or directory
+ls: cannot access '.next/standalone/.next': No such file or directory
+drwxrwxr-x 7 arm arm 4096 Oct 31 08:52 .next
+standalone BUILD_ID=cat: .next/standalone/.next/BUILD_ID: No such file or directory
+top-level .next BUILD_ID=cat: .next/BUILD_ID: No such file or directory
+build-manifest.json cache diagnostics package.json react-loadable-manifest.json server static trace trace-build types 
+afldb.service active since Sun 2026-10-18 13:06:32 AEDT
+HTTP/1.1 200 OK
+{"status":"ok","database":"ok","latencyMs":1}
+/ 307
+/players 307
+/matches 307
+/seasons/2025 307
+/admin/operations 307
+HTTP/2 200 
+               total        used        free      shared  buff/cache   available
+Mem:            3915        1101        2253         146         997        2813
+Swap:              0           0           0
+2
+porcelain=0 HEAD=9ed9c9dd3e84682c43e96c46e98974b245eb54ed

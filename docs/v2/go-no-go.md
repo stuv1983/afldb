@@ -1,5 +1,14 @@
 # AFLDB V2 — go/no-go checklist and current verdicts
 
+**Production execution, 2026-10-31 (D-V2-PROD-EXEC-1): V2 RELEASED.**
+- Production runs `9ed9c9dd` (`BUILD_ID` `QNEHXAtU53TzUjj0Mb7mv`, ledger 117) behind `beta.afldb.com`, with the AFL
+  Tables timer retired.
+- Still **NO-GO**: the AFL API cutover writer activation (stage C beyond source retirement), stage D, every new writer
+  or provider, and the apex launch.
+- Deployment defect: AFLDB-ISSUE-329.
+- [Execution record](production-execution-record-2026-10-31.md). The verdicts below predate the release and are kept
+  as history.
+
 **Current decision package, 2026-10-28:** [release decision package](release-decision-package-2026-10-28.md).
 It separates stages A (inert V2 installation), B (schema/data acceptance), C (source retirement and
 AFL API cutover) and D (first 2027 fixture ingestion). Production remains **NO-GO**.
@@ -177,7 +186,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | 14 | Production access is not needed to run the test suite | **met** | ADR 0005: the test setup strips DSNs and refuses any non-`_test` database |
 | 15 | Migration, comparison, rollback and cutover instructions are complete | **met**; application rollback and populated-ledger DB reversal/recovery rehearsed on an isolated copy (not a production dump) | `cutover-runbook.md` (now with step 4a and 111-114), `rollback-runbook.md` §5 (111-114) and §7 record; V2-GAP-026 |
 | 16 | No secrets are committed | **met** | no `.env*` beyond `.env.example`; DSNs in tests are synthetic placeholders; closure scans at every stage |
-| 17 | No production action has occurred | **met** | V2 has no remote; no production or shared database, ssh, deploy or service command was run in any launch. Launch F's only network use was one read-only GET of the public AFL API compSeasons list |
+| 17 | No production action has occurred | **met** | (Update 2026-10-30: V2 now has `origin`, and `main`/`v2/rebuild` were pushed under D-V2-PUSH-ROUTE-1. A Git push is not a production action.) Originally: V2 has no remote; no production or shared database, ssh, deploy or service command was run in any launch. Launch F's only network use was one read-only GET of the public AFL API compSeasons list |
 
 ## 3. Production no-go conditions
 
@@ -212,7 +221,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 
 | Item | Decision |
 |---|---|
-| V2 merge | review and merge `v2/rebuild` into the mainline (V2 has no remote); reconcile the 19 ISSUE-316 follow-up-8 files it carries (commit `c9cca86d`) with the source worktree (RISK-15) |
+| V2 merge | **merged locally 2026-10-29 (D-V2-LOCK-1) and pushed 2026-10-30 (D-V2-PUSH-ROUTE-1)**: `git merge --no-ff` into local `main`, locked execution commit `9ed9c9dd`. `origin` (the source repository's existing URL) was added. `origin/main` was exactly `ff100dc2` and was fast-forwarded to `9ed9c9dd` without force; `v2/rebuild` was pushed at `d3286d92`. The lock holds. Production execution: [package](production-execution-package-2026-10-30.md), preparation P-1–P-7 complete (§4.1); approved and **executed 2026-10-31** ([record](production-execution-record-2026-10-31.md)). Earlier text: reconcile the 19 ISSUE-316 follow-up-8 files it carries (commit `c9cca86d`) with the source worktree (RISK-15) |
 | V2-GAP-004 | fix or disable the user-level Read/Grep/Glob hook that runs in the source worktree; decide on the stray `supplies` |
 | V2-GAP-005 | whether AFLW joins the historical manifest |
 | V2-GAP-006 | database-level seal enforcement |

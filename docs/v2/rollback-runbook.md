@@ -80,13 +80,14 @@ only the variable named by `--dsn-env`.
 
 Use the current production release procedure with the previously deployed commit (`PREV`, recorded
 at the start of the window) as the target: check out `PREV`, `npm ci`, `npm run build`, restart,
-then the health and build-identity checks that procedure requires. Migrations 111-114 can stay in
-place: `PREV` never reads or writes the five tables, and the tables hold no row that `PREV` needs.
+then the health and build-identity checks that procedure requires. Migrations 111-117 can stay in
+place: `PREV` never reads or writes the six new tables, and the tables hold no row that `PREV` needs
+(validated for 111-117 on 2026-10-30, §4.5).
 
 ### 4.2 Expected preflight finding with the migrations left in place
 
-With 111-114 applied and `PREV` checked out, a migration-parity comparison reports
-`unknown-applied-migration` for each of the four files (`tools/db/migration-safety.ts:165-169`), which the
+With 111-117 applied and `PREV` checked out, a migration-parity comparison reports
+`unknown-applied-migration` for each of the seven files (`tools/db/migration-safety.ts:165-169`), which the
 preflight grades `FAIL` outside inspection mode (`tools/dev/preflight-core.ts:202-205`). Decide in
 advance which applies: record it as the expected exception for this rollback, or run §5 so the
 ledger and the checkout agree again. Do not edit the ledger by hand for any other reason.

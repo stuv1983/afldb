@@ -164,6 +164,75 @@ is therefore not expected to be byte-for-byte identical. AFLDB retains its inten
 validate route semantics, console/hydration health and build identity rather than treating a
 different `.rsc`/segment layout as a regression by itself.
 
+## 3a. Production release route (`AFLDB-ISSUE-329`; not yet installed)
+
+`npm run build` in the serving checkout deletes the live `.next/standalone` before it compiles
+(`next build`'s clean step), so a failed or interrupted in-place build takes every asset of the
+running site with it. That happened on 2026-10-31 (AFLDB-ISSUE-329). The release route builds
+somewhere else and only switches in a validated, finished release. It is **production only**, and
+it takes effect only once the owner installs it (`issues/open/AFLDB-ISSUE-329.md` §9). DEV keeps
+the in-place route above.
+
+```bash
+# as arm, from the serving checkout, with the unit's pinned Node first on PATH
+R=deploy/release.mjs
+node $R build --checkout ~/projects/afldb --revision <40-hex> --afldb-env production
+node $R promote <rev12>-<BUILD_ID>            # refuses unless the service runs `current`
+sudo systemctl restart afldb                   # owner
+node $R status --expect <rev12>-<BUILD_ID>     # the identity gate
+# if the gate fails: switch back to the retained release (no build), restart, gate again
+node $R rollback && sudo systemctl restart afldb && node $R status --expect <previous id>
+```
+
+- **Layout.** `/home/arm/afldb-releases/releases/<rev12>-<BUILD_ID>/` holds one release: the bundle,
+  the revision's `deploy/server-cluster.mjs`, `release.json` and `MANIFEST.sha256`. `current` and
+  `previous` are symlinks. The drop-in `deploy/afldb.service.d/release-route.conf` starts the service
+  from `current`. systemd resolves that symlink at start, so switching it takes effect only at the
+  next restart.
+- **Build.** `git archive` of the revision into `builds/<stamp>-…/src`; `npm ci`; `npm run build`
+  with the heap cap and one build worker; the bundle moves into a candidate directory. Nothing is
+  written outside `builds/` until one final rename into `releases/`.
+- **Validation before a release exists.** BUILD_ID agreement; static and public assets byte-identical
+  to the build output; no `.env`-named file; no symlink leaving the release; HSTS if and only if
+  `--afldb-env production`. Then a boot smoke: the candidate is started on `127.0.0.1:3199` with the
+  service's environment (`.env` minus the unit's `UnsetEnvironment=`). It must answer `/api/health`
+  ok/ok and serve its own `_buildManifest.js` and a CSS asset.
+  - **Pages.** The smoke's requests carry a five-minute beta claim, signed in-process with the
+    service's `AFLDB_SESSION_SECRET` and never logged, so `/` and every `--smoke-paths` page render
+    behind the beta gate and must answer 200. Without a secret, `/` may instead redirect to `/beta`,
+    and `/beta` must render.
+  - **Cache header.** Each page's `x-nextjs-cache` is recorded: `HIT` is a prerender served from
+    disk, so name a dynamic or on-demand page to prove a runtime render.
+  - **After the smoke.** The server must log no render error. The manifest is taken before the smoke
+    and must still match afterwards, apart from ISR output.
+  - **Build environment.** It is the shell's environment minus every name the checkout's `.env`
+    defines, so `.env` governs as it does for the service. `AFLDB_BUILD_TYPECHECK` is always set
+    explicitly.
+- **Memory.** The build process group and the smoke server run with `oom_score_adj=1000`. A guard
+  samples `MemAvailable` every 0.5 s and kills them below `--min-available-mb` (default 384).
+  Measured on Linux (2026-10-31), the build lowers `MemAvailable` by about 2.8 GB with its
+  type-check phase and about 1.7 GB without it. Admission therefore refuses a start below 3,200 MB
+  available (2,100 MB with `--typecheck off-host`) or 6 GB free disk. `--require-available-mb`
+  overrides the memory figure.
+  `--typecheck off-host --typecheck-evidence "<where this revision passed npm run typecheck>"` skips
+  that phase (`AFLDB_BUILD_TYPECHECK=off-host` in `next.config.ts`) and records the evidence in
+  `release.json`.
+- **Failure.** Any failure, signal (`SIGINT`, `SIGTERM`, `SIGHUP`) or guard abort leaves `current`,
+  `previous` and every release untouched. The workspace keeps its logs and source; its
+  `node_modules` is removed. A tool killed with `SIGKILL` leaves its build lock behind. The next
+  build breaks that stale lock and first kills the orphaned process group. Builds and link changes
+  take separate locks, so a running build never blocks `rollback`.
+- **Identity, without request tracing.** `status` checks four things: the service's `MainPID`
+  working directory is inside the expected release; that release's BUILD_ID `_buildManifest.js`
+  answers 200; the previous release's answers 404; and health is ok/ok. A passing
+  `status --expect` is recorded in `events.log`. The supervisor also logs
+  `[afldb] serving build <BUILD_ID> release <id> revision <sha>` at every start. `x-afldb-build`
+  remains a tracing-only header.
+- **Sessions.** Run `build` inside `tmux` (or `systemd-run --user`): a dropped SSH session sends
+  `SIGHUP`, which stops the build safely but wastes it.
+- **Retention.** Nothing is deleted automatically. A release is about 0.8 GB. `rollback --to <id>`
+  names any retained release. Migrations stay forward-only: see §11 before rolling back across one.
+
 ## 4. Service management
 
 ```bash
@@ -177,7 +246,9 @@ The unit is `enabled`, so it starts at boot and after a PostgreSQL restart. `Res
 
 ### Hardening
 
-The unit runs with `ProtectSystem=strict`, `ProtectHome=read-only`, `PrivateTmp`, `NoNewPrivileges` and a `@system-service` syscall filter. Only `.next` is writable, for the ISR cache.
+The unit runs with `ProtectSystem=strict`, `ProtectHome=read-only`, `PrivateTmp`, `NoNewPrivileges` and a `@system-service` syscall filter. Only `.next` is writable, for the ISR cache. With the
+release-route drop-in (§3a), only `/home/arm/afldb-releases/releases` and the apex page directory are
+writable.
 
 ## 5. Clustering
 
@@ -1481,6 +1552,11 @@ back to development.
 **It is deliberately not the same flag as `AFLDB_ENV`.** That one is transport security — `Secure` on the session cookie, HSTS, and the CSP that drops `'unsafe-eval'` — and every host reachable over public HTTPS sets it to `production` whether or not it is ready to be indexed. The two were one flag until 2026-08-16, which meant holding a pre-cutover HTTPS host out of search results also stripped `Secure` from its admin cookies. See `src/lib/indexing.ts`.
 
 ## 11. Rollback
+
+On a host that uses the release route (§3a), roll back with `node deploy/release.mjs rollback`, then
+restart. That reuses the retained release and rebuilds nothing. The in-place commands below rebuild
+in the serving checkout: they take the live assets down while they run, and a failed run leaves the
+site broken (AFLDB-ISSUE-329).
 
 ```bash
 cd ~/projects/afldb

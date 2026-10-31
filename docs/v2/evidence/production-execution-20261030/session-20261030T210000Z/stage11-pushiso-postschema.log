@@ -1,0 +1,4 @@
+﻿afldb_prod-20261031-084435.dump: OK
+afldb_prod-20261031-084435.release.json: OK
+start with: ssh arm@10.0.40.100 "nohup bash /home/arm/afldb-v2-prodexec-20261030T210000Z/pinned/isolated-rehearsal.sh after 20261030T210000Z 3f5b5339cee312950c308b494ca98ff29a2f1620d9f60a4d062fbaf37b624730 38e7fbb4c948211796be4f7e9ea8de1e92be53cc2c82982e723952f9660e1842 > /home/arm/afldb-v2-prodexec-20261030T210000Z/after.out 2>&1 &"
+TRANSFER PASS mode=PushIso label=postschema isolated_root=/home/arm/afldb-v2-prodexec-20261030T210000Z

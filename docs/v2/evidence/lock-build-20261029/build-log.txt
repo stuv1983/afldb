@@ -1,0 +1,240 @@
+﻿HEAD=9ed9c9dd3e84682c43e96c46e98974b245eb54ed start=2026-10-29T13:06:18.2887146Z
+node : isolated-pg: afldb_v2_visual2_test verified (cluster afldb_v2_isolated, 127.0.0.1:55433); running node
+At line:1 char:654
++ ...  utf8 $log; node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.t ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (isolated-pg: af...); running node:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+▲ Next.js 16.3.1 (webpack)
+✓ Running next.config.ts took 35ms
+- Experiments (use with caution):
+  · cpus: 4
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+⚠ Compiled with warnings in 1303ms
+
+./node_modules/next/dist/esm/server/app-render/dynamic-rendering.js
+A Node.js API is used (process.cwd at line: 1044) which is not supported in the Edge Runtime.
+Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+
+Import trace for requested module:
+./node_modules/next/dist/esm/server/app-render/dynamic-rendering.js
+./node_modules/next/dist/esm/server/request/connection.js
+./node_modules/next/dist/esm/server/web/exports/index.js
+./node_modules/next/dist/esm/api/server.js
+
+./node_modules/next/dist/esm/server/app-render/dynamic-rendering.js
+A Node.js API is used (process.cwd at line: 1044) which is not supported in the Edge Runtime.
+Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+
+Import trace for requested module:
+./node_modules/next/dist/esm/server/app-render/dynamic-rendering.js
+./node_modules/next/dist/esm/server/request/connection.js
+./node_modules/next/dist/esm/server/web/exports/index.js
+./node_modules/next/dist/esm/api/server.js
+
+✓ Compiled successfully in 25.8s
+  Running TypeScript ...
+  Finished TypeScript in 33.2s ...
+  Collecting page data using 4 workers ...
+  Generating static pages using 4 workers (0/1516) ...
+  Generating static pages using 4 workers (379/1516) 
+  Generating static pages using 4 workers (758/1516) 
+  Generating static pages using 4 workers (1137/1516) 
+✓ Generating static pages using 4 workers (1516/1516) in 23.1s
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)                                         Revalidate  Expire
+┌ ○ /                                                       1h      1y
+├ ○ /_not-found
+├ ○ /about
+├ ƒ /admin
+├ ƒ /admin/access
+├ ƒ /admin/admins
+├ ƒ /admin/app-health
+├ ƒ /admin/audit
+├ ƒ /admin/audit/entity/[table]/[rowId]
+├ ƒ /admin/awards
+├ ƒ /admin/awards/hall-of-fame
+├ ƒ /admin/awards/hall-of-fame/[id]
+├ ƒ /admin/awards/hall-of-fame/new
+├ ƒ /admin/awards/honour-teams
+├ ƒ /admin/awards/honour-teams/[id]
+├ ƒ /admin/awards/honour-teams/new
+├ ƒ /admin/awards/revalidate
+├ ƒ /admin/awards/winners
+├ ƒ /admin/awards/winners/[id]
+├ ƒ /admin/awards/winners/new
+├ ƒ /admin/brownlow
+├ ƒ /admin/brownlow/[season]
+├ ƒ /admin/brownlow/[season]/[round]
+├ ƒ /admin/coaches
+├ ƒ /admin/coaches/[id]
+├ ƒ /admin/coaches/revalidate
+├ ƒ /admin/content
+├ ƒ /admin/content/asset/[...path]
+├ ƒ /admin/content/media
+├ ƒ /admin/content/preview
+├ ƒ /admin/current-season
+├ ƒ /admin/data-editor
+├ ƒ /admin/db-health
+├ ƒ /admin/draft
+├ ƒ /admin/draft/[id]
+├ ƒ /admin/draft/new
+├ ƒ /admin/draft/revalidate
+├ ƒ /admin/fixtures
+├ ƒ /admin/fixtures/[season]
+├ ƒ /admin/fixtures/[season]/[fixtureKey]
+├ ƒ /admin/fixtures/[season]/new
+├ ƒ /admin/grid-solver
+├ ƒ /admin/invite/[token]
+├ ƒ /admin/login
+├ ƒ /admin/nl-search
+├ ƒ /admin/nl-search/[id]
+├ ƒ /admin/nl-search/export
+├ ƒ /admin/nl-search/feedback
+├ ƒ /admin/operations
+├ ƒ /admin/operations/afl-api-refusals
+├ ƒ /admin/operations/awards
+├ ƒ /admin/operations/awards/[id]
+├ ƒ /admin/operations/brownlow
+├ ƒ /admin/operations/brownlow/revalidate
+├ ƒ /admin/operations/coleman
+├ ƒ /admin/password
+├ ƒ /admin/player-links
+├ ƒ /admin/player-links/afl-api
+├ ƒ /admin/player-links/afl-api/[providerId]
+├ ƒ /admin/player-links/revalidate
+├ ƒ /admin/query-builder
+├ ƒ /admin/records
+├ ƒ /admin/records/after-the-siren
+├ ƒ /admin/records/after-the-siren/[id]
+├ ƒ /admin/records/after-the-siren/new
+├ ƒ /admin/records/first-kick-goal
+├ ƒ /admin/records/first-kick-goal/[id]
+├ ƒ /admin/records/first-kick-goal/new
+├ ƒ /admin/records/revalidate
+├ ƒ /admin/season-lists
+├ ƒ /admin/season-lists/[season]
+├ ƒ /admin/season-lists/[season]/[club]
+├ ƒ /admin/season-lists/revalidate
+├ ƒ /admin/settings
+├ ƒ /admin/submissions/[id]
+├ ƒ /admin/upload
+├ ƒ /admin/upload/stage
+├ ƒ /advanced-search
+├ ○ /aflw                                                   1h      1y
+├ ƒ /aflw/clubs
+├ ƒ /aflw/clubs/[code]
+├ ƒ /aflw/match-search
+├ ƒ /aflw/matches/[key]
+├ ƒ /aflw/players
+├ ƒ /aflw/players/[slug]
+├ ƒ /aflw/seasons
+├ ƒ /aflw/seasons/[key]
+├ ƒ /aflw/venues
+├ ƒ /api/admin/email-intake
+├ ƒ /api/coaches/[id]/opponent-record
+├ ƒ /api/early-access
+├ ƒ /api/health
+├ ƒ /api/health-event
+├ ƒ /api/internal/revalidate-season
+├ ƒ /api/search/autocomplete
+├ ○ /awards                                                 1d      1y
+├ ƒ /awards/[slug]
+├ ƒ /awards/[slug]/[season]
+├ ƒ /beta
+├ ƒ /beta/verify
+├ ƒ /brownlow
+├   /brownlow/[year]
+│ ├ ● /brownlow/1924                                        1h      1y
+│ ├ ● /brownlow/1925                                        1h      1y
+│ ├ ● /brownlow/1926                                        1h      1y
+│ └ ● [+95 more paths]
+├ ƒ /clubs
+├   /clubs/[slug]
+│ ├ ● /clubs/adelaide                                       1d      1y
+│ ├ ● /clubs/brisbane-lions                                 1d      1y
+│ ├ ● /clubs/carlton                                        1d      1y
+│ └ ● [+21 more paths]
+├ ƒ /clubs/compare
+├ ○ /coaches                                                1h      1y
+├ ƒ /coaches/[slug]
+├ ƒ /coaches/compare
+├ ƒ /draft
+├ ƒ /draft/[year]
+├ ƒ /grid-solver
+├ ƒ /hall-of-fame
+├   /honour-teams/[slug]
+│ ├ ● /honour-teams/afl-vfl-team-of-the-century             1d      1y
+│ ├ ● /honour-teams/greek-team-of-the-century               1d      1y
+│ ├ ● /honour-teams/indigenous-team-of-the-century          1d      1y
+│ └ ● [+2 more paths]
+├ ○ /icon.svg
+├ ƒ /match-search
+├   /matches/[id]
+│ ├ ● /matches/16592                                        1h      1y
+│ ├ ● /matches/16691                                        1h      1y
+│ ├ ● /matches/16774                                        1h      1y
+│ └ ● [+624 more paths]
+├ ○ /opengraph-image
+├ ƒ /players
+├   /players/[slug]
+│ ├ ● /players/brent-harvey-2164                            1h      1y
+│ ├ ● /players/michael-tuck-9593                            1h      1y
+│ ├ ● /players/scott-pendlebury-11724                       1h      1y
+│ └ ● [+497 more paths]
+├ ƒ /players/[slug]/matches
+├ ƒ /players/compare
+├ ○ /privacy
+├ ○ /records                                                1h      1y
+├ ƒ /records/[category]
+├ ○ /records/after-the-siren                                1d      1y
+├ ○ /records/coaches                                        1d      1y
+├ ○ /records/family                                         1d      1y
+├ ○ /records/father-son                                     1d      1y
+├ ƒ /records/first-kick-goal
+├ ○ /robots.txt
+├ ƒ /search
+├ ƒ /search/qualifying-matches
+├ ƒ /seasons
+├   /seasons/[year]
+│ ├ ● /seasons/2026                                         1h      1y
+│ ├ ● /seasons/2025                                         1h      1y
+│ ├ ● /seasons/2024                                         1h      1y
+│ └ ● [+127 more paths]
+├ ○ /sitemap.xml                                            1d      1y
+├ ● /sitemap/[__metadata_id__]
+├ ƒ /venues
+├   /venues/[slug]
+│ ├ ● /venues/adelaide-oval                                 1d      1y
+│ ├ ● /venues/albury                                        1d      1y
+│ ├ ● /venues/arden-st                                      1d      1y
+│ └ ● [+49 more paths]
+└ ƒ /venues/[slug]/matches
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+
+prepare-standalone: confirmed no .env* under .next/standalone
+prepare-standalone: info: AFLDB_ENV is not production; building with development headers
+prepare-standalone: copied .next/static
+prepare-standalone: copied public
+prepare-standalone: copied deploy/coming-soon
+prepare-standalone: copied and verified 7 runtime reference files
+prepare-standalone: created .next/cache for ISR
+prepare-standalone: confirmed no .env* anywhere under .next/standalone
+prepare-standalone: standalone bundle ready
+EXIT=0 end=2026-10-29T13:08:03.4213605Z

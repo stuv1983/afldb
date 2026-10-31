@@ -1,0 +1,221 @@
+disk: 12217 MiB free (need 3 GiB) 03:49:49
+== D controls (template A = the frozen bytes, reference REF0/a4641ca0) 2026-10-30T03:49:49Z
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: ATTRIBUTED_ONLY
+CONTROL D1-writer-activity-attributed: PASS (got 3, expected 3)
+CONTROL D1-classes: PASS (got auth-activity,runtime-telemetry,settle-bookkeeping, expected auth-activity,runtime-telemetry,settle-bookkeeping)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: STOP (2 stop reason(s))
+CONTROL D2-canonical-row-change-stops: PASS (got 1, expected 1)
+CONTROL D2-subject: PASS (got yes, expected yes)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: STOP (2 stop reason(s))
+CONTROL D3-definition-change-stops: PASS (got 1, expected 1)
+CONTROL D3-subject: PASS (got yes, expected yes)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: STOP (1 stop reason(s))
+CONTROL D4-ledger-change-stops: PASS (got 1, expected 1)
+CONTROL D4-subject: PASS (got yes, expected yes)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: STOP (1 stop reason(s))
+CONTROL D5-unsigned-bookkeeping-stops: PASS (got 1, expected 1)
+CONTROL D5-subject: PASS (got yes, expected yes)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: STOP (1 stop reason(s))
+CONTROL D6-backdated-bookkeeping-stops: PASS (got 1, expected 1)
+CONTROL D6-subject: PASS (got yes, expected yes)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: STOP (2 stop reason(s))
+CONTROL D7-canonical-change-beside-settle-stops: PASS (got 1, expected 1)
+CONTROL D7-subject: PASS (got yes, expected yes)
+CONTROL D8-scope-mismatch-refused: PASS (got 2, expected 2)
+CONTROL D8-no-report-written: PASS (got absent, expected absent)
+CONTROL D9-missing-compare-is-invalid: PASS (got 2, expected 2)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: ATTRIBUTED_ONLY
+d10_gate_seconds=144
+CONTROL D10-settle-replay-attributed: PASS (got 3, expected 3)
+CONTROL D10-seven-settle-tables: PASS (got public.import_batches,public.import_rejections,staging.afltables_match,staging.afltables_player_match,staging.source_payloads,staging.source_record_versions,staging.source_records, expected public.import_batches,public.import_rejections,staging.afltables_match,staging.afltables_player_match,staging.source_payloads,staging.source_record_versions,staging.source_records)
+CONTROL D10-classes: PASS (got settle-bookkeeping, expected settle-bookkeeping)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate drift: STOP (3 stop reason(s))
+CONTROL D11-unbound-refresh-stops: PASS (got 1, expected 1)
+CONTROL D11-subject: PASS (got yes, expected yes)
+CONTROL D11-projection-subject: PASS (got yes, expected yes)
+== T controls (template B after the A-REL sequence) 2026-10-30T04:10:27Z
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+T1 suite 42/43 failed=[holds no write privilege on any table or view]
+CONTROL T1-suite-below-43: PASS (got below, expected below)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+CONTROL T1-widened-grant-different: PASS (got 1, expected 1)
+CONTROL T1-effective-line-reported: PASS (got 1, expected 1)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+T2 suite 42/43 failed=[inherits that from migration 014, whose default privilege is pinned here]
+CONTROL T2-suite-42-of-43: PASS (got 42/43, expected 42/43)
+CONTROL T2-failing-assertion: PASS (got 1, expected 1)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+CONTROL T2-missing-default-different: PASS (got 1, expected 1)
+CONTROL T2-stored-default-acl-line: PASS (got 1, expected 1)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+CONTROL T5-ownership-change-different: PASS (got 1, expected 1)
+CONTROL T3-cluster-role-fact-review: PASS (got 3, expected 3)
+CONTROL T4-assertion-fail-different: PASS (got 1, expected 1)
+CONTROL T6-truncated-readback-different: PASS (got 1, expected 1)
+== V3 controls (template AM, the rehearsed after-state) 2026-10-30T04:10:49Z
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate after: LEDGER_TIMING_ONLY
+CONTROL V1-ledger-timing-only: PASS (got 0, expected 0)
+CONTROL V1-verdict: PASS (got LEDGER_TIMING_ONLY, expected LEDGER_TIMING_ONLY)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate after: ATTRIBUTED_ONLY
+CONTROL V2-visitor-telemetry-attributed: PASS (got 3, expected 3)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate after: STOP (1 stop reason(s))
+CONTROL V3-settle-after-retirement-stops: PASS (got 1, expected 1)
+CONTROL V3-subject: PASS (got yes, expected yes)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate after: STOP (1 stop reason(s))
+CONTROL V4-ledger-checksum-stops: PASS (got 1, expected 1)
+CONTROL V4-subject: PASS (got yes, expected yes)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate after: STOP (2 stop reason(s))
+CONTROL V5-canonical-write-under-freeze-stops: PASS (got 1, expected 1)
+CONTROL V5-subject: PASS (got yes, expected yes)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate after: STOP (1 stop reason(s))
+CONTROL V6-password-change-after-arel-stops: PASS (got 1, expected 1)
+CONTROL V6-subject: PASS (got yes, expected yes)
+== N controls: failures propagate, incomplete evidence is never PASS 2026-10-30T04:24:36Z
+CONTROL N1-corrupted-transfer-stops: PASS (got 9, expected 9)
+CONTROL N1-result-recorded-fail: PASS (got FAIL, expected FAIL)
+CONTROL N1-no-cluster-created: PASS (got no, expected no)
+CONTROL N2-missing-root-stops: PASS (got 2, expected 2)
+CONTROL N3-missing-gateR-incomplete: PASS (got 2, expected 2)
+CONTROL N3-only-gateR-missing: PASS (got gateR.json, expected gateR.json)
+CONTROL N4-42-of-43-fails: PASS (got 1, expected 1)
+CONTROL N5-failed-step-code-fails: PASS (got 1, expected 1)
+== RB: forward-schema code rollback, rollback runbook §4.1 (PREV ff100dc2 on the 117 schema) 2026-10-30T04:24:38Z
+CONTROL RB1-prev-runner-accepts-ledger: PASS (got 0, expected 0)
+CONTROL RB1-prev-nothing-pending: PASS (got 1, expected 1)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+CONTROL RB2-unknown-applied-exactly-111-117: PASS (got 111_curated_award_proposals.sql 112_derived_award_results.sql 113_brownlow_eligibility_decisions.sql 114_award_projections_and_curated_revisions.sql 115_adjudication_supersession_fk_index.sql 116_brownlow_correction_receipts.sql 117_brownlow_provider_eligibility_unknown.sql, expected 111_curated_award_proposals.sql 112_derived_award_results.sql 113_brownlow_eligibility_decisions.sql 114_award_projections_and_curated_revisions.sql 115_adjudication_supersession_fk_index.sql 116_brownlow_correction_receipts.sql 117_brownlow_provider_eligibility_unknown.sql)
+CONTROL RB2-every-prev-migration-applied: PASS (got 0, expected 0)
+disk: 11685 MiB free (need 6 GiB) 04:24:43
+CONTROL RB3-prev-build: PASS (got 0, expected 0)
+rb_build_seconds=225
+CONTROL RB4-prev-health-200: PASS (got 200, expected 200)
+CONTROL RB4-prev-health-database-ok: PASS (got 1, expected 1)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+RB null-eligible rows present: 0
+CONTROL RB5-prev-runtime-checks: PASS (got 0, expected 0)
+CONTROL RB5-route-permission-checks: PASS (got 18, expected 18)
+CONTROL RB4-prev-server-stopped: PASS (got 0, expected 0)
+disk: 11684 MiB free (need 2 GiB) 04:28:45
+CONTROL RB6-prev-brownlow-writer-suite: PASS (got 0, expected 0)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+CONTROL RB6-null-eligible-rows-kept: PASS (got 0, expected 0)
+CONTROL RB7-prev-privileges-completes: PASS (got 0, expected 0)
+isolated-pg: afldb_v2_shadow_pxctl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /usr/bin/env
+INFO RB7 read-back after PREV privileges.sql vs B: exit 1 (not on the code-rollback route; recorded, not graded)
+== H controls: host-session.sh functions in library mode (no production) 2026-10-30T04:29:06Z
+CONTROL H1-identity-110: FAIL (got 5, expected 0)
+CONTROL H2a-117-without-digest: FAIL (got 5, expected 2)
+CONTROL H2b-110-db-is-not-117: PASS (got 5, expected 5)
+CONTROL H3a-no-password: PASS (got 2, expected 2)
+CONTROL H3b-duplicate-key: PASS (got 2, expected 2)
+CONTROL H3c-bad-scheme: PASS (got 2, expected 2)
+CONTROL H3d-owner-under-backup-key: PASS (got 2, expected 2)
+CONTROL H3e-percent-decoding: PASS (got 1, expected 1)
+CONTROL H4-writer-process-stops: PASS (got 4, expected 4)
+CONTROL H5-frozen-backup: FAIL (got 5, expected 0)
+CONTROL H5-series-unchanged: PASS (got 2, expected 2)
+ls: cannot access '/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/hs/backups/release-v2-20261029T210300Z/*.release.json': No such file or directory
+node:internal/modules/cjs/loader:1522
+    throw new ERR_INVALID_ARG_VALUE('id', id,
+    ^
+
+TypeError [ERR_INVALID_ARG_VALUE]: The argument 'id' must be a non-empty string. Received ''
+    at Module.require (node:internal/modules/cjs/loader:1522:11)
+    at require (node:internal/modules/helpers:147:16)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'ERR_INVALID_ARG_VALUE'
+}
+
+Node.js v22.23.2
+CONTROL H5-sidecar-accepted-by-P3: FAIL (got 1, expected 0)
+sha256sum: frozen.SHA256SUMS: No such file or directory
+CONTROL H5-sums-verify: FAIL (got 1, expected 0)
+CONTROL H5b-second-frozen-refused: FAIL (got 5, expected 6)
+grep: /home/arm/afldb-v2-prodexec-20261030T020000Z/controls/hs/backups/release-v2-20261029T210300Z/frozen.SHA256SUMS: No such file or directory
+CONTROL H6-manifest-before: FAIL (got 5, expected 0)
+CONTROL H6b-after-on-110-refused: PASS (got 5, expected 5)
+CONTROL H8-arel-refuses-non-reviewed-checkout: FAIL (got 2, expected 6)
+CONTROL H8-reason: FAIL (got 0, expected 1)
+CONTROL H8b-arel-without-archive-hash: PASS (got 2, expected 2)
+CONTROL H13-enabled-timer-stops: PASS (got 4, expected 4)
+CONTROL H13-reason: PASS (got 1, expected 1)
+CONTROL H7-readback-117: FAIL (got 5, expected 0)
+grep: /home/arm/afldb-v2-prodexec-20261030T020000Z/controls/hs/backups/release-v2-20261029T210300Z/P.permissions.txt: No such file or directory
+CONTROL H7-read-only: FAIL (got , expected 1)
+mv: cannot stat '/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/hs/backups/release-v2-20261029T210300Z/P.permissions.txt': No such file or directory
+CONTROL H7b-tampered-pinned-refused: FAIL (got 5, expected 6)
+CONTROL H10-postschema-backup: FAIL (got 5, expected 0)
+CONTROL H10-result-line: FAIL (got 0, expected 1)
+CONTROL H11-readback-of-B-clone: FAIL (got 5, expected 0)
+disk: 13645 MiB free (need 3 GiB) 04:29:30
+cp: cannot stat '/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/hs/backups/release-v2-20261029T210300Z/frozen.SHA256SUMS': No such file or directory
+STOP: arel dir 20261029T210500Z

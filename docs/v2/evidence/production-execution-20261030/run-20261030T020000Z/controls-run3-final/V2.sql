@@ -1,0 +1,2 @@
+UPDATE afldb_meta.schema_migrations SET applied_at = now(), duration_ms = coalesce(duration_ms, 0) + 1 WHERE name >= '111';
+SELECT format('INSERT INTO %s (%s) SELECT %s FROM %s ORDER BY id DESC LIMIT 1', 'public.nl_search_log', c, c, 'public.nl_search_log') FROM (SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position) c FROM information_schema.columns WHERE table_schema = split_part('public.nl_search_log','.',1) AND table_name = split_part('public.nl_search_log','.',2) AND column_name NOT IN ('id','at','created_at','client_ref')) s \gexec

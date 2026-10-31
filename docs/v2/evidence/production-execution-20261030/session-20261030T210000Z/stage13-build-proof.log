@@ -1,0 +1,7 @@
+env_trace_on_lines=0
+live https://beta.afldb.com/_next/static/QNEHXAtU53TzUjj0Mb7mv/_buildManifest.js 200
+live https://beta.afldb.com/_next/static/QNEHXAtU53TzUjj0Mb7mv/_ssgManifest.js 200
+control: old build id path 404
+QNEHXAtU53TzUjj0Mb7mv chunks css media 
+MainPID=3170412 cwd=/home/arm/projects/afldb start=Sat Oct 31 09:41:24 2026
+BUILD_ID file mtime: 2026-10-31 09:39:35.670169804 +1100

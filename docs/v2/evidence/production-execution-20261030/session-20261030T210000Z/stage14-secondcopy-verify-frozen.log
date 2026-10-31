@@ -1,0 +1,5 @@
+﻿== O1 local frozen set re-verified (6 files + frozen.SHA256SUMS e4f67f71379b042ec8b923aebc5e6f1c9a63dd6da13cecda62e79e4fa3dfe98b, 29935887 bytes, archive 599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb)
+== O4 identity and remote verification (read-only)
+  remote: DEST /mnt/backup/backup(2026-10-31) mount=/mnt/backup source=/dev/sdg1 fstype=ext4 uuid=4bc4fb8d-b3eb-466a-b5f4-42806ec83d3c owner=arm:700
+  remote: REMOTE VERIFIED /mnt/backup/backup(2026-10-31)/release-v2-20261030T210000Z/frozen files=7
+SECONDCOPY VERIFY PASS label=frozen attempt=1 sums_sha256=e4f67f71379b042ec8b923aebc5e6f1c9a63dd6da13cecda62e79e4fa3dfe98b dest=/mnt/backup/backup(2026-10-31)/release-v2-20261030T210000Z/frozen

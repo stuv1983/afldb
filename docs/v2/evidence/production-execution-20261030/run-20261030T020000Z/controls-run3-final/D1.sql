@@ -1,0 +1,9 @@
+INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)
+SELECT source_id, 'settle-afltables.ts', 'staging.source_record_versions', 0,
+       'AFLDB-ISSUE-099 settle; snapshot=settle-2026-2026-10-30-0444; season=2026; mode=apply'
+  FROM import_batches WHERE tool = 'settle-afltables.ts' ORDER BY id DESC LIMIT 1;
+SELECT format('INSERT INTO %s (%s) SELECT %s FROM %s ORDER BY id DESC LIMIT 1', 'public.auth_audit_log', c, c, 'public.auth_audit_log') FROM (SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position) c FROM information_schema.columns WHERE table_schema = split_part('public.auth_audit_log','.',1) AND table_name = split_part('public.auth_audit_log','.',2) AND column_name NOT IN ('id','at','created_at','client_ref')) s \gexec
+SELECT format('INSERT INTO %s (%s) SELECT %s FROM %s ORDER BY id DESC LIMIT 1', 'public.app_health_events', c, c, 'public.app_health_events') FROM (SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position) c FROM information_schema.columns WHERE table_schema = split_part('public.app_health_events','.',1) AND table_name = split_part('public.app_health_events','.',2) AND column_name NOT IN ('id','at','created_at','client_ref')) s \gexec
+SELECT format('INSERT INTO %s (%s) SELECT %s FROM %s ORDER BY id DESC LIMIT 1', 'public.nl_search_log', c, c, 'public.nl_search_log') FROM (SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position) c FROM information_schema.columns WHERE table_schema = split_part('public.nl_search_log','.',1) AND table_name = split_part('public.nl_search_log','.',2) AND column_name NOT IN ('id','at','created_at','client_ref')) s \gexec
+INSERT INTO auth_sessions (token_hash, user_id, expires_at) SELECT 'control-' || md5(random()::text), min(id), now() + interval '1 day' FROM auth_users;
+UPDATE auth_users SET totp_last_step = coalesce(totp_last_step, 0) + 1 WHERE id = (SELECT min(id) FROM auth_users);

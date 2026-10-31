@@ -1,0 +1,18 @@
+== D-V2-PROD-EXEC-1 host session stage=writers stamp=20261030T210000Z 2026-10-30T21:17:26Z
+host=afldb-prod user=arm boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac checkout=ff100dc2b8da8523f550ef45a9eaa3ef96d9d840 build=vcxM_SyDxFCP0sj9n9W1t
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+ledger rows=110 last=110_match_sheet_player_match_stats_authority.sql digest=789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153
+unit afldb.service active=active enabled=enabled
+unit afldb-settle-afltables.service active=inactive enabled=static
+unit afldb-settle-afltables.timer active=inactive enabled=disabled
+unit afldb-settle-afl-api.service active=inactive enabled=not-found
+unit afldb-settle-afl-api.timer active=inactive enabled=not-found
+unit afldb-settle-afl-api-brownlow.service active=inactive enabled=not-found
+unit afldb-settle-afl-api-brownlow.timer active=inactive enabled=not-found
+unit afldb-email-intake.service active=inactive enabled=not-found
+unit afldb-email-intake.timer active=inactive enabled=not-found
+timer none matching afldb
+no settle/migrate/dump/restore process
+activity sessions	afldb_app	2
+activity access_exclusive_relation_locks	0
+RESULT PASS stage=writers

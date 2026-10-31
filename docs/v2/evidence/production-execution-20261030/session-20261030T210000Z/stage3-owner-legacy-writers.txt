@@ -1,0 +1,10 @@
+﻿Stage 3 legacy-writers gate, owner-run with sudo (owner decision: arm cannot list /etc/polkit-1/rules.d), pasted by the owner.
+arm@afldb-prod:~/projects/afldb$ cd /home/arm/projects/afldb && sudo /home/arm/.nvm/versions/node/v22.23.2/bin/node --import tsx tools/v2/cutover-preflight.ts legacy-writers; echo "exit=$?"
+Legacy production writers: PASS
+  PASS afldb-settle-afltables.timer: load=loaded file=disabled active=inactive
+  PASS afldb-settle-afltables.service: load=loaded file=static active=inactive
+  PASS afldb-email-intake.timer: not installed (load=not-found file=- active=inactive)
+  PASS afldb-email-intake.service: not installed (load=not-found file=- active=inactive)
+  PASS polkit rules: no rule grants an on-demand AFL Tables settle start
+No legacy writer can run. This is one release precondition, never the release go.
+exit=0

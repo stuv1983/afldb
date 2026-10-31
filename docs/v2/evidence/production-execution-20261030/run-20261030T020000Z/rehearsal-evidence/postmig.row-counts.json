@@ -1,0 +1,545 @@
+{
+  "format": "afldb.v2.table-row-counts",
+  "formatVersion": 1,
+  "status": "complete",
+  "producedAt": "2026-10-30T01:47:40.859Z",
+  "source": {
+    "database": "afldb_v2_shadow_pxfrozenmig_test",
+    "serverVersion": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "transaction": "repeatable read, read only, rolled back"
+  },
+  "schemas": [
+    "afldb_meta",
+    "aflw",
+    "public",
+    "staging",
+    "staging_aflw"
+  ],
+  "tables": [
+    {
+      "schema": "afldb_meta",
+      "table": "app_readable_tables",
+      "rows": 55
+    },
+    {
+      "schema": "afldb_meta",
+      "table": "import_writable_tables",
+      "rows": 47
+    },
+    {
+      "schema": "afldb_meta",
+      "table": "schema_migrations",
+      "rows": 117
+    },
+    {
+      "schema": "public",
+      "table": "admin_invites",
+      "rows": 3
+    },
+    {
+      "schema": "public",
+      "table": "afl_api_identity_adjudications",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "after_siren_kicks",
+      "rows": 126
+    },
+    {
+      "schema": "public",
+      "table": "app_health_events",
+      "rows": 17
+    },
+    {
+      "schema": "public",
+      "table": "auth_audit_log",
+      "rows": 203
+    },
+    {
+      "schema": "public",
+      "table": "auth_sessions",
+      "rows": 5
+    },
+    {
+      "schema": "public",
+      "table": "auth_users",
+      "rows": 4
+    },
+    {
+      "schema": "public",
+      "table": "award_nominations",
+      "rows": 766
+    },
+    {
+      "schema": "public",
+      "table": "award_proposal_decisions",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "award_proposals",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "award_winners",
+      "rows": 3712
+    },
+    {
+      "schema": "public",
+      "table": "awards",
+      "rows": 47
+    },
+    {
+      "schema": "public",
+      "table": "beta_access_codes",
+      "rows": 3
+    },
+    {
+      "schema": "public",
+      "table": "beta_allowed_emails",
+      "rows": 1
+    },
+    {
+      "schema": "public",
+      "table": "beta_join_requests",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "beta_login_tokens",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "brownlow_correction_receipts",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "brownlow_eligibility_decisions",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "brownlow_round_votes",
+      "rows": 330383
+    },
+    {
+      "schema": "public",
+      "table": "brownlow_season_authority",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "brownlow_season_votes",
+      "rows": 16120
+    },
+    {
+      "schema": "public",
+      "table": "brownlow_vote_entry_state",
+      "rows": 1
+    },
+    {
+      "schema": "public",
+      "table": "canonical_applications",
+      "rows": 20047
+    },
+    {
+      "schema": "public",
+      "table": "captaincies",
+      "rows": 1774
+    },
+    {
+      "schema": "public",
+      "table": "club_aliases",
+      "rows": 48
+    },
+    {
+      "schema": "public",
+      "table": "club_leadership",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "club_organization_relations",
+      "rows": 3
+    },
+    {
+      "schema": "public",
+      "table": "club_organizations",
+      "rows": 21
+    },
+    {
+      "schema": "public",
+      "table": "club_seasons",
+      "rows": 1640
+    },
+    {
+      "schema": "public",
+      "table": "clubs",
+      "rows": 24
+    },
+    {
+      "schema": "public",
+      "table": "coaches",
+      "rows": 386
+    },
+    {
+      "schema": "public",
+      "table": "data_edits",
+      "rows": 95
+    },
+    {
+      "schema": "public",
+      "table": "data_issues",
+      "rows": 40
+    },
+    {
+      "schema": "public",
+      "table": "data_overrides",
+      "rows": 93
+    },
+    {
+      "schema": "public",
+      "table": "data_submission_rows",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "data_submissions",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "derived_award_projections",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "derived_award_results",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "derived_rebuilds",
+      "rows": 14
+    },
+    {
+      "schema": "public",
+      "table": "draft_persons",
+      "rows": 5057
+    },
+    {
+      "schema": "public",
+      "table": "draft_picks",
+      "rows": 6810
+    },
+    {
+      "schema": "public",
+      "table": "external_grid_axes",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "external_grid_sources",
+      "rows": 1
+    },
+    {
+      "schema": "public",
+      "table": "external_grids",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "external_identities",
+      "rows": 19319
+    },
+    {
+      "schema": "public",
+      "table": "father_son_selections",
+      "rows": 127
+    },
+    {
+      "schema": "public",
+      "table": "fixtures",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "hall_of_fame",
+      "rows": 343
+    },
+    {
+      "schema": "public",
+      "table": "honour_team_members",
+      "rows": 113
+    },
+    {
+      "schema": "public",
+      "table": "import_batches",
+      "rows": 64
+    },
+    {
+      "schema": "public",
+      "table": "import_rejections",
+      "rows": 681
+    },
+    {
+      "schema": "public",
+      "table": "match_coaches",
+      "rows": 32034
+    },
+    {
+      "schema": "public",
+      "table": "match_period_scores",
+      "rows": 136448
+    },
+    {
+      "schema": "public",
+      "table": "matches",
+      "rows": 17056
+    },
+    {
+      "schema": "public",
+      "table": "nl_search_feedback",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "nl_search_log",
+      "rows": 52
+    },
+    {
+      "schema": "public",
+      "table": "nl_search_review",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "player_achievements",
+      "rows": 334
+    },
+    {
+      "schema": "public",
+      "table": "player_birth_evidence",
+      "rows": 14110
+    },
+    {
+      "schema": "public",
+      "table": "player_career_stats",
+      "rows": 13363
+    },
+    {
+      "schema": "public",
+      "table": "player_club_season_stats",
+      "rows": 59094
+    },
+    {
+      "schema": "public",
+      "table": "player_clubs",
+      "rows": 16842
+    },
+    {
+      "schema": "public",
+      "table": "player_height_evidence",
+      "rows": 14395
+    },
+    {
+      "schema": "public",
+      "table": "player_link_match_candidates",
+      "rows": 10472
+    },
+    {
+      "schema": "public",
+      "table": "player_link_resolutions",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "player_link_suggestions",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "player_match_period_stats",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "player_match_stats",
+      "rows": 695499
+    },
+    {
+      "schema": "public",
+      "table": "player_name_aliases",
+      "rows": 13273
+    },
+    {
+      "schema": "public",
+      "table": "player_relationships",
+      "rows": 625
+    },
+    {
+      "schema": "public",
+      "table": "player_season_stats",
+      "rows": 58845
+    },
+    {
+      "schema": "public",
+      "table": "players",
+      "rows": 13365
+    },
+    {
+      "schema": "public",
+      "table": "promotion_candidates",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "promotion_decisions",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "season_list_members",
+      "rows": 0
+    },
+    {
+      "schema": "public",
+      "table": "seasons",
+      "rows": 130
+    },
+    {
+      "schema": "public",
+      "table": "site_media",
+      "rows": 1
+    },
+    {
+      "schema": "public",
+      "table": "site_settings",
+      "rows": 16
+    },
+    {
+      "schema": "public",
+      "table": "sources",
+      "rows": 14
+    },
+    {
+      "schema": "public",
+      "table": "stat_availability",
+      "rows": 3120
+    },
+    {
+      "schema": "public",
+      "table": "stat_definitions",
+      "rows": 24
+    },
+    {
+      "schema": "public",
+      "table": "venue_aliases",
+      "rows": 55
+    },
+    {
+      "schema": "public",
+      "table": "venues",
+      "rows": 52
+    },
+    {
+      "schema": "staging",
+      "table": "afl_api_brownlow_vote",
+      "rows": 0
+    },
+    {
+      "schema": "staging",
+      "table": "afl_api_lineup",
+      "rows": 0
+    },
+    {
+      "schema": "staging",
+      "table": "afl_api_match",
+      "rows": 0
+    },
+    {
+      "schema": "staging",
+      "table": "afl_api_player_match",
+      "rows": 9983
+    },
+    {
+      "schema": "staging",
+      "table": "afltables_match",
+      "rows": 218
+    },
+    {
+      "schema": "staging",
+      "table": "afltables_player_match",
+      "rows": 10028
+    },
+    {
+      "schema": "staging",
+      "table": "external_current_matches",
+      "rows": 0
+    },
+    {
+      "schema": "staging",
+      "table": "source_payloads",
+      "rows": 30245
+    },
+    {
+      "schema": "staging",
+      "table": "source_record_versions",
+      "rows": 30245
+    },
+    {
+      "schema": "staging",
+      "table": "source_records",
+      "rows": 20663
+    },
+    {
+      "schema": "staging",
+      "table": "team_seasons",
+      "rows": 0
+    },
+    {
+      "schema": "staging_aflw",
+      "table": "fixtures",
+      "rows": 818
+    },
+    {
+      "schema": "staging_aflw",
+      "table": "issues",
+      "rows": 2
+    },
+    {
+      "schema": "staging_aflw",
+      "table": "ladders",
+      "rows": 144
+    },
+    {
+      "schema": "staging_aflw",
+      "table": "matches",
+      "rows": 710
+    },
+    {
+      "schema": "staging_aflw",
+      "table": "player_match_stats",
+      "rows": 29878
+    },
+    {
+      "schema": "staging_aflw",
+      "table": "player_seasons",
+      "rows": 3972
+    },
+    {
+      "schema": "staging_aflw",
+      "table": "scoring_events",
+      "rows": 15483
+    },
+    {
+      "schema": "staging_aflw",
+      "table": "seasons",
+      "rows": 11
+    }
+  ]
+}

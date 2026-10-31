@@ -1,0 +1,4 @@
+﻿== T1 protected local directory C:\Users\stuar\backups\afldb\release-v2-20261030T210000Z
+== T2 copy postschema set from production (read-only scp)
+local hashes OK (6 files)
+TRANSFER PASS mode=Pull label=postschema archive_sha256=3f5b5339cee312950c308b494ca98ff29a2f1620d9f60a4d062fbaf37b624730 local=C:\Users\stuar\backups\afldb\release-v2-20261030T210000Z

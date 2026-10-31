@@ -1,0 +1,2 @@
+isolated-pg: afldb_v2_shadow_pxfrozen_test verified (cluster afldb_v2_isolated, 127.0.0.1:55491); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+drift-gate: compare report unreadable: ENOENT: no such file or directory, open '/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/does-not-exist.json'

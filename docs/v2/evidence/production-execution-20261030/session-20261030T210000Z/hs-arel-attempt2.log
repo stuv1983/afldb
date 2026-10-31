@@ -1,0 +1,45 @@
+== D-V2-PROD-EXEC-1 host session stage=arel stamp=20261030T210000Z 2026-10-30T21:44:09Z
+host=afldb-prod user=arm boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac checkout=9ed9c9dd3e84682c43e96c46e98974b245eb54ed build=vcxM_SyDxFCP0sj9n9W1t
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=110 last=110_match_sheet_player_match_stats_authority.sql digest=789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=localhost port=5432 database=afldb_prod
+owner_identity afldb_prod afldb_owner 66668 7674454702926115004
+no settle/migrate/dump/restore process
+timer afldb-settle-afltables.timer enabled=disabled active=inactive
+timer afldb-settle-afl-api.timer enabled=not-found active=inactive
+timer afldb-settle-afl-api-brownlow.timer enabled=not-found active=inactive
+timer afldb-email-intake.timer enabled=not-found active=inactive
+checkout HEAD=9ed9c9dd3e84682c43e96c46e98974b245eb54ed porcelain_lines=0
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=localhost port=5432 database=afldb_prod
+pending: 111_curated_award_proposals.sql 112_derived_award_results.sql 113_brownlow_eligibility_decisions.sql 114_award_projections_and_curated_revisions.sql 115_adjudication_supersession_fk_index.sql 116_brownlow_correction_receipts.sql 117_brownlow_provider_eligibility_unknown.sql
+AFLDB migrations -> prod (afldb_owner@localhost:5432/afldb_prod)
+  117 migration file(s), 110 already applied
+
+  applying 111_curated_award_proposals.sql ... ok (74 ms)
+  applying 112_derived_award_results.sql ... ok (33 ms)
+  applying 113_brownlow_eligibility_decisions.sql ... ok (23 ms)
+  applying 114_award_projections_and_curated_revisions.sql ... ok (21 ms)
+  applying 115_adjudication_supersession_fk_index.sql ... ok (8 ms)
+  applying 116_brownlow_correction_receipts.sql ... ok (12 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (2 ms)
+
+Applied 7 migration(s).
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+ledger rows=117 last=117_brownlow_provider_eligibility_unknown.sql digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=localhost port=5432 database=afldb_prod
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+eligible-nullable-117|ok
+index-115|ok
+ledger-last-117|ok
+ledger-rows-117|ok
+staging-default-acl|ok
+table-award_proposal_decisions|ok
+table-award_proposals|ok
+table-brownlow_correction_receipts|ok
+table-brownlow_eligibility_decisions|ok
+table-derived_award_projections|ok
+table-derived_award_results|ok
+trigger-116-enabled|ok
+RESULT PASS stage=arel ledger_digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72

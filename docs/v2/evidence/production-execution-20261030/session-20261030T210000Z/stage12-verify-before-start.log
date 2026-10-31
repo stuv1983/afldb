@@ -1,0 +1,12 @@
+BUILD_ID .next=QNEHXAtU53TzUjj0Mb7mv standalone=QNEHXAtU53TzUjj0Mb7mv
+static files root=184 standalone=184
+runtime reference files: 7/7 byte-identical
+porcelain=0 HEAD=9ed9c9dd3e84682c43e96c46e98974b245eb54ed
+{"files":12994,"symlinks":0,"bytes":810719022,"manifest_sha256":"b8a0c6d33b9fd623185b2b2e08fd9b041b973602db82e93eefae520b4b556a29"}
+4bc73395161c301e3befbe2d33335df0b863ee6f222ea1c16b40a2b425d92e52  /home/arm/backups/afldb/release-v2-20261030T210000Z/build.attempt2.log
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  /home/arm/backups/afldb/release-v2-20261030T210000Z/build.attempt2.exit
+5968d0dd1eab43445970bc870135421756fbb439b1df6b66e6a6a0ef83fccc06  /home/arm/backups/afldb/release-v2-20261030T210000Z/build.attempt2.mem.log
+b8a0c6d33b9fd623185b2b2e08fd9b041b973602db82e93eefae520b4b556a29  /home/arm/backups/afldb/release-v2-20261030T210000Z/standalone-manifest.sha256
+91a562521bafdc4c3d74f2e323f720b99090b8cda47f13058d2ca9ca11856315  /home/arm/backups/afldb/release-v2-20261030T210000Z/build.identity.txt
+afldb.service=inactive
+VERIFY PASS before start

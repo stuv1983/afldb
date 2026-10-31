@@ -30,6 +30,23 @@ const workers = Number.isSafeInteger(configured) && configured > 0
 if (cluster.isPrimary) {
   console.log(`[afldb] primary ${process.pid} starting ${workers} worker(s)`);
 
+  // AFLDB-ISSUE-329: build identity in the journal on every start, whether or
+  // not request tracing is on. Under the release route (deploy/release.mjs)
+  // release.json sits one level up from this file; in place it does not, and
+  // the line still names the BUILD_ID. Never fatal.
+  {
+    const { readFileSync } = await import('node:fs');
+    const read = (path) => {
+      try { return readFileSync(new URL(path, import.meta.url), 'utf8').trim(); } catch { return null; }
+    };
+    let release = null;
+    try { release = JSON.parse(read('../release.json') ?? 'null'); } catch { /* malformed: report none */ }
+    console.log(
+      `[afldb] serving build ${read('../.next/standalone/.next/BUILD_ID') ?? 'unknown'} `
+      + `release ${release?.id ?? 'in-place'} revision ${release?.revision ?? 'unknown'}`,
+    );
+  }
+
   // AFLDB_WORKER_ID is a small stable ordinal (1..N), NOT cluster's own
   // worker.id, which counts up forever: a worker that dies and is replaced
   // gets a fresh cluster id, so an investigation correlating failures with

@@ -1,0 +1,7 @@
+restore_seconds_two_clones=99
+before_capture_seconds=168
+arel_seconds=21
+suite_seconds=3
+clone_B_seconds=39
+rehearsal_seconds=553
+after_seconds=195

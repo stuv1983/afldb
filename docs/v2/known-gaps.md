@@ -50,13 +50,13 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-004 | Low | source worktree hygiene | no | open: owner action | fix or disable the user-level Read/Grep/Glob hook; decide whether to delete the stray `supplies` |
 | V2-GAP-005 | Low | historical baseline scope | no | open: AFLW not covered by the manifest | decide whether AFLW joins the manifest |
 | V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open | decide on database-level seal enforcement |
-| V2-GAP-007 | Medium | historical baseline | rehearsal | open, narrowed (Launch F): the producer ran repeatedly on the isolated rebuild with identical results; no real-baseline manifest | approve the shadow captures (§4), then a read-only production run (cutover runbook step 3) |
+| V2-GAP-007 | Medium | historical baseline | rehearsal | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: the owner-authorised read-only production runs produced the real-baseline manifest before (`4060c929…`, ledger 110) and after (`ba1d5c64…`, ledger 117) the release; both are 32 tables and 1,380 buckets, kept outside the repository in the host release directory; gate M sealed scope identical. Isolated repeat runs were already identical (Launch F) | none |
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
 | V2-GAP-009 | Medium | AFL API promotion | rehearsal | open, narrowed: the two formerly name-pinned files pass locally and on Linux (2026-10-28: backtest 6/6, state-b 1/1, under the guarded isolated target); strict isolated proofs replace the name pin | production-dump replay under the same guarded target contract |
 | V2-GAP-010 | Medium | AFL API coverage | no (coverage is not claimed) | open: 2012-2025 API coverage has no committed evidence | decide which seasons to evidence |
-| V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains | approve A-AFLT (disable the timer in the window); the alternative "release after C5" was withdrawn by the owner on 2026-10-29 (D-V2-LOCK-1), so A-AFLT is required before production schema/code installation |
+| V2-GAP-011 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): a V2 checkout refuses the AFL Tables settle; `cutover-preflight.ts legacy-writers` refuses the release while the timer or polkit rule remains. **2026-10-31 (D-V2-PROD-EXEC-1):** A-AFLT executed. The timer is disabled and inactive, the polkit rule was recorded absent, and `legacy-writers` passed (owner sudo) at Stages 3 and 13. Its close condition, the ISSUE-316 sequence, is not met | the owner's ISSUE-316 sequence (C2, the C4b PASS, C5) |
 | V2-GAP-012 | Medium | legacy runtime | no | **CLOSED (Launch F)**: helpers moved to `settle-shared.ts`, both edges removed from the ratchet, settle integration suites pass on isolated PG16 | none |
-| V2-GAP-013 | High | legacy runtime | **cutover** | **open, production-only**, narrowed (Launch F): the poller refuses in V2; the preflight refuses the release while the email-intake timer runs | approve the release window (step 4, 4a) |
+| V2-GAP-013 | High | legacy runtime | **cutover** | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: in the approved window, `afldb-email-intake.service` and `.timer` were `not-found` and inactive at every writer check (initial, freeze and close), so step 4 had nothing to disable; live `POST /api/admin/email-intake` answered 410 at Stage 13. The three changed integration suites ran in the full Linux default workflow on 2026-10-28, whose only failures were `gridley-corpus` (V2-GAP-029) | none |
 | V2-GAP-014 | Low | legacy quarantine | no | **CLOSED locally**: acquisition implementations quarantined, refusing old entry points; deterministic rebuild retained and verified | no live retirement authorised |
 | V2-GAP-015 | Medium | Coleman | reconciliation | open, narrowed (Launch F): 46/46 seasons (1980-2025) agree on the locally rebuilt history; production data not compared | approve the shadow Coleman capture on the production dump (§4/§8) |
 | V2-GAP-016 | Medium | Brownlow | reconciliation | open, narrowed: atomic audited public publication implemented; 98/98 local seasons agree, none unresolved; archive-scoped migration evidence accepted (D-V2-BROWNLOW-ALT-1: stored-only, identical 98-season before/after; D-V2-BROWNLOW-ALT-3 for current-production archive `a4641ca0…`, 2026-10-29, migration evidence only, privileges 42/43 not waived) and an **authentic 2025 API snapshot reconciles** (207/207 matches, 188 players, 621 votes, totals, ranks and winner; [record](brownlow-authentic-reconciliation-2026-10-20.md)) **except 12 players the provider marks ineligible whom the stored table holds eligible (policy/rulings approved under D-V2-BROWNLOW-ELIGIBILITY-1; the tri-state runtime is implemented locally and isolated-verified ([record](brownlow-eligibility-implementation-2026-10-20.md)); production recording and rollout pending; exact citations preserved: [ruling](brownlow-eligibility-ruling-2026-10-20.md))** | review the local runtime commit and **new migration 117**; separately approve schema installation (116 + 117), exact production recording and reconciliation acceptance ([checklist](release-requirements-checklist-2026-10-20.md) item 1) |
@@ -200,6 +200,14 @@ award results must be shown reconcilable before production; **no** — not a pro
 
 ## V2-GAP-007 — No manifest of the real baseline exists yet
 
+- **CLOSED 2026-10-31 (D-V2-PROD-EXEC-1).** The close condition below is met. The producer ran
+  read-only against `afldb_prod` (session and transaction read-only, rolled back) at 21:27:12Z
+  (ledger 110) and 22:42:46Z (ledger 117). It wrote `manifest-before.json` `4060c929…` and
+  `manifest-after.json` `ba1d5c64…`, each 32 tables and 1,380 buckets. Both are under
+  `afldb-prod:/home/arm/backups/afldb/release-v2-20261030T210000Z/`, outside the repository. Gate M
+  found the sealed scope identical. Evidence: `docs/v2/evidence/production-execution-20261030/session-20261030T210000Z/hs-manifest.log`
+  and `hs-manifest-after.log`. The session logs record start times only, not run durations.
+
 - **Launch F (2026-10-19).** `historical-manifest.ts produce` ran on isolated copies of the locally rebuilt history (32 tables, 1,376 buckets). The before and after manifests around migrations 111-114 compared identical. No manifest of the real baseline exists.
 - **What.** The producer (`tools/v2/historical-manifest.ts produce`) is tested only through a fake
   query function; its SQL has never executed on PostgreSQL, so a server-side error (for example a
@@ -326,6 +334,18 @@ award results must be shown reconcilable before production; **no** — not a pro
   with L4.
 
 ## V2-GAP-013 — CUTOVER BLOCKER: the email-intake timer still runs; the CSV, email and Squiggle/Kali admin paths now refuse
+
+- **CLOSED 2026-10-31 (D-V2-PROD-EXEC-1).** Both parts of the close condition below are met.
+  - **Window.** The owner approved the window. The host's email-intake units were absent
+    (`enabled=not-found`, inactive) at the initial, freeze and closing writer checks
+    (`hs-writers.log`, `hs-writers-freeze.log`, `hs-writers-after.log` in
+    `docs/v2/evidence/production-execution-20261030/session-20261030T210000Z/`). Step 4's
+    "disable it only if present" therefore had nothing to disable.
+  - **Live route.** Stage 13 `POST /api/admin/email-intake` → 410 (`stage13-acceptance.log`).
+  - **Suites.** The three changed integration suites are part of the default Vitest workflow. That
+    workflow ran in full on Linux against guarded `_test` targets on 2026-10-28, and its only
+    failures were `gridley-corpus`, which is V2-GAP-029
+    ([Linux verification](linux-verification-2026-10-28.md)).
 
 - **Launch F (2026-10-19).** `tools/email_intake/fetch_and_stage.py`, executed directly, refuses before reading the environment or the mailbox. The cutover preflight refuses the release while the email-intake timer can run. Production-only remainder: cutover-runbook step 4, not executed.
 - **What.** CSV upload (`src/app/admin/upload/**`), CSV submission review and promotion

@@ -15,6 +15,92 @@ commit.
 
 ## [Unreleased]
 
+### Non-destructive production build, promotion and rollback (AFLDB-ISSUE-329, 2026-10-31; not installed)
+
+- New `deploy/release.mjs`. It builds a revision in a workspace outside the serving checkout
+  (`git archive`, `npm ci`, `npm run build`), then validates the candidate:
+  - BUILD_ID agreement, byte-identical assets, no `.env` file, no escaping symlink, the transport
+    flag;
+  - a boot smoke with the service's environment that renders `/`;
+  - a file manifest.
+  Only then is the candidate published as an immutable release. `promote` and `rollback` switch
+  `current`/`previous` symlinks by rename. Rollback reuses the retained release and never rebuilds.
+  `status` proves build identity without request tracing: the service process's release, its own
+  `_buildManifest.js` 200, the previous one's 404, and health ok/ok. `adopt` registers today's
+  in-place bundle once.
+- New production-only drop-in `deploy/afldb.service.d/release-route.conf`: the service starts from
+  `current`, and only `releases/` is writable. DEV is unchanged.
+- Memory: the build's process group runs with `oom_score_adj` 1000, an admission check and a 0.5 s
+  `MemAvailable` guard that kills only the build. Measured on Linux: about 2.8 GB with the build's
+  type-check, about 1.7 GB without it. `next.config.ts` skips that phase only for
+  `AFLDB_BUILD_TYPECHECK=off-host`, which the tool sets only with recorded type-check evidence.
+- `deploy/server-cluster.mjs` logs `serving build <BUILD_ID> release <id> revision <sha>` at every
+  start.
+- `tsconfig.json` excludes `docs/v2/evidence`. A retained session script imports an absolute
+  Windows path, which failed a clean Linux type-check of the current branch. That failure was found
+  by the route's first real build.
+- Release tracking reconciled to the 2026-10-31 window: V2-GAP-007 and V2-GAP-013 closed; checklist
+  rows 5 and 9 closed; blocker R60 ended; V2-GAP-011 updated and still open (the ISSUE-316
+  sequence). R6, R8 and R58 stay open: their production checks are not in the window's evidence.
+
+### V2 released to production (D-V2-PROD-EXEC-1, 2026-10-31)
+
+- Production runs V2 at `9ed9c9dd3e84682c43e96c46e98974b245eb54ed` (`BUILD_ID` `QNEHXAtU53TzUjj0Mb7mv`) behind the
+  unchanged `beta.afldb.com` route. Migrations 111–117, `privileges.sql` and both staging defaults are applied (ledger
+  117). Gates: D ATTRIBUTED_ONLY with owner GO; R REPRODUCED; 43/43 on an isolated clone (no test on production); V2
+  IDENTICAL; V3 LEDGER_TIMING_ONLY; M sealed scope identical.
+- The AFL Tables settle timer is retired; email intake answers 410. No AFL API writer, provider or curated operation was
+  enabled. Caddy, `.env` and DNS are unchanged.
+- Verified frozen and post-schema backups are kept on the host, on the workstation and as an O-5 second copy on
+  `streamanator:/mnt/backup/backup(2026-10-31)/` (new reviewed adapter `second-copy.ps1`, controls 43/43). They are
+  retained until at least 2026-11-30.
+- Incident: the first host build ran out of memory after `next build` had removed the serving bundle, and live assets
+  failed until one controlled rebuild. The deployment defect is AFLDB-ISSUE-329. Admin live acceptance was accepted by
+  the owner. Record: [execution record](docs/v2/production-execution-record-2026-10-31.md).
+
+### Production execution preparation P-1 to P-7 completed (D-V2-PROD-EXEC-1, 2026-10-30; production NO-GO)
+
+- The session scripts exist and are pinned by SHA-256 (`docs/v2/evidence/production-execution-20261030/`):
+  `host-session.sh` (P-1: identity, writers, release directory, frozen and post-schema backups via HC-3
+  `backup.sh`, restore proof, sealed manifests, A-REL, read-back), `transfer-session.ps1` (P-2),
+  `isolated-rehearsal.sh` with `drift-gate.mjs`, `gate-r.mjs` and `lib/` (P-3), and the tightened
+  `permission-readback.sql`/`snapshot-compare.mjs` plus `permission-assertion-map.md` (P-4/P-5).
+- Preparation ran only on streamanator, in a new private root with its own loopback-only isolated cluster and fresh
+  credentials, on disposable `_test` restores of the approved `a4641ca0` archive: rehearsal PASS (gate D
+  `NO_DIFFERENCE`, gate R `REPRODUCED`, privileges 43/43), 112/112 positive and negative controls in one run
+  (including the previous-release rollback checks on the 117 schema and A-REL end to end), the end-to-end transfer
+  and V2/V3 chain (V3 `NO_DIFFERENCE`, V2 `IDENTICAL`). No production or DEV access. Results and failed attempts:
+  package §4.1.
+- The independent review's HIGH findings were fixed before the final run: gate D now attributes every table the
+  nightly settle writes, including head refreshes, absence marks and the projections it re-stamps on every run
+  (controls D10/D11). Also fixed: refusal exit codes, the isolated cluster's own superuser in the permission
+  read-back, a failed gate V3 result in the transfer pull, and the transfer pull after gate V3 (`timings.txt`).
+- O-DRIFT (b) is now a precise, evidence-based proposed rule (package §3.1) for both gate D and gate V3; it awaits the
+  owner's choice. The fixed 2026-11-07 date is replaced by an owner-triggered session of 4 h 45 min with
+  T0-relative cut-offs (package §5). The rollback runbook §4 now covers 111–117.
+
+### V2 pushed; production execution package prepared (D-V2-PUSH-ROUTE-1, 2026-10-30; production NO-GO)
+
+- V2 gained `origin`: the source repository's existing URL, read without changing `D:\dev\afldb`, with the same root
+  commit verified. `origin/main` was exactly `ff100dc2`. One atomic push without force fast-forwarded it to the
+  locked commit `9ed9c9dd3e84682c43e96c46e98974b245eb54ed` and created `v2/rebuild` at `d3286d92`. The lock holds.
+  Record: `docs/v2/owner-decision-lock-2026-10-29.md` §4a.
+- O-ARTIFACT approved as the release method: a host build of exactly `9ed9c9dd` with `AFLDB_ENV=production`, with
+  `BUILD_ID` and manifest recorded before restart. The Windows build stays verification evidence only.
+- `docs/v2/production-execution-package-2026-10-30.md` is one timed session (proposed Saturday 2026-11-07,
+  09:00–14:00 AEDT) covering writer retirement and the freeze, a frozen backup with off-host copy and proven
+  restore, recovery routes, migrations 111–117 with the two staging defaults, permission verification, the host
+  build and live acceptance. The package also covers:
+  - **43/43 evidence:** the unmodified privileges suite runs only on an isolated clone of the frozen dump. Production
+    gets a read-only catalogue and effective-permission read-back
+    (`docs/v2/evidence/production-execution-20261030/permission-readback.sql`), compared line by line with that clone.
+  - **Data claims:** whole-row content comparisons from restored dumps
+    (`docs/v2/evidence/production-execution-20261030/snapshot-compare.mjs`), not the ledger.
+  - **Drift:** drift against `a4641ca0` is close to certain, because every nightly AFL Tables settle under
+    `ff100dc2` inserts an `import_batches` row. That is raised as owner choice O-DRIFT.
+  - **Status:** both new artefacts are unexecuted, and their control runs are pre-session item P-4. Nothing was run
+    against DEV, production or any database.
+
 ### Owner visual acceptance and release decisions recorded (D-V2-LOCK-1, 2026-10-29; production NO-GO)
 
 - D-V2-VISUAL-1: the owner accepted all screens and states presented for acceptance in
@@ -25,6 +111,13 @@ commit.
   "Release after C5" is withdrawn: stages A/B do not wait for 2027 evidence, and A-AFLT stays required before
   production schema/code installation. Record: `docs/v2/owner-decision-lock-2026-10-29.md`. Nothing was deployed or
   run against DEV or production.
+- `v2/rebuild` merged into local `main` with `--no-ff`; locked execution commit `9ed9c9dd` (no application change
+  against the accepted candidate `7670441b`). Not pushed: V2 has no remote, so the push needs the owner's route
+  choice (O-PUSH).
+- One build of the locked commit by the established local release procedure (Windows 11, Node 22.21.0, Next.js
+  16.3.1): `BUILD_ID` `6z0tEoDM6-V-s4wbIH5RE`, 1516/1516 pages, standalone manifest SHA-256 `68f1d184…`
+  (`docs/v2/evidence/lock-build-20261029/`). Built with development transport headers against synthetic isolated
+  data; it is the lock's identity record, not the Linux install artifact, and implies no Linux verification.
 
 ### Last † Brownlow images recaptured; consolidated release decision package (2026-10-29; production NO-GO)
 

@@ -1,0 +1,30 @@
+{
+  "format": "afldb.v2.snapshot-compare.1",
+  "mode": "preservation",
+  "inputs": {
+    "a": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/postmig.preservation.json",
+      "sha256": "14436851922a8ecd8a4517ba3e42ec7e0552583552920ed593185f3e9b805e8b"
+    },
+    "b": {
+      "path": "/home/arm/afldb-v2-prodexec-20261030T020000Z/evidence/after.preservation.json",
+      "sha256": "8714352ebfccebf0c334aa093845dd372a4cb4f45ee4c4d073893dbd5322b4ac"
+    }
+  },
+  "scopeA": {
+    "backupSha256": "a4641ca0d1533c30d6670dfa9b555552548a91b736054e941adba75cee0c46fc",
+    "queryContractSha256": "f0bc0b9a95c52e25f37b65ea688ccc0e90417ecc45ced7b6fdfb880008e6ae4f",
+    "seal": 2025,
+    "phase": "migration"
+  },
+  "scopeB": {
+    "backupSha256": "7008a15a5fc27acbd83a111064e47af48772aa3b4b5065e00aa86ed85b573a78",
+    "queryContractSha256": "f0bc0b9a95c52e25f37b65ea688ccc0e90417ecc45ced7b6fdfb880008e6ae4f",
+    "seal": 2025,
+    "phase": "migration"
+  },
+  "tablesCompared": 105,
+  "queriesCompared": 6,
+  "findings": [],
+  "verdict": "IDENTICAL"
+}

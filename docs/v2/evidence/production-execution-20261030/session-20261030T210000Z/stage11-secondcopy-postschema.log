@@ -1,0 +1,10 @@
+﻿== O1 local postschema set re-verified (6 files + postschema.SHA256SUMS 47e5313fe5ed0458d2c46544255aeec075ab5ee0b6416d1ccfc81dca2b248bf4, 29997546 bytes, archive 3f5b5339cee312950c308b494ca98ff29a2f1620d9f60a4d062fbaf37b624730)
+== O2 destination check and new directory /mnt/backup/backup(2026-10-31)/release-v2-20261030T210000Z/postschema on arm@10.0.40.100
+  remote: DEST /mnt/backup/backup(2026-10-31) mount=/mnt/backup source=/dev/sdg1 fstype=ext4 uuid=4bc4fb8d-b3eb-466a-b5f4-42806ec83d3c owner=arm:700
+  remote: capacity avail=59631382528 need=29997546 reserve=2GiB
+  remote: created /mnt/backup/backup(2026-10-31)/release-v2-20261030T210000Z/postschema
+== O3 copy (7 files, scp in SFTP mode: the remote path is never parsed by a shell)
+== O4 fsync and remote verification
+  remote: DEST /mnt/backup/backup(2026-10-31) mount=/mnt/backup source=/dev/sdg1 fstype=ext4 uuid=4bc4fb8d-b3eb-466a-b5f4-42806ec83d3c owner=arm:700
+  remote: REMOTE VERIFIED /mnt/backup/backup(2026-10-31)/release-v2-20261030T210000Z/postschema files=7
+SECONDCOPY PASS label=postschema attempt=1 archive_sha256=3f5b5339cee312950c308b494ca98ff29a2f1620d9f60a4d062fbaf37b624730 sums_sha256=47e5313fe5ed0458d2c46544255aeec075ab5ee0b6416d1ccfc81dca2b248bf4 dest=/mnt/backup/backup(2026-10-31)/release-v2-20261030T210000Z/postschema

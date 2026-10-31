@@ -1,0 +1,2 @@
+snapshot-compare: not like-for-like: scope.seal differs
+usage: snapshot-compare.mjs preservation|permissions --a FILE --b FILE --out REPORT.json

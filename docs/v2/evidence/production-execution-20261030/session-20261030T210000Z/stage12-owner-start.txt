@@ -1,0 +1,6 @@
+﻿Owner service start (incident recovery, Option 1), pasted by the owner:
+arm@afldb-prod:~/projects/afldb$ sudo systemctl start afldb
+active
+MainPID=3170412
+NRestarts=0
+ActiveEnterTimestamp=Sat 2026-10-31 09:41:25 AEDT

@@ -1,0 +1,2 @@
+# Evidence is stored byte-exact so its recorded SHA-256 hashes verify after checkout.
+* -text

@@ -1,0 +1,143 @@
+{
+  "format": "afldb.v2.drift-gate.1",
+  "mode": "drift",
+  "compare": "/home/arm/afldb-v2-prodexec-20261030T020000Z/controls/out/D11.compare.json",
+  "compareVerdict": "DIFFERENT",
+  "manifestExit": 0,
+  "referenceDatabase": "afldb_v2_shadow_pxref_test",
+  "referenceTime": "2026-10-28T19:23:36.899Z",
+  "verdict": "STOP",
+  "stops": [
+    {
+      "subject": "staging.afltables_match",
+      "reason": "50 updated row(s) inconsistent with settle-bookkeeping: projection not re-stamped by an attributed settle batch after the reference time"
+    },
+    {
+      "subject": "staging.afltables_player_match",
+      "reason": "50 updated row(s) inconsistent with settle-bookkeeping: projection not re-stamped by an attributed settle batch after the reference time"
+    },
+    {
+      "subject": "staging.source_records",
+      "reason": "50 updated row(s) inconsistent with settle-bookkeeping: head refresh not bound to an attributed settle batch after the reference time"
+    }
+  ],
+  "tables": [
+    {
+      "table": "public.import_batches",
+      "cls": "settle-bookkeeping",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 0,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "started_at",
+          "earliest": "2026-10-30T04:56:22.745Z",
+          "latest": "2026-10-30T04:56:22.745Z"
+        },
+        "signatures": [
+          "settle-afltables.ts | staging.source_record_versions | AFLDB-ISSUE-099 settle; snapshot=settle-2026-2026-10-30-0444; season=2026; mode=apply"
+        ]
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "public.import_rejections",
+      "cls": "settle-bookkeeping",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 0,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "rejected_at",
+          "earliest": "2026-10-30T04:56:22.830Z",
+          "latest": "2026-10-30T04:56:22.830Z"
+        }
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "staging.afltables_match",
+      "cls": "settle-bookkeeping",
+      "inserted": 0,
+      "deleted": 0,
+      "updated": 50,
+      "evidence": {
+        "updatedColumns": [
+          "projected_at",
+          "projected_by_batch_id"
+        ]
+      },
+      "verdict": "STOP"
+    },
+    {
+      "table": "staging.afltables_player_match",
+      "cls": "settle-bookkeeping",
+      "inserted": 0,
+      "deleted": 0,
+      "updated": 50,
+      "evidence": {
+        "updatedColumns": [
+          "projected_at",
+          "projected_by_batch_id"
+        ]
+      },
+      "verdict": "STOP"
+    },
+    {
+      "table": "staging.source_payloads",
+      "cls": "settle-bookkeeping",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 0,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "first_stored_at",
+          "earliest": "2026-10-30T04:56:22.778Z",
+          "latest": "2026-10-30T04:56:22.778Z"
+        }
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "staging.source_record_versions",
+      "cls": "settle-bookkeeping",
+      "inserted": 1,
+      "deleted": 0,
+      "updated": 1,
+      "evidence": {
+        "inserted": {
+          "timeColumn": "observed_from",
+          "earliest": "2026-10-30T04:56:22.811Z",
+          "latest": "2026-10-30T04:56:22.811Z"
+        },
+        "updatedColumns": [
+          "closed_by_batch_id",
+          "observed_to"
+        ]
+      },
+      "verdict": "ATTRIBUTED"
+    },
+    {
+      "table": "staging.source_records",
+      "cls": "settle-bookkeeping",
+      "inserted": 0,
+      "deleted": 0,
+      "updated": 52,
+      "evidence": {
+        "updatedColumns": [
+          "absent_since",
+          "current_payload_hash",
+          "current_version_seq",
+          "last_batch_id",
+          "last_seen_at"
+        ]
+      },
+      "verdict": "STOP"
+    }
+  ],
+  "queries": [],
+  "classes": [
+    "settle-bookkeeping"
+  ],
+  "rule": "O-DRIFT (b) as proposed: stop on any definition, scope, public-query, sealed-scope or migration-sensitive change; every remaining row change is re-derived from both databases and bound to a writer signature. NOT an owner approval."
+}

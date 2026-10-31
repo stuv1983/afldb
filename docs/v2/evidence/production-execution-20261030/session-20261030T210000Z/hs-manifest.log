@@ -1,0 +1,12 @@
+== D-V2-PROD-EXEC-1 host session stage=manifest stamp=20261030T210000Z 2026-10-30T21:27:12Z
+host=afldb-prod user=arm boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac checkout=9ed9c9dd3e84682c43e96c46e98974b245eb54ed build=vcxM_SyDxFCP0sj9n9W1t
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=110 last=110_match_sheet_player_match_stats_authority.sql digest=789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153
+AFLDB V2 historical baseline manifest — READ ONLY (session + transaction), rolled back
+  target   : database 'afldb_prod' from AFLDB_V2_RELEASE_READONLY_URL (NON-TEST source, read-only flags given)
+  sealed   : 1897-2026
+  written  : /home/arm/backups/afldb/release-v2-20261030T210000Z/manifest-before.json (32 tables, 1380 buckets; counts and digests only)
+4060c92915d0110748974cd9d5cf3653f69fb018f7d6113efad7800edc8f7644  /home/arm/backups/afldb/release-v2-20261030T210000Z/manifest-before.json
+RESULT PASS stage=manifest which=before

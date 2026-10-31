@@ -1,0 +1,4 @@
+﻿rehearse result: PASS-PENDING-OWNER-GO
+after result: PASS
+ledger 117 digest for host-session.sh arel: 647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72 (frozen archive 599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb)
+TRANSFER PASS mode=PullIso dest=C:\Users\stuar\backups\afldb\release-v2-20261030T210000Z\iso-evidence results=rehearse:PASS-PENDING-OWNER-GO,after:PASS

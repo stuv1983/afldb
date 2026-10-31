@@ -1,0 +1,8 @@
+== D-V2-PROD-EXEC-1 host session stage=readback stamp=20261030T210000Z 2026-10-30T21:44:21Z
+host=afldb-prod user=arm boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac checkout=9ed9c9dd3e84682c43e96c46e98974b245eb54ed build=vcxM_SyDxFCP0sj9n9W1t
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=117 last=117_brownlow_provider_eligibility_unknown.sql digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+8ebc118cf5d7f0abf86f3322b70e6eff36cc6b9987bd2c12d9921b4a0f9941ce  /home/arm/backups/afldb/release-v2-20261030T210000Z/P.permissions.txt
+RESULT PASS stage=readback lines=5357
