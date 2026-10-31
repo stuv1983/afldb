@@ -25,6 +25,8 @@ and Linux runs on guarded isolated PostgreSQL. **No settle suite has been replay
 is recorded as a stated limit, not waived (entry below).
 **Gap 004 was CLOSED on 2026-10-31** (entry below): the hook fix dates from 2026-10-19; this session re-ran its harness
 (147/147) and a live Read probe.
+The remaining owner decisions (005, 006, 010) and the production or external gates are consolidated in
+[owner-decisions-remaining-2026-10-31.md](owner-decisions-remaining-2026-10-31.md).
 Current register: **38 total / 29 closed / 9 open**, counted from the table rows on 2026-10-31 after closing 004
 (open: 005, 006, 008, 010, 011, 016, 029, 030, 031). The paragraph that follows is the earlier same-day count (28 / 10,
 before 004). The 2026-10-31
