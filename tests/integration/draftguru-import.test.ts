@@ -1188,6 +1188,9 @@ describe.skipIf(!canRun)(
           pickNumber: 1, clubSlug,
           player: { displayName: `${MARKER} Player`, dob: '2006-09-09' },
           adminUserId: admin.id,
+          // V2-GAP-006: this draft year can be a sealed season on a baseline whose latest match season is complete;
+          // the seal then needs a human correction note. The test is about reload survival, not the seal.
+          note: 'Synthetic fixture: reload-survival test of an administrator-created selection (no real correction).',
         });
         expect(created.ok, JSON.stringify(created)).toBe(true);
         if (!created.ok) return;
