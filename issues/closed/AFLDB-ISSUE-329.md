@@ -1,13 +1,13 @@
 # AFLDB-ISSUE-329 — Non-destructive production build, promotion and rollback
 
-Status: **implemented and validated locally and on isolated Linux (2026-10-31); production
-installation pending.**
+Status: **RESOLVED 2026-10-31: installed on production and live-accepted (§10).**
 - The final verification (§8a) closed the real-systemd proof gap with the reviewed code.
 - The installation package is
-  [`AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md`](AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md),
-  on branch `codex/issue329-release`. Each of its two parts needs its own owner approval.
-- Production stays at `9ed9c9dd3e84682c43e96c46e98974b245eb54ed` (`BUILD_ID`
-  `QNEHXAtU53TzUjj0Mb7mv`).
+  [`AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md`](AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md);
+  its Parts A and B ran on 2026-10-31 under owner approval.
+- Production serves `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` (revision
+  `61a95f7397dacc49fe919ca99cffa00379d612bf`, `BUILD_ID` `JYIBkYn8ynPgYMn1e5nK-`), built through the
+  route. The adopted `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv` is retained as `previous`.
 
 Sources: incident [`docs/v2/production-execution-record-2026-10-31.md`](../../docs/v2/production-execution-record-2026-10-31.md)
 §4; `deploy/afldb.service`; `deploy/server-cluster.mjs`; `tools/build/prepare-standalone.mjs`;
@@ -378,3 +378,26 @@ the next.
    record of what was approved. After installation, `docs/deployment.md` §3a and §11 govern
    production. The rollback runbook's R4 header gate is replaced by `status --expect` in its next
    revision.
+
+## 10. Production installation and live acceptance (2026-10-31)
+
+Executed under the owner's approvals of package Part A and then Parts A and B. Evidence:
+[`AFLDB-ISSUE-329-installation-20261031/evidence/live/`](AFLDB-ISSUE-329-installation-20261031/evidence/live/).
+The full step record is the `issues.md` entry.
+
+| Step | Result |
+|---|---|
+| A0 | `origin/main` fast-forwarded `9ed9c9dd..61a95f73`; no force |
+| A1 | `PREFLIGHT PASS (install)` |
+| A2–A3 | checkout fast-forwarded by Git; `ADOPTED 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv`, `VERIFY PASS`, `STATUS PASS` |
+| A4 | drop-in `14942fc5…`, read-back as designed; restart 06:08:22Z; both `nsenter` probes `Read-only file system` |
+| A5 | `POST-INSTALL CHECK PASS`; Playwright 10/12, only the two accepted false failures |
+| B0 | `PREFLIGHT PASS (build)`, MemAvailable 2,868 MB |
+| B1 | `RELEASE READY 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`; `next build` 234 s, min MemAvailable 1,304 MB, peak RSS 1,713 MB; site answered 19/19 probes during the build |
+| B2 | promoted; restart 07:02:55Z; `status --expect` PASS, journal identity line, assets byte-identical; check `FAIL (1)` only on the public previous-`BUILD_ID` 404, a Cloudflare cache HIT of an immutable asset (origin 404 cache-busted): **owner-accepted equivalent**; Playwright 10/12, the same two accepted false failures |
+
+Follow-ups: the post-install check's public previous-`BUILD_ID` assertion should test the origin
+(cache-busted) in its next revision; the source comments that still name `issues/open/` for this
+runbook; the rollback runbook's R4 header gate (replace with `status --expect`). Retained pending an
+owner decision: the adopted release, the checkout's in-place bundle, the 2026-10-30 backup directory
+and the build workspace logs.

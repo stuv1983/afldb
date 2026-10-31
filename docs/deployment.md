@@ -164,13 +164,13 @@ is therefore not expected to be byte-for-byte identical. AFLDB retains its inten
 validate route semantics, console/hydration health and build identity rather than treating a
 different `.rsc`/segment layout as a regression by itself.
 
-## 3a. Production release route (`AFLDB-ISSUE-329`; not yet installed)
+## 3a. Production release route (`AFLDB-ISSUE-329`; installed 2026-10-31)
 
 `npm run build` in the serving checkout deletes the live `.next/standalone` before it compiles
 (`next build`'s clean step), so a failed or interrupted in-place build takes every asset of the
 running site with it. That happened on 2026-10-31 (AFLDB-ISSUE-329). The release route builds
 somewhere else and only switches in a validated, finished release. It is **production only**, and
-it takes effect only once the owner installs it (`issues/open/AFLDB-ISSUE-329.md` §9). DEV keeps
+it has governed production builds since its installation on 2026-10-31 (`issues/closed/AFLDB-ISSUE-329.md` §10). DEV keeps
 the in-place route above.
 
 ```bash

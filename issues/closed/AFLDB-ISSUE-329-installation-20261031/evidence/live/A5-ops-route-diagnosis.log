@@ -1,0 +1,22 @@
+at 2026-10-31T06:33:10Z
+== /home/arm/afldb-releases/current/.next/standalone/.next
+/home/arm/afldb-releases/current/.next/standalone/.next/server/app/admin/operations
+afl-api-refusals
+awards
+brownlow
+coleman
+page.js
+== /home/arm/projects/afldb/.next/standalone/.next
+/home/arm/projects/afldb/.next/standalone/.next/server/app/admin/operations
+afl-api-refusals
+awards
+brownlow
+coleman
+page.js
+/home/arm/afldb-releases/current/.next/standalone/.next/app-path-routes-manifest.json:1
+/home/arm/projects/afldb/.next/standalone/.next/app-path-routes-manifest.json:1
+--- journal since restart, non-startup lines
+--- anon curl
+307 https://beta.afldb.com/admin/login
+307 https://beta.afldb.com/admin/login
+200

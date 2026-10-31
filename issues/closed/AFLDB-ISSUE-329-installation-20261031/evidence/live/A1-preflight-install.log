@@ -1,0 +1,40 @@
+host afldb-prod user arm at 2026-10-31T04:56:51Z
+From github.com-afldb-deploy:stuv1983/afldb
+ * branch              main       -> FETCH_HEAD
+   9ed9c9dd..61a95f73  main       -> origin/main
+CANDIDATE-PRESENT
+preflight sha 41004a1635e20a7fbbdff6a6d40bf3467da0c063d0f5bba35e3c9fc127acccc3
+AFLDB-ISSUE-329 preflight (install) 2026-10-31T04:56:55Z on afldb-prod
+identity
+  ok    user arm
+  ok    checkout HEAD 9ed9c9dd3e84682c43e96c46e98974b245eb54ed (production; step 1 fast-forwards it)
+  ok    candidate descends from 9ed9c9dd3e84682c43e96c46e98974b245eb54ed (fast-forward)
+  ok    checkout porcelain clean
+  ok    candidate differs from the typechecked tree 6790983ab3d3ae5292ad8a311c203e2584bd04a5 only in issues/, docs/ or Markdown
+  ok    no migration between 9ed9c9dd3e84682c43e96c46e98974b245eb54ed and the candidate (forward-only rule not engaged)
+  ok    deploy/release.mjs f5a24a71e5cd… at the candidate
+  ok    deploy/afldb.service.d/release-route.conf 14942fc53421… at the candidate
+  ok    deploy/server-cluster.mjs d82f24c48e2b… at the candidate
+  ok    tools/build/env-in-standalone.mjs 99ed47c6d673… at the candidate
+  ok    node /home/arm/.nvm/versions/node/v22.23.2/bin/node v22.23.2
+service
+  ok    afldb active, MainPID 3170412, NRestarts 0
+  info  journal readable by arm
+  ok    ExecStart runs the relative deploy/server-cluster.mjs
+  ok    no drop-in installed
+  ok    serving in place from /home/arm/projects/afldb
+artifacts
+  ok    in-place BUILD_ID QNEHXAtU53TzUjj0Mb7mv
+  ok    manifest b8a0c6d33b9f… intact
+  ok    manifest lists 12994 files, 0 symlinks
+  ok    release root /home/arm/afldb-releases absent or empty
+capacity
+  ok    free disk under /home/arm: 57 GB (floor 6)
+  info  MemTotal 3915 MB, MemAvailable 2783 MB, swap 0 MB, afldb MemoryCurrent 417 MB
+  ok    MemAvailable 2783 MB ≥ 800 MB
+PREFLIGHT PASS (install)
+preflight exit 0
+--- free
+               total        used        free      shared  buff/cache   available
+Mem:            3915        1131         395         146        2826        2784
+Swap:              0           0           0

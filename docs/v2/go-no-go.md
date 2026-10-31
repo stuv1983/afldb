@@ -5,7 +5,8 @@
   Tables timer retired.
 - Still **NO-GO**: the AFL API cutover writer activation (stage C beyond source retirement), stage D, every new writer
   or provider, and the apex launch.
-- Deployment defect: AFLDB-ISSUE-329.
+- Deployment defect: AFLDB-ISSUE-329, resolved 2026-10-31. Production now serves `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`
+  (revision `61a95f73`, `BUILD_ID` `JYIBkYn8ynPgYMn1e5nK-`), built through the release route.
 - [Execution record](production-execution-record-2026-10-31.md). The verdicts below predate the release and are kept
   as history.
 

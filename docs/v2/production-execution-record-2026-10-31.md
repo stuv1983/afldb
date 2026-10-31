@@ -167,9 +167,14 @@ Retention: until at least **2026-11-30**, and only after a separate decision. No
 
 ## 7. Remaining work
 
-1. **AFLDB-ISSUE-329:** make host builds non-destructive, as a separate decision. It also covers the rollback route's
+1. **AFLDB-ISSUE-329:** make host builds non-destructive, as a separate decision. *(Update, 2026-10-31 after this
+   window: resolved; the route is installed and production serves `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`. See
+   `issues/closed/AFLDB-ISSUE-329.md` §10.)* It also covers the rollback route's
    in-place build and its `x-afldb-build` gate, and the host's build memory headroom.
-2. **Acceptance observations** in §3: the pending link prefetches and the 0-game `/players` rows. Both are uninvestigated
+2. **Acceptance observations** in §3: the pending link prefetches and the 0-game `/players` rows. *(Update, 2026-10-31
+   after this window: the `/players` ordering is AFLDB-ISSUE-330, fixed locally; the prefetch observation was triaged:
+   navigation is not impaired, no defect registered
+   (`issues/closed/AFLDB-ISSUE-329-installation-20261031/evidence/live/observation-1-prefetch-triage.md`).)* Both are uninvestigated
    and need an owner decision on whether to register them.
 3. **Legacy-writers check:** it needs owner sudo while `rules.d` is unreadable by `arm`. The polkit rule is absent.
 4. **Moved settle manifests:** 61 files in the release directory's `checkout-settle-manifests/`, kept; their fate is

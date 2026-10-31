@@ -15,7 +15,24 @@ commit.
 
 ## [Unreleased]
 
-### Non-destructive production build, promotion and rollback (AFLDB-ISSUE-329, 2026-10-31; not installed)
+### Release route installed on production; first route build served (AFLDB-ISSUE-329 resolved, 2026-10-31)
+
+- Installed under owner-approved package Parts A and B: `origin/main` fast-forwarded to
+  `61a95f73`; production's existing bundle adopted as `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv`; the
+  `release-route.conf` drop-in installed (writes outside the running release are `EROFS`).
+- First production build through `deploy/release.mjs` (`--typecheck off-host`): `RELEASE READY
+  61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`, minimum MemAvailable 1,304 MB, with the live site answering
+  throughout. Promoted and live-accepted; the adopted release stays as `previous` for rollback.
+- One owner-accepted amendment: the public previous-`BUILD_ID` 404 check was met at the origin,
+  because Cloudflare had cached the immutable asset.
+
+### Players index: career-less players no longer head descending sorts (AFLDB-ISSUE-330, 2026-10-31; local, not deployed)
+
+- `listPlayers()` orders the sort column `NULLS LAST`. Listed players with no career row (yet to
+  debut) were ranked above the leader in games, goals, finals, Brownlow and premierships descending.
+  New case in `tests/integration/database.test.ts`.
+
+### Non-destructive production build, promotion and rollback (AFLDB-ISSUE-329, 2026-10-31; installed 2026-10-31, see above)
 
 - New `deploy/release.mjs`. It builds a revision in a workspace outside the serving checkout
   (`git archive`, `npm ci`, `npm run build`), then validates the candidate:
@@ -45,7 +62,7 @@ commit.
   - Real-systemd adopt, promote, rollback and filesystem-restriction proof with the reviewed code.
   - Read-only `preflight.sh` and `post-install-check.sh`, proven by a dress rehearsal of the package.
   - Restarts are paced 30 s apart: the unit's start limit counts manual restarts.
-  - Package: `issues/open/AFLDB-ISSUE-329-installation-20261031/`.
+  - Package: `issues/closed/AFLDB-ISSUE-329-installation-20261031/`.
 - Release tracking reconciled to the 2026-10-31 window: V2-GAP-007 and V2-GAP-013 closed; checklist
   rows 5 and 9 closed; blocker R60 ended; V2-GAP-011 updated and still open (the ISSUE-316
   sequence). R6, R8 and R58 stay open: their production checks are not in the window's evidence.

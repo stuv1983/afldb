@@ -1,0 +1,53 @@
+host afldb-prod user arm at 2026-10-31T06:09:48Z HEAD 61a95f7397dacc49fe919ca99cffa00379d612bf porcelain 0
+MainPID=3184062
+NRestarts=0
+WorkingDirectory=/home/arm/afldb-releases/current
+ActiveState=active
+DropInPaths=/etc/systemd/system/afldb.service.d/release-route.conf
+ActiveEnterTimestamp=Sat 2026-10-31 17:08:22 AEDT
+cwd /home/arm/afldb-releases/releases/9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+AFLDB-ISSUE-329 post-install check 2026-10-31T06:09:48Z: expect 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv (BUILD_ID QNEHXAtU53TzUjj0Mb7mv)
+release route status
+        release: current  9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv revision 9ed9c9dd3e84682c43e96c46e98974b245eb54ed BUILD_ID QNEHXAtU53TzUjj0Mb7mv production
+        release: previous (none)
+        release: memory   afldb MemoryCurrent 142 MB
+        release: process  3184062 runs in /home/arm/afldb-releases/releases/9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/QNEHXAtU53TzUjj0Mb7mv/_buildManifest.js 200
+        release: STATUS PASS 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+  ok    status --expect 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv PASS
+identity through both origins
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    http://127.0.0.1:3100 _buildManifest.js for QNEHXAtU53TzUjj0Mb7mv 200
+  ok    https://beta.afldb.com/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    https://beta.afldb.com _buildManifest.js for QNEHXAtU53TzUjj0Mb7mv 200
+pages and every referenced asset (public origin, redirects followed)
+  ok    page / -> 200 https://beta.afldb.com/beta
+  ok    page /beta -> 200 https://beta.afldb.com/beta
+  ok    page /players -> 200 https://beta.afldb.com/beta?from=%2Fplayers
+  ok    page /matches -> 200 https://beta.afldb.com/beta?from=%2Fmatches
+  ok    page /seasons -> 200 https://beta.afldb.com/beta?from=%2Fseasons
+  ok    page /clubs -> 200 https://beta.afldb.com/beta?from=%2Fclubs
+  ok    page /records -> 200 https://beta.afldb.com/beta?from=%2Frecords
+  ok    page /search -> 200 https://beta.afldb.com/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 https://beta.afldb.com/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Sat 2026-10-31 17:08:22 AEDT
+        (no identity line: this release's supervisor predates it, as expected for the adopted 9ed9c9dd)
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 162 MB
+POST-INSTALL CHECK PASS 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+check exit 0
+--- journal since start (serving/primary lines)
+[afldb] primary 3184062 starting 2 worker(s)
+--- events.log
+{"ts":"2026-10-31T04:57:39.865Z","op":"adopt","id":"9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv","revision":"9ed9c9dd3e84682c43e96c46e98974b245eb54ed","buildId":"QNEHXAtU53TzUjj0Mb7mv","manifest":"6ecde4c688124ca190684034351241731f3e03bb3bbd6a5569dcc426a7ad4e28","setCurrent":true,"copied":"12994 files from /home/arm/backups/afldb/release-v2-20261030T210000Z/standalone-manifest.sha256"}
+{"ts":"2026-10-31T06:09:48.261Z","op":"status-pass","id":"9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv"}
+--- capacity
+               total        used        free      shared  buff/cache   available
+Mem:            3915         877         501         146        2974        3038
+Swap:              0           0           0
+/dev/vda1        77G   22G   56G  28% /

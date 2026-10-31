@@ -1,0 +1,3 @@
+﻿[2026-10-31T06:10:00.658Z] READY: the browser shows the sign-in page. Sign in with an Admin account (not Super Admin). Waiting up to 20 minutes.
+[2026-10-31T06:30:03.452Z] FAIL run {"error":"Error: timed out waiting for an Admin session on /admin/operations"}
+[2026-10-31T06:30:03.455Z] VERDICT FAIL (0/1)

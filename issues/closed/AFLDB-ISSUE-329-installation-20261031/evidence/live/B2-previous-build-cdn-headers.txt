@@ -1,0 +1,23 @@
+AFLDB-ISSUE-329 B2: public 'previous BUILD_ID 404' check, header evidence (2026-10-31T07:04:17Z, workstation curl)
+== https://beta.afldb.com/_next/static/QNEHXAtU53TzUjj0Mb7mv/_buildManifest.js
+HTTP/1.1 200 OK
+Date: Sat, 31 Oct 2026 07:04:17 GMT
+Cache-Control: public, max-age=31536000, immutable
+last-modified: Sat, 31 Oct 2026 04:57:34 GMT
+via: 1.1 Caddy
+Age: 991
+cf-cache-status: HIT
+== https://beta.afldb.com/_next/static/JYIBkYn8ynPgYMn1e5nK-/_buildManifest.js
+HTTP/1.1 200 OK
+Date: Sat, 31 Oct 2026 07:04:17 GMT
+Cache-Control: public, max-age=31536000, immutable
+last-modified: Sat, 31 Oct 2026 06:51:44 GMT
+via: 1.1 Caddy
+Age: 20
+cf-cache-status: HIT
+== https://beta.afldb.com/_next/static/QNEHXAtU53TzUjj0Mb7mv/_buildManifest.js?cachebust=21616321
+HTTP/1.1 404 Not Found
+Date: Sat, 31 Oct 2026 07:04:17 GMT
+Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+via: 1.1 Caddy
+cf-cache-status: BYPASS

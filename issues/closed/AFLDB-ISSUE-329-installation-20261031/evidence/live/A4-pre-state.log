@@ -1,0 +1,24 @@
+host afldb-prod user arm at 2026-10-31T05:05:35Z
+HEAD 61a95f7397dacc49fe919ca99cffa00379d612bf porcelain 0
+standalone BUILD_ID QNEHXAtU53TzUjj0Mb7mv
+MainPID=3170412
+NRestarts=0
+ExecMainStartTimestamp=Sat 2026-10-31 09:41:25 AEDT
+WorkingDirectory=/home/arm/projects/afldb
+ReadWritePaths=/home/arm/projects/afldb/.next -/var/www/afldb-soon
+ActiveState=active
+SubState=running
+DropInPaths=
+cwd /home/arm/projects/afldb
+ls: cannot access '/etc/systemd/system/afldb.service.d/': No such file or directory
+current -> releases/9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+{"ts":"2026-10-31T04:57:39.865Z","op":"adopt","id":"9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv","revision":"9ed9c9dd3e84682c43e96c46e98974b245eb54ed","buildId":"QNEHXAtU53TzUjj0Mb7mv","manifest":"6ecde4c688124ca190684034351241731f3e03bb3bbd6a5569dcc426a7ad4e28","setCurrent":true,"copied":"12994 files from /home/arm/backups/afldb/release-v2-20261030T210000Z/standalone-manifest.sha256"}
+{"status":"ok","database":"ok","latencyMs":2}
+Oct 31 09:41:25 afldb-prod afldb[3170421]: - Network:       http://127.0.0.1:3100
+Oct 31 09:41:25 afldb-prod afldb[3170421]: ✓ Ready in 0ms
+Oct 31 09:41:25 afldb-prod afldb[3170421]: ✓ Running next.config took 4ms
+Oct 31 09:41:25 afldb-prod afldb[3170420]: ▲ Next.js 16.3.1
+Oct 31 09:41:25 afldb-prod afldb[3170420]: - Local:         http://127.0.0.1:3100
+Oct 31 09:41:25 afldb-prod afldb[3170420]: - Network:       http://127.0.0.1:3100
+Oct 31 09:41:25 afldb-prod afldb[3170420]: ✓ Ready in 0ms
+Oct 31 09:41:25 afldb-prod afldb[3170420]: ✓ Running next.config took 7ms

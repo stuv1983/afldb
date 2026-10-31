@@ -17,8 +17,9 @@
 >   - **R58**: the installed invite-redemption check.
 >
 >   All three fix commits are ancestors of `9ed9c9dd`.
-> - **ISSUE-329 is implemented and proven locally and on isolated Linux, and not installed.** Production installation
->   needs owner approval ([runbook](issues/open/AFLDB-ISSUE-329.md) §9).
+> - **ISSUE-329 RESOLVED 2026-10-31:** the release route is installed and live-accepted; production serves
+>   `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` built through it, with `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv` retained for
+>   rollback ([runbook](issues/closed/AFLDB-ISSUE-329.md) §10). The blocker below has ended.
 > - The AFL API production activation and the apex launch remain NO-GO.
 > - [Record](docs/v2/production-execution-record-2026-10-31.md).
 

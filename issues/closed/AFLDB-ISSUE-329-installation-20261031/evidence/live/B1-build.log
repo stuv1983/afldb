@@ -1,0 +1,14 @@
+B1 start 2026-10-31T06:47:34Z HEAD 61a95f7397dacc49fe919ca99cffa00379d612bf
+release: admission: MemAvailable 2871 MB of 3915 MB, swap 0 MB, free disk 55.3 GB
+release: workspace /home/arm/afldb-releases/builds/20261031T064734Z-61a95f7397da-f4bf55
+release: npm ci: 14 s, min MemAvailable 1958 MB, peak RSS 953 MB
+release: build: 234 s, min MemAvailable 1304 MB, peak RSS 1713 MB
+release: candidate 61a95f7397da-JYIBkYn8ynPgYMn1e5nK- passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/cb39c2e05a6b8ca6.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200"} (beta claim)
+release: RELEASE READY 61a95f7397da-JYIBkYn8ynPgYMn1e5nK- (12995 files, manifest b8a6b86d736b…) at /home/arm/afldb-releases/releases/61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+release: next: node deploy/release.mjs promote 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+B1 exit 0 at 2026-10-31T06:52:05Z
+MemAvailable:    2884912 kB
+no server running on /tmp/tmux-1000/default
+
+[exited with code 1]

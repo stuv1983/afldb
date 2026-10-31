@@ -1,0 +1,31 @@
+AFLDB-ISSUE-329 Part A step A4: owner-sudo transcript as the owner pasted it into the session (2026-10-31).
+Commands were run by the owner as arm on afldb-prod in /home/arm/projects/afldb. Verbatim except that the sudo
+password prompt line is kept and nothing else is removed.
+
+$ cd /home/arm/projects/afldb && sudo install -D -o root -g root -m 0644 /home/arm/projects/afldb/deploy/afldb.service.d/release-route.conf /etc/systemd/system/afldb.service.d/release-route.conf
+$ sha256sum /etc/systemd/system/afldb.service.d/release-route.conf
+$ sudo systemctl daemon-reload
+$ systemctl show afldb -p DropInPaths -p WorkingDirectory -p ReadWritePaths
+[sudo] password for arm:
+14942fc53421ff60eddb738b338e7a3db38a22429839fb4eabd8978edea1f5ff  /etc/systemd/system/afldb.service.d/release-route.conf
+WorkingDirectory=/home/arm/afldb-releases/current
+ReadWritePaths=/home/arm/afldb-releases/releases -/var/www/afldb-soon
+DropInPaths=/etc/systemd/system/afldb.service.d/release-route.conf
+
+$ sudo systemctl restart afldb
+$ date -u +%FT%TZ
+$ systemctl is-active afldb
+$ P=$(systemctl show -p MainPID --value afldb); echo "MainPID $P"
+$ sudo nsenter -t "$P" -m touch /home/arm/projects/afldb/.r329-probe
+$ sudo nsenter -t "$P" -m touch /home/arm/afldb-releases/.r329-probe
+$ ls -la /home/arm/projects/afldb/.r329-probe /home/arm/afldb-releases/.r329-probe 2>&1
+2026-10-31T06:08:22Z
+active
+MainPID 3184062
+touch: cannot touch '/home/arm/projects/afldb/.r329-probe': Read-only file system
+touch: cannot touch '/home/arm/afldb-releases/.r329-probe': Read-only file system
+ls: cannot access '/home/arm/projects/afldb/.r329-probe': No such file or directory
+ls: cannot access '/home/arm/afldb-releases/.r329-probe': No such file or directory
+$ sudo rm -f /home/arm/projects/afldb/.r329-probe /home/arm/afldb-releases/.r329-probe   (precautionary; nothing existed)
+
+Read-back matched the package's A4 expectation before the restart. Both filesystem probes: Read-only file system.
