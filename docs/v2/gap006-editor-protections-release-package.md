@@ -7,16 +7,28 @@ non-destructive release route (`deploy/release.mjs`, AFLDB-ISSUE-329; `docs/depl
 did (`issues/closed/AFLDB-ISSUE-330.md` §4). There is **no calendar window** here: the sequence is relative to `T0`, the
 moment the owner starts.
 
+**Revision 2 (2026-11-01, documentation and read-only helper scripts only; the build revision `C` and its validation
+are unchanged).** Revision 1 sent a refused promotion to a rollback that took the route's default target, `previous`,
+which before a promotion is `61a95f73…` and not the release that is serving. Revision 2: (1) pins `OLD_ID` and makes
+recovery **state-aware**, with explicit-target `rollback --to` and a read-only probe that distinguishes "promotion
+refused, `OLD_ID` still serving: preserve and stop" from "`NEW_ID` selected and the restart or acceptance failed:
+restore `OLD_ID`" from "uncertain: inspect first" (section 7); (2) moves the static no-migration, dependency, deploy,
+data and config delta check to the workstation **before D0** and repeats it on production after the fetch, binds the
+fetched remote to the exact approved `R`, and fast-forwards to that pinned `R` (sections 4 and 6); (3) turns every
+"expected value" comment into an enforced assertion; (4) separates Claude's permitted work from the owner's
+sudo, restart, push and sign-in steps (section 4.1).
+
 ## 1. Candidate and outgoing state
 
 | | |
 |---|---|
 | **Candidate (build revision) `C`** | `fd48ace0c2cb70296d723603aa397b5bd7a21a0d`, tree `01b3e6855516d22238013f58114e9f19d7ec75d7` |
-| Package commit `R` | the documentation-only child of `C` that adds this file; get it with `git rev-parse HEAD` on the workstation. `git diff --name-only C R` must list only `docs/`, `CHANGELOG.md`, `IssuesIndex.md`, `issues.md` |
+| Package commit `R` | the documentation-only **descendant** of `C` that carries this file and its two scripts (a commit cannot contain its own hash, so `R` is stated in the owner's approval, section 10, and equals `git rev-parse HEAD` on the workstation). `static-delta-check.sh` enforces that `git diff --name-only C R` lists only `docs/`, `CHANGELOG.md`, `IssuesIndex.md`, `issues.md` |
 | **Outgoing (running) release** | `ad245d602f6f-m0M8pf121326vNSo2B759` (revision `ad245d602f6f0776c1fd86b66fef4f177fe63276`, `BUILD_ID` `m0M8pf121326vNSo2B759`), per `issues/closed/AFLDB-ISSUE-330.md` §5, 2026-10-31. **Re-verify at P2; any difference is a STOP** |
 | Outgoing checkout | `/home/arm/projects/afldb` at `65c02ecc29f93cec8410e01c91f4fc293002b774`, clean |
-| Last known `origin/main` | `63c945ae4b492ec59dfd29c960783341fab96933` (a documentation child of `65c02ecc`); verify with `git ls-remote origin refs/heads/main` at P1 |
-| Rollback target (retained) | `ad245d602f6f-m0M8pf121326vNSo2B759` becomes `previous` at promotion. Deeper retained releases: `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`, `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv` |
+| Last known `origin/main` | `63c945ae4b492ec59dfd29c960783341fab96933` (a documentation child of `65c02ecc`); enforced by W0 with `git ls-remote origin refs/heads/main` |
+| `current` / `previous` today | `current` = `OLD_ID`; `previous` = `OLD_PREV` = `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` (enforced by P-A) |
+| **Rollback target (pinned)** | **`OLD_ID` = `ad245d602f6f-m0M8pf121326vNSo2B759`, always named explicitly (`rollback --to`).** It becomes `previous` at promotion. Deeper retained releases `OLD_PREV` and `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv` are not rollback targets of this package; choosing one is an owner decision |
 
 Chain from production: `65c02ecc` → `63c945ae` (ISSUE-330 record) → 12 further commits to `dd2c0e79` → `C` (one test-only
 commit). The editor work is `f2563e01` (seal on the audited editors), `fc9e07c4` (note-length bypass, form keep),
@@ -114,30 +126,126 @@ the exact route on this revision, with its own V1-V6 gates).
    re-run because its code was unchanged. `src/db/queries/coleman-award-winners.ts` does change (it now names its
    workflow to the seal). Coleman was therefore run here: 28/28.
 
-## 4. Production preflight (all read-only except the checkout fast-forward in D1)
+## 4. Preflight (all read-only; nothing has changed before D0)
 
-Do these before `D0`. Any failed item is a STOP (section 7); nothing has been changed yet at that point.
+Every check below is **enforced**: each block runs in a subshell with `set -euo pipefail`, so the first failed
+assertion stops the block with a non-zero status and prints no PASS line. A pasted block never closes your shell. Any
+failure is a STOP (section 7.1); do not adjust an expected value.
 
-| # | Where | Check | Expected |
-|---|---|---|---|
-| P1 | workstation | `git rev-parse HEAD`; `git status --short`; `git diff --name-only fd48ace0c2cb70296d723603aa397b5bd7a21a0d HEAD -- . ':!docs' ':!CHANGELOG.md' ':!IssuesIndex.md' ':!issues.md'`; `git ls-remote origin refs/heads/main` | `R`; clean (apart from untracked `.codex/`); **empty**; `63c945ae4b492ec59dfd29c960783341fab96933` |
-| P2 | production, `arm` | `cd /home/arm/projects/afldb; git rev-parse HEAD; git status --porcelain`; `N=/home/arm/.nvm/versions/node/v22.23.2/bin/node; $N deploy/release.mjs status`; `ls /home/arm/afldb-releases/*.lock` | `65c02ecc29f93cec8410e01c91f4fc293002b774`; empty; `current ad245d602f6f-m0M8pf121326vNSo2B759`, `previous 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`, **STATUS PASS**; no lock |
-| P3 | production | `ls /home/arm/afldb-releases/releases/` | contains `ad245d602f6f-m0M8pf121326vNSo2B759`, `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` and `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv` |
-| P4 | production | `git fetch origin` is **not** done yet. After D0: `git diff --name-only 65c02ecc29f93cec8410e01c91f4fc293002b774 fd48ace0c2cb70296d723603aa397b5bd7a21a0d -- src/db/migrations package.json package-lock.json deploy data next.config.ts` | **empty** (no migration, no dependency, no route change). Any entry is a STOP |
-| P5 | production | `free -m`; `df -h /home/arm`; `systemctl show -p MemoryCurrent afldb`; `systemctl list-timers --all \| grep -i afldb`; `pgrep -a -f 'pg_dump\|rsync\|restore'` | **MemAvailable at least 2,100 MB** (the tool re-checks; floor 384), **free disk at least 6 GB**, no afldb timer due and no backup, restore or maintenance job running inside the window |
-| P6 | production, owner (`sudo -u postgres psql -X -d <production database>`, read-only) | the privilege query below | `afldb_import` and `afldb_app` each hold `SELECT` and `INSERT` on `public.data_edits`, `afldb_import` holds `USAGE` on `data_edits_id_seq`, and **neither holds UPDATE, DELETE or TRUNCATE** |
-| P7 | production, owner (same session) | `SELECT count(*), max(name) FROM afldb_meta.schema_migrations;` | 117 rows, `117_brownlow_provider_eligibility_unknown.sql` (nothing to migrate) |
-| P8 | production | `grep -c '^AFLDB_IMPORT_DATABASE_URL=' /home/arm/projects/afldb/.env` (count only, never print the value) | `1` |
+### 4.1 Who does what
 
-**Why P6 is a hard gate.** Every audited editor mutation runs as one transaction on the **import** connection
-(`AFLDB_IMPORT_DATABASE_URL`, role `afldb_import`). The new code writes the audit row with `INSERT ... RETURNING id`, and
-PostgreSQL requires `SELECT` on the returned column. Migration 066 gave `afldb_import` `INSERT` only; migration 108 and
-`tools/maintenance/privileges.sql` add `SELECT`. If the grant were absent on production, **every editor write would fail
-closed** ("permission denied for table data_edits"). Production is at ledger 117 so 108 should be applied, but privileges
-can be reset by a privileges run, so verify the live grant rather than the ledger.
+| Step | Who | Authority needed |
+|---|---|---|
+| W0 workstation static checks | **Claude** | local read-only Git, plus `git ls-remote origin` (read-only) |
+| P-A production read-only checks | **Claude** over SSH as `arm`, or the owner | no sudo; `status` and `verify` only read |
+| P-B production database checks (P6, P7) | **Owner only** | `sudo -u postgres psql`, read-only transaction |
+| D0 push | **Owner only** | push to `origin/main` |
+| D1 fetch + fast-forward, D2 build, D3a promote, D3c checks | **Claude** over SSH as `arm`, or the owner | no sudo |
+| D3b / recovery restart | **Owner only** | `sudo systemctl restart afldb` |
+| D4 visual acceptance | **Owner only** | signs in as Super Admin |
+| Recovery `rollback --to` and its checks | **Claude** over SSH as `arm`, or the owner | no sudo |
 
-```sql
--- P6 (read-only). Run inside: BEGIN READ ONLY; ... ROLLBACK;
+Claude never uses `sudo`, never restarts the unit, never signs in, never pushes, and never grants a privilege.
+Use **one SSH session per phase**, not one per command (bursts of SSH connections have tripped the network's intrusion
+prevention before).
+
+### 4.2 Variables
+
+`R` is the approved package commit. **A commit cannot contain its own hash**, so this file cannot print `R`; it is
+stated in the owner's approval (section 10) and is also `git rev-parse HEAD` on the workstation. Every block refuses
+anything that is not 40 lowercase hex, so the unresolved placeholder fails safe. `NEW_ID` exists only after the build; D2
+writes it to a file and the later blocks read it back and re-validate it.
+
+```bash
+# workstation (Git Bash) -- paste at the start of the workstation session
+R=REPLACE_WITH_40_HEX_R                                # from the owner approval; anything else fails safe
+C=fd48ace0c2cb70296d723603aa397b5bd7a21a0d
+PKG=docs/v2/evidence/gap006-release-package-20261101
+ORIGIN_MAIN=63c945ae4b492ec59dfd29c960783341fab96933
+```
+
+```bash
+# production, as arm -- paste at the start of EVERY production session or SSH call
+R=REPLACE_WITH_40_HEX_R                                # from the owner approval; anything else fails safe
+C=fd48ace0c2cb70296d723603aa397b5bd7a21a0d
+PKG=docs/v2/evidence/gap006-release-package-20261101
+OLD_ID=ad245d602f6f-m0M8pf121326vNSo2B759          # running release, PINNED: the only rollback target
+OLD_PREV=61a95f7397da-JYIBkYn8ynPgYMn1e5nK-        # `previous` today; NOT a rollback target for this package
+OLD_DEEP=9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+PROD_HEAD=65c02ecc29f93cec8410e01c91f4fc293002b774
+ROOT=/home/arm/afldb-releases
+CHK=/home/arm/projects/afldb
+N=/home/arm/.nvm/versions/node/v22.23.2/bin/node
+NEWFILE=/home/arm/gap006-new-id.txt                # written by D2; read by D3 and by recovery
+```
+
+### 4.3 W0: workstation static checks (Claude; before D0, where both commits exist)
+
+```bash
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]
+  cd /d/dev/afldb
+  [ "$(git rev-parse HEAD)" = "$R" ]                                          # the working tree is R
+  [ -z "$(git status --porcelain | grep -v '^?? \.codex/$' || true)" ]        # clean, apart from untracked .codex/
+  bash "$PKG/static-delta-check.sh" "$R"                                      # section 4.4; prints PASS or exits 1
+  bash "$PKG/state-probe.sh" --self-test                                      # the recovery classifier, offline
+  [ "$(git ls-remote origin refs/heads/main | cut -f1)" = "$ORIGIN_MAIN" ]    # nobody pushed since
+  echo "W0 PASS"
+)
+```
+
+### 4.4 What the static delta check enforces
+
+`static-delta-check.sh` (read-only, no network) fails unless **all** hold, and fails rather than passing on a missing
+object: `R`, `C`, the outgoing revision, the production HEAD and `63c945ae` exist; `C`'s tree is
+`01b3e6855516d22238013f58114e9f19d7ec75d7`; `C` is an ancestor of `R`; production HEAD `65c02ecc…` and `63c945ae…` are
+ancestors of `R` (so the push and the production fast-forward are both fast-forwards); `git diff C R` outside
+`docs/`, `CHANGELOG.md`, `IssuesIndex.md`, `issues.md` is **empty**; the **running release's revision `ad245d60…` to `C`**
+and **production HEAD `65c02ecc…` to `R`** are both empty on `src/db/migrations`, `package.json`,
+`package-lock.json`, `deploy`, `data`, `next.config.ts`, `tsconfig.json`, `tools/maintenance`; and the trees `src`,
+`packages`, `tools`, `deploy`, `data`, `package.json`, `package-lock.json`, `next.config.ts`, `tsconfig.json` are
+byte-identical in `C` and `R`. It is run **again on production** at D1, from the pinned bytes of `R` itself
+(`git show "$R:$PKG/static-delta-check.sh" | bash -s -- "$R"`), after the fetch and before the fast-forward.
+
+### 4.5 P-A: production read-only checks (Claude over SSH as `arm`, or the owner; no sudo)
+
+```bash
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd "$CHK"
+  [ "$(git rev-parse HEAD)" = "$PROD_HEAD" ]                                  # P2: checkout still at 65c02ecc
+  [ -z "$(git status --porcelain)" ]                                          # clean
+  [ -z "$(ls "$ROOT"/*.lock 2>/dev/null || true)" ]                           # no build or links lock
+  [ "$(readlink "$ROOT/current")"  = "releases/$OLD_ID" ]                     # P2: OLD_ID is what is selected
+  [ "$(readlink "$ROOT/previous")" = "releases/$OLD_PREV" ]
+  for id in "$OLD_ID" "$OLD_PREV" "$OLD_DEEP"; do [ -d "$ROOT/releases/$id" ]; done      # P3
+  "$N" deploy/release.mjs status                                              # P2: exit 0 only on STATUS PASS (writes nothing)
+  "$N" deploy/release.mjs verify "$OLD_ID"                                    # the pinned rollback target still matches its manifest
+  avail=$(awk '/^MemAvailable:/ {print int($2/1024)}' /proc/meminfo); echo "MemAvailable ${avail} MB"
+  [ "$avail" -ge 2100 ]                                                       # P5 (the tool re-checks at the build)
+  free_kb=$(df --output=avail -k /home/arm | tail -n 1 | tr -d ' '); echo "free ${free_kb} KB"
+  [ "$free_kb" -ge 6291456 ]                                                  # P5: 6 GB
+  [ -z "$(pgrep -f '[p]g_dump|[r]sync|[r]estore' || true)" ]                  # P5: no backup, copy or restore running
+  now=$(date +%s); limit=$((now + 100 * 60))                                  # P5: no afldb systemd timer inside the 90-minute window plus margin
+  for t in $(systemctl list-timers --all --no-legend | awk '{for (i = 1; i <= NF; i++) if ($i ~ /^afldb.*\.timer$/) print $i}' | sort -u); do
+    n=$(systemctl show -p NextElapseUSecRealtime --value "$t"); echo "timer $t next: ${n:-none}"
+    [ -z "$n" ] || [ "$(date -d "$n" +%s)" -gt "$limit" ]
+  done
+  [ "$(grep -c '^AFLDB_IMPORT_DATABASE_URL=' "$CHK/.env")" = 1 ]              # P8: count only, the value is never printed
+  systemctl show -p MemoryCurrent afldb                                       # informational
+  echo "P-A PASS (and read the one judgement item below)"
+)
+crontab -l 2>/dev/null | grep -i afldb || echo "no afldb cron entries"       # J1: JUDGEMENT, not enforced
+```
+
+**J1 is the only judgement item.** Cron entries cannot be compared with the window mechanically: read them, and none may
+fire within 100 minutes of `T0`. The nightly watcher and the AFL Tables settle have fixed early-morning times.
+
+### 4.6 P-B: database checks P6 and P7 (owner only; read-only; fail closed)
+
+The production database is `afldb_prod` (`docs/production-cutover.md`). A connection error means the name is wrong or
+the access is missing: that is a STOP, never a prompt to guess another name.
+
+```bash
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d afldb_prod <<'SQL'
+BEGIN READ ONLY;
 SELECT r.rolname,
        has_table_privilege(r.rolname, 'public.data_edits', 'SELECT')   AS sel,
        has_table_privilege(r.rolname, 'public.data_edits', 'INSERT')   AS ins,
@@ -146,12 +254,51 @@ SELECT r.rolname,
        has_table_privilege(r.rolname, 'public.data_edits', 'TRUNCATE') AS trunc,
        has_sequence_privilege(r.rolname, 'public.data_edits_id_seq', 'USAGE') AS seq
   FROM pg_roles r WHERE r.rolname IN ('afldb_app', 'afldb_import') ORDER BY 1;
--- expected: both roles sel=t ins=t upd=f del=f trunc=f; afldb_import seq=t
+SELECT count(*) AS migrations, max(name) AS latest FROM afldb_meta.schema_migrations;
+DO $$
+DECLARE roles int; good int;
+BEGIN
+  SELECT count(*),
+         count(*) FILTER (WHERE has_table_privilege(rolname, 'public.data_edits', 'SELECT')
+                            AND has_table_privilege(rolname, 'public.data_edits', 'INSERT')
+                            AND NOT has_table_privilege(rolname, 'public.data_edits', 'UPDATE')
+                            AND NOT has_table_privilege(rolname, 'public.data_edits', 'DELETE')
+                            AND NOT has_table_privilege(rolname, 'public.data_edits', 'TRUNCATE'))
+    INTO roles, good FROM pg_roles WHERE rolname IN ('afldb_app', 'afldb_import');
+  IF roles <> 2 OR good <> 2 THEN
+    RAISE EXCEPTION 'P6 FAIL: % of 2 roles found, % hold SELECT+INSERT without UPDATE/DELETE/TRUNCATE on data_edits', roles, good;
+  END IF;
+  IF NOT has_sequence_privilege('afldb_import', 'public.data_edits_id_seq', 'USAGE') THEN
+    RAISE EXCEPTION 'P6 FAIL: afldb_import lacks USAGE on data_edits_id_seq';
+  END IF;
+  IF (SELECT count(*) FROM afldb_meta.schema_migrations) <> 117
+     OR (SELECT max(name) FROM afldb_meta.schema_migrations) <> '117_brownlow_provider_eligibility_unknown.sql' THEN
+    RAISE EXCEPTION 'P7 FAIL: the migration ledger is not 117 rows ending 117_brownlow_provider_eligibility_unknown.sql';
+  END IF;
+  RAISE NOTICE 'P6 PASS, P7 PASS';
+END $$;
+ROLLBACK;
+SQL
+echo "P6/P7 psql exit status: $?   (must be 0 and the output must contain: P6 PASS, P7 PASS)"
 ```
 
-If `afldb_import` lacks `SELECT`, **do not deploy**. Apply the grant through the normal privileges route as its own
-owner-approved step (it is SELECT only, the migration-108 shape, `GRANT SELECT ON TABLE public.data_edits TO afldb_import`),
-then repeat P6. That is a database change and outside this package's authority.
+This SQL was written for this package and **has not been executed against any database** (production is untouched
+until approval). It cannot change anything (`BEGIN READ ONLY … ROLLBACK`) and fails closed: a syntax error or a failed
+assertion exits non-zero, which is a STOP.
+
+**Why P6 is a hard gate.** Every audited editor mutation runs as one transaction on the **import** connection
+(`AFLDB_IMPORT_DATABASE_URL`, role `afldb_import`). The new code writes the audit row with `INSERT ... RETURNING id`, and
+PostgreSQL requires `SELECT` on the returned column. Migration 066 gave `afldb_import` `INSERT` only; migration 108 and
+`tools/maintenance/privileges.sql` add `SELECT`. If the grant were absent on production, **every editor write would fail
+closed** ("permission denied for table data_edits"). Production is at ledger 117 so 108 should be applied, but privileges
+can be reset by a privileges run, so the live grant is verified rather than the ledger.
+
+**If any P6 or P7 assertion fails, this is a STOP at the go/no-go. No grant is authorised by this package.** Closing a
+missing privilege would be a database change needing its own owner-approved package; do not improvise one.
+
+### 4.7 Go/no-go (`T0+15`)
+
+W0 PASS, P-A PASS with J1 read, P-B PASS. Then D0.
 
 ## 5. Build and resource requirements
 
@@ -174,86 +321,228 @@ then repeat P6. That is a database change and outside this package's authority.
 ## 6. Execution sequence (relative; owner-attended start)
 
 `T0` is when the owner says go. Times are budgets, not a schedule. If a step overruns its budget, treat it as a STOP
-condition for that step (section 7), not as a reason to continue.
+condition for that step (section 7), not as a reason to continue. Variables are those of section 4.2. **Before any block
+that follows a failure or a surprise, run the state probe (section 7.2) and act only on its STATE.**
 
-**`T0+0` to `T0+15` P1-P8.** Go/no-go at `T0+15`. No change has been made.
+**`T0+0` to `T0+15` W0, P-A, P-B.** Go/no-go at `T0+15`. No change has been made.
 
-**`T0+15` D0. Push (owner, workstation).** Fast-forward only, no force; `origin/main` must still be `63c945ae…`:
-
-```bash
-git push origin <R>:main
-git ls-remote origin refs/heads/main      # must print R
-```
-
-**`T0+20` D1. Production checkout fast-forward (`arm`).** This is the only change before the build, and it does not
-touch the running site or the in-place bundle:
+**`T0+15` D0. Push (owner, workstation).** Fast-forward only, no force. The block re-checks that the tree is `R` and that
+`origin/main` is still `63c945ae…`, pushes exactly `R`, and re-reads the remote:
 
 ```bash
-cd /home/arm/projects/afldb
-N=/home/arm/.nvm/versions/node/v22.23.2/bin/node
-git fetch origin && git merge --ff-only origin/main      # 65c02ecc -> R
-git rev-parse HEAD; git status --porcelain               # R; empty
-git cat-file -e fd48ace0c2cb70296d723603aa397b5bd7a21a0d^{commit} && echo "C present"
-git diff --name-only 65c02ecc29f93cec8410e01c91f4fc293002b774 fd48ace0c2cb70296d723603aa397b5bd7a21a0d -- src/db/migrations package.json package-lock.json deploy data next.config.ts   # P4: empty
-$N deploy/release.mjs status                              # still ad245d602f6f-m0M8pf121326vNSo2B759, STATUS PASS
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd /d/dev/afldb
+  [ "$(git rev-parse HEAD)" = "$R" ]
+  [ "$(git ls-remote origin refs/heads/main | cut -f1)" = "$ORIGIN_MAIN" ]
+  git push origin "$R:refs/heads/main"                                        # no --force: a non-fast-forward is rejected
+  [ "$(git ls-remote origin refs/heads/main | cut -f1)" = "$R" ]
+  echo "D0 PASS"
+)
 ```
 
-**`T0+25` D2. Build (`arm`, inside `tmux`; budget 20 min).**
+**`T0+20` D1. Production checkout fast-forward (Claude over SSH as `arm`, or the owner).** The only change before the
+build; it does not touch the running site or the in-place bundle. The fetched remote must equal `R` **before** anything
+moves, the static delta check runs again from `R`'s own pinned bytes, and the fast-forward is to the pinned `R`, never to
+whatever `origin/main` happens to be:
 
 ```bash
-$N deploy/release.mjs build --checkout /home/arm/projects/afldb --revision fd48ace0c2cb70296d723603aa397b5bd7a21a0d \
-  --afldb-env production --typecheck off-host --smoke-paths /players,/clubs,/seasons \
-  --typecheck-evidence "npm run typecheck exit 0 (next typegen && tsc --noEmit) on Linux (streamanator, Ubuntu 24.04.5, node v22.23.2) for git archive of fd48ace0 (tree 01b3e685); 2026-11-01; docs/v2/evidence/gap006-linux-qualification-20261101/evidence/typecheck.log"
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd "$CHK"
+  [ "$(git rev-parse HEAD)" = "$PROD_HEAD" ]
+  git fetch origin
+  [ "$(git rev-parse refs/remotes/origin/main)" = "$R" ]                      # fetched remote == the approved R
+  git cat-file -e "$R^{commit}"; git cat-file -e "$C^{commit}"
+  git show "$R:$PKG/static-delta-check.sh" | bash -s -- "$R"                  # P4 on production, enforced
+  git merge --ff-only "$R"                                                    # 65c02ecc -> R, pinned
+  [ "$(git rev-parse HEAD)" = "$R" ]; [ -z "$(git status --porcelain)" ]
+  "$N" deploy/release.mjs status                                              # still STATUS PASS
+  bash "$PKG/state-probe.sh" "$OLD_ID" - --expect OLD_SERVING
+  echo "D1 PASS"
+)
 ```
 
-Expect `RELEASE READY fd48ace0c2cb-<BUILD_ID>`. Any `REFUSED`, guard abort or failure is a STOP with `current` and
-`previous` untouched (the release route's own guarantee).
-
-**`T0+45` D3. Promote, restart, check.**
+**`T0+25` D2. Build (`arm`, inside `tmux`; budget 20 min).** Run once. The build is of `C`, not `R`. It refuses to start if
+`NEWFILE` already exists, so a stale ID can never be promoted:
 
 ```bash
-$N deploy/release.mjs promote NEW_ID          # previous becomes ad245d602f6f-m0M8pf121326vNSo2B759
-sudo systemctl restart afldb                  # owner; at least 30 s after the last start; the only downtime (about 15-30 s)
-$N deploy/release.mjs status --expect NEW_ID
-bash deploy/post-install-check.sh NEW_ID      # proves m0M8pf121326vNSo2B759 is absent at the origin
-journalctl -u afldb --since '5 minutes ago' | grep 'serving build'
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd "$CHK"
+  [ ! -e "$NEWFILE" ]
+  [ "$(git rev-parse HEAD)" = "$R" ]; [ -z "$(git status --porcelain)" ]
+  bash "$PKG/state-probe.sh" "$OLD_ID" - --expect OLD_SERVING
+  "$N" deploy/release.mjs build --checkout "$CHK" --revision "$C" \
+    --afldb-env production --typecheck off-host --smoke-paths /players,/clubs,/seasons \
+    --typecheck-evidence "npm run typecheck exit 0 (next typegen && tsc --noEmit) on Linux (streamanator, Ubuntu 24.04.5, node v22.23.2) for git archive of fd48ace0 (tree 01b3e685); 2026-11-01; docs/v2/evidence/gap006-linux-qualification-20261101/evidence/typecheck.log" \
+    2>&1 | tee /home/arm/gap006-d2-build.log
+  NEW_ID=$(sed -n 's/^release: RELEASE READY \([^ ]*\) .*$/\1/p' /home/arm/gap006-d2-build.log | tail -n 1)
+  [[ $NEW_ID =~ ^fd48ace0c2cb-[A-Za-z0-9_-]+$ ]]                              # RELEASE READY fd48ace0c2cb-<BUILD_ID>
+  "$N" deploy/release.mjs verify "$NEW_ID"
+  [ "$(readlink "$ROOT/current")"  = "releases/$OLD_ID" ]                     # a build never moves a link
+  [ "$(readlink "$ROOT/previous")" = "releases/$OLD_PREV" ]
+  bash "$PKG/state-probe.sh" "$OLD_ID" "$NEW_ID" --expect OLD_SERVING
+  echo "$NEW_ID" > "$NEWFILE"; echo "D2 PASS NEW_ID=$NEW_ID"
+)
 ```
 
-The journal must log `serving build <BUILD_ID> release NEW_ID revision fd48ace0…`. A `CACHE` line for
-`m0M8pf121326vNSo2B759` is an old Cloudflare copy and does not fail the check; every `FAIL` does.
+Any `REFUSED`, guard abort or failure is a STOP with `current` and `previous` untouched (the release route's own
+guarantee, `docs/deployment.md` §3a) and `NEWFILE` unwritten. Nothing is promoted, so there is nothing to recover.
+
+**`T0+45` D3. Promote, restart, check.** Three parts, in order.
+
+*D3a. Promote (Claude over SSH as `arm`, or the owner).* Every refusal inside `promote` happens **before** a link moves
+(section 7.3), and the block checks the state before and after:
+
+```bash
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd "$CHK"
+  NEW_ID=$(cat "$NEWFILE"); [[ $NEW_ID =~ ^fd48ace0c2cb-[A-Za-z0-9_-]+$ ]]
+  bash "$PKG/state-probe.sh" "$OLD_ID" "$NEW_ID" --expect OLD_SERVING
+  "$N" deploy/release.mjs promote "$NEW_ID"          # previous becomes OLD_ID; the running service is unchanged until it restarts
+  bash "$PKG/state-probe.sh" "$OLD_ID" "$NEW_ID" --expect NEW_SELECTED_OLD_RUNNING
+  [ "$(readlink "$ROOT/previous")" = "releases/$OLD_ID" ]
+  echo "D3a PASS"
+)
+```
+
+If this block stops anywhere, **do not roll back or restart by reflex**: go to section 7.2.
+
+*D3b. Restart (owner only):* `sudo systemctl restart afldb`, at least 30 s after the last start. This is the only
+downtime (about 15-30 s).
+
+*D3c. Check (Claude over SSH as `arm`, or the owner).* `post-install-check.sh` waits up to 60 s for health itself:
+
+```bash
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd "$CHK"
+  NEW_ID=$(cat "$NEWFILE"); [[ $NEW_ID =~ ^fd48ace0c2cb-[A-Za-z0-9_-]+$ ]]
+  bash deploy/post-install-check.sh "$NEW_ID"        # status --expect, origin/public assets, the previous BUILD_ID absent; prints PASS or FAIL
+  bash "$PKG/state-probe.sh" "$OLD_ID" "$NEW_ID" --expect NEW_SERVING
+  journalctl -u afldb --since '10 minutes ago' --no-pager | grep -F 'serving build' | tail -n 1 | grep -q "release $NEW_ID revision fd48ace0"
+  echo "D3c PASS"
+)
+```
+
+`post-install-check.sh` ends `POST-INSTALL CHECK PASS` or `FAIL` and exits non-zero on FAIL, which stops the block. A
+`CACHE` line for `m0M8pf121326vNSo2B759` is an old Cloudflare copy and does not fail the check; every `FAIL` does. If
+`arm` cannot read the journal, the owner runs that last line.
 
 **`T0+55` D4. Authenticated visual acceptance (owner signs in; section 8).** Budget 20 min.
 
-**`T0+75` decision.** Accept (all gates passed) or roll back (D5). **`T0+90` hard end:** if D4 is not complete and
-passing by then, roll back.
+**`T0+75` decision.** Accept (D3c PASS and every D4 gate) or recover (section 7.2, row NEW_SERVING). **`T0+90` hard
+end:** if D4 is not complete and passing by then, recover.
 
-**D5. Rollback on any failed gate** (no build, `npm` or Git; budget 5 min):
+## 7. Stop and recovery
 
-```bash
-$N deploy/release.mjs rollback                # current -> ad245d602f6f-m0M8pf121326vNSo2B759; previous -> NEW_ID
-sudo systemctl restart afldb                  # owner; at least 30 s after the last start
-$N deploy/release.mjs status --expect ad245d602f6f-m0M8pf121326vNSo2B759
-bash deploy/post-install-check.sh ad245d602f6f-m0M8pf121326vNSo2B759
-```
-
-Rolling back needs **no database action**: there is no migration, and rows the new code wrote (audit rows in
-`data_edits`, notes) are valid under the old code because the schema is unchanged. If the restart itself fails (the unit
-does not become active), read `systemctl status afldb` and `journalctl -u afldb`; the first recovery is the rollback above.
-
-## 7. Stop and recovery conditions
+### 7.1 Stop conditions (before anything is promoted nothing needs recovering)
 
 | Condition | Action |
 |---|---|
-| P1-P8 not exactly as expected (including `afldb_import` lacking `SELECT` on `data_edits`, a different running release, a dirty checkout, a lock, or a timer or backup in the window) | **STOP before D0.** Nothing changed. Re-plan; do not adjust the expected values |
-| `git push` rejected, or `origin/main` is not `63c945ae…` | STOP; do not force |
-| D1: non-fast-forward, `C` absent, or any migration/dependency/deploy/data/config entry in the P4 diff | STOP; production checkout may be left at its fast-forward (harmless) |
-| MemAvailable under 2,100 MB or free disk under 6 GB (admission), or the build is `REFUSED`, aborted by the guard or exceeds its budget | STOP; `current`/`previous` untouched; no swap, no service stop, no lowered threshold |
-| `promote` refuses, or the restart does not leave the unit active within about 60 s | Run D5 |
-| `status --expect NEW_ID` fails, or `post-install-check.sh` prints any `FAIL`, or the journal shows an error loop or a build/release other than `NEW_ID` | Run D5 |
-| D4 fails any gate (section 8), a page errors, or the role is not Super Admin after sign-in | Run D5 and record the failure |
-| An editor write fails with "permission denied" in the journal | Run D5; this is the P6 condition appearing late |
-| D4 not complete and passing by `T0+90` | Run D5 |
+| W0, P-A or P-B fails (including `afldb_import` lacking `SELECT` on `data_edits`, a different running release, a dirty checkout, a lock, a timer, backup or resource shortfall, or J1 not clear) | **STOP before D0.** Nothing changed. Re-plan; do not adjust the expected values. **No grant is authorised** |
+| `git push` rejected, or `origin/main` is not `63c945ae…` before it | STOP; do not force |
+| D1: fetched remote is not `R`, non-fast-forward, `C` absent, or the production static check fails | STOP; the checkout is untouched (the fast-forward is the last step and only follows a pass) |
+| Build `REFUSED`, guard abort, admission shortfall, or over budget | STOP; `current`/`previous` untouched; no swap, no service stop, no lowered threshold |
+| Anything in D3a-D4, or `T0+90` reached | **Do not act yet. Run the state probe (7.2) and act only on its STATE** |
 | Anything unexpected | Stop, run nothing further, keep every log, and report |
+
+### 7.2 State-aware recovery
+
+**The rule.** The pinned outgoing release is `OLD_ID` = `ad245d602f6f-m0M8pf121326vNSo2B759`. Recovery always names it:
+`rollback --to "$OLD_ID"`. **An unqualified `rollback` is forbidden in this package**: it selects `previous`, and before
+a promotion `previous` is `61a95f73…`, not the release that is serving. Never roll back, and never restart, a release
+that the probe shows as unchanged and healthy.
+
+Probe (read-only, changes nothing; `NEW_ID` is `-` before the build exists):
+
+```bash
+( set -u; cd "$CHK"; NEW_ID=$(cat "$NEWFILE" 2>/dev/null || echo -); bash "$PKG/state-probe.sh" "$OLD_ID" "$NEW_ID" )
+```
+
+It prints the links, the unit, the service process's release directory, health and locks, then one `STATE`:
+
+| STATE | Meaning | Action |
+|---|---|---|
+| `OLD_SERVING` | `OLD_ID` is selected, running and healthy: the promotion was refused or never happened, or recovery is finished | **Preserve it and stop.** No rollback (it would be refused as "already current", or, unqualified, would select `61a95f73…`), no restart. Report the refusal text. `previous` may be `61a95f73…` (never promoted) or `NEW_ID` (after a rollback); both are fine |
+| `NEW_SELECTED_OLD_RUNNING` | promoted, restart not yet done (or never reached), and the old process still serves | To abandon: **R2** (links only, **no restart**: the process already runs `OLD_ID`). To continue: D3b |
+| `NEW_SERVING` | restarted and healthy on `NEW_ID` | Proceed with D3c and D4. If any gate then fails, or `T0+90` passes: **R3** |
+| `NEW_SELECTED_FAILED` | `NEW_ID` selected and the unit is down or unhealthy (probe again after 60 s first) | **R3** |
+| `OLD_SELECTED_NEW_RUNNING` | links are back at `OLD_ID` but the process still runs `NEW_ID` (recovery interrupted before the restart) | **R4** |
+| `TRANSIENT` | unit is `activating` | change nothing; probe again in 15 s |
+| `UNCERTAIN` | anything else (a third release, `OLD_ID` selected but down or unhealthy, an unreadable process) | **R5: act on nothing** |
+
+**R2. Abandon after promotion, before the restart (links only; Claude over SSH as `arm`, or the owner).**
+
+```bash
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd "$CHK"
+  NEW_ID=$(cat "$NEWFILE"); [[ $NEW_ID =~ ^fd48ace0c2cb-[A-Za-z0-9_-]+$ ]]
+  bash "$PKG/state-probe.sh" "$OLD_ID" "$NEW_ID" --expect NEW_SELECTED_OLD_RUNNING
+  "$N" deploy/release.mjs rollback --to "$OLD_ID"    # current -> OLD_ID, previous -> NEW_ID; no service action
+  bash "$PKG/state-probe.sh" "$OLD_ID" "$NEW_ID" --expect OLD_SERVING
+  bash deploy/post-install-check.sh "$OLD_ID"
+  echo "R2 PASS: OLD_ID selected, the unchanged process left running"
+)
+```
+
+**R3. Failure after the restart (including acceptance failure): restore the pinned `OLD_ID`.** First capture the
+evidence for the record: `systemctl status afldb --no-pager`; `journalctl -u afldb --since '15 minutes ago' --no-pager`.
+
+```bash
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd "$CHK"                    # Claude over SSH as arm, or the owner
+  NEW_ID=$(cat "$NEWFILE"); [[ $NEW_ID =~ ^fd48ace0c2cb-[A-Za-z0-9_-]+$ ]]
+  [ "$(readlink "$ROOT/current")" = "releases/$NEW_ID" ]    # roll back only when NEW_ID is the selected release
+  "$N" deploy/release.mjs rollback --to "$OLD_ID"           # current -> OLD_ID, previous -> NEW_ID (retained, not deleted)
+  [ "$(readlink "$ROOT/current")"  = "releases/$OLD_ID" ]
+  [ "$(readlink "$ROOT/previous")" = "releases/$NEW_ID" ]
+  echo "R3 links restored; the restart below is owed"
+)
+```
+
+Then **the owner** runs `sudo systemctl restart afldb` (at least 30 s after the last start; if the unit reports
+`start-limit-hit`, `sudo systemctl reset-failed afldb && sudo systemctl start afldb`). Then:
+
+```bash
+( set -euo pipefail; [[ $R =~ ^[0-9a-f]{40}$ ]]; cd "$CHK"                    # Claude over SSH as arm, or the owner
+  NEW_ID=$(cat "$NEWFILE"); [[ $NEW_ID =~ ^fd48ace0c2cb-[A-Za-z0-9_-]+$ ]]
+  bash deploy/post-install-check.sh "$OLD_ID"
+  bash "$PKG/state-probe.sh" "$OLD_ID" "$NEW_ID" --expect OLD_SERVING
+  echo "R3 PASS: OLD_ID serving"
+)
+```
+
+**R4. Links already at `OLD_ID`, process still `NEW_ID`.** The owner restarts, then the second R3 block above verifies.
+
+**R5. `UNCERTAIN`: run nothing that changes state.** Collect read-only: the probe output; `ls -l "$ROOT"`;
+`"$N" deploy/release.mjs status` (its failures are information); `systemctl status afldb --no-pager`;
+`journalctl -u afldb --since '30 minutes ago' --no-pager`; `ls "$ROOT"/*.lock`. Keep every log and report. If
+`rollback --to "$OLD_ID"` itself refuses because `OLD_ID` fails its manifest check, that is also R5: choosing the
+deeper `OLD_PREV` is an owner decision, not a step of this package.
+
+**No database action is ever part of a rollback.** There is no migration; rows the new code wrote (audit rows in
+`data_edits`, notes) are valid under the old code because the schema is unchanged.
+
+### 7.3 Walk-through against the installed route (`deploy/release.mjs`)
+
+The route's real semantics, from the code, and what each scenario therefore does:
+
+| Command | What it does to links and service |
+|---|---|
+| `promote <id>` (`cmdPromote`, line 1029) | Under the links lock: `verifyRelease(id)` (refuses on manifest drift) → refuses if `id` is already `current` → refuses unless the service's MainPID working directory is the current release → **only then** `previous := current`, then `current := id` (two renames). The service is not touched |
+| `rollback --to <id>` (`cmdRollback`, line 1068) | Target is `--to`, **else `previous`**. Refuses if the target is already `current`; `verifyRelease(target)` (refuses on drift); warns if the target has no recorded status PASS; then `current := target` first, `previous := old current`. It does **not** read or restart the service and runs no build, `npm` or Git |
+| `status [--expect id]` | Fails unless `current` is `id`, the MainPID directory is that release, health is ok/ok, `id`'s BUILD_ID manifest answers 200 and the previous release's answers 404. A PASS with `--expect` appends a `status-pass` line to `events.log` |
+
+**Scenario 1. Promotion refused (before promotion).** Whatever refuses (lock held, manifest drift, "already current", "the
+service is not running current") happens before the first rename. Result: `current` = `OLD_ID`, `previous` =
+`61a95f73…`, service untouched: **`OLD_SERVING`**. The correct act is to preserve it and stop. Revision 1 of this package
+sent this case to an unqualified `rollback`, which would have selected `61a95f73…` and pointed the next restart at an
+older release than the one serving. Now: `rollback --to "$OLD_ID"` would be refused as "already current" (harmless), and
+the package never issues it in this state. One narrow exception: a process killed between the two renames leaves
+`previous` = `current` = `OLD_ID` (the probe prints `ANOMALY`); the site still serves `OLD_ID`; stop and report, and do
+not re-promote without an owner decision.
+
+**Scenario 2. Failure after promotion.** `current` = `NEW_ID`, `previous` = `OLD_ID`. (2a) Before the restart the
+service still runs `OLD_ID` (`NEW_SELECTED_OLD_RUNNING`): `rollback --to "$OLD_ID"` restores the link and the already
+healthy process needs **no restart** (R2). (2b) After the restart the unit is down or unhealthy (`NEW_SELECTED_FAILED`):
+`rollback --to "$OLD_ID"` restores the link, then the owner restarts, and `post-install-check.sh "$OLD_ID"` proves it
+(R3). `--to` is pinned although `previous` equals `OLD_ID` here, so the same command is right if a second promote or
+build ever intervenes.
+
+**Scenario 3. Acceptance failure.** The unit is healthy on `NEW_ID` (`NEW_SERVING`) but a D3c or D4 gate fails or
+`T0+90` passes. Same as 2b (R3): the link is the only thing that changes, so the owner's restart is what actually
+returns the site. `NEW_ID` stays retained as `previous` for diagnosis; nothing is deleted.
 
 ## 8. Authenticated visual acceptance (D4)
 
@@ -291,15 +580,39 @@ Optional negative control: run the same script **before D0** against the still-r
   by recomputation, but the earlier local records kept only hash prefixes: this is consistency with the record, not a
   proven historical full-hash match. The 8/8 Brownlow result is isolated-test evidence only.
 
-## 10. Exact remaining owner actions
+## 10. Owner approval and exact remaining actions
+
+Execution begins only when the owner sends an approval in this shape, with `<R>` filled in (the workstation prints it:
+`git rev-parse HEAD`). Nothing runs on production before then, and `T0` is whenever the owner says go; this package
+fixes no calendar window.
+
+```text
+I approve execution of the GAP-006 editor-protections release package, revision 2, at R=<R>
+(docs/v2/gap006-editor-protections-release-package.md), building revision
+C=fd48ace0c2cb70296d723603aa397b5bd7a21a0d, outgoing release
+OLD_ID=ad245d602f6f-m0M8pf121326vNSo2B759. T0 is when I say "go".
+
+Claude may: run W0 on the workstation; run, as arm over SSH without sudo, P-A, D1, D2, D3a, D3c and the recovery
+blocks R2/R3/R5 exactly as written; run the read-only state probe at any time; stop at the first failed check.
+I will do: P6/P7 (sudo -u postgres, read-only), the D0 push of exactly R, every `sudo systemctl restart afldb`,
+and the D4 sign-in and visual acceptance.
+
+Claude must not: use sudo, restart the unit, push, grant any privilege, run an unqualified `rollback`, roll back or
+restart a release the probe shows as OLD_SERVING, build anything other than C, delete any release, backup or frozen
+material, or continue past a failed check. Missing afldb_import privileges are a STOP; no grant is authorised.
+V2-GAP-006 and ISSUE-331 stay open with their limitations.
+```
+
+Remaining owner actions, in order:
 
 1. Read this package and `docs/v2/gap006-release-readiness-2026-11-01.md`; decide whether to proceed and when `T0` is.
-2. At `T0`, run P1 (workstation) and P2-P8 (production; P6/P7 need the owner's `sudo -u postgres`).
-3. D0: `git push origin <R>:main` (fast-forward only).
-4. D1-D3: as written; **the owner runs `sudo systemctl restart afldb`**.
+2. Send the approval above. At `T0`: W0 and P-A run; **you** run P-B (P6/P7) and read J1.
+3. D0: the push block (owner).
+4. D1, D2, D3a (Claude, or you), then **you** run `sudo systemctl restart afldb` (D3b), then D3c.
 5. D4: sign in as Super Admin and run the acceptance script; look at the screenshots.
-6. Accept, or run D5. Then record the outcome (a closing note in this file and in `CHANGELOG.md`/`issues.md`
-   as the owner directs).
+6. Accept, or recover by the probe's STATE (section 7.2). Then record the outcome (a closing note in this file and in
+   `CHANGELOG.md`/`issues.md` as the owner directs).
 
-Not authorised and not done by this package: pushing, any production-host access, deployment, writer activation, provider
-acquisition, or any real Brownlow recording, backfill, adoption or publication.
+Not authorised and not done by this package: any grant or database change, a build other than `C`, deleting a retained
+release, backup or frozen store, writer activation, provider acquisition, or any real Brownlow recording, backfill,
+adoption or publication.
