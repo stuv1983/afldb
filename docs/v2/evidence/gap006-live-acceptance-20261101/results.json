@@ -1,0 +1,317 @@
+{
+  "started": "2026-10-31T23:51:52.357Z",
+  "base": "https://beta.afldb.com",
+  "pages": [
+    "award-winner-new /admin/awards/winners/new",
+    "draft-new-pick /admin/draft/new",
+    "first-kick-goal-new /admin/records/first-kick-goal/new"
+  ],
+  "checks": [
+    {
+      "id": "role-super-admin",
+      "ok": true,
+      "detail": {
+        "role": "Super Admin"
+      }
+    },
+    {
+      "id": "1440x900 award-winner-new status-200",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "url": "https://beta.afldb.com/admin/awards/winners/new"
+      }
+    },
+    {
+      "id": "1440x900 award-winner-new correction-note-control",
+      "ok": true,
+      "detail": {
+        "count": 1,
+        "first": {
+          "label": "Administrative note (kept with the audit entry)",
+          "name": "adminNote",
+          "maxLength": "2000",
+          "hint": "Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.",
+          "associated": true
+        }
+      }
+    },
+    {
+      "id": "1440x900 award-winner-new no-overflow",
+      "ok": true,
+      "detail": {
+        "scrollWidth": 1425,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "id": "1440x900 award-winner-new static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 12,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    },
+    {
+      "id": "1440x900 draft-new-pick status-200",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "url": "https://beta.afldb.com/admin/draft/new"
+      }
+    },
+    {
+      "id": "1440x900 draft-new-pick correction-note-control",
+      "ok": true,
+      "detail": {
+        "count": 1,
+        "first": {
+          "label": "Admin note (recorded on the audit row)",
+          "name": "note",
+          "maxLength": "2000",
+          "hint": "Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.",
+          "associated": true
+        }
+      }
+    },
+    {
+      "id": "1440x900 draft-new-pick no-overflow",
+      "ok": true,
+      "detail": {
+        "scrollWidth": 1425,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "id": "1440x900 draft-new-pick static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 11,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    },
+    {
+      "id": "1440x900 first-kick-goal-new status-200",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "url": "https://beta.afldb.com/admin/records/first-kick-goal/new"
+      }
+    },
+    {
+      "id": "1440x900 first-kick-goal-new correction-note-control",
+      "ok": true,
+      "detail": {
+        "count": 1,
+        "first": {
+          "label": "Administrative note (kept with the audit entry)",
+          "name": "adminNote",
+          "maxLength": "2000",
+          "hint": "Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.",
+          "associated": true
+        }
+      }
+    },
+    {
+      "id": "1440x900 first-kick-goal-new no-overflow",
+      "ok": true,
+      "detail": {
+        "scrollWidth": 1425,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "id": "1440x900 first-kick-goal-new static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 12,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    },
+    {
+      "id": "390x844 award-winner-new status-200",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "url": "https://beta.afldb.com/admin/awards/winners/new"
+      }
+    },
+    {
+      "id": "390x844 award-winner-new correction-note-control",
+      "ok": true,
+      "detail": {
+        "count": 1,
+        "first": {
+          "label": "Administrative note (kept with the audit entry)",
+          "name": "adminNote",
+          "maxLength": "2000",
+          "hint": "Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.",
+          "associated": true
+        }
+      }
+    },
+    {
+      "id": "390x844 award-winner-new no-overflow",
+      "ok": true,
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 390
+      }
+    },
+    {
+      "id": "390x844 award-winner-new static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 12,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    },
+    {
+      "id": "390x844 draft-new-pick status-200",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "url": "https://beta.afldb.com/admin/draft/new"
+      }
+    },
+    {
+      "id": "390x844 draft-new-pick correction-note-control",
+      "ok": true,
+      "detail": {
+        "count": 1,
+        "first": {
+          "label": "Admin note (recorded on the audit row)",
+          "name": "note",
+          "maxLength": "2000",
+          "hint": "Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.",
+          "associated": true
+        }
+      }
+    },
+    {
+      "id": "390x844 draft-new-pick no-overflow",
+      "ok": true,
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 390
+      }
+    },
+    {
+      "id": "390x844 draft-new-pick static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 11,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    },
+    {
+      "id": "390x844 first-kick-goal-new status-200",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "url": "https://beta.afldb.com/admin/records/first-kick-goal/new"
+      }
+    },
+    {
+      "id": "390x844 first-kick-goal-new correction-note-control",
+      "ok": true,
+      "detail": {
+        "count": 1,
+        "first": {
+          "label": "Administrative note (kept with the audit entry)",
+          "name": "adminNote",
+          "maxLength": "2000",
+          "hint": "Required when this changes a sealed (completed) season: 20-2000 characters saying what is being corrected and the evidence. Optional for the current season.",
+          "associated": true
+        }
+      }
+    },
+    {
+      "id": "390x844 first-kick-goal-new no-overflow",
+      "ok": true,
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 390
+      }
+    },
+    {
+      "id": "390x844 first-kick-goal-new static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 12,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "01-award-winner-new-1440x900.png",
+      "url": "https://beta.afldb.com/admin/awards/winners/new",
+      "viewport": "1440x900",
+      "at": "2026-10-31T23:57:28.724Z"
+    },
+    {
+      "file": "02-draft-new-pick-1440x900.png",
+      "url": "https://beta.afldb.com/admin/draft/new",
+      "viewport": "1440x900",
+      "at": "2026-10-31T23:57:33.029Z"
+    },
+    {
+      "file": "03-first-kick-goal-new-1440x900.png",
+      "url": "https://beta.afldb.com/admin/records/first-kick-goal/new",
+      "viewport": "1440x900",
+      "at": "2026-10-31T23:57:37.324Z"
+    },
+    {
+      "file": "04-season-lists-info-1440x900.png",
+      "url": "https://beta.afldb.com/admin/season-lists",
+      "viewport": "1440x900",
+      "at": "2026-10-31T23:57:40.604Z"
+    },
+    {
+      "file": "05-player-links-info-1440x900.png",
+      "url": "https://beta.afldb.com/admin/player-links",
+      "viewport": "1440x900",
+      "at": "2026-10-31T23:57:44.553Z"
+    },
+    {
+      "file": "06-award-winner-new-390x844.png",
+      "url": "https://beta.afldb.com/admin/awards/winners/new",
+      "viewport": "390x844",
+      "at": "2026-10-31T23:57:48.847Z"
+    },
+    {
+      "file": "07-draft-new-pick-390x844.png",
+      "url": "https://beta.afldb.com/admin/draft/new",
+      "viewport": "390x844",
+      "at": "2026-10-31T23:57:53.072Z"
+    },
+    {
+      "file": "08-first-kick-goal-new-390x844.png",
+      "url": "https://beta.afldb.com/admin/records/first-kick-goal/new",
+      "viewport": "390x844",
+      "at": "2026-10-31T23:57:57.257Z"
+    }
+  ],
+  "role": "Super Admin",
+  "info": [
+    {
+      "name": "season-lists",
+      "status": 200,
+      "controls": 0
+    },
+    {
+      "name": "player-links",
+      "status": 200,
+      "controls": 0
+    }
+  ],
+  "finished": "2026-10-31T23:57:57.257Z",
+  "verdict": "PASS"
+}

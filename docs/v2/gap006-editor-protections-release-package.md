@@ -711,6 +711,24 @@ therefore correct and safe: `afldb_import` has what `C` needs and stays append-o
 throwaway PostgreSQL 16.15 cluster, including the production-observed state, which passes, and revision 2's block against
 it, which reproduces the exit 3). `C` and its validation are unchanged.
 
-### 11.3 Revision 3 attempt
+### 11.3 Revision 3 attempt, 2026-11-01 (executed; D4 accepted on evidence)
 
-Not started. Starts at a new owner approval carrying revision 3's `R`.
+Owner approval of revision 3 at `R=9b9c6b2acda28e4d222c04a951275bdf654da74f`. Times are UTC; AEDT is +11 h.
+
+| Step | Result |
+|---|---|
+| W0, P-A, J1 | run earlier in the session before the context was cleared; their output is not part of this record and was not re-verified here (D1's production static check, `status` and probe re-covered the same ground) |
+| P6/P7 (owner, `afldb-prod`) | **PASS** as reported by the owner (not independently seen by Claude); no grant made |
+| D0 push (owner) | reported passed by the owner; Claude confirmed `origin/main` = `R` with `git ls-remote` before D1, and D1 re-read the fetched remote as `R` |
+| D1 (2026-10-31T23:29Z) | **PASS.** Production static delta check PASS; checkout `65c02ecc` fast-forwarded to `R`, clean; `status` PASS; probe `OLD_SERVING` |
+| D2 (23:30-23:34Z) | **PASS.** `NEW_ID=fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy` (12,995 files, manifest `2f011e790d79…`), build 225 s, build min MemAvailable 1,391 MB, peak RSS 1,720 MB, V1-V5 and boot smoke passed; `verify` PASS; links untouched; probe `OLD_SERVING`. Logs: `gap006-live-acceptance-20261101/d2-build.prod.log`, `d2-run.prod.out` |
+| D3a (23:35Z) | **PASS.** `previous` = `OLD_ID`, `current` = `NEW_ID`; probe `NEW_SELECTED_OLD_RUNNING` (PID 3190377 still on `OLD_ID`) |
+| D3b (owner, 23:50:30Z) | `sudo systemctl restart afldb`: active |
+| D3c (23:51Z) | **PASS.** `POST-INSTALL CHECK PASS`; probe `NEW_SERVING` (PID 3218527, health ok/ok); journal line `serving build pqAQwRIJWLjSYzR8LiTuy release fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy revision fd48ace0…`; 0 error lines; `NRestarts 0`; origin 404 for the previous build; one old Cloudflare cache HIT for `m0M8pf121326vNSo2B759` (informational, as the package states) |
+| D4 (23:57Z) | **PASS 25/25** by the packaged runner, Super Admin, `https://beta.afldb.com`. The runner continues only once the browser is on `/admin/operations`; after signing in the owner had to open that URL by hand. Screenshots inspected by Claude, not only the runner's verdict: the correction-note control (label, textarea, rule text, 2000 cap) renders on all three pages at both widths with no overflow. In the mobile full-page captures the fixed bottom navigation repeats mid-image; that is a capture artefact, not a layout defect |
+
+Evidence: `docs/v2/evidence/gap006-live-acceptance-20261101/` (8 screenshots, `results.json`, `d4-console.log`, the two D2 logs).
+
+**Not live-verified.** `/admin/season-lists` and `/admin/player-links` (information pages, not gates) showed 0 correction-note controls on their list views; the controls on those editors sit in per-record panels that the read-only runner does not open. The refusal behaviour itself was not exercised against production (no production write was made); it rests on the PostgreSQL integration suites and the synthetic-registry visual journeys.
+
+**State left.** `current` = `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy` serving; `previous` = `ad245d602f6f-m0M8pf121326vNSo2B759` (retained, rollback target `rollback --to`); nothing deleted; no grant, schema or database change; Claude used no `sudo`, restarted nothing and pushed nothing. Only transient files on production were `/home/arm/gap006-{d1,d2,d2-launch,d3a,d3c}.sh` (removed) and the retained `gap006-new-id.txt`, `gap006-d2-build.log`, `gap006-d2.out`. **V2-GAP-006 stays open** (database-level enforcement, the other writers, owner decision pending); **ISSUE-331 stays open**. `CHANGELOG.md` and `issues.md` are not updated; that is the owner's direction (section 10, step 6).

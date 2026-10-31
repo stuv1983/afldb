@@ -1,0 +1,31 @@
+state probe 2026-10-31T23:30:05Z
+  OLD_ID   ad245d602f6f-m0M8pf121326vNSo2B759
+  NEW_ID   (not set)
+  current  ad245d602f6f-m0M8pf121326vNSo2B759
+  previous 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+  unit     afldb ActiveState=active Result=success MainPID=3190377
+  process  runs ad245d602f6f-m0M8pf121326vNSo2B759 (/home/arm/afldb-releases/releases/ad245d602f6f-m0M8pf121326vNSo2B759)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE OLD_SERVING
+release: admission: MemAvailable 2943 MB of 3915 MB, swap 0 MB, free disk 53.6 GB
+release: workspace /home/arm/afldb-releases/builds/20261031T233005Z-fd48ace0c2cb-85430f
+release: npm ci: 16 s, min MemAvailable 2035 MB, peak RSS 916 MB
+release: build: 225 s, min MemAvailable 1391 MB, peak RSS 1720 MB
+release: candidate fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/cb39c2e05a6b8ca6.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200"} (beta claim)
+release: RELEASE READY fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy (12995 files, manifest 2f011e790d79…) at /home/arm/afldb-releases/releases/fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+release: next: node deploy/release.mjs promote fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+release: VERIFY PASS fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy (revision fd48ace0c2cb70296d723603aa397b5bd7a21a0d, BUILD_ID pqAQwRIJWLjSYzR8LiTuy, 12995 files)
+state probe 2026-10-31T23:34:36Z
+  OLD_ID   ad245d602f6f-m0M8pf121326vNSo2B759
+  NEW_ID   fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  current  ad245d602f6f-m0M8pf121326vNSo2B759
+  previous 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+  unit     afldb ActiveState=active Result=success MainPID=3190377
+  process  runs ad245d602f6f-m0M8pf121326vNSo2B759 (/home/arm/afldb-releases/releases/ad245d602f6f-m0M8pf121326vNSo2B759)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE OLD_SERVING
+D2 PASS NEW_ID=fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+D2 EXIT=0
