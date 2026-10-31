@@ -23,7 +23,11 @@ target, not an exercised one.
 **Gap 009 was CLOSED on retained evidence on 2026-10-31** (entry below): its written criterion is met by the local
 and Linux runs on guarded isolated PostgreSQL. **No settle suite has been replayed on a production-dump clone**; that
 is recorded as a stated limit, not waived (entry below).
-Current register: **38 total / 28 closed / 10 open**, counted from the table rows on 2026-10-31. The 2026-10-31
+**Gap 004 was CLOSED on 2026-10-31** (entry below): the hook fix dates from 2026-10-19; this session re-ran its harness
+(147/147) and a live Read probe.
+Current register: **38 total / 29 closed / 9 open**, counted from the table rows on 2026-10-31 after closing 004
+(open: 005, 006, 008, 010, 011, 016, 029, 030, 031). The paragraph that follows is the earlier same-day count (28 / 10,
+before 004). The 2026-10-31
 production execution (D-V2-PROD-EXEC-1) had already closed 007 and 013 (table 25 / 13); the sentence below still read
 23 / 15 and was not updated then. Closing 026 made 26 / 12, closing 015 made 27 / 11, and closing 009 makes 28 / 10.
 Earlier recount: **38 / 23 / 15**, counted from the table rows on 2026-10-30 after the owner's
@@ -57,7 +61,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-001 | Medium | test safety | rehearsal | **CLOSED locally (2026-10-28, Linux)**: the full default workflow ran on streamanator with present `_test` DSNs and the strip active; no suite reached a non-`_test` database and no failure came from the strip ([Linux verification](linux-verification-2026-10-28.md)) | none |
 | V2-GAP-002 | Medium | frontend build | no | **CLOSED (Launch F)**: `npm run build` exit 0 against the isolated `afldb_v2_visual_test`, telemetry disabled | none |
 | V2-GAP-003 | Medium | environment | rehearsal | **CLOSED locally (2026-10-28, Linux)**: full default workflow on streamanator at `c3dea709` 14,860 passed / 3 failed / 63 skipped plus Coleman 28/28; the only failures are listed `gridley-corpus` (V2-GAP-029); three Linux regressions were fixed first. Not run: 11 Brownlow dedicated-clone tests, 45 opt-in tests ([Linux verification](linux-verification-2026-10-28.md)). A second pass (§9 there) ran the eligible opt-in suites: receipts 7/7, import lock 1/1, populated lifecycle 17/17, oracle reports pass. The Brownlow clones, Phase B, populated-pending and external-grids remain blocked, with their reasons recorded | none |
-| V2-GAP-004 | Low | source worktree hygiene | no | open: owner action | fix or disable the user-level Read/Grep/Glob hook; decide whether to delete the stray `supplies` |
+| V2-GAP-004 | Low | source worktree hygiene | no | **CLOSED (2026-10-31, re-verified; fix made 2026-10-19)**: the user-level hook runs through a no-shell Node runner, not `cmd.exe`; harness 147/147 and a live Read probe created no file; the stray `supplies` was deleted 2026-10-19 under its four proved conditions. User-level, outside the repository; re-run the harness after any `codebase-memory-mcp` update | none |
 | V2-GAP-005 | Low | historical baseline scope | no | open: AFLW not covered by the manifest | decide whether AFLW joins the manifest |
 | V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4): enforced at the AFL API settle CLIs, the Coleman publisher and curated award approval; database-level and other writers open | decide on database-level seal enforcement |
 | V2-GAP-007 | Medium | historical baseline | rehearsal | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: the owner-authorised read-only production runs produced the real-baseline manifest before (`4060c929…`, ledger 110) and after (`ba1d5c64…`, ledger 117) the release; both are 32 tables and 1,380 buckets, kept outside the repository in the host release directory; gate M sealed scope identical. Isolated repeat runs were already identical (Launch F) | none |
@@ -163,6 +167,24 @@ award results must be shown reconcilable before production; **no** — not a pro
   an empty file). It appeared during the Launch A plan review. V2 work never writes to the source.
 - **Close.** Owner removes the file (V2 agents are forbidden to modify the source) and, ideally,
   fixes or disables the hook.
+- **CLOSED (2026-10-31).** Both halves of the close condition are met on retained and re-run evidence.
+  - *Hook fixed (2026-10-19, Launch F; [evidence](evidence/hook-remediation/README.md)).* The seven hook entries run
+    `node.exe cbm-hook-runner.js <label>`: constant argv, payload read as bytes, `shell: false`, fail-open. The old
+    transport (`cmd.exe /d /s /c` rewritten by MSYS path conversion, so cmd read the payload as command lines) is gone.
+  - *Re-verified today.* `settings.json` still names the runner for all seven entries and the runner's sha256 is
+    unchanged (`95ee936f…e6ae6`; `settings.json` itself has since changed for unrelated settings, so its 2026-10-19
+    hash is not compared). The harness re-ran: **147 cases, 0 failures**, including the negative control that proves
+    it still sees the old hazard ([result](evidence/hook-remediation/harness-result-20261031.json), sha256
+    `7d6816f2…c325d`). A live probe followed: the `Read` tool read a file whose text held `> alpha > STRAYPROBE1`,
+    `=> t.kind` and `2>$null`, and the repository root gained no file (`git status` unchanged). This is the exact
+    shape that made `TARGET`, `t.kind`, `void` and `$null)` in October.
+  - *Stray file.* `supplies` was deleted 2026-10-19 after untracked/empty/hook-created/unreferenced were proved
+    (README §4). No stray file exists in the tree today.
+  - *Limits.* The hook is user-level, outside the repository, so this record is evidence of its state on
+    2026-10-31 rather than a guarantee. Residual risk stands (README §5): `codebase-memory-mcp install` or `update`
+    may rewrite the entries with the old transport; re-run the harness after any update, and treat any `bash/*`
+    failure as the old transport being back. The security control (the code-discovery gate) was preserved: the real
+    binary still runs for the valid path.
 
 ## V2-GAP-005 — AFLW is outside the historical baseline manifest
 

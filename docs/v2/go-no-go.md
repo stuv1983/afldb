@@ -226,7 +226,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | Item | Decision |
 |---|---|
 | V2 merge | **merged locally 2026-10-29 (D-V2-LOCK-1) and pushed 2026-10-30 (D-V2-PUSH-ROUTE-1)**: `git merge --no-ff` into local `main`, locked execution commit `9ed9c9dd`. `origin` (the source repository's existing URL) was added. `origin/main` was exactly `ff100dc2` and was fast-forwarded to `9ed9c9dd` without force; `v2/rebuild` was pushed at `d3286d92`. The lock holds. Production execution: [package](production-execution-package-2026-10-30.md), preparation P-1–P-7 complete (§4.1); approved and **executed 2026-10-31** ([record](production-execution-record-2026-10-31.md)). Earlier text: reconcile the 19 ISSUE-316 follow-up-8 files it carries (commit `c9cca86d`) with the source worktree (RISK-15) |
-| V2-GAP-004 | fix or disable the user-level Read/Grep/Glob hook that runs in the source worktree; decide on the stray `supplies` |
+| V2-GAP-004 | **closed 2026-10-31**: hook fixed (no-shell runner), stray `supplies` deleted; see the gap entry |
 | V2-GAP-005 | whether AFLW joins the historical manifest |
 | V2-GAP-006 | database-level seal enforcement |
 | V2-GAP-016 | decided (ADR 0014); remaining: confirm the projection path and run the blast-radius count |

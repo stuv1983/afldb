@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-004 closed: workstation Read/Grep/Glob hook verified safe (2026-10-31)
+
+- Records and evidence only; no repository code changed. The user-level hook (outside the repository) was fixed on
+  2026-10-19 to run through a no-shell Node runner. Re-verified: the configuration still names the runner for all
+  seven entries, its sha256 is unchanged, the regression harness gives **147 cases, 0 failures** (negative control
+  intact, real `codebase-memory-mcp hook-augment` path still works), and a live `Read` of redirect-bearing text
+  created no file. Evidence: `docs/v2/evidence/hook-remediation/harness-result-20261031.json`.
+- Limit: user-level configuration, so this is the state on 2026-10-31. A `codebase-memory-mcp` update may revert it;
+  re-run the harness after any update. Register now 38 total / 29 closed / 9 open.
+
 ### V2-GAP-009 closed: AFL API settle suites executed on guarded isolated PostgreSQL (2026-10-31)
 
 - Records only; no test, capture, build, host or database access, writer activation, deployment or push. The gap's
