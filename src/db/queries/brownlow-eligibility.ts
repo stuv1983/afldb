@@ -352,6 +352,12 @@ export interface BrownlowPublicationRequest {
   actorId: number;
   note: string;
   /**
+   * The HUMAN-written note the season seal evaluates (V2-GAP-006), when `note` may be a server default
+   * ("Authorised completed-season publication"). Present (even as undefined) means `note` is not the human's
+   * text and only this is judged; absent means `note` is itself the human's. A default never counts.
+   */
+  sealNote?: string | null;
+  /**
    * What to do when a vote-getter's eligibility is unknown. `withhold` (default) leaves the stored rows exactly
    * as they were and reports why; `refuse` throws {@link BrownlowPublicationRefusedError} so the caller's
    * transaction rolls back (for a caller that must publish authoritatively or not at all).
@@ -407,6 +413,7 @@ export async function publishBrownlowEligibilityInTransaction(
         decisionIds: evidence.decisions.filter((d) => d.current).map((d) => d.id), basis: determination.basis,
         ranksWithheld: true, unresolvedPlayerIds },
       adminUserId: request.actorId, note: request.note,
+      sealNote: 'sealNote' in request ? request.sealNote : request.note,
       seal: { kind: 'row' },
     });
     return { determination, changed: true, publication: { state: 'partial', unresolvedPlayerIds } };
@@ -476,6 +483,7 @@ export async function publishBrownlowEligibilityInTransaction(
         })),
         votesTotal: stored.reduce((n, r) => n + r.votes, 0) },
       adminUserId: request.actorId, note: request.note,
+      sealNote: 'sealNote' in request ? request.sealNote : request.note,
       seal: { kind: 'row' },
     });
   }

@@ -173,7 +173,9 @@ export async function resolveSealScopeSeasons(
   }
   const found: (number | null)[] = [];
   if (scope.kind === 'seasons') {
-    found.push(...scope.seasons);
+    // An empty declaration would resolve to "no season, nothing to guard" and silently skip the seal, so a
+    // computed-empty list fails closed as one UNKNOWN season instead (an unknown season is treated as sealed).
+    found.push(...(scope.seasons.length === 0 ? [null] : scope.seasons));
   } else {
     found.push(...(scope.previousSeasons ?? []));
     found.push(...await seasonsOfAuditedRow(tx, tableName, rowId));

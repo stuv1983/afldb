@@ -1,6 +1,7 @@
 'use client';
 
 import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
+import { keepFormOnSubmit } from '@/components/admin/keep-form-on-submit';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 
@@ -328,7 +329,7 @@ export function ResolveControls({
           ) : null}
 
           {!match.hardConflict && targets.length === 1 && (
-            <form action={approveAction} style={{ display: 'grid', gap: '0.4rem' }}>
+            <form onSubmit={keepFormOnSubmit(approveAction)} style={{ display: 'grid', gap: '0.4rem' }}>
               <input type="hidden" name="targets" value={targetsRaw} />
               <input type="hidden" name="playerId" value={match.playerId} />
               <CorrectionNoteField name="note" label="Verification note" id={`approve-note-${targetsRaw}`} rows={1} />
@@ -359,7 +360,7 @@ export function ResolveControls({
                     <EvidenceTable evidence={alt.evidence} conflicts={alt.conflicts} />
                     {/* Choosing an alternative is a manual decision and is
                         recorded as one: it is not the model's suggestion. */}
-                    <form action={linkAction} style={{ marginTop: '0.3rem' }}>
+                    <form onSubmit={keepFormOnSubmit(linkAction)} style={{ marginTop: '0.3rem' }}>
                       <input type="hidden" name="targets" value={targetsRaw} />
                       <input type="hidden" name="playerId" value={alt.playerId} />
                       <button type="submit" className="btn btn-secondary" disabled={linkPending}
@@ -405,7 +406,7 @@ export function ResolveControls({
 
       {/* Tab 1: Link Existing Player */}
       {tab === 'link' && (
-        <form action={linkAction} style={{ display: 'grid', gap: '0.6rem' }}>
+        <form onSubmit={keepFormOnSubmit(linkAction)} style={{ display: 'grid', gap: '0.6rem' }}>
           <input type="hidden" name="targets" value={targetsRaw} />
           <input type="hidden" name="playerId" value={picked?.id ?? ''} />
           <div>
@@ -425,7 +426,7 @@ export function ResolveControls({
 
       {/* Tab 2: Create & Link New Player */}
       {tab === 'create' && (
-        <form action={createAction} style={{ display: 'grid', gap: '0.6rem' }}>
+        <form onSubmit={keepFormOnSubmit(createAction)} style={{ display: 'grid', gap: '0.6rem' }}>
           <input type="hidden" name="targets" value={targetsRaw} />
 
           <div style={{ display: 'grid', gap: '0.5rem' }}>
@@ -532,7 +533,7 @@ export function ResolveControls({
 
       {/* Tab 3: Confirm Not an AFL/VFL Player */}
       {tab === 'unlinked' && (
-        <form action={confirmAction} style={{ display: 'grid', gap: '0.6rem' }}>
+        <form onSubmit={keepFormOnSubmit(confirmAction)} style={{ display: 'grid', gap: '0.6rem' }}>
           <input type="hidden" name="targets" value={targetsRaw} />
           <p className="muted" style={{ fontSize: '0.85rem', margin: 0 }}>
             Mark this record as vetted non-AFL/VFL player (e.g. state-league or pioneer recipient).

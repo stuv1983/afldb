@@ -1626,7 +1626,7 @@ describe('queue page contracts', () => {
     expect(controls).toContain('currentAlgorithmVersion');
     // The warning sits above the approval form, not after it.
     expect(controls.indexOf('Stale suggestion'))
-      .toBeLessThan(controls.indexOf('action={approveAction}'));
+      .toBeLessThan(controls.indexOf('onSubmit={keepFormOnSubmit(approveAction)}'));
   });
 
   it('explains a capped row rather than leaving the band unexplained', () => {
@@ -1673,7 +1673,7 @@ describe('queue page contracts', () => {
     expect(controls.indexOf('Stale suggestion'))
       .toBeLessThan(controls.indexOf('match.bulkCriteria.length > 0'));
     expect(controls.indexOf('match.bulkCriteria.length > 0'))
-      .toBeLessThan(controls.indexOf('action={approveAction}'));
+      .toBeLessThan(controls.indexOf('onSubmit={keepFormOnSubmit(approveAction)}'));
   });
 
   it('leaves scoring, bands and bulk eligibility to the server', () => {

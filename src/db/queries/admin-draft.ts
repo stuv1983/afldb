@@ -807,6 +807,8 @@ export async function saveSourcePickFields(
         return { ok: true as const, changed };
       });
     } catch (error) {
+      // V2-GAP-006: the season seal rolled the transaction back whole; say so in its own words, as every editor does.
+      if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
       return refuse('failed', `The selection could not be saved: ${message(error)}`);
     }
   });
@@ -864,6 +866,8 @@ export async function retireSourcePickOverride(input: {
         return { ok: true as const };
       });
     } catch (error) {
+      // V2-GAP-006: the season seal rolled the transaction back whole; say so in its own words, as every editor does.
+      if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
       return refuse('failed', `The override could not be retired: ${message(error)}`);
     }
   });
@@ -1036,6 +1040,8 @@ export async function createManualPick(
         return { ok: true as const, pickId, pickToken: token, playerSlug: player.slug, playerId: player.id };
       });
     } catch (error) {
+      // V2-GAP-006: the season seal rolled the transaction back whole; say so in its own words, as every editor does.
+      if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
       return refuse('failed', `The selection could not be created: ${message(error)}`);
     }
   });
@@ -1144,6 +1150,8 @@ export async function createPlayerAndDraftPick(
         };
       });
     } catch (error) {
+      // V2-GAP-006: the season seal rolled the transaction back whole; say so in its own words, as every editor does.
+      if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
       return refuse('failed', `The player and selection could not be created: ${message(error)}`);
     }
   });
@@ -1276,6 +1284,8 @@ export async function saveManualPick(
         return { ok: true as const, relinked };
       });
     } catch (error) {
+      // V2-GAP-006: the season seal rolled the transaction back whole; say so in its own words, as every editor does.
+      if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
       return refuse('failed', `The selection could not be saved: ${message(error)}`);
     }
   });
@@ -1667,6 +1677,8 @@ export async function retireManualPick(input: {
         return { ok: true as const, playerId: pick.playerId };
       });
     } catch (error) {
+      // V2-GAP-006: the season seal rolled the transaction back whole; say so in its own words, as every editor does.
+      if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
       return refuse('failed', `The selection could not be retired: ${message(error)}`);
     }
   });
@@ -1740,6 +1752,8 @@ export async function supersedeManualPickBySourceRow(input: {
         return { ok: true as const, playerId: manual.playerId };
       });
     } catch (error) {
+      // V2-GAP-006: the season seal rolled the transaction back whole; say so in its own words, as every editor does.
+      if (isSealedEditorRefusal(error)) return refuse('validation', error.message);
       return refuse('failed', `The selection could not be superseded: ${message(error)}`);
     }
   });

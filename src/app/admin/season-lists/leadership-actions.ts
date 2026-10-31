@@ -11,6 +11,7 @@ import {
   type LeadershipRefusalReason,
 } from '@/db/queries/admin-club-leadership';
 import { audit, requireCapability } from '@/lib/auth/session';
+import { parseCorrectionNote } from '@/lib/seasons/correction-note';
 
 import type { LeadershipActionState } from './submit-helper';
 import { optionalText, parsePositiveInt, requiredText } from './validation';
@@ -82,7 +83,7 @@ export async function appointLeaderAction(
     role: roleRaw,
     adminUserId: admin.id,
     startedOn: optionalText(formData.get('startedOn'), 10),
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     // Strict '1' -- never a truthy coercion. An absent, empty or
     // accidentally-repeated field must never read as confirmed (L-3).
     confirmCoCaptaincy: formData.get('confirmCoCaptaincy') === '1',
@@ -132,7 +133,7 @@ export async function replaceLeaderAction(
     newPlayerId,
     adminUserId: admin.id,
     effectiveOn: optionalText(formData.get('effectiveOn'), 10),
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -181,7 +182,7 @@ export async function endAppointmentAction(
     endedOn: optionalText(formData.get('endedOn'), 10),
     reason: optionalText(formData.get('reason'), 500),
     // V2-GAP-006: the correction note the server requires for a sealed season.
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -217,7 +218,7 @@ export async function reinstateAppointmentAction(
     expectedUpdatedAt,
     adminUserId: admin.id,
     confirmCoCaptaincy: formData.get('confirmCoCaptaincy') === '1',
-    note: optionalText(formData.get('note'), 2000), // V2-GAP-006
+    note: parseCorrectionNote(formData.get('note')), // V2-GAP-006
   });
 
   if (!result.ok) {
@@ -255,7 +256,7 @@ export async function correctAppointmentAction(
     startedOn: optionalText(formData.get('startedOn'), 10),
     endedOn: optionalText(formData.get('endedOn'), 10),
     appointmentNote: optionalText(formData.get('appointmentNote'), 2000),
-    note: optionalText(formData.get('note'), 2000), // V2-GAP-006: the audit note, distinct from the appointment's own note
+    note: parseCorrectionNote(formData.get('note')), // V2-GAP-006: the audit note, distinct from the appointment's own note
   });
 
   if (!result.ok) {
@@ -291,7 +292,7 @@ export async function voidAppointmentAction(
 
   const result = await voidAppointmentQuery({
     appointmentKey, expectedUpdatedAt, adminUserId: admin.id, reason,
-    note: optionalText(formData.get('note'), 2000), // V2-GAP-006
+    note: parseCorrectionNote(formData.get('note')), // V2-GAP-006
   });
 
   if (!result.ok) {

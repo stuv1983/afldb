@@ -9,6 +9,7 @@ import {
   type SeasonListRefusalReason,
 } from '@/db/queries/admin-season-lists';
 import { audit, requireCapability } from '@/lib/auth/session';
+import { parseCorrectionNote } from '@/lib/seasons/correction-note';
 
 import type { CopyForwardActionState, SeasonListActionState } from './submit-helper';
 import { optionalText, parsePositiveInt, requiredText } from './validation';
@@ -57,7 +58,7 @@ export async function addSeasonListMemberAction(
     clubSlug,
     playerId,
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     candidateSource: optionalText(formData.get('candidateSource'), 60),
   });
 
@@ -103,7 +104,7 @@ export async function addSeasonListMembersAction(
     clubSlug,
     playerIds,
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     candidateSource: optionalText(formData.get('candidateSource'), 60),
   });
 
@@ -144,7 +145,7 @@ export async function removeSeasonListMemberAction(
     membershipId,
     expectedUpdatedAt,
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -185,7 +186,7 @@ export async function transferSeasonListMemberAction(
     toClubSlug,
     expectedUpdatedAt,
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -223,7 +224,7 @@ export async function copySeasonListsForwardAction(
 
   const result = await copySeasonListsForwardQuery({
     season, clubs, dryRun, adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000), // V2-GAP-006
+    note: parseCorrectionNote(formData.get('note')), // V2-GAP-006
   });
 
   if (!result.ok) {

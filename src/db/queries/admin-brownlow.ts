@@ -1158,6 +1158,7 @@ async function runMatchMutation(
           `;
           const publication = await publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
             season: match.season, actorId: input.actorId, note: reason ?? 'Recompute after an authorised match correction',
+            sealNote: reason, // the human's reason only; the default text above never satisfies the season seal
             registry: { first_season: match.season, last_season: match.season, in_progress_seasons: [] },
           });
           summary.winners = publication.determination.winners.map((winner) => winner.playerId);
@@ -1410,6 +1411,7 @@ export async function publishBrownlowSeason(input: {
 
       const publication = await publishBrownlowEligibilityInTransaction(postgresTransactionExecutor(tx), {
         season: input.season, actorId: input.actorId, note: input.note ?? 'Authorised completed-season publication',
+        sealNote: input.note, // the human's note only; the default text never satisfies the season seal
         registry: { first_season: input.season, last_season: input.season, in_progress_seasons: [] },
       });
       summary.winners = publication.determination.winners.map((winner) => winner.playerId);

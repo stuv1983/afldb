@@ -17,6 +17,7 @@ import {
 import { administrableListSeasons, isAdministrableListSeason } from '@/db/queries/admin-season-lists';
 import { searchPlayers } from '@/db/queries/search';
 import { audit, requireCapability } from '@/lib/auth/session';
+import { parseCorrectionNote } from '@/lib/seasons/correction-note';
 import { playerPath } from '@/lib/format';
 
 import type { DraftActionState, SeasonListHandoff } from './submit-helper';
@@ -105,7 +106,7 @@ export async function saveSourcePickFieldsAction(
     groupKey,
     raw: readFieldValues(formData, 'field:'),
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     expectedRevision: optionalText(formData.get('expectedRevision'), 40),
     confirmed: formData.get('confirmed') === '1',
   });
@@ -145,7 +146,7 @@ export async function retireSourcePickOverrideAction(
   if (pickId === null || !groupKey) return { error: 'Bad request.' };
 
   const result = await retireSourcePickOverrideQuery({
-    pickId, groupKey, adminUserId: admin.id, note: optionalText(formData.get('note'), 2000),
+    pickId, groupKey, adminUserId: admin.id, note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -201,7 +202,7 @@ export async function createManualPickAction(
     pickNote: optionalText(formData.get('pickNote'), 500),
     detail: optionalText(formData.get('detail'), 2000),
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     confirmed: formData.get('confirmed') === '1',
   });
 
@@ -268,7 +269,7 @@ export async function createPlayerAndDraftPickAction(
       notes: optionalText(formData.get('notes'), 2000),
     },
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     confirmed: formData.get('confirmed') === '1',
   });
 
@@ -333,7 +334,7 @@ export async function saveManualPickAction(
     pickNote: optionalText(formData.get('pickNote'), 500),
     detail: optionalText(formData.get('detail'), 2000),
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     expectedRevision: optionalText(formData.get('expectedRevision'), 40),
     confirmed: formData.get('confirmed') === '1',
   });
@@ -380,7 +381,7 @@ export async function adoptLegacyPickAction(
     draftType: eventPair.draftType,
     draftKind: eventPair.draftKind,
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     confirmed: formData.get('confirmed') === '1',
   });
 
@@ -426,7 +427,7 @@ export async function attachAflTablesIdentityAction(
   if (playerId === null || !profilePath) return { error: 'Enter an AFL Tables profile path.' };
 
   const result = await attachAflTablesIdentityQuery({
-    playerId, profilePath, adminUserId: admin.id, note: optionalText(formData.get('note'), 2000),
+    playerId, profilePath, adminUserId: admin.id, note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -465,7 +466,7 @@ export async function retireManualPickAction(
   const result = await retireManualPickQuery({
     pickId,
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     expectedRevision: optionalText(formData.get('expectedRevision'), 40),
   });
 
@@ -497,7 +498,7 @@ export async function supersedeManualPickBySourceRowAction(
   if (manualPickId === null || sourcePickId === null) return { error: 'Bad request.' };
 
   const result = await supersedeManualPickBySourceRowQuery({
-    manualPickId, sourcePickId, adminUserId: admin.id, note: optionalText(formData.get('note'), 2000),
+    manualPickId, sourcePickId, adminUserId: admin.id, note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {

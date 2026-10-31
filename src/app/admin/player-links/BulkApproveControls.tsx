@@ -1,6 +1,7 @@
 'use client';
 
 import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
+import { keepFormOnSubmit } from '@/components/admin/keep-form-on-submit';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect } from 'react';
 
@@ -51,7 +52,7 @@ export function BulkApproveControls({
   }
 
   return (
-    <form action={formAction} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+    <form onSubmit={keepFormOnSubmit(formAction)} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
       <input
         type="hidden"
         name="targets"

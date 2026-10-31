@@ -7,6 +7,7 @@ import postgres from 'postgres';
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
 import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
+import { storedNoteText } from '@/lib/seasons/correction-note';
 import { resolvePlayerIdentity } from '@/db/queries/player-identity';
 
 /**
@@ -492,7 +493,7 @@ async function insertMembership(tx: Tx, input: {
     origin: input.origin,
     copiedFromSeason: input.copiedFromSeason,
     candidateSource: input.candidateSource,
-    note: input.note,
+    note: storedNoteText(input.note),
   });
 
   const [inserted] = await tx<{ id: number }[]>`
@@ -500,7 +501,7 @@ async function insertMembership(tx: Tx, input: {
           (season, club_id, player_id, source_id, origin, copied_from_season, note)
     VALUES (${input.season}::smallint, ${input.club.id}, ${input.player.id}, ${input.sourceId},
             ${input.origin}, ${input.copiedFromSeason ?? null}::smallint,
-            ${(input.note ?? '').trim() || null})
+            ${storedNoteText(input.note)})
     ON CONFLICT (season, player_id) DO NOTHING
     RETURNING id::int AS id
   `;
@@ -597,7 +598,7 @@ async function deleteMembership(tx: Tx, input: {
       club_slug: input.row.clubSlug,
       entity_key: entityKey,
       ...(input.auditExtra ?? {}),
-      ...((input.note ?? '').trim() ? { note: (input.note ?? '').trim() } : {}),
+      ...(storedNoteText(input.note) ? { note: storedNoteText(input.note) } : {}),
     },
     adminUserId: input.adminUserId,
     note: input.note,

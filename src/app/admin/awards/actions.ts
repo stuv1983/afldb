@@ -28,6 +28,7 @@ import {
   type HonourTeamCorrection,
 } from '@/db/queries/admin-awards';
 import { audit, requireCapability } from '@/lib/auth/session';
+import { parseCorrectionNote } from '@/lib/seasons/correction-note';
 
 import type { AwardsActionState } from './submit-helper';
 import {
@@ -200,7 +201,7 @@ export async function correctAwardWinnerAction(
   }
 
   const result = await correctAwardWinnerQuery({
-    ...base, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000), fields,
+    ...base, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')), fields,
   });
   return settle(result, {
     action: 'correct_award_winner',
@@ -223,7 +224,7 @@ export async function voidAwardWinnerAction(
   if (!reason) return { error: 'Give a reason for voiding this award winner.' };
 
   const result = await voidAwardWinnerQuery({
-    ...base, reason, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, reason, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'void_award_winner',
@@ -244,7 +245,7 @@ export async function reinstateAwardWinnerAction(
   if (base === null) return { error: 'Bad request.' };
 
   const result = await reinstateAwardWinnerQuery({
-    ...base, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'reinstate_award_winner',
@@ -311,7 +312,7 @@ export async function createAwardWinnerAction(
 
   const result = await createAwardWinnerQuery({
     ...facts.value, adminUserId: admin.id,
-    adminNote: optionalText(formData.get('adminNote'), 2000),
+    adminNote: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'create_award_winner',
@@ -343,7 +344,7 @@ export async function replaceAwardWinnerAction(
 
   const result = await replaceAwardWinnerQuery({
     ...base, reason, adminUserId: admin.id,
-    note: optionalText(formData.get('adminNote'), 2000),
+    note: parseCorrectionNote(formData.get('adminNote')),
     replacement: facts.value,
   });
   return settle(result, {
@@ -397,7 +398,7 @@ export async function correctHallOfFameAction(
   if (changed.includes('notes')) fields.notes = optionalText(formData.get('notes'), 2000);
 
   const result = await correctHallOfFameQuery({
-    ...base, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000), fields,
+    ...base, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')), fields,
   });
   return settle(result, {
     action: 'correct_hall_of_fame',
@@ -420,7 +421,7 @@ export async function voidHallOfFameAction(
   if (!reason) return { error: 'Give a reason for voiding this Hall of Fame entry.' };
 
   const result = await voidHallOfFameQuery({
-    ...base, reason, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, reason, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'void_hall_of_fame',
@@ -441,7 +442,7 @@ export async function reinstateHallOfFameAction(
   if (base === null) return { error: 'Bad request.' };
 
   const result = await reinstateHallOfFameQuery({
-    ...base, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'reinstate_hall_of_fame',
@@ -511,7 +512,7 @@ export async function createHallOfFameAction(
 
   const result = await createHallOfFameQuery({
     ...facts.value, adminUserId: admin.id,
-    adminNote: optionalText(formData.get('adminNote'), 2000),
+    adminNote: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'create_hall_of_fame',
@@ -541,7 +542,7 @@ export async function replaceHallOfFameAction(
 
   const result = await replaceHallOfFameQuery({
     ...base, reason, adminUserId: admin.id,
-    note: optionalText(formData.get('adminNote'), 2000),
+    note: parseCorrectionNote(formData.get('adminNote')),
     replacement: facts.value,
   });
   return settle(result, {
@@ -586,7 +587,7 @@ export async function correctHonourTeamAction(
   if (changed.includes('note')) fields.note = optionalText(formData.get('note'), 1000);
 
   const result = await correctHonourTeamQuery({
-    ...base, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000), fields,
+    ...base, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')), fields,
   });
   return settle(result, {
     action: 'correct_honour_team',
@@ -609,7 +610,7 @@ export async function voidHonourTeamAction(
   if (!reason) return { error: 'Give a reason for voiding this selection.' };
 
   const result = await voidHonourTeamQuery({
-    ...base, reason, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, reason, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'void_honour_team',
@@ -630,7 +631,7 @@ export async function reinstateHonourTeamAction(
   if (base === null) return { error: 'Bad request.' };
 
   const result = await reinstateHonourTeamQuery({
-    ...base, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'reinstate_honour_team',
@@ -686,7 +687,7 @@ export async function createHonourTeamMemberAction(
 
   const result = await createHonourTeamQuery({
     ...facts.value, adminUserId: admin.id,
-    adminNote: optionalText(formData.get('adminNote'), 2000),
+    adminNote: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'create_honour_team',
@@ -716,7 +717,7 @@ export async function replaceHonourTeamAction(
 
   const result = await replaceHonourTeamQuery({
     ...base, reason, adminUserId: admin.id,
-    note: optionalText(formData.get('adminNote'), 2000),
+    note: parseCorrectionNote(formData.get('adminNote')),
     replacement: facts.value,
   });
   return settle(result, {

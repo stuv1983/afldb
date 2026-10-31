@@ -1,6 +1,7 @@
 'use client';
 
 import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
+import { keepFormOnSubmit } from '@/components/admin/keep-form-on-submit';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 
@@ -84,7 +85,7 @@ export function DeleteMatchButton({
         </p>
       )}
 
-      <form action={formAction} style={{ display: 'grid', gap: '0.5rem' }}>
+      <form onSubmit={keepFormOnSubmit(formAction)} style={{ display: 'grid', gap: '0.5rem' }}>
         <input type="hidden" name="matchId" value={matchId} />
         <CorrectionNoteField
           name="reason"

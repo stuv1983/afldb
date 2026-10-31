@@ -1,6 +1,7 @@
 'use client';
 
 import { CorrectionNoteField } from '@/components/admin/CorrectionNoteField';
+import { keepFormOnSubmit } from '@/components/admin/keep-form-on-submit';
 import { useActionState, useMemo, useState, type ChangeEvent } from 'react';
 
 import { publishSeasonAction, type BrownlowActionState } from '@/app/admin/brownlow/actions';
@@ -134,7 +135,7 @@ export function PublishPanel({
         </details>
       )}
 
-      <form action={submit}>
+      <form onSubmit={keepFormOnSubmit(submit)}>
         <input type="hidden" name="season" value={season} />
         <input type="hidden" name="expectedRevision" value={expectedRevision} />
         {[...ineligible].map((id) => (

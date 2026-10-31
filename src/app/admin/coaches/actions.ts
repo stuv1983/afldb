@@ -14,6 +14,7 @@ import {
 import { sql } from '@/db/client';
 import { searchPlayers, type SearchResult } from '@/db/queries/search';
 import { audit, requireCapability } from '@/lib/auth/session';
+import { parseCorrectionNote } from '@/lib/seasons/correction-note';
 import { clubPath, coachPath, matchPath, playerPath } from '@/lib/format';
 import { coachSlug } from '@/lib/slugs';
 
@@ -75,7 +76,7 @@ export async function createCoachAction(
     dob: optionalText(formData.get('dob'), 10),
     notes: optionalText(formData.get('notes'), 2000),
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
     confirmed: formData.get('confirmed') === '1',
   });
 
@@ -123,7 +124,7 @@ export async function saveCoachMetadataAction(
     dob: optionalText(formData.get('dob'), 10),
     notes: optionalText(formData.get('notes'), 2000),
     adminUserId: admin.id,
-    note: optionalText(formData.get('note'), 2000),
+    note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -151,7 +152,7 @@ export async function linkCoachToPlayerAction(
   if (coachId === null || playerId === null) return { error: 'Pick a player first.' };
 
   const result = await linkCoachToPlayerQuery({
-    coachId, playerId, adminUserId: admin.id, note: optionalText(formData.get('note'), 2000),
+    coachId, playerId, adminUserId: admin.id, note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -178,7 +179,7 @@ export async function unlinkCoachAction(
   if (coachId === null) return { error: 'Bad coach id.' };
 
   const result = await unlinkCoachQuery({
-    coachId, adminUserId: admin.id, note: optionalText(formData.get('note'), 2000),
+    coachId, adminUserId: admin.id, note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -206,7 +207,7 @@ export async function setCoachAssignmentAction(
   if (coachId === null || assignments === null) return { error: 'Pick at least one match first.' };
 
   const result = await setCoachAssignmentQuery({
-    assignments, coachId, adminUserId: admin.id, note: optionalText(formData.get('note'), 2000),
+    assignments, coachId, adminUserId: admin.id, note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -247,7 +248,7 @@ export async function clearCoachAssignmentAction(
   if (matchId === null || clubId === null) return { error: 'Bad match or club id.' };
 
   const result = await clearCoachAssignmentQuery({
-    matchId, clubId, adminUserId: admin.id, note: optionalText(formData.get('note'), 2000),
+    matchId, clubId, adminUserId: admin.id, note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {
@@ -294,7 +295,7 @@ export async function retireCoachOverrideAction(
   }
 
   const result = await retireCoachOverrideQuery({
-    coachId, fieldGroup, adminUserId: admin.id, note: optionalText(formData.get('note'), 2000),
+    coachId, fieldGroup, adminUserId: admin.id, note: parseCorrectionNote(formData.get('note')),
   });
 
   if (!result.ok) {

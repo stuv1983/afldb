@@ -30,6 +30,9 @@ import './guard';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { createAwardWinnerAction } from '@/app/admin/awards/actions';
+import { setCoachAssignmentAction } from '@/app/admin/coaches/actions';
+import { createManualPickAction } from '@/app/admin/draft/actions';
 import { createAwardWinner } from '@/db/queries/admin-awards';
 import { setCoachAssignment } from '@/db/queries/admin-coaches';
 import { createManualPick } from '@/db/queries/admin-draft';
@@ -49,6 +52,21 @@ vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) => {
   );
   return { ...actual, loadSealedSeasons: vi.fn(actual.loadSealedSeasons) };
 });
+
+// The server actions are driven through their real FormData boundary (V2-GAP-006 note-length
+// regression). Only the session (who the administrator is) and the cache/header seams are stubbed;
+// the actions, their parsers and the query layer under them are the real ones.
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+vi.mock('next/headers', () => ({
+  headers: async () => ({ get: () => null }),
+  cookies: async () => ({ get: () => undefined, delete: () => undefined }),
+}));
+const fixtureAdmin = vi.hoisted(() => ({ id: 0, email: 'gap006-actions@example.invalid' }));
+vi.mock('@/lib/auth/session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth/session')>()),
+  requireCapability: vi.fn(async () => ({ id: fixtureAdmin.id, email: fixtureAdmin.email })),
+  audit: vi.fn(async () => undefined),
+}));
 
 const testDbUrl = process.env.AFLDB_TEST_DATABASE_URL!;
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_IMPORT_DATABASE_URL ?? testDbUrl;
@@ -155,6 +173,7 @@ beforeAll(async () => {
     actorId = row.id;
     createdThrowawayAdmin = true;
   }
+  fixtureAdmin.id = actorId;
   setFixtureSeasonsOpen([OPEN]);
   await cleanupLeftovers(); // a crashed earlier run must not collide with this one's round numbers
   [sealedClubA, sealedClubB] = await eligibleClubs(SEALED);
@@ -391,7 +410,11 @@ describe('the guard run directly on a transaction', () => {
         throw Object.assign(new Error('rollback'), { expected: true });
       }).catch((error: { expected?: boolean }) => expect(error.expected).toBe(true));
     } finally {
-      const actual = await vi.importActual<typeof import('@/lib/seasons/sealed-seasons')>('@/lib/seasons/sealed-seasons');
+      // Restore the FIXTURE-wrapped loader (the real registry plus the OPEN fixture season), not the raw
+      // real one, so every later test in this file still sees the fixture season open.
+      const actual = (await import('./sealed-registry-fixture')).withFixtureSeasonOpen(
+        await vi.importActual<typeof import('@/lib/seasons/sealed-seasons')>('@/lib/seasons/sealed-seasons'),
+      );
       mocked.mockReset();
       mocked.mockImplementation(actual.loadSealedSeasons);
     }
@@ -446,5 +469,90 @@ describe('other editor families refuse a sealed-season change without a note and
       if (!result.ok) expect(result.error).toContain('sealed historical data');
     }
     expect(await counts()).toEqual(before);
+  });
+});
+
+describe('through the server actions: a crafted over-length note is refused, never truncated into a valid correction', () => {
+  // 2001 characters: the textarea's maxLength is only a browser hint, so a crafted POST can send this.
+  const CRAFTED = `${MARKER}: crafted ${'x'.repeat(2001)}`.slice(0, 2001);
+  const AT_LIMIT = CRAFTED.slice(0, 2000);
+
+  const form = (fields: Record<string, string>) => {
+    const data = new FormData();
+    for (const [key, value] of Object.entries(fields)) data.set(key, value);
+    return data;
+  };
+  const snapshot = async () => (await owner<Record<string, number>[]>`
+    SELECT (SELECT count(*)::int FROM data_edits) AS audits,
+           (SELECT count(*)::int FROM match_coaches) AS "matchCoaches",
+           (SELECT count(*)::int FROM data_overrides) AS overrides,
+           (SELECT count(*)::int FROM award_winners) AS winners,
+           (SELECT count(*)::int FROM draft_picks) AS picks,
+           (SELECT count(*)::int FROM matches) AS matches`)[0];
+  const expectRefusedAsTooLong = (result: { error?: string; ok?: boolean }) => {
+    expect(result.ok, JSON.stringify(result)).toBeUndefined();
+    expect(result.error).toContain('sealed historical data');
+    expect(result.error).toContain('longer than 2000 characters');
+    expect(result.error).toContain('Nothing was changed');
+  };
+
+  it('has the crafted fixture note at exactly 2001 characters, one over the limit', () => {
+    expect(CRAFTED).toHaveLength(2001);
+    expect(AT_LIMIT).toHaveLength(2000);
+    expect(CRAFTED).toBe(CRAFTED.trim());
+  });
+
+  it('coach assignment action on a sealed match: refused, canonical rows, overrides and audit unchanged', async () => {
+    const [target] = await owner<{ matchId: number; clubId: number; coachId: number }[]>`
+      SELECT m.id::int AS "matchId", m.home_club_id::int AS "clubId", (SELECT id::int FROM coaches ORDER BY id LIMIT 1) AS "coachId"
+        FROM matches m WHERE m.season = ${SEALED} ORDER BY m.id LIMIT 1`;
+    const before = await snapshot();
+    const result = await setCoachAssignmentAction({}, form({
+      coachId: String(target.coachId), assignments: `${target.matchId}:${target.clubId}`, note: CRAFTED,
+    }));
+    expectRefusedAsTooLong(result);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('award winner action on a sealed season: refused, nothing written', async () => {
+    const [award] = await owner<{ id: number }[]>`SELECT id::int AS id FROM awards ORDER BY id LIMIT 1`;
+    const before = await snapshot();
+    const result = await createAwardWinnerAction({}, form({
+      awardId: String(award.id), season: String(SEALED), playerNameRaw: `${MARKER} synthetic`, adminNote: CRAFTED,
+    }));
+    expectRefusedAsTooLong(result);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('draft selection action on a sealed year: refused, nothing written', async () => {
+    const [player] = await owner<{ id: number }[]>`SELECT id::int AS id FROM players ORDER BY id LIMIT 1`;
+    const club = await owner<{ slug: string }[]>`SELECT slug FROM clubs WHERE id = ${sealedClubA}`;
+    const before = await snapshot();
+    const result = await createManualPickAction({}, form({
+      playerId: String(player.id), draftYear: String(SEALED), eventPair: 'National|national', pickNumber: '199',
+      clubSlug: club[0].slug, playerNameRaw: `${MARKER} synthetic`, confirmed: '1', note: CRAFTED,
+    }));
+    expectRefusedAsTooLong(result);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('leaves an OPEN season unchanged: the same 2001-character note is accepted and stored cut to 2000', async () => {
+    const { created } = await createFixtureMatch(OPEN, undefined);
+    if (!created.ok) throw new Error(JSON.stringify(created));
+    const [coach] = await owner<{ id: number }[]>`SELECT id::int AS id FROM coaches ORDER BY id LIMIT 1`;
+    const [match] = await owner<{ matchKey: string; slug: string }[]>`
+      SELECT m.match_key AS "matchKey", c.slug FROM matches m JOIN clubs c ON c.id = m.home_club_id WHERE m.id = ${created.id}`;
+    try {
+      const result = await setCoachAssignmentAction({}, form({
+        coachId: String(coach.id), assignments: `${created.id}:${clubA}`, note: CRAFTED,
+      }));
+      expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
+      const rows = await owner<{ note: string | null }[]>`
+        SELECT note FROM data_edits WHERE table_name = 'matches' AND row_id = ${created.id} AND field_group = 'coach_assignment'`;
+      expect(rows).toHaveLength(1);
+      expect(rows[0].note).toBe(AT_LIMIT); // unchanged open-season behaviour: stored, cut to 2000
+    } finally {
+      await owner`DELETE FROM data_overrides WHERE entity_type = 'match_coaches' AND entity_key LIKE ${`${match.matchKey}%`}`.catch(() => undefined);
+    }
   });
 });

@@ -20,6 +20,7 @@ import {
   type SpecialRecordRefusalReason,
 } from '@/db/queries/admin-special-records';
 import { audit, requireCapability } from '@/lib/auth/session';
+import { parseCorrectionNote } from '@/lib/seasons/correction-note';
 import {
   AFTER_SIREN_EFFECTS, AFTER_SIREN_RESULTS, AFTER_SIREN_SCORES, AFTER_SIREN_SIRENS,
 } from '@/lib/special-records/after-siren-rules';
@@ -215,7 +216,7 @@ export async function correctFirstKickGoalAction(
   const result = await correctFirstKickQuery({
     ...base,
     adminUserId: admin.id,
-    note: optionalText(formData.get('adminNote'), 2000),
+    note: parseCorrectionNote(formData.get('adminNote')),
     fields: fields.value,
   });
   return settle(result, {
@@ -239,7 +240,7 @@ export async function suppressFirstKickGoalAction(
   if (!reason) return { error: 'Give a reason for suppressing this first-kick-goal record.' };
 
   const result = await suppressFirstKickQuery({
-    ...base, reason, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, reason, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'suppress_first_kick_goal',
@@ -260,7 +261,7 @@ export async function reinstateFirstKickGoalAction(
   if (base === null) return { error: 'Bad request.' };
 
   const result = await reinstateFirstKickQuery({
-    ...base, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'reinstate_first_kick_goal',
@@ -334,7 +335,7 @@ export async function createFirstKickGoalAction(
   if (!facts.ok) return { error: facts.error };
 
   // V2-GAP-006: the administrator's note (the server requires it for a sealed season; optional otherwise).
-  const adminNote = optionalText(formData.get('adminNote'), 2000) ?? undefined;
+  const adminNote = parseCorrectionNote(formData.get('adminNote')) ?? undefined;
   const result = await createFirstKickQuery({ ...facts.value, adminUserId: admin.id, adminNote });
   return settle(result, {
     action: 'create_first_kick_goal',
@@ -363,7 +364,7 @@ export async function replaceFirstKickGoalAction(
     ...base,
     reason,
     adminUserId: admin.id,
-    note: optionalText(formData.get('adminNote'), 2000),
+    note: parseCorrectionNote(formData.get('adminNote')),
     replacement: facts.value,
   });
   return settle(result, {
@@ -467,7 +468,7 @@ export async function correctAfterSirenKickAction(
   const result = await correctAfterSirenQuery({
     ...base,
     adminUserId: admin.id,
-    note: optionalText(formData.get('adminNote'), 2000),
+    note: parseCorrectionNote(formData.get('adminNote')),
     fields: fields.value,
   });
   return settle(result, {
@@ -491,7 +492,7 @@ export async function suppressAfterSirenKickAction(
   if (!reason) return { error: 'Give a reason for suppressing this after-the-siren record.' };
 
   const result = await suppressAfterSirenQuery({
-    ...base, reason, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, reason, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'suppress_after_siren',
@@ -512,7 +513,7 @@ export async function reinstateAfterSirenKickAction(
   if (base === null) return { error: 'Bad request.' };
 
   const result = await reinstateAfterSirenQuery({
-    ...base, adminUserId: admin.id, note: optionalText(formData.get('adminNote'), 2000),
+    ...base, adminUserId: admin.id, note: parseCorrectionNote(formData.get('adminNote')),
   });
   return settle(result, {
     action: 'reinstate_after_siren',
@@ -607,7 +608,7 @@ export async function createAfterSirenKickAction(
   if (!facts.ok) return { error: facts.error };
 
   // V2-GAP-006: the administrator's note (the server requires it for a sealed season; optional otherwise).
-  const adminNote = optionalText(formData.get('adminNote'), 2000) ?? undefined;
+  const adminNote = parseCorrectionNote(formData.get('adminNote')) ?? undefined;
   const result = await createAfterSirenQuery({ ...facts.value, adminUserId: admin.id, adminNote });
   return settle(result, {
     action: 'create_after_siren',
@@ -636,7 +637,7 @@ export async function replaceAfterSirenKickAction(
     ...base,
     reason,
     adminUserId: admin.id,
-    note: optionalText(formData.get('adminNote'), 2000),
+    note: parseCorrectionNote(formData.get('adminNote')),
     replacement: facts.value,
   });
   return settle(result, {

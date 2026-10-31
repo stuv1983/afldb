@@ -41,6 +41,7 @@ import {
   workflowForAuditTable,
   type SealScope,
 } from '@/lib/seasons/sealed-editor-guard';
+import { parseCorrectionNote, storedNoteText } from '@/lib/seasons/correction-note';
 import { SeasonRegistryError, loadSealedSeasons } from '@/lib/seasons/sealed-seasons';
 
 import { isSettleSeasonSealed, refuseSealedSeasonForSettle } from '../tools/current-season/settle-season-seal';
@@ -456,6 +457,12 @@ describe('the editor guard: sealed seasons need a human note (V2-GAP-006 E1)', (
   });
 });
 
+describe('an empty season declaration fails closed (V2-GAP-006 E1 review F-005)', () => {
+  it('resolves to one unknown season, which is treated as sealed, never to "nothing to guard"', async () => {
+    await expect(resolveSealScopeSeasons({} as postgres.TransactionSql, 'players', 1, { kind: 'seasons', seasons: [] })).resolves.toEqual([null]);
+  });
+});
+
 describe('every audited editor mutation declares its seasons (V2-GAP-006 E1 inventory)', () => {
   const QUERY_DIR = join(__dirname, '..', 'src', 'db', 'queries');
   const files = readdirSync(QUERY_DIR).filter((f) => f.endsWith('.ts') && f !== 'audit-log.ts');
@@ -503,5 +510,112 @@ describe('every audited editor mutation declares its seasons (V2-GAP-006 E1 inve
     const source = readFileSync(join(QUERY_DIR, 'player-links.ts'), 'utf8');
     expect(source).toContain("workflow: 'identity_adjudication'");
     expect(source).toContain('enforceSealedEditorWrite');
+  });
+});
+
+describe('the action layer never truncates the correction note (V2-GAP-006 E1, note-length bypass)', () => {
+  const ADMIN_DIR = join(__dirname, '..', 'src', 'app', 'admin');
+
+  function adminSources(dir: string = ADMIN_DIR): { file: string; source: string }[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) return adminSources(path);
+      return /\.tsx?$/.test(entry.name) ? [{ file: path.slice(ADMIN_DIR.length + 1).replaceAll('\\', '/'), source: readFileSync(path, 'utf8') }] : [];
+    });
+  }
+
+  it('parseCorrectionNote trims, maps blank to null and keeps an over-length note whole', () => {
+    expect(parseCorrectionNote(null)).toBeNull();
+    expect(parseCorrectionNote('')).toBeNull();
+    expect(parseCorrectionNote('   \n ')).toBeNull();
+    expect(parseCorrectionNote('  a note  ')).toBe('a note');
+    expect(parseCorrectionNote('x'.repeat(2000))).toHaveLength(2000);
+    // The point of the fix: 2001 characters must reach the guard as 2001, never be cut to 2000.
+    expect(parseCorrectionNote('x'.repeat(2001))).toHaveLength(2001);
+    expect(parseCorrectionNote(`  ${'y'.repeat(5000)}  `)).toHaveLength(5000);
+  });
+
+  it('a note of 2001 characters is refused by the guard, while the truncated 2000 would have been accepted', () => {
+    const sealed = SEALED;
+    const verdict = (note: string) => evaluateSeasonWrite({
+      season: 1990, sealed,
+      correction: { workflow: 'data_editor', actorUserId: 1, note, evidenceRef: 'data_edits:1' },
+    });
+    expect(verdict('x'.repeat(2000)).allowed).toBe(true);
+    expect(verdict(parseCorrectionNote('x'.repeat(2001)) ?? '').allowed).toBe(false);
+  });
+
+  it('no sealed-editor action parses its audit note through a truncating helper', () => {
+    // Fixtures write only the schedule (a declared reference table), so its optional note is not a seal note.
+    const NOT_SEALED = new Set(['fixtures/actions.ts']);
+    // data-editor and player-links reject an over-length note outright before calling the query layer.
+    const REJECTS_OVERLENGTH = new Set(['data-editor/actions.ts', 'player-links/actions.ts']);
+    for (const { file, source } of adminSources()) {
+      if (NOT_SEALED.has(file) || REJECTS_OVERLENGTH.has(file)) continue;
+      // A bare `note` may be a record's own 1000-character field (awards), so only the 2000 cap is the audit note.
+      expect(source, file).not.toMatch(/(optionalText|requiredText)\(\s*formData\.get\('(note|adminNote)'\)\s*,\s*2000\s*\)/);
+    }
+    for (const file of REJECTS_OVERLENGTH) {
+      const source = readFileSync(join(ADMIN_DIR, file), 'utf8');
+      expect(source, file).toContain('Notes are limited to 2000 characters.');
+    }
+  });
+
+  it('every audit-note field of the covered actions goes through parseCorrectionNote (pinned per module)', () => {
+    const PINNED: Record<string, number> = {
+      'awards/actions.ts': 15, 'coaches/actions.ts': 7, 'draft/actions.ts': 9, 'records/actions.ts': 10,
+      'season-lists/actions.ts': 5, 'season-lists/leadership-actions.ts': 6,
+    };
+    for (const [file, expected] of Object.entries(PINNED)) {
+      const source = readFileSync(join(ADMIN_DIR, file), 'utf8');
+      expect(source.match(/parseCorrectionNote\(formData\.get\('(note|adminNote)'\)\)/g) ?? [], file).toHaveLength(expected);
+      // `adminNote` is only ever the audit note, so no read of it may bypass the parser.
+      expect(source, file).not.toMatch(/(?<!parseCorrectionNote\()formData\.get\('adminNote'\)/);
+    }
+  });
+
+  it('no form that carries the correction note uses <form action>, whose automatic reset would wipe a refused edit', () => {
+    // React 19 resets every uncontrolled field when a <form action={fn}> settles, refusal included. A sealed-season
+    // refusal must keep what the administrator typed, so those forms submit through keepFormOnSubmit instead.
+    for (const { file, source } of adminSources()) {
+      if (!/CorrectionNoteField|name="note"/.test(source) || !file.endsWith('.tsx')) continue;
+      expect(source, file).not.toMatch(/<form[^>]*action={/);
+    }
+  });
+
+  it('storedNoteText keeps the open-season stored copy exactly as before: trimmed, cut to 2000, blank is null', () => {
+    expect(storedNoteText(undefined)).toBeNull();
+    expect(storedNoteText('  \n ')).toBeNull();
+    expect(storedNoteText('  kept  ')).toBe('kept');
+    expect(storedNoteText('y'.repeat(2001))).toHaveLength(2000);
+    expect(storedNoteText(` ${'z'.repeat(2500)} `)).toBe('z'.repeat(2000));
+  });
+
+  it('the records that keep the note as their own text store the capped copy, never the raw one', () => {
+    const q = (file: string) => readFileSync(join(__dirname, '..', 'src', 'db', 'queries', file), 'utf8');
+    const leadership = q('admin-club-leadership.ts');
+    expect(leadership).toContain("'active', ${input.startedOn}::date, ${storedNoteText(input.note)},");
+    expect(leadership).toContain('note: storedNoteText(input.note),');
+    const lists = q('admin-season-lists.ts');
+    expect(lists).toContain('${storedNoteText(input.note)})');
+    expect(lists).toContain('note: storedNoteText(input.note),');
+  });
+
+  it('the Brownlow eligibility publication seals the HUMAN note, never its generated default', () => {
+    const q = (file: string) => readFileSync(join(__dirname, '..', 'src', 'db', 'queries', file), 'utf8');
+    const publication = q('brownlow-eligibility.ts');
+    const calls = publication.match(/await recordDataEdit\(native, \{[\s\S]*?\n    \}\);/g) ?? [];
+    expect(calls).toHaveLength(2);
+    for (const call of calls) expect(call).toContain("sealNote: 'sealNote' in request ? request.sealNote : request.note");
+    const admin = q('admin-brownlow.ts');
+    expect(admin).toContain('sealNote: reason,');
+    expect(admin).toContain('sealNote: input.note,');
+  });
+
+  it('the shared parser never slices', () => {
+    const source = readFileSync(join(__dirname, '..', 'src', 'lib', 'seasons', 'correction-note.ts'), 'utf8');
+    const parser = /export function parseCorrectionNote[\s\S]*?\n\}/.exec(source)?.[0] ?? '';
+    expect(parser).toContain('parseCorrectionNote');
+    expect(parser).not.toMatch(/slice|substring|substr|maxLength/);
   });
 });

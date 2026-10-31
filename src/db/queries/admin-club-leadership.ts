@@ -13,6 +13,7 @@ import {
 } from '@/db/queries/admin-season-lists';
 import { recordDataEdit } from '@/db/queries/audit-log';
 import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
+import { storedNoteText } from '@/lib/seasons/correction-note';
 import { FIRST_LEADERSHIP_SEASON } from '@/db/queries/club-leadership';
 import { resolvePlayerIdentity } from '@/db/queries/player-identity';
 
@@ -742,7 +743,7 @@ async function insertAppointment(tx: Tx, input: {
           (appointment_key, season, club_id, player_id, role, status,
            started_on, note, source_id, source_record_id)
     VALUES (${appointmentKey}, ${input.season}::smallint, ${input.club.id}, ${input.player.id},
-            ${input.role}, 'active', ${input.startedOn}::date, ${input.note},
+            ${input.role}, 'active', ${input.startedOn}::date, ${storedNoteText(input.note)},
             ${input.sourceId}, ${appointmentKey})
     RETURNING id::int AS id
   `;
@@ -757,7 +758,7 @@ async function insertAppointment(tx: Tx, input: {
     status: 'active',
     startedOn: input.startedOn,
     endedOn: null,
-    note: input.note,
+    note: storedNoteText(input.note),
     replacesAppointmentKey: input.replacesAppointmentKey,
   });
   await writeLeadershipOverride(tx, payload, input.adminUserId);
